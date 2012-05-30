@@ -40,7 +40,8 @@ int config_init(config* cfg)
   cfg->output = NULL;
   cfg->debug  = NULL;
   cfg->frames = 0;
-  cfg->skip   = 0;
+  cfg->width  = 320;
+  cfg->height = 240;
 
   return 1;
 }
