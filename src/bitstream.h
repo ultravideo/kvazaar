@@ -1,3 +1,10 @@
+/*! \file bitstream.h
+    \brief Bitstream related functions
+    \author Marko Viitanen
+    \date 2012-05
+    
+    This file has all bitstream headers
+*/
 #ifndef _BITSTREAM_H
 #define _BITSTREAM_H
  

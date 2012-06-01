@@ -1,3 +1,11 @@
+/*! \file bitstream.c
+    \brief Bitstream related functions
+    \author Marko Viitanen
+    \date 2012-05
+    
+    This file has all bitstream functions
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -7,21 +15,17 @@
 #include "global.h"
 #include "bitstream.h"
  
- 
+#ifdef VERBOSE
 void printf_bitstream(char *msg, ...)
-{
- 
-va_list fmtargs;
-char buffer[1024];
- 
+{ 
+  va_list fmtargs;
+  char buffer[1024]; 
   va_start(fmtargs,msg);
   vsnprintf(buffer,sizeof(buffer)-1,msg,fmtargs);
   va_end(fmtargs);
-  printf("%s",buffer);
- 
-}
- 
- 
+  printf("%s",buffer); 
+} 
+#endif
 /*
  * Clear bitstream
  */
@@ -46,6 +50,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 {
     uint8_t i=0;
     uint32_t bitsleft=32-stream->cur_bit;
+    #ifdef VERBOSE
     printf_bitstream("put: ");
     for(i=0;i<bits;i++)
     {
@@ -53,6 +58,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
     }
     printf_bitstream("\n");
     //printf_bitstream(" count: %i\n",bits);
+    #endif
  
     //Theres space for all the bits
     if(bits<=bitsleft)

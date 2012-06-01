@@ -40,6 +40,7 @@
  #include <string.h>
  #include "global.h"
  #include "config.h"
+ #include "encoder.h"
  
  
  /*!
@@ -54,6 +55,7 @@
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
     FILE *output = NULL;
+    encoder_control* encoder;
  
     /* Handle configuration */
     cfg = config_alloc();
@@ -77,6 +79,7 @@
     }
     
 	  printf("Input: %s, output: %s\r\n", cfg->input, cfg->output);
+    printf("  Video size: %dx%d\r\n", cfg->width, cfg->height);
 
     /* Open input file and check that it was opened correctly */
     input = fopen(cfg->input, "rb");
