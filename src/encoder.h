@@ -1,3 +1,8 @@
+/**
+ *  HEVC Encoder
+ *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ */
+
 /*! \file encoder.h
     \brief Encoding related functions
     \author Marko Viitanen
@@ -8,10 +13,13 @@
 #ifndef _ENCODER_H
 #define _ENCODER_H
 
+typedef struct encoder_control;
+
 //ToDo: add ME data
 typedef struct
 {
-  void (*IME)(encoder_control* encoder);
+  //void (*IME)(encoder_control* encoder);
+  int range;
  
 } encoder_me;
 

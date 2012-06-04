@@ -1,3 +1,8 @@
+/**
+ *  HEVC Encoder
+ *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ */
+
 /*! \file bitstream.c
     \brief Bitstream related functions
     \author Marko Viitanen

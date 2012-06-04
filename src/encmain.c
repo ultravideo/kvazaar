@@ -41,6 +41,7 @@
  #include "global.h"
  #include "config.h"
  #include "encoder.h"
+ #include "cabac.h"
  
  
  /*!
@@ -55,7 +56,7 @@
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
     FILE *output = NULL;
-    encoder_control* encoder;
+    encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));;
  
     /* Handle configuration */
     cfg = config_alloc();
@@ -77,7 +78,7 @@
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
-    
+
 	  printf("Input: %s, output: %s\r\n", cfg->input, cfg->output);
     printf("  Video size: %dx%d\r\n", cfg->width, cfg->height);
 
@@ -98,6 +99,13 @@
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
+
+    /* Initialization */
+    cabac_init(&cabac);
+    //ToDo: add bitstream
+    //cabac.stream = 
+    init_encoder_control(encoder, output);
+    init_encoder_input(&encoder->in, input, 320, 240);
 
     fclose(input);
     fclose(output);

@@ -14,12 +14,12 @@ typedef struct
     uint32_t data[32];
     uint8_t  cur_byte;
     uint8_t  cur_bit; 
- 
+    FILE*    output;
 } bitstream;
  
 void bitstream_init(bitstream* stream);
  
-void bitstream_put(bitstream* stream, uint32_t* data, uint8_t bits);
+void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
  
 void bitstream_align(bitstream* stream);
  

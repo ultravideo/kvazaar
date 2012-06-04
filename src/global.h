@@ -20,6 +20,9 @@
   #include <stdint.h>
 #endif
 
+#define MAX(a,b) (((a)<(b))?(b):(a))
+#define MIN(a,b) (((a)>(b))?(b):(a))
+
 
 #define VERSION_STRING "0.1               "
 #define VERSION 0.1
