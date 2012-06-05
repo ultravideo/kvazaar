@@ -71,9 +71,8 @@ void bitstream_init(bitstream* stream)
 {
     stream->cur_byte=0;
     stream->cur_bit=0;
-    stream->buffer_pos = 0;
-    memset(stream->data, 0, sizeof(uint32_t)*32);
- 
+    stream->output = 0;
+    memset(stream->data, 0, sizeof(uint32_t)*32); 
 }
 
 /*
@@ -181,13 +180,13 @@ void bitstream_flush(bitstream* stream)
     if(stream->cur_byte)
     {
       memcpy(&stream->buffer[stream->buffer_pos],&stream->data[0],stream->cur_byte*4);
-      stream->buffer_pos = stream->cur_byte*4;
+      stream->buffer_pos += stream->cur_byte*4;
     }
    
    if(stream->cur_bit>>3)
    {
      memcpy(&stream->buffer[stream->buffer_pos],&stream->data[stream->cur_byte],stream->cur_bit>>3);
-     stream->buffer_pos = stream->cur_bit>>3;
+     stream->buffer_pos += stream->cur_bit>>3;
    }    
   }
     //Stream flushed, zero out the values

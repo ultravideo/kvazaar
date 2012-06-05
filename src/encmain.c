@@ -108,6 +108,7 @@
 
     /* Init bitstream */
     bitstream_init(encoder->stream);
+    encoder->stream->buffer_pos = 0;
     bitstream_alloc(encoder->stream, 1024*1024);
 
     /* Config pointer to encoder struct */
