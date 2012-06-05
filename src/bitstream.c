@@ -19,7 +19,9 @@
  
 #include "global.h"
 #include "bitstream.h"
- 
+
+//#define VERBOSE
+
 #ifdef VERBOSE
 void printf_bitstream(char *msg, ...)
 { 
@@ -32,7 +34,7 @@ void printf_bitstream(char *msg, ...)
 } 
 #endif
 
-bitTable *exp_table;
+bitTable *g_exp_table;
 
 //From wikipedia
 //http://en.wikipedia.org/wiki/Binary_logarithm#Algorithm
@@ -52,14 +54,14 @@ void init_exp_golomb(uint32_t len)
     uint32_t code_num;
     uint32_t M;
     uint32_t info;
-    exp_table=(bitTable*)malloc(len*sizeof(bitTable));    
+    g_exp_table=(bitTable*)malloc(len*sizeof(bitTable));    
     
     for(code_num=0;code_num<len;code_num++)
     {
         M=(uint32_t)floorLog2(code_num+1);
         info=code_num+1-(uint32_t)pow(2,M);        
-        exp_table[code_num].len=M*2+1;
-        exp_table[code_num].value=(1<<M)|info;
+        g_exp_table[code_num].len=M*2+1;
+        g_exp_table[code_num].value=(1<<M)|info;
         //printf_cavlc("Len: %i %x\n", M*2+1, (1<<M)|info);
     }
 }
@@ -71,7 +73,6 @@ void bitstream_init(bitstream* stream)
 {
     stream->cur_byte=0;
     stream->cur_bit=0;
-    stream->output = 0;
     memset(stream->data, 0, sizeof(uint32_t)*32); 
 }
 
@@ -97,51 +98,52 @@ void bitstream_alloc(bitstream* stream, uint32_t alloc)
  
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 {
-    uint8_t i=0;
-    uint32_t bitsleft=32-stream->cur_bit;
-    #ifdef VERBOSE
-    printf_bitstream("put: ");
-    for(i=0;i<bits;i++)
-    {
-        printf("%i",(data&(1<<(bits-i-1)))?1:0);
-    }
-    printf_bitstream("\n");
-    //printf_bitstream(" count: %i\n",bits);
-    #endif
+  uint32_t bitsleft=32-stream->cur_bit;
+  #ifdef VERBOSE
+  uint8_t i=0;
+  printf_bitstream("put: ");
+  for(i=0;i<bits;i++)
+  {
+      printf("%i",(data&(1<<(bits-i-1)))?1:0);
+  }
+  printf_bitstream("\n");
+  //printf_bitstream(" count: %i\n",bits);
+  #endif
  
-    //Theres space for all the bits
-    if(bits<=bitsleft)
-    {
-        stream->data[stream->cur_byte] |= (data<<((bitsleft-bits)));
-        stream->cur_bit+=bits;
-        bits=0;
-    }
-    //No space for everything, store the bits we can and continue later
-    else
-    {
-        stream->data[stream->cur_byte] |= (data>>(bits-bitsleft));
-        stream->cur_bit=32;
-        bits-=bitsleft;        
-    }
+  //Theres space for all the bits
+  if(bits<=bitsleft)
+  {
+    stream->data[stream->cur_byte] |= (data<<((bitsleft-bits)));
+    stream->cur_bit+=bits;
+    bits=0;
+  }
+  //No space for everything, store the bits we can and continue later
+  else
+  {
+    stream->data[stream->cur_byte] |= (data>>(bits-bitsleft));
+    stream->cur_bit=32;
+    bits-=bitsleft;
+  }
  
-    //Check if the buffer is full
-    if(stream->cur_bit==32)
+  //Check if the buffer is full
+  if(stream->cur_bit==32)
+  {
+    bitsleft=32;
+    stream->cur_byte++;
+    stream->cur_bit = 0;
+    if(stream->cur_byte==32)
     {
-        stream->cur_byte++;
-        bitsleft=32;
-        if(stream->cur_byte==32)
-        {
-            //Flush data out
-            bitstream_flush(stream);
-        }
+        //Flush data out
+        bitstream_flush(stream);
     }
+  }
  
-    //..still some writing to do
-    if(bits!=0)
-    {
-        stream->data[stream->cur_byte] |= (data<<(bitsleft-bits));
-        stream->cur_bit+=bits;
-    }
+  //..still some writing to do
+  if(bits!=0)
+  {
+    stream->data[stream->cur_byte] |= (data<<(bitsleft-bits));
+    stream->cur_bit+=bits;
+  }
  
  
  
@@ -152,7 +154,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
  */
 void bitstream_align(bitstream* stream)
 {  
-  if(stream->cur_bit&7 != 0)
+  if((stream->cur_bit&7) != 0)
   {
     bitstream_put(stream,0, 8-stream->cur_bit&7);
   }
@@ -163,11 +165,12 @@ void bitstream_flush(bitstream* stream)
    /*
     *  SAVE DATA TO OUTPUT
     */
+  int i,j;
   if(stream->output)
   {
     if(stream->cur_byte)
     {
-      fwrite(stream->data, stream->cur_byte*4, 1, stream->output);
+      fwrite(&stream->data[0], stream->cur_byte*4, 1, stream->output);
     }
    
     if(stream->cur_bit>>3)
@@ -175,19 +178,27 @@ void bitstream_flush(bitstream* stream)
       fwrite(&stream->data[stream->cur_byte], stream->cur_bit>>3, 1, stream->output);
     }
   }
+  /* No file open, write to buffer */   
   else
   {
     if(stream->cur_byte)
     {
-      memcpy(&stream->buffer[stream->buffer_pos],&stream->data[0],stream->cur_byte*4);
+      //memcpy((uint8_t*)&stream->buffer[stream->buffer_pos],(uint8_t*)stream->data,stream->cur_byte*4);
+      
+      for(i = 0,j=3; i < stream->cur_byte*4; i++,j--)
+      {
+        if(j == -1) j = 3;
+        stream->buffer[stream->buffer_pos+i] = ((uint8_t*)stream->data)[((i>>2)<<2)+j];
+      }
+      
       stream->buffer_pos += stream->cur_byte*4;
     }
    
-   if(stream->cur_bit>>3)
-   {
-     memcpy(&stream->buffer[stream->buffer_pos],&stream->data[stream->cur_byte],stream->cur_bit>>3);
-     stream->buffer_pos += stream->cur_bit>>3;
-   }    
+    if(stream->cur_bit>>3)
+    {
+      memcpy((uint8_t*)&stream->buffer[stream->buffer_pos],(uint8_t*)&stream->data[stream->cur_byte],stream->cur_bit>>3);
+      stream->buffer_pos += stream->cur_bit>>3;
+    }    
   }
     //Stream flushed, zero out the values
     bitstream_init(stream);

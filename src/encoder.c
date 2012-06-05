@@ -56,7 +56,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 0);
-    
+
   }
 
 }

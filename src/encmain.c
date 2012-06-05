@@ -80,14 +80,14 @@
       return EXIT_FAILURE;
     }
 
-	  printf("Input: %s, output: %s\r\n", cfg->input, cfg->output);
-    printf("  Video size: %dx%d\r\n", cfg->width, cfg->height);
+	  printf("Input: %s, output: %s\n", cfg->input, cfg->output);
+    printf("  Video size: %dx%d\n", cfg->width, cfg->height);
 
     /* Open input file and check that it was opened correctly */
     input = fopen(cfg->input, "rb");
     if(input == NULL)
     {
-      fprintf(stderr, "Could not open input file, shutting down!\r\n");
+      fprintf(stderr, "Could not open input file, shutting down!\n");
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
@@ -96,7 +96,7 @@
     output = fopen(cfg->output, "wb");
     if(output == NULL)
     {
-      fprintf(stderr, "Could not open output file, shutting down!\r\n");
+      fprintf(stderr, "Could not open output file, shutting down!\n");
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
@@ -109,6 +109,7 @@
     /* Init bitstream */
     bitstream_init(encoder->stream);
     encoder->stream->buffer_pos = 0;
+    encoder->stream->output = 0;
     bitstream_alloc(encoder->stream, 1024*1024);
 
     /* Config pointer to encoder struct */
@@ -134,7 +135,7 @@
     }
     /* Coding finished */
 
-
+    printf(" Processed %d frames\n", encoder->frame-1);
 
     fclose(input);
     fclose(output);

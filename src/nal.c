@@ -62,7 +62,7 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
     fwrite(&buffer[i], 1, 1, output);
   }
   //If last byte was 0, add emulation_prevention_three_byte
-  if(buffer[buffer_len-1] == 0)
-    fwrite(&emulation_prevention_three_byte, 1, 1, output);
+  //if(buffer[buffer_len-1] == 0)
+  //  fwrite(&emulation_prevention_three_byte, 1, 1, output);
 
 }
