@@ -83,6 +83,7 @@
     <ClCompile Include="..\..\src\config.c" />
     <ClCompile Include="..\..\src\encmain.c" />
     <ClCompile Include="..\..\src\encoder.c" />
+    <ClCompile Include="..\..\src\picture.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h" />
@@ -90,6 +91,7 @@
     <ClInclude Include="..\..\src\config.h" />
     <ClInclude Include="..\..\src\encoder.h" />
     <ClInclude Include="..\..\src\global.h" />
+    <ClInclude Include="..\..\src\picture.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

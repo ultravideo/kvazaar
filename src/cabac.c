@@ -122,8 +122,7 @@ void cabac_start(cabac_data* data)
   data->bufferedByte     = 0xff;
 }
 
-#define CTX_STATE(ctx) (ctx.ucState>>1)
-#define CTX_MPS(ctx) (ctx.ucState&1)
+
 
 void cabac_encodeBin(cabac_data* data, uint32_t binValue )
 {
@@ -193,8 +192,8 @@ void cabac_write(cabac_data* data)
     {
       data->numBufferedBytes = 1;
       data->bufferedByte = leadByte;
-    }      
-  }    
+    }
+  }
 }
 
 void cabac_encodeFlush(cabac_data* data, uint8_t end )
@@ -239,7 +238,7 @@ void cabac_finish(cabac_data* data)
     {
       bitstream_put(data->stream, 0xff, 8 );
       data->numBufferedBytes--;
-    }    
+    }
   }
   bitstream_put(data->stream, data->uiLow >> 8, 24 - data->bitsLeft );
 }
@@ -268,7 +267,7 @@ void cabac_encodeBinTrm(cabac_data* data, uint32_t binValue )
   {
     data->uiLow   <<= 1;
     data->uiRange <<= 1;
-    data->bitsLeft--;    
+    data->bitsLeft--;
   }
   
   if(data->bitsLeft < 12)
@@ -310,7 +309,7 @@ void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins )
   while ( numBins > 8 )
   {
     numBins -= 8;
-    pattern = binValues >> numBins; 
+    pattern = binValues >> numBins;
     data->uiLow <<= 8;
     data->uiLow += data->uiRange * pattern;
     binValues -= pattern << numBins;

@@ -31,6 +31,39 @@ void printf_bitstream(char *msg, ...)
   printf("%s",buffer); 
 } 
 #endif
+
+bitTable *exp_table;
+
+//From wikipedia
+//http://en.wikipedia.org/wiki/Binary_logarithm#Algorithm
+int floorLog2(unsigned int n) {
+  int pos = 0;
+  if (n >= 1<<16) { n >>= 16; pos += 16; }
+  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
+  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
+  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
+  if (n >= 1<< 1) {           pos +=  1; }
+  return ((n == 0) ? (-1) : pos);  
+}
+
+//Initialize the Exp Golomb code table with desired number of values
+void init_exp_golomb(uint32_t len)
+{
+    uint32_t code_num;
+    uint32_t M;
+    uint32_t info;
+    exp_table=(bitTable*)malloc(len*sizeof(bitTable));    
+    
+    for(code_num=0;code_num<len;code_num++)
+    {
+        M=(uint32_t)floorLog2(code_num+1);
+        info=code_num+1-(uint32_t)pow(2,M);        
+        exp_table[code_num].len=M*2+1;
+        exp_table[code_num].value=(1<<M)|info;
+        //printf_cavlc("Len: %i %x\n", M*2+1, (1<<M)|info);
+    }
+}
+
 /*
  * Clear bitstream
  */
@@ -38,8 +71,20 @@ void bitstream_init(bitstream* stream)
 {
     stream->cur_byte=0;
     stream->cur_bit=0;
+    stream->buffer_pos = 0;
     memset(stream->data, 0, sizeof(uint32_t)*32);
  
+}
+
+/*
+ *  Allocate buffer
+ */
+void bitstream_alloc(bitstream* stream, uint32_t alloc)
+{
+  stream->buffer = (uint8_t*)malloc(alloc);
+  //Clear just to be sure
+  memset(stream->buffer,0,alloc);
+  stream->buffer_pos = 0;
 }
  
  
@@ -108,25 +153,55 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
  */
 void bitstream_align(bitstream* stream)
 {  
-    if(stream->cur_byte==32)
-    {
-        //Stream flushed, zero out the values
-        bitstream_init(stream);
-    }
-    else
-    {
-        stream->cur_byte++;
-    }
+  if(stream->cur_bit&7 != 0)
+  {
+    bitstream_put(stream,0, 8-stream->cur_bit&7);
+  }
 }
  
 void bitstream_flush(bitstream* stream)
 {
+   /*
+    *  SAVE DATA TO OUTPUT
+    */
+  if(stream->output)
+  {
+    if(stream->cur_byte)
+    {
+      fwrite(stream->data, stream->cur_byte*4, 1, stream->output);
+    }
    
-    /*
-     *  SAVE DATA TO OUTPUT
-     */
- 
+    if(stream->cur_bit>>3)
+    {
+      fwrite(&stream->data[stream->cur_byte], stream->cur_bit>>3, 1, stream->output);
+    }
+  }
+  else
+  {
+    if(stream->cur_byte)
+    {
+      memcpy(&stream->buffer[stream->buffer_pos],&stream->data[0],stream->cur_byte*4);
+      stream->buffer_pos = stream->cur_byte*4;
+    }
+   
+   if(stream->cur_bit>>3)
+   {
+     memcpy(&stream->buffer[stream->buffer_pos],&stream->data[stream->cur_byte],stream->cur_bit>>3);
+     stream->buffer_pos = stream->cur_bit>>3;
+   }    
+  }
     //Stream flushed, zero out the values
     bitstream_init(stream);
 }
- 
+
+/*
+void bitstream_put_ue(bitstream* stream, uint32_t data)
+{
+    bitstream_put(stream,exp_table[data].value,exp_table[data].len);
+}
+void bitstream_put_se(bitstream* stream, uint32_t data)
+{
+    uint32_t index=(data<=0)?2*(uint32_t)(-data):2*(uint32_t)(data)-1;    
+    bitstream_put(stream,exp_table[index].value,exp_table[index].len);
+}
+*/

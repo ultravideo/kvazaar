@@ -19,12 +19,12 @@
 */
 typedef struct
 {
-  char *input; /*!< \brief Pointer to input filename  */
-  char *output;/*!< \brief Pointer to output filename */
-  char *debug; /*!< \brief Pointer to debug output    */
-  int frames;  /*!< \brief Number of frames to decode */
-  int width;   /*!< \brief frame width */
-  int height;  /*!< \brief frame height */
+  char *input;      /*!< \brief Pointer to input filename  */
+  char *output;     /*!< \brief Pointer to output filename */
+  char *debug;      /*!< \brief Pointer to debug output    */
+  uint32_t frames;  /*!< \brief Number of frames to decode */
+  uint32_t width;   /*!< \brief frame width */
+  uint32_t height;  /*!< \brief frame height */
 } config;
 
 /* Function definitions */

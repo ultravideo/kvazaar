@@ -30,6 +30,8 @@ typedef struct
   uint8_t  ucState;
   uint32_t binsCoded;
 } cabac_ctx;
+#define CTX_STATE(ctx) (ctx.ucState>>1)
+#define CTX_MPS(ctx) (ctx.ucState&1)
 
 void cxt_init(cabac_ctx* ctx,uint32_t qp, uint32_t initValue );
 void cxt_buildNextStateTable();

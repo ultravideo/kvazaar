@@ -42,6 +42,7 @@
  #include "config.h"
  #include "encoder.h"
  #include "cabac.h"
+ #include "picture.h"
  
  
  /*!
@@ -52,7 +53,7 @@
  */
   int main(int argc, char* argv[])
   {
-
+    uint32_t curFrame = 0;
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
     FILE *output = NULL;
@@ -64,10 +65,10 @@
     /* If problem with configuration, shutdown */
     if(!config_init(cfg) || !config_read(cfg,argc,argv))
     {
-      fprintf(stderr, "/////////////////////////////////////////////////\r\n");
-      fprintf(stderr, "//           HEVC Encoder v. " VERSION_STRING "//\r\n");
-      fprintf(stderr, "//      Tampere University of Technology  2012 //\r\n");
-      fprintf(stderr, "/////////////////////////////////////////////////\r\n\r\n");
+      fprintf(stderr, "/***********************************************/\r\n");
+      fprintf(stderr, " *           HEVC Encoder v. " VERSION_STRING "*\r\n");
+      fprintf(stderr, " *     Tampere University of Technology  2012  *\r\n");
+      fprintf(stderr, "/***********************************************/\r\n\r\n");
       
       fprintf(stderr, "Usage:\r\n");
       fprintf(stderr, "encmain -i <input> -w <width> -h <height> -o <output>\r\n");
@@ -86,7 +87,7 @@
     input = fopen(cfg->input, "rb");
     if(input == NULL)
     {
-      fprintf(stderr, "Couldn't open input file!\r\n");
+      fprintf(stderr, "Could not open input file, shutting down!\r\n");
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
@@ -95,17 +96,44 @@
     output = fopen(cfg->output, "wb");
     if(output == NULL)
     {
-      fprintf(stderr, "Couldn't open output file!\r\n");
+      fprintf(stderr, "Could not open output file, shutting down!\r\n");
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
 
     /* Initialization */
+    init_exp_golomb(4096*8);
     cabac_init(&cabac);
-    //ToDo: add bitstream
-    //cabac.stream = 
-    init_encoder_control(encoder, output);
-    init_encoder_input(&encoder->in, input, 320, 240);
+    init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream)));
+
+    /* Init bitstream */
+    bitstream_init(encoder->stream);
+    bitstream_alloc(encoder->stream, 1024*1024);
+
+    /* Config pointer to encoder struct */
+    encoder->cfg = cfg;
+    /* Set output file */
+    encoder->output = output;
+    /* Set CABAC output bitstream */
+    cabac.stream = encoder->stream;
+
+    /* input init */
+    encoder->frame = 0;
+    init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
+
+    /* Start coding cycle */
+    while(!feof(input) && (!cfg->frames || curFrame < cfg->frames))
+    {      
+      /* Read one frame from the input */
+      fread(encoder->in.cur_pic.yData, cfg->width*cfg->height,1,input);
+      fread(encoder->in.cur_pic.uData, cfg->width*cfg->height/4,1,input);
+      fread(encoder->in.cur_pic.vData, cfg->width*cfg->height/4,1,input);
+      encode_one_frame(encoder);
+      encoder->frame++;
+    }
+    /* Coding finished */
+
+
 
     fclose(input);
     fclose(output);

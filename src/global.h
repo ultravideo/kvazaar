@@ -23,6 +23,7 @@
 #define MAX(a,b) (((a)<(b))?(b):(a))
 #define MIN(a,b) (((a)>(b))?(b):(a))
 
+#define LCU 64 /*!< Largest Coding Unit */
 
 #define VERSION_STRING "0.1               "
 #define VERSION 0.1

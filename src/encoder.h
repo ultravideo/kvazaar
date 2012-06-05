@@ -13,34 +13,44 @@
 #ifndef _ENCODER_H
 #define _ENCODER_H
 
+#include "bitstream.h"
+#include "picture.h"
+
 typedef struct encoder_control;
 
 //ToDo: add ME data
 typedef struct
 {
-  //void (*IME)(encoder_control* encoder);
+  void (*IME)();
+  void (*FME)();
   int range;
  
 } encoder_me;
 
-
+/* Input info struct */
 typedef struct
 {
   FILE* file;
   uint32_t width;
   uint32_t height;
   uint32_t height_in_LCU;
-  uint32_t width_in_LCU; 
+  uint32_t width_in_LCU;
+  picture cur_pic;
 } encoder_input;
 
 typedef struct
 {
+  uint32_t frame;
+  config *cfg;
   encoder_input in;
   encoder_me me;
-  FILE* output; 
+  bitstream* stream;
+  FILE *output;
+  picture_list *ref;
 } encoder_control;
 
-init_encoder_control(encoder_control* control,FILE* output) {control->output = output;};
-init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height) {input->file = inputfile; input->width = width; input->height = height;};
+void init_encoder_control(encoder_control* control,bitstream* output);
+void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height);
+void encode_one_frame(encoder_control* encoder);
 
 #endif

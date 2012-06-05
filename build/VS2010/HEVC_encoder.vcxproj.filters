@@ -30,6 +30,9 @@
     <ClCompile Include="..\..\src\cabac.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\picture.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -45,6 +48,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\cabac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\picture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
