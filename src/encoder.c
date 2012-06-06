@@ -51,14 +51,20 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 0);
-        
     bitstream_clear_buffer(encoder->stream);
 
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 0);
+    bitstream_clear_buffer(encoder->stream);
 
+    encode_slice_header(encoder);
+    encode_slice_data(encoder);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+    bitstream_clear_buffer(encoder->stream);
   }
 
 }
@@ -70,39 +76,28 @@ void encode_pic_parameter_set(encoder_control* encoder)
 #endif
   WRITE_UE(encoder->stream, 0, "pic_parameter_set_id");
   WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
-
   WRITE_U(encoder->stream, 0, 1, "sign_data_hiding_flag");
   WRITE_U(encoder->stream, 0, 1, "cabac_init_present_flag");
-
   WRITE_U(encoder->stream, 0, 3, "num_ref_idx_l0_default_active_minus1");
   WRITE_U(encoder->stream, 0, 3, "num_ref_idx_l1_default_active_minus1");
   /*
+  //Should be this
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
   */
   WRITE_SE(encoder->stream, 0, "pic_init_qp_minus26");
-
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(encoder->stream, 0, 1, "enable_temporal_mvp_flag");
-
   WRITE_U(encoder->stream, 0, 2, "slice_granularity");
-
   WRITE_UE(encoder->stream, 0, "max_cu_qp_delta_depth");
-
   WRITE_SE(encoder->stream, 0, "cb_qp_offset");
   WRITE_SE(encoder->stream, 0, "cr_qp_offset");
-
   WRITE_U(encoder->stream, 0, 1, "weighted_pred_flag");
-  WRITE_U(encoder->stream, 0, 2, "weighted_bipred_idc");
-  
-  WRITE_U(encoder->stream, 1, 1, "output_flag_present_flag");
-  
+  WRITE_U(encoder->stream, 0, 2, "weighted_bipred_idc");  
+  WRITE_U(encoder->stream, 1, 1, "output_flag_present_flag");  
   WRITE_U(encoder->stream, 0, 1, "deblocking_filter_control_present_flag");
-
   WRITE_UE(encoder->stream, 0, "log2_parallel_merge_level_minus2");
-
-  WRITE_U(encoder->stream, 0, 1, "pps_extension_flag"); 
-  
+  WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");  
 }
 
 void encode_seq_parameter_set(encoder_control* encoder)
@@ -119,53 +114,79 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
   WRITE_U(encoder->stream, 0, 1, "pic_cropping_flag");
-
   WRITE_UE(encoder->stream, 0, "bit_depth_luma_minus8");
   WRITE_UE(encoder->stream, 0, "bit_depth_chroma_minus8");
-
   WRITE_U(encoder->stream, 0, 1, "pcm_enabled_flag");
-
   WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");
-
   WRITE_UE(encoder->stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
-
   WRITE_UE(encoder->stream, 0, "max_dec_pic_buffering");
   WRITE_UE(encoder->stream, 0, "num_reorder_pics");
   WRITE_UE(encoder->stream, 0, "max_latency_increase");
-
   WRITE_U(encoder->stream, 0, 1, "restricted_ref_pic_lists_flag");
-
   WRITE_UE(encoder->stream, 0, "log2_min_coding_block_size_minus3");
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_coding_block_size");
   WRITE_UE(encoder->stream, 0, "log2_min_transform_block_size_minus2");
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size");
 
-  WRITE_U(encoder->stream, 0, 1, "unknown_flag");
+  //If log2MinCUSize == 3
+  WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
+
+  /* //IF PCM
+  {
+    WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
+    WRITE_UE(encoder->stream, 0, "log2_diff_max_min_pcm_coding_block_size");
+  }
+  */
 
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
-  WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
-  
+  WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");  
   WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "chroma_pred_from_luma_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
-
   WRITE_U(encoder->stream, 0, 1, "deblocking_filter_in_aps_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "seq_loop_filter_across_slices_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "asymmetric_motion_partitions_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "nsrqt_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
-	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
-	
-  WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");
-	
-  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");
-	
-  WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
-	
-  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");
-	
-	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
-  
+	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");	
+  WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");	
+  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");	
+  WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");	
+  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");	
+	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");  
+}
+
+void encode_slice_header(encoder_control* encoder)
+{
+
+  WRITE_U(encoder->stream, 1, 1, "first_slice_in_pic_flag");
+  WRITE_UE(encoder->stream, SLICE_I, "slice_type");
+
+  WRITE_U(encoder->stream, 0, 1, "entropy_slice_flag");
+  // if !entropy_slice_flag
+    WRITE_UE(encoder->stream, 0, "pic_parameter_set_id");
+    //if output_flag_present_flag
+      WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
+    //end if
+    //if( IdrPicFlag ) <- nal_unit_type == 5
+      WRITE_UE(encoder->stream, encoder->frame&1, "idr_pic_id");
+      WRITE_U(encoder->stream, 0, 1, "no_output_of_prior_pics_flag");
+    //else
+      /*
+
+
+      */
+    //end if
+  //end if
+  /*
+   Skip unpresent flags */
+  // if !entropy_slice_flag
+  WRITE_UE(encoder->stream, 0, "slice_qp_delta");
 }
   
+
+void encode_slice_data(encoder_control* encoder)
+{
+  uint16_t xCtb,yCtb;
+}
 

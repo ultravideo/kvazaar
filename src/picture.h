@@ -52,6 +52,9 @@ int picture_list_destroy(picture_list *list);
 int picture_destroy(picture *pic);
 
 
+enum { SLICE_P = 0, SLICE_B = 1, SLICE_I = 2 };
+
+
   /** @} */ // end of group1
 
 #endif
