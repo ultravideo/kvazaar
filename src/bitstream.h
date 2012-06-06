@@ -17,6 +17,7 @@ typedef struct
     FILE*    output;
     uint8_t* buffer;
     uint32_t buffer_pos;
+    uint32_t bufferlen;
 } bitstream;
 
 typedef struct
@@ -29,7 +30,8 @@ extern bitTable *g_exp_table;
 
 int floorLog2(unsigned int n);
  
-void bitstream_alloc(bitstream* stream, uint32_t alloc); 
+void bitstream_alloc(bitstream* stream, uint32_t alloc);
+void bitstream_clear_buffer(bitstream* stream);
 void bitstream_init(bitstream* stream); 
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits); 
 /*

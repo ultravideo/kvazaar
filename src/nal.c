@@ -27,10 +27,10 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   uint8_t byte;
   uint32_t i;
   uint8_t zerocount=0;
-  uint8_t emulation_prevention_three_byte = 0x03;
-  uint8_t start_code_prefix_one_3bytes = 0x01;
-  uint8_t zero = 0x00;
-  
+  const uint8_t emulation_prevention_three_byte = 0x03;
+  const uint8_t start_code_prefix_one_3bytes = 0x01;
+  const uint8_t zero = 0x00;
+
   //start_code_prefix_one_3bytes
   fwrite(&zero, 1, 1, output);
   fwrite(&zero, 1, 1, output);
@@ -59,10 +59,12 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
     else
       zerocount = 0;
 
+    /* Write the actual data */
     fwrite(&buffer[i], 1, 1, output);
   }
+
   //If last byte was 0, add emulation_prevention_three_byte
-  //if(buffer[buffer_len-1] == 0)
-  //  fwrite(&emulation_prevention_three_byte, 1, 1, output);
+  if(buffer[buffer_len-1] == 0)
+    fwrite(&emulation_prevention_three_byte, 1, 1, output);
 
 }

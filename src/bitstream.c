@@ -88,8 +88,14 @@ void bitstream_init(bitstream* stream)
 void bitstream_alloc(bitstream* stream, uint32_t alloc)
 {
   stream->buffer = (uint8_t*)malloc(alloc);
+  stream->bufferlen = alloc;
   //Clear just to be sure
-  memset(stream->buffer,0,alloc);
+  bitstream_clear_buffer(stream);
+}
+
+void bitstream_clear_buffer(bitstream* stream)
+{
+  memset(stream->buffer,0,stream->bufferlen);
   stream->buffer_pos = 0;
 }
  
@@ -139,8 +145,6 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
     stream->cur_bit = 0;
     if(stream->cur_byte==32)
     {
-        //We only have bytes 0..31
-        stream->cur_byte--;
         //Flush data out
         bitstream_flush(stream);
     }
@@ -151,10 +155,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
   {
     stream->data[stream->cur_byte] |= (data<<(bitsleft-bits));
     stream->cur_bit+=bits;
-  }
- 
- 
- 
+  } 
 }
  
 /*
@@ -193,7 +194,7 @@ void bitstream_flush(bitstream* stream)
     if(stream->cur_byte)
     {
       /* Handle endianness issue */
-      for(i = 0; i < stream->cur_byte+1; i++)
+      for(i = 0; i < stream->cur_byte; i++)
       {
         /* "network" is big-endian */
         correct_endian = htonl(stream->data[i]);

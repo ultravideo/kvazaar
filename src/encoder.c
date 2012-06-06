@@ -51,6 +51,8 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 0);
+        
+    bitstream_clear_buffer(encoder->stream);
 
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
@@ -72,8 +74,12 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "sign_data_hiding_flag");
   WRITE_U(encoder->stream, 0, 1, "cabac_init_present_flag");
 
+  WRITE_U(encoder->stream, 0, 3, "num_ref_idx_l0_default_active_minus1");
+  WRITE_U(encoder->stream, 0, 3, "num_ref_idx_l1_default_active_minus1");
+  /*
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
+  */
   WRITE_SE(encoder->stream, 0, "pic_init_qp_minus26");
 
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
@@ -119,7 +125,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
 
   WRITE_U(encoder->stream, 0, 1, "pcm_enabled_flag");
 
-  WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");   
+  WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");
 
   WRITE_UE(encoder->stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
 
@@ -134,14 +140,14 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "log2_min_transform_block_size_minus2");
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size");
 
+  WRITE_U(encoder->stream, 0, 1, "unknown_flag");
+
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
-
-
+  
   WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "chroma_pred_from_luma_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
-	
 
   WRITE_U(encoder->stream, 0, 1, "deblocking_filter_in_aps_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "seq_loop_filter_across_slices_enabled_flag");
