@@ -17,9 +17,12 @@
 #include <string.h>
 #include "global.h"
 #include "config.h"
-#include "encoder.h"
-#include "cabac.h"
+#include "bitstream.h"
 #include "picture.h"
+#include "cabac.h"
+#include "encoder.h"
+
+
 #include "nal.h"
 
 void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id)
@@ -32,7 +35,7 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   const uint8_t zero = 0x00;
 
   //start_code_prefix_one_3bytes
-  fwrite(&zero, 1, 1, output);
+  //fwrite(&zero, 1, 1, output);
   fwrite(&zero, 1, 1, output);
   fwrite(&zero, 1, 1, output);
   fwrite(&start_code_prefix_one_3bytes, 1, 1, output);

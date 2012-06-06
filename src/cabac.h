@@ -13,10 +13,6 @@
 #ifndef __CABAC_H
 #define __CABAC_H
 
-#include "bitstream.h"
-
-
-
 extern const uint8_t g_aucNextStateMPS[ 128 ];
 extern const uint8_t g_aucNextStateLPS[ 128 ];
 extern const uint32_t g_entropyBits[128];
@@ -30,6 +26,7 @@ typedef struct
   uint8_t  ucState;
   uint32_t binsCoded;
 } cabac_ctx;
+
 #define CTX_STATE(ctx) (ctx.ucState>>1)
 #define CTX_MPS(ctx) (ctx.ucState&1)
 

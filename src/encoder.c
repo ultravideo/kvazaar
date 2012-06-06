@@ -32,6 +32,13 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->width = width;
   input->height = height;
 
+  input->height_in_LCU = height / LCU_WIDTH;
+  input->width_in_LCU =  width / LCU_WIDTH;
+  if(input->height_in_LCU * LCU_WIDTH < height)
+    input->height_in_LCU++;
+  if(input->width_in_LCU * LCU_WIDTH < width)
+    input->width_in_LCU++;
+
   input->cur_pic.width = width;
   input->cur_pic.height = height;
   input->cur_pic.referenced = 0;
@@ -59,8 +66,20 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
 
+
     encode_slice_header(encoder);
     encode_slice_data(encoder);
+    cabac_flush(&cabac);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+    bitstream_clear_buffer(encoder->stream);
+  }
+  else
+  {
+    encode_slice_header(encoder);
+    encode_slice_data(encoder);
+    cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
@@ -116,7 +135,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "pic_cropping_flag");
   WRITE_UE(encoder->stream, 0, "bit_depth_luma_minus8");
   WRITE_UE(encoder->stream, 0, "bit_depth_chroma_minus8");
-  WRITE_U(encoder->stream, 0, 1, "pcm_enabled_flag");
+  WRITE_U(encoder->stream, 1, 1, "pcm_enabled_flag");
+  WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_luma_minus1");
+  WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_chroma_minus1");
   WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");
   WRITE_UE(encoder->stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_UE(encoder->stream, 0, "max_dec_pic_buffering");
@@ -131,15 +152,16 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //If log2MinCUSize == 3
   WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
 
-  /* //IF PCM
+  //IF PCM
   {
     WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
     WRITE_UE(encoder->stream, 0, "log2_diff_max_min_pcm_coding_block_size");
   }
-  */
+  
 
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
-  WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");  
+  WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
+
   WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "chroma_pred_from_luma_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
@@ -148,7 +170,10 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "asymmetric_motion_partitions_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "nsrqt_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
-	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");	
+	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
+  //IF PCM
+    WRITE_U(encoder->stream, 0, 1, "pcm_loop_filter_disable_flag");
+  //endif
   WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");	
   WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");	
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");	
@@ -158,6 +183,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
 
 void encode_slice_header(encoder_control* encoder)
 {
+#ifdef _DEBUG
+  printf("=========== Slice ===========\n");
+#endif
 
   WRITE_U(encoder->stream, 1, 1, "first_slice_in_pic_flag");
   WRITE_UE(encoder->stream, SLICE_I, "slice_type");
@@ -181,12 +209,45 @@ void encode_slice_header(encoder_control* encoder)
   /*
    Skip unpresent flags */
   // if !entropy_slice_flag
-  WRITE_UE(encoder->stream, 0, "slice_qp_delta");
+    WRITE_UE(encoder->stream, 0, "slice_qp_delta");
+    WRITE_UE(encoder->stream, 0, "5_minus_max_num_merge_cand");
 }
   
+cabac_ctx SplitFlagSCModel;
 
 void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb;
+  cxt_init(&SplitFlagSCModel, 26, 0);
+  cxt_init(&cabac.ctx, 26, 0);
+  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  {
+    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    {
+      uint8_t depth = 0;
+      encode_coding_tree(encoder, xCtb,yCtb, depth);
+    }
+  }
+}
+
+void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
+{
+  
+  //Split flag
+  cabac_encodeBin(&cabac, 5);
+
+  /* coding_unit( x0, y0, log2CbSize ) */
+   /* prediction_unit 2Nx2N*/
+   //If MODE_INTRA
+    
+   //endif
+   
+   /* end prediction unit */  
+   cabac_encodeBin(&cabac, 0); //prev_intra_luma_pred_flag
+
+   cabac_encodeBin(&cabac, 1); //rem_intra_luma_pred_mode
+
+  /* end coding_unit */
+  
 }
 

@@ -13,8 +13,8 @@
 #ifndef _ENCODER_H
 #define _ENCODER_H
 
-#include "bitstream.h"
 #include "picture.h"
+#include "bitstream.h"
 
 typedef struct encoder_control;
 
@@ -58,5 +58,6 @@ void encode_seq_parameter_set(encoder_control* encoder);
 void encode_pic_parameter_set(encoder_control* encoder);
 void encode_slice_data(encoder_control* encoder);
 void encode_slice_header(encoder_control* encoder);
+void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 
 #endif
