@@ -16,6 +16,12 @@
 #include <math.h>
 #include <string.h>
 #include <stdarg.h>
+/* for hton */
+#ifdef WIN32
+#include <Winsock2.h>
+#else
+#include <net/hton.h>
+#endif
  
 #include "global.h"
 #include "bitstream.h"
@@ -133,6 +139,8 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
     stream->cur_bit = 0;
     if(stream->cur_byte==32)
     {
+        //We only have bytes 0..31
+        stream->cur_byte--;
         //Flush data out
         bitstream_flush(stream);
     }
@@ -166,6 +174,7 @@ void bitstream_flush(bitstream* stream)
     *  SAVE DATA TO OUTPUT
     */
   int i,j;
+  uint32_t correct_endian;
   if(stream->output)
   {
     if(stream->cur_byte)
@@ -183,25 +192,25 @@ void bitstream_flush(bitstream* stream)
   {
     if(stream->cur_byte)
     {
-      //memcpy((uint8_t*)&stream->buffer[stream->buffer_pos],(uint8_t*)stream->data,stream->cur_byte*4);
-      
-      for(i = 0,j=3; i < stream->cur_byte*4; i++,j--)
+      /* Handle endianness issue */
+      for(i = 0; i < stream->cur_byte+1; i++)
       {
-        if(j == -1) j = 3;
-        stream->buffer[stream->buffer_pos+i] = ((uint8_t*)stream->data)[((i>>2)<<2)+j];
+        /* "network" is big-endian */
+        correct_endian = htonl(stream->data[i]);
+        memcpy((uint8_t*)&stream->buffer[stream->buffer_pos],&correct_endian,4);
+        stream->buffer_pos += 4;
       }
-      
-      stream->buffer_pos += stream->cur_byte*4;
     }
    
     if(stream->cur_bit>>3)
     {
-      memcpy((uint8_t*)&stream->buffer[stream->buffer_pos],(uint8_t*)&stream->data[stream->cur_byte],stream->cur_bit>>3);
+      correct_endian = htonl(stream->data[stream->cur_byte]);
+      memcpy((uint8_t*)&stream->buffer[stream->buffer_pos],&correct_endian,stream->cur_bit>>3);
       stream->buffer_pos += stream->cur_bit>>3;
-    }    
+    }
   }
-    //Stream flushed, zero out the values
-    bitstream_init(stream);
+  //Stream flushed, zero out the values
+  bitstream_init(stream);
 }
 
 /*
