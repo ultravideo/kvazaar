@@ -47,6 +47,7 @@ typedef struct
   bitstream* stream;
   FILE *output;
   picture_list *ref;
+  uint8_t QP;
 } encoder_control;
 
 void init_encoder_control(encoder_control* control,bitstream* output);

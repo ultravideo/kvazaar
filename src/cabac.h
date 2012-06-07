@@ -27,8 +27,8 @@ typedef struct
   uint32_t binsCoded;
 } cabac_ctx;
 
-#define CTX_STATE(ctx) (ctx.ucState>>1)
-#define CTX_MPS(ctx) (ctx.ucState&1)
+#define CTX_STATE(ctx) (ctx->ucState>>1)
+#define CTX_MPS(ctx) (ctx->ucState&1)
 
 void cxt_init(cabac_ctx* ctx,uint32_t qp, uint32_t initValue );
 void cxt_buildNextStateTable();
@@ -38,7 +38,7 @@ void ctx_update_MPS(cabac_ctx* ctx);
 
 typedef struct
 {
-  cabac_ctx  ctx;
+  cabac_ctx  *ctx;
   uint32_t   uiLow;
   uint32_t   uiRange;
   uint32_t   bufferedByte;
@@ -52,6 +52,7 @@ typedef struct
 
 extern cabac_data cabac;
 
+void cabac_start(cabac_data* data);
 void cabac_init(cabac_data* data);
 void cabac_encodeBin(cabac_data* data, uint32_t binValue );
 void cabac_encodeFlush(cabac_data* data, uint8_t end );
@@ -60,6 +61,15 @@ void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins );
 void cabac_write(cabac_data* data);
 void cabac_finish(cabac_data* data);
 void cabac_flush(cabac_data* data);
+void cabac_encodeBinTrm(cabac_data* data, uint32_t binValue );
 
+
+#ifdef _DEBUG
+#define CABAC_BIN(data, value, name) {  uint32_t prev_state = (data)->ctx->ucState;\
+                                        cabac_encodeBin(data, value); \
+                                        printf("\%s = %d\tprev_state=%d\tstate=%d\n",name,split_flag,prev_state, (data)->ctx->ucState);}
+#else
+#define CABAC_BIN(data, value, name) cabac_encodeBin(data, value);
+#endif
 
 #endif

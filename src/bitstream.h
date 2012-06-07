@@ -50,7 +50,7 @@ void init_exp_golomb(uint32_t len);
 static int WRITE_VALUE = 0;
 #define WRITE_U(stream, data, bits, name) { printf("%8d  %-40s u(%d) : %d\n",WRITE_VALUE, name,bits,data); bitstream_put(stream,data,bits); WRITE_VALUE++;}
 #define WRITE_UE(stream, data, name) { printf("%8d  %-40s ue(v): %d\n",WRITE_VALUE, name,data); bitstream_put_ue(stream,data); WRITE_VALUE++;}
-#define WRITE_SE(stream, data, name) { printf("%8d  %-40s se(v): %d\n",WRITE_VALUE, name,data); bitstream_put_se(stream,data); WRITE_VALUE++;}
+#define WRITE_SE(stream, data, name) { printf("%8d  %-40s se(v): %d\n",WRITE_VALUE, name,data); bitstream_put_se(stream,(data)); WRITE_VALUE++;}
 #else
 #define WRITE_U(stream, data, bits, name) { bitstream_put(stream,data,bits); }
 #define WRITE_UE(stream, data, name) { bitstream_put_ue(stream,data); }

@@ -84,7 +84,7 @@ void cxt_init(cabac_ctx* ctx, uint32_t qp, uint32_t initValue )
 {
   int  slope       = (initValue>>4)*5 - 45;
   int  offset      = ((initValue&15)<<3)-16;
-  int  initState   =  MIN( MAX( 1, ( ( ( slope * qp ) >> 4 ) + offset ) ), 126 );
+  int  initState   =  MIN( MAX( 1, ( ( ( slope * (int)qp ) >> 4 ) + offset ) ), 126 );
   uint8_t mpState  = (initState >= 64 )?1:0;
   ctx->ucState     = ( (mpState? (initState - 64):(63 - initState)) <<1) + mpState;
   ctx->binsCoded   = 0;
@@ -129,10 +129,11 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
 {
   uint32_t uiLPS;
   data->uiBinsCoded += data->binCountIncrement;
-  data->ctx.binsCoded = 1;
+  data->ctx->binsCoded = 1;
   
-  uiLPS   = g_aucLPSTable[ CTX_STATE(data->ctx) ][ ( data->uiRange >> 6 ) & 3 ];
+  uiLPS   = g_aucLPSTable[ CTX_STATE(data->ctx) ][ ( data->uiRange >> 6 ) -4 ];
   data->uiRange    -= uiLPS;
+  /*printf("\tdecodeBin m_uiRange %d uiLPS %d m_uiValue%d \n", data->uiRange,uiLPS,data->uiLow);*/
   
   if( binValue != CTX_MPS(data->ctx) )
   {
@@ -140,13 +141,13 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
     data->uiLow     = ( data->uiLow + data->uiRange ) << numBits;
     data->uiRange   = uiLPS << numBits;
     
-    ctx_update_LPS(&data->ctx);
+    ctx_update_LPS(data->ctx);
     
     data->bitsLeft -= numBits;
   }
   else
   {
-    ctx_update_MPS(&data->ctx);
+    ctx_update_MPS(data->ctx);
     if (  data->uiRange >= 256 )
     {
       return;
@@ -251,6 +252,7 @@ void cabac_finish(cabac_data* data)
  */
 void cabac_encodeBinTrm(cabac_data* data, uint32_t binValue )
 {
+  printf("\tdecodeBin m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
   data->uiBinsCoded += data->binCountIncrement;
   data->uiRange -= 2;
   if( binValue )

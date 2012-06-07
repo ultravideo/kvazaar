@@ -25,7 +25,11 @@
 #include "picture.h"
 #include "nal.h"
 
-void init_encoder_control(encoder_control* control,bitstream* output) {control->stream = output;};
+void init_encoder_control(encoder_control* control,bitstream* output)
+{
+  control->stream = output;
+}
+
 void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height)
 {
   input->file = inputfile;
@@ -46,7 +50,7 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->cur_pic.yData = (uint8_t *)malloc(width*height);
   input->cur_pic.uData = (uint8_t *)malloc((width*height)>>2);
   input->cur_pic.vData = (uint8_t *)malloc((width*height)>>2);
-};
+}
 
 
 void encode_one_frame(encoder_control* encoder)
@@ -67,6 +71,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
 
 
+    cabac_start(&cabac);
     encode_slice_header(encoder);
     encode_slice_data(encoder);
     cabac_flush(&cabac);
@@ -77,6 +82,7 @@ void encode_one_frame(encoder_control* encoder)
   }
   else
   {
+    /*
     encode_slice_header(encoder);
     encode_slice_data(encoder);
     cabac_flush(&cabac);
@@ -84,8 +90,8 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
     bitstream_clear_buffer(encoder->stream);
+    */
   }
-
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)
@@ -104,7 +110,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
   */
-  WRITE_SE(encoder->stream, 0, "pic_init_qp_minus26");
+  WRITE_SE(encoder->stream, encoder->QP-26, "pic_init_qp_minus26");
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(encoder->stream, 0, 1, "enable_temporal_mvp_flag");
   WRITE_U(encoder->stream, 0, 2, "slice_granularity");
@@ -139,23 +145,23 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_luma_minus1");
   WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_chroma_minus1");
   WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");
-  WRITE_UE(encoder->stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_UE(encoder->stream, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_UE(encoder->stream, 0, "max_dec_pic_buffering");
   WRITE_UE(encoder->stream, 0, "num_reorder_pics");
   WRITE_UE(encoder->stream, 0, "max_latency_increase");
   WRITE_U(encoder->stream, 0, 1, "restricted_ref_pic_lists_flag");
-  WRITE_UE(encoder->stream, 0, "log2_min_coding_block_size_minus3");
-  WRITE_UE(encoder->stream, 3, "log2_diff_max_min_coding_block_size");
+  WRITE_UE(encoder->stream, 1, "log2_min_coding_block_size_minus3");
+  WRITE_UE(encoder->stream, 2, "log2_diff_max_min_coding_block_size");
   WRITE_UE(encoder->stream, 0, "log2_min_transform_block_size_minus2");
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size");
 
   //If log2MinCUSize == 3
-  WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
+  //WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
 
   //IF PCM
   {
     WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
-    WRITE_UE(encoder->stream, 0, "log2_diff_max_min_pcm_coding_block_size");
+    WRITE_UE(encoder->stream, 2, "log2_diff_max_min_pcm_coding_block_size");
   }
   
 
@@ -172,7 +178,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
 	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
   //IF PCM
-    WRITE_U(encoder->stream, 0, 1, "pcm_loop_filter_disable_flag");
+    WRITE_U(encoder->stream, 1, 1, "pcm_loop_filter_disable_flag");
   //endif
   WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");	
   WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");	
@@ -214,12 +220,21 @@ void encode_slice_header(encoder_control* encoder)
 }
   
 cabac_ctx SplitFlagSCModel;
+cabac_ctx PCMFlagSCModel;
+cabac_ctx PartSizeSCModel;
 
 void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb;
-  cxt_init(&SplitFlagSCModel, 26, 0);
-  cxt_init(&cabac.ctx, 26, 0);
+  cxt_init(&SplitFlagSCModel, encoder->QP, 107);
+  cxt_init(&PCMFlagSCModel, encoder->QP, 0);
+  cxt_init(&PartSizeSCModel, encoder->QP, 0);
+  //SplitFlagSCModel.ucState = 15;
+  PCMFlagSCModel.ucState = 0;
+  PartSizeSCModel.ucState = 0;
+  
+  //cxt_init(&cabac.ctx, 26, 87);
+  
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
   {
     for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
@@ -231,21 +246,47 @@ void encode_slice_data(encoder_control* encoder)
 }
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
-{
-  
-  //Split flag
-  cabac_encodeBin(&cabac, 5);
-
+{    
+  int i;
+  uint8_t split_flag = (depth!=1)?1:0;
+  cabac.ctx = &SplitFlagSCModel;
+  CABAC_BIN(&cabac, split_flag, "SplitFlag");
+  if(split_flag)
+  {
+    encode_coding_tree(encoder,xCtb,yCtb,depth+1);
+    encode_coding_tree(encoder,xCtb+1,yCtb,depth+1);
+    encode_coding_tree(encoder,xCtb,yCtb+1,depth+1);
+    encode_coding_tree(encoder,xCtb+1,yCtb+1,depth+1);
+    return;
+  }
   /* coding_unit( x0, y0, log2CbSize ) */
    /* prediction_unit 2Nx2N*/
+    //if !intra PREDMODE
+   //PartSize
+    //cabac.ctx = &PartSizeSCModel;
+    //CABAC_BIN(&cabac, 1, "PartSize");
    //If MODE_INTRA
-    
+    cabac.ctx = &PCMFlagSCModel;
+    cabac_encodeBinTrm(&cabac, 1);
+    printf("\tIPCMFlag = 1\n");
+    cabac_finish(&cabac);
+    WRITE_U(cabac.stream, 1, 1, "stop_bit");
+    WRITE_U(cabac.stream, 0, 1, "stop_bit");
+    //WRITE_U(cabac.stream, 0, 3, "num_subsequent_pcm");
+    bitstream_align(cabac.stream);
+     /* PCM sample */
+      for(i = 0; i < 16*16; i++)
+      {
+        bitstream_put(cabac.stream, 125, 8);
+      }
+   
+    /* end PCM sample
    //endif
    
    /* end prediction unit */  
-   cabac_encodeBin(&cabac, 0); //prev_intra_luma_pred_flag
+   //cabac_encodeBin(&cabac, 0); //prev_intra_luma_pred_flag
 
-   cabac_encodeBin(&cabac, 1); //rem_intra_luma_pred_mode
+   //cabac_encodeBin(&cabac, 1); //rem_intra_luma_pred_mode
 
   /* end coding_unit */
   

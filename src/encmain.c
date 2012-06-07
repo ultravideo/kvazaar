@@ -121,6 +121,7 @@
 
     /* input init */
     encoder->frame = 0;
+    encoder->QP = 1;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
     /* Start coding cycle */
