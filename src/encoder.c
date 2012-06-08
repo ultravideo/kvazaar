@@ -73,6 +73,7 @@ void encode_one_frame(encoder_control* encoder)
 
     cabac_start(&cabac);
     encode_slice_header(encoder);
+    bitstream_align(encoder->stream);
     encode_slice_data(encoder);
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
@@ -134,7 +135,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 8, "reserved_zero_8bits");
   WRITE_U(encoder->stream, 0, 8, "level_idc");
   WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
-  WRITE_UE(encoder->stream, 0, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
+  WRITE_UE(encoder->stream, 1, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
   WRITE_U(encoder->stream, 0, 3, "max_temporal_layers_minus1");
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
@@ -227,12 +228,11 @@ void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb;
   cxt_init(&SplitFlagSCModel, encoder->QP, 107);
-  cxt_init(&PCMFlagSCModel, encoder->QP, 0);
-  cxt_init(&PartSizeSCModel, encoder->QP, 0);
+  //cxt_init(&PCMFlagSCModel, encoder->QP, 0);
+  cxt_init(&PartSizeSCModel, encoder->QP, 154);
   //SplitFlagSCModel.ucState = 15;
-  PCMFlagSCModel.ucState = 0;
-  PartSizeSCModel.ucState = 0;
-  
+  //PCMFlagSCModel.ucState = 0;
+  //PartSizeSCModel.ucState = 30;
   //cxt_init(&cabac.ctx, 26, 87);
   
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
@@ -250,37 +250,57 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   int i;
   uint8_t split_flag = (depth!=1)?1:0;
   cabac.ctx = &SplitFlagSCModel;
-  CABAC_BIN(&cabac, split_flag, "SplitFlag");
-  if(split_flag)
+  if(depth != 2)
   {
-    encode_coding_tree(encoder,xCtb,yCtb,depth+1);
-    encode_coding_tree(encoder,xCtb+1,yCtb,depth+1);
-    encode_coding_tree(encoder,xCtb,yCtb+1,depth+1);
-    encode_coding_tree(encoder,xCtb+1,yCtb+1,depth+1);
-    return;
+    CABAC_BIN(&cabac, split_flag, "SplitFlag");
+    if(split_flag)
+    {
+      encode_coding_tree(encoder,xCtb,yCtb,depth+1);
+      encode_coding_tree(encoder,xCtb+1,yCtb,depth+1);
+      encode_coding_tree(encoder,xCtb,yCtb+1,depth+1);
+      encode_coding_tree(encoder,xCtb+1,yCtb+1,depth+1);
+      return;
+    }
   }
   /* coding_unit( x0, y0, log2CbSize ) */
    /* prediction_unit 2Nx2N*/
     //if !intra PREDMODE
-   //PartSize
-    //cabac.ctx = &PartSizeSCModel;
-    //CABAC_BIN(&cabac, 1, "PartSize");
+    /* if depth = MAX_DEPTH */
+     //PartSize
+     if(depth == 2)
+     {
+       cabac.ctx = &PartSizeSCModel;
+       CABAC_BIN(&cabac, 1, "PartSize");
+     }
+   /*end partsize*/
    //If MODE_INTRA
-    cabac.ctx = &PCMFlagSCModel;
+    //cabac.ctx = &PCMFlagSCModel;
     cabac_encodeBinTrm(&cabac, 1);
     printf("\tIPCMFlag = 1\n");
     cabac_finish(&cabac);
     WRITE_U(cabac.stream, 1, 1, "stop_bit");
-    WRITE_U(cabac.stream, 0, 1, "stop_bit");
-    //WRITE_U(cabac.stream, 0, 3, "num_subsequent_pcm");
+
+    WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");
     bitstream_align(cabac.stream);
      /* PCM sample */
+      for(i = 0; i < 32*32; i++)
+      {
+        bitstream_put(cabac.stream, 100, 8);
+      }
+      //Cb
       for(i = 0; i < 16*16; i++)
       {
-        bitstream_put(cabac.stream, 125, 8);
+        bitstream_put(cabac.stream, 41, 8);
       }
-   
-    /* end PCM sample
+
+      //Cr
+      for(i = 0; i < 16*16; i++)
+      {
+        bitstream_put(cabac.stream, 78, 8);
+      }
+    
+    /* end PCM sample */
+    cabac_start(&cabac);
    //endif
    
    /* end prediction unit */  

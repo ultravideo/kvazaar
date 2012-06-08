@@ -104,13 +104,14 @@ void cxt_buildNextStateTable()
 }
 
 void ctx_update(cabac_ctx* ctx, int val ) { ctx->ucState = g_nextState[ctx->ucState][val]; }
-void ctx_update_LPS(cabac_ctx* ctx) { ctx->ucState = g_aucNextStateLPS[ ctx->ucState ]; }
-void ctx_update_MPS(cabac_ctx* ctx) { ctx->ucState = g_aucNextStateMPS[ ctx->ucState ]; }
+//void ctx_update_LPS(cabac_ctx* ctx) { ctx->ucState = g_aucNextStateLPS[ ctx->ucState ]; }
+//void ctx_update_MPS(cabac_ctx* ctx) { ctx->ucState = g_aucNextStateMPS[ ctx->ucState ]; }
 
 void cabac_init(cabac_data* data)
 {
   data->fracBits = 0;
-
+  data->binCountIncrement = 0;
+  data->uiBinsCoded = 0;
   cxt_buildNextStateTable();
 }
 
@@ -123,23 +124,23 @@ void cabac_start(cabac_data* data)
   data->bufferedByte     = 0xff;
 }
 
-
-
 void cabac_encodeBin(cabac_data* data, uint32_t binValue )
 {
   uint32_t uiLPS;
+  //printf("\tdecodeBin m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
   data->uiBinsCoded += data->binCountIncrement;
   data->ctx->binsCoded = 1;
   
-  uiLPS   = g_aucLPSTable[ CTX_STATE(data->ctx) ][ ( data->uiRange >> 6 ) -4 ];
+  uiLPS   = g_aucLPSTable[ CTX_STATE(data->ctx) ][ ( data->uiRange >> 6 ) & 3 ];
   data->uiRange    -= uiLPS;
-  /*printf("\tdecodeBin m_uiRange %d uiLPS %d m_uiValue%d \n", data->uiRange,uiLPS,data->uiLow);*/
+  printf("\tencodeBin m_uiRange %d uiLPS %d m_uiValue %d ", data->uiRange,uiLPS,data->uiLow);
   
+  //Not the Most Propable Symbol?
   if( binValue != CTX_MPS(data->ctx) )
   {
-    int numBits = g_aucRenormTable[ uiLPS >> 3 ];
-    data->uiLow     = ( data->uiLow + data->uiRange ) << numBits;
-    data->uiRange   = uiLPS << numBits;
+    int numBits   = g_aucRenormTable[ uiLPS >> 3 ];
+    data->uiLow   = ( data->uiLow + data->uiRange ) << numBits;
+    data->uiRange = uiLPS << numBits;
     
     ctx_update_LPS(data->ctx);
     
@@ -150,6 +151,7 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
     ctx_update_MPS(data->ctx);
     if (  data->uiRange >= 256 )
     {
+      printf("enduiValue %d \n",data->uiLow);
       return;
     }
     
@@ -162,6 +164,7 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
   {
     cabac_write(data);
   }
+  printf("enduiValue %d \n",data->uiLow);
 }
 
 void cabac_write(cabac_data* data)
@@ -250,9 +253,9 @@ void cabac_finish(cabac_data* data)
  *
  * \param binValue bin value
  */
-void cabac_encodeBinTrm(cabac_data* data, uint32_t binValue )
+void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue )
 {
-  printf("\tdecodeBin m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
+  printf("\tencodeBinTrm m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
   data->uiBinsCoded += data->binCountIncrement;
   data->uiRange -= 2;
   if( binValue )
@@ -331,5 +334,33 @@ void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins )
   if(data->bitsLeft < 12)
   {
     cabac_write(data);
+  }
+}
+
+
+void cabac_encoderflush(cabac_data* data, uint8_t end)
+{
+  cabac_encodeBinTrm(data,1);
+  cabac_finish(data);
+  bitstream_put(data->stream,1,1);
+
+  cabac_start(data);
+
+
+  data->uiRange = 2;
+
+  data->uiLow  += 2;
+  data->uiLow <<= 7;
+  data->uiRange = 2 << 7;
+  data->bitsLeft -= 7;
+  if(data->bitsLeft < 12)
+  {
+    cabac_write(data);
+  }
+  cabac_finish(data);
+
+  if(!end)
+  {
+    bitstream_put(data->stream, 1, 1 ); // stop bit
   }
 }

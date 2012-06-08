@@ -159,13 +159,13 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 }
  
 /*
- *  Align the bitstream
+ *  \brief Align the bitstream
  */
 void bitstream_align(bitstream* stream)
 {  
   if((stream->cur_bit&7) != 0)
   {
-    bitstream_put(stream,0, 8-stream->cur_bit&7);
+    bitstream_put(stream,0, 8-(stream->cur_bit&7));
   }
 }
  
@@ -174,7 +174,7 @@ void bitstream_flush(bitstream* stream)
    /*
     *  SAVE DATA TO OUTPUT
     */
-  int i,j;
+  int i;
   uint32_t correct_endian;
   if(stream->output)
   {
@@ -214,14 +214,3 @@ void bitstream_flush(bitstream* stream)
   bitstream_init(stream);
 }
 
-/*
-void bitstream_put_ue(bitstream* stream, uint32_t data)
-{
-    bitstream_put(stream,exp_table[data].value,exp_table[data].len);
-}
-void bitstream_put_se(bitstream* stream, uint32_t data)
-{
-    uint32_t index=(data<=0)?2*(uint32_t)(-data):2*(uint32_t)(data)-1;    
-    bitstream_put(stream,exp_table[index].value,exp_table[index].len);
-}
-*/
