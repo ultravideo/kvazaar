@@ -61,4 +61,13 @@ void encode_slice_data(encoder_control* encoder);
 void encode_slice_header(encoder_control* encoder);
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 
+
+static const uint8_t 
+      INIT_SPLIT_FLAG[3][3] =  
+      {
+        { 107,  139,  126, },
+        { 107,  139,  126, }, 
+        { 139,  141,  157, }
+      };
+
 #endif
