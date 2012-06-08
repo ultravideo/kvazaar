@@ -235,9 +235,9 @@ void encode_slice_data(encoder_control* encoder)
   //PartSizeSCModel.ucState = 30;
   //cxt_init(&cabac.ctx, 26, 87);
   
-  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  for(yCtb = 0; yCtb < encoder->in.height_in_LCU<<2; yCtb+=4)
   {
-    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    for(xCtb = 0; xCtb < encoder->in.width_in_LCU<<2; xCtb+=4)
     {
       uint8_t depth = 0;
       encode_coding_tree(encoder, xCtb,yCtb, depth);
@@ -247,7 +247,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  int i;
+  int i,x,y;
   uint8_t split_flag = (depth!=1)?1:0;
   cabac.ctx = &SplitFlagSCModel;
   if(depth != 2)
@@ -255,10 +255,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     CABAC_BIN(&cabac, split_flag, "SplitFlag");
     if(split_flag)
     {
+      uint8_t change = 2;
       encode_coding_tree(encoder,xCtb,yCtb,depth+1);
-      encode_coding_tree(encoder,xCtb+1,yCtb,depth+1);
-      encode_coding_tree(encoder,xCtb,yCtb+1,depth+1);
-      encode_coding_tree(encoder,xCtb+1,yCtb+1,depth+1);
+      encode_coding_tree(encoder,xCtb+change,yCtb,depth+1);
+      encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);
+      encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1);
       return;
     }
   }
@@ -283,22 +284,29 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");
     bitstream_align(cabac.stream);
      /* PCM sample */
-      for(i = 0; i < 32*32; i++)
+    {
+      uint8_t *base = &encoder->in.cur_pic.yData[xCtb*16 + (yCtb*16)*encoder->in.width];
+      uint8_t *baseCb = &encoder->in.cur_pic.uData[(xCtb*16 + (yCtb*16)*encoder->in.width)>>2];
+      uint8_t *baseCr = &encoder->in.cur_pic.vData[(xCtb*16 + (yCtb*16)*encoder->in.width)>>2];
+      for(y = 0; y < 32; y++)
       {
-        bitstream_put(cabac.stream, 100, 8);
+        for(x = 0; x < 32; x++)
+        {          
+          bitstream_put(cabac.stream, base[x+y*encoder->in.width], 8);
+        }
       }
       //Cb
       for(i = 0; i < 16*16; i++)
       {
-        bitstream_put(cabac.stream, 41, 8);
+        bitstream_put(cabac.stream, baseCb[x+y*(encoder->in.width>>1)], 8);
       }
 
       //Cr
       for(i = 0; i < 16*16; i++)
       {
-        bitstream_put(cabac.stream, 78, 8);
+        bitstream_put(cabac.stream, baseCr[x+y*(encoder->in.width>>1)], 8);
       }
-    
+    }
     /* end PCM sample */
     cabac_start(&cabac);
    //endif
