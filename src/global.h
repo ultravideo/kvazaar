@@ -13,6 +13,15 @@
 #ifndef __GLOBAL_H
 #define __GLOBAL_H
 
+/* CONFIG VARIABLES */
+#define LCU_WIDTH 64 /*!< Largest Coding Unit */
+#define MAX_DEPTH 2
+
+#define ENABLE_PCM 1
+
+/* END OF CONFIG VARIABLES */
+
+
 //Including stdint.h, 
 #ifdef _MSC_VER
   #include "../include/stdint.h"
@@ -22,9 +31,6 @@
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
-
-#define LCU_WIDTH 64 /*!< Largest Coding Unit */
-#define MAX_DEPTH 2
 
 #define VERSION_STRING "0.1               "
 #define VERSION 0.1
@@ -38,10 +44,11 @@
 #define SIZE_NxN   3
 #define SIZE_NONE  15
 
+/*
 #define MODE_SKIP  0
 #define MODE_INTER 1
 #define MODE_INTRA 2
 #define MODE_NONE  15
-
+*/
 
 #endif

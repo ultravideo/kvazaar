@@ -52,10 +52,9 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->cur_pic.uData = (uint8_t *)malloc((width*height)>>2);
   input->cur_pic.vData = (uint8_t *)malloc((width*height)>>2);
 
-
-  /* Allocate memory for CU info */
-
-  input->cur_pic.CU = (CU_info*)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
+  /* Allocate memory for CU info 2D array */
+  //ToDo: we don't need this much space on LCU...MAX_DEPTH-1
+  input->cur_pic.CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
   for(i=0; i < MAX_DEPTH+1; i++)
   {
     input->cur_pic.CU[i] = (CU_info*)malloc((input->height_in_LCU<<2)*(input->width_in_LCU<<2)*sizeof(CU_info));
@@ -155,9 +154,11 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "pic_cropping_flag");
   WRITE_UE(encoder->stream, 0, "bit_depth_luma_minus8");
   WRITE_UE(encoder->stream, 0, "bit_depth_chroma_minus8");
-  WRITE_U(encoder->stream, 1, 1, "pcm_enabled_flag");
+  WRITE_U(encoder->stream, ENABLE_PCM, 1, "pcm_enabled_flag");
+  #if ENABLE_PCM == 1
   WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_luma_minus1");
   WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_chroma_minus1");
+  #endif
   WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");
   WRITE_UE(encoder->stream, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_UE(encoder->stream, 0, "max_dec_pic_buffering");
@@ -172,11 +173,10 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //If log2MinCUSize == 3
   //WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
 
-  //IF PCM
-  {
+  #if ENABLE_PCM == 1
     WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
     WRITE_UE(encoder->stream, 2, "log2_diff_max_min_pcm_coding_block_size");
-  }
+  #endif
   
 
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
@@ -191,9 +191,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "nsrqt_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
 	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
-  //IF PCM
+  #if ENABLE_PCM == 1
     WRITE_U(encoder->stream, 1, 1, "pcm_loop_filter_disable_flag");
-  //endif
+  #endif
   WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");
   WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
@@ -283,76 +283,21 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   int i,x,y;
   uint8_t split_flag = (depth!=1)?1:0;
   uint8_t split_model = 0;
-  //ToDo: GET REAL VALUE
-  if(xCtb > 0 && GET_SPLITDATA(&encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)]) == 1)
+  /* Get left and top block split_flags and if they are present and true, increase model number */
+  if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
   {
     split_model++;
   }
-
-  if(yCtb > 0 && GET_SPLITDATA(&encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)]) == 1)
+  if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
   {
     split_model++;
   }
-
   cabac.ctx = &g_SplitFlagSCModel[split_model];
 
-  if((yCtb > 0 && xCtb > 0))
-  {
-    SplitFlagSCModel = &g_SplitFlagSCModel[2];
-    printf("Model: 2\n");
-  }
-  else if(yCtb > 0 || xCtb > 0)
-  {
-    SplitFlagSCModel = &g_SplitFlagSCModel[1];
-    printf("Model: 1\n");
-  }
-  else
-  {
-    SplitFlagSCModel = &g_SplitFlagSCModel[0];
-    printf("Model: 0\n");
-  }
-  
-  
-  cabac.ctx = SplitFlagSCModel;//&g_SplitFlagSCModel[split_model];
-
-  
-  if(depth == 1)
-  {
-    cabac.ctx = &g_SplitFlagSCModel[0];
-  }
-
-
-  /*
-  if((yCtb > 0 && xCtb > 0))
-  {
-    SplitFlagSCModel = &g_SplitFlagSCModel[2];
-    printf("Model: 2\n");
-  }
-  else if(yCtb > 0 || xCtb > 0)
-  {
-    SplitFlagSCModel = &g_SplitFlagSCModel[1];
-    printf("Model: 1\n");
-  }
-  else
-  {
-    SplitFlagSCModel = &g_SplitFlagSCModel[0];
-    printf("Model: 0\n");
-  }
-  
-  
-  cabac.ctx = SplitFlagSCModel;//&g_SplitFlagSCModel[split_model];
-
-  
-  if(depth == 1)
-  {
-    cabac.ctx = &g_SplitFlagSCModel[0];
-  }
-  */
-  
-
+  /* When not in MAX_DEPTH, insert split flag and split the blocks if needed */
   if(depth != MAX_DEPTH)
   {
-    SET_SPLITDATA(&encoder->in.cur_pic.CU[depth][xCtb>>(MAX_DEPTH-depth)+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)],split_flag);
+    SET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)]),split_flag);
     CABAC_BIN(&cabac, split_flag, "SplitFlag");
     if(split_flag)
     {

@@ -22,8 +22,8 @@
 
 enum { CU_NOTSET = 0, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER};
 
-#define GET_SPLITDATA(CU) (((CU)->type==CU_SPLIT)?0:( (uint32_t)(CU)->typedata ))
-#define SET_SPLITDATA(CU,flag) { (CU)->type=CU_SPLIT; (CU)->typedata=(void*)(flag); }
+#define GET_SPLITDATA(CU) ((CU)->split)
+#define SET_SPLITDATA(CU,flag) { (CU)->split=(flag); }
 
 /*!
     \brief Struct for CU info
@@ -42,6 +42,7 @@ typedef struct
 {
   uint8_t type;
   void* typedata;
+  uint8_t split;
 } CU_info;
 
 /*!
