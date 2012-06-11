@@ -32,6 +32,7 @@ void init_encoder_control(encoder_control* control,bitstream* output)
 
 void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height)
 {
+  int i;
   input->file = inputfile;
   input->width = width;
   input->height = height;
@@ -50,18 +51,28 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->cur_pic.yData = (uint8_t *)malloc(width*height);
   input->cur_pic.uData = (uint8_t *)malloc((width*height)>>2);
   input->cur_pic.vData = (uint8_t *)malloc((width*height)>>2);
+
+
+  /* Allocate memory for CU info */
+
+  input->cur_pic.CU = (CU_info*)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
+  for(i=0; i < MAX_DEPTH+1; i++)
+  {
+    input->cur_pic.CU[i] = (CU_info*)malloc((input->height_in_LCU<<2)*(input->width_in_LCU<<2)*sizeof(CU_info));
+    memset(input->cur_pic.CU[i], 0, (input->height_in_LCU<<2)*(input->width_in_LCU<<2)*sizeof(CU_info));
+  }  
 }
 
 
 void encode_one_frame(encoder_control* encoder)
 {
-  //output parameters before first frame
+  /* output parameters before first frame */
   if(encoder->frame == 0)
   {
     encode_seq_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 1);
     bitstream_clear_buffer(encoder->stream);
 
     encode_pic_parameter_set(encoder);
@@ -70,10 +81,11 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
 
-
+    /* First slice is IDR */
     cabac_start(&cabac);
+    encoder->in.cur_pic.type = NAL_IDR_SLICE;
     encode_slice_header(encoder);
-    bitstream_align(encoder->stream);
+    bitstream_align(encoder->stream);    
     encode_slice_data(encoder);
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
@@ -81,18 +93,19 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
     bitstream_clear_buffer(encoder->stream);
   }
-  else
+  else if(encoder->frame < 3)
   {
-    /*
+    cabac_start(&cabac);
+    encoder->in.cur_pic.type = NAL_NONIDR_SLICE;
     encode_slice_header(encoder);
+    bitstream_align(encoder->stream);
     encode_slice_data(encoder);
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_NONIDR_SLICE, 0);
     bitstream_clear_buffer(encoder->stream);
-    */
-  }
+  }  
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)
@@ -181,11 +194,12 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //IF PCM
     WRITE_U(encoder->stream, 1, 1, "pcm_loop_filter_disable_flag");
   //endif
-  WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");	
-  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");	
-  WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");	
-  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");	
-	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");  
+  WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");
+  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");
+  WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
+  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");  
+	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
+  //WRITE_U(encoder->stream, 0, 8, "stuffing");
 }
 
 void encode_slice_header(encoder_control* encoder)
@@ -204,13 +218,18 @@ void encode_slice_header(encoder_control* encoder)
       WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-      WRITE_UE(encoder->stream, encoder->frame&1, "idr_pic_id");
+    if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
+    {
+      WRITE_UE(encoder->stream, encoder->frame&3, "idr_pic_id");
       WRITE_U(encoder->stream, 0, 1, "no_output_of_prior_pics_flag");
-    //else
-      /*
+    }
+    else
+    {
+      WRITE_U(encoder->stream, encoder->frame, 8, "pic_order_cnt_lsb");
+      WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
+      WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
 
-
-      */
+    }
     //end if
   //end if
   /*
@@ -228,33 +247,32 @@ cabac_ctx PartSizeSCModel;
 void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb;
-  cxt_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[0][0]);
-  cxt_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[0][1]);
-  cxt_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[0][2]);
-  //cxt_init(&PCMFlagSCModel, encoder->QP, 0);
+  /* Initialize contexts */
+  cxt_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][0]);
+  cxt_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][1]);
+  cxt_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][2]);
+
   cxt_init(&PartSizeSCModel, encoder->QP, 154);
-  g_SplitFlagSCModel[1].ucState = 47;
-  //SplitFlagSCModel.ucState = 15;
-  //PCMFlagSCModel.ucState = 0;
-  //PartSizeSCModel.ucState = 30;
-  //cxt_init(&cabac.ctx, 26, 87);
-  
-  
+  //g_SplitFlagSCModel[1].ucState = 47;
+  //g_SplitFlagSCModel[2].ucState = 36;
 
-  for(yCtb = 0; yCtb < encoder->in.height_in_LCU<<2; yCtb+=4)
+  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
   {
-    uint8_t lastCUy = (yCtb == (encoder->in.height_in_LCU<<2)-1)?1:0;
-    for(xCtb = 0; xCtb < encoder->in.width_in_LCU<<2; xCtb+=4)
+    uint8_t lastCUy = (yCtb == (encoder->in.height_in_LCU-1))?1:0;
+    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
     {
-      uint8_t lastCUx = (xCtb == (encoder->in.width_in_LCU<<2)-1)?1:0;
+      uint8_t lastCUx = (xCtb == (encoder->in.width_in_LCU-1))?1:0;
       uint8_t depth = 0;
-
  
-      encode_coding_tree(encoder, xCtb,yCtb, depth);
+      encode_coding_tree(encoder, xCtb<<2,yCtb<<2, depth);
       //Terminating bit
       if(!lastCUx || !lastCUy)
       {
         cabac_encodeBinTrm(&cabac, 0);
+      }
+      else
+      {
+        cabac_encodeBinTrm(&cabac, 1);
       }
     }
   }
@@ -264,33 +282,81 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 {    
   int i,x,y;
   uint8_t split_flag = (depth!=1)?1:0;
+  uint8_t split_model = 0;
+  //ToDo: GET REAL VALUE
+  if(xCtb > 0 && GET_SPLITDATA(&encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)]) == 1)
+  {
+    split_model++;
+  }
 
-  //ToDo: 
-  if(yCtb > 0 && xCtb > 0)
+  if(yCtb > 0 && GET_SPLITDATA(&encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)]) == 1)
+  {
+    split_model++;
+  }
+
+  cabac.ctx = &g_SplitFlagSCModel[split_model];
+
+  if((yCtb > 0 && xCtb > 0))
   {
     SplitFlagSCModel = &g_SplitFlagSCModel[2];
+    printf("Model: 2\n");
   }
   else if(yCtb > 0 || xCtb > 0)
   {
     SplitFlagSCModel = &g_SplitFlagSCModel[1];
+    printf("Model: 1\n");
   }
   else
   {
     SplitFlagSCModel = &g_SplitFlagSCModel[0];
+    printf("Model: 0\n");
   }
-  cabac.ctx = SplitFlagSCModel;
+  
+  
+  cabac.ctx = SplitFlagSCModel;//&g_SplitFlagSCModel[split_model];
 
+  
   if(depth == 1)
   {
     cabac.ctx = &g_SplitFlagSCModel[0];
   }
 
-  if(depth != 2)
+
+  /*
+  if((yCtb > 0 && xCtb > 0))
   {
+    SplitFlagSCModel = &g_SplitFlagSCModel[2];
+    printf("Model: 2\n");
+  }
+  else if(yCtb > 0 || xCtb > 0)
+  {
+    SplitFlagSCModel = &g_SplitFlagSCModel[1];
+    printf("Model: 1\n");
+  }
+  else
+  {
+    SplitFlagSCModel = &g_SplitFlagSCModel[0];
+    printf("Model: 0\n");
+  }
+  
+  
+  cabac.ctx = SplitFlagSCModel;//&g_SplitFlagSCModel[split_model];
+
+  
+  if(depth == 1)
+  {
+    cabac.ctx = &g_SplitFlagSCModel[0];
+  }
+  */
+  
+
+  if(depth != MAX_DEPTH)
+  {
+    SET_SPLITDATA(&encoder->in.cur_pic.CU[depth][xCtb>>(MAX_DEPTH-depth)+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)],split_flag);
     CABAC_BIN(&cabac, split_flag, "SplitFlag");
     if(split_flag)
     {
-      uint8_t change = 2;
+      uint8_t change = 1<<(MAX_DEPTH-1-depth);
       encode_coding_tree(encoder,xCtb,yCtb,depth+1);
       encode_coding_tree(encoder,xCtb+change,yCtb,depth+1);
       encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);
@@ -315,7 +381,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     printf("\tIPCMFlag = 1\n");
     cabac_finish(&cabac);
     WRITE_U(cabac.stream, 1, 1, "stop_bit");
-    WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");
+    WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");    
     bitstream_align(cabac.stream);
      /* PCM sample */
     {

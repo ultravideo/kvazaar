@@ -24,6 +24,7 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
 #define LCU_WIDTH 64 /*!< Largest Coding Unit */
+#define MAX_DEPTH 2
 
 #define VERSION_STRING "0.1               "
 #define VERSION 0.1

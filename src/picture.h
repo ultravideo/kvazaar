@@ -20,6 +20,30 @@
  *  @{
  */
 
+enum { CU_NOTSET = 0, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER};
+
+#define GET_SPLITDATA(CU) (((CU)->type==CU_SPLIT)?0:( (uint32_t)(CU)->typedata ))
+#define SET_SPLITDATA(CU,flag) { (CU)->type=CU_SPLIT; (CU)->typedata=(void*)(flag); }
+
+/*!
+    \brief Struct for CU info
+*/
+typedef struct
+{
+  uint8_t mode;
+  uint32_t cost;
+} CU_info_intra;
+
+
+/*!
+    \brief Struct for CU info
+*/
+typedef struct
+{
+  uint8_t type;
+  void* typedata;
+} CU_info;
+
 /*!
     \brief Struct which contains all picture data
 */
@@ -31,6 +55,8 @@ typedef struct
   int width;          /*!< \brief Picture width */
   int height;         /*!< \brief Picture height  */
   uint8_t referenced; /*!< \brief Is this picture referenced */
+  CU_info** CU;     /*!< \brief info for each CU at each depth */
+  uint8_t type;
 } picture;
 
 /*!
