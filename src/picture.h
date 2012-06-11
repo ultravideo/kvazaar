@@ -20,7 +20,7 @@
  *  @{
  */
 
-enum { CU_NOTSET = 0, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER};
+enum { CU_NOTSET = 0,CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER };
 
 #define GET_SPLITDATA(CU) ((CU)->split)
 #define SET_SPLITDATA(CU,flag) { (CU)->split=(flag); }
@@ -53,6 +53,11 @@ typedef struct
   uint8_t* yData;     /*!< \brief Pointer to Y-data  */
   uint8_t* uData;     /*!< \brief Pointer to U-data  */
   uint8_t* vData;     /*!< \brief Pointer to V-data  */
+
+  uint8_t* yRecData;     /*!< \brief Pointer to reconstructed Y-data  */
+  uint8_t* uRecData;     /*!< \brief Pointer to reconstructed U-data  */
+  uint8_t* vRecData;     /*!< \brief Pointer to reconstructed V-data  */
+
   int width;          /*!< \brief Picture width */
   int height;         /*!< \brief Picture height  */
   uint8_t referenced; /*!< \brief Is this picture referenced */
