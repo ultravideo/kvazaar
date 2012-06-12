@@ -156,7 +156,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 8, "reserved_zero_8bits");
   WRITE_U(encoder->stream, 0, 8, "level_idc");
   WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
-  WRITE_UE(encoder->stream, 1, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
+  WRITE_UE(encoder->stream, encoder->in.video_format, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
   WRITE_U(encoder->stream, 0, 3, "max_temporal_layers_minus1");
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
@@ -208,7 +208,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
   WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");  
-	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");  
+	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
+
+  WRITE_U(encoder->stream, 1, 8, "stuffing");
 }
 
 void encode_slice_header(encoder_control* encoder)
@@ -253,8 +255,12 @@ cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */
 cabac_ctx g_IntraModeSCModel;    /*<! \brief intra mode context models */
 cabac_ctx g_ChromaPredSCModel[2];
 cabac_ctx g_TransSubdivSCModel[4];    /*<! \brief intra mode context models */
-cabac_ctx g_QtCbfSCModel[8];
-cabac_ctx PartSizeSCModel;
+cabac_ctx g_QtCbfSCModelY[5];
+cabac_ctx g_QtCbfSCModelU[5];
+cabac_ctx g_QtCbfSCModelV[5];
+cabac_ctx g_PartSizeSCModel;
+cabac_ctx g_CUSigCoeffGroupSCModel[4];
+cabac_ctx g_CUSigSCModel[45];
 
 void encode_slice_data(encoder_control* encoder)
 {
@@ -274,10 +280,18 @@ void encode_slice_data(encoder_control* encoder)
   for(i = 0; i < 4; i++)
   {
     cxt_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE_I][i]);
+    cxt_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE_I][i]);
   }
-  for(i = 0; i < 8; i++)
+  for(i = 0; i < 5; i++)
   {
-    cxt_init(&g_QtCbfSCModel[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
+    cxt_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+5]);
+    cxt_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+5]);
+    cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
+  }
+  for(i = 0; i < 45; i++)
+  {
+    cxt_init(&g_CUSigSCModel[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i]);
+
   }
 
   encoder->in.cur_pic.CU[1][0].type = CU_INTRA;
@@ -345,16 +359,16 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
      //PartSize
      if(depth == MAX_DEPTH)
      {
-       cabac.ctx = &PartSizeSCModel;
+       cabac.ctx = &g_PartSizeSCModel;
        CABAC_BIN(&cabac, 1, "PartSize");
      }
    /*end partsize*/
    //If MODE_INTRA
     //cabac.ctx = &PCMFlagSCModel;
      /* Code IPCM block */
-     if(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)].type <= CU_PCM)
-     {
-      cabac_encodeBinTrm(&cabac, 1);
+    if(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)].type <= CU_PCM)
+    {
+      cabac_encodeBinTrm(&cabac, 1); /* IPCMFlag == 1 */
       //printf("\tIPCMFlag = 1\n");
       cabac_finish(&cabac);
       WRITE_U(cabac.stream, 1, 1, "stop_bit");
@@ -371,47 +385,87 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           {          
             bitstream_put(cabac.stream, base[x+y*encoder->in.width], 8);
           }
-        }
-        //Cb
-        for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+        }       
+        if(encoder->in.video_format != FORMAT_400)
         {
-          for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+          //Cb
+          for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
           {
-            bitstream_put(cabac.stream, baseCb[x+y*(encoder->in.width>>1)], 8);
+            for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+            {
+              bitstream_put(cabac.stream, baseCb[x+y*(encoder->in.width>>1)], 8);
+            }
           }
-        }
 
-        //Cr
-        for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-        {
-          for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+          //Cr
+          for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
           {
-            bitstream_put(cabac.stream, baseCr[x+y*(encoder->in.width>>1)], 8);
+            for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+            {
+              bitstream_put(cabac.stream, baseCr[x+y*(encoder->in.width>>1)], 8);
+            }
           }
         }
       }
       /* end PCM sample */
       cabac_start(&cabac);
 
-     } /* end Code IPCM block */
-     else
-     {
-       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
+    } /* end Code IPCM block */
+    else
+    {
+      cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
        
-       cabac.ctx = &g_IntraModeSCModel;
-       CABAC_BIN(&cabac,0,"IntraPred");
+      cabac.ctx = &g_IntraModeSCModel;
+      CABAC_BIN(&cabac,0,"IntraPred");
 
-       cabac.ctx = &g_ChromaPredSCModel[0];
-       CABAC_BIN(&cabac,0,"IntraPredChroma");
+      /*
+      Int preds[3] = {-1, -1, -1};
+      Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
+      */
+      CABAC_BINS_EP(&cabac, 0, 5, "intraPredMode");
+ 
+      cabac.ctx = &g_ChromaPredSCModel[0];
+      CABAC_BIN(&cabac,0,"IntraPredChroma");
 
-       cabac.ctx = &g_TransSubdivSCModel[1]; /* //uiLog2TransformBlockSize */
-       CABAC_BIN(&cabac,0,"TransformSubdivFlag");
+      /* Coeff */
+      /* Transform tree */
+      cabac.ctx = &g_TransSubdivSCModel[1]; /* //uiLog2TransformBlockSize */
+      CABAC_BIN(&cabac,0,"TransformSubdivFlag");
 
-       /* Transform tree */
+      {
+        uint8_t CbY = 0,CbU = 0,CbV = 0;
+      
+        /*
+         Quant and transform ...
+        */
+        CbY = 1;
 
-       /* end Transform tree */
+        /* Non-zero chroma U Tcoeffs */
+        cabac.ctx = &g_QtCbfSCModelU[0];        
+        CABAC_BIN(&cabac,CbU,"cbf_chroma_u");
 
-     }
+        /* Non-zero chroma V Tcoeffs */
+        cabac.ctx = &g_QtCbfSCModelU[0];        
+        CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
+
+        /* Non-zero luma Tcoeffs */
+        cabac.ctx = &g_QtCbfSCModelY[1];        
+        CABAC_BIN(&cabac,CbY,"cbf_luma");
+
+        /* CoeffNxN */
+        if(CbY)
+        {
+
+        }
+        
+
+      }
+      
+
+      /* end Transform tree */
+      /* end Coeff */
+
+    }
    //endif   
    /* end prediction unit */
 
