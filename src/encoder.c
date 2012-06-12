@@ -255,9 +255,9 @@ cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */
 cabac_ctx g_IntraModeSCModel;    /*<! \brief intra mode context models */
 cabac_ctx g_ChromaPredSCModel[2];
 cabac_ctx g_TransSubdivSCModel[4];    /*<! \brief intra mode context models */
-cabac_ctx g_QtCbfSCModelY[5];
-cabac_ctx g_QtCbfSCModelU[5];
-cabac_ctx g_QtCbfSCModelV[5];
+cabac_ctx g_QtCbfSCModelY[3];
+cabac_ctx g_QtCbfSCModelU[3];
+//cabac_ctx g_QtCbfSCModelV[3];
 cabac_ctx g_PartSizeSCModel;
 cabac_ctx g_CUSigCoeffGroupSCModel[4];
 cabac_ctx g_CUSigSCModel[45];
@@ -282,11 +282,11 @@ void encode_slice_data(encoder_control* encoder)
     cxt_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE_I][i]);
     cxt_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE_I][i]);
   }
-  for(i = 0; i < 5; i++)
+  for(i = 0; i < 3; i++)
   {
-    cxt_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+5]);
-    cxt_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+5]);
-    cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
+    cxt_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
+    cxt_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+3]);
+    //cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
   }
   for(i = 0; i < 45; i++)
   {

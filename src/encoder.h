@@ -80,11 +80,11 @@ static const uint8_t INIT_TRANS_SUBDIV_FLAG[3][4] =
   { CNU,  224,  167,  122 }
 };
 
-static const uint8_t INIT_QT_CBF[3][10] =  
+static const uint8_t INIT_QT_CBF[3][6] =  
 {
-  { 153,  111,  CNU,  CNU,  CNU,  149,   92,  167,  CNU,  CNU },
-  { 153,  111,  CNU,  CNU,  CNU,  149,  107,  167,  CNU,  CNU },
-  { 111,  141,  CNU,  CNU,  CNU,   94,  138,  182,  CNU,  CNU }
+  { 153,  111,  CNU,  149,   92,  167 },
+  { 153,  111,  CNU,  149,  107,  167 },
+  { 111,  141,  CNU,   94,  138,  182 }
 };
 
 static const uint8_t INIT_SIG_CG_FLAG[3][4] =  
