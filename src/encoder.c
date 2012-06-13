@@ -133,7 +133,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   */
   WRITE_SE(encoder->stream, encoder->QP-26, "pic_init_qp_minus26");
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(encoder->stream, 0, 1, "enable_temporal_mvp_flag");
+  WRITE_U(encoder->stream, 0, 1, "enable_temporal_mvp_flag"); /* ToDo: remove this */
   WRITE_U(encoder->stream, 0, 2, "slice_granularity");
   WRITE_UE(encoder->stream, 0, "max_cu_qp_delta_depth");
   WRITE_SE(encoder->stream, 0, "cb_qp_offset");
@@ -261,6 +261,10 @@ cabac_ctx g_QtCbfSCModelU[3];
 cabac_ctx g_PartSizeSCModel;
 cabac_ctx g_CUSigCoeffGroupSCModel[4];
 cabac_ctx g_CUSigSCModel[45];
+cabac_ctx g_CuCtxLastY_luma[15];
+cabac_ctx g_CuCtxLastY_chroma[15];
+cabac_ctx g_CuCtxLastX_luma[15];
+cabac_ctx g_CuCtxLastX_chroma[15];
 
 void encode_slice_data(encoder_control* encoder)
 {
@@ -288,6 +292,15 @@ void encode_slice_data(encoder_control* encoder)
     cxt_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+3]);
     //cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
   }
+  for(i = 0; i < 15; i++)
+  {    
+    cxt_init(&g_CuCtxLastY_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
+    cxt_init(&g_CuCtxLastX_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
+
+    cxt_init(&g_CuCtxLastY_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
+    cxt_init(&g_CuCtxLastX_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
+  }
+  
   for(i = 0; i < 45; i++)
   {
     cxt_init(&g_CUSigSCModel[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i]);
@@ -432,30 +445,97 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       cabac.ctx = &g_TransSubdivSCModel[1]; /* //uiLog2TransformBlockSize */
       CABAC_BIN(&cabac,0,"TransformSubdivFlag");
 
+      /* We don't subdiv and we have 64>>depth transform size */
+      /* ToDo: allow other sized */
       {
         uint8_t CbY = 0,CbU = 0,CbV = 0;
       
         /*
          Quant and transform ...
         */
-        CbY = 1;
+        CbY = 1; /* Let's pretend we have LUMA coefficients */
 
         /* Non-zero chroma U Tcoeffs */
-        cabac.ctx = &g_QtCbfSCModelU[0];        
+        cabac.ctx = &g_QtCbfSCModelU[0];
         CABAC_BIN(&cabac,CbU,"cbf_chroma_u");
 
         /* Non-zero chroma V Tcoeffs */
-        cabac.ctx = &g_QtCbfSCModelU[0];        
+        cabac.ctx = &g_QtCbfSCModelU[0];
         CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
 
         /* Non-zero luma Tcoeffs */
-        cabac.ctx = &g_QtCbfSCModelY[1];        
+        cabac.ctx = &g_QtCbfSCModelY[1];
         CABAC_BIN(&cabac,CbY,"cbf_luma");
 
         /* CoeffNxN */
         if(CbY)
         {
+          /* Residual Coding */
+          /* LastSignificantXY */
+          //encode_lastSignificantXY(uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
+          uint8_t lastpos_x = 31, lastpos_y  = 31;
+          uint8_t last_x    = 1, last_y     = 1;
+          uint8_t offset_x  = 10,offset_y   = 10;
+          uint8_t shift_x   = 1, shift_y    = 1;          
+          int uiGroupIdxX    = g_uiGroupIdx[ lastpos_x ];
+          int uiGroupIdxY    = g_uiGroupIdx[ lastpos_y ];
+          int temp;
+          /*
+          blkSizeOffsetX = eTType ? 0: (g_aucConvertToBit[ width ] *3 + ((g_aucConvertToBit[ width ] +1)>>2));
+          blkSizeOffsetY = eTType ? 0: (g_aucConvertToBit[ height ]*3 + ((g_aucConvertToBit[ height ]+1)>>2));
+          shiftX= eTType ? g_aucConvertToBit[ width  ] :((g_aucConvertToBit[ width  ]+3)>>2);
+          shiftY= eTType ? g_aucConvertToBit[ height ] :((g_aucConvertToBit[ height ]+3)>>2);
+          */
+          /* Last X binarization */
+          for(last_x = 0; last_x < uiGroupIdxX ; last_x++)
+          {
+            cabac.ctx = &g_CuCtxLastX_luma[offset_x+(last_x>>shift_x)];
+            CABAC_BIN(&cabac,1,"LastSignificantX");
+          }
+          if(uiGroupIdxX < g_uiGroupIdx[32-1])
+          {
+            cabac.ctx = &g_CuCtxLastX_luma[offset_x+(last_x>>shift_x)];
+            CABAC_BIN(&cabac,0,"LastSignificantX");
+          }
+          
+          /* Last Y binarization */
+          for(last_y = 0; last_y < uiGroupIdxY ; last_y++)
+          {
+            cabac.ctx = &g_CuCtxLastY_luma[offset_y+(last_y>>shift_y)];
+            CABAC_BIN(&cabac,1,"LastSignificantY");
+          }
+          if(uiGroupIdxY < g_uiGroupIdx[32-1])
+          {
+            cabac.ctx = &g_CuCtxLastY_luma[offset_y+(last_y>>shift_y)];
+            CABAC_BIN(&cabac,0,"LastSignificantY");
+          }
 
+          /* Last X */
+          if(uiGroupIdxX > 3)
+          {
+            lastpos_x -= g_uiMinInGroup[uiGroupIdxX];
+            for(i = ((uiGroupIdxX-2)>>1)-1; i>=0; i--) 
+            {
+              CABAC_BIN_EP(&cabac,(lastpos_x>>i) & 1,"LastSignificantX");
+            }
+          }
+          
+          /* Last Y */
+          if(uiGroupIdxY > 3)
+          {
+            lastpos_y -= g_uiMinInGroup[uiGroupIdxY];
+            for(i = ((uiGroupIdxY-2)>>1)-1; i>=0; i--) 
+            {
+              CABAC_BIN_EP(&cabac,(lastpos_y>>i) & 1,"LastSignificantY");
+            }
+          }
+          /* end LastSignificantXY */
+
+          /* significant_coeff_flag */
+
+
+
+          /* end Residual Coding */
         }
         
 

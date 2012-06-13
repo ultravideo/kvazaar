@@ -75,9 +75,14 @@ void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue );
 #define CABAC_BINS_EP(data, value,bins, name) {  uint32_t prev_state = (data)->ctx->ucState;\
   cabac_encodeBinsEP(data, value,bins); \
   printf("%s = %d prev_state=%d state=%d\n",name,value,prev_state, (data)->ctx->ucState);}
+
+#define CABAC_BIN_EP(data, value, name) {  uint32_t prev_state = (data)->ctx->ucState;\
+  cabac_encodeBinEP(data, value); \
+  printf("%s = %d prev_state=%d state=%d\n",name,value,prev_state, (data)->ctx->ucState);}
 #else
 #define CABAC_BIN(data, value, name) cabac_encodeBin(data, value);
 #define CABAC_BINS_EP(data, value,bins, name) cabac_encodeBinsEP(data, value,bins);
+#define CABAC_BIN_EP(data, value,bins, name) cabac_encodeBinEP(data, value);
 #endif
 
 #endif
