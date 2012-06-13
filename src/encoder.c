@@ -260,50 +260,56 @@ cabac_ctx g_QtCbfSCModelU[3];
 //cabac_ctx g_QtCbfSCModelV[3];
 cabac_ctx g_PartSizeSCModel;
 cabac_ctx g_CUSigCoeffGroupSCModel[4];
-cabac_ctx g_CUSigSCModel[45];
+cabac_ctx g_CUSigSCModel_luma[24];
+cabac_ctx g_CUSigSCModel_chroma[24];
 cabac_ctx g_CuCtxLastY_luma[15];
 cabac_ctx g_CuCtxLastY_chroma[15];
 cabac_ctx g_CuCtxLastX_luma[15];
 cabac_ctx g_CuCtxLastX_chroma[15];
+
 
 void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb,i;
   /* Initialize contexts */
   /* ToDo: add P/B slice */
-  cxt_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][0]);
-  cxt_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][1]);
-  cxt_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][2]);
+  ctx_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][0]);
+  ctx_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][1]);
+  ctx_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][2]);
 
-  cxt_init(&g_IntraModeSCModel, encoder->QP, INIT_INTRA_PRED_MODE[SLICE_I]);
+  ctx_init(&g_IntraModeSCModel, encoder->QP, INIT_INTRA_PRED_MODE[SLICE_I]);
 
-  cxt_init(&g_ChromaPredSCModel[0], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE_I][0]);
-  cxt_init(&g_ChromaPredSCModel[1], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE_I][1]);
+  ctx_init(&g_ChromaPredSCModel[0], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE_I][0]);
+  ctx_init(&g_ChromaPredSCModel[1], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE_I][1]);
   
 
   for(i = 0; i < 4; i++)
   {
-    cxt_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE_I][i]);
-    cxt_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE_I][i]);
+    ctx_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE_I][i]);
+    ctx_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE_I][i]);
   }
   for(i = 0; i < 3; i++)
   {
-    cxt_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
-    cxt_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+3]);
+    ctx_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
+    ctx_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+3]);
     //cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
   }
   for(i = 0; i < 15; i++)
   {    
-    cxt_init(&g_CuCtxLastY_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
-    cxt_init(&g_CuCtxLastX_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
+    ctx_init(&g_CuCtxLastY_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
+    ctx_init(&g_CuCtxLastX_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
 
-    cxt_init(&g_CuCtxLastY_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
-    cxt_init(&g_CuCtxLastX_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
+    ctx_init(&g_CuCtxLastY_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
+    ctx_init(&g_CuCtxLastX_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
   }
   
-  for(i = 0; i < 45; i++)
+  for(i = 0; i < 24; i++)
   {
-    cxt_init(&g_CUSigSCModel[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i]);
+    ctx_init(&g_CUSigSCModel_luma[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i]);
+    if(i < 21)
+    {   
+      ctx_init(&g_CUSigSCModel_chroma[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i+24]);
+    }
 
   }
 
@@ -460,7 +466,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         CABAC_BIN(&cabac,CbU,"cbf_chroma_u");
 
         /* Non-zero chroma V Tcoeffs */
-        cabac.ctx = &g_QtCbfSCModelU[0];
+        /* Using the same ctx as before */
         CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
 
         /* Non-zero luma Tcoeffs */
@@ -472,6 +478,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         {
           /* Residual Coding */
           /* LastSignificantXY */
+          /* ToDo: separate to a function */
           //encode_lastSignificantXY(uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
           uint8_t lastpos_x = 31, lastpos_y  = 31;
           uint8_t last_x    = 1, last_y     = 1;
@@ -531,13 +538,22 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           }
           /* end LastSignificantXY */
 
-          /* significant_coeff_flag */
+          for(i = 15; i >= 0; i-- )
+          {          
+            /* significant_coeff_flag */
+            cabac.ctx = &g_CUSigSCModel_luma[21]; /* 21 = uiCtxSig =TComTrQuant::getSigCtxInc( patternSigCtx, uiPosX, uiPosY, blockType, uiWidth, uiHeight, eTType );*/
+            CABAC_BIN(&cabac,0,"significant_coeff_flag");
+          }
 
-
+          for(i = 0; i < 8; i++)
+          {          
+            /* significant_coeff_flag */
+            cabac.ctx = &g_CUSigSCModel_luma[8]; /* 8 = 4 * uiCtxSet */
+            CABAC_BIN(&cabac,0,"significant_coeff_flag");
+          }
 
           /* end Residual Coding */
-        }
-        
+        }        
 
       }
       

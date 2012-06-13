@@ -30,8 +30,8 @@ typedef struct
 #define CTX_STATE(ctx) (ctx->ucState>>1)
 #define CTX_MPS(ctx) (ctx->ucState&1)
 
-void cxt_init(cabac_ctx* ctx,uint32_t qp, uint32_t initValue );
-void cxt_buildNextStateTable();
+void ctx_init(cabac_ctx* ctx,uint32_t qp, uint32_t initValue );
+void ctx_buildNextStateTable();
 void ctx_update(cabac_ctx* ctx, int val );
 //void ctx_update_LPS(cabac_ctx* ctx);
 //void ctx_update_MPS(cabac_ctx* ctx);
@@ -72,6 +72,7 @@ void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue );
 #define CABAC_BIN(data, value, name) {  uint32_t prev_state = (data)->ctx->ucState;\
                                         cabac_encodeBin(data, value); \
                                         printf("%s = %d prev_state=%d state=%d\n",name,value,prev_state, (data)->ctx->ucState);}
+
 #define CABAC_BINS_EP(data, value,bins, name) {  uint32_t prev_state = (data)->ctx->ucState;\
   cabac_encodeBinsEP(data, value,bins); \
   printf("%s = %d prev_state=%d state=%d\n",name,value,prev_state, (data)->ctx->ucState);}
