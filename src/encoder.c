@@ -476,87 +476,34 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /* CoeffNxN */
         if(CbY)
         {
+          int c1;
           /* Residual Coding */
           /* LastSignificantXY */
-          /* ToDo: separate to a function */
-          //encode_lastSignificantXY(uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
-          uint8_t lastpos_x = 31, lastpos_y  = 31;
-          uint8_t last_x    = 1, last_y     = 1;
-          uint8_t offset_x  = 10,offset_y   = 10;
-          uint8_t shift_x   = 1, shift_y    = 1;          
-          int uiGroupIdxX    = g_uiGroupIdx[ lastpos_x ];
-          int uiGroupIdxY    = g_uiGroupIdx[ lastpos_y ];
-          int temp;
-          /*
-          blkSizeOffsetX = eTType ? 0: (g_aucConvertToBit[ width ] *3 + ((g_aucConvertToBit[ width ] +1)>>2));
-          blkSizeOffsetY = eTType ? 0: (g_aucConvertToBit[ height ]*3 + ((g_aucConvertToBit[ height ]+1)>>2));
-          shiftX= eTType ? g_aucConvertToBit[ width  ] :((g_aucConvertToBit[ width  ]+3)>>2);
-          shiftY= eTType ? g_aucConvertToBit[ height ] :((g_aucConvertToBit[ height ]+3)>>2);
-          */
-          /* Last X binarization */
-          for(last_x = 0; last_x < uiGroupIdxX ; last_x++)
-          {
-            cabac.ctx = &g_CuCtxLastX_luma[offset_x+(last_x>>shift_x)];
-            CABAC_BIN(&cabac,1,"LastSignificantX");
-          }
-          if(uiGroupIdxX < g_uiGroupIdx[32-1])
-          {
-            cabac.ctx = &g_CuCtxLastX_luma[offset_x+(last_x>>shift_x)];
-            CABAC_BIN(&cabac,0,"LastSignificantX");
-          }
+          encode_lastSignificantXY(encoder,31, 31, 32, 32, 0, 0);
           
-          /* Last Y binarization */
-          for(last_y = 0; last_y < uiGroupIdxY ; last_y++)
-          {
-            cabac.ctx = &g_CuCtxLastY_luma[offset_y+(last_y>>shift_y)];
-            CABAC_BIN(&cabac,1,"LastSignificantY");
-          }
-          if(uiGroupIdxY < g_uiGroupIdx[32-1])
-          {
-            cabac.ctx = &g_CuCtxLastY_luma[offset_y+(last_y>>shift_y)];
-            CABAC_BIN(&cabac,0,"LastSignificantY");
-          }
-
-          /* Last X */
-          if(uiGroupIdxX > 3)
-          {
-            lastpos_x -= g_uiMinInGroup[uiGroupIdxX];
-            for(i = ((uiGroupIdxX-2)>>1)-1; i>=0; i--) 
-            {
-              CABAC_BIN_EP(&cabac,(lastpos_x>>i) & 1,"LastSignificantX");
-            }
-          }
-          
-          /* Last Y */
-          if(uiGroupIdxY > 3)
-          {
-            lastpos_y -= g_uiMinInGroup[uiGroupIdxY];
-            for(i = ((uiGroupIdxY-2)>>1)-1; i>=0; i--) 
-            {
-              CABAC_BIN_EP(&cabac,(lastpos_y>>i) & 1,"LastSignificantY");
-            }
-          }
-          /* end LastSignificantXY */
-
           for(i = 15; i >= 0; i-- )
-          {          
+          {
             /* significant_coeff_flag */
-            cabac.ctx = &g_CUSigSCModel_luma[21]; /* 21 = uiCtxSig =TComTrQuant::getSigCtxInc( patternSigCtx, uiPosX, uiPosY, blockType, uiWidth, uiHeight, eTType );*/
+            cabac.ctx = &g_CUSigSCModel_luma[21+((i<7)?1:0)]; /* 21 = uiCtxSig =TComTrQuant::getSigCtxInc( patternSigCtx, uiPosX, uiPosY, blockType, uiWidth, uiHeight, eTType );*/
             CABAC_BIN(&cabac,0,"significant_coeff_flag");
           }
 
+          c1 = 1;
           for(i = 0; i < 8; i++)
-          {          
+          {
             /* significant_coeff_flag */
-            cabac.ctx = &g_CUSigSCModel_luma[8]; /* 8 = 4 * uiCtxSet */
+            cabac.ctx = &g_CUSigSCModel_luma[8+c1]; /* 8 = 4 * uiCtxSet */
             CABAC_BIN(&cabac,0,"significant_coeff_flag");
+            if(c1 < 3)
+            {
+              c1 ++;
+            }
           }
 
           /* end Residual Coding */
-        }        
+        }
 
-      }
-      
+      }      
 
       /* end Transform tree */
       /* end Coeff */
@@ -573,3 +520,63 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   
 }
 
+
+
+void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
+{
+  uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
+  uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
+  int uiGroupIdxX    = g_uiGroupIdx[ lastpos_x ];
+  int uiGroupIdxY    = g_uiGroupIdx[ lastpos_y ];
+  int last_x,last_y,i;
+
+  if(width != height)
+  {
+    shift_y = (TOBITS(height)+3)>>2;
+    offset_y = TOBITS(height)*3 + ((TOBITS(height)+1)>>2);
+  }
+
+  /* Last X binarization */
+  for(last_x = 0; last_x < uiGroupIdxX ; last_x++)
+  {
+    cabac.ctx = &g_CuCtxLastX_luma[offset_x+(last_x>>shift_x)];
+    CABAC_BIN(&cabac,1,"LastSignificantX");
+  }
+  if(uiGroupIdxX < g_uiGroupIdx[32-1])
+  {
+    cabac.ctx = &g_CuCtxLastX_luma[offset_x+(last_x>>shift_x)];
+    CABAC_BIN(&cabac,0,"LastSignificantX");
+  }
+
+  /* Last Y binarization */
+  for(last_y = 0; last_y < uiGroupIdxY ; last_y++)
+  {
+    cabac.ctx = &g_CuCtxLastY_luma[offset_y+(last_y>>shift_y)];
+    CABAC_BIN(&cabac,1,"LastSignificantY");
+  }
+  if(uiGroupIdxY < g_uiGroupIdx[32-1])
+  {
+    cabac.ctx = &g_CuCtxLastY_luma[offset_y+(last_y>>shift_y)];
+    CABAC_BIN(&cabac,0,"LastSignificantY");
+  }
+
+  /* Last X */
+  if(uiGroupIdxX > 3)
+  {
+    lastpos_x -= g_uiMinInGroup[uiGroupIdxX];
+    for(i = ((uiGroupIdxX-2)>>1)-1; i>=0; i--) 
+    {
+      CABAC_BIN_EP(&cabac,(lastpos_x>>i) & 1,"LastSignificantX");
+    }
+  }          
+  /* Last Y */
+  if(uiGroupIdxY > 3)
+  {
+    lastpos_y -= g_uiMinInGroup[uiGroupIdxY];
+    for(i = ((uiGroupIdxY-2)>>1)-1; i>=0; i--) 
+    {
+      CABAC_BIN_EP(&cabac,(lastpos_y>>i) & 1,"LastSignificantY");
+    }
+  }
+  /* end LastSignificantXY */
+}

@@ -64,7 +64,7 @@ void encode_pic_parameter_set(encoder_control* encoder);
 void encode_slice_data(encoder_control* encoder);
 void encode_slice_header(encoder_control* encoder);
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
-
+void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan);
 
 static const uint8_t  INIT_SPLIT_FLAG[3][3] =  
                        { { 107,  139,  126 },
@@ -124,7 +124,21 @@ static const uint8_t g_sigLastScanCG32x32[ 64 ] =
   29,22,15,58,51,44,37,30,
   23,59,52,45,38,31,60,53,
   46,39,61,54,47,62,55,63 };
- 
+
+// 
+//4 8 16 32 64 128
+//0 1  2  3  4   5
+static const uint8_t g_toBits[129] =
+{  
+  0,
+  0,0,0,0,
+  0,0,0,1,
+  0,0,0,0,0,0,0,2,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5
+};
+#define TOBITS(len) g_toBits[len]
 
 
 #endif
