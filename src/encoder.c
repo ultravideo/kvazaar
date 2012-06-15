@@ -266,6 +266,7 @@ cabac_ctx g_CuCtxLastY_luma[15];
 cabac_ctx g_CuCtxLastY_chroma[15];
 cabac_ctx g_CuCtxLastX_luma[15];
 cabac_ctx g_CuCtxLastX_chroma[15];
+cabac_ctx g_CUOneSCModel_luma[24];
 
 
 void encode_slice_data(encoder_control* encoder)
@@ -305,12 +306,13 @@ void encode_slice_data(encoder_control* encoder)
   
   for(i = 0; i < 24; i++)
   {
+    ctx_init(&g_CUOneSCModel_luma[i], encoder->QP, INIT_ONE_FLAG[SLICE_I][i]);
+
     ctx_init(&g_CUSigSCModel_luma[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i]);
     if(i < 21)
     {   
       ctx_init(&g_CUSigSCModel_chroma[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i+24]);
     }
-
   }
 
   encoder->in.cur_pic.CU[1][0].type = CU_INTRA;
@@ -391,7 +393,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       //printf("\tIPCMFlag = 1\n");
       cabac_finish(&cabac);
       WRITE_U(cabac.stream, 1, 1, "stop_bit");
-      WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");    
+      WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");
       bitstream_align(cabac.stream);
        /* PCM sample */
       {
@@ -401,10 +403,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         for(y = 0; y < LCU_WIDTH>>depth; y++)
         {
           for(x = 0; x < LCU_WIDTH>>depth; x++)
-          {          
+          {
             bitstream_put(cabac.stream, base[x+y*encoder->in.width], 8);
           }
-        }       
+        }
         if(encoder->in.video_format != FORMAT_400)
         {
           //Cb
@@ -457,9 +459,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         uint8_t CbY = 0,CbU = 0,CbV = 0;
       
         /*
-         Quant and transform ...
+         Quant and transform here...
         */
-        CbY = 1; /* Let's pretend we have LUMA coefficients */
+        CbY = 1; /* Let's pretend we have luma coefficients */
 
         /* Non-zero chroma U Tcoeffs */
         cabac.ctx = &g_QtCbfSCModelU[0];
@@ -476,40 +478,50 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /* CoeffNxN */
         if(CbY)
         {
-          int c1;
+          int c1,c1_num;
+          int patternSigCtx;
+          int numNonZero = 16;
+          /* scanCG == g_sigLastScanCG32x32 */
           /* Residual Coding */
           /* LastSignificantXY */
-          encode_lastSignificantXY(encoder,31, 31, 32, 32, 0, 0);
+          encode_lastSignificantXY(encoder,31/*last_coeff_x */, 31/* last_coeff_y */, 32, 32, 0, 0);
           
           for(i = 15; i >= 0; i-- )
           {
             /* significant_coeff_flag */
             cabac.ctx = &g_CUSigSCModel_luma[21+((i<7)?1:0)]; /* 21 = uiCtxSig =TComTrQuant::getSigCtxInc( patternSigCtx, uiPosX, uiPosY, blockType, uiWidth, uiHeight, eTType );*/
-            CABAC_BIN(&cabac,0,"significant_coeff_flag");
+            CABAC_BIN(&cabac,1,"significant_coeff_flag");
           }
 
+          /* n = 15 .. 0 coeff_abs_level_greater1_flag[ n ] */
+
+          /* coeff_abs_level_greater2_flag[ firstGreater1CoeffIdx] */
+
           c1 = 1;
-          for(i = 0; i < 8; i++)
+          c1_num = MIN(numNonZero,C1FLAG_NUMBER);
+          for(i = 0; i < c1_num; i++)
           {
+            int val = 0;
             /* significant_coeff_flag */
-            cabac.ctx = &g_CUSigSCModel_luma[8+c1]; /* 8 = 4 * uiCtxSet */
-            CABAC_BIN(&cabac,0,"significant_coeff_flag");
-            if(c1 < 3)
+            cabac.ctx = &g_CUOneSCModel_luma[4*2+c1]; /* 4 * uiCtxSet +c1 */
+            CABAC_BIN(&cabac,val,"coeff_abs_level_greater1_flag");
+            if(val)
             {
-              c1 ++;
+              c1 = 0;
+            }
+            else if(c1 < 3)
+            {
+              c1++;
             }
           }
 
           /* end Residual Coding */
         }
-
-      }      
-
+      }
       /* end Transform tree */
       /* end Coeff */
-
     }
-   //endif   
+   //endif
    /* end prediction unit */
 
    //cabac_encodeBin(&cabac, 0); //prev_intra_luma_pred_flag
@@ -521,13 +533,12 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 }
 
 
-
 void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
 {
   uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
   uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
-  int uiGroupIdxX    = g_uiGroupIdx[ lastpos_x ];
-  int uiGroupIdxY    = g_uiGroupIdx[ lastpos_y ];
+  int uiGroupIdxX   = g_uiGroupIdx[lastpos_x];
+  int uiGroupIdxY   = g_uiGroupIdx[lastpos_y];
   int last_x,last_y,i;
 
   if(width != height)

@@ -261,7 +261,9 @@ void cabac_finish(cabac_data* data)
  */
 void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue )
 {
+  #ifdef _DEBUG
   printf("\tencodeBinTrm m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
+  #endif
   data->uiBinsCoded += data->binCountIncrement;
   data->uiRange -= 2;
   if( binValue )

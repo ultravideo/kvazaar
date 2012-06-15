@@ -113,6 +113,15 @@ static const uint8_t INIT_LAST[3][30] =
     108,  123,   63,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  }
 };
 
+static const uint8_t INIT_ONE_FLAG[3][24] = 
+{
+  {154,196,167,167,154,152,167,182,182,134,149,136,153,121,136,122,169,208,166,167,154,152,167,182},
+  {154,196,196,167,154,152,167,182,182,134,149,136,153,121,136,137,169,194,166,167,154,167,137,182},
+  {140, 92,137,138,140,152,138,139,153, 74,149, 92,139,107,122,152,140,179,166,182,140,227,122,197}
+};
+
+static uint8_t* g_auiSigLastScan[4][7];
+
 static const uint8_t g_uiGroupIdx[ 32 ]   = {0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9};
 static const uint8_t g_uiMinInGroup[ 10 ] = {0,1,2,3,4,6,8,12,16,24};
 static const uint8_t g_sigLastScanCG32x32[ 64 ] = 
@@ -139,6 +148,10 @@ static const uint8_t g_toBits[129] =
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5
 };
 #define TOBITS(len) g_toBits[len]
+
+
+#define C1FLAG_NUMBER               8 // maximum number of largerThan1 flag coded in one chunk
+#define C2FLAG_NUMBER               1 // maximum number of largerThan2 flag coded in one chunk
 
 
 #endif
