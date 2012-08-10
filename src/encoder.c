@@ -80,6 +80,13 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 1);
     bitstream_clear_buffer(encoder->stream);
 
+    /* Video Parameter Set (VPS) */
+    encode_vid_parameter_set(encoder);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_VID_PARAMETER_SET, 0);
+    bitstream_clear_buffer(encoder->stream);
+
     /* Picture Parameter Set (PPS) */
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
@@ -124,26 +131,30 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
   WRITE_U(encoder->stream, 0, 1, "sign_data_hiding_flag");
   WRITE_U(encoder->stream, 0, 1, "cabac_init_present_flag");
-  WRITE_U(encoder->stream, 0, 3, "num_ref_idx_l0_default_active_minus1");
-  WRITE_U(encoder->stream, 0, 3, "num_ref_idx_l1_default_active_minus1");
-  /*
-  //Should be this
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
-  */
   WRITE_SE(encoder->stream, encoder->QP-26, "pic_init_qp_minus26");
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(encoder->stream, 0, 1, "enable_temporal_mvp_flag"); /* ToDo: remove this */
-  WRITE_U(encoder->stream, 0, 2, "slice_granularity");
-  WRITE_UE(encoder->stream, 0, "max_cu_qp_delta_depth");
+  WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
+  WRITE_U(encoder->stream, 0, 1, "cu_qp_delta_enabled_flag");
+  //if cu_qp_delta_enabled_flag
+  //WRITE_UE(encoder->stream, 0, "diff_cu_qp_delta_depth");
+
   WRITE_SE(encoder->stream, 0, "cb_qp_offset");
   WRITE_SE(encoder->stream, 0, "cr_qp_offset");
+  WRITE_U(encoder->stream, 0, 1, "slicelevel_chroma_qp_flag");
   WRITE_U(encoder->stream, 0, 1, "weighted_pred_flag");
-  WRITE_U(encoder->stream, 0, 2, "weighted_bipred_idc");  
-  WRITE_U(encoder->stream, 1, 1, "output_flag_present_flag");  
+  WRITE_U(encoder->stream, 0, 2, "weighted_bipred_idc");
+  WRITE_U(encoder->stream, 1, 1, "output_flag_present_flag");
+  WRITE_U(encoder->stream, 0, 1, "dependent_slices_enabled_flag");
+  WRITE_U(encoder->stream, 0, 1, "transquant_bypass_enable_flag");
+  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");
+  WRITE_U(encoder->stream, 0, 1, "loop_filter_across_slice_flag");
   WRITE_U(encoder->stream, 0, 1, "deblocking_filter_control_present_flag");
+  WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
   WRITE_UE(encoder->stream, 0, "log2_parallel_merge_level_minus2");
-  WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");  
+  WRITE_U(encoder->stream, 0, 1, "slice_header_extension_present_flag");
+  WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");
 }
 
 void encode_seq_parameter_set(encoder_control* encoder)
@@ -152,10 +163,13 @@ void encode_seq_parameter_set(encoder_control* encoder)
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
   /* ToDo: profile IDC and level IDC should be defined later on */
-  WRITE_U(encoder->stream, 0, 8, "profile_idc");
-  WRITE_U(encoder->stream, 0, 8, "reserved_zero_8bits");
+  WRITE_U(encoder->stream, 0, 3, "profile_space");
+  WRITE_U(encoder->stream, 0, 5, "profile_idc");
+  WRITE_U(encoder->stream, 0, 16, "reserved_indicator_flags");
   WRITE_U(encoder->stream, 0, 8, "level_idc");
+  WRITE_U(encoder->stream, 0, 32, "profile_compatibility");
   WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
+  WRITE_UE(encoder->stream, 0, "video_parameter_set_id");
   WRITE_UE(encoder->stream, encoder->in.video_format, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
   WRITE_U(encoder->stream, 0, 3, "max_temporal_layers_minus1");
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
@@ -169,7 +183,6 @@ void encode_seq_parameter_set(encoder_control* encoder)
     WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_luma_minus1");
     WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_chroma_minus1");
   #endif
-  WRITE_U(encoder->stream, 0, 1, "qpprime_y_zero_transquant_bypass_flag");
   WRITE_UE(encoder->stream, 4, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_UE(encoder->stream, 0, "max_dec_pic_buffering");
   WRITE_UE(encoder->stream, 0, "num_reorder_pics");
@@ -193,12 +206,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
 
   WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
-  WRITE_U(encoder->stream, 0, 1, "chroma_pred_from_luma_enabled_flag");
-  WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
-  WRITE_U(encoder->stream, 0, 1, "deblocking_filter_in_aps_enabled_flag");
-  WRITE_U(encoder->stream, 0, 1, "seq_loop_filter_across_slices_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "asymmetric_motion_partitions_enabled_flag");
-  WRITE_U(encoder->stream, 0, 1, "nsrqt_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
 	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
   #if ENABLE_PCM == 1
@@ -207,10 +215,21 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");
   WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
-  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");  
+  WRITE_U(encoder->stream, 0, 1, "sps_temporal_mvp_enable_flag");  
 	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
+}
 
-  WRITE_U(encoder->stream, 1, 8, "stuffing");
+void encode_vid_parameter_set(encoder_control* encoder)
+{
+#ifdef _DEBUG
+  printf("=========== Video Parameter Set ID: 0 ===========\n");
+#endif
+  WRITE_U(encoder->stream, 0, 3, "vps_max_temporal_layers_minus1");
+  WRITE_U(encoder->stream, 0, 5, "vps_max_layers_minus1");
+  WRITE_UE(encoder->stream, 0, "video_parameter_set_id");
+
+
+	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
 void encode_slice_header(encoder_control* encoder)
@@ -220,25 +239,34 @@ void encode_slice_header(encoder_control* encoder)
 #endif
 
   WRITE_U(encoder->stream, 1, 1, "first_slice_in_pic_flag");
+  if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
+  {
+    WRITE_U(encoder->stream, 0, 1, "no_output_of_prior_pics_flag");
+  }
+  WRITE_UE(encoder->stream, 0, "pic_parameter_set_id");
+  
   WRITE_UE(encoder->stream, SLICE_I, "slice_type");
 
-  WRITE_U(encoder->stream, 0, 1, "entropy_slice_flag");
+  WRITE_U(encoder->stream, 0, 1, "dependent_slice_flag");
+
   // if !entropy_slice_flag
-    WRITE_UE(encoder->stream, 0, "pic_parameter_set_id");
+  
     //if output_flag_present_flag
       WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
     if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
     {
-      WRITE_UE(encoder->stream, encoder->frame&3, "idr_pic_id");
-      WRITE_U(encoder->stream, 0, 1, "no_output_of_prior_pics_flag");
+      //WRITE_UE(encoder->stream, encoder->frame&3, "idr_pic_id");      
     }
     else
     {
+      //ToDo
+      /*
       WRITE_U(encoder->stream, encoder->frame, 8, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
+      */
     }
     //end if
   //end if
@@ -479,7 +507,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         if(CbY)
         {
           int c1,c1_num;
-          int patternSigCtx;
+          //int patternSigCtx;
           int numNonZero = 16;
           /* scanCG == g_sigLastScanCG32x32 */
           /* Residual Coding */
