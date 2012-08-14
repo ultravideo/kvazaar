@@ -80,13 +80,13 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 1);
     bitstream_clear_buffer(encoder->stream);
 
-    /* Video Parameter Set (VPS) */
+    /* Video Parameter Set (VPS) */    
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_VID_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
-
+    
     /* Picture Parameter Set (PPS) */
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
@@ -98,12 +98,12 @@ void encode_one_frame(encoder_control* encoder)
     cabac_start(&cabac);
     encoder->in.cur_pic.type = NAL_IDR_SLICE;
     encode_slice_header(encoder);
-    bitstream_align(encoder->stream);    
+    bitstream_align(encoder->stream);
     encode_slice_data(encoder);
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 1);
     bitstream_clear_buffer(encoder->stream);
   }
   else if(encoder->frame < 3)
@@ -117,7 +117,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_NONIDR_SLICE, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_NONIDR_SLICE, encoder->frame+1);
     bitstream_clear_buffer(encoder->stream);
   }  
 }
@@ -144,7 +144,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_SE(encoder->stream, 0, "cr_qp_offset");
   WRITE_U(encoder->stream, 0, 1, "slicelevel_chroma_qp_flag");
   WRITE_U(encoder->stream, 0, 1, "weighted_pred_flag");
-  WRITE_U(encoder->stream, 0, 2, "weighted_bipred_idc");
+  WRITE_U(encoder->stream, 0, 1, "weighted_bipred_idc");
   WRITE_U(encoder->stream, 1, 1, "output_flag_present_flag");
   WRITE_U(encoder->stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "transquant_bypass_enable_flag");
@@ -208,12 +208,13 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "asymmetric_motion_partitions_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
-	WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
+	//WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
   #if ENABLE_PCM == 1
     WRITE_U(encoder->stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
   WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");
-  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");
+  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");  
+  //WRITE_U(encoder->stream, 0, 1, "inter_ref_pic_set_prediction_flag");
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
   WRITE_U(encoder->stream, 0, 1, "sps_temporal_mvp_enable_flag");  
 	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
@@ -227,9 +228,15 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 3, "vps_max_temporal_layers_minus1");
   WRITE_U(encoder->stream, 0, 5, "vps_max_layers_minus1");
   WRITE_UE(encoder->stream, 0, "video_parameter_set_id");
+  WRITE_U(encoder->stream, 0, 1, "vps_temporal_id_nesting_flag");
 
+  WRITE_UE(encoder->stream, 0, "vps_max_dec_pic_buffering");
+  WRITE_UE(encoder->stream, 0, "vps_num_reorder_pics");
+  WRITE_UE(encoder->stream, 0, "vps_max_latency_increase");
 
 	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
+
+
 }
 
 void encode_slice_header(encoder_control* encoder)
@@ -260,20 +267,20 @@ void encode_slice_header(encoder_control* encoder)
       //WRITE_UE(encoder->stream, encoder->frame&3, "idr_pic_id");      
     }
     else
-    {
-      //ToDo
-      /*
-      WRITE_U(encoder->stream, encoder->frame, 8, "pic_order_cnt_lsb");
+    {     
+      WRITE_U(encoder->stream, encoder->frame+1, 8, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
+      //WRITE_U(encoder->stream, 1, 1, "inter_ref_pic_set_prediction_flag");
       WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
-      */
     }
     //end if
   //end if
   /* Skip flags that are not present */
   // if !entropy_slice_flag
-    WRITE_UE(encoder->stream, 0, "slice_qp_delta");
+    WRITE_SE(encoder->stream, 0, "slice_qp_delta");
     WRITE_UE(encoder->stream, 0, "5_minus_max_num_merge_cand");
+
+    WRITE_U(encoder->stream, 1, 1, "alignment");
 }
   
 /* CONTEXTS */
@@ -415,7 +422,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
    //If MODE_INTRA
     //cabac.ctx = &PCMFlagSCModel;
      /* Code IPCM block */
-    if(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)].type <= CU_PCM)
+    if(1)//encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)].type <= CU_PCM)
     {
       cabac_encodeBinTrm(&cabac, 1); /* IPCMFlag == 1 */
       //printf("\tIPCMFlag = 1\n");

@@ -41,12 +41,12 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   fwrite(&zero, 1, 1, output);
   fwrite(&start_code_prefix_one_3bytes, 1, 1, output);
 
-  /* forbidden_zero_flag(1) + nal_ref_flag(1) + nal_unit_type(6) */
-  byte = nal_ref<<6 | nal_type;
+  /* forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of reserved_one_6bits(3)*/
+  byte = nal_type<<1;
   fwrite(&byte, 1, 1, output);
 
-  /* Temporal_id(3) + reserved_one_5bits(5) */
-  byte = temporal_id << 5 | 1;
+  /* 5bits of reserved_one_6bits + Temporal_id(3) */
+  byte = temporal_id&7;
   fwrite(&byte, 1, 1, output);
 
   /* Write out bytes and add emulation_prevention_three_byte when needed */
