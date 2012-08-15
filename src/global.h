@@ -15,7 +15,8 @@
 
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit */
-#define MAX_DEPTH 2
+#define MAX_DEPTH 3
+#define MIN_SIZE 0
 
 #define ENABLE_PCM 1
 

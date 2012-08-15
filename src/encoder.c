@@ -63,8 +63,8 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->cur_pic.CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
   for(i=0; i < MAX_DEPTH+1; i++)
   {
-    input->cur_pic.CU[i] = (CU_info*)malloc((input->height_in_LCU<<2)*(input->width_in_LCU<<2)*sizeof(CU_info));
-    memset(input->cur_pic.CU[i], 0, (input->height_in_LCU<<2)*(input->width_in_LCU<<2)*sizeof(CU_info));
+    input->cur_pic.CU[i] = (CU_info*)malloc((input->height_in_LCU<<MAX_DEPTH)*(input->width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+    memset(input->cur_pic.CU[i], 0, (input->height_in_LCU<<MAX_DEPTH)*(input->width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
   }  
 }
 
@@ -190,13 +190,15 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "num_reorder_pics");
   WRITE_UE(encoder->stream, 0, "max_latency_increase");
   WRITE_U(encoder->stream, 0, 1, "restricted_ref_pic_lists_flag");
-  WRITE_UE(encoder->stream, 1, "log2_min_coding_block_size_minus3");
+  WRITE_UE(encoder->stream, MIN_SIZE, "log2_min_coding_block_size_minus3");
   WRITE_UE(encoder->stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
   WRITE_UE(encoder->stream, 0, "log2_min_transform_block_size_minus2");
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size");
 
   //If log2MinCUSize == 3
-  //WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
+  #if MAX_DEPTH == 3
+    //WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
+  #endif
 
   #if ENABLE_PCM == 1
     WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
@@ -296,8 +298,8 @@ void encode_slice_data(encoder_control* encoder)
 
   init_contexts(encoder);
 
-  //encoder->in.cur_pic.CU[1][2].type = CU_INTRA;
-  //encoder->in.cur_pic.CU[1][3].type = CU_INTRA;
+  encoder->in.cur_pic.CU[1][2].type = CU_INTRA;
+  encoder->in.cur_pic.CU[1][3].type = CU_INTRA;
   
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
@@ -325,31 +327,33 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   int i,x,y;
   uint8_t split_flag = (depth!=1)?1:0;
   uint8_t split_model = 0;
-  uint8_t border_x = (encoder->in.width+1)<((xCtb>>(MAX_DEPTH-depth))+1)*(LCU_WIDTH>>depth);
-  uint8_t border_y = (encoder->in.height+1)<((yCtb>>(MAX_DEPTH-depth))+1)*(LCU_WIDTH>>depth);
+
+  /* Check for slice border */
+  uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + LCU_WIDTH>>depth ))?1:0;
+  uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>(MAX_DEPTH)) + LCU_WIDTH>>depth ))?1:0;
   uint8_t border = border_x | border_y;
 
-  /* Get left and top block split_flags and if they are present and true, increase model number */
-  if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
-  {
-    split_model++;
-  }
-  if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
-  {
-    split_model++;
-  }
-  
+
   /* When not in MAX_DEPTH, insert split flag and split the blocks if needed */
-  if(depth != MAX_DEPTH || border)
+  if(depth != MAX_DEPTH)
   {
     SET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)]),split_flag);
-    cabac.ctx = &g_SplitFlagSCModel[split_model];
     //Implisit split flag when on border
     if(!border)
     {
+      /* Get left and top block split_flags and if they are present and true, increase model number */
+      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
+      {
+        split_model++;
+      }
+      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
+      {
+        split_model++;
+      }    
+      cabac.ctx = &g_SplitFlagSCModel[split_model];    
       CABAC_BIN(&cabac, split_flag, "SplitFlag");
     }
-    if(split_flag)
+    if(split_flag || border)
     {
       /* Split blocks and remember to change x and y block positions */
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
@@ -394,16 +398,16 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       bitstream_align(cabac.stream);
        /* PCM sample */
       {
-        uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(depth+1)) + (yCtb*(LCU_WIDTH>>(depth+1)))*encoder->in.width];
-        uint8_t *baseCb = &encoder->in.cur_pic.uData[(xCtb*(LCU_WIDTH>>(depth+2)) + (yCtb*(LCU_WIDTH>>(depth+2)))*encoder->in.width/2)];
-        uint8_t *baseCr = &encoder->in.cur_pic.vData[(xCtb*(LCU_WIDTH>>(depth+2)) + (yCtb*(LCU_WIDTH>>(depth+2)))*encoder->in.width/2)];
+        uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+        uint8_t *baseCb = &encoder->in.cur_pic.uData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
+        uint8_t *baseCr = &encoder->in.cur_pic.vData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
         for(y = 0; y < LCU_WIDTH>>depth; y++)
         {
           for(x = 0; x < LCU_WIDTH>>depth; x++)
           {
             bitstream_put(cabac.stream, base[x+y*encoder->in.width], 8);
           }
-        }
+        }       
         if(encoder->in.video_format != FORMAT_400)
         {
           //Cb
@@ -432,7 +436,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     else
     {
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
-       
+      
       cabac.ctx = &g_IntraModeSCModel;
       CABAC_BIN(&cabac,0,"IntraPred");
 
@@ -441,7 +445,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
       */
       CABAC_BINS_EP(&cabac, 0, 5, "intraPredMode");
- 
+      
       if(encoder->in.video_format != FORMAT_400)
       {
         cabac.ctx = &g_ChromaPredSCModel[0];
