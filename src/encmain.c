@@ -102,6 +102,7 @@
     }
 
     /* Initialization */
+    init_tables();
     init_exp_golomb(4096*8);
     cabac_init(&cabac);
     init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream)));
