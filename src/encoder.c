@@ -24,6 +24,7 @@
 #include "cabac.h"
 #include "picture.h"
 #include "nal.h"
+#include "context.h"
 
 void init_encoder_control(encoder_control* control,bitstream* output)
 {
@@ -159,6 +160,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
 
 void encode_seq_parameter_set(encoder_control* encoder)
 {
+  int i;
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
@@ -216,7 +218,11 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");  
   //WRITE_U(encoder->stream, 0, 1, "inter_ref_pic_set_prediction_flag");
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
-  WRITE_U(encoder->stream, 0, 1, "sps_temporal_mvp_enable_flag");  
+  WRITE_U(encoder->stream, 0, 1, "sps_temporal_mvp_enable_flag");
+  for(i = 0; i < MAX_DEPTH; i++)
+  {
+    WRITE_U(encoder->stream, 0, 1, "AMVP modeflag");
+  }
 	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
@@ -235,8 +241,6 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "vps_max_latency_increase");
 
 	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
-
-
 }
 
 void encode_slice_header(encoder_control* encoder)
@@ -267,7 +271,7 @@ void encode_slice_header(encoder_control* encoder)
       //WRITE_UE(encoder->stream, encoder->frame&3, "idr_pic_id");      
     }
     else
-    {     
+    {
       WRITE_U(encoder->stream, encoder->frame+1, 8, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
       //WRITE_U(encoder->stream, 1, 1, "inter_ref_pic_set_prediction_flag");
@@ -283,75 +287,17 @@ void encode_slice_header(encoder_control* encoder)
     WRITE_U(encoder->stream, 1, 1, "alignment");
 }
   
-/* CONTEXTS */
-/* ToDo: move somewhere else */
-cabac_ctx *SplitFlagSCModel;
-cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */
-cabac_ctx g_IntraModeSCModel;    /*<! \brief intra mode context models */
-cabac_ctx g_ChromaPredSCModel[2];
-cabac_ctx g_TransSubdivSCModel[4];    /*<! \brief intra mode context models */
-cabac_ctx g_QtCbfSCModelY[3];
-cabac_ctx g_QtCbfSCModelU[3];
-//cabac_ctx g_QtCbfSCModelV[3];
-cabac_ctx g_PartSizeSCModel;
-cabac_ctx g_CUSigCoeffGroupSCModel[4];
-cabac_ctx g_CUSigSCModel_luma[24];
-cabac_ctx g_CUSigSCModel_chroma[24];
-cabac_ctx g_CuCtxLastY_luma[15];
-cabac_ctx g_CuCtxLastY_chroma[15];
-cabac_ctx g_CuCtxLastX_luma[15];
-cabac_ctx g_CuCtxLastX_chroma[15];
-cabac_ctx g_CUOneSCModel_luma[24];
+
 
 
 void encode_slice_data(encoder_control* encoder)
 {
-  uint16_t xCtb,yCtb,i;
-  /* Initialize contexts */
-  /* ToDo: add P/B slice */
-  ctx_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][0]);
-  ctx_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][1]);
-  ctx_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE_I][2]);
+  uint16_t xCtb,yCtb;
 
-  ctx_init(&g_IntraModeSCModel, encoder->QP, INIT_INTRA_PRED_MODE[SLICE_I]);
+  init_contexts(encoder);
 
-  ctx_init(&g_ChromaPredSCModel[0], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE_I][0]);
-  ctx_init(&g_ChromaPredSCModel[1], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE_I][1]);
-  
-
-  for(i = 0; i < 4; i++)
-  {
-    ctx_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE_I][i]);
-    ctx_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE_I][i]);
-  }
-  for(i = 0; i < 3; i++)
-  {
-    ctx_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
-    ctx_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE_I][i+3]);
-    //cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE_I][i]);
-  }
-  for(i = 0; i < 15; i++)
-  {    
-    ctx_init(&g_CuCtxLastY_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
-    ctx_init(&g_CuCtxLastX_luma[i], encoder->QP, INIT_LAST[SLICE_I][i] );
-
-    ctx_init(&g_CuCtxLastY_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
-    ctx_init(&g_CuCtxLastX_chroma[i], encoder->QP, INIT_LAST[SLICE_I][i+15] );
-  }
-  
-  for(i = 0; i < 24; i++)
-  {
-    ctx_init(&g_CUOneSCModel_luma[i], encoder->QP, INIT_ONE_FLAG[SLICE_I][i]);
-
-    ctx_init(&g_CUSigSCModel_luma[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i]);
-    if(i < 21)
-    {   
-      ctx_init(&g_CUSigSCModel_chroma[i], encoder->QP, INIT_SIG_FLAG[SLICE_I][i+24]);
-    }
-  }
-
-  encoder->in.cur_pic.CU[1][0].type = CU_INTRA;
-  encoder->in.cur_pic.CU[1][2].type = CU_INTRA;  
+  //encoder->in.cur_pic.CU[1][2].type = CU_INTRA;
+  //encoder->in.cur_pic.CU[1][3].type = CU_INTRA;
   
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
@@ -379,6 +325,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   int i,x,y;
   uint8_t split_flag = (depth!=1)?1:0;
   uint8_t split_model = 0;
+  uint8_t border_x = (encoder->in.width+1)<((xCtb>>(MAX_DEPTH-depth))+1)*(LCU_WIDTH>>depth);
+  uint8_t border_y = (encoder->in.height+1)<((yCtb>>(MAX_DEPTH-depth))+1)*(LCU_WIDTH>>depth);
+  uint8_t border = border_x | border_y;
 
   /* Get left and top block split_flags and if they are present and true, increase model number */
   if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
@@ -389,21 +338,34 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   {
     split_model++;
   }
-  cabac.ctx = &g_SplitFlagSCModel[split_model];
-
+  
   /* When not in MAX_DEPTH, insert split flag and split the blocks if needed */
-  if(depth != MAX_DEPTH)
+  if(depth != MAX_DEPTH || border)
   {
     SET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)]),split_flag);
-    CABAC_BIN(&cabac, split_flag, "SplitFlag");
+    cabac.ctx = &g_SplitFlagSCModel[split_model];
+    //Implisit split flag when on border
+    if(!border)
+    {
+      CABAC_BIN(&cabac, split_flag, "SplitFlag");
+    }
     if(split_flag)
     {
       /* Split blocks and remember to change x and y block positions */
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
       encode_coding_tree(encoder,xCtb,yCtb,depth+1);
-      encode_coding_tree(encoder,xCtb+change,yCtb,depth+1);
-      encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);
-      encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1);
+      if(!border_x)
+      {
+        encode_coding_tree(encoder,xCtb+change,yCtb,depth+1);
+      }
+      if(!border_y)
+      {
+        encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);      
+      }
+      if(!border)
+      {
+        encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1);
+      }
       /* We don't need to do anything else here */
       return;
     }
@@ -422,7 +384,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
    //If MODE_INTRA
     //cabac.ctx = &PCMFlagSCModel;
      /* Code IPCM block */
-    if(1)//encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)].type <= CU_PCM)
+    if(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)].type <= CU_PCM)
     {
       cabac_encodeBinTrm(&cabac, 1); /* IPCMFlag == 1 */
       //printf("\tIPCMFlag = 1\n");
@@ -480,8 +442,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       */
       CABAC_BINS_EP(&cabac, 0, 5, "intraPredMode");
  
-      cabac.ctx = &g_ChromaPredSCModel[0];
-      CABAC_BIN(&cabac,0,"IntraPredChroma");
+      if(encoder->in.video_format != FORMAT_400)
+      {
+        cabac.ctx = &g_ChromaPredSCModel[0];
+        CABAC_BIN(&cabac,0,"IntraPredChroma");
+      }
 
       /* Coeff */
       /* Transform tree */
@@ -498,13 +463,16 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         */
         CbY = 1; /* Let's pretend we have luma coefficients */
 
-        /* Non-zero chroma U Tcoeffs */
-        cabac.ctx = &g_QtCbfSCModelU[0];
-        CABAC_BIN(&cabac,CbU,"cbf_chroma_u");
+        if(encoder->in.video_format != FORMAT_400)
+        {
+          /* Non-zero chroma U Tcoeffs */
+          cabac.ctx = &g_QtCbfSCModelU[0];
+          CABAC_BIN(&cabac,CbU,"cbf_chroma_u");
 
-        /* Non-zero chroma V Tcoeffs */
-        /* Using the same ctx as before */
-        CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
+          /* Non-zero chroma V Tcoeffs */
+          /* Using the same ctx as before */
+          CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
+        }
 
         /* Non-zero luma Tcoeffs */
         cabac.ctx = &g_QtCbfSCModelY[1];
@@ -528,6 +496,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             CABAC_BIN(&cabac,1,"significant_coeff_flag");
           }
 
+          /*UInt uiSigCoeffGroupFlag[ MLS_GRP_NUM ];
+            ::memset( uiSigCoeffGroupFlag, 0, sizeof(UInt) * MLS_GRP_NUM );*/
           /* n = 15 .. 0 coeff_abs_level_greater1_flag[ n ] */
 
           /* coeff_abs_level_greater2_flag[ firstGreater1CoeffIdx] */

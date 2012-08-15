@@ -61,11 +61,11 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue );
 void cabac_encodeFlush(cabac_data* data, uint8_t end );
 void cabac_encodeBinEP(cabac_data* data, uint32_t binValue );
 void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins );
+void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue );
 void cabac_write(cabac_data* data);
 void cabac_finish(cabac_data* data);
 void cabac_flush(cabac_data* data);
-void cabac_encoderflush(cabac_data* data, uint8_t end);
-void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue );
+
 
 
 #ifdef _DEBUG

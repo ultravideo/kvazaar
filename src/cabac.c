@@ -209,9 +209,9 @@ void cabac_write(cabac_data* data)
 
 void cabac_encodeFlush(cabac_data* data, uint8_t end )
 {
-  data->uiRange = 2;
+  data->uiRange -= 2;
 
-  data->uiLow  += 2;
+  data->uiLow  += data->uiRange;
   data->uiLow <<= 7;
   data->uiRange = 2 << 7;
   data->bitsLeft -= 7;
@@ -221,10 +221,10 @@ void cabac_encodeFlush(cabac_data* data, uint8_t end )
   }
   cabac_finish(data);
 
-  if(!end)
-  {
-    bitstream_put(data->stream,1,1);
-  }
+  bitstream_put(data->stream,1,1);  
+  bitstream_align(data->stream);
+
+  cabac_start(data);
 }
 
 void cabac_finish(cabac_data* data)
@@ -342,33 +342,5 @@ void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins )
   if(data->bitsLeft < 12)
   {
     cabac_write(data);
-  }
-}
-
-
-void cabac_encoderflush(cabac_data* data, uint8_t end)
-{
-  cabac_encodeBinTrm(data,1);
-  cabac_finish(data);
-  bitstream_put(data->stream,1,1);
-
-  cabac_start(data);
-
-
-  data->uiRange = 2;
-
-  data->uiLow  += 2;
-  data->uiLow <<= 7;
-  data->uiRange = 2 << 7;
-  data->bitsLeft -= 7;
-  if(data->bitsLeft < 12)
-  {
-    cabac_write(data);
-  }
-  cabac_finish(data);
-
-  if(!end)
-  {
-    bitstream_put(data->stream, 1, 1 ); // stop bit
   }
 }
