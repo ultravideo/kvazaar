@@ -25,6 +25,7 @@
 #include "picture.h"
 #include "nal.h"
 #include "context.h"
+#include "transform.h"
 
 void initSigLastScan(uint32_t* pBuffZ, uint32_t* pBuffH, uint32_t* pBuffV, uint32_t* pBuffD, int32_t iWidth, int32_t iHeight, int32_t iDepth)
 {
@@ -164,7 +165,7 @@ void init_tables(void)
   int i;
   int c = 0;
   memset( g_aucConvertToBit,-1, sizeof( g_aucConvertToBit ) );  
-  for ( i=4; i<LCU_WIDTH; i*=2 )
+  for ( i=4; i<(1<<7); i*=2 )
   {
     g_aucConvertToBit[i] = c;
     c++;
@@ -172,7 +173,7 @@ void init_tables(void)
   g_aucConvertToBit[i] = c;
 
   c = 2;
-  for ( i=0; i<MAX_DEPTH; i++ )
+  for ( i=0; i<7; i++ )
   {
     g_auiSigLastScan[0][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
     g_auiSigLastScan[1][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
@@ -454,7 +455,7 @@ void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb;
 
-  init_contexts(encoder);
+  init_contexts(encoder,SLICE_I);
 
   //encoder->in.cur_pic.CU[3][5].type = CU_INTRA;
   //encoder->in.cur_pic.CU[3][6].type = CU_INTRA;
@@ -482,7 +483,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  int i,x,y;
+  int x,y;
   uint8_t split_flag = (depth<1)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
@@ -648,53 +649,258 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /* CoeffNxN */
         if(CbY)
         {
-          int c1,c1_num;
+          //void encode_CoeffNxN(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
+          int c1 = 0;//,c1_num;
           //int patternSigCtx;
-          int numNonZero = 16;
           /* scanCG == g_sigLastScanCG32x32 */
           /* Residual Coding */
           /* LastSignificantXY */
+          int16_t pre_quant_coeff[32*32];
           int16_t coeff[32*32];
           uint8_t last_coeff_x = 0;
           uint8_t last_coeff_y = 0;
+          int32_t i,ii;
           uint32_t sig_coeffgroup_flag[64];
-          memset(coeff,0,sizeof(int16_t)*16*16);
+          uint32_t width = LCU_WIDTH>>depth;
+          uint32_t num_nonzero = 0;
+          int32_t scanPosLast = -1;
+          int32_t posLast = 0;
+          int8_t type = 0; /* LUMA */
+          int32_t shift = 4>>1;
+          int32_t iScanPosSig;
+          int32_t iLastScanSet;
+          uint32_t uiGoRiceParam = 0;
+          int16_t block[32*32];
+          uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+          uint32_t uiBlkPos, uiPosY, uiPosX, uiSig, uiCtxSig;
+
+          /* CONSTANTS */
+          const uint32_t uiNumBlkSide = width >> shift;
+          const uint32_t uiLog2BlockSize = g_aucConvertToBit[ width ] + 2;
+          const uint32_t* scan = g_auiSigLastScan[ SCAN_DIAG ][ uiLog2BlockSize - 1 ];
+          const uint32_t* scanCG = NULL;
+          cabac_ctx* baseCoeffGroupCtx = &g_CUSigCoeffGroupSCModel[type];
+          cabac_ctx* baseCtx = (type==0) ? &g_CUSigSCModel_luma[0] :&g_CUSigSCModel_chroma[0];
+
+          memset(pre_quant_coeff,0,sizeof(int16_t)*32*32);
+          memset(coeff,0,sizeof(int16_t)*32*32);
           memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
-          coeff[8*16+8] = 123;
 
-          encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, LCU_WIDTH>>depth, LCU_WIDTH>>depth, 0, 0);
+          i = 0;
+          for(y = 0; y < LCU_WIDTH>>depth; y++)
+          {
+            for(x = 0; x < LCU_WIDTH>>depth; x++)
+            {
+              block[i++]=base[x+y*encoder->in.width];
+            }
+          }
+
+          /* Our coeffs */
+          transform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+          {
+             //uint32_t uiAcSum;
+             //quant(encoder, pre_quant_coeff, coeff, width, width, &uiAcSum, type);
+            i = 0;
+            for(y = 0; y < LCU_WIDTH>>depth; y++)
+            {
+              for(x = 0; x < LCU_WIDTH>>depth; x++)
+              {
+                coeff[i++]=pre_quant_coeff[x+y*(LCU_WIDTH>>depth)]/encoder->QP;
+              }
+            }
+          }
+          /* Count non-zero coeffs */
+          for(i = 0; (uint32_t)i < width*width; i++)
+          {
+           if(coeff[i] != 0)
+           {
+             num_nonzero++;
+             ii = i;
+           }
+          }
+          last_coeff_x = ii & (width-1);
+          last_coeff_y = ii/width;
+
+          scanCG = g_auiSigLastScan[ SCAN_DIAG ][ uiLog2BlockSize > 3 ? uiLog2BlockSize-2-1 : 0 ];
+          if( uiLog2BlockSize == 3 )
+          {
+            scanCG = g_sigLastScan8x8[ SCAN_DIAG ];
+          }
+          else if( uiLog2BlockSize == 5 )
+          {
+            scanCG = g_sigLastScanCG32x32;
+          }
+
+          /* Significance mapping */
+          while(num_nonzero)
+          {
+            posLast = scan[ ++scanPosLast ];
+            #define POSY (posLast >> uiLog2BlockSize)
+            #define POSX (posLast - ( POSY << uiLog2BlockSize ))
+            if( coeff[ posLast ] )
+            {
+              sig_coeffgroup_flag[(uiNumBlkSide * (POSY >> shift) + (POSX >> shift))] = 1;
+            }
+            num_nonzero -= ( coeff[ posLast ] != 0 )?1:0;
+            #undef POSY
+            #undef POSX
+          }
+
+          /* Code last_coeff_x and last_coeff_y */
+          encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, 0);
           
-          for(i = 15; i >= 0; i-- )
+          iScanPosSig = scanPosLast;
+          iLastScanSet = (scanPosLast >> 4);
+          /* significant_coeff_flag */
+          for(i = iLastScanSet; i >= 0; i-- )
           {
-            /* significant_coeff_flag */
-            cabac.ctx = &g_CUSigSCModel_luma[21+((i<7)?1:0)]; /* 21 = uiCtxSig =TComTrQuant::getSigCtxInc( patternSigCtx, uiPosX, uiPosY, blockType, uiWidth, uiHeight, eTType );*/
-            CABAC_BIN(&cabac,1,"significant_coeff_flag");
-          }
+            int32_t iSubPos = i << 4 /*LOG2_SCAN_SET_SIZE*/;
+            int32_t abs_coeff[16];
+            int32_t iCGBlkPos = scanCG[ i ];
+            int32_t iCGPosY   = iCGBlkPos / uiNumBlkSide;
+            int32_t iCGPosX   = iCGBlkPos - (iCGPosY * uiNumBlkSide);
+            uint32_t coeffSigns = 0;
+            int32_t lastNZPosInCG = -1, firstNZPosInCG = 16;
+            int32_t numNonZero = 0;
 
-          /*UInt uiSigCoeffGroupFlag[ MLS_GRP_NUM ];
-            ::memset( uiSigCoeffGroupFlag, 0, sizeof(UInt) * MLS_GRP_NUM );*/
-          /* n = 15 .. 0 coeff_abs_level_greater1_flag[ n ] */
-
-          /* coeff_abs_level_greater2_flag[ firstGreater1CoeffIdx] */
-
-          c1 = 1;
-          c1_num = MIN(numNonZero,C1FLAG_NUMBER);
-          for(i = 0; i < c1_num; i++)
-          {
-            int val = 0;
-            /* significant_coeff_flag */
-            cabac.ctx = &g_CUOneSCModel_luma[4*2+c1]; /* 4 * uiCtxSet +c1 */
-            CABAC_BIN(&cabac,val,"coeff_abs_level_greater1_flag");
-            if(val)
+            if( iScanPosSig == scanPosLast )
             {
-              c1 = 0;
+              abs_coeff[ 0 ] = abs( coeff[ posLast ] );
+              coeffSigns    = ( coeff[ posLast ] < 0 )?1:0;
+              numNonZero    = 1;
+              lastNZPosInCG  = iScanPosSig;
+              firstNZPosInCG = iScanPosSig;
+              iScanPosSig--;
             }
-            else if(c1 < 3)
+            if( i == iLastScanSet || i == 0)
             {
-              c1++;
+              sig_coeffgroup_flag[ iCGBlkPos ] = 1;
+            }
+            else
+            {
+              uint32_t uiSigCoeffGroup   = (sig_coeffgroup_flag[ iCGBlkPos ] != 0);
+              uint32_t uiCtxSig  = context_get_sigCoeffGroup(sig_coeffgroup_flag, iCGPosX, iCGPosY, SCAN_DIAG, width);
+              cabac.ctx = &baseCoeffGroupCtx[ uiCtxSig ];
+              CABAC_BIN(&cabac,uiSigCoeffGroup,"significant_coeff_group");
+            }
+
+            if( sig_coeffgroup_flag[ iCGBlkPos ] )
+            {
+              int32_t patternSigCtx = context_calcPatternSigCtx( sig_coeffgroup_flag, iCGPosX, iCGPosY, width);
+              for( ; iScanPosSig >= iSubPos; iScanPosSig-- )
+              {
+                uiBlkPos = scan[ iScanPosSig ]; 
+                uiPosY   = uiBlkPos >> uiLog2BlockSize;
+                uiPosX   = uiBlkPos - ( uiPosY << uiLog2BlockSize );
+                uiSig    = (coeff[ uiBlkPos ] != 0);
+                if( iScanPosSig > iSubPos || i == 0 || numNonZero )
+                {
+                  uiCtxSig  = context_getSigCtxInc( patternSigCtx, SCAN_DIAG, uiPosX, uiPosY, uiLog2BlockSize, width, type );
+                  cabac.ctx = &baseCtx[ uiCtxSig ];
+                  CABAC_BIN(&cabac,uiSig,"significant_coeff_flag");
+                }
+                else
+                {
+                  uiSig = 1;
+                }
+                
+                if( uiSig )
+                {                  
+                  abs_coeff[ numNonZero ] = abs( coeff[ uiBlkPos ] );
+                  coeffSigns = 2 * coeffSigns + ( coeff[ uiBlkPos ] < 0 );
+                  numNonZero++;
+                  if( lastNZPosInCG == -1 )
+                  {
+                    lastNZPosInCG = iScanPosSig;
+                  }
+                  firstNZPosInCG = iScanPosSig;
+                }
+              }
+            }            
+            else
+            {
+              iScanPosSig = iSubPos - 1;
+            }
+            
+
+            if( numNonZero > 0 )
+            {
+              uint8_t signHidden = ( lastNZPosInCG - firstNZPosInCG >= 4 );
+              uint32_t uiCtxSet = (i > 0 && type==0) ? 2 : 0;
+              cabac_ctx* baseCtxMod;
+              int32_t numC1Flag,firstC2FlagIdx,idx,iFirstCoeff2;
+              if( c1 == 0 )
+              {
+                uiCtxSet++;
+              }
+              c1 = 1;
+
+              baseCtxMod = ( type==0 ) ? &g_CUOneSCModel_luma[4 * uiCtxSet] : &g_CUOneSCModel_chroma[4 * uiCtxSet];
+      
+              numC1Flag = MIN(numNonZero, C1FLAG_NUMBER);
+              firstC2FlagIdx = -1;
+              for(idx = 0; idx < numC1Flag; idx++ )
+              {
+                uint32_t uiSymbol = (abs_coeff[ idx ] > 1)?1:0;
+                cabac.ctx = &baseCtxMod[c1];
+                CABAC_BIN(&cabac,uiSymbol,"significant_coeff2_flag");
+                if( uiSymbol )
+                {
+                  c1 = 0;
+                  if (firstC2FlagIdx == -1)
+                  {
+                    firstC2FlagIdx = idx;
+                  }
+                }
+                else if( (c1 < 3) && (c1 > 0) )
+                {
+                  c1++;
+                }
+              }
+      
+              if (c1 == 0)
+              {
+                baseCtxMod = ( type==0 ) ? &g_cCUAbsSCModel_luma[uiCtxSet] : &g_cCUAbsSCModel_chroma[uiCtxSet];
+                if ( firstC2FlagIdx != -1)
+                {
+                  uint8_t symbol = (abs_coeff[ firstC2FlagIdx ] > 2)?1:0;
+                  cabac.ctx = &baseCtxMod[0];
+                  CABAC_BIN(&cabac,symbol,"first_c2_flag");
+                }
+              }
+      
+              if( 0 && /*beValid */ signHidden )
+              {
+                CABAC_BINS_EP(&cabac,(coeffSigns >> 1),(numNonZero-1),"");
+              }
+              else
+              {
+                CABAC_BINS_EP(&cabac,coeffSigns,numNonZero,"");                
+              }
+      
+              iFirstCoeff2 = 1;    
+              if (c1 == 0 || numNonZero > C1FLAG_NUMBER)
+              {
+                for (idx = 0; idx < numNonZero; idx++ )
+                {
+                  int32_t baseLevel  = (idx < C1FLAG_NUMBER)? (2 + iFirstCoeff2 ) : 1;
+
+                  if( abs_coeff[ idx ] >= baseLevel)
+                  {
+                    cabac_writeCoeffRemain(&cabac, abs_coeff[ idx ] - baseLevel, uiGoRiceParam );
+                    if(abs_coeff[idx] > 3*(1<<uiGoRiceParam))
+                    {
+                       uiGoRiceParam = MIN(uiGoRiceParam+ 1, 4);
+                    }
+                  }
+                  if(abs_coeff[ idx ] >= 2)  
+                  {
+                    iFirstCoeff2 = 0;
+                  }
+                }        
+              }
             }
           }
-
           /* end Residual Coding */
         }
       }
@@ -717,6 +923,12 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   
 }
 
+void encode_CoeffNxN(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
+{
+
+}
+
+
 /* ToDo: fix for others than 32x32 */
 void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
 {
@@ -725,12 +937,6 @@ void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_
   int uiGroupIdxX   = g_uiGroupIdx[lastpos_x];
   int uiGroupIdxY   = g_uiGroupIdx[lastpos_y];
   int last_x,last_y,i;
-
-  if(width != height)
-  {
-    shift_y = (TOBITS(height)+3)>>2;
-    offset_y = TOBITS(height)*3 + ((TOBITS(height)+1)>>2);
-  }
 
   /* Last X binarization */
   for(last_x = 0; last_x < uiGroupIdxX ; last_x++)

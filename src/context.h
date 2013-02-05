@@ -17,12 +17,16 @@
 
 
 
-void init_contexts(encoder_control *encoder);
+void init_contexts(encoder_control *encoder, int8_t SLICE);
 
+int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t posXCG, uint32_t posYCG, int32_t width);
 
+uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,uint32_t uiCGPosX,
+                                    uint32_t uiCGPosY,uint32_t scanIdx,int32_t width);
 
-
-
+int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX,
+                             int32_t posY,int32_t blockType,int32_t width,
+                             int8_t textureType);
 
 
 /* CONTEXTS */
@@ -35,13 +39,16 @@ extern cabac_ctx g_QtCbfSCModelY[3];
 extern cabac_ctx g_QtCbfSCModelU[3];
 extern cabac_ctx g_PartSizeSCModel;
 extern cabac_ctx g_CUSigCoeffGroupSCModel[4];
-extern cabac_ctx g_CUSigSCModel_luma[24];
-extern cabac_ctx g_CUSigSCModel_chroma[24];
+extern cabac_ctx g_CUSigSCModel_luma[27];
+extern cabac_ctx g_CUSigSCModel_chroma[15];
 extern cabac_ctx g_CuCtxLastY_luma[15];
 extern cabac_ctx g_CuCtxLastY_chroma[15];
 extern cabac_ctx g_CuCtxLastX_luma[15];
 extern cabac_ctx g_CuCtxLastX_chroma[15];
-extern cabac_ctx g_CUOneSCModel_luma[24];
+extern cabac_ctx g_CUOneSCModel_luma[16];
+extern cabac_ctx g_CUOneSCModel_chroma[8];
+extern cabac_ctx g_cCUAbsSCModel_luma[4];
+extern cabac_ctx g_cCUAbsSCModel_chroma[2];
 
 static const uint8_t  INIT_SPLIT_FLAG[3][3] =  
                        { { 107,  139,  126 },
@@ -70,15 +77,12 @@ static const uint8_t INIT_QT_CBF[3][6] =
 static const uint8_t INIT_SIG_CG_FLAG[3][4] =  
  {  { 121,  140,  61,  154  },  { 121,  140,  61,  154 }, {  91,  171,  134,  141  } };
 
-static const uint8_t INIT_SIG_FLAG[3][45] = 
-  {{170,154,139,153,139,123,123, 63,124,153,153,152,152,152,137,152,137,137,166,183,140,136,153,
-    154,170,153,138,138,122,121,122,121,167,153,167,136,121,122,136,121,122, 91,151,183,140,},
-
-  {155,154,139,153,139,123,123, 63,153,153,153,152,152,152,137,152,137,122,166,183,140,136,153,
-   154,170,153,123,123,107,121,107,121,167,153,167,136,149,107,136,121,122, 91,151,183,140,},
-
-  {111,111,125,110,110, 94,124,108,124,139,139,139,168,124,138,124,138,107,107,125,141,179,153,
-   125,140,139,182,182,152,136,152,136,153,182,137,149,192,152,224,136, 31,136,136,139,111,} };
+static const uint8_t INIT_SIG_FLAG[3][42] = 
+  {
+   {170,154,139,153,139,123,123, 63,124,166,183,140,136,153,154,166,183,140,136,153,154,166,183,140,136,153,154,170,153,138,138,122,121,122,121,167,151,183,140,151,183,140,},
+   {155,154,139,153,139,123,123,63,153,166,183,140,136,153,154,166,183,140,136,153,154,166,183,140,136,153,154,170,153,123,123,107,121,107,121,167,151,183,140,151,183,140,},
+   {111,111,125,110,110,94,124,108,124,107,125,141,179,153,125,107,125,141,179,153,125,107,125,141,179,153,125,140,139,182,182,152,136,152,136,153,136,139,111,136,139,111,}
+  };
 
 static const uint8_t INIT_LAST[3][30] =  
 {
@@ -95,6 +99,13 @@ static const uint8_t INIT_ONE_FLAG[3][24] =
   {154,196,167,167,154,152,167,182,182,134,149,136,153,121,136,122,169,208,166,167,154,152,167,182},
   {154,196,196,167,154,152,167,182,182,134,149,136,153,121,136,137,169,194,166,167,154,167,137,182},
   {140, 92,137,138,140,152,138,139,153, 74,149, 92,139,107,122,152,140,179,166,182,140,227,122,197}
+};
+
+static const uint8_t INIT_ABS_FLAG[3][6] =  
+{
+  { 107,167, 91,107,107,167}, 
+  { 107,167, 91,122,107,167}, 
+  { 138,153,136,167,152,152}, 
 };
 
 

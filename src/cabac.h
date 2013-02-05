@@ -65,6 +65,7 @@ void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue );
 void cabac_write(cabac_data* data);
 void cabac_finish(cabac_data* data);
 void cabac_flush(cabac_data* data);
+void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam );
 
 
 

@@ -43,6 +43,7 @@
  #include "encoder.h"
  #include "cabac.h"
  #include "picture.h"
+ #include "transform.h"
  
  
  /*!
@@ -105,8 +106,9 @@
     init_tables();
     init_exp_golomb(4096*8);
     cabac_init(&cabac);
-    init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream)));
-
+    scalinglist_init();
+    init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream)));    
+    
     /* Init bitstream */
     bitstream_init(encoder->stream);
     encoder->stream->buffer_pos = 0;
@@ -143,7 +145,9 @@
     fclose(input);
     fclose(output);
 
+    /* Deallocating */
     config_destroy(cfg);
+    scalinglist_destroy();
 
     return EXIT_SUCCESS;
   }

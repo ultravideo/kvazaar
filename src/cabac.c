@@ -344,3 +344,33 @@ void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins )
     cabac_write(data);
   }
 }
+
+
+
+/** Coding of coeff_abs_level_minus3
+ * \param uiSymbol value of coeff_abs_level_minus3
+ * \param ruiGoRiceParam reference to Rice parameter
+ * \returns Void
+ */
+void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
+{
+  int32_t codeNumber = symbol;
+  uint32_t length;
+  if (codeNumber < (3 << rParam))
+  {
+    length = codeNumber>>rParam;
+    cabac_encodeBinsEP(cabac, (1<<(length+1))-2 , length+1);
+    cabac_encodeBinsEP(cabac,(codeNumber%(1<<rParam)),rParam);
+  }
+  else
+  {
+    length = rParam;
+    codeNumber  = codeNumber - ( 3 << rParam);
+    while (codeNumber >= (1<<length))
+    {
+      codeNumber -=  (1<<(length++));    
+    }
+    cabac_encodeBinsEP(cabac,(1<<(3+length+1-rParam))-2,3+length+1-rParam);
+    cabac_encodeBinsEP(cabac,codeNumber,length);
+  }
+}

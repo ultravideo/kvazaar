@@ -52,4 +52,13 @@
 #define MODE_NONE  15
 */
 
+
+/* Inlining functions */
+#ifdef _MSC_VER /* Visual studio */
+  #define INLINE __forceinline
+  #pragma inline_recursion(on)
+#else /* others */
+  #define INLINE inline
+#endif
+
 #endif
