@@ -187,7 +187,7 @@ void init_tables(void)
 }
 void init_encoder_control(encoder_control* control,bitstream* output)
 {
-  control->stream = output;
+  control->stream = output;  
 }
 
 void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height)
@@ -289,8 +289,12 @@ void encode_pic_parameter_set(encoder_control* encoder)
 #endif
   WRITE_UE(encoder->stream, 0, "pic_parameter_set_id");
   WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
+  WRITE_U(encoder->stream, 0, 1, "dependent_slice_segments_enabled_flag");
+  WRITE_U(encoder->stream, 0, 1, "output_flag_present_flag");
+  WRITE_U(encoder->stream, 0, 3, "num_extra_slice_header_bits");
   WRITE_U(encoder->stream, 0, 1, "sign_data_hiding_flag");
   WRITE_U(encoder->stream, 0, 1, "cabac_init_present_flag");
+
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_SE(encoder->stream, encoder->QP-26, "pic_init_qp_minus26");
@@ -300,20 +304,28 @@ void encode_pic_parameter_set(encoder_control* encoder)
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(encoder->stream, 0, "diff_cu_qp_delta_depth");
 
-  WRITE_SE(encoder->stream, 0, "cb_qp_offset");
-  WRITE_SE(encoder->stream, 0, "cr_qp_offset");
-  WRITE_U(encoder->stream, 0, 1, "slicelevel_chroma_qp_flag");
+  //ToDo: add QP offsets
+  WRITE_SE(encoder->stream, 0, "pps_cb_qp_offset");
+  WRITE_SE(encoder->stream, 0, "pps_cr_qp_offset");
+  WRITE_U(encoder->stream, 0, 1, "pps_slice_chroma_qp_offsets_present_flag");
   WRITE_U(encoder->stream, 0, 1, "weighted_pred_flag");
   WRITE_U(encoder->stream, 0, 1, "weighted_bipred_idc");
-  WRITE_U(encoder->stream, 1, 1, "output_flag_present_flag");
-  WRITE_U(encoder->stream, 0, 1, "dependent_slices_enabled_flag");
+
+  //WRITE_U(encoder->stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "transquant_bypass_enable_flag");
-  WRITE_U(encoder->stream, 0, 2, "tiles_or_entropy_coding_sync_idc");
+  WRITE_U(encoder->stream, 0, 2, "tiles_enabled_flag");
+  //ToDo: enable tiles for concurrency
+  //IF tiles
+  //ENDIF
   WRITE_U(encoder->stream, 0, 1, "loop_filter_across_slice_flag");
   WRITE_U(encoder->stream, 0, 1, "deblocking_filter_control_present_flag");
+  //IF deblocking_filter
+  //ENDIF
   WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
+  //IF scaling_list
+  //ENDIF
   WRITE_UE(encoder->stream, 0, "log2_parallel_merge_level_minus2");
-  WRITE_U(encoder->stream, 0, 1, "slice_header_extension_present_flag");
+  WRITE_U(encoder->stream, 0, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");
 }
 
@@ -324,66 +336,69 @@ void encode_seq_parameter_set(encoder_control* encoder)
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
   /* ToDo: profile IDC and level IDC should be defined later on */
-  WRITE_U(encoder->stream, 0, 3, "profile_space");
-  WRITE_U(encoder->stream, 0, 5, "profile_idc");
-  WRITE_U(encoder->stream, 0, 16, "reserved_indicator_flags");
-  WRITE_U(encoder->stream, 0, 8, "level_idc");
-  WRITE_U(encoder->stream, 0, 32, "profile_compatibility");
-  WRITE_UE(encoder->stream, 0, "seq_parameter_set_id");
-  WRITE_UE(encoder->stream, 0, "video_parameter_set_id");
+  WRITE_U(encoder->stream, 0, 4, "sps_video_parameter_set_id");
+  WRITE_U(encoder->stream, 0, 3, "sps_max_sub_layers_minus1");
+
+  WRITE_U(encoder->stream, 0, 1, "sps_temporal_id_nesting_flag");
+
+  WRITE_UE(encoder->stream, 0, "sps_seq_parameter_set_id");
   WRITE_UE(encoder->stream, encoder->in.video_format, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
-  WRITE_U(encoder->stream, 0, 3, "max_temporal_layers_minus1");
+  if(encoder->in.video_format == 3)
+  {
+    WRITE_U(encoder->stream, 0, 1, "separate_colour_plane_flag");
+  }
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
-  WRITE_U(encoder->stream, 0, 1, "pic_cropping_flag");
-  /* ToDo: 10bit support? */
-  WRITE_UE(encoder->stream, 0, "bit_depth_luma_minus8");
-  WRITE_UE(encoder->stream, 0, "bit_depth_chroma_minus8");
-  WRITE_U(encoder->stream, ENABLE_PCM, 1, "pcm_enabled_flag");
-  #if ENABLE_PCM == 1
-    WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_luma_minus1");
-    WRITE_U(encoder->stream, 7, 4, "pcm_bit_depth_chroma_minus1");
-  #endif
-  WRITE_UE(encoder->stream, 4, "log2_max_pic_order_cnt_lsb_minus4");
-  WRITE_UE(encoder->stream, 0, "max_dec_pic_buffering");
-  WRITE_UE(encoder->stream, 0, "num_reorder_pics");
-  WRITE_UE(encoder->stream, 0, "max_latency_increase");
-  WRITE_U(encoder->stream, 0, 1, "restricted_ref_pic_lists_flag");
+  WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
+  //IF window flag
+  //END IF
+  
+  WRITE_UE(encoder->stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
+  WRITE_UE(encoder->stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
+
+  WRITE_UE(encoder->stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
+
+  WRITE_U(encoder->stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
+  //for each layer
+  WRITE_UE(encoder->stream, 0, "sps_max_dec_pic_buffering");
+  WRITE_UE(encoder->stream, 0, "sps_num_reorder_pics");
+  WRITE_UE(encoder->stream, 0, "sps_max_latency_increase");
+  //end for
+
   WRITE_UE(encoder->stream, MIN_SIZE, "log2_min_coding_block_size_minus3");
   WRITE_UE(encoder->stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
   WRITE_UE(encoder->stream, 0, "log2_min_transform_block_size_minus2");
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size");
-
-  //If log2MinCUSize == 3
-  #if MAX_DEPTH == 3
-    //WRITE_U(encoder->stream, 0, 1, "DisInter4x4");
-  #endif
-
-  #if ENABLE_PCM == 1
-    WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
-    WRITE_UE(encoder->stream, 2, "log2_diff_max_min_pcm_coding_block_size");
-  #endif
-  
-
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
-
   WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
-  WRITE_U(encoder->stream, 0, 1, "asymmetric_motion_partitions_enabled_flag");
+  //IF scaling list
+  //ENDIF
+
+  WRITE_U(encoder->stream, 0, 1, "amp_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
-	//WRITE_U(encoder->stream, 0, 1, "adaptive_loop_filter_enabled_flag");
+
+  WRITE_U(encoder->stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
+    WRITE_U(encoder->stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
+    WRITE_U(encoder->stream, 7, 4, "pcm_sample_bit_depth_chroma_minus1");
+    WRITE_UE(encoder->stream, 0, "log2_min_pcm_coding_block_size_minus3");
+    WRITE_UE(encoder->stream, 2, "log2_diff_max_min_pcm_coding_block_size");
     WRITE_U(encoder->stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
-  WRITE_U(encoder->stream, 0, 1, "temporal_id_nesting_flag");
-  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets");  
-  //WRITE_U(encoder->stream, 0, 1, "inter_ref_pic_set_prediction_flag");
+
+  WRITE_UE(encoder->stream, 0, "num_short_term_ref_pic_sets"); 
+  //IF num short term ref pic sets
+  //ENDIF
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
+  //IF long_term_ref_pics_present
+  //ENDIF
   WRITE_U(encoder->stream, 0, 1, "sps_temporal_mvp_enable_flag");
-  for(i = 0; i < MAX_DEPTH; i++)
-  {
-    WRITE_U(encoder->stream, 0, 1, "AMVP modeflag");
-  }
+
+  WRITE_U(encoder->stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
+
+  WRITE_U(encoder->stream, 0, 1, "vui_parameters_present_flag");
+
 	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
@@ -392,16 +407,64 @@ void encode_vid_parameter_set(encoder_control* encoder)
 #ifdef _DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
-  WRITE_U(encoder->stream, 0, 3, "vps_max_temporal_layers_minus1");
-  WRITE_U(encoder->stream, 0, 5, "vps_max_layers_minus1");
-  WRITE_UE(encoder->stream, 0, "video_parameter_set_id");
-  WRITE_U(encoder->stream, 0, 1, "vps_temporal_id_nesting_flag");
 
+  WRITE_U(encoder->stream, 0, 4, "vps_video_parameter_set_id");
+  WRITE_U(encoder->stream, 3, 2, "vps_reserved_three_2bits" );
+  WRITE_U(encoder->stream, 0, 6, "vps_reserved_zero_6bits" );
+
+  WRITE_U(encoder->stream, 0, 3, "vps_max_sub_layers_minus1");
+  WRITE_U(encoder->stream, 0, 1, "vps_temporal_id_nesting_flag");
+  WRITE_U(encoder->stream, 0xffff, 16, "vps_reserved_ffff_16bits");
+  WRITE_U(encoder->stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
+  //for each layer
   WRITE_UE(encoder->stream, 0, "vps_max_dec_pic_buffering");
   WRITE_UE(encoder->stream, 0, "vps_num_reorder_pics");
   WRITE_UE(encoder->stream, 0, "vps_max_latency_increase");
+  //end for
+  WRITE_U(encoder->stream, 0, 6, "vps_max_nuh_reserved_zero_layer_id");
+  WRITE_UE(encoder->stream, 0, "vps_max_op_sets_minus1");
+
+  WRITE_U(encoder->stream, 0, 1, "vps_timing_info_present_flag");
+  //IF timing info
+  //END IF
 
 	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
+}
+
+void encode_VUI(encoder_control* encoder)
+{
+#ifdef _DEBUG
+  printf("=========== VUI Set ID: 0 ===========\n");
+#endif
+  WRITE_U(encoder->stream, 0, 1, "aspect_ratio_info_present_flag");
+  //IF aspect ratio info
+  //ENDIF
+
+  WRITE_U(encoder->stream, 0, 1, "overscan_info_present_flag");
+  //IF overscan info
+  //ENDIF
+
+  WRITE_U(encoder->stream, 0, 1, "video_signal_type_present_flag");
+  //IF video type
+  //ENDIF
+
+  WRITE_U(encoder->stream, 0, 1, "chroma_loc_info_present_flag");
+  //IF chroma loc info
+  //ENDIF
+  WRITE_U(encoder->stream, 0, 1, "neutral_chroma_indication_flag");
+  WRITE_U(encoder->stream, 0, 1, "field_seq_flag");
+  WRITE_U(encoder->stream, 0, 1, "frame_field_info_present_flag");
+  WRITE_U(encoder->stream, 0, 1, "default_display_window_flag");
+  //IF default display window
+  //ENDIF
+
+  WRITE_U(encoder->stream, 0, 1, "vui_timing_info_present_flag");
+  //IF timing info
+  //ENDIF
+
+  WRITE_U(encoder->stream, 0, 1, "bitstream_restriction_flag");
+  //IF bitstream restriction
+  //ENDIF
 }
 
 void encode_slice_header(encoder_control* encoder)

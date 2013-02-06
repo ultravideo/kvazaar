@@ -52,6 +52,7 @@ typedef struct
   FILE *output;
   picture_list *ref;
   uint8_t QP;
+  uint8_t bitdepth;
 } encoder_control;
 
 void init_encoder_control(encoder_control* control,bitstream* output);

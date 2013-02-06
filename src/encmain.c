@@ -123,8 +123,9 @@
     cabac.stream = encoder->stream;
 
     /* input init */
-    encoder->frame = 0;
-    encoder->QP = 10;
+    encoder->bitdepth = 8;
+    encoder->frame    = 0;
+    encoder->QP       = 10;
     encoder->in.video_format = FORMAT_420;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
