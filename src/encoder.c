@@ -6,7 +6,7 @@
 /*! \file encoder.c
     \brief Encoding related functions
     \author Marko Viitanen
-    \date 2012-06
+    \date 2013-02
     
     Encoder main level
 */
@@ -244,14 +244,14 @@ void encode_one_frame(encoder_control* encoder)
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_VID_PARAMETER_SET, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_VID_PARAMETER_SET, 1);
     bitstream_clear_buffer(encoder->stream);
     
     /* Picture Parameter Set (PPS) */
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 1);
     bitstream_clear_buffer(encoder->stream);
 
     /* First slice is IDR */
@@ -265,10 +265,11 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 1);
     bitstream_clear_buffer(encoder->stream);
-  }
+  }  
   else if(encoder->frame < 3)
   {
     /* Non-IDR slice */
+    /*
     cabac_start(&cabac);
     encoder->in.cur_pic.type = NAL_NONIDR_SLICE;
     encode_slice_header(encoder);
@@ -279,6 +280,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_NONIDR_SLICE, encoder->frame+1);
     bitstream_clear_buffer(encoder->stream);
+    */
   }  
 }
 
@@ -313,7 +315,8 @@ void encode_pic_parameter_set(encoder_control* encoder)
 
   //WRITE_U(encoder->stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "transquant_bypass_enable_flag");
-  WRITE_U(encoder->stream, 0, 2, "tiles_enabled_flag");
+  WRITE_U(encoder->stream, 0, 1, "tiles_enabled_flag");
+  WRITE_U(encoder->stream, 0, 1, "entropy_coding_sync_enabled_flag");
   //ToDo: enable tiles for concurrency
   //IF tiles
   //ENDIF
@@ -324,14 +327,37 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
   //ENDIF
+  WRITE_U(encoder->stream, 0, 1, "lists_modification_present_flag");
   WRITE_UE(encoder->stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(encoder->stream, 0, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");
 }
 
+void encode_PTL(encoder_control *encoder)
+{
+  /*PTL*/
+  /*Profile Tier*/
+  WRITE_U(encoder->stream, 0, 2, "XXX_profile_space[]");
+  WRITE_U(encoder->stream, 0, 1, "XXX_tier_flag[]");
+  WRITE_U(encoder->stream, 0, 5, "XXX_profile_idc[]");
+  WRITE_U(encoder->stream, 0, 32, "XXX_profile_compatibility_flag[][j]");
+
+  WRITE_U(encoder->stream, 0, 1, "general_progressive_source_flag");
+  WRITE_U(encoder->stream, 0, 1, "general_interlaced_source_flag");
+  WRITE_U(encoder->stream, 0, 1, "general_non_packed_constraint_flag");
+  WRITE_U(encoder->stream, 0, 1, "general_frame_only_constraint_flag");
+
+  WRITE_U(encoder->stream, 0, 32, "XXX_reserved_zero_44bits[0..31]");
+  WRITE_U(encoder->stream, 0, 12, "XXX_reserved_zero_44bits[32..43]");
+  
+  /*end Profile Tier */
+
+  WRITE_U(encoder->stream, 0, 8, "general_level_idc");
+  /*end PTL*/
+}
+
 void encode_seq_parameter_set(encoder_control* encoder)
 {
-  int i;
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
@@ -339,7 +365,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 4, "sps_video_parameter_set_id");
   WRITE_U(encoder->stream, 0, 3, "sps_max_sub_layers_minus1");
 
-  WRITE_U(encoder->stream, 0, 1, "sps_temporal_id_nesting_flag");
+  WRITE_U(encoder->stream, 1, 1, "sps_temporal_id_nesting_flag");
+    
+  encode_PTL(encoder);
 
   WRITE_UE(encoder->stream, 0, "sps_seq_parameter_set_id");
   WRITE_UE(encoder->stream, encoder->in.video_format, "chroma_format_idc"); /* 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4 */
@@ -398,7 +426,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
 
   WRITE_U(encoder->stream, 0, 1, "vui_parameters_present_flag");
-
+  //ToDo: VUI?
+  //encode_VUI(encoder);
+  
 	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
@@ -411,10 +441,12 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 4, "vps_video_parameter_set_id");
   WRITE_U(encoder->stream, 3, 2, "vps_reserved_three_2bits" );
   WRITE_U(encoder->stream, 0, 6, "vps_reserved_zero_6bits" );
-
   WRITE_U(encoder->stream, 0, 3, "vps_max_sub_layers_minus1");
-  WRITE_U(encoder->stream, 0, 1, "vps_temporal_id_nesting_flag");
+  WRITE_U(encoder->stream, 1, 1, "vps_temporal_id_nesting_flag");
   WRITE_U(encoder->stream, 0xffff, 16, "vps_reserved_ffff_16bits");
+
+  encode_PTL(encoder);
+
   WRITE_U(encoder->stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
   //for each layer
   WRITE_UE(encoder->stream, 0, "vps_max_dec_pic_buffering");
@@ -473,21 +505,24 @@ void encode_slice_header(encoder_control* encoder)
   printf("=========== Slice ===========\n");
 #endif
 
-  WRITE_U(encoder->stream, 1, 1, "first_slice_in_pic_flag");
+  WRITE_U(encoder->stream, 1, 1, "first_slice_segment_in_pic_flag");
   if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
   {
     WRITE_U(encoder->stream, 0, 1, "no_output_of_prior_pics_flag");
   }
-  WRITE_UE(encoder->stream, 0, "pic_parameter_set_id");
+  WRITE_UE(encoder->stream, 0, "slice_pic_parameter_set_id");
+
+  //WRITE_U(encoder->stream, 0, 1, "dependent_slice_segment_flag");
   
+  /* ToDo: add more slice types */
   WRITE_UE(encoder->stream, SLICE_I, "slice_type");
 
-  WRITE_U(encoder->stream, 0, 1, "dependent_slice_flag");
+  
 
   // if !entropy_slice_flag
   
     //if output_flag_present_flag
-      WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
+      //WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
     if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
@@ -496,18 +531,27 @@ void encode_slice_header(encoder_control* encoder)
     }
     else
     {
-      WRITE_U(encoder->stream, encoder->frame+1, 8, "pic_order_cnt_lsb");
+      WRITE_U(encoder->stream, encoder->frame+1, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
       //WRITE_U(encoder->stream, 1, 1, "inter_ref_pic_set_prediction_flag");
       WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
     }
     //end if
   //end if
+    //IF sao
+    /*
+    WRITE_U(encoder->stream, 0,1, "slice_sao_luma_flag" );
+    WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag" );
+    */
+    //ENDIF
   /* Skip flags that are not present */
   // if !entropy_slice_flag
     WRITE_SE(encoder->stream, 0, "slice_qp_delta");
+    /*
     WRITE_UE(encoder->stream, 0, "5_minus_max_num_merge_cand");
 
+    WRITE_U(encoder->stream, 1, 1, "alignment");
+    */
     WRITE_U(encoder->stream, 1, 1, "alignment");
 }
   
@@ -596,11 +640,12 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       return;
     }
   }
-
+  /*
   if(yCtb > 20 && xCtb > 20)
   {
     cur_CU->type = CU_INTRA;
   }
+  */
 
   /* coding_unit( x0, y0, log2CbSize ) */
    /* prediction_unit 2Nx2N*/

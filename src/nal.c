@@ -45,7 +45,7 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   byte = nal_type<<1;
   fwrite(&byte, 1, 1, output);
 
-  /* 5bits of reserved_one_6bits + Temporal_id(3) */
+  /* 5bits of reserved_one_6bits + nuh_temporal_id_plus1(3) */
   byte = temporal_id&7;
   fwrite(&byte, 1, 1, output);
 

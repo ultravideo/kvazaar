@@ -6,7 +6,7 @@
 /*! \file bitstream.c
     \brief Bitstream related functions
     \author Marko Viitanen
-    \date 2012-05
+    \date 2013-02
     
     This file has all bitstream functions
 */
@@ -108,7 +108,7 @@ void bitstream_clear_buffer(bitstream* stream)
  *          bits   = number of bits to write      
  */
  
-INLINE void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
+void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 {
   uint32_t bitsleft=32-stream->cur_bit;
   #ifdef VERBOSE
@@ -161,7 +161,7 @@ INLINE void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 /*
  *  \brief Align the bitstream
  */
-INLINE void bitstream_align(bitstream* stream)
+void bitstream_align(bitstream* stream)
 {  
   if((stream->cur_bit&7) != 0)
   {
@@ -169,7 +169,7 @@ INLINE void bitstream_align(bitstream* stream)
   }
 }
  
-INLINE void bitstream_flush(bitstream* stream)
+void bitstream_flush(bitstream* stream)
 {
    /*
     *  SAVE DATA TO OUTPUT
