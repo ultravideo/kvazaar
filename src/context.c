@@ -25,7 +25,7 @@ cabac_ctx *SplitFlagSCModel;
 cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */
 cabac_ctx g_IntraModeSCModel;    /*<! \brief intra mode context models */
 cabac_ctx g_ChromaPredSCModel[2];
-cabac_ctx g_TransSubdivSCModel[4];    /*<! \brief intra mode context models */
+cabac_ctx g_TransSubdivSCModel[3];    /*<! \brief intra mode context models */
 cabac_ctx g_QtCbfSCModelY[3];
 cabac_ctx g_QtCbfSCModelU[3];
 //cabac_ctx g_QtCbfSCModelV[3];
@@ -61,14 +61,13 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   ctx_init(&g_cCUAbsSCModel_chroma[1], encoder->QP, INIT_ABS_FLAG[SLICE][5]);
 
   for(i = 0; i < 4; i++)
-  {
-    ctx_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE][i]);
+  {    
     ctx_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE][i]);
-
     ctx_init(&g_cCUAbsSCModel_luma[i], encoder->QP, INIT_ABS_FLAG[SLICE][i]);
   }
   for(i = 0; i < 3; i++)
   {
+    ctx_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE][i]);
     ctx_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE][i]);
     ctx_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE][i+3]);
     //cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE][i]);

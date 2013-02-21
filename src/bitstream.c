@@ -163,6 +163,15 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
  */
 void bitstream_align(bitstream* stream)
 {  
+  bitstream_put(stream,1, 1);
+  if((stream->cur_bit&7) != 0)
+  {
+    bitstream_put(stream,0, 8-(stream->cur_bit&7));
+  }
+}
+
+void bitstream_align_zero(bitstream* stream)
+{  
   if((stream->cur_bit&7) != 0)
   {
     bitstream_put(stream,0, 8-(stream->cur_bit&7));

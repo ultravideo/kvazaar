@@ -131,7 +131,7 @@
 
     /* Start coding cycle */
     while(!feof(input) && (!cfg->frames || curFrame < cfg->frames))
-    {      
+    {
       /* Read one frame from the input */
       fread(encoder->in.cur_pic.yData, cfg->width*cfg->height,1,input);
       fread(encoder->in.cur_pic.uData, cfg->width*cfg->height/4,1,input);

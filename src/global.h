@@ -61,4 +61,6 @@
   #define INLINE inline
 #endif
 
+#define free_pointer(pointer) if(pointer != NULL) { free(pointer); pointer = NULL; }
+
 #endif

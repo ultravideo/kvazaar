@@ -221,7 +221,6 @@ void cabac_encodeFlush(cabac_data* data, uint8_t end )
   }
   cabac_finish(data);
 
-  bitstream_put(data->stream,1,1);  
   bitstream_align(data->stream);
 
   cabac_start(data);

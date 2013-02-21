@@ -41,6 +41,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
                                          bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
 
 void bitstream_align(bitstream* stream); 
+void bitstream_align_zero(bitstream* stream);
 void bitstream_flush(bitstream* stream);
 void init_exp_golomb(uint32_t len);
 

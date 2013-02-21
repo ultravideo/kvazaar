@@ -34,7 +34,7 @@ extern cabac_ctx *SplitFlagSCModel;
 extern cabac_ctx g_SplitFlagSCModel[3];
 extern cabac_ctx g_IntraModeSCModel;
 extern cabac_ctx g_ChromaPredSCModel[2];
-extern cabac_ctx g_TransSubdivSCModel[4];
+extern cabac_ctx g_TransSubdivSCModel[3];
 extern cabac_ctx g_QtCbfSCModelY[3];
 extern cabac_ctx g_QtCbfSCModelU[3];
 extern cabac_ctx g_PartSizeSCModel;
@@ -60,11 +60,11 @@ static const uint8_t INIT_INTRA_PRED_MODE[3] = { 183,154,184 };
 static const uint8_t INIT_CHROMA_PRED_MODE[3][2] = { { 152,  139 }, { 152,  139 }, {  63,  139 } };
 
 #define CNU 154
-static const uint8_t INIT_TRANS_SUBDIV_FLAG[3][4] = 
+static const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = 
 {
-  { CNU,  153,  138,  138 }, 
-  { CNU,  124,  138,   94 }, 
-  { CNU,  224,  167,  122 }
+  { 224,  167,  122 }, 
+  { 124,  138,   94 }, 
+  { 153,  138,  138 }
 };
 
 static const uint8_t INIT_QT_CBF[3][6] =  

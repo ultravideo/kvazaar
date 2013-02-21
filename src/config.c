@@ -53,17 +53,8 @@ int config_init(config* cfg)
 */
 int config_destroy(config* cfg)
 {
-  if(cfg->input != NULL)
-  {
-    free(cfg->input);
-    cfg->input = NULL;
-  }
-
-  if(cfg->output != NULL)
-  {
-    free(cfg->output);
-    cfg->output = NULL;
-  }
+  free_pointer(cfg->input);
+  free_pointer(cfg->output);
   free(cfg);
 
   return 1;
@@ -96,31 +87,31 @@ int config_read(config* cfg,int argc, char* argv[])
       {
         case 'i': /* Input */
           /* Allocate +1 for \0 */
-          cfg->input = malloc(strlen(argv[arg])+1);
+          cfg->input = (char *)malloc(strlen(argv[arg])+1);
           memcpy(cfg->input, argv[arg], strlen(argv[arg])+1);
           break;
         case 'o': /* Output */
-          cfg->output = malloc(strlen(argv[arg])+1);
+          cfg->output = (char *)malloc(strlen(argv[arg])+1);
           memcpy(cfg->output, argv[arg], strlen(argv[arg])+1);
           break;
         case 'd': /* Debug */
-          cfg->debug = malloc(strlen(argv[arg])+1);
+          cfg->debug = (char *)malloc(strlen(argv[arg])+1);
           memcpy(cfg->debug, argv[arg], strlen(argv[arg])+1);
           break;
         case 'w': /* width */
-          /* Get skipped frames count */
+          /* Get picture width */
           cfg->width = atoi(argv[arg]);
           break;
         case 'h': /* height */
-          /* Get skipped frames count */
+          /* Get picture height */
           cfg->height = atoi(argv[arg]);
           break;
         case 'n': /* Framecount */
-          /* Get frame count */
+          /* Get frame count to encode */
           cfg->frames = atoi(argv[arg]);
           break;
         default:
-          /* Unknown command */
+          /* Unknown command, print error message and ignore */
           fprintf(stderr, "%c is not a known option\r\n", option);
           break;
       }

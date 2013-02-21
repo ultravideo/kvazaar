@@ -37,16 +37,21 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   const uint8_t zero = 0x00;
 
   /*start_code_prefix_one_3bytes */  
+  if(temporal_id == 0)
+  {
+    fwrite(&zero, 1, 1, output);
+  }  
   fwrite(&zero, 1, 1, output);
   fwrite(&zero, 1, 1, output);
   fwrite(&start_code_prefix_one_3bytes, 1, 1, output);
 
-  /* forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of reserved_one_6bits(3)*/
+  /* Handle header bits with full bytes instead of using bitstream */
+  /* forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of nuh_layer_id*/
   byte = nal_type<<1;
   fwrite(&byte, 1, 1, output);
 
-  /* 5bits of reserved_one_6bits + nuh_temporal_id_plus1(3) */
-  byte = temporal_id&7;
+  /* 5bits of nuh_layer_id + nuh_temporal_id_plus1(3) */
+  byte = (temporal_id+1)&7;
   fwrite(&byte, 1, 1, output);
 
   /* Write out bytes and add emulation_prevention_three_byte when needed */

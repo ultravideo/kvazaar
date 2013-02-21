@@ -233,25 +233,26 @@ void encode_one_frame(encoder_control* encoder)
   /* output parameters before first frame */
   if(encoder->frame == 0)
   {
+
     /* Sequence Parameter Set (SPS) */
     encode_seq_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_SEQ_PARAMETER_SET, 1);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_SEQ_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
 
     /* Video Parameter Set (VPS) */    
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_VID_PARAMETER_SET, 1);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_VID_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
     
     /* Picture Parameter Set (PPS) */
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 1, NAL_PIC_PARAMETER_SET, 1);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PIC_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
 
     /* First slice is IDR */
@@ -263,11 +264,45 @@ void encode_one_frame(encoder_control* encoder)
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 1);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
     bitstream_clear_buffer(encoder->stream);
+
+
+
   }  
-  else if(encoder->frame < 3)
+  else if(encoder->frame < 10)
   {
+    cabac_start(&cabac);
+    encoder->in.cur_pic.type = 0;
+    encode_slice_header(encoder);  
+    bitstream_align(encoder->stream);
+    encode_slice_data(encoder);
+    cabac_flush(&cabac);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, encoder->frame);
+    bitstream_clear_buffer(encoder->stream);
+    /*
+    encoder->in.cur_pic.type = 0;
+    encode_slice_header(encoder);    
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, 0);
+    bitstream_clear_buffer(encoder->stream);
+    */
+
+    /*
+    cabac_start(&cabac);
+    encoder->in.cur_pic.type = NAL_IDR_SLICE;
+    encode_slice_header(encoder);
+    bitstream_align(encoder->stream);
+    encode_slice_data(encoder);
+    cabac_flush(&cabac);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+    bitstream_clear_buffer(encoder->stream);
+    */
     /* Non-IDR slice */
     /*
     cabac_start(&cabac);
@@ -335,6 +370,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
 
 void encode_PTL(encoder_control *encoder)
 {
+  int i;
   /*PTL*/
   /*Profile Tier*/
   WRITE_U(encoder->stream, 0, 2, "XXX_profile_space[]");
@@ -353,6 +389,14 @@ void encode_PTL(encoder_control *encoder)
   /*end Profile Tier */
 
   WRITE_U(encoder->stream, 0, 8, "general_level_idc");
+
+   WRITE_U(encoder->stream, 0, 1, "sub_layer_profile_present_flag");
+  WRITE_U(encoder->stream, 0, 1, "sub_layer_level_present_flag");
+  for(i = 1; i < 8; i++)
+  {
+    WRITE_U(encoder->stream, 0, 2, "reserved_zero_2bits");
+  }
+
   /*end PTL*/
 }
 
@@ -363,9 +407,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
 #endif
   /* ToDo: profile IDC and level IDC should be defined later on */
   WRITE_U(encoder->stream, 0, 4, "sps_video_parameter_set_id");
-  WRITE_U(encoder->stream, 0, 3, "sps_max_sub_layers_minus1");
+  WRITE_U(encoder->stream, 1, 3, "sps_max_sub_layers_minus1");
 
-  WRITE_U(encoder->stream, 1, 1, "sps_temporal_id_nesting_flag");
+  WRITE_U(encoder->stream, 0, 1, "sps_temporal_id_nesting_flag");
     
   encode_PTL(encoder);
 
@@ -434,6 +478,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
 
 void encode_vid_parameter_set(encoder_control* encoder)
 {
+  int i;
 #ifdef _DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
@@ -441,17 +486,20 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 4, "vps_video_parameter_set_id");
   WRITE_U(encoder->stream, 3, 2, "vps_reserved_three_2bits" );
   WRITE_U(encoder->stream, 0, 6, "vps_reserved_zero_6bits" );
-  WRITE_U(encoder->stream, 0, 3, "vps_max_sub_layers_minus1");
-  WRITE_U(encoder->stream, 1, 1, "vps_temporal_id_nesting_flag");
+  WRITE_U(encoder->stream, 1, 3, "vps_max_sub_layers_minus1");
+  WRITE_U(encoder->stream, 0, 1, "vps_temporal_id_nesting_flag");
   WRITE_U(encoder->stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
   encode_PTL(encoder);
 
   WRITE_U(encoder->stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
   //for each layer
+  for(i = 0; i < 1; i++)
+  {
   WRITE_UE(encoder->stream, 0, "vps_max_dec_pic_buffering");
   WRITE_UE(encoder->stream, 0, "vps_num_reorder_pics");
   WRITE_UE(encoder->stream, 0, "vps_max_latency_increase");
+  }
   //end for
   WRITE_U(encoder->stream, 0, 6, "vps_max_nuh_reserved_zero_layer_id");
   WRITE_UE(encoder->stream, 0, "vps_max_op_sets_minus1");
@@ -531,10 +579,9 @@ void encode_slice_header(encoder_control* encoder)
     }
     else
     {
-      WRITE_U(encoder->stream, encoder->frame+1, 4, "pic_order_cnt_lsb");
+      WRITE_U(encoder->stream, encoder->frame, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
-      //WRITE_U(encoder->stream, 1, 1, "inter_ref_pic_set_prediction_flag");
-      WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
+      //WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
     }
     //end if
   //end if
@@ -547,12 +594,7 @@ void encode_slice_header(encoder_control* encoder)
   /* Skip flags that are not present */
   // if !entropy_slice_flag
     WRITE_SE(encoder->stream, 0, "slice_qp_delta");
-    /*
-    WRITE_UE(encoder->stream, 0, "5_minus_max_num_merge_cand");
-
-    WRITE_U(encoder->stream, 1, 1, "alignment");
-    */
-    WRITE_U(encoder->stream, 1, 1, "alignment");
+    //WRITE_U(encoder->stream, 1, 1, "alignment");
 }
   
 
@@ -641,7 +683,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
   }
   /*
-  if(yCtb > 20 && xCtb > 20)
+  if(border_x && border_y)//yCtb == 20 && xCtb == 20)
   {
     cur_CU->type = CU_INTRA;
   }
@@ -660,13 +702,13 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
    /*end partsize*/
    //If MODE_INTRA
     /* Code IPCM block */
-    if(cur_CU->type == CU_PCM || cur_CU->type == CU_NOTSET)
+    if(cur_CU->type == CU_PCM || cur_CU->type == CU_NOTSET) /* also handling NOTSET conditions */
     {
       cabac_encodeBinTrm(&cabac, 1); /* IPCMFlag == 1 */
       //printf("\tIPCMFlag = 1\n");
       cabac_finish(&cabac);
-      WRITE_U(cabac.stream, 1, 1, "stop_bit");
-      WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");
+      //WRITE_U(cabac.stream, 1, 1, "stop_bit");
+      //WRITE_U(cabac.stream, 0, 1, "numSubseqIPCM_flag");
       bitstream_align(cabac.stream);
        /* PCM sample */
       {
@@ -707,6 +749,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     } /* end Code IPCM block */
     else if(cur_CU->type == CU_INTRA)
     {
+      static int predMode = 0;
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
       
       cabac.ctx = &g_IntraModeSCModel;
@@ -716,17 +759,21 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       Int preds[3] = {-1, -1, -1};
       Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
       */
-      CABAC_BINS_EP(&cabac, 0, 5, "intraPredMode");
+      CABAC_BINS_EP(&cabac, predMode, 5, "intraPredMode");
+      predMode++;
+      predMode = predMode % 10;
       
       if(encoder->in.video_format != FORMAT_400)
       {
         cabac.ctx = &g_ChromaPredSCModel[0];
-        CABAC_BIN(&cabac,0,"IntraPredChroma");
+        CABAC_BIN(&cabac,1,"IntraPredChroma");
+
+        CABAC_BINS_EP(&cabac, 0, 2, "intraPredModeChroma");
       }
 
       /* Coeff */
       /* Transform tree */
-      cabac.ctx = &g_TransSubdivSCModel[1]; /* //uiLog2TransformBlockSize */
+      cabac.ctx = &g_TransSubdivSCModel[0]; /* //uiLog2TransformBlockSize */
       CABAC_BIN(&cabac,0,"TransformSubdivFlag");
 
       /* We don't subdiv and we have 64>>depth transform size */
@@ -737,8 +784,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /*
          Quant and transform here...
         */
-        CbY = 1; /* Let's pretend we have luma coefficients */
+        //CbY = 1; /* Let's pretend we have luma coefficients */
 
+        /* Signal if chroma data is present */
         if(encoder->in.video_format != FORMAT_400)
         {
           /* Non-zero chroma U Tcoeffs */
@@ -1014,6 +1062,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       }
       /* end Transform tree */
       /* end Coeff */
+
     }
     else
     {
@@ -1022,11 +1071,6 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
    //endif
    /* end prediction unit */
-
-   //cabac_encodeBin(&cabac, 0); //prev_intra_luma_pred_flag
-
-   //cabac_encodeBin(&cabac, 1); //rem_intra_luma_pred_mode
-
   /* end coding_unit */
   
 }
