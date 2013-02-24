@@ -682,12 +682,12 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       return;
     }
   }
-  /*
-  if(border_x && border_y)//yCtb == 20 && xCtb == 20)
+  
+  if(/*border_x && border_y)//*/yCtb == 20 && (xCtb >= 20 && xCtb <= 40))
   {
     cur_CU->type = CU_INTRA;
   }
-  */
+  
 
   /* coding_unit( x0, y0, log2CbSize ) */
    /* prediction_unit 2Nx2N*/
@@ -759,16 +759,16 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       Int preds[3] = {-1, -1, -1};
       Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
       */
-      CABAC_BINS_EP(&cabac, predMode, 5, "intraPredMode");
-      predMode++;
-      predMode = predMode % 10;
+      CABAC_BINS_EP(&cabac, 10, 5, "intraPredMode");
+      //predMode++;
+      //predMode = predMode % 10;
       
       if(encoder->in.video_format != FORMAT_400)
       {
         cabac.ctx = &g_ChromaPredSCModel[0];
         CABAC_BIN(&cabac,1,"IntraPredChroma");
 
-        CABAC_BINS_EP(&cabac, 0, 2, "intraPredModeChroma");
+        CABAC_BINS_EP(&cabac, 1, 2, "intraPredModeChroma");
       }
 
       /* Coeff */
