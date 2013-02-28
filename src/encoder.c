@@ -272,6 +272,7 @@ void encode_one_frame(encoder_control* encoder)
   }  
   else if(encoder->frame < 10)
   {
+    /*
     cabac_start(&cabac);
     encoder->in.cur_pic.type = 0;
     encode_slice_header(encoder);  
@@ -282,6 +283,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, encoder->frame);
     bitstream_clear_buffer(encoder->stream);
+    */
     /*
     encoder->in.cur_pic.type = 0;
     encode_slice_header(encoder);    
@@ -683,7 +685,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
   }
   
-  if(/*border_x && border_y)//*/yCtb == 20 && (xCtb >= 20 && xCtb <= 40))
+  if(/*border_x && border_y)//*/(yCtb >= 10 && yCtb <= 20) && (xCtb >= 20 && xCtb <= 60))
   {
     cur_CU->type = CU_INTRA;
   }
@@ -750,26 +752,54 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     else if(cur_CU->type == CU_INTRA)
     {
       static int predMode = 0;
+      uint8_t intraPredMode = 10;
+      uint8_t intraPredModeChroma = 36; //Chroma derived from luma
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
       
-      cabac.ctx = &g_IntraModeSCModel;
-      CABAC_BIN(&cabac,0,"IntraPred");
-
-      /*
-      Int preds[3] = {-1, -1, -1};
-      Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
-      */
-      CABAC_BINS_EP(&cabac, 10, 5, "intraPredMode");
-      //predMode++;
-      //predMode = predMode % 10;
       
-      if(encoder->in.video_format != FORMAT_400)
-      {
-        cabac.ctx = &g_ChromaPredSCModel[0];
-        CABAC_BIN(&cabac,1,"IntraPredChroma");
+      /*
+        PREDINFO CODING
+        If intra prediction mode is found from the predictors,
+        it can be signaled with two EP's. Otherwise we can send
+        5 EP bins with the full predmode
+        Int preds[3] = {-1, -1, -1};
+        Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
+      */
+        //ToDo: apply predictors
+        // mpmPred[part] == is_in_predictors(preds);
+        //For each part {
+        cabac.ctx = &g_IntraModeSCModel;
+        CABAC_BIN(&cabac,0/*mpmPred[part]*/,"IntraPred");
+        //} End for each part
 
-        CABAC_BINS_EP(&cabac, 1, 2, "intraPredModeChroma");
-      }
+        /*Skeleton structure for intrapredmode signaling */
+        //For each part {
+          //IF mpmPred[part] { //If found from predictors, we can simplify signaling
+          //  intraPredMode =  mpmPred[part];
+          //  CABAC_BIN_EP(&cabac, (intraPredMode==0)?0:1, "intraPredMode");
+          //  if(intraPredMode!=0)
+          //    CABAC_BIN_EP(&cabac, (intraPredMode==1)?0:1, "intraPredMode");      
+          // } else { //Else we signal the full predmode
+           CABAC_BINS_EP(&cabac, intraPredMode, 5, "intraPredMode");
+          //predMode++;
+          //predMode = predMode % 10;
+          //}
+        //} End for each part
+
+      
+        if(encoder->in.video_format != FORMAT_400)
+        {
+          cabac.ctx = &g_ChromaPredSCModel[0];
+          CABAC_BIN(&cabac,((intraPredModeChroma!=36)?1:0),"IntraPredChroma");
+          if(intraPredModeChroma!=36)
+          {
+            //ToDo: allowedChromaDir
+            CABAC_BINS_EP(&cabac, intraPredModeChroma, 2, "intraPredModeChroma");
+          }
+        }
+      /*
+      END OF PREDINFO CODING
+      */
 
       /* Coeff */
       /* Transform tree */
@@ -784,7 +814,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /*
          Quant and transform here...
         */
-        //CbY = 1; /* Let's pretend we have luma coefficients */
+        CbY = 1; /* Let's pretend we have luma coefficients */
 
         /* Signal if chroma data is present */
         if(encoder->in.video_format != FORMAT_400)
@@ -903,6 +933,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           }
 
           /* Code last_coeff_x and last_coeff_y */
+          #ifdef _DEBUG
+           printf("lastSignificantXY: %i, %i\r\n",last_coeff_x,last_coeff_y);
+          #endif          
           encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, 0);
           
           iScanPosSig = scanPosLast;

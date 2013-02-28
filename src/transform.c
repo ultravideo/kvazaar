@@ -416,20 +416,26 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
 
   }
   else*/ 
-  if(blockSize == 8)
+  switch(blockSize)
   {
-    partialButterfly8( block, tmp, shift_1st, blockSize );
-    partialButterfly8( tmp, coeff, shift_2nd, blockSize );
-  }
-  else if(blockSize == 16)
-  {
-    partialButterfly16( block, tmp, shift_1st, blockSize );
-    partialButterfly16( tmp, coeff, shift_2nd, blockSize );
-  }
-  else if(blockSize == 32)
-  {
-    partialButterfly32( block, tmp, shift_1st, blockSize );
-    partialButterfly32( tmp, coeff, shift_2nd, blockSize );
+    case 8:
+    {
+      partialButterfly8( block, tmp, shift_1st, blockSize );
+      partialButterfly8( tmp, coeff, shift_2nd, blockSize );
+      break;
+    }
+    case 16:
+    {
+      partialButterfly16( block, tmp, shift_1st, blockSize );
+      partialButterfly16( tmp, coeff, shift_2nd, blockSize );
+      break;
+    }
+    case 32:
+    {
+      partialButterfly32( block, tmp, shift_1st, blockSize );
+      partialButterfly32( tmp, coeff, shift_2nd, blockSize );
+      break;
+    }
   }
 }
 
