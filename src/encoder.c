@@ -842,7 +842,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           /* Residual Coding */
           /* LastSignificantXY */
           int16_t pre_quant_coeff[32*32];
-          int16_t coeff[32*32];
+          int16_t coeff[32*32] ={-129	,-1	,13	,-6	,-14	,10	,11	,-10	,-6	,10	,5	,-11	,-4	,9	,1	,-8	,1	,7	,-2	,-6	,1	,4	,-2	,-3	,2	,2	,-3	,0	,0	,0	,-1	,0	,20	,1	,-1	,2	,-2	,-2	,2	,1	,-3	,-2	,3	,2	,-4	,-2	,4	,0	,-5	,2	,4	,-4	,-2	,3	,3	,-4	,-1	,3	,1	,-1	,2	,2	,0	,0	,2	,1	,0	,0	,1	,-1	,-1	,1	,1	,0	,0	,0	,0	,-1	,-2	,1	,0	,-1	,-1	,2	,0	,-1	,0	,0	,-1	,-2	,-1	,1	,0	,0	,0	,0	,3	,-1	,1	,0	,1	,-1	,1	,0	,0	,-1	,0	,1	,0	,1	,1	,-1	,-2	,0	,1	,0	,-1	,0	,2	,0	,0	,0	,-1	,-1	,-1	,1	,-1	,-2	,0	,0	,0	,-1	,0	,-2	,0	,0	,0	,-1	,0	,0	,1	,1	,1	,1	,-1	,0	,0	,0	,-1	,1	,-1	,1	,1	,1	,-1	,1	,0	,0	,0	,-1	,0	,1	,-1	,-1	,1	,1	,0	,-2	,1	,0	,1	,1	,0	,-1	,-1	,0	,0	,2	,0	,1	,-1	,2	,1	,-1	,0	,0	,0	,1	,0	,0	,1	,-2	,0	,1	,-1	,1	,0	,0	,0	,0	,1	,1	,0	,0	,0	,0	,-1	,1	,0	,0	,-1	,0	,0	,1	,0	,0	,-1	,0	,0	,2	,-1	,1	,0	,-1	,1	,0	,0	,0	,0	,0	,0	,0	,0	,0	,-2	,0	,1	,-1	,0	,0	,0	,0	,0	,-2	,-1	,1	,1	,0	,1	,0	,-1	,0	,-1	,0	,2	,1	,1	,0	,1	,0	,-1	,1	,0	,1	,1	,0	,0	,-1	,0	,0	,0	,0	,0	,2	,-1	,0	,0	,0	,0	,1	,-1	,-2	,0	,0	,0	,0	,0	,-1	,0	,0	,-1	,-1	,2	,-1	,-1	,-1	,-1	,-1	,0	,1	,1	,1	,1	,0	,2	,-1	,0	,0	,0	,0	,-1	,1	,-1	,1	,1	,0	,-1	,0	,0	,0	,1	,0	,0	,0	,1	,1	,-1	,0	,1	,1	,-1	,0	,0	,1	,-1	,1	,0	,-1	,1	,2	,0	,0	,1	,-1	,0	,-1	,1	,1	,-1	,-1	,0	,0	,0	,-1	,-1	,-1	,1	,1	,0	,2	,0	,0	,-1	,1	,1	,1	,-1	,-1	,1	,1	,0	,0	,-1	,-2	,0	,1	,0	,1	,0	,1	,0	,1	,0	,0	,-1	,0	,0	,-1	,1	,-1	,0	,0	,-1	,0	,0	,0	,0	,0	,0	,-1	,0	,-2	,0	,1	,1	,-1	,1	,0	,-1	,0	,-1	,1	,-1	,0	,0	,0	,0	,0	,-1	,0	,1	,0	,0	,1	,1	,0	,0	,1	,0	,0	,1	,1	,0	,1	,-1	,2	,-1	,0	,1	,0	,-1	,0	,1	,2	,0	,0	,0	,0	,0	,0	,2	,1	,-1	,-1	,1	,-1	,-1	,0	,-1	,0	,0	,-1	,1	,1	,0	,1	,0	,-1	,0	,-1	,0	,-1	,0	,-1	,-1	,-1	,0	,0	,0	,0	,0	,1	,0	,-2	,2	,1	,0	,1	,1	,0	,0	,1	,-2	,-1	,0	,0	,-1	,0	,2	,-1	,-2	,0	,0	,-1	,-1	,0	,0	,0	,-1	,-1	,0	,0	,-1	,0	,0	,1	,1	,0	,0	,0	,1	,0	,0	,-1	,0	,0	,-1	,1	,0	,-1	,-1	,0	,-1	,0	,0	,0	,1	,0	,1	,1	,0	,-2	,0	,0	,0	,0	,1	,1	,1	,1	,2	,-1	,-1	,-1	,-1	,0	,0	,0	,1	,-1	,1	,0	,0	,0	,-1	,0	,-2	,0	,0	,1	,0	,-1	,-1	,0	,0	,-1	,0	,1	,0	,-1	,-1	,1	,0	,0	,-1	,-1	,-1	,0	,0	,-2	,0	,1	,0	,0	,0	,1	,0	,0	,0	,0	,-1	,1	,-1	,1	,1	,1	,0	,0	,0	,0	,0	,1	,1	,0	,-1	,0	,-1	,1	,0	,0	,0	,-1	,2	,-1	,0	,-1	,-1	,0	,0	,1	,0	,0	,1	,-1	,2	,1	,-1	,0	,0	,0	,-1	,-1	,0	,1	,0	,-1	,1	,1	,1	,0	,-1	,-1	,1	,-1	,0	,0	,0	,-1	,0	,0	,0	,0	,0	,0	,1	,1	,-1	,0	,1	,-1	,0	,0	,-1	,1	,0	,-1	,0	,0	,0	,1	,0	,-1	,-1	,0	,0	,-1	,0	,0	,-2	,0	,0	,0	,0	,0	,0	,0	,0	,-1	,0	,0	,1	,0	,0	,1	,0	,0	,0	,1	,1	,1	,3	,0	,0	,-1	,0	,1	,-1	,0	,0	,2	,1	,-1	,0	,0	,0	,0	,0	,0	,-1	,0	,0	,1	,0	,0	,-1	,-1	,1	,-1	,0	,0	,-1	,-2	,-1	,0	,0	,-2	,-1	,0	,1	,0	,2	,-1	,-1	,2	,1	,0	,0	,0	,0	,0	,0	,0	,1	,-1	,0	,1	,1	,0	,1	,-1	,-1	,-1	,1	,1	,1	,0	,1	,-1	,0	,0	,0	,0	,0	,0	,0	,-1	,0	,-2	,-1	,1	,0	,0	,-1	,1	,0	,2	,-1	,1	,0	,1	,1	,1	,-1	,1	,0	,0	,1	,0	,-1	,0	,0	,0	,0	,0	,0	,0	,-1	,0	,0	,-1	,-1	,1	,0	,0	,0	,0	,1	,0	,0	,0	,0	,0	,0	,2	,-1	,2	,0	,1	,-1	,-1	,0	,0	,1	,0	,0	,0	,0	,0	,0	,1	,0	,-1	,0	,2	,0	,-2	,1	,0	,-1	,0	,-1	,0	,0	,0	,-1	,0	,0	,0	,0	,0	,0	,-1	,1	,-2	,-1	,0	,0	,0	,0	,0	,1	,0	,0	,1	,-1	,-1	,0	,1	,-1	,0	,0	,1	,0	,-1	,1	,-1	,-1	,-1	,0	,0	,0	,0	,0	,0	,1	,-1	,0	,0	,0	,0	,0	,0	,-1	,0	,0	,0	,-1	,-2	,0	,-1	,1	,0	,-1	,0	,2	,-1	,0	,1	,0	,1	,0	,0	,0	,0	,0	,0	,0	,1	,0	,-1	,0	,0	,0	,0	,0	,0	,0	,-1	,0	,1	,0	,0	,0	,1	,-1	,0	,-1	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,-1	,0	,0	,0	,0	,0	,2	,2	,0	,-1	,0	,0	,-2	,0	,0	,0	,0	,-1	,0	,1	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,0	,1	,0	,0	,0	,0	,0	,0	,1	,0	,-1	,0	,0	,0	,0	,0	,0	,-2	,-1	,1	,0	,-1};
           uint8_t last_coeff_x = 0;
           uint8_t last_coeff_y = 0;
           int32_t i,ii;
@@ -869,10 +869,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           cabac_ctx* baseCtx = (type==0) ? &g_CUSigSCModel_luma[0] :&g_CUSigSCModel_chroma[0];
 
           memset(pre_quant_coeff,0,sizeof(int16_t)*32*32);
-          memset(coeff,0,sizeof(int16_t)*32*32);
+          //memset(coeff,0,sizeof(int16_t)*32*32);
           memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
 
           i = 0;
+          
           for(y = 0; y < LCU_WIDTH>>depth; y++)
           {
             for(x = 0; x < LCU_WIDTH>>depth; x++)
@@ -880,8 +881,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
               block[i++]=base[x+y*encoder->in.width];
             }
           }
+          
 
           /* Our coeffs */
+          /*
           transform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
           {
              //uint32_t uiAcSum;
@@ -895,17 +898,17 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
               }
             }
           }
-          /* Count non-zero coeffs */
+          */
+          /* Count non-zero coeffs */          
           for(i = 0; (uint32_t)i < width*width; i++)
           {
            if(coeff[i] != 0)
            {
              num_nonzero++;
-             ii = i;
+             //ii = i;
            }
           }
-          last_coeff_x = ii & (width-1);
-          last_coeff_y = ii/width;
+          
 
           scanCG = g_auiSigLastScan[ SCAN_DIAG ][ uiLog2BlockSize > 3 ? uiLog2BlockSize-2-1 : 0 ];
           if( uiLog2BlockSize == 3 )
@@ -917,13 +920,14 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             scanCG = g_sigLastScanCG32x32;
           }
 
+          scanPosLast = -1;
           /* Significance mapping */
-          while(num_nonzero)
+          while(num_nonzero > 0)
           {
             posLast = scan[ ++scanPosLast ];
             #define POSY (posLast >> uiLog2BlockSize)
             #define POSX (posLast - ( POSY << uiLog2BlockSize ))
-            if( coeff[ posLast ] )
+            if( coeff[ posLast ] != 0 )
             {
               sig_coeffgroup_flag[(uiNumBlkSide * (POSY >> shift) + (POSX >> shift))] = 1;
             }
@@ -931,6 +935,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             #undef POSY
             #undef POSX
           }
+          
+          last_coeff_x = posLast & (width-1);
+          last_coeff_y = posLast>> uiLog2BlockSize;
 
           /* Code last_coeff_x and last_coeff_y */
           #ifdef _DEBUG
