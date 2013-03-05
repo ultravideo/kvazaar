@@ -88,6 +88,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
 
     ctx_init(&g_CUOneSCModel_luma[i], encoder->QP, INIT_ONE_FLAG[SLICE][i]);
   }
+  ctx_init(&g_CUOneSCModel_luma[15], encoder->QP, INIT_ONE_FLAG[SLICE][15]);
   
   for(i = 0; i < 27; i++)
   { 
