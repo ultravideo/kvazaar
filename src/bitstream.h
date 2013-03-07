@@ -37,7 +37,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
 
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }
-#define bitstream_put_se(stream, data) { uint32_t index=(data<=0)?2*(uint32_t)(-data):2*(uint32_t)(data)-1;    \
+#define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
                                          bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
 
 void bitstream_align(bitstream* stream); 
@@ -47,7 +47,7 @@ void init_exp_golomb(uint32_t len);
 
 
 /* In debug mode print out some extra info */
-#ifdef _DEBUG
+#ifdef NOTDEFINED//_DEBUG
 /* Counter to keep up with bits written */
 static int WRITE_VALUE = 0;
 #define WRITE_U(stream, data, bits, name) { printf("%8d  %-40s u(%d) : %d\n",WRITE_VALUE, name,bits,data); bitstream_put(stream,data,bits); WRITE_VALUE++;}

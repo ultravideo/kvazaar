@@ -69,7 +69,7 @@ void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
 
 
 
-#ifdef _DEBUG
+#ifdef VERBOSE
 #define CABAC_BIN(data, value, name) {  uint32_t prev_state = (data)->ctx->ucState;\
                                         cabac_encodeBin(data, value); \
                                         printf("%s = %d prev_state=%d state=%d\n",name,value,prev_state, (data)->ctx->ucState);}
@@ -84,7 +84,7 @@ void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
 #else
 #define CABAC_BIN(data, value, name) cabac_encodeBin(data, value);
 #define CABAC_BINS_EP(data, value,bins, name) cabac_encodeBinsEP(data, value,bins);
-#define CABAC_BIN_EP(data, value,bins, name) cabac_encodeBinEP(data, value);
+#define CABAC_BIN_EP(data, value, name) cabac_encodeBinEP(data, value);
 #endif
 
 #endif

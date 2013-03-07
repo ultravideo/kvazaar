@@ -134,7 +134,7 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
   uiLPS   = g_aucLPSTable[ CTX_STATE(data->ctx) ][ ( data->uiRange >> 6 ) & 3 ];
   data->uiRange    -= uiLPS;
   #ifdef _DEBUG
-  printf("\tencodeBin m_uiRange %d uiLPS %d m_uiValue %d ", data->uiRange,uiLPS,data->uiLow);
+  //printf("\tencodeBin m_uiRange %d uiLPS %d m_uiValue %d ", data->uiRange,uiLPS,data->uiLow);
   #endif
   
   //Not the Most Probable Symbol?
@@ -154,7 +154,7 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
     if (  data->uiRange >= 256 )
     {
       #ifdef _DEBUG
-      printf("enduiValue %d \n",data->uiLow);
+      //printf("enduiValue %d \n",data->uiLow);
       #endif
       return;
     }
@@ -169,7 +169,7 @@ void cabac_encodeBin(cabac_data* data, uint32_t binValue )
     cabac_write(data);
   }
   #ifdef _DEBUG
-  printf("enduiValue %d \n",data->uiLow);
+  //printf("enduiValue %d \n",data->uiLow);
   #endif
 }
 
@@ -253,15 +253,14 @@ void cabac_finish(cabac_data* data)
   bitstream_put(data->stream, data->uiLow >> 8, 24 - data->bitsLeft );
 }
 
-/**
- * \brief Encode terminating bin
- *
- * \param binValue bin value
- */
+/*!
+  \brief Encode terminating bin
+  \param binValue bin value
+*/
 void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue )
 {
   #ifdef _DEBUG
-  printf("\tencodeBinTrm m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
+  //printf("\tencodeBinTrm m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
   #endif
   data->uiBinsCoded += data->binCountIncrement;
   data->uiRange -= 2;
@@ -346,11 +345,12 @@ void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins )
 
 
 
-/** Coding of coeff_abs_level_minus3
- * \param uiSymbol value of coeff_abs_level_minus3
- * \param ruiGoRiceParam reference to Rice parameter
- * \returns Void
- */
+/*!
+  \brief Coding of coeff_abs_level_minus3
+  \param uiSymbol value of coeff_abs_level_minus3
+  \param ruiGoRiceParam reference to Rice parameter
+  \returns Void
+*/
 void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
 {
   int32_t codeNumber = symbol;

@@ -26,6 +26,7 @@
 #include "nal.h"
 #include "context.h"
 #include "transform.h"
+#include "intra.h"
 
 void initSigLastScan(uint32_t* pBuffZ, uint32_t* pBuffH, uint32_t* pBuffV, uint32_t* pBuffD, int32_t iWidth, int32_t iHeight, int32_t iDepth)
 {
@@ -217,6 +218,9 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->cur_pic.uRecData = (uint8_t *)malloc((width*height)>>2);
   input->cur_pic.vRecData = (uint8_t *)malloc((width*height)>>2);
 
+  memset(input->cur_pic.uRecData, 127, (width*height)>>2);
+  memset(input->cur_pic.vRecData, 127, (width*height)>>2);
+
   /* Allocate memory for CU info 2D array */
   //ToDo: we don't need this much space on LCU...MAX_DEPTH-1
   input->cur_pic.CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
@@ -270,9 +274,9 @@ void encode_one_frame(encoder_control* encoder)
 
 
   }  
-  else if(encoder->frame < 10)
+  else if(encoder->frame < 20)
   {
-    /*
+    
     cabac_start(&cabac);
     encoder->in.cur_pic.type = 0;
     encode_slice_header(encoder);  
@@ -283,7 +287,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, encoder->frame);
     bitstream_clear_buffer(encoder->stream);
-    */
+    
     /*
     encoder->in.cur_pic.type = 0;
     encode_slice_header(encoder);    
@@ -336,7 +340,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
 
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
-  WRITE_SE(encoder->stream, encoder->QP-26, "pic_init_qp_minus26");
+  WRITE_SE(encoder->stream, ((int8_t)encoder->QP)-26, "pic_init_qp_minus26");
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "cu_qp_delta_enabled_flag");
@@ -430,7 +434,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(encoder->stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
 
-  WRITE_UE(encoder->stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_UE(encoder->stream, 4, "log2_max_pic_order_cnt_lsb_minus4");
 
   WRITE_U(encoder->stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
   //for each layer
@@ -581,7 +585,7 @@ void encode_slice_header(encoder_control* encoder)
     }
     else
     {
-      WRITE_U(encoder->stream, encoder->frame, 4, "pic_order_cnt_lsb");
+      WRITE_U(encoder->stream, encoder->frame, 8, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
       //WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
     }
@@ -606,11 +610,9 @@ void encode_slice_data(encoder_control* encoder)
 {
   uint16_t xCtb,yCtb;
 
+  scalinglist_process();
   init_contexts(encoder,SLICE_I);
 
-  //encoder->in.cur_pic.CU[3][5].type = CU_INTRA;
-  //encoder->in.cur_pic.CU[3][6].type = CU_INTRA;
-  
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
   {
@@ -685,7 +687,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
   }
   
-  if(/*border_x && border_y)//*/(yCtb >= 10 && yCtb <= 20) && (xCtb >= 20 && xCtb <= 60))
+  //if(/*border_x && border_y)//*/(yCtb >= 10 && yCtb <= 20) && (xCtb >= 20 && xCtb <= 60))
+  //if(yCtb || xCtb)
   {
     cur_CU->type = CU_INTRA;
   }
@@ -751,39 +754,53 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     } /* end Code IPCM block */
     else if(cur_CU->type == CU_INTRA)
     {
-      static int predMode = 0;
-      uint8_t intraPredMode = 10;
+      //static int predMode = 0;
+      uint8_t intraPredMode = 1;
       uint8_t intraPredModeChroma = 36; //Chroma derived from luma
-      cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
-      
-      
+      int8_t intraPreds[3] = {-1, -1, -1};
+      int8_t mpmPred = -1;
+      int i;
+      cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */    
       /*
         PREDINFO CODING
         If intra prediction mode is found from the predictors,
         it can be signaled with two EP's. Otherwise we can send
         5 EP bins with the full predmode
-        Int preds[3] = {-1, -1, -1};
-        Int predNum = pcCU->getIntraDirLumaPredictor(absPartIdx+partOffset*j, preds);  
       */
+      intra_getDirLumaPredictor(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPreds);
+      intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);
+      
+      for(i = 0; i < 3; i++)
+      {
+        if(intraPreds[i] == intraPredMode)
+        {
+          mpmPred = i;
+          break;
+        }
+      }
         //ToDo: apply predictors
         // mpmPred[part] == is_in_predictors(preds);
         //For each part {
         cabac.ctx = &g_IntraModeSCModel;
-        CABAC_BIN(&cabac,0/*mpmPred[part]*/,"IntraPred");
+        CABAC_BIN(&cabac,(mpmPred==-1)?0:1,"IntraPred");
         //} End for each part
 
         /*Skeleton structure for intrapredmode signaling */
         //For each part {
-          //IF mpmPred[part] { //If found from predictors, we can simplify signaling
+        if(mpmPred!=-1)        
+        { //If found from predictors, we can simplify signaling
           //  intraPredMode =  mpmPred[part];
-          //  CABAC_BIN_EP(&cabac, (intraPredMode==0)?0:1, "intraPredMode");
-          //  if(intraPredMode!=0)
-          //    CABAC_BIN_EP(&cabac, (intraPredMode==1)?0:1, "intraPredMode");      
-          // } else { //Else we signal the full predmode
-           CABAC_BINS_EP(&cabac, intraPredMode, 5, "intraPredMode");
+        
+            CABAC_BIN_EP(&cabac, (mpmPred==0)?0:1, "intraPredMode");
+            if(mpmPred!=0)
+              CABAC_BIN_EP(&cabac, (mpmPred==1)?0:1, "intraPredMode");      
+        }
+        else
+        { //Else we signal the full predmode
+          CABAC_BINS_EP(&cabac, intraPredMode, 5, "intraPredMode");
           //predMode++;
           //predMode = predMode % 10;
-          //}
+         }
         //} End for each part
 
       
@@ -842,10 +859,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           /* Residual Coding */
           /* LastSignificantXY */
           int16_t pre_quant_coeff[32*32];
-          int16_t coeff[32*32] ={-129,-1,12,-5,-13,9,10,-10,-6,10,5,-11,-3,9,1,-8,1,7,-2,-6,1,3,-1,-3,1,2,-3,0,0,0,-1,0,20,1,-1,1,-1,-2,2,1,-3,-2,3,1,-4,-1,4,0,-5,2,4,-4,-2,3,3,-4,-1,3,1,0,2,2,1,-1,2,1,0,0,1,-1,-1,1,1,0,0,0,0,-1,-1,1,0,-1,0,2,0,-1,0,0,-1,-1,-1,1,0,0,0,0,2,-1,1,0,1,-1,1,0,0,0,0,1,0,1,1,0,-2,0,0,0,-1,0,2,0,0,0,-1,0,-1,1,-1,-2,0,0,0,-1,0,-2,0,0,0,0,0,0,0,1,0,0,-1,0,0,0,0,1,-1,1,0,1,-1,1,0,0,0,-1,0,1,-1,-1,1,1,0,-2,1,0,0,1,0,-1,-1,0,0,2,0,1,-1,2,1,-1,0,0,0,1,0,0,1,-2,0,0,-1,1,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,-1,0,0,1,0,0,-1,0,0,2,-1,1,0,-1,0,0,0,0,0,0,0,0,0,0,-1,0,1,-1,0,0,0,0,0,-2,0,1,1,0,1,0,0,0,0,0,1,1,1,0,1,0,-1,0,0,1,1,0,0,-1,0,0,0,0,0,2,-1,0,0,0,0,1,0,-2,0,0,0,0,0,-1,0,0,0,-1,2,-1,0,0,-1,-1,0,0,1,1,0,0,1,-1,0,0,0,0,-1,0,-1,0,1,0,0,0,0,0,1,0,0,0,1,1,-1,0,0,1,0,0,0,1,-1,0,0,-1,1,2,0,0,0,-1,0,-1,1,1,0,-1,0,0,0,0,-1,-1,0,1,0,2,0,0,-1,0,1,0,-1,0,1,0,0,0,-1,-2,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,0,0,0,-2,0,1,1,-1,1,0,0,0,-1,1,-1,0,0,0,0,0,-1,0,1,0,0,1,1,0,0,1,0,0,1,1,0,1,-1,2,-1,0,1,0,-1,0,1,1,0,0,0,-1,0,0,1,0,-1,0,1,-1,-1,0,-1,0,0,-1,1,1,0,0,0,-1,0,-1,0,-1,0,-1,-1,-1,0,0,0,-1,0,1,0,-2,2,1,0,0,1,0,0,1,-1,-1,0,0,-1,0,1,-1,-2,0,0,-1,-1,0,0,0,-1,-1,0,0,-1,0,0,1,1,0,0,0,1,0,0,-1,0,0,-1,1,0,-1,-1,0,-1,0,0,0,0,0,0,1,0,-2,0,0,0,0,0,1,1,0,2,-1,-1,-1,0,0,0,0,1,-1,1,0,0,0,-1,0,-2,0,0,0,0,-1,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,0,0,-2,0,1,0,0,0,1,0,0,0,-1,-1,1,-1,1,1,1,-1,0,0,0,0,0,1,0,-1,0,-1,1,0,0,0,-1,2,-1,0,-1,-1,0,0,1,1,0,1,-1,2,1,-1,0,0,0,0,-1,0,1,0,-1,1,1,0,0,-1,-1,0,-1,0,0,0,-1,0,0,0,0,0,0,1,1,-1,0,1,-1,0,0,0,1,0,-1,0,0,0,0,0,-1,-1,0,0,-1,0,0,-2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1,1,1,3,0,0,-1,0,1,-1,0,0,2,1,-1,0,0,0,0,0,0,0,0,0,1,0,0,-1,-1,0,0,0,0,0,-2,-1,0,0,-2,-1,0,1,0,2,-1,-1,1,1,-1,1,-1,0,0,0,0,1,-1,0,1,1,0,1,-1,-1,-1,0,0,0,0,1,-1,1,0,0,0,0,0,0,0,0,-2,0,0,0,0,-1,1,0,2,0,1,0,1,1,1,-1,1,0,0,1,0,-1,0,0,0,0,0,0,0,-1,0,0,0,-1,1,0,0,0,0,1,0,0,0,0,0,0,1,-1,1,0,1,-1,-1,0,0,1,0,0,0,0,1,0,1,0,-1,0,2,0,-2,1,0,-1,0,-1,0,0,0,-1,0,0,0,0,1,0,-1,1,-2,-1,1,0,0,-1,0,0,0,0,0,0,0,0,1,-1,0,0,1,0,-1,1,-1,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,-1,0,0,0,-1,-1,0,0,1,0,-1,0,1,-1,0,1,0,1,-1,0,0,1,0,0,0,1,0,-1,0,0,0,0,0,0,0,-1,0,1,0,0,1,1,-1,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,1,0,-1,1,0,0,0,0,2,2,0,-1,0,0,-2,0,0,0,1,-1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,-1,0,0,0,1,0,-1,0,0,0,0,0,0,-2,-1,1,0,-1};
+          int16_t coeff[32*32];// ={-129,-1,12,-5,-13,9,10,-10,-6,10,5,-11,-3,9,1,-8,1,7,-2,-6,1,3,-1,-3,1,2,-3,0,0,0,-1,0,20,1,-1,1,-1,-2,2,1,-3,-2,3,1,-4,-1,4,0,-5,2,4,-4,-2,3,3,-4,-1,3,1,0,2,2,1,-1,2,1,0,0,1,-1,-1,1,1,0,0,0,0,-1,-1,1,0,-1,0,2,0,-1,0,0,-1,-1,-1,1,0,0,0,0,2,-1,1,0,1,-1,1,0,0,0,0,1,0,1,1,0,-2,0,0,0,-1,0,2,0,0,0,-1,0,-1,1,-1,-2,0,0,0,-1,0,-2,0,0,0,0,0,0,0,1,0,0,-1,0,0,0,0,1,-1,1,0,1,-1,1,0,0,0,-1,0,1,-1,-1,1,1,0,-2,1,0,0,1,0,-1,-1,0,0,2,0,1,-1,2,1,-1,0,0,0,1,0,0,1,-2,0,0,-1,1,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,-1,0,0,1,0,0,-1,0,0,2,-1,1,0,-1,0,0,0,0,0,0,0,0,0,0,-1,0,1,-1,0,0,0,0,0,-2,0,1,1,0,1,0,0,0,0,0,1,1,1,0,1,0,-1,0,0,1,1,0,0,-1,0,0,0,0,0,2,-1,0,0,0,0,1,0,-2,0,0,0,0,0,-1,0,0,0,-1,2,-1,0,0,-1,-1,0,0,1,1,0,0,1,-1,0,0,0,0,-1,0,-1,0,1,0,0,0,0,0,1,0,0,0,1,1,-1,0,0,1,0,0,0,1,-1,0,0,-1,1,2,0,0,0,-1,0,-1,1,1,0,-1,0,0,0,0,-1,-1,0,1,0,2,0,0,-1,0,1,0,-1,0,1,0,0,0,-1,-2,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,0,0,0,-2,0,1,1,-1,1,0,0,0,-1,1,-1,0,0,0,0,0,-1,0,1,0,0,1,1,0,0,1,0,0,1,1,0,1,-1,2,-1,0,1,0,-1,0,1,1,0,0,0,-1,0,0,1,0,-1,0,1,-1,-1,0,-1,0,0,-1,1,1,0,0,0,-1,0,-1,0,-1,0,-1,-1,-1,0,0,0,-1,0,1,0,-2,2,1,0,0,1,0,0,1,-1,-1,0,0,-1,0,1,-1,-2,0,0,-1,-1,0,0,0,-1,-1,0,0,-1,0,0,1,1,0,0,0,1,0,0,-1,0,0,-1,1,0,-1,-1,0,-1,0,0,0,0,0,0,1,0,-2,0,0,0,0,0,1,1,0,2,-1,-1,-1,0,0,0,0,1,-1,1,0,0,0,-1,0,-2,0,0,0,0,-1,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,0,0,-2,0,1,0,0,0,1,0,0,0,-1,-1,1,-1,1,1,1,-1,0,0,0,0,0,1,0,-1,0,-1,1,0,0,0,-1,2,-1,0,-1,-1,0,0,1,1,0,1,-1,2,1,-1,0,0,0,0,-1,0,1,0,-1,1,1,0,0,-1,-1,0,-1,0,0,0,-1,0,0,0,0,0,0,1,1,-1,0,1,-1,0,0,0,1,0,-1,0,0,0,0,0,-1,-1,0,0,-1,0,0,-2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1,1,1,3,0,0,-1,0,1,-1,0,0,2,1,-1,0,0,0,0,0,0,0,0,0,1,0,0,-1,-1,0,0,0,0,0,-2,-1,0,0,-2,-1,0,1,0,2,-1,-1,1,1,-1,1,-1,0,0,0,0,1,-1,0,1,1,0,1,-1,-1,-1,0,0,0,0,1,-1,1,0,0,0,0,0,0,0,0,-2,0,0,0,0,-1,1,0,2,0,1,0,1,1,1,-1,1,0,0,1,0,-1,0,0,0,0,0,0,0,-1,0,0,0,-1,1,0,0,0,0,1,0,0,0,0,0,0,1,-1,1,0,1,-1,-1,0,0,1,0,0,0,0,1,0,1,0,-1,0,2,0,-2,1,0,-1,0,-1,0,0,0,-1,0,0,0,0,1,0,-1,1,-2,-1,1,0,0,-1,0,0,0,0,0,0,0,0,1,-1,0,0,1,0,-1,1,-1,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,-1,0,0,0,-1,-1,0,0,1,0,-1,0,1,-1,0,1,0,1,-1,0,0,1,0,0,0,1,0,-1,0,0,0,0,0,0,0,-1,0,1,0,0,1,1,-1,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,1,0,-1,1,0,0,0,0,2,2,0,-1,0,0,-2,0,0,0,1,-1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,-1,0,0,0,1,0,-1,0,0,0,0,0,0,-2,-1,1,0,-1};
           uint8_t last_coeff_x = 0;
           uint8_t last_coeff_y = 0;
-          int32_t i,ii;
+          int32_t i;
           uint32_t sig_coeffgroup_flag[64];
           uint32_t width = LCU_WIDTH>>depth;
           uint32_t num_nonzero = 0;
@@ -858,7 +875,13 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           uint32_t uiGoRiceParam = 0;
           int16_t block[32*32];
           uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+          uint8_t *recbase = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
           uint32_t uiBlkPos, uiPosY, uiPosX, uiSig, uiCtxSig;
+          //INTRAPREDICTION
+          int16_t pred[32*32];
+          int16_t dcpred = intra_getDCPred(&encoder->in.cur_pic, xCtb, yCtb, depth);
+
+          //INTRAPREDICTION
 
           /* CONSTANTS */
           const uint32_t uiNumBlkSide = width >> shift;
@@ -869,43 +892,54 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           cabac_ctx* baseCtx = (type==0) ? &g_CUSigSCModel_luma[0] :&g_CUSigSCModel_chroma[0];
 
           memset(pre_quant_coeff,0,sizeof(int16_t)*32*32);
-          //memset(coeff,0,sizeof(int16_t)*32*32);
+          memset(coeff,0,sizeof(int16_t)*32*32);
           memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
 
-          i = 0;
-          
+          //FILL PREDICTION
           for(y = 0; y < LCU_WIDTH>>depth; y++)
           {
             for(x = 0; x < LCU_WIDTH>>depth; x++)
             {
-              block[i++]=base[x+y*encoder->in.width];
+              pred[x+y*32] = dcpred;
+            }
+          }
+
+
+          i = 0;          
+          for(y = 0; y < LCU_WIDTH>>depth; y++)
+          {
+            for(x = 0; x < LCU_WIDTH>>depth; x++)
+            {
+              block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*32];
+              //if(x == 30 || y == 30 || x == 31 || y == 31) block[i-1] = 0;
             }
           }
           
 
           /* Our coeffs */
-          /*
+          
           transform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+          quant(encoder,pre_quant_coeff,coeff, width, width, type);
+          
+          dequant(encoder,coeff,pre_quant_coeff,width, width);
+          itransform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+
+          i = 0;
+          for(y = 0; y < LCU_WIDTH>>depth; y++)
           {
-             //uint32_t uiAcSum;
-             //quant(encoder, pre_quant_coeff, coeff, width, width, &uiAcSum, type);
-            i = 0;
-            for(y = 0; y < LCU_WIDTH>>depth; y++)
+            for(x = 0; x < LCU_WIDTH>>depth; x++)
             {
-              for(x = 0; x < LCU_WIDTH>>depth; x++)
-              {
-                coeff[i++]=pre_quant_coeff[x+y*(LCU_WIDTH>>depth)]/encoder->QP;
-              }
+              int16_t val = block[i++]+dcpred;
+              recbase[x+y*encoder->in.width] = (uint8_t)MAX(0,MIN(255,val));
             }
           }
-          */
+                    
           /* Count non-zero coeffs */
           for(i = 0; (uint32_t)i < width*width; i++)
           {
            if(coeff[i] != 0)
            {
              num_nonzero++;
-             //ii = i;
            }
           }
           
@@ -941,7 +975,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
           /* Code last_coeff_x and last_coeff_y */
           #ifdef _DEBUG
-           printf("lastSignificantXY: %i, %i\r\n",last_coeff_x,last_coeff_y);
+          // printf("lastSignificantXY: %i, %i\r\n",last_coeff_x,last_coeff_y);
           #endif
           encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, 0);
           

@@ -58,6 +58,7 @@
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
     FILE *output = NULL;
+    FILE *recout = fopen("encrec.yuv","wb");
     encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));;
  
     /* Handle configuration */
@@ -113,6 +114,7 @@
     bitstream_init(encoder->stream);
     encoder->stream->buffer_pos = 0;
     encoder->stream->output = 0;
+    /* Alloc 1MB */
     bitstream_alloc(encoder->stream, 1024*1024);
 
     /* Config pointer to encoder struct */
@@ -122,10 +124,10 @@
     /* Set CABAC output bitstream */
     cabac.stream = encoder->stream;
 
-    /* input init */
+    /* input init (ToDo: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
-    encoder->QP       = 10;
+    encoder->QP       = 22;
     encoder->in.video_format = FORMAT_420;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
@@ -134,9 +136,16 @@
     {
       /* Read one frame from the input */
       fread(encoder->in.cur_pic.yData, cfg->width*cfg->height,1,input);
-      fread(encoder->in.cur_pic.uData, cfg->width*cfg->height/4,1,input);
-      fread(encoder->in.cur_pic.vData, cfg->width*cfg->height/4,1,input);
+      fread(encoder->in.cur_pic.uData, cfg->width*cfg->height>>2,1,input);
+      fread(encoder->in.cur_pic.vData, cfg->width*cfg->height>>2,1,input);
       encode_one_frame(encoder);
+
+      /* Write reconstructed frame out */
+      fwrite(encoder->in.cur_pic.yRecData,cfg->width*cfg->height,1,recout);
+      fwrite(encoder->in.cur_pic.uRecData,cfg->width*cfg->height>>2,1,recout);
+      fwrite(encoder->in.cur_pic.vRecData,cfg->width*cfg->height>>2,1,recout);
+      
+      printf("[%d] %c-frame\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3]);
       encoder->frame++;
     }
     /* Coding finished */
@@ -145,6 +154,7 @@
 
     fclose(input);
     fclose(output);
+    fclose(recout);
 
     /* Deallocating */
     config_destroy(cfg);
