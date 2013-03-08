@@ -30,8 +30,11 @@
   #include <stdint.h>
 #endif
 
+/* Some tools */
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
+#define CLIP(low,high,value) MAX((low),MIN((high),(value)))
+#define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 
 #define VERSION_STRING "0.1               "
 #define VERSION 0.1

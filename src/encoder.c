@@ -778,42 +778,75 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           break;
         }
       }
-        //ToDo: apply predictors
-        // mpmPred[part] == is_in_predictors(preds);
-        //For each part {
-        cabac.ctx = &g_IntraModeSCModel;
-        CABAC_BIN(&cabac,(mpmPred==-1)?0:1,"IntraPred");
-        //} End for each part
+      //For each part {
+      cabac.ctx = &g_IntraModeSCModel;
+      CABAC_BIN(&cabac,(mpmPred==-1)?0:1,"IntraPred");
+      //} End for each part
 
-        /*Skeleton structure for intrapredmode signaling */
-        //For each part {
-        if(mpmPred!=-1)        
-        { //If found from predictors, we can simplify signaling
-          //  intraPredMode =  mpmPred[part];
-        
-            CABAC_BIN_EP(&cabac, (mpmPred==0)?0:1, "intraPredMode");
-            if(mpmPred!=0)
-              CABAC_BIN_EP(&cabac, (mpmPred==1)?0:1, "intraPredMode");      
+      /*Skeleton structure for intrapredmode signaling */
+      //If found from predictors, we can simplify signaling
+      if(mpmPred!=-1)        
+      {      
+        CABAC_BIN_EP(&cabac, (mpmPred==0)?0:1, "intraPredMode");
+        if(mpmPred!=0)
+          CABAC_BIN_EP(&cabac, (mpmPred==1)?0:1, "intraPredMode");      
+      }
+      else //Else we signal the full predmode
+      { 
+        int8_t intraPredModeTemp = intraPredMode;
+        if (intraPreds[0] > intraPreds[1])
+        { 
+          SWAP(intraPreds[0], intraPreds[1], int8_t); 
         }
-        else
-        { //Else we signal the full predmode
-          CABAC_BINS_EP(&cabac, intraPredMode, 5, "intraPredMode");
-          //predMode++;
-          //predMode = predMode % 10;
-         }
-        //} End for each part
+        if (intraPreds[0] > intraPreds[2])
+        {
+          SWAP(intraPreds[0], intraPreds[2], int8_t); 
+        }
+        if (intraPreds[1] > intraPreds[2])
+        {
+          SWAP(intraPreds[1], intraPreds[2], int8_t); 
+        }
+        for(i = 2; i >= 0; i--)
+        {
+          intraPredModeTemp = intraPredModeTemp > intraPreds[i] ? intraPredModeTemp - 1 : intraPredModeTemp;
+        }
+        CABAC_BINS_EP(&cabac, intraPredModeTemp, 5, "intraPredMode");
+      }
 
       
-        if(encoder->in.video_format != FORMAT_400)
+      if(encoder->in.video_format != FORMAT_400)
+      {
+        //Chroma intra prediction
+        cabac.ctx = &g_ChromaPredSCModel[0];
+        CABAC_BIN(&cabac,((intraPredModeChroma!=36)?1:0),"IntraPredChroma");
+
+        //If not copied from luma, signal it
+        if(intraPredModeChroma!=36)
         {
-          cabac.ctx = &g_ChromaPredSCModel[0];
-          CABAC_BIN(&cabac,((intraPredModeChroma!=36)?1:0),"IntraPredChroma");
-          if(intraPredModeChroma!=36)
+          int8_t intraPredModeChromaTemp = intraPredModeChroma;
+          uint32_t allowedChromaDir[ 5 ] = { 0, 26, 10, 1, 36 };
+          
+          //If intra is the same as one of the default predictors, replace it
+          for(i = 0; i < 4; i++ )
           {
-            //ToDo: allowedChromaDir
-            CABAC_BINS_EP(&cabac, intraPredModeChroma, 2, "intraPredModeChroma");
+            if( intraPredMode == allowedChromaDir[i] )
+            {
+              allowedChromaDir[i] = 34; // VER+8 mode
+              break;
+            }
           }
+
+          for(i = 0; i < 4; i++ )
+          {
+            if( intraPredModeChromaTemp == allowedChromaDir[i] )
+            {
+              intraPredModeChromaTemp = i;
+              break;
+            }
+          }
+          CABAC_BINS_EP(&cabac, intraPredModeChromaTemp, 2, "intraPredModeChroma");
         }
+      }
       /*
       END OF PREDINFO CODING
       */
