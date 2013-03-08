@@ -90,33 +90,49 @@ int16_t intra_getDCPred(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
   int32_t SCUwidth = (LCU_WIDTH>>MAX_DEPTH);
   int32_t xpos = SCUwidth*xCtb;
   int32_t ypos = SCUwidth*yCtb;
+  int32_t LCU_xpos = xpos - (xpos%LCU_WIDTH);
+  int32_t LCU_ypos = ypos - (ypos%LCU_WIDTH);
 
-  int8_t bAbove = (yCtb>0)?1:0;
-  int8_t bLeft  = (xCtb>0)?1:0;
+  int8_t bAbove = (yCtb>0)?1:0;//*/(yCtb*SCUwidth>(LCU_WIDTH-1))?1:0;
+  int8_t bLeft  = (xCtb>0)?1:0;//*/(xCtb*SCUwidth>(LCU_WIDTH-1))?1:0;
   int32_t add;
 
 
   if (bAbove)
   {
     add = (ypos-1)*pic->width;
-    for (i = xpos+add;i < xpos+width+add;i++)
+    for (i = xpos+add; i < xpos+width+add ; i++)
     {
       iSum += pic->yRecData[i];
     }
+  }  
+  else if (bLeft)
+  {
+    iSum += pic->yRecData[ypos*pic->width+xpos-1]*width;
   }
+
+
   if (bLeft)
   {
     add = xpos-1;
-    for (i = ypos*pic->width+add;i < (ypos+width)*pic->width+add;i+=pic->width)
+    for (i = ypos*pic->width+add ; i < (ypos+width)*pic->width+add ; i+=pic->width)
     {
       iSum += pic->yRecData[i];
     }
+  }  
+  else if (bAbove)
+  {
+    iSum += pic->yRecData[(ypos-1)*pic->width+xpos]*width;
   }
 
-  if (bAbove && bLeft)
+
+
+  //if (bAbove && bLeft)
+  if (bAbove || bLeft)
   {
     pDcVal = (iSum + width) / (width + width);
   }
+  /*
   else if (bAbove)
   {
     pDcVal = (iSum + width/2) / width;
@@ -125,6 +141,7 @@ int16_t intra_getDCPred(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
   {
     pDcVal = (iSum + width/2) / width;
   }
+  */
   
   return pDcVal;
 }

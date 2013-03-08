@@ -23,7 +23,7 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
 void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode);
 
 void scalinglist_init();
-void scalinglist_processEnc( int32_t *coeff, int32_t *quantcoeff, int32_t quantScales, uint32_t height,uint32_t width, uint32_t ratio, int32_t sizuNum, uint32_t dc);
+void scalinglist_processEnc( int32_t *coeff, int32_t *quantcoeff, int32_t quantScales, uint32_t height,uint32_t width, uint32_t ratio, int32_t sizuNum, uint32_t dc, uint8_t flat);
 void scalinglist_process();
 void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t qp);
 void scalinglist_destroy();

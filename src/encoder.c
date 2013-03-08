@@ -274,7 +274,7 @@ void encode_one_frame(encoder_control* encoder)
 
 
   }  
-  else if(encoder->frame < 20)
+  else if(encoder->frame < 10)
   {
     
     cabac_start(&cabac);
@@ -364,6 +364,8 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "loop_filter_across_slice_flag");
   WRITE_U(encoder->stream, 0, 1, "deblocking_filter_control_present_flag");
   //IF deblocking_filter
+    //WRITE_U(encoder->stream, 0, 1, "deblocking_filter_override_enabled_flag");
+    //WRITE_U(encoder->stream, 1, 1, "pps_disable_deblocking_filter_flag");
   //ENDIF
   WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
@@ -687,6 +689,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
   }
   
+  /* Set every block as intra for now */
   //if(/*border_x && border_y)//*/(yCtb >= 10 && yCtb <= 20) && (xCtb >= 20 && xCtb <= 60))
   //if(yCtb || xCtb)
   {
@@ -754,13 +757,12 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     } /* end Code IPCM block */
     else if(cur_CU->type == CU_INTRA)
     {
-      //static int predMode = 0;
       uint8_t intraPredMode = 1;
       uint8_t intraPredModeChroma = 36; //Chroma derived from luma
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
       int i;
-      cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */    
+      cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
       /*
         PREDINFO CODING
         If intra prediction mode is found from the predictors,
@@ -783,16 +785,17 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       CABAC_BIN(&cabac,(mpmPred==-1)?0:1,"IntraPred");
       //} End for each part
 
-      /*Skeleton structure for intrapredmode signaling */
-      //If found from predictors, we can simplify signaling
-      if(mpmPred!=-1)        
-      {      
+      /*           Intrapredmode signaling 
+        If found from predictors, we can simplify signaling
+      */
+      if(mpmPred!=-1)
+      {
         CABAC_BIN_EP(&cabac, (mpmPred==0)?0:1, "intraPredMode");
         if(mpmPred!=0)
           CABAC_BIN_EP(&cabac, (mpmPred==1)?0:1, "intraPredMode");      
       }
       else //Else we signal the full predmode
-      { 
+      {
         int8_t intraPredModeTemp = intraPredMode;
         if (intraPreds[0] > intraPreds[1])
         { 
@@ -813,7 +816,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         CABAC_BINS_EP(&cabac, intraPredModeTemp, 5, "intraPredMode");
       }
 
-      
+      /* If we have chroma, signal it */
       if(encoder->in.video_format != FORMAT_400)
       {
         //Chroma intra prediction
@@ -824,6 +827,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         if(intraPredModeChroma!=36)
         {
           int8_t intraPredModeChromaTemp = intraPredModeChroma;
+          /* Default chroma predictors */
           uint32_t allowedChromaDir[ 5 ] = { 0, 26, 10, 1, 36 };
           
           //If intra is the same as one of the default predictors, replace it
@@ -864,7 +868,82 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /*
          Quant and transform here...
         */
-        CbY = 1; /* Let's pretend we have luma coefficients */
+        //INTRAPREDICTION
+        int16_t pred[32*32];
+        int16_t dcpred = intra_getDCPred(&encoder->in.cur_pic, xCtb, yCtb, depth);
+        int16_t block[32*32];
+        int16_t pre_quant_coeff[32*32];
+        int16_t coeff[32*32];
+        uint32_t width = LCU_WIDTH>>depth;
+        uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];                 
+        uint8_t *recbase = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+        //fill prediction
+        for(y = 0; y < LCU_WIDTH>>depth; y++)
+        {
+          for(x = 0; x < LCU_WIDTH>>depth; x++)
+          {
+            pred[x+y*32] = dcpred;
+          }
+        }
+
+        i = 0;          
+        for(y = 0; y < LCU_WIDTH>>depth; y++)
+        {
+          for(x = 0; x < LCU_WIDTH>>depth; x++)
+          {
+            block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*32];
+          }
+        }
+        
+        memset(pre_quant_coeff,0,sizeof(int16_t)*32*32);
+        memset(coeff,0,sizeof(int16_t)*32*32);
+
+        /* Our coeffs */          
+        transform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+        quant(encoder,pre_quant_coeff,coeff, width, width, 0);
+          
+
+
+        for(i = 0; (uint32_t)i < width*width; i++)
+        {
+          if(coeff[i] != 0)
+          {
+            CbY = 1;
+            break;
+          }
+        }
+
+        if(CbY)
+        {
+          /* RECONSTRUCT for predictions */
+          dequant(encoder,coeff,pre_quant_coeff,width, width);
+          itransform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+
+          i = 0;
+          for(y = 0; y < LCU_WIDTH>>depth; y++)
+          {
+            for(x = 0; x < LCU_WIDTH>>depth; x++)
+            {
+              int16_t val = block[i++]+pred[x+y*32];
+              //ToDo: support 10+bits
+              recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,val);
+            }
+          }
+          /* END RECONTRUCTION */
+        }
+        else
+        {
+          for(y = 0; y < LCU_WIDTH>>depth; y++)
+          {
+            for(x = 0; x < LCU_WIDTH>>depth; x++)
+            {
+              recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,pred[x+y*32]);
+            }
+          }
+        }
+    
+
+        //INTRAPREDICTION
 
         /* Signal if chroma data is present */
         if(encoder->in.video_format != FORMAT_400)
@@ -885,19 +964,19 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /* CoeffNxN */
         if(CbY)
         {
+          //ToDo: split to function
           //void encode_CoeffNxN(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
           int c1 = 1;//,c1_num;
           //int patternSigCtx;
           /* scanCG == g_sigLastScanCG32x32 */
           /* Residual Coding */
           /* LastSignificantXY */
-          int16_t pre_quant_coeff[32*32];
-          int16_t coeff[32*32];// ={-129,-1,12,-5,-13,9,10,-10,-6,10,5,-11,-3,9,1,-8,1,7,-2,-6,1,3,-1,-3,1,2,-3,0,0,0,-1,0,20,1,-1,1,-1,-2,2,1,-3,-2,3,1,-4,-1,4,0,-5,2,4,-4,-2,3,3,-4,-1,3,1,0,2,2,1,-1,2,1,0,0,1,-1,-1,1,1,0,0,0,0,-1,-1,1,0,-1,0,2,0,-1,0,0,-1,-1,-1,1,0,0,0,0,2,-1,1,0,1,-1,1,0,0,0,0,1,0,1,1,0,-2,0,0,0,-1,0,2,0,0,0,-1,0,-1,1,-1,-2,0,0,0,-1,0,-2,0,0,0,0,0,0,0,1,0,0,-1,0,0,0,0,1,-1,1,0,1,-1,1,0,0,0,-1,0,1,-1,-1,1,1,0,-2,1,0,0,1,0,-1,-1,0,0,2,0,1,-1,2,1,-1,0,0,0,1,0,0,1,-2,0,0,-1,1,0,0,0,0,1,0,0,0,0,0,-1,0,0,0,-1,0,0,1,0,0,-1,0,0,2,-1,1,0,-1,0,0,0,0,0,0,0,0,0,0,-1,0,1,-1,0,0,0,0,0,-2,0,1,1,0,1,0,0,0,0,0,1,1,1,0,1,0,-1,0,0,1,1,0,0,-1,0,0,0,0,0,2,-1,0,0,0,0,1,0,-2,0,0,0,0,0,-1,0,0,0,-1,2,-1,0,0,-1,-1,0,0,1,1,0,0,1,-1,0,0,0,0,-1,0,-1,0,1,0,0,0,0,0,1,0,0,0,1,1,-1,0,0,1,0,0,0,1,-1,0,0,-1,1,2,0,0,0,-1,0,-1,1,1,0,-1,0,0,0,0,-1,-1,0,1,0,2,0,0,-1,0,1,0,-1,0,1,0,0,0,-1,-2,0,1,0,1,0,1,0,1,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0,0,0,0,0,-2,0,1,1,-1,1,0,0,0,-1,1,-1,0,0,0,0,0,-1,0,1,0,0,1,1,0,0,1,0,0,1,1,0,1,-1,2,-1,0,1,0,-1,0,1,1,0,0,0,-1,0,0,1,0,-1,0,1,-1,-1,0,-1,0,0,-1,1,1,0,0,0,-1,0,-1,0,-1,0,-1,-1,-1,0,0,0,-1,0,1,0,-2,2,1,0,0,1,0,0,1,-1,-1,0,0,-1,0,1,-1,-2,0,0,-1,-1,0,0,0,-1,-1,0,0,-1,0,0,1,1,0,0,0,1,0,0,-1,0,0,-1,1,0,-1,-1,0,-1,0,0,0,0,0,0,1,0,-2,0,0,0,0,0,1,1,0,2,-1,-1,-1,0,0,0,0,1,-1,1,0,0,0,-1,0,-2,0,0,0,0,-1,0,0,0,-1,0,0,0,0,0,1,0,0,0,0,0,0,0,-2,0,1,0,0,0,1,0,0,0,-1,-1,1,-1,1,1,1,-1,0,0,0,0,0,1,0,-1,0,-1,1,0,0,0,-1,2,-1,0,-1,-1,0,0,1,1,0,1,-1,2,1,-1,0,0,0,0,-1,0,1,0,-1,1,1,0,0,-1,-1,0,-1,0,0,0,-1,0,0,0,0,0,0,1,1,-1,0,1,-1,0,0,0,1,0,-1,0,0,0,0,0,-1,-1,0,0,-1,0,0,-2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,0,0,0,1,1,1,3,0,0,-1,0,1,-1,0,0,2,1,-1,0,0,0,0,0,0,0,0,0,1,0,0,-1,-1,0,0,0,0,0,-2,-1,0,0,-2,-1,0,1,0,2,-1,-1,1,1,-1,1,-1,0,0,0,0,1,-1,0,1,1,0,1,-1,-1,-1,0,0,0,0,1,-1,1,0,0,0,0,0,0,0,0,-2,0,0,0,0,-1,1,0,2,0,1,0,1,1,1,-1,1,0,0,1,0,-1,0,0,0,0,0,0,0,-1,0,0,0,-1,1,0,0,0,0,1,0,0,0,0,0,0,1,-1,1,0,1,-1,-1,0,0,1,0,0,0,0,1,0,1,0,-1,0,2,0,-2,1,0,-1,0,-1,0,0,0,-1,0,0,0,0,1,0,-1,1,-2,-1,1,0,0,-1,0,0,0,0,0,0,0,0,1,-1,0,0,1,0,-1,1,-1,0,-1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,-1,0,0,0,-1,-1,0,0,1,0,-1,0,1,-1,0,1,0,1,-1,0,0,1,0,0,0,1,0,-1,0,0,0,0,0,0,0,-1,0,1,0,0,1,1,-1,0,0,0,0,-1,0,0,0,0,0,0,-1,0,0,1,0,-1,1,0,0,0,0,2,2,0,-1,0,0,-2,0,0,0,1,-1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,-1,0,0,0,1,0,-1,0,0,0,0,0,0,-2,-1,1,0,-1};
+
           uint8_t last_coeff_x = 0;
           uint8_t last_coeff_y = 0;
           int32_t i;
           uint32_t sig_coeffgroup_flag[64];
-          uint32_t width = LCU_WIDTH>>depth;
+          
           uint32_t num_nonzero = 0;
           int32_t scanPosLast = -1;
           int32_t posLast = 0;
@@ -906,74 +985,33 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           int32_t iScanPosSig;
           int32_t iLastScanSet;
           uint32_t uiGoRiceParam = 0;
-          int16_t block[32*32];
-          uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
-          uint8_t *recbase = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
-          uint32_t uiBlkPos, uiPosY, uiPosX, uiSig, uiCtxSig;
-          //INTRAPREDICTION
-          int16_t pred[32*32];
-          int16_t dcpred = intra_getDCPred(&encoder->in.cur_pic, xCtb, yCtb, depth);
 
-          //INTRAPREDICTION
+          uint32_t uiBlkPos, uiPosY, uiPosX, uiSig, uiCtxSig;
+
 
           /* CONSTANTS */
           const uint32_t uiNumBlkSide = width >> shift;
           const uint32_t uiLog2BlockSize = g_aucConvertToBit[ width ] + 2;
           const uint32_t* scan = g_auiSigLastScan[ SCAN_DIAG ][ uiLog2BlockSize - 1 ];
           const uint32_t* scanCG = NULL;
+
+          /* Init base contexts according to block type */
           cabac_ctx* baseCoeffGroupCtx = &g_CUSigCoeffGroupSCModel[type];
           cabac_ctx* baseCtx = (type==0) ? &g_CUSigSCModel_luma[0] :&g_CUSigSCModel_chroma[0];
 
-          memset(pre_quant_coeff,0,sizeof(int16_t)*32*32);
-          memset(coeff,0,sizeof(int16_t)*32*32);
           memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
 
-          //FILL PREDICTION
-          for(y = 0; y < LCU_WIDTH>>depth; y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>depth; x++)
-            {
-              pred[x+y*32] = dcpred;
-            }
-          }
 
 
-          i = 0;          
-          for(y = 0; y < LCU_WIDTH>>depth; y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>depth; x++)
-            {
-              block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*32];
-              //if(x == 30 || y == 30 || x == 31 || y == 31) block[i-1] = 0;
-            }
-          }
-          
 
-          /* Our coeffs */
-          
-          transform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
-          quant(encoder,pre_quant_coeff,coeff, width, width, type);
-          
-          dequant(encoder,coeff,pre_quant_coeff,width, width);
-          itransform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
-
-          i = 0;
-          for(y = 0; y < LCU_WIDTH>>depth; y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>depth; x++)
-            {
-              int16_t val = block[i++]+dcpred;
-              recbase[x+y*encoder->in.width] = (uint8_t)MAX(0,MIN(255,val));
-            }
-          }
                     
           /* Count non-zero coeffs */
           for(i = 0; (uint32_t)i < width*width; i++)
           {
-           if(coeff[i] != 0)
-           {
-             num_nonzero++;
-           }
+            if(coeff[i] != 0)
+            {
+              num_nonzero++;
+            }
           }
           
 
@@ -1062,11 +1100,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                   uiCtxSig  = context_getSigCtxInc( patternSigCtx, SCAN_DIAG, uiPosX, uiPosY, uiLog2BlockSize, width, type );
                   cabac.ctx = &baseCtx[ uiCtxSig ];
                   CABAC_BIN(&cabac,uiSig,"significant_coeff_flag");
-                }/*
-                else
-                {
-                  uiSig = 1;
-                }*/
+                }
                 
                 if( uiSig )
                 {
@@ -1133,6 +1167,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                 }
               }
       
+              //ToDo: enable sign hiding
               if( 0 && /*beValid */ signHidden )
               {
                 CABAC_BINS_EP(&cabac,(coeffSigns >> 1),(numNonZero-1),"");
