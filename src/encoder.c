@@ -453,8 +453,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size");
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
-  WRITE_U(encoder->stream, 0, 1, "scaling_list_enable_flag");
+  WRITE_U(encoder->stream, 1, 1, "scaling_list_enable_flag");
   //IF scaling list
+    WRITE_U(encoder->stream, 0, 1, "sps_scaling_list_data_present_flag");
   //ENDIF
 
   WRITE_U(encoder->stream, 0, 1, "amp_enabled_flag");
@@ -924,7 +925,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         if(CbY)
         {
           /* RECONSTRUCT for predictions */
-          dequant(encoder,coeff,pre_quant_coeff,width, width);
+          dequant(encoder,coeff,pre_quant_coeff,width, width,0);
           itransform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
 
           i = 0;
@@ -954,7 +955,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         if(CbU)
         {
           /* RECONSTRUCT for predictions */
-          dequant(encoder,coeffU,pre_quant_coeff,width>>1, width>>1);
+          dequant(encoder,coeffU,pre_quant_coeff,width>>1, width>>1,2);
           itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
 
           i = 0;
@@ -984,7 +985,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         if(CbV)
         {
           /* RECONSTRUCT for predictions */
-          dequant(encoder,coeffV,pre_quant_coeff,width>>1, width>>1);
+          dequant(encoder,coeffV,pre_quant_coeff,width>>1, width>>1,3);
           itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
 
           i = 0;

@@ -129,7 +129,7 @@
     /* input init (ToDo: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
-    encoder->QP       = 25;
+    encoder->QP       = 35;
     encoder->in.video_format = FORMAT_420;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
