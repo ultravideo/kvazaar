@@ -63,6 +63,7 @@ typedef struct
   uint8_t referenced; /*!< \brief Is this picture referenced */
   CU_info** CU;     /*!< \brief info for each CU at each depth */
   uint8_t type;
+  uint8_t slicetype;
 } picture;
 
 /*!

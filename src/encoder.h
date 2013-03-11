@@ -67,6 +67,7 @@ void encode_slice_data(encoder_control* encoder);
 void encode_slice_header(encoder_control* encoder);
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan);
+void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type);
 
 void init_tables(void);
 

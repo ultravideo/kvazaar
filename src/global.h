@@ -6,17 +6,17 @@
 /*! \file global.h
     \brief Contains global includes
     \author Marko Viitanen
-    \date 2012-05
+    \date 2013-03
   
-    This file should be included to every C-file.
+    This file should be included in every C-file.
 */
 #ifndef __GLOBAL_H
 #define __GLOBAL_H
 
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit */
-#define MAX_DEPTH 3 /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
-#define MIN_SIZE 0
+#define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
+#define MIN_SIZE 3   /*!< log2_min_coding_block_size */
 
 #define ENABLE_PCM 1
 
@@ -36,8 +36,8 @@
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 
-#define VERSION_STRING "0.1               "
-#define VERSION 0.1
+#define VERSION_STRING "0.2               "
+#define VERSION 0.2
 
 //#define VERBOSE 1
 
