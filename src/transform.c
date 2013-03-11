@@ -597,7 +597,7 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
   int32_t shift_1st = g_aucConvertToBit[blockSize]  + 1 + g_uiBitIncrement; // log2(iWidth) - 1 + g_uiBitIncrement
   int32_t shift_2nd = g_aucConvertToBit[blockSize]  + 8;                   // log2(iHeight) + 6
 
-  short tmp[ 64 * 64 ];
+  int16_t tmp[32*32];
   /*
   if(blockSize== 4)
   {
@@ -648,7 +648,7 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (g_uiBitDepth-8);
-  int16_t tmp[ 64*64];
+  int16_t tmp[32*32];
 
   if( blockSize == 8)
   {
@@ -726,7 +726,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, /*int32_t** p
 
   int32_t iTransformShift = /*MAX_TR_DYNAMIC_RANGE*/15 - uiBitDepth - uiLog2TrSize; // Represents scaling through forward transform
   int32_t iQBits = QUANT_SHIFT + /*cQpBase.m_iPer +*/qpScaled/6 + iTransformShift;
-  int32_t iAdd = ((encoder->in.cur_pic.type == NAL_IDR_SLICE || encoder->in.cur_pic.type == 0) ? 171 : 85) << (iQBits-9);
+  int32_t iAdd = ((encoder->in.cur_pic.slicetype == SLICE_I) ? 171 : 85) << (iQBits-9);
 
   int32_t qBits8 = iQBits-8;
   for( n = 0; n < iWidth*iHeight; n++ )

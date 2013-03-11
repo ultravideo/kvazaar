@@ -58,7 +58,9 @@
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
     FILE *output = NULL;
+    #ifdef _DEBUG
     FILE *recout = fopen("encrec.yuv","wb");
+    #endif
     encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));;
  
     /* Handle configuration */
@@ -127,7 +129,7 @@
     /* input init (ToDo: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
-    encoder->QP       = 35;
+    encoder->QP       = 25;
     encoder->in.video_format = FORMAT_420;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
@@ -140,10 +142,12 @@
       fread(encoder->in.cur_pic.vData, cfg->width*cfg->height>>2,1,input);
       encode_one_frame(encoder);
 
-      /* Write reconstructed frame out */
+      #ifdef _DEBUG
+      /* Write reconstructed frame out */     
       fwrite(encoder->in.cur_pic.yRecData,cfg->width*cfg->height,1,recout);
       fwrite(encoder->in.cur_pic.uRecData,cfg->width*cfg->height>>2,1,recout);
       fwrite(encoder->in.cur_pic.vRecData,cfg->width*cfg->height>>2,1,recout);
+      #endif
       //printf("[%d] %c-frame\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3]);
       encoder->frame++;
     }
@@ -153,7 +157,9 @@
 
     fclose(input);
     fclose(output);
+    #ifdef _DEBUG
     fclose(recout);
+    #endif
 
     /* Deallocating */
     config_destroy(cfg);

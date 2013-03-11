@@ -82,12 +82,12 @@ int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t dep
 \param depth current CU depth
 \returns DC prediction or -1 if not available
 */
-int16_t intra_getDCPred(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth)
+int16_t intra_getDCPred(uint8_t* pic, uint16_t picwidth,uint32_t xCtb, uint32_t yCtb, uint8_t depth, uint8_t chroma)
 {
   int32_t i, iSum = 0;
   int16_t pDcVal = 1<<(g_uiBitDepth-1);
-  int32_t width = (LCU_WIDTH>>depth);
-  int32_t SCUwidth = (LCU_WIDTH>>MAX_DEPTH);
+  int32_t width = (LCU_WIDTH>>(depth+chroma));
+  int32_t SCUwidth = (LCU_WIDTH>>(MAX_DEPTH+chroma));
   int32_t xpos = SCUwidth*xCtb;
   int32_t ypos = SCUwidth*yCtb;
   int32_t LCU_xpos = xpos - (xpos%LCU_WIDTH);
@@ -100,48 +100,35 @@ int16_t intra_getDCPred(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
 
   if (bAbove)
   {
-    add = (ypos-1)*pic->width;
+    add = (ypos-1)*picwidth;
     for (i = xpos+add; i < xpos+width+add ; i++)
     {
-      iSum += pic->yRecData[i];
+      iSum += pic[i];
     }
   }  
   else if (bLeft)
   {
-    iSum += pic->yRecData[ypos*pic->width+xpos-1]*width;
+    iSum += pic[ypos*picwidth+xpos-1]*width;
   }
 
 
   if (bLeft)
   {
     add = xpos-1;
-    for (i = ypos*pic->width+add ; i < (ypos+width)*pic->width+add ; i+=pic->width)
+    for (i = ypos*picwidth+add ; i < (ypos+width)*picwidth+add ; i+=picwidth)
     {
-      iSum += pic->yRecData[i];
+      iSum += pic[i];
     }
   }  
   else if (bAbove)
   {
-    iSum += pic->yRecData[(ypos-1)*pic->width+xpos]*width;
+    iSum += pic[(ypos-1)*picwidth+xpos]*width;
   }
 
-
-
-  //if (bAbove && bLeft)
   if (bAbove || bLeft)
   {
     pDcVal = (iSum + width) / (width + width);
   }
-  /*
-  else if (bAbove)
-  {
-    pDcVal = (iSum + width/2) / width;
-  }
-  else if (bLeft)
-  {
-    pDcVal = (iSum + width/2) / width;
-  }
-  */
   
   return pDcVal;
 }
@@ -205,6 +192,27 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
   } 
 
   return 1;
+}
+
+
+void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight )
+{
+  uint8_t* pDst = rpDst;
+  int32_t x, y, iDstStride2, iSrcStride2;
+
+  // boundary pixels processing
+  pDst[0] = ((pSrc[-iSrcStride] + pSrc[-1] + 2 * pDst[0] + 2) >> 2);
+
+  for ( x = 1; x < iWidth; x++ )
+  {
+    pDst[x] = ((pSrc[x - iSrcStride] +  3 * pDst[x] + 2) >> 2);
+  }
+  for ( y = 1, iDstStride2 = iDstStride, iSrcStride2 = iSrcStride-1; y < iHeight; y++, iDstStride2+=iDstStride, iSrcStride2+=iSrcStride )
+  {
+    pDst[iDstStride2] = ((pSrc[iSrcStride2] + 3 * pDst[iDstStride2] + 2) >> 2);
+  }
+
+  return;
 }
 
 /*! \brief Function for deriving planar intra prediction.
