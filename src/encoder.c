@@ -277,7 +277,14 @@ void encode_one_frame(encoder_control* encoder)
   }  
   else// if(encoder->frame < 10)
   {
-    
+    if(encoder->QP > 20) encoder->QP-=2;
+    /* Picture Parameter Set (PPS) */
+    encode_pic_parameter_set(encoder);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PIC_PARAMETER_SET, 0);
+    bitstream_clear_buffer(encoder->stream);
+
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = 0;
@@ -702,7 +709,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
     if(cur_CU->type == CU_INTRA)
     {
-      uint8_t intraPredMode = 1;
+      uint8_t intraPredMode = 0;
       uint8_t intraPredModeChroma = 36; /* 36 = Chroma derived from luma */
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
@@ -829,13 +836,14 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         int16_t pred[32*32];
         int16_t predU[16*16];
         int16_t predV[16*16];
-        int16_t dcpred   = intra_getDCPred(encoder->in.cur_pic.yRecData,encoder->in.width, xCtb, yCtb, depth,0);
-        int16_t dcpredU  = intra_getDCPred(encoder->in.cur_pic.uRecData,encoder->in.width>>1, xCtb, yCtb, depth,1);
-        int16_t dcpredV  = intra_getDCPred(encoder->in.cur_pic.vRecData,encoder->in.width>>1, xCtb, yCtb, depth,1);
+        //int16_t dcpred   = intra_getDCPred(encoder->in.cur_pic.yRecData,encoder->in.width, xCtb, yCtb, depth,0);
+        //int16_t dcpredU  = intra_getDCPred(encoder->in.cur_pic.uRecData,encoder->in.width>>1, xCtb, yCtb, depth,1);
+        //int16_t dcpredV  = intra_getDCPred(encoder->in.cur_pic.vRecData,encoder->in.width>>1, xCtb, yCtb, depth,1);
         uint8_t *recbase = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
         uint8_t *recbaseU = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
         uint8_t *recbaseV = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
         /* Fill prediction */
+        /*
         for(y = 0; y < LCU_WIDTH>>depth; y++)
         {
           for(x = 0; x < LCU_WIDTH>>depth; x++)
@@ -851,6 +859,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             predV[x+y*16] = dcpredV;
           }
         }
+        */
+        intra_getPlanarPred(encoder->in.cur_pic.yRecData, encoder->in.width,xCtb*(LCU_WIDTH>>MAX_DEPTH),yCtb*(LCU_WIDTH>>MAX_DEPTH),LCU_WIDTH>>depth,pred,LCU_WIDTH>>depth);
+        intra_getPlanarPred(encoder->in.cur_pic.uRecData, encoder->in.width>>1,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),LCU_WIDTH>>(depth+1),predU,LCU_WIDTH>>(depth+1));
+        intra_getPlanarPred(encoder->in.cur_pic.vRecData, encoder->in.width>>1,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),LCU_WIDTH>>(depth+1),predV,LCU_WIDTH>>(depth+1));
 
         /* Get residual by subtracting prediction */
         i = 0;          

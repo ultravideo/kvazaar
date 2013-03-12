@@ -15,6 +15,12 @@
 #define _PICTURE_H_
 
 
+/* Functions */
+
+uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+double imagePSNR(uint8_t *frame1, uint8_t *frame2, uint32_t x, uint32_t y);
+
 /** \defgroup picture_group Picture handler group
  *  This group contains all picture related stuff
  *  @{
@@ -41,7 +47,7 @@ typedef struct
 typedef struct
 {
   uint8_t type;
-  void* typedata;
+  CU_info_intra intra;
   uint8_t split;
 } CU_info;
 

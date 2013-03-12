@@ -58,6 +58,7 @@
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
     FILE *output = NULL;
+    double PSNR[3] = { 0.0, 0.0, 0.0 };
     #ifdef _DEBUG
     FILE *recout = fopen("encrec.yuv","wb");
     #endif
@@ -140,6 +141,10 @@
       fread(encoder->in.cur_pic.yData, cfg->width*cfg->height,1,input);
       fread(encoder->in.cur_pic.uData, cfg->width*cfg->height>>2,1,input);
       fread(encoder->in.cur_pic.vData, cfg->width*cfg->height>>2,1,input);
+      memset(encoder->in.cur_pic.yRecData, 0, cfg->width*cfg->height);
+      memset(encoder->in.cur_pic.uRecData, 128, cfg->width*cfg->height>>2);
+      memset(encoder->in.cur_pic.vRecData, 128, cfg->width*cfg->height>>2);
+
       encode_one_frame(encoder);
 
       #ifdef _DEBUG
@@ -148,12 +153,23 @@
       fwrite(encoder->in.cur_pic.uRecData,cfg->width*cfg->height>>2,1,recout);
       fwrite(encoder->in.cur_pic.vRecData,cfg->width*cfg->height>>2,1,recout);
       #endif
-      //printf("[%d] %c-frame\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3]);
+      {
+        double temp_PSNR[3];
+        temp_PSNR[0] = imagePSNR(encoder->in.cur_pic.yData,encoder->in.cur_pic.yRecData,cfg->width,cfg->height);
+        temp_PSNR[1] = imagePSNR(encoder->in.cur_pic.uData,encoder->in.cur_pic.uRecData,cfg->width>>1,cfg->height>>1);
+        temp_PSNR[2] = imagePSNR(encoder->in.cur_pic.vData,encoder->in.cur_pic.vRecData,cfg->width>>1,cfg->height>>1);
+
+        printf("[%d] %c-frame PSNR: %2.2f %2.2f %2.2f\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3],
+                                                        temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);
+        PSNR[0]+=temp_PSNR[0];
+        PSNR[1]+=temp_PSNR[1];
+        PSNR[2]+=temp_PSNR[2];
+      }
       encoder->frame++;
     }
     /* Coding finished */
 
-    printf(" Processed %d frames\n", encoder->frame-1);
+    printf(" Processed %d frames, AVG PSNR: %2.2f %2.2f %2.2f\n", encoder->frame,PSNR[0]/encoder->frame,PSNR[1]/encoder->frame,PSNR[2]/encoder->frame);
 
     fclose(input);
     fclose(output);
