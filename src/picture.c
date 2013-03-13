@@ -126,7 +126,7 @@
 
 
 #include <math.h>
-#define PSNRMAX (255*255)
+#define PSNRMAX (255.0*255.0)
 
 //Calculates image PSNR value
 double imagePSNR(uint8_t *frame1, uint8_t *frame2, uint32_t x, uint32_t y)
