@@ -714,7 +714,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       uint8_t intraPredModeChroma = 36; /* 36 = Chroma derived from luma */
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
-      int i;
+      int i,x,y;
       uint32_t flag;
       uint32_t bestSAD;
       uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
@@ -727,7 +727,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int16_t pred[32*32];
       int16_t predU[16*16];
       int16_t predV[16*16];
-      uint8_t *recbase = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+
+      int16_t rec[(LCU_WIDTH+8)*(LCU_WIDTH+8)];
+      int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];
+      int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
+      uint8_t *recbase  = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
       uint8_t *recbaseU = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *recbaseV = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       //int16_t dcpredU  = intra_getDCPred(encoder->in.cur_pic.uRecData,encoder->in.width>>1, xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), depth+1);
@@ -735,12 +739,18 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
        
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
 
-      intraPredMode = intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,encoder->in.cur_pic.yRecData,encoder->in.width,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
+      /* Build reconstructed block to use in prediction with extrapolated borders */      
+      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+
+      intraPredMode = intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
+
       /* ToDo: chroma prediction */
-
-      intra_recon(encoder->in.cur_pic.uRecData,(encoder->in.width>>1),xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode);
-      intra_recon(encoder->in.cur_pic.vRecData,(encoder->in.width>>1),xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredMode);
-
+      //printf("(%d, %d) SAD: %d\n", xCtb,yCtb,bestSAD);      
+      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
+      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode);
+      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
+      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredMode);
+      
       /*
         PREDINFO CODING
         If intra prediction mode is found from the predictors,

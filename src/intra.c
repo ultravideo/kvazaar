@@ -37,13 +37,13 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
+    int CUpos = y*width_in_SCU;
     for(x = xCtb; x < xCtb+block_SCU_width; x++)
-    {
-      int CUpos = y*width_in_SCU+x;
+    {      
       for(d = 0; d < MAX_DEPTH; d++)
       {
-        pic->CU[d][CUpos].type = CU_INTRA;
-        pic->CU[d][CUpos].intra.mode = mode;
+        pic->CU[d][CUpos+x].type = CU_INTRA;
+        pic->CU[d][CUpos+x].intra.mode = mode;
       }
     }
   }
@@ -75,16 +75,26 @@ int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t dep
 \param xpos x-position
 \param ypos y-position
 \param width block width
-\returns DC prediction or -1 if not available
+\returns DC prediction
 */
-int16_t intra_getDCPred(uint8_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width)
+int16_t intra_getDCPred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width)
 {
   int32_t i, iSum = 0;
   int16_t pDcVal = 1<<(g_uiBitDepth-1);  
-  int8_t bAbove = ypos?1:0;
-  int8_t bLeft  = xpos?1:0;
-  int32_t add;
-  
+  //int8_t bAbove = ypos?1:0;
+  //int8_t bLeft  = xpos?1:0;
+  //int32_t add;
+
+  for (i = -picwidth; i < width-picwidth ; i++)
+  {
+    iSum += pic[i];
+  }
+
+  for (i = -1 ; i < width*picwidth-1 ; i+=picwidth)
+  {
+    iSum += pic[i];
+  }
+  /*
   if (bAbove)
   {
     add = (ypos-1)*picwidth;
@@ -110,8 +120,9 @@ int16_t intra_getDCPred(uint8_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t 
   {
     iSum += pic[(ypos-1)*picwidth+xpos]*width;
   }
+  */
 
-  if (bAbove || bLeft)
+  //if (1)//bAbove || bLeft)
   {
     pDcVal = (iSum + width) / (width + width);
   }
@@ -194,7 +205,7 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
  
   This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(uint8_t* orig,uint32_t origstride,uint8_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad)
+int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad)
 {
   uint32_t bestSAD = 0xffffffff;
   uint32_t SAD = 0;
@@ -204,7 +215,6 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,uint8_t* rec,uint32_t
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
   int16_t origBlock[LCU_WIDTH*LCU_WIDTH>>2];
   uint8_t *origShift = &orig[xpos+ypos*origstride];
-  uint8_t* recShift = &rec[xpos+ypos*recstride];
   #define COPY_PRED_TO_DST() for(y = 0; y < width; y++)  {   for(x = 0; x < width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
   #define CHECK_FOR_BEST(mode)  SAD = calcSAD(pred,width,origBlock,width); \
                                 if(SAD < bestSAD)\
@@ -216,6 +226,12 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,uint8_t* rec,uint32_t
 
   switch(width)
   {
+    case 4:
+      calcSAD = &SAD4x4;
+      break;
+    case 8:
+      calcSAD = &SAD8x8;
+      break;
     case 16:
       calcSAD = &SAD16x16;
       break;
@@ -251,28 +267,29 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,uint8_t* rec,uint32_t
   /* ToDo: add conditions to skip some modes on borders */
   
   //chroma can use only 26 and 10
+  
+  if(xpos && ypos)
   //for(i = 2; i < 35; i++)
   //for(i = 26; i < 35; i++)
-  /*
-  for(i = 23; i < 26; i++)
+  
+  for(i = 2; i < 35; i++)
   {
-    intra_getAngularPred(recShift,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0);
+    intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
     CHECK_FOR_BEST(i);
   }
-  */
+
   
   *sad = bestSAD;
   
   return bestMode;
 }
 
-void intra_recon(uint8_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, int8_t mode)
+void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, int8_t mode)
 {
   int32_t x,y,i;
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
-  uint8_t* recShift = &rec[xpos+ypos*recstride];
+  //int16_t* recShift = &rec[xpos+ypos*recstride];
   #define COPY_PRED_TO_DST() for(y = 0; y < width; y++)  {   for(x = 0; x < width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
-
 
   /* planar */  
   if(mode == 0)
@@ -282,23 +299,133 @@ void intra_recon(uint8_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   /* DC */
   else if(mode == 1)
   {
-    x = intra_getDCPred(rec, recstride, xpos, ypos, width);
-    for(i = 0; i < width*width; i++)
+    i = intra_getDCPred(rec, recstride, xpos, ypos, width);
+    for(y = 0; y < width; y++)
     {
-      pred[i] = x;
+      for(x = 0; x < width; x++)
+      {
+        dst[x+y*dststride] = i;
+      }
     }
+    return;
   }
   /* directional predictions */
   else
   {
-    intra_getAngularPred(recShift, recstride,pred, width,width,width,mode, xpos?1:0, ypos?1:0);
+    intra_getAngularPred(rec, recstride,pred, width,width,width,mode, xpos?1:0, ypos?1:0, 0);
   }
 
   COPY_PRED_TO_DST();
 }
 
+void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
+{
+  int32_t leftColumn;  /*!< left column iterator */
+  int16_t val;         /*!< variable to store extrapolated value */
+  int32_t i;           /*!< index iterator */
+  int16_t dcVal        = 1<<(g_uiBitDepth-1); /*!< default predictor value */
+  int32_t topRow;      /*!< top row iterator */
+  int32_t srcWidth     = (pic->width>>(chroma?1:0)); /*!< source picture width */
+  int32_t srcHeight    = (pic->height>>(chroma?1:0));/*!< source picture height */
+  uint8_t* srcPic      = (!chroma)?pic->yRecData: ((chroma==1)?pic->uRecData: pic->vRecData); /*!< input picture pointer */  
+  int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
+  uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
+  int32_t width_in_SCU = srcWidth/SCU_width;     /*!< picture width in SCU */
 
-void intra_getAngularPred(uint8_t* pSrc, int32_t srcStride, int16_t* rpDst, int32_t dstStride, int32_t width, int32_t height, int32_t dirMode, int8_t leftAvail,int8_t topAvail)
+  memset(dst,0,outwidth*outwidth*sizeof(int16_t));
+
+  /* Fill left column */
+  if(xCtb)
+  {
+    /* Loop SCU's */
+    for(leftColumn = 1; leftColumn < outwidth/SCU_width; leftColumn++)
+    {
+      /* If over the picture height or block not yet coded, stop */
+      if((yCtb+leftColumn)*SCU_width >= srcHeight || pic->CU[0][xCtb-1+(yCtb+leftColumn)*width_in_SCU].type == CU_NOTSET)
+      {
+        break;
+      }
+    }
+    /* Copy the pixels to output */
+    for(i = 0; i < leftColumn*SCU_width-1; i ++)
+    {
+      dst[(i+1)*dststride] = srcShifted[i*srcWidth-1];
+    }
+
+    /* if the loop was not completed, extrapolate the last pixel pushed to output */
+    if(leftColumn != outwidth/SCU_width)
+    {
+      val = srcShifted[(leftColumn*SCU_width-1)*srcWidth-1];
+      for(i = (leftColumn*SCU_width); i < outwidth; i++)
+      {
+        dst[i*dststride] = val;
+      }
+    }    
+  }
+  /* If left column not available, copy from toprow or use the default predictor */
+  else
+  {
+    val = yCtb?srcShifted[-srcWidth]:dcVal;
+    for(i = 0; i < outwidth; i++)
+    {
+      dst[i*dststride] = val;
+    }
+  }
+
+  if(yCtb)
+  {
+    /* Loop top SCU's */
+    for(topRow = 1; topRow < outwidth/SCU_width; topRow++)
+    {
+      if((xCtb+topRow)*SCU_width >= srcWidth || pic->CU[0][xCtb+topRow+(yCtb-1)*width_in_SCU].type == CU_NOTSET)
+      {
+        break;
+      }
+    }
+
+    for(i = 0; i < topRow*SCU_width-1; i ++)
+    {
+      dst[i+1] = srcShifted[i-srcWidth];
+    }
+
+    if(topRow != outwidth/SCU_width)
+    {
+      val = srcShifted[(topRow*SCU_width)-srcWidth-1];
+      for(i = (topRow*SCU_width); i < outwidth; i++)
+      {
+        dst[i] = val;
+      }
+    }
+  }
+  else
+  {
+    val = xCtb?srcShifted[-1]:dcVal;
+    for(i = 1; i < outwidth; i++)
+    {
+      dst[i] = val;
+    }
+  }
+  /* Topleft corner */
+  dst[0] = (xCtb&&yCtb)?srcShifted[-srcWidth-1]:dst[dststride];
+  /*
+  {
+    FILE* test = fopen("blockout.yuv","wb");
+    int x,y;
+    uint8_t outvalue;
+    for(y = 0; y < outwidth; y++)
+    {
+      for(x = 0; x < outwidth; x++)
+      {
+        outvalue = dst[x+y*outwidth];
+        fwrite(&outvalue,1,1,test);
+      }
+    }
+    fclose(test);
+  }
+  */
+}
+
+void intra_getAngularPred(uint16_t* pSrc, int32_t srcStride, int16_t* rpDst, int32_t dstStride, int32_t width, int32_t height, int32_t dirMode, int8_t leftAvail,int8_t topAvail, int8_t filter)
 {
   int32_t k,l;
   int32_t blkSize        = width;
@@ -329,38 +456,13 @@ void intra_getAngularPred(uint8_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
   if (intraPredAngle < 0)
   {
     int32_t invAngleSum = 128;       // rounding for (shift by 8)
-    if(topAvail)
+    for (k=0;k<blkSize+1;k++)
     {
-      for (k=1;k<blkSize+1;k++)
-      {
-        refAbove[k+blkSize-1] = pSrc[k-srcStride-1];
-      }
-      refAbove[blkSize-1] = leftAvail?pSrc[-srcStride-1]:pSrc[-srcStride];
+      refAbove[k+blkSize-1] = pSrc[k-srcStride-1];
     }
-    else
+    for (k=0;k<blkSize+1;k++)
     {
-      int16_t prediction = leftAvail?pSrc[-1]:(1<<g_uiBitDepth)-1;
-      for (k=0;k<blkSize+1;k++)
-      {
-        refAbove[k+blkSize-1] = prediction;
-      }
-    }
-
-    if(leftAvail)
-    {
-      for (k=1;k<blkSize+1;k++)
-      {
-        refLeft[k+blkSize-1] = pSrc[(k-1)*srcStride-1];
-      }
-      refLeft[blkSize-1] = topAvail?pSrc[-srcStride-1]:pSrc[-1];
-    }
-    else
-    {
-      int16_t prediction = topAvail?pSrc[-srcStride]:(1<<g_uiBitDepth)-1;
-      for (k=0;k<blkSize+1;k++)
-      {
-        refLeft[k+blkSize-1] = prediction;
-      }
+      refLeft[k+blkSize-1] = pSrc[(k-1)*srcStride-1];
     }
     refMain = (modeVer ? refAbove : refLeft) + (blkSize-1);
     refSide = (modeVer ? refLeft : refAbove) + (blkSize-1);
@@ -396,7 +498,7 @@ void intra_getAngularPred(uint8_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
       }
     }
 
-    if ( width < 32 )
+    if(filter)
     {
       for (k=0;k<blkSize;k++)
       {
@@ -488,13 +590,11 @@ void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, in
  
   This function derives the prediction samples for planar mode (intra coding).
 */
-//ToDo: FIX!
-void intra_getPlanarPred(uint8_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
+void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
 {
   int8_t bAbove = ypos?1:0;
   int8_t bLeft  = xpos?1:0;
   int16_t pDcVal = 1<<(g_uiBitDepth-1);
-  uint8_t* srcShifted = &src[xpos + ypos*srcstride];
   uint32_t k, l, bottomLeft, topRight;
   int32_t horPred;
   int16_t leftColumn[LCU_WIDTH], topRow[LCU_WIDTH], bottomRow[LCU_WIDTH], rightColumn[LCU_WIDTH];
@@ -505,11 +605,12 @@ void intra_getPlanarPred(uint8_t* src,int32_t srcstride, uint32_t xpos, uint32_t
 
   if(bAbove)
   {    
-    for(k=0;k<blkSize;k++)
+    for(k=0;k<blkSize+1;k++)
     {
-      topRow[k] = srcShifted[k-srcstride];
+      topRow[k] = src[k-srcstride];
     }
   }
+  /*
   else
   {
     int16_t prediction = bLeft?srcShifted[-1]:pDcVal;
@@ -518,14 +619,15 @@ void intra_getPlanarPred(uint8_t* src,int32_t srcstride, uint32_t xpos, uint32_t
       topRow[k] = prediction;
     }
   }
-
+  */
   if(bLeft)
   {
-    for(k=0;k<blkSize;k++)
+    for(k=0;k<blkSize+1;k++)
     {
-      leftColumn[k] = srcShifted[k*srcstride-1];
+      leftColumn[k] = src[k*srcstride-1];
     }
   }
+  /*
   else
   {
     int16_t prediction = (bAbove?(int16_t)srcShifted[-srcstride]:pDcVal);
@@ -536,6 +638,7 @@ void intra_getPlanarPred(uint8_t* src,int32_t srcstride, uint32_t xpos, uint32_t
   }
   leftColumn[blkSize] = leftColumn[blkSize-1];
   topRow[blkSize] = topRow[blkSize-1];
+  */
 
   // Get left and above reference column and row
   
