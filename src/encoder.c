@@ -235,6 +235,7 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
 
 void encode_one_frame(encoder_control* encoder)
 {
+  int i;
   /* output parameters before first frame */
   if(encoder->frame == 0)
   {
@@ -333,6 +334,12 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
     */
   }  
+  /* Clear prediction data */
+  /* ToDo: store */
+  for(i=0; i < MAX_DEPTH+1; i++)
+  {    
+    memset(encoder->in.cur_pic.CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+  } 
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)

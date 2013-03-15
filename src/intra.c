@@ -252,10 +252,8 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   }
 
   /* Test planar */
-  /*
   intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0);
-  */
   /* Test DC */
   x = intra_getDCPred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < width*width; i++)
@@ -267,17 +265,17 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   /* ToDo: add conditions to skip some modes on borders */
   
   //chroma can use only 26 and 10
-  
+
+  /*
   if(xpos && ypos)
   //for(i = 2; i < 35; i++)
   //for(i = 26; i < 35; i++)
-  
   for(i = 2; i < 35; i++)
   {
     intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
     CHECK_FOR_BEST(i);
   }
-
+  */
   
   *sad = bestSAD;
   
@@ -592,8 +590,6 @@ void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, in
 */
 void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
 {
-  int8_t bAbove = ypos?1:0;
-  int8_t bLeft  = xpos?1:0;
   int16_t pDcVal = 1<<(g_uiBitDepth-1);
   uint32_t k, l, bottomLeft, topRight;
   int32_t horPred;
@@ -603,42 +599,12 @@ void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t
   uint32_t shift1D = g_aucConvertToBit[ width ] + 2;
   uint32_t shift2D = shift1D + 1;
 
-  if(bAbove)
-  {    
-    for(k=0;k<blkSize+1;k++)
-    {
-      topRow[k] = src[k-srcstride];
-    }
-  }
-  /*
-  else
+
+  for(k=0;k<blkSize+1;k++)
   {
-    int16_t prediction = bLeft?srcShifted[-1]:pDcVal;
-    for(k=0;k<blkSize;k++)
-    {
-      topRow[k] = prediction;
-    }
+    topRow[k] = src[k-srcstride];
+    leftColumn[k] = src[k*srcstride-1];
   }
-  */
-  if(bLeft)
-  {
-    for(k=0;k<blkSize+1;k++)
-    {
-      leftColumn[k] = src[k*srcstride-1];
-    }
-  }
-  /*
-  else
-  {
-    int16_t prediction = (bAbove?(int16_t)srcShifted[-srcstride]:pDcVal);
-    for(k=0;k<blkSize;k++)
-    {
-      leftColumn[k] = prediction;
-    }
-  }
-  leftColumn[blkSize] = leftColumn[blkSize-1];
-  topRow[blkSize] = topRow[blkSize-1];
-  */
 
   // Get left and above reference column and row
   
