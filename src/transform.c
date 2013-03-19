@@ -141,7 +141,7 @@ const int16_t g_invQuantScales[6] = { 40,45,51,57,64,72 };
 
 void scalinglist_init()
 {
-  uint32_t sizeId,listId,qp,dir;
+  uint32_t sizeId,listId,qp;
   for(sizeId = 0; sizeId < 4; sizeId++)
   {
     for(listId = 0; listId < g_scalingListNum[sizeId]; listId++)
@@ -172,7 +172,7 @@ void scalinglist_init()
 
 void scalinglist_destroy()
 {
-  uint32_t sizeId,listId,qp,dir;
+  uint32_t sizeId,listId,qp;
   for(sizeId = 0; sizeId < 4; sizeId++)
   {
     for(listId = 0; listId < g_scalingListNum[sizeId]; listId++)
@@ -779,7 +779,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
   int32_t iShift,iAdd,iCoeffQ;
   uint32_t uiLog2TrSize = g_aucConvertToBit[ iWidth ] + 2;
   int16_t clipQCoef;
-  int32_t n,scale;
+  int32_t n;
   int32_t iTransformShift = 15 - g_uiBitDepth - (g_aucConvertToBit[ iWidth ] + 2);
   int32_t qpScaled;
   int32_t iQpBase = encoder->QP;

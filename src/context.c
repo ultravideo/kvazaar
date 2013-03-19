@@ -111,10 +111,10 @@ uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,
   uint32_t uiRight = 0;
   uint32_t uiLower = 0;
   width >>= 2;
-  if( uiCGPosX < width - 1 )
+  if( uiCGPosX < (uint32_t)width - 1 )
     uiRight = (uiSigCoeffGroupFlag[ uiCGPosY * width + uiCGPosX + 1 ] != 0);
 
-  if (uiCGPosY < width - 1 )
+  if (uiCGPosY < (uint32_t)width - 1 )
     uiLower = (uiSigCoeffGroupFlag[ (uiCGPosY  + 1 ) * width + uiCGPosX ] != 0);
 
   return (uiRight || uiLower);
@@ -141,11 +141,11 @@ int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t 
   uint32_t sigRight = 0;
   uint32_t sigLower = 0;
   width >>= 2;
-  if( posXCG < width - 1 )
+  if( posXCG < (uint32_t)width - 1 )
   {
     sigRight = (sigCoeffGroupFlag[ posYCG * width + posXCG + 1 ] != 0);
   }
-  if (posYCG < width - 1 )
+  if (posYCG < (uint32_t)width - 1 )
   {
     sigLower = (sigCoeffGroupFlag[ (posYCG  + 1 ) * width + posXCG ] != 0);
   }

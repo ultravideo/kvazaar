@@ -6,7 +6,7 @@
 /*! \file encoder.c
     \brief Encoding related functions
     \author Marko Viitanen
-    \date 2013-02
+    \date 2013-03
     
     Encoder main level
 */
@@ -758,25 +758,16 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
       uint8_t *recbaseU  = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *recbaseV  = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-      //int16_t dcpredU  = intra_getDCPred(encoder->in.cur_pic.uRecData,encoder->in.width>>1, xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), depth+1);
-      //int16_t dcpredV  = intra_getDCPred(encoder->in.cur_pic.vRecData,encoder->in.width>>1, xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), depth+1);
-       
+
+      /* Code must start after variable initialization */
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
-      /*
-      {
-        FILE *recout = fopen("blockrec.yuv", "wb");
-        fwrite(encoder->in.cur_pic.yRecData,encoder->cfg->width*encoder->cfg->height,1,recout);
-        fwrite(encoder->in.cur_pic.uRecData,encoder->cfg->width*encoder->cfg->height>>2,1,recout);
-        fwrite(encoder->in.cur_pic.vRecData,encoder->cfg->width*encoder->cfg->height>>2,1,recout);
-        fclose(recout);
-      }
-      */
+
       /* Build reconstructed block to use in prediction with extrapolated borders */      
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
 
-      intraPredMode = intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
+      intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
 
-      /* ToDo: chroma prediction */
+      /* ToDo: separate chroma prediction */
       //printf("(%d, %d) SAD: %d\n", xCtb,yCtb,bestSAD);      
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
       intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode);
