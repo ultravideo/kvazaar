@@ -20,6 +20,9 @@
 #include "picture.h"
 #include "intra.h"
 
+
+const uint8_t intraHorVerDistThres[4] = {0,7,1,0};
+
 /*!
  \brief Set intrablock mode (and init typedata)
  \param pic picture to use
@@ -224,6 +227,7 @@ void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode)
 */
 int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad)
 {
+  typedef uint32_t (*SADfunction)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
   uint32_t bestSAD = 0xffffffff;
   uint32_t SAD = 0;
   int16_t bestMode = 1;
@@ -231,7 +235,9 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   uint32_t (*calcSAD)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
   int16_t origBlock[LCU_WIDTH*LCU_WIDTH>>2];
-  uint8_t *origShift = &orig[xpos+ypos*origstride];
+  uint8_t *origShift = &orig[xpos+ypos*origstride];  
+  SADfunction SADarray[4] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32};
+  uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
   #define CHECK_FOR_BEST(mode)  SAD = calcSAD(pred,width,origBlock,width); \
                                 if(SAD < bestSAD)\
@@ -241,23 +247,9 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
                                   COPY_PRED_TO_DST();\
                                 }
 
-  switch(width)
-  {
-    case 4:
-      calcSAD = &SAD4x4;
-      break;
-    case 8:
-      calcSAD = &SAD8x8;
-      break;
-    case 16:
-      calcSAD = &SAD16x16;
-      break;
-    case 32:
-      calcSAD = &SAD32x32;
-      break;
-    default:
-      ;
-  }
+  /* Choose SAD function according to width */
+  calcSAD = SADarray[g_toBits[width]];
+
   /* Store original block for SAD computation */
   i = 0;
   for(y = 0; y < (int32_t)width; y++)
@@ -276,31 +268,20 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
     pred[i] = x;
   }
   CHECK_FOR_BEST(1);
-  
-  intra_getAngularPred(rec,recstride,pred, width,width,width,10, xpos?1:0, ypos?1:0, 0);
-  CHECK_FOR_BEST(10);
-  intra_getAngularPred(rec,recstride,pred, width,width,width,26, xpos?1:0, ypos?1:0, 0);
-  CHECK_FOR_BEST(26);
+
+  /* Check angular that don't require filtering */
+  for(i = 2; i < 35; i++)
+  {
+    if(MIN(abs(i-26),abs(i-10)) <= threshold)
+    {
+      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
+      CHECK_FOR_BEST(i);
+    }
+  }
   
   /*Apply filter*/
   intra_filter(rec,recstride,width,0);
 
-  /*
-  {
-    FILE* test = fopen("blockoutF.yuv","wb");
-    
-    uint8_t outvalue;
-    for(y = 0; y < recstride; y++)
-    {
-      for(x = 0; x < recstride; x++)
-      {
-        outvalue = rec[(x-1)+(y-1)*recstride];
-        fwrite(&outvalue,1,1,test);
-      }
-    }
-    fclose(test);
-  }
-  */
   /* Test planar */  
   intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0);
@@ -310,30 +291,16 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   /* ToDo: add conditions to skip some modes on borders */
   
   //chroma can use only 26 and 10
-  //OK: 26 10
-  
-  //if(xpos && ypos)
-  //for(i = 2; i < 35; i++)
-  //for(i = 26; i < 35; i++)
-  
+  /* Test angular predictions which require filtered samples */
   for(i = 2; i < 35; i++)
   {
-    if(i != 10 && i != 26)
+    if(MIN(abs(i-26),abs(i-10)) > threshold)
     {
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
       CHECK_FOR_BEST(i);
     }
   }
-  
-  /*
-  intra_getAngularPred(rec,recstride,pred, width,width,width,2, xpos?1:0, ypos?1:0, 0);
-  CHECK_FOR_BEST(2);
-  */
-  /*
-  intra_getAngularPred(rec,recstride,pred, width,width,width,3, xpos?1:0, ypos?1:0, 0);
-  CHECK_FOR_BEST(3);
-  */
-  
+
   *sad = bestSAD;
   #undef COPY_PRED_TO_DST
   #undef CHECK_FOR_BEST
@@ -341,12 +308,22 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   return bestMode;
 }
 
-void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, int8_t mode)
+void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, int8_t mode, int8_t chroma)
 {
   int32_t x,y,i;
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
   //int16_t* recShift = &rec[xpos+ypos*recstride];
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
+
+  /* Filtering apply if luma and not DC */
+  if(!chroma && mode != 1/*&& width > 4*/)
+  {
+    uint8_t threshold = intraHorVerDistThres[g_toBits[width]];
+    if(MIN(abs(mode-26),abs(mode-10)) > threshold)
+    {
+      intra_filter(rec,recstride,width,0);
+    }
+  }
 
   /* planar */  
   if(mode == 0)

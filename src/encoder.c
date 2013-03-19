@@ -279,13 +279,8 @@ void encode_one_frame(encoder_control* encoder)
   }  
   else// if(encoder->frame < 10)
   {
-    if(encoder->QP > 20) encoder->QP-=2;
-    /* Picture Parameter Set (PPS) */
-    encode_pic_parameter_set(encoder);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PIC_PARAMETER_SET, 0);
-    bitstream_clear_buffer(encoder->stream);
+    //if(encoder->QP > 20) encoder->QP-=2;
+
 
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
@@ -298,41 +293,6 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, encoder->frame);
     bitstream_clear_buffer(encoder->stream);
-    
-    /*
-    encoder->in.cur_pic.type = 0;
-    encode_slice_header(encoder);    
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, 0);
-    bitstream_clear_buffer(encoder->stream);
-    */
-
-    /*
-    cabac_start(&cabac);
-    encoder->in.cur_pic.type = NAL_IDR_SLICE;
-    encode_slice_header(encoder);
-    bitstream_align(encoder->stream);
-    encode_slice_data(encoder);
-    cabac_flush(&cabac);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
-    bitstream_clear_buffer(encoder->stream);
-    */
-    /* Non-IDR slice */
-    /*
-    cabac_start(&cabac);
-    encoder->in.cur_pic.type = NAL_NONIDR_SLICE;
-    encode_slice_header(encoder);
-    bitstream_align(encoder->stream);
-    encode_slice_data(encoder);
-    cabac_flush(&cabac);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_NONIDR_SLICE, encoder->frame+1);
-    bitstream_clear_buffer(encoder->stream);
-    */
   }  
   #ifdef _DEBUG
   /*
@@ -770,9 +730,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       /* ToDo: separate chroma prediction */
       //printf("(%d, %d) SAD: %d\n", xCtb,yCtb,bestSAD);      
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
-      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode);
+      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode,1);
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
-      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredMode);
+      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredMode,1);
       
       /*
         PREDINFO CODING
