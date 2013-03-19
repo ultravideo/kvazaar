@@ -334,12 +334,29 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
     */
   }  
+  #ifdef _DEBUG
+  /*
+  {
+    int x,y;
+    for(y = 0; y < encoder->in.height_in_LCU*2;y++)
+    {
+      for(x = 0;x < encoder->in.width_in_LCU*2;x++)
+      {
+        i = (x<<2)+(y<<2)*(encoder->in.width_in_LCU<<MAX_DEPTH);
+        printf("(%d,%d) Intramode: %d\n", x<<2, y<<2,encoder->in.cur_pic.CU[0][i].intra.mode);
+      }
+    }
+  }
+  */
+  #endif
+
   /* Clear prediction data */
   /* ToDo: store */
   for(i=0; i < MAX_DEPTH+1; i++)
   {    
     memset(encoder->in.cur_pic.CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
   } 
+
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)
@@ -724,7 +741,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int i,x,y;
       uint32_t flag;
       uint32_t bestSAD;
-      uint8_t *base = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+      uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
       uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *baseV = &encoder->in.cur_pic.vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint32_t width = LCU_WIDTH>>depth;
@@ -736,16 +753,24 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int16_t predV[16*16];
 
       int16_t rec[(LCU_WIDTH+8)*(LCU_WIDTH+8)];
-      int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];
+      int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
       int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
-      uint8_t *recbase  = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
-      uint8_t *recbaseU = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-      uint8_t *recbaseV = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+      uint8_t *recbaseU  = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *recbaseV  = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       //int16_t dcpredU  = intra_getDCPred(encoder->in.cur_pic.uRecData,encoder->in.width>>1, xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), depth+1);
       //int16_t dcpredV  = intra_getDCPred(encoder->in.cur_pic.vRecData,encoder->in.width>>1, xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)), depth+1);
        
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
-
+      /*
+      {
+        FILE *recout = fopen("blockrec.yuv", "wb");
+        fwrite(encoder->in.cur_pic.yRecData,encoder->cfg->width*encoder->cfg->height,1,recout);
+        fwrite(encoder->in.cur_pic.uRecData,encoder->cfg->width*encoder->cfg->height>>2,1,recout);
+        fwrite(encoder->in.cur_pic.vRecData,encoder->cfg->width*encoder->cfg->height>>2,1,recout);
+        fclose(recout);
+      }
+      */
       /* Build reconstructed block to use in prediction with extrapolated borders */      
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
 
@@ -886,7 +911,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         }
 
         /* Transform and quant residual to coeffs */          
-        transform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+        transform2d(block,pre_quant_coeff,width,0);
         quant(encoder,pre_quant_coeff,coeff, width, width, 0);
 
         /* Check for non-zero coeffs */
@@ -906,7 +931,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         {
           /* RECONSTRUCT for predictions */
           dequant(encoder,coeff,pre_quant_coeff,width, width,0);
-          itransform2d(block,pre_quant_coeff,LCU_WIDTH>>depth,0);
+          itransform2d(block,pre_quant_coeff,width,0);
 
           i = 0;
           for(y = 0; y < LCU_WIDTH>>depth; y++)

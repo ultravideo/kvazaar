@@ -130,7 +130,7 @@
     /* input init (ToDo: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
-    encoder->QP       = 35;
+    encoder->QP       = 36;
     encoder->in.video_format = FORMAT_420;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
@@ -141,10 +141,13 @@
       fread(encoder->in.cur_pic.yData, cfg->width*cfg->height,1,input);
       fread(encoder->in.cur_pic.uData, cfg->width*cfg->height>>2,1,input);
       fread(encoder->in.cur_pic.vData, cfg->width*cfg->height>>2,1,input);
+
+      /* Clear reconstruction buffers */
       memset(encoder->in.cur_pic.yRecData, 0, cfg->width*cfg->height);
       memset(encoder->in.cur_pic.uRecData, 128, cfg->width*cfg->height>>2);
       memset(encoder->in.cur_pic.vRecData, 128, cfg->width*cfg->height>>2);
 
+      /* /////////////THE ACTUAL CODING HAPPENDS HERE\\\\\\\\\\\\\\\\\\\ */
       encode_one_frame(encoder);
 
       #ifdef _DEBUG

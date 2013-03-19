@@ -190,6 +190,69 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
   return 1;
 }
 
+
+void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode)
+{
+  #define FWIDTH (LCU_WIDTH+1)
+  int16_t filtered[FWIDTH*FWIDTH];
+  int16_t* filteredShift = &filtered[FWIDTH+1];
+  int x,y;
+  if(!mode)
+  {
+    //pF[ -1 ][ -1 ] = ( p[ -1 ][ 0 ] + 2 * p[ -1 ][ -1 ] + p[ 0 ][ -1 ] + 2 )  >>  2	(8 35)
+    filteredShift[-FWIDTH-1] = (ref[-1]+2*ref[-stride-1]+ref[-stride]+2) >> 2;
+
+    //pF[ -1 ][ y ] = ( p[ -1 ][ y + 1 ] + 2 * p[ -1 ][ y ] + p[ -1 ][ y - 1 ] + 2 )  >>  2 for y = 0..nTbS * 2 - 2	(8 36)
+    for(y = 0; y < width*2-1; y++)
+    {
+      filteredShift[y*FWIDTH-1] = (ref[(y+1)*stride-1] + 2*ref[y*stride-1] + ref[(y-1)*stride-1]+2) >> 2;
+    }
+    
+    //pF[ -1 ][ nTbS * 2 - 1 ] = p[ -1 ][ nTbS * 2 - 1 ]		(8 37)
+    filteredShift[(width*2-1)*FWIDTH-1] = ref[(width*2-1)*stride-1];
+
+    //pF[ x ][ -1 ] = ( p[ x - 1 ][ -1 ] + 2 * p[ x ][ -1 ] + p[ x + 1 ][ -1 ] + 2 )  >>  2 for x = 0..nTbS * 2 - 2	(8 38)
+    for(x = 0; x < width*2-1; x++)
+    {
+      filteredShift[x-FWIDTH] = (ref[x-1-stride] + 2*ref[x-stride] + ref[x+1-stride]+2) >> 2;
+    }
+
+    //pF[ nTbS * 2 - 1 ][ -1 ] = p[ nTbS * 2 - 1 ][ -1 ]	
+    filteredShift[(width*2-1)-FWIDTH] = ref[(width*2-1)-stride];
+
+    for(x = -1; x < (int32_t)width*2; x++)
+    {
+      ref[x-stride] = filtered[x+1];
+    }
+    for(y = 0; y < width*2; y++)
+    {
+      ref[y*stride-1] = filtered[(y+1)*FWIDTH];
+    }
+    /*
+    {
+    FILE* test = fopen("blockoutF2.yuv","wb");
+    
+    uint8_t outvalue;
+    for(y = 0; y < 72; y++)
+    {
+      for(x = 0; x < 72; x++)
+      {
+        outvalue = filtered[(x)+(y)*FWIDTH];
+        fwrite(&outvalue,1,1,test);
+      }
+    }
+    fclose(test);
+    }
+    */
+  }
+  else
+  {
+    printf("UNHANDLED: %s: %d\r\n", __FILE__, __LINE__);
+    exit(1);
+  }
+  #undef FWIDTH
+}
+
 /*! \brief Function to test best intra prediction
   \param orig original picture data
   \param origstride original picture stride
@@ -251,30 +314,70 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
     }
   }
 
-  /* Test planar */
-  intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
-  CHECK_FOR_BEST(0);
-  /* Test DC */
+
+  /* Test DC */  
   x = intra_getDCPred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < width*width; i++)
   {
     pred[i] = x;
   }
   CHECK_FOR_BEST(1);
+  
+  intra_getAngularPred(rec,recstride,pred, width,width,width,10, xpos?1:0, ypos?1:0, 0);
+  CHECK_FOR_BEST(10);
+  intra_getAngularPred(rec,recstride,pred, width,width,width,26, xpos?1:0, ypos?1:0, 0);
+  CHECK_FOR_BEST(26);
+  
+  /*Apply filter*/
+  intra_filter(rec,recstride,width,0);
+
+  /*
+  {
+    FILE* test = fopen("blockoutF.yuv","wb");
+    
+    uint8_t outvalue;
+    for(y = 0; y < recstride; y++)
+    {
+      for(x = 0; x < recstride; x++)
+      {
+        outvalue = rec[(x-1)+(y-1)*recstride];
+        fwrite(&outvalue,1,1,test);
+      }
+    }
+    fclose(test);
+  }
+  */
+  /* Test planar */  
+  intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
+  CHECK_FOR_BEST(0);
+  
+
   /* Test directional predictions */
   /* ToDo: add conditions to skip some modes on borders */
   
   //chroma can use only 26 and 10
-
-  /*
-  if(xpos && ypos)
+  //OK: 26 10
+  
+  //if(xpos && ypos)
   //for(i = 2; i < 35; i++)
   //for(i = 26; i < 35; i++)
+  
   for(i = 2; i < 35; i++)
   {
-    intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
-    CHECK_FOR_BEST(i);
+    if(i != 10 && i != 26)
+    {
+      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
+      CHECK_FOR_BEST(i);
+    }
   }
+  
+  /*
+  intra_getAngularPred(rec,recstride,pred, width,width,width,2, xpos?1:0, ypos?1:0, 0);
+  CHECK_FOR_BEST(2);
+  */
+  /*
+  intra_getAngularPred(rec,recstride,pred, width,width,width,3, xpos?1:0, ypos?1:0, 0);
+  CHECK_FOR_BEST(3);
   */
   
   *sad = bestSAD;
@@ -316,6 +419,14 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   COPY_PRED_TO_DST();
 }
 
+
+/*! \brief this functions build a reference block (only borders) used for intra predictions
+    \param pic picture to use as a source, should contain full CU-data
+    \param outwidth width of the prediction block
+    \param chroma signaling if chroma is used, 0 = luma, 1 = U and 2 = V
+    
+
+*/
 void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
 {
   int32_t leftColumn;  /*!< left column iterator */
@@ -330,7 +441,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t 
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
   int32_t width_in_SCU = srcWidth/SCU_width;     /*!< picture width in SCU */
 
-  memset(dst,0,outwidth*outwidth*sizeof(int16_t));
+  //memset(dst,127,outwidth*outwidth*sizeof(int16_t));
 
   /* Fill left column */
   if(xCtb)
@@ -405,7 +516,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t 
   }
   /* Topleft corner */
   dst[0] = (xCtb&&yCtb)?srcShifted[-srcWidth-1]:dst[dststride];
-  /*
+  
   {
     FILE* test = fopen("blockout.yuv","wb");
     int x,y;
@@ -420,7 +531,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t 
     }
     fclose(test);
   }
-  */
+  
 }
 
 void intra_getAngularPred(uint16_t* pSrc, int32_t srcStride, int16_t* rpDst, int32_t dstStride, int32_t width, int32_t height, int32_t dirMode, int8_t leftAvail,int8_t topAvail, int8_t filter)
@@ -591,9 +702,9 @@ void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, in
 void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
 {
   int16_t pDcVal = 1<<(g_uiBitDepth-1);
-  uint32_t k, l, bottomLeft, topRight;
+  int32_t k, l, bottomLeft, topRight;
   int32_t horPred;
-  int16_t leftColumn[LCU_WIDTH], topRow[LCU_WIDTH], bottomRow[LCU_WIDTH], rightColumn[LCU_WIDTH];
+  int32_t leftColumn[LCU_WIDTH], topRow[LCU_WIDTH], bottomRow[LCU_WIDTH], rightColumn[LCU_WIDTH];
   uint32_t blkSize = width;
   uint32_t offset2D = width;
   uint32_t shift1D = g_aucConvertToBit[ width ] + 2;
