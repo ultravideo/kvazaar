@@ -67,11 +67,11 @@ void encode_slice_data(encoder_control* encoder);
 void encode_slice_header(encoder_control* encoder);
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan);
-void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type);
+void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode);
 
 void init_tables(void);
 
-static uint32_t* g_auiSigLastScan[4][7];
+static uint32_t* g_auiSigLastScan[3][7];
 int8_t  g_aucConvertToBit[LCU_WIDTH+1];
 static int8_t g_uiBitDepth = 8;
 static int8_t g_uiBitIncrement = 0;
@@ -88,11 +88,11 @@ static uint32_t g_sigLastScanCG32x32[ 64 ] =
   23,59,52,45,38,31,60,53,
   46,39,61,54,47,62,55,63 };
 
-static const uint32_t g_sigLastScan8x8[ 4 ][ 4 ] =
-{ {0, 1, 2, 3},
+static const uint32_t g_sigLastScan8x8[ 3 ][ 4 ] =
+{ {0, 2, 1, 3},
   {0, 1, 2, 3},
-  {0, 2, 1, 3},
-  {0, 2, 1, 3} };
+  {0, 2, 1, 3}
+};
 
 // 
 //4 8 16 32 64 128
@@ -115,10 +115,9 @@ static const uint8_t g_toBits[129] =
 
 enum COEFF_SCAN_TYPE
 {
-  SCAN_ZIGZAG = 0,
-  SCAN_HOR,
-  SCAN_VER,
-  SCAN_DIAG
+  SCAN_DIAG = 0,         /*!< up-right diagonal scan */
+  SCAN_HOR,              /*!< horizontal first scan  */
+  SCAN_VER               /*!< vertical first scan    */
 };
 
 

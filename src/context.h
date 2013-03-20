@@ -22,7 +22,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE);
 int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t posXCG, uint32_t posYCG, int32_t width);
 
 uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,uint32_t uiCGPosX,
-                                    uint32_t uiCGPosY,uint32_t scanIdx,int32_t width);
+                                    uint32_t uiCGPosY,int32_t width);
 
 int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX,
                              int32_t posY,int32_t blockType,int32_t width,

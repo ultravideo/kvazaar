@@ -104,8 +104,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
 
 uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,
                                     uint32_t uiCGPosX,
-                                    uint32_t uiCGPosY,
-                                    uint32_t scanIdx,
+                                    uint32_t uiCGPosY,                                    
                                     int32_t width)
 {
   uint32_t uiRight = 0;

@@ -18,7 +18,8 @@
 #define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
 #define MIN_SIZE 3   /*!< log2_min_coding_block_size */
 
-#define ENABLE_PCM 1
+#define ENABLE_PCM 0 /*!< Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
+#define ENABLE_SIGN_HIDING 0 /*!< NEED QUANT CHANGES! */
 
 /* END OF CONFIG VARIABLES */
 

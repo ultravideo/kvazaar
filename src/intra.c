@@ -236,6 +236,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
   int16_t origBlock[LCU_WIDTH*LCU_WIDTH>>2];
   uint8_t *origShift = &orig[xpos+ypos*origstride];  
+  int8_t filter = (width<32);
   SADfunction SADarray[4] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32};
   uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
@@ -262,19 +263,21 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
 
 
   /* Test DC */  
+  /*
   x = intra_getDCPred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < (int32_t)(width*width); i++)
   {
     pred[i] = x;
   }
   CHECK_FOR_BEST(1);
-
-  /* Check angular that don't require filtering */
+  */
+  /* Check angular not requiring filtering */
+  
   for(i = 2; i < 35; i++)
   {
     if(MIN(abs(i-26),abs(i-10)) <= threshold)
     {
-      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
+      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
   }
@@ -283,6 +286,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   intra_filter(rec,recstride,width,0);
 
   /* Test planar */  
+  
   intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0);
   
@@ -292,15 +296,16 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   
   //chroma can use only 26 and 10
   /* Test angular predictions which require filtered samples */
+  
   for(i = 2; i < 35; i++)
   {
     if(MIN(abs(i-26),abs(i-10)) > threshold)
     {
-      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, 0);
+      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
   }
-
+  
   *sad = bestSAD;
   #undef COPY_PRED_TO_DST
   #undef CHECK_FOR_BEST
@@ -312,6 +317,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
 {
   int32_t x,y,i;
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
+  int8_t filter = !chroma&&(width<32);
   //int16_t* recShift = &rec[xpos+ypos*recstride];
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
 
@@ -346,7 +352,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   /* directional predictions */
   else
   {
-    intra_getAngularPred(rec, recstride,pred, width,width,width,mode, xpos?1:0, ypos?1:0, 0);
+    intra_getAngularPred(rec, recstride,pred, width,width,width,mode, xpos?1:0, ypos?1:0, filter);
   }
 
   COPY_PRED_TO_DST();

@@ -706,11 +706,6 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, /*int32_t** p
 
   uint32_t scanIdx = SCAN_DIAG;
 
-  if(scanIdx == SCAN_ZIGZAG)
-  {
-    scanIdx = SCAN_DIAG;
-  }
-
   scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];  
   {
   int32_t deltaU[32*32] ;
