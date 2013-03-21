@@ -16,7 +16,8 @@
 extern int32_t* g_quant_coeff[4][6][6];
 extern const int32_t g_quantIntraDefault8x8[64];
 
-void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes,int32_t iWidth,int32_t iHeight, int8_t eTType );
+void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidth,
+           int32_t iHeight, uint32_t *uiAcSum, int8_t eTType, int8_t scanIdx );
 void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_t iWidth, int32_t iHeight,int8_t eTType);
 
 void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode);

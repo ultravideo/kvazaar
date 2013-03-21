@@ -199,13 +199,19 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, ui
   input->height = height;
 
   input->height_in_LCU = height / LCU_WIDTH;
-  input->width_in_LCU =  width / LCU_WIDTH;
-  if(input->height_in_LCU * LCU_WIDTH < height)
-    input->height_in_LCU++;
-  if(input->width_in_LCU * LCU_WIDTH < width)
-    input->width_in_LCU++;
+  input->width_in_LCU  =  width / LCU_WIDTH;
 
-  input->cur_pic.width = width;
+  /* Add one extra LCU when image not divisible by LCU_WIDTH */
+  if(input->height_in_LCU * LCU_WIDTH < height)
+  {
+    input->height_in_LCU++;
+  }
+  if(input->width_in_LCU * LCU_WIDTH < width)
+  {
+    input->width_in_LCU++;
+  }
+
+  input->cur_pic.width  = width;
   input->cur_pic.height = height;
   input->cur_pic.referenced = 0;
   /* Allocate buffers */
@@ -629,7 +635,6 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  int x,y;
   uint8_t split_flag = (depth<2)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
@@ -729,15 +734,23 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
 
       intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
-
+      
+      /* Filter DC-prediction */
+      if(intraPredMode == 1 && (LCU_WIDTH>>depth) < 32 && xCtb && yCtb)
+      {
+        intra_DCPredFiltering(recbase,encoder->in.width,recbase,encoder->in.width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
+      }
+      
+      /* ToDo: separate chroma prediction(?) */
+      /* intraPredModeChroma = 1; */
+      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
+      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
+      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
+      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
+      
+      /* This affects reconstruction, do after that */
       intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);
 
-      /* ToDo: separate chroma prediction(?) */     
-      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
-      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode,1);
-      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
-      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredMode,1);
-      
       /*
         PREDINFO CODING
         If intra prediction mode is found from the predictors,
@@ -866,7 +879,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
         /* Transform and quant residual to coeffs */          
         transform2d(block,pre_quant_coeff,width,0);
-        quant(encoder,pre_quant_coeff,coeff, width, width, 0);
+        quant(encoder,pre_quant_coeff,coeff,width, width,0, 0, SCAN_DIAG);
 
         /* Check for non-zero coeffs */
         for(i = 0; (uint32_t)i < width*width; i++)
@@ -911,10 +924,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           }
         }
 
-
         if(encoder->in.video_format != FORMAT_400)
         {
-          /* U */ 
+          /* U */
           i = 0;
           for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
           {
@@ -924,7 +936,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             }
           }
           transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
-          quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 2);                    
+          quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 0,2,SCAN_DIAG);
           for(i = 0; (uint32_t)i < width*width>>2; i++)
           {
             if(coeffU[i] != 0)
@@ -945,7 +957,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             }
           }
           transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
-          quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 3);
+          quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 0,3,SCAN_DIAG);
           for(i = 0; (uint32_t)i < width*width>>2; i++)
           {
             if(coeffV[i] != 0)
@@ -984,7 +996,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                 recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*(LCU_WIDTH>>(depth+1))]);
               }
             }
-          }           
+          }
         
           if(CbV)
           {
@@ -1015,17 +1027,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
               }
             }
           }
-
         }
 
-        /* Filter DC-prediction */
-        /*
-        if(intraPredMode == 1 && (LCU_WIDTH>>depth) < 32 && xCtb && yCtb)
-        {
-          intra_DCPredFiltering(recbase,encoder->in.width,recbase,encoder->in.width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
-        }
-        */
-        
         
         /* END INTRAPREDICTION */
 

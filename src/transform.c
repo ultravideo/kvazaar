@@ -694,8 +694,8 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode
 
 #define QUANT_SHIFT 14
 
-void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, /*int32_t** pArlDes,*/ int32_t iWidth,
-           int32_t iHeight, /*uint32_t *uiAcSum,*/ int8_t eTType/*, uint32_t uiAbsPartIdx*/ )
+void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidth,
+           int32_t iHeight, uint32_t *uiAcSum, int8_t eTType, int8_t scanIdx )
 {
   int16_t*   piCoef    = pSrc;
   int16_t*   piQCoef   = pDes;
@@ -704,7 +704,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, /*int32_t** p
   int8_t useRDOQForTransformSkip = 0;
   uint32_t log2BlockSize = g_aucConvertToBit[ iWidth ] + 2;
 
-  uint32_t scanIdx = SCAN_DIAG;
+  //uint32_t scanIdx = SCAN_DIAG;
 
   scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];  
   {
@@ -804,7 +804,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
   iShift += 4;
   
 
-  if(iShift >qpScaled/5)
+  if(iShift >qpScaled/6)
   {
     iAdd = 1 << (iShift - qpScaled/6 - 1);
       

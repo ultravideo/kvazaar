@@ -236,7 +236,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
   int16_t origBlock[LCU_WIDTH*LCU_WIDTH>>2];
   uint8_t *origShift = &orig[xpos+ypos*origstride];  
-  int8_t filter = (width<32);
+  int8_t filter = (width<32); //ToDo: chroma support
   SADfunction SADarray[4] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32};
   uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
@@ -261,8 +261,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
     }
   }
 
-
-  /* Test DC */  
+  /* Test DC */
   /*
   x = intra_getDCPred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < (int32_t)(width*width); i++)
@@ -272,7 +271,6 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   CHECK_FOR_BEST(1);
   */
   /* Check angular not requiring filtering */
-  
   for(i = 2; i < 35; i++)
   {
     if(MIN(abs(i-26),abs(i-10)) <= threshold)
@@ -280,13 +278,11 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
-  }
-  
+  }  
   /*Apply filter*/
   intra_filter(rec,recstride,width,0);
 
   /* Test planar */  
-  
   intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0);
   
@@ -295,8 +291,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   /* ToDo: add conditions to skip some modes on borders */
   
   //chroma can use only 26 and 10
-  /* Test angular predictions which require filtered samples */
-  
+  /* Test angular predictions which require filtered samples */  
   for(i = 2; i < 35; i++)
   {
     if(MIN(abs(i-26),abs(i-10)) > threshold)
@@ -304,8 +299,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
-  }
-  
+  }  
   *sad = bestSAD;
   #undef COPY_PRED_TO_DST
   #undef CHECK_FOR_BEST
