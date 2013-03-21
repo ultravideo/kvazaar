@@ -702,21 +702,21 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int i,x,y;
       uint32_t flag;
       uint32_t bestSAD;
-      uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+      uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *baseV = &encoder->in.cur_pic.vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint32_t width = LCU_WIDTH>>depth;
 
       /* INTRAPREDICTION */
       /* ToDo: split to a function */
-      int16_t pred[32*32];
-      int16_t predU[16*16];
-      int16_t predV[16*16];
+      int16_t pred[LCU_WIDTH*LCU_WIDTH];
+      int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
+      int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
       int16_t rec[(LCU_WIDTH+8)*(LCU_WIDTH+8)];
       int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
       int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
-      uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+      uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *recbaseU  = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *recbaseV  = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
 
@@ -732,8 +732,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
       intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);
 
-      /* ToDo: separate chroma prediction */
-      //printf("(%d, %d) SAD: %d\n", xCtb,yCtb,bestSAD);      
+      /* ToDo: separate chroma prediction(?) */     
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
       intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredMode,1);
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
@@ -838,7 +837,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
       /* Coeff */
       /* Transform tree */
-      cabac.ctx = &g_TransSubdivSCModel[5-g_aucConvertToBit[LCU_WIDTH]+2-depth];
+      cabac.ctx = &g_TransSubdivSCModel[5-(g_aucConvertToBit[LCU_WIDTH]+2-depth)];
       CABAC_BIN(&cabac,0,"TransformSubdivFlag");
 
       /* We don't subdiv and we have 64>>depth transform size */
@@ -849,11 +848,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /*
          Quant and transform here...
         */
-        int16_t block[32*32];
-        int16_t pre_quant_coeff[32*32];
-        int16_t coeff[32*32];
-        int16_t coeffU[16*16];
-        int16_t coeffV[16*16];
+        int16_t block[LCU_WIDTH*LCU_WIDTH];
+        int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH];
+        int16_t coeff[LCU_WIDTH*LCU_WIDTH];
+        int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>2];
+        int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>2];
 
         /* Get residual by subtracting prediction */
         i = 0;          
@@ -982,7 +981,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             {
               for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
               {
-                recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*16]);
+                recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*(LCU_WIDTH>>(depth+1))]);
               }
             }
           }           
@@ -1064,15 +1063,17 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         /* Residual Coding */
         if(CbY)
         {
+          /* Luma (Intra) scanmode */
           uiDirMode = intraPredMode;
           if (uiCTXIdx >3 && uiCTXIdx < 6) //if multiple scans supported for transform size
           {
             uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
           }
-          encode_CoeffNxN(encoder,coeff, width, 0, uiScanIdx);          
+          encode_CoeffNxN(encoder,coeff, width, 0, uiScanIdx);
         }
         if(CbU||CbV)
         {
+          /* Chroma scanmode */
           uiCTXIdx++;
           uiDirMode = intraPredModeChroma;
           if(uiDirMode==36)
@@ -1085,6 +1086,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           {
             uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
           }
+
           if(CbU)
           {
             encode_CoeffNxN(encoder,coeffU, width>>1, 2, uiScanIdx);
@@ -1350,10 +1352,9 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
           cabac.ctx = &baseCtxMod[0];
           CABAC_BIN(&cabac,symbol,"first_c2_flag");
         }
-      }
+      }      
       
-      //ToDo: enable sign hiding
-      if( beValid && /*beValid */ signHidden )
+      if( beValid && signHidden )
       {
         CABAC_BINS_EP(&cabac,(coeffSigns >> 1),(numNonZero-1),"");
       }
@@ -1402,19 +1403,18 @@ void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_
 {
   uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
   uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
-  int uiGroupIdxX   = g_uiGroupIdx[lastpos_x];
-  int uiGroupIdxY   = g_uiGroupIdx[lastpos_y];
+  int uiGroupIdxX;
+  int uiGroupIdxY;
   int last_x,last_y,i;
   cabac_ctx* basectxX = (type?g_CuCtxLastX_chroma:g_CuCtxLastX_luma);
   cabac_ctx* basectxY = (type?g_CuCtxLastY_chroma:g_CuCtxLastY_luma);
 
-  /* ToDo: handle */
-  /*
   if( scan == SCAN_VER )
   {
-    SWAP( uiPosX, uiPosY,uint8_t );
+    SWAP( lastpos_x, lastpos_y,uint8_t );
   }
-  */
+  uiGroupIdxX   = g_uiGroupIdx[lastpos_x];
+  uiGroupIdxY   = g_uiGroupIdx[lastpos_y];
 
   /* Last X binarization */
   for(last_x = 0; last_x < uiGroupIdxX ; last_x++)

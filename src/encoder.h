@@ -73,11 +73,11 @@ void init_tables(void);
 
 static uint32_t* g_auiSigLastScan[3][7];
 int8_t  g_aucConvertToBit[LCU_WIDTH+1];
-static int8_t g_uiBitDepth = 8;
+static int8_t g_uiBitDepth     = 8;
 static int8_t g_uiBitIncrement = 0;
 
-static const uint8_t g_uiGroupIdx[ 32 ]   = {0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9};
-static const uint8_t g_uiMinInGroup[ 10 ] = {0,1,2,3,4,6,8,12,16,24};
+static const uint8_t g_uiGroupIdx[ 32 ]    = {0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9};
+static const uint8_t g_uiMinInGroup[ 10 ]  = {0,1,2,3,4,6,8,12,16,24};
 static uint32_t g_sigLastScanCG32x32[ 64 ] = 
 {  0, 8, 1,16, 9, 2,24,17,
   10, 3,32,25,18,11, 4,40,

@@ -316,7 +316,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
 void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, int8_t mode, int8_t chroma)
 {
   int32_t x,y,i;
-  int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
+  int16_t pred[LCU_WIDTH*LCU_WIDTH];
   int8_t filter = !chroma&&(width<32);
   //int16_t* recShift = &rec[xpos+ypos*recstride];
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
@@ -382,7 +382,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t 
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
   int32_t width_in_SCU = srcWidth/SCU_width;     /*!< picture width in SCU */
 
-  //memset(dst,127,outwidth*outwidth*sizeof(int16_t));
+  //memset(dst,0,outwidth*outwidth*sizeof(int16_t));
 
   /* Fill left column */
   if(xCtb)
