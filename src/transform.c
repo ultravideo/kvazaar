@@ -294,6 +294,31 @@ void partialButterfly4(short *src,short *dst,int32_t shift, int32_t line)
   }
 }
 
+void partialButterflyInverse4(short *src,short *dst,int shift, int line)
+{
+  int j;
+  int E[2],O[2];
+  int add = 1<<(shift-1);
+
+  for (j=0; j<line; j++)
+  {    
+    /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */    
+    O[0] = g_aiT4[1][0]*src[line] + g_aiT4[3][0]*src[3*line];
+    O[1] = g_aiT4[1][1]*src[line] + g_aiT4[3][1]*src[3*line];
+    E[0] = g_aiT4[0][0]*src[0] + g_aiT4[2][0]*src[2*line];
+    E[1] = g_aiT4[0][1]*src[0] + g_aiT4[2][1]*src[2*line];
+
+    /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
+    dst[0] = CLIP( -32768, 32767, (E[0] + O[0] + add)>>shift );
+    dst[1] = CLIP( -32768, 32767, (E[1] + O[1] + add)>>shift );
+    dst[2] = CLIP( -32768, 32767, (E[1] - O[1] + add)>>shift );
+    dst[3] = CLIP( -32768, 32767, (E[0] - O[0] + add)>>shift );
+            
+    src   ++;
+    dst += 4;
+  }
+}
+
 // Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm 
 // give identical results
 void fastForwardDst(short *block,short *coeff,int32_t shift)  // input block, output coeff
@@ -315,6 +340,24 @@ void fastForwardDst(short *block,short *coeff,int32_t shift)  // input block, ou
   }
 }
 
+void fastInverseDst(short *tmp,short *block,int shift)  // input tmp, output block
+{
+  int i, c[4];
+  int rnd_factor = 1<<(shift-1);
+  for (i=0; i<4; i++)
+  {  
+    // Intermediate Variables
+    c[0] = tmp[  i] + tmp[ 8+i];
+    c[1] = tmp[8+i] + tmp[12+i];
+    c[2] = tmp[  i] - tmp[12+i];
+    c[3] = 74* tmp[4+i];
+
+    block[4*i+0] = CLIP( -32768, 32767, ( 29 * c[0] + 55 * c[1]     + c[3]               + rnd_factor ) >> shift );
+    block[4*i+1] = CLIP( -32768, 32767, ( 55 * c[2] - 29 * c[1]     + c[3]               + rnd_factor ) >> shift );
+    block[4*i+2] = CLIP( -32768, 32767, ( 74 * (tmp[i] - tmp[8+i]  + tmp[12+i])      + rnd_factor ) >> shift );
+    block[4*i+3] = CLIP( -32768, 32767, ( 55 * c[0] + 29 * c[2]     - c[3]               + rnd_factor ) >> shift );
+  }
+}
 
 
 void partialButterfly8(short *src,short *dst,int32_t shift, int32_t line)
@@ -622,22 +665,22 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
   int32_t shift_2nd = g_aucConvertToBit[blockSize]  + 8;                   // log2(iHeight) + 6
 
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
-  /*
+  
   if(blockSize== 4)
   {
-    if (uiMode != REG_DCT)
+    if (uiMode != 65535)
     {
       fastForwardDst(block,tmp,shift_1st); // Forward DST BY FAST ALGORITHM, block input, tmp output
       fastForwardDst(tmp,coeff,shift_2nd); // Forward DST BY FAST ALGORITHM, tmp input, coeff output
     }
     else
     {
-      partialButterfly4(block, tmp, shift_1st, iHeight);
-      partialButterfly4(tmp, coeff, shift_2nd, iWidth);
+      partialButterfly4(block, tmp, shift_1st, blockSize);
+      partialButterfly4(tmp, coeff, shift_2nd, blockSize);
     }
 
   }
-  else*/ 
+  else
   switch(blockSize)
   {
     case 8:
@@ -674,7 +717,20 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode
   int32_t shift_2nd = 12 - (g_uiBitDepth-8);
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
-  if( blockSize == 8)
+  if( blockSize == 4)
+  {
+    if (uiMode != 65535)
+    {
+      fastInverseDst(coeff,tmp,shift_1st);    // Inverse DST by FAST Algorithm, coeff input, tmp output
+      fastInverseDst(tmp,block,shift_2nd); // Inverse DST by FAST Algorithm, tmp input, coeff output
+    }
+    else
+    {
+      partialButterflyInverse4(coeff,tmp,shift_1st,blockSize);
+      partialButterflyInverse4(tmp,block,shift_2nd,blockSize);
+    }
+  }
+  else if( blockSize == 8)
   {
     partialButterflyInverse8(coeff,tmp,shift_1st,blockSize);
     partialButterflyInverse8(tmp,block,shift_2nd,blockSize);
