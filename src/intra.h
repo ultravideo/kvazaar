@@ -19,7 +19,7 @@ int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t dep
 int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t* preds);
 void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight );
 
-void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma);
+void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma);
 void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode);
 
 /* Predictions */

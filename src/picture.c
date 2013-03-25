@@ -170,6 +170,24 @@ uint32_t SAD(uint8_t *block,uint8_t* block2, uint32_t x, uint32_t y)
     return sum;    
 }
 
+uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
+{
+    int32_t i,ii,y,x;
+    uint32_t sum=0;
+    for(y=0;y<64;y++)
+    {
+      i = y*stride1; 
+      ii = y*stride2;
+      for(x = 0; x < 64;x++)
+      {
+        sum+=abs((int32_t)block[i+x]-(int32_t)block2[ii+x]);
+      }
+
+    }
+
+    return sum;    
+}
+
 uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
     int32_t i,ii,y;

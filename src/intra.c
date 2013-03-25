@@ -164,7 +164,7 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
 
 void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode)
 {
-  #define FWIDTH (LCU_WIDTH+1)
+  #define FWIDTH (LCU_WIDTH*2+1)
   int16_t filtered[FWIDTH*FWIDTH];
   int16_t* filteredShift = &filtered[FWIDTH+1];
   int x,y;
@@ -233,11 +233,11 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   int16_t bestMode = 1;
   int32_t x,y,i;
   uint32_t (*calcSAD)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-  int16_t pred[LCU_WIDTH*LCU_WIDTH>>2];
-  int16_t origBlock[LCU_WIDTH*LCU_WIDTH>>2];
+  int16_t pred[LCU_WIDTH*LCU_WIDTH];
+  int16_t origBlock[LCU_WIDTH*LCU_WIDTH];
   uint8_t *origShift = &orig[xpos+ypos*origstride];  
   int8_t filter = (width<32); //ToDo: chroma support
-  SADfunction SADarray[4] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32};
+  SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64};
   uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
   #define CHECK_FOR_BEST(mode)  SAD = calcSAD(pred,width,origBlock,width); \
@@ -362,7 +362,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
     
 
 */
-void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int8_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
+void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
 {
   int32_t leftColumn;  /*!< left column iterator */
   int16_t val;         /*!< variable to store extrapolated value */
@@ -639,7 +639,7 @@ void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t
   int16_t pDcVal = 1<<(g_uiBitDepth-1);
   int32_t k, l, bottomLeft, topRight;
   int32_t horPred;
-  int32_t leftColumn[LCU_WIDTH], topRow[LCU_WIDTH], bottomRow[LCU_WIDTH], rightColumn[LCU_WIDTH];
+  int32_t leftColumn[LCU_WIDTH+1], topRow[LCU_WIDTH+1], bottomRow[LCU_WIDTH+1], rightColumn[LCU_WIDTH+1];
   uint32_t blkSize = width;
   uint32_t offset2D = width;
   uint32_t shift1D = g_aucConvertToBit[ width ] + 2;

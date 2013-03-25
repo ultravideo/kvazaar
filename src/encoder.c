@@ -630,7 +630,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  uint8_t split_flag = (depth<2)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = 0;//(depth<1)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -699,7 +699,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       uint8_t intraPredModeChroma = 36; /* 36 = Chroma derived from luma */
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
-      int i,x,y;
+      int i;
       uint32_t flag;
       uint32_t bestSAD;
       uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
@@ -713,7 +713,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
       int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
-      int16_t rec[(LCU_WIDTH+8)*(LCU_WIDTH+8)];
+      int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
       int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
       int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
       uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
@@ -845,10 +845,35 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
       /* Coeff */
       /* Transform tree */
-      encode_transform_tree(encoder,base, baseU, baseV, encoder->in.width,
-                            recbase,recbaseU, recbaseV, encoder->in.width,
-                            pred,predU,predV,LCU_WIDTH,
-                            depth, intraPredMode, intraPredModeChroma);
+      {
+        int16_t coeff[LCU_WIDTH*LCU_WIDTH];
+        int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>2];
+        int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>2];
+        int8_t split = 0;
+        int32_t cb = encode_transform_tree(encoder,base, baseU, baseV, encoder->in.width,
+                              recbase,recbaseU, recbaseV, encoder->in.width,
+                              pred,predU,predV,(LCU_WIDTH>>depth),
+                              coeff,coeffU,coeffV,
+                              depth, &split);
+
+        if(split)
+        {
+          encode_transform_coeff(encoder, coeff, coeffU, coeffV, cb&0x1, cb&0x2, cb&0x4,width>>1, intraPredMode, intraPredModeChroma, 1);
+          cb >>= 3;
+          encode_transform_coeff(encoder, &coeff[LCU_WIDTH*LCU_WIDTH>>2], &coeffU[LCU_WIDTH*LCU_WIDTH>>4], &coeffV[LCU_WIDTH*LCU_WIDTH>>4],
+                                 (cb&0x1)?1:0, (cb&0x2)?1:0, (cb&0x4)?1:0,width>>1, intraPredMode, intraPredModeChroma, 0);
+          cb >>= 3;
+          encode_transform_coeff(encoder, &coeff[LCU_WIDTH*LCU_WIDTH>>1], &coeffU[LCU_WIDTH*LCU_WIDTH>>3], &coeffV[LCU_WIDTH*LCU_WIDTH>>3],
+                                 (cb&0x1)?1:0, (cb&0x2)?1:0, (cb&0x4)?1:0,width>>1, intraPredMode, intraPredModeChroma, 0);
+          cb >>= 3;
+          encode_transform_coeff(encoder, &coeff[3*LCU_WIDTH*LCU_WIDTH>>2], &coeffU[3*LCU_WIDTH*LCU_WIDTH>>4], &coeffV[3*LCU_WIDTH*LCU_WIDTH>>4],
+                                 (cb&0x1)?1:0, (cb&0x2)?1:0, (cb&0x4)?1:0,width>>1, intraPredMode, intraPredModeChroma, 0);
+        }
+        else
+        {
+          encode_transform_coeff(encoder, coeff, coeffU, coeffV, (cb&0x1)?1:0, (cb&0x2)?1:0, (cb&0x4)?1:0,width, intraPredMode, intraPredModeChroma, 1);
+        }
+      }
       /* end Transform tree */
       /* end Coeff */
 
@@ -908,52 +933,74 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   
 }
 
-void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *baseU, uint8_t *baseV,int32_t base_stride,
+int32_t encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *baseU, uint8_t *baseV,int32_t base_stride,
                                                     uint8_t *recbase,uint8_t *recbaseU, uint8_t *recbaseV,int32_t recbase_stride,
                                                     int16_t *pred, int16_t *predU, int16_t *predV,int32_t pred_stride,
-                                                    uint8_t depth, int8_t intraPredMode, int8_t intraPredModeChroma)
+                                                    int16_t *coeff, int16_t *coeffU, int16_t *coeffV,
+                                                    uint8_t depth, int8_t* split)
 {
+  /* we have 64>>depth transform size */
   int x,y,i;
   int32_t width = LCU_WIDTH>>depth;
-  int8_t split = 0;
-  if(depth < MAX_DEPTH)
+  int32_t half_width = width >> 1;
+  uint8_t CbY = 0,CbU = 0,CbV = 0;
+
+  if(depth == 0)
+  {
+    *split |= 1<<depth;
+  }
+  else if(depth < MAX_DEPTH)
   {
     cabac.ctx = &g_TransSubdivSCModel[5-(g_aucConvertToBit[LCU_WIDTH]+2-depth)];
-    CABAC_BIN(&cabac,split,"TransformSubdivFlag");
-  }
-  if(split)
-  {
-    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
-                          recbase,recbaseU, recbaseV, recbase_stride,
-                          pred,predU,predV,pred_stride,
-                          depth+1, intraPredMode, intraPredModeChroma);
-    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
-                          recbase,recbaseU, recbaseV, recbase_stride,
-                          pred,predU,predV,pred_stride,
-                          depth+1, intraPredMode, intraPredModeChroma);
-    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
-                          recbase,recbaseU, recbaseV, recbase_stride,
-                          pred,predU,predV,pred_stride,
-                          depth+1, intraPredMode, intraPredModeChroma);
-    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
-                          recbase,recbaseU, recbaseV, recbase_stride,
-                          pred,predU,predV,pred_stride,
-                          depth+1, intraPredMode, intraPredModeChroma);
+    CABAC_BIN(&cabac,(*split)&(1<<depth),"TransformSubdivFlag");
   }
 
-  /* We don't subdiv and we have 64>>depth transform size */
-  /* ToDo: allow other sized */
+  if((*split)&(1<<depth))
   {
-    uint8_t CbY = 0,CbU = 0,CbV = 0;
+    int32_t recbase_offset_y   = recbase_stride*(half_width);
+    int32_t base_offset_y      = base_stride*(half_width);
+    int32_t pred_offset_y      = pred_stride*(half_width);
+    int32_t recbase_offset_c_y = (recbase_stride>>1)*(half_width>>1);
+    int32_t base_offset_c_y    = (base_stride>>1)*(half_width>>1);
+    int32_t pred_offset_c_y    = (pred_stride>>1)*(half_width>>1);
+    int32_t coeff_fourth = (LCU_WIDTH*LCU_WIDTH>>4);
+    int32_t output    = 0;
+    int32_t outhelper = 0;
+    output = encode_transform_tree(encoder,base, baseU, baseV, base_stride,
+                          recbase,recbaseU, recbaseV, recbase_stride,
+                          pred,predU,predV,pred_stride,
+                          coeff,coeffU,coeffV,
+                          depth+1, split);
+    outhelper = encode_transform_tree(encoder,&base[half_width], &baseU[half_width>>1], &baseV[half_width>>1], base_stride,
+                          &recbase[half_width],&recbaseU[half_width>>1], &recbaseV[half_width>>1], recbase_stride,
+                          &pred[half_width],&predU[half_width>>1],&predV[half_width>>1],pred_stride,
+                          &coeff[coeff_fourth],&coeffU[coeff_fourth>>1],&coeffV[coeff_fourth>>1],
+                          depth+1, split);
+    output |= outhelper<<3;
+    outhelper = encode_transform_tree(encoder,&base[base_offset_y], &baseU[base_offset_c_y], &baseV[base_offset_c_y], base_stride,
+                          &recbase[recbase_offset_y],&recbaseU[recbase_offset_c_y], &recbaseV[recbase_offset_c_y], recbase_stride,
+                          &pred[pred_offset_y],&predU[pred_offset_c_y>>1],&predV[pred_offset_c_y>>1],pred_stride,
+                          &coeff[coeff_fourth<<1],&coeffU[coeff_fourth],&coeffV[coeff_fourth],
+                          depth+1, split);
+    output |= outhelper<<6;
+    outhelper = encode_transform_tree(encoder,&base[base_offset_y+half_width], &baseU[base_offset_c_y+(half_width>>1)], &baseV[base_offset_c_y+(half_width>>1)], base_stride,
+                          &recbase[recbase_offset_y+half_width],&recbaseU[recbase_offset_c_y+(half_width>>1)], &recbaseV[recbase_offset_c_y+(half_width>>1)], recbase_stride,
+                          &pred[pred_offset_y+half_width],&predU[pred_offset_c_y+(half_width>>1)],&predV[pred_offset_c_y+(half_width>>1)],pred_stride,
+                          &coeff[3*coeff_fourth],&coeffU[(3*coeff_fourth)>>1],&coeffV[(3*coeff_fourth)>>1],
+                          depth+1, split);
+    output |= outhelper<<9;
+    return output;
+  }
+
+  
+  {
+    
       
     /*
       Quant and transform here...
     */
-    int16_t block[LCU_WIDTH*LCU_WIDTH];
-    int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH];
-    int16_t coeff[LCU_WIDTH*LCU_WIDTH];
-    int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>2];
-    int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>2];
+    int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
+    int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
 
     /* Get residual by subtracting prediction */
     i = 0;          
@@ -961,7 +1008,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
     {
       for(x = 0; x < LCU_WIDTH>>depth; x++)
       {
-        block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*(LCU_WIDTH>>depth)];
+        block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*pred_stride];
       }
     }
 
@@ -970,7 +1017,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
     quant(encoder,pre_quant_coeff,coeff,width, width,0, 0, SCAN_DIAG);
 
     /* Check for non-zero coeffs */
-    for(i = 0; (uint32_t)i < width*width; i++)
+    for(i = 0; i < width*width; i++)
     {
       if(coeff[i] != 0)
       {
@@ -979,7 +1026,6 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
         break;
       }
     }
-
         
     /* if non-zero coeffs */
     if(CbY)
@@ -993,7 +1039,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
       {
         for(x = 0; x < LCU_WIDTH>>depth; x++)
         {
-          int16_t val = block[i++]+pred[x+y*(LCU_WIDTH>>depth)];
+          int16_t val = block[i++]+pred[x+y*pred_stride];
           //ToDo: support 10+bits
           recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,val);
         }
@@ -1007,7 +1053,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
       {
         for(x = 0; x < LCU_WIDTH>>depth; x++)
         {
-          recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,pred[x+y*(LCU_WIDTH>>depth)]);
+          recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,pred[x+y*pred_stride]);
         }
       }
     }
@@ -1020,12 +1066,12 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
       {
         for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
         {
-          block[i++]=((int16_t)baseU[x+y*(encoder->in.width>>1)])-predU[x+y*(LCU_WIDTH>>(depth+1))];
+          block[i++]=((int16_t)baseU[x+y*(encoder->in.width>>1)])-predU[x+y*(pred_stride>>1)];
         }
       }
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
       quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 0,2,SCAN_DIAG);
-      for(i = 0; (uint32_t)i < width*width>>2; i++)
+      for(i = 0; i < width*width>>2; i++)
       {
         if(coeffU[i] != 0)
         {
@@ -1041,12 +1087,12 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
       {
         for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
         {
-          block[i++]=((int16_t)baseV[x+y*(encoder->in.width>>1)])-predV[x+y*(LCU_WIDTH>>(depth+1))];
+          block[i++]=((int16_t)baseV[x+y*(encoder->in.width>>1)])-predV[x+y*(pred_stride>>1)];
         }
       }
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
       quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 0,3,SCAN_DIAG);
-      for(i = 0; (uint32_t)i < width*width>>2; i++)
+      for(i = 0; i < width*width>>2; i++)
       {
         if(coeffV[i] != 0)
         {
@@ -1067,7 +1113,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
         {
           for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
           {
-            int16_t val = block[i++]+predU[x+y*(LCU_WIDTH>>(depth+1))];
+            int16_t val = block[i++]+predU[x+y*(pred_stride>>1)];
             //ToDo: support 10+bits
             recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,val);
           }
@@ -1081,7 +1127,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
         {
           for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
           {
-            recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*(LCU_WIDTH>>(depth+1))]);
+            recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*(pred_stride>>1)]);
           }
         }
       }
@@ -1097,7 +1143,7 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
         {
           for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
           {
-            int16_t val = block[i++]+predV[x+y*(LCU_WIDTH>>(depth+1))];
+            int16_t val = block[i++]+predV[x+y*(pred_stride>>1)];
             //ToDo: support 10+bits
             recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,val);
           }
@@ -1111,32 +1157,41 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
         {
           for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
           {
-            recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predV[x+y*(LCU_WIDTH>>(depth+1))]);
+            recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predV[x+y*(pred_stride>>1)]);
           }
         }
       }
     }
-
         
     /* END INTRAPREDICTION */
+  }
 
-    /* Signal if chroma data is present */
-    if(encoder->in.video_format != FORMAT_400)
-    {
-      /* Non-zero chroma U Tcoeffs */
-      cabac.ctx = &g_QtCbfSCModelU[0];     /*<-    */
-      CABAC_BIN(&cabac,CbU,"cbf_chroma_u");/*  \   */
-                                            /*   |  */
-      /* Non-zero chroma V Tcoeffs */      /*   |  */
-      /* NOTE: Using the same ctx as before  _ /   */
-      CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
-    }
+    /* end Residual Coding */
+  return CbY | (CbU<<1) | (CbV<<2);
+}
 
-    /* Non-zero luma Tcoeffs */
-    cabac.ctx = &g_QtCbfSCModelY[1];
-    CABAC_BIN(&cabac,CbY,"cbf_luma");
 
-    {
+void encode_transform_coeff(encoder_control* encoder, int16_t *coeff, int16_t *coeffU, int16_t *coeffV, 
+                            int8_t CbY, int8_t CbU, int8_t CbV,int8_t width, int8_t intraPredMode, int8_t intraPredModeChroma, int8_t toplevel)
+{
+  /* Signal if chroma data is present */
+  if(toplevel && encoder->in.video_format != FORMAT_400)
+  {
+    /* Non-zero chroma U Tcoeffs */
+    cabac.ctx = &g_QtCbfSCModelU[0];     /*<-    */
+    CABAC_BIN(&cabac,CbU,"cbf_chroma_u");/*  \   */
+                                          /*   |  */
+    /* Non-zero chroma V Tcoeffs */      /*   |  */
+    /* NOTE: Using the same ctx as before  _ /   */
+    CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
+  }
+    
+
+  /* Non-zero luma Tcoeffs */
+  cabac.ctx = &g_QtCbfSCModelY[1];
+  CABAC_BIN(&cabac,CbY,"cbf_luma");
+
+  {
     uint32_t uiCTXIdx;
     uint32_t uiScanIdx = SCAN_DIAG;
     uint32_t uiDirMode;
@@ -1187,13 +1242,8 @@ void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *base
         encode_CoeffNxN(encoder,coeffV, width>>1, 2, uiScanIdx);
       }
     }
-    }
-
   }
-
-    /* end Residual Coding */
 }
-
 
 void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode)
 {

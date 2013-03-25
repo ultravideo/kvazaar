@@ -16,7 +16,7 @@
 
 
 /* Functions */
-
+uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
 uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
 uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
 uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
