@@ -30,7 +30,6 @@ int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX
 
 
 /* CONTEXTS */
-extern cabac_ctx *SplitFlagSCModel;
 extern cabac_ctx g_SplitFlagSCModel[3];
 extern cabac_ctx g_IntraModeSCModel;
 extern cabac_ctx g_ChromaPredSCModel[2];

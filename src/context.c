@@ -20,8 +20,6 @@
 #include "context.h"
 
 /* CONTEXTS */
-/* ToDo: move somewhere else */
-cabac_ctx *SplitFlagSCModel;
 cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */
 cabac_ctx g_IntraModeSCModel;    /*<! \brief intra mode context models */
 cabac_ctx g_ChromaPredSCModel[2];
@@ -120,17 +118,15 @@ uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,
 }
 
 
-//uint8_t get_context_coeff_abs_significant_flag(uint8_t 
-
-
-  /** Pattern decision for context derivation process of significant_coeff_flag
- * \param sigCoeffGroupFlag pointer to prior coded significant coeff group
- * \param posXCG column of current coefficient group
- * \param posYCG row of current coefficient group
- * \param width width of the block
- * \param height height of the block
- * \returns pattern for current coefficient group
- */
+/*! 
+ \brief Pattern decision for context derivation process of significant_coeff_flag
+ \param sigCoeffGroupFlag pointer to prior coded significant coeff group
+ \param posXCG column of current coefficient group
+ \param posYCG row of current coefficient group
+ \param width width of the block
+ \param height height of the block
+ \returns pattern for current coefficient group
+*/
  
 int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t posXCG, uint32_t posYCG, int32_t width)
 {
@@ -154,15 +150,16 @@ int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t 
 }
 
 
-/** Context derivation process of coeff_abs_significant_flag
- * \param patternSigCtx pattern for current coefficient group
- * \param posX column of current scan position
- * \param posY row of current scan position
- * \param blockType log2 value of block size if square block, or 4 otherwise
- * \param width width of the block
- * \param textureType texture type (TEXT_LUMA...)
- * \returns ctxInc for current scan position
- */
+/*! 
+ \brief Context derivation process of coeff_abs_significant_flag
+ \param patternSigCtx pattern for current coefficient group
+ \param posX column of current scan position
+ \param posY row of current scan position
+ \param blockType log2 value of block size if square block, or 4 otherwise
+ \param width width of the block
+ \param textureType texture type (TEXT_LUMA...)
+ \returns ctxInc for current scan position
+*/
 
 int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX,
                              int32_t posY,int32_t blockType,int32_t width,

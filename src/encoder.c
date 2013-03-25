@@ -630,7 +630,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  uint8_t split_flag = (depth<3)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = (depth<2)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -654,7 +654,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
       {
         split_model++;
-      }    
+      }
       cabac.ctx = &g_SplitFlagSCModel[split_model];    
       CABAC_BIN(&cabac, split_flag, "SplitFlag");
     }
@@ -690,7 +690,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     {
       cabac.ctx = &g_PartSizeSCModel;
       CABAC_BIN(&cabac, 1, "PartSize");
-    }
+    }    
     /*end partsize*/
 
     if(cur_CU->type == CU_INTRA)
@@ -845,263 +845,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
       /* Coeff */
       /* Transform tree */
-      if(depth < MAX_DEPTH)
-      {
-        cabac.ctx = &g_TransSubdivSCModel[5-(g_aucConvertToBit[LCU_WIDTH]+2-depth)];
-        CABAC_BIN(&cabac,0,"TransformSubdivFlag");
-      }
-
-      /* We don't subdiv and we have 64>>depth transform size */
-      /* ToDo: allow other sized */
-      {
-        uint8_t CbY = 0,CbU = 0,CbV = 0;
-      
-        /*
-         Quant and transform here...
-        */
-        int16_t block[LCU_WIDTH*LCU_WIDTH];
-        int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH];
-        int16_t coeff[LCU_WIDTH*LCU_WIDTH];
-        int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>2];
-        int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>2];
-
-        /* Get residual by subtracting prediction */
-        i = 0;          
-        for(y = 0; y < LCU_WIDTH>>depth; y++)
-        {
-          for(x = 0; x < LCU_WIDTH>>depth; x++)
-          {
-            block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*(LCU_WIDTH>>depth)];
-          }
-        }
-
-        /* Transform and quant residual to coeffs */          
-        transform2d(block,pre_quant_coeff,width,0);
-        quant(encoder,pre_quant_coeff,coeff,width, width,0, 0, SCAN_DIAG);
-
-        /* Check for non-zero coeffs */
-        for(i = 0; (uint32_t)i < width*width; i++)
-        {
-          if(coeff[i] != 0)
-          {
-            /* Found one, we can break here */
-            CbY = 1;
-            break;
-          }
-        }
-
-        
-        /* if non-zero coeffs */
-        if(CbY)
-        {
-          /* RECONSTRUCT for predictions */
-          dequant(encoder,coeff,pre_quant_coeff,width, width,0);
-          itransform2d(block,pre_quant_coeff,width,0);
-
-          i = 0;
-          for(y = 0; y < LCU_WIDTH>>depth; y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>depth; x++)
-            {
-              int16_t val = block[i++]+pred[x+y*(LCU_WIDTH>>depth)];
-              //ToDo: support 10+bits
-              recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,val);
-            }
-          }
-          /* END RECONTRUCTION */
-        }
-        /* without coeffs, we only use the prediction */
-        else
-        {
-          for(y = 0; y < LCU_WIDTH>>depth; y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>depth; x++)
-            {
-              recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,pred[x+y*(LCU_WIDTH>>depth)]);
-            }
-          }
-        }
-
-        if(encoder->in.video_format != FORMAT_400)
-        {
-          /* U */
-          i = 0;
-          for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
-            {
-              block[i++]=((int16_t)baseU[x+y*(encoder->in.width>>1)])-predU[x+y*(LCU_WIDTH>>(depth+1))];
-            }
-          }
-          transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
-          quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 0,2,SCAN_DIAG);
-          for(i = 0; (uint32_t)i < width*width>>2; i++)
-          {
-            if(coeffU[i] != 0)
-            {
-              /* Found one, we can break here */
-              CbU = 1;
-              break;
-            }
-          }
-
-          /* V */   
-          i = 0;
-          for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-          {
-            for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
-            {
-              block[i++]=((int16_t)baseV[x+y*(encoder->in.width>>1)])-predV[x+y*(LCU_WIDTH>>(depth+1))];
-            }
-          }
-          transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
-          quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 0,3,SCAN_DIAG);
-          for(i = 0; (uint32_t)i < width*width>>2; i++)
-          {
-            if(coeffV[i] != 0)
-            {
-              /* Found one, we can break here */
-              CbV = 1;
-              break;
-            }
-          }
-          
-          if(CbU)
-          {
-            /* RECONSTRUCT for predictions */
-            dequant(encoder,coeffU,pre_quant_coeff,width>>1, width>>1,2);
-            itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
-
-            i = 0;
-            for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-            {
-              for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
-              {
-                int16_t val = block[i++]+predU[x+y*(LCU_WIDTH>>(depth+1))];
-                //ToDo: support 10+bits
-                recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,val);
-              }
-            }
-            /* END RECONTRUCTION */
-          }
-          /* without coeffs, we only use the prediction */
-          else
-          {
-            for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-            {
-              for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
-              {
-                recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*(LCU_WIDTH>>(depth+1))]);
-              }
-            }
-          }
-        
-          if(CbV)
-          {
-            /* RECONSTRUCT for predictions */
-            dequant(encoder,coeffV,pre_quant_coeff,width>>1, width>>1,3);
-            itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
-
-            i = 0;
-            for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-            {
-              for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
-              {
-                int16_t val = block[i++]+predV[x+y*(LCU_WIDTH>>(depth+1))];
-                //ToDo: support 10+bits
-                recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,val);
-              }
-            }
-            /* END RECONTRUCTION */
-          }
-          /* without coeffs, we only use the prediction */
-          else
-          {
-            for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
-            {
-              for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
-              {
-                recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predV[x+y*(LCU_WIDTH>>(depth+1))]);
-              }
-            }
-          }
-        }
-
-        
-        /* END INTRAPREDICTION */
-
-        /* Signal if chroma data is present */
-        if(encoder->in.video_format != FORMAT_400)
-        {
-          /* Non-zero chroma U Tcoeffs */
-          cabac.ctx = &g_QtCbfSCModelU[0];     /*<-    */
-          CABAC_BIN(&cabac,CbU,"cbf_chroma_u");/*  \   */
-                                               /*   |  */
-          /* Non-zero chroma V Tcoeffs */      /*   |  */
-          /* NOTE: Using the same ctx as before  _ /   */
-          CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
-        }
-
-        /* Non-zero luma Tcoeffs */
-        cabac.ctx = &g_QtCbfSCModelY[1];
-        CABAC_BIN(&cabac,CbY,"cbf_luma");
-
-        {
-        uint32_t uiCTXIdx;
-        uint32_t uiScanIdx = SCAN_DIAG;
-        uint32_t uiDirMode;
-        switch(width)
-        {
-          case  2: uiCTXIdx = 6; break;
-          case  4: uiCTXIdx = 5; break;
-          case  8: uiCTXIdx = 4; break;
-          case 16: uiCTXIdx = 3; break;
-          case 32: uiCTXIdx = 2; break;
-          case 64: uiCTXIdx = 1; break;
-          default: uiCTXIdx = 0; break;
-        }
-        /* CoeffNxN */
-        /* Residual Coding */
-        if(CbY)
-        {
-          /* Luma (Intra) scanmode */
-          uiDirMode = intraPredMode;
-          if (uiCTXIdx >3 && uiCTXIdx < 6) //if multiple scans supported for transform size
-          {
-            uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
-          }
-          encode_CoeffNxN(encoder,coeff, width, 0, uiScanIdx);
-        }
-        if(CbU||CbV)
-        {
-          /* Chroma scanmode */
-          uiCTXIdx++;
-          uiDirMode = intraPredModeChroma;
-          if(uiDirMode==36)
-          {
-            /* ToDo: support NxN */
-            uiDirMode = intraPredMode;
-          }
-          uiScanIdx = SCAN_DIAG;
-          if (uiCTXIdx >4 && uiCTXIdx < 7) //if multiple scans supported for transform size
-          {
-            uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
-          }
-
-          if(CbU)
-          {
-            encode_CoeffNxN(encoder,coeffU, width>>1, 2, uiScanIdx);
-          }
-          if(CbV)
-          {
-            encode_CoeffNxN(encoder,coeffV, width>>1, 2, uiScanIdx);
-          }
-        }
-        }
-
-
-        /* end Residual Coding */
-      }      
+      encode_transform_tree(encoder,base, baseU, baseV, encoder->in.width,
+                            recbase,recbaseU, recbaseV, encoder->in.width,
+                            pred,predU,predV,LCU_WIDTH,
+                            depth, intraPredMode, intraPredModeChroma);
       /* end Transform tree */
       /* end Coeff */
 
@@ -1160,6 +907,293 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   /* end coding_unit */
   
 }
+
+void encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *baseU, uint8_t *baseV,int32_t base_stride,
+                                                    uint8_t *recbase,uint8_t *recbaseU, uint8_t *recbaseV,int32_t recbase_stride,
+                                                    int16_t *pred, int16_t *predU, int16_t *predV,int32_t pred_stride,
+                                                    uint8_t depth, int8_t intraPredMode, int8_t intraPredModeChroma)
+{
+  int x,y,i;
+  int32_t width = LCU_WIDTH>>depth;
+  int8_t split = 0;
+  if(depth < MAX_DEPTH)
+  {
+    cabac.ctx = &g_TransSubdivSCModel[5-(g_aucConvertToBit[LCU_WIDTH]+2-depth)];
+    CABAC_BIN(&cabac,split,"TransformSubdivFlag");
+  }
+  if(split)
+  {
+    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
+                          recbase,recbaseU, recbaseV, recbase_stride,
+                          pred,predU,predV,pred_stride,
+                          depth+1, intraPredMode, intraPredModeChroma);
+    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
+                          recbase,recbaseU, recbaseV, recbase_stride,
+                          pred,predU,predV,pred_stride,
+                          depth+1, intraPredMode, intraPredModeChroma);
+    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
+                          recbase,recbaseU, recbaseV, recbase_stride,
+                          pred,predU,predV,pred_stride,
+                          depth+1, intraPredMode, intraPredModeChroma);
+    encode_transform_tree(encoder,base, baseU, baseV, base_stride,
+                          recbase,recbaseU, recbaseV, recbase_stride,
+                          pred,predU,predV,pred_stride,
+                          depth+1, intraPredMode, intraPredModeChroma);
+  }
+
+  /* We don't subdiv and we have 64>>depth transform size */
+  /* ToDo: allow other sized */
+  {
+    uint8_t CbY = 0,CbU = 0,CbV = 0;
+      
+    /*
+      Quant and transform here...
+    */
+    int16_t block[LCU_WIDTH*LCU_WIDTH];
+    int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH];
+    int16_t coeff[LCU_WIDTH*LCU_WIDTH];
+    int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>2];
+    int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>2];
+
+    /* Get residual by subtracting prediction */
+    i = 0;          
+    for(y = 0; y < LCU_WIDTH>>depth; y++)
+    {
+      for(x = 0; x < LCU_WIDTH>>depth; x++)
+      {
+        block[i++]=((int16_t)base[x+y*encoder->in.width])-pred[x+y*(LCU_WIDTH>>depth)];
+      }
+    }
+
+    /* Transform and quant residual to coeffs */          
+    transform2d(block,pre_quant_coeff,width,0);
+    quant(encoder,pre_quant_coeff,coeff,width, width,0, 0, SCAN_DIAG);
+
+    /* Check for non-zero coeffs */
+    for(i = 0; (uint32_t)i < width*width; i++)
+    {
+      if(coeff[i] != 0)
+      {
+        /* Found one, we can break here */
+        CbY = 1;
+        break;
+      }
+    }
+
+        
+    /* if non-zero coeffs */
+    if(CbY)
+    {
+      /* RECONSTRUCT for predictions */
+      dequant(encoder,coeff,pre_quant_coeff,width, width,0);
+      itransform2d(block,pre_quant_coeff,width,0);
+
+      i = 0;
+      for(y = 0; y < LCU_WIDTH>>depth; y++)
+      {
+        for(x = 0; x < LCU_WIDTH>>depth; x++)
+        {
+          int16_t val = block[i++]+pred[x+y*(LCU_WIDTH>>depth)];
+          //ToDo: support 10+bits
+          recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,val);
+        }
+      }
+      /* END RECONTRUCTION */
+    }
+    /* without coeffs, we only use the prediction */
+    else
+    {
+      for(y = 0; y < LCU_WIDTH>>depth; y++)
+      {
+        for(x = 0; x < LCU_WIDTH>>depth; x++)
+        {
+          recbase[x+y*encoder->in.width] = (uint8_t)CLIP(0,255,pred[x+y*(LCU_WIDTH>>depth)]);
+        }
+      }
+    }
+
+    if(encoder->in.video_format != FORMAT_400)
+    {
+      /* U */
+      i = 0;
+      for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+      {
+        for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+        {
+          block[i++]=((int16_t)baseU[x+y*(encoder->in.width>>1)])-predU[x+y*(LCU_WIDTH>>(depth+1))];
+        }
+      }
+      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+      quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 0,2,SCAN_DIAG);
+      for(i = 0; (uint32_t)i < width*width>>2; i++)
+      {
+        if(coeffU[i] != 0)
+        {
+          /* Found one, we can break here */
+          CbU = 1;
+          break;
+        }
+      }
+
+      /* V */   
+      i = 0;
+      for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+      {
+        for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+        {
+          block[i++]=((int16_t)baseV[x+y*(encoder->in.width>>1)])-predV[x+y*(LCU_WIDTH>>(depth+1))];
+        }
+      }
+      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+      quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 0,3,SCAN_DIAG);
+      for(i = 0; (uint32_t)i < width*width>>2; i++)
+      {
+        if(coeffV[i] != 0)
+        {
+          /* Found one, we can break here */
+          CbV = 1;
+          break;
+        }
+      }
+          
+      if(CbU)
+      {
+        /* RECONSTRUCT for predictions */
+        dequant(encoder,coeffU,pre_quant_coeff,width>>1, width>>1,2);
+        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+
+        i = 0;
+        for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+        {
+          for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+          {
+            int16_t val = block[i++]+predU[x+y*(LCU_WIDTH>>(depth+1))];
+            //ToDo: support 10+bits
+            recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,val);
+          }
+        }
+        /* END RECONTRUCTION */
+      }
+      /* without coeffs, we only use the prediction */
+      else
+      {
+        for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+        {
+          for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+          {
+            recbaseU[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predU[x+y*(LCU_WIDTH>>(depth+1))]);
+          }
+        }
+      }
+        
+      if(CbV)
+      {
+        /* RECONSTRUCT for predictions */
+        dequant(encoder,coeffV,pre_quant_coeff,width>>1, width>>1,3);
+        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+
+        i = 0;
+        for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+        {
+          for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+          {
+            int16_t val = block[i++]+predV[x+y*(LCU_WIDTH>>(depth+1))];
+            //ToDo: support 10+bits
+            recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,val);
+          }
+        }
+        /* END RECONTRUCTION */
+      }
+      /* without coeffs, we only use the prediction */
+      else
+      {
+        for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
+        {
+          for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
+          {
+            recbaseV[x+y*(encoder->in.width>>1)] = (uint8_t)CLIP(0,255,predV[x+y*(LCU_WIDTH>>(depth+1))]);
+          }
+        }
+      }
+    }
+
+        
+    /* END INTRAPREDICTION */
+
+    /* Signal if chroma data is present */
+    if(encoder->in.video_format != FORMAT_400)
+    {
+      /* Non-zero chroma U Tcoeffs */
+      cabac.ctx = &g_QtCbfSCModelU[0];     /*<-    */
+      CABAC_BIN(&cabac,CbU,"cbf_chroma_u");/*  \   */
+                                            /*   |  */
+      /* Non-zero chroma V Tcoeffs */      /*   |  */
+      /* NOTE: Using the same ctx as before  _ /   */
+      CABAC_BIN(&cabac,CbV,"cbf_chroma_v");
+    }
+
+    /* Non-zero luma Tcoeffs */
+    cabac.ctx = &g_QtCbfSCModelY[1];
+    CABAC_BIN(&cabac,CbY,"cbf_luma");
+
+    {
+    uint32_t uiCTXIdx;
+    uint32_t uiScanIdx = SCAN_DIAG;
+    uint32_t uiDirMode;
+    switch(width)
+    {
+      case  2: uiCTXIdx = 6; break;
+      case  4: uiCTXIdx = 5; break;
+      case  8: uiCTXIdx = 4; break;
+      case 16: uiCTXIdx = 3; break;
+      case 32: uiCTXIdx = 2; break;
+      case 64: uiCTXIdx = 1; break;
+      default: uiCTXIdx = 0; break;
+    }
+    /* CoeffNxN */
+    /* Residual Coding */
+    if(CbY)
+    {
+      /* Luma (Intra) scanmode */
+      uiDirMode = intraPredMode;
+      if (uiCTXIdx >3 && uiCTXIdx < 6) //if multiple scans supported for transform size
+      {
+        uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
+      }
+      encode_CoeffNxN(encoder,coeff, width, 0, uiScanIdx);
+    }
+    if(CbU||CbV)
+    {
+      /* Chroma scanmode */
+      uiCTXIdx++;
+      uiDirMode = intraPredModeChroma;
+      if(uiDirMode==36)
+      {
+        /* ToDo: support NxN */
+        uiDirMode = intraPredMode;
+      }
+      uiScanIdx = SCAN_DIAG;
+      if (uiCTXIdx >4 && uiCTXIdx < 7) //if multiple scans supported for transform size
+      {
+        uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
+      }
+
+      if(CbU)
+      {
+        encode_CoeffNxN(encoder,coeffU, width>>1, 2, uiScanIdx);
+      }
+      if(CbV)
+      {
+        encode_CoeffNxN(encoder,coeffV, width>>1, 2, uiScanIdx);
+      }
+    }
+    }
+
+  }
+
+    /* end Residual Coding */
+}
+
 
 void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode)
 {
