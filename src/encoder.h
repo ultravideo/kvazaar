@@ -74,7 +74,7 @@ int32_t encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *b
                                                     int16_t *coeff, int16_t *coeffU, int16_t *coeffV,
                                                     uint8_t depth, int8_t* split);
 void encode_transform_coeff(encoder_control* encoder, int16_t *coeff, int16_t *coeffU, int16_t *coeffV, 
-                            int8_t CbY, int8_t CbU, int8_t CbV,int8_t width, int8_t intraPredMode, int8_t intraPredModeChroma, int8_t toplevel);
+                            int32_t CbY, int32_t CbU, int32_t CbV,int8_t depth, int8_t intraPredMode, int8_t intraPredModeChroma, int8_t split, int8_t toplevel);
 void init_tables(void);
 
 static uint32_t* g_auiSigLastScan[3][7];
