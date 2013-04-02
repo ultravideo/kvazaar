@@ -55,6 +55,34 @@ typedef struct
   uint8_t bitdepth;
 } encoder_control;
 
+typedef struct
+{
+  int8_t idx;
+  uint8_t *base;
+  uint8_t *baseU;
+  uint8_t *baseV;
+  
+  uint8_t *recbase;
+  uint8_t *recbaseU;
+  uint8_t *recbaseV;
+  
+  int16_t *pred;
+  int16_t *predU;
+  int16_t *predV;
+
+  int32_t base_stride;
+  int32_t recbase_stride;
+  int32_t pred_stride;
+  
+  /* ToDo: unify luma+chroma arrays */
+  int16_t *coeff[3];
+  int8_t cb_top[3];
+  int8_t cb[4];
+  int8_t intraPredMode;
+  int8_t intraPredModeChroma;
+  int32_t split[4];
+} transform_info;
+
 void init_encoder_control(encoder_control* control,bitstream* output);
 void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height);
 void encode_one_frame(encoder_control* encoder);
@@ -68,13 +96,8 @@ void encode_slice_header(encoder_control* encoder);
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan);
 void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode);
-int32_t encode_transform_tree(encoder_control* encoder,uint8_t *base, uint8_t *baseU, uint8_t *baseV,int32_t base_stride,
-                                                    uint8_t *recbase,uint8_t *recbaseU, uint8_t *recbaseV,int32_t recbase_stride,
-                                                    int16_t *pred, int16_t *predU, int16_t *predV,int32_t pred_stride,
-                                                    int16_t *coeff, int16_t *coeffU, int16_t *coeffV,
-                                                    uint8_t depth, int8_t* split);
-void encode_transform_coeff(encoder_control* encoder, int16_t *coeff, int16_t *coeffU, int16_t *coeffV, 
-                            int32_t CbY, int32_t CbU, int32_t CbV,int8_t depth, int8_t intraPredMode, int8_t intraPredModeChroma, int8_t split, int8_t toplevel);
+void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t depth);
+void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t depth, int8_t trDepth);
 void init_tables(void);
 
 static uint32_t* g_auiSigLastScan[3][7];
