@@ -714,7 +714,7 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode
   //(Int bitDepth, Short *coeff,Short *block, Int iWidth, Int iHeight, UInt uiMode)
 {
   int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (g_uiBitDepth-8);
+  int32_t shift_2nd = 12 - (g_bitDepth-8);
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
   if( blockSize == 4)
@@ -797,7 +797,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   
   int32_t *piQuantCoeff = g_quant_coeff[uiLog2TrSize-2][scalingListType][/*m_cQP.m_iRem*/qpScaled%6];
 
-  uint32_t uiBitDepth = g_uiBitDepth;
+  uint32_t uiBitDepth = g_bitDepth;
 
   int32_t iTransformShift = /*MAX_TR_DYNAMIC_RANGE*/15 - uiBitDepth - uiLog2TrSize; // Represents scaling through forward transform
   int32_t iQBits = QUANT_SHIFT + /*cQpBase.m_iPer +*/qpScaled/6 + iTransformShift;
@@ -831,7 +831,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
   uint32_t uiLog2TrSize = g_aucConvertToBit[ iWidth ] + 2;
   int16_t clipQCoef;
   int32_t n;
-  int32_t iTransformShift = 15 - g_uiBitDepth - (g_aucConvertToBit[ iWidth ] + 2);
+  int32_t iTransformShift = 15 - g_bitDepth - (g_aucConvertToBit[ iWidth ] + 2);
   int32_t qpScaled;
   int32_t iQpBase = encoder->QP;
   int32_t scalingListType = (/*pcCU->isint32_tra(uiAbsPartIdx)*/0 ? 0 : 3) + (int8_t)("\0\3\1\2"[eTType]);

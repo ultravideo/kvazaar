@@ -83,7 +83,7 @@ int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t dep
 int16_t intra_getDCPred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width)
 {
   int32_t i, iSum = 0;
-  int16_t pDcVal = 1<<(g_uiBitDepth-1);  
+  int16_t pDcVal = 1<<(g_bitDepth-1);  
   
   /* Average of pixels on top and left */
   for (i = -picwidth; i < width-picwidth ; i++)
@@ -367,7 +367,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
   int32_t leftColumn;  /*!< left column iterator */
   int16_t val;         /*!< variable to store extrapolated value */
   int32_t i;           /*!< index iterator */
-  int16_t dcVal        = 1<<(g_uiBitDepth-1); /*!< default predictor value */
+  int16_t dcVal        = 1<<(g_bitDepth-1); /*!< default predictor value */
   int32_t topRow;      /*!< top row iterator */
   int32_t srcWidth     = (pic->width>>(chroma?1:0)); /*!< source picture width */
   int32_t srcHeight    = (pic->height>>(chroma?1:0));/*!< source picture height */
@@ -546,7 +546,7 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
     {
       for (k=0;k<blkSize;k++)
       {
-        pDst[k*dstStride] = CLIP(0, (1<<g_uiBitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
+        pDst[k*dstStride] = CLIP(0, (1<<g_bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
       }
     }
   }
@@ -636,7 +636,7 @@ void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, in
 */
 void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
 {
-  int16_t pDcVal = 1<<(g_uiBitDepth-1);
+  int16_t pDcVal = 1<<(g_bitDepth-1);
   int32_t k, l, bottomLeft, topRight;
   int32_t horPred;
   int32_t leftColumn[LCU_WIDTH+1], topRow[LCU_WIDTH+1], bottomRow[LCU_WIDTH+1], rightColumn[LCU_WIDTH+1];

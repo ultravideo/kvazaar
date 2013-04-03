@@ -53,6 +53,10 @@ typedef struct
   picture_list *ref;
   uint8_t QP;
   uint8_t bitdepth;
+
+  /* Filtering */
+  int8_t betaOffset;
+  int8_t tcOffset;
 } encoder_control;
 
 typedef struct
@@ -102,7 +106,7 @@ void init_tables(void);
 
 static uint32_t* g_auiSigLastScan[3][7];
 int8_t  g_aucConvertToBit[LCU_WIDTH+1];
-static int8_t g_uiBitDepth     = 8;
+static int8_t g_bitDepth     = 8;
 static int8_t g_uiBitIncrement = 0;
 
 static const uint8_t g_uiGroupIdx[ 32 ]    = {0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9};
