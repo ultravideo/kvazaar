@@ -732,9 +732,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
       
       /* Filter DC-prediction */
-      if(intraPredMode == 1 && (LCU_WIDTH>>depth) < 32 && xCtb && yCtb)
+      if(intraPredMode == 1 && (LCU_WIDTH>>depth) < 32)
       {
-        intra_DCPredFiltering(recbase,encoder->in.width,recbase,encoder->in.width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
+        intra_DCPredFiltering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
       }
       
       /* ToDo: separate chroma prediction(?) */

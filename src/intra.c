@@ -235,6 +235,8 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   uint32_t (*calcSAD)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
   int16_t pred[LCU_WIDTH*LCU_WIDTH];
   int16_t origBlock[LCU_WIDTH*LCU_WIDTH];
+  int16_t recFilteredTemp[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+  int16_t* recFiltered = &recFilteredTemp[recstride+1];
   uint8_t *origShift = &orig[xpos+ypos*origstride];  
   int8_t filter = (width<32); //ToDo: chroma support
   SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64};
@@ -257,20 +259,30 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   {
     for(x = 0; x < (int32_t)width; x++)
     {
-      origBlock[i++] = origShift[x+y*origstride];
+      origBlock[i++] = origShift[x+y*origstride];      
     }
+  }
+  /* Filtered only needs the borders */
+  for(y = -1; y < (int32_t)recstride; y++)
+  {
+    recFiltered[y*recstride-1] = rec[y*recstride-1];
+  }
+  for(x = 0; x < (int32_t)recstride; x++)
+  {
+    recFiltered[y-recstride] = rec[y-recstride];
   }
 
   /* Test DC */
-  /*
+  
   x = intra_getDCPred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < (int32_t)(width*width); i++)
   {
     pred[i] = x;
   }
   CHECK_FOR_BEST(1);
-  */
+  
   /* Check angular not requiring filtering */
+  
   for(i = 2; i < 35; i++)
   {
     if(MIN(abs(i-26),abs(i-10)) <= threshold)
@@ -278,12 +290,13 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
-  }  
+  } 
+  
   /*Apply filter*/
-  intra_filter(rec,recstride,width,0);
+  intra_filter(recFiltered,recstride,width,0);
 
-  /* Test planar */  
-  intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width);
+  /* Test planar */    
+  intra_getPlanarPred(recFiltered, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0);
   
 
@@ -296,7 +309,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   {
     if(MIN(abs(i-26),abs(i-10)) > threshold)
     {
-      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
+      intra_getAngularPred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
   }  
@@ -603,9 +616,9 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
 
 
 
-void intra_DCPredFiltering(uint8_t* pSrc, int32_t iSrcStride, uint8_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight )
+void intra_DCPredFiltering(int16_t* pSrc, int32_t iSrcStride, int16_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight )
 {
-  uint8_t* pDst = rpDst;
+  int16_t* pDst = rpDst;
   int32_t x, y, iDstStride2, iSrcStride2;
 
   // boundary pixels processing
