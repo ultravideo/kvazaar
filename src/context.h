@@ -36,7 +36,7 @@ extern cabac_ctx g_ChromaPredSCModel[2];
 extern cabac_ctx g_TransSubdivSCModel[3];
 extern cabac_ctx g_QtCbfSCModelY[3];
 extern cabac_ctx g_QtCbfSCModelU[3];
-extern cabac_ctx g_PartSizeSCModel;
+extern cabac_ctx g_PartSizeSCModel[4];
 extern cabac_ctx g_CUSigCoeffGroupSCModel[4];
 extern cabac_ctx g_CUSigSCModel_luma[27];
 extern cabac_ctx g_CUSigSCModel_chroma[15];
@@ -49,6 +49,15 @@ extern cabac_ctx g_CUOneSCModel_chroma[8];
 extern cabac_ctx g_cCUAbsSCModel_luma[4];
 extern cabac_ctx g_cCUAbsSCModel_chroma[2];
 
+#define CNU 154
+static const uint8_t 
+INIT_PART_SIZE[3][4] =  
+{
+  { 154,  139,  CNU,  CNU, }, 
+  { 154,  139,  CNU,  CNU, }, 
+  { 184,  CNU,  CNU,  CNU, }, 
+};
+
 static const uint8_t  INIT_SPLIT_FLAG[3][3] =  
                        { { 107,  139,  126 },
                          { 107,  139,  126 },
@@ -58,7 +67,7 @@ static const uint8_t INIT_INTRA_PRED_MODE[3] = { 183,154,184 };
 
 static const uint8_t INIT_CHROMA_PRED_MODE[3][2] = { { 152,  139 }, { 152,  139 }, {  63,  139 } };
 
-#define CNU 154
+
 static const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = 
 {
   { 224,  167,  122 }, 

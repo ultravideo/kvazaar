@@ -27,7 +27,7 @@ cabac_ctx g_TransSubdivSCModel[3];    /*<! \brief intra mode context models */
 cabac_ctx g_QtCbfSCModelY[3];
 cabac_ctx g_QtCbfSCModelU[3];
 //cabac_ctx g_QtCbfSCModelV[3];
-cabac_ctx g_PartSizeSCModel;
+cabac_ctx g_PartSizeSCModel[4];
 cabac_ctx g_CUSigCoeffGroupSCModel[4];
 cabac_ctx g_CUSigSCModel_luma[27];
 cabac_ctx g_CUSigSCModel_chroma[15];
@@ -50,7 +50,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   ctx_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE][1]);
   ctx_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE][2]);
 
-  ctx_init(&g_IntraModeSCModel, encoder->QP, INIT_INTRA_PRED_MODE[SLICE]);
+  ctx_init(&g_IntraModeSCModel, encoder->QP, INIT_INTRA_PRED_MODE[SLICE]);  
 
   ctx_init(&g_ChromaPredSCModel[0], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE][0]);
   ctx_init(&g_ChromaPredSCModel[1], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE][1]);
@@ -62,6 +62,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   {    
     ctx_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE][i]);
     ctx_init(&g_cCUAbsSCModel_luma[i], encoder->QP, INIT_ABS_FLAG[SLICE][i]);
+    ctx_init(&g_PartSizeSCModel[i], encoder->QP, INIT_PART_SIZE[SLICE][i]);
   }
   for(i = 0; i < 3; i++)
   {

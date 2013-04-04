@@ -55,8 +55,8 @@ typedef struct
   uint8_t bitdepth;
 
   /* Filtering */
-  int8_t betaOffset;
-  int8_t tcOffset;
+  int8_t betaOffsetdiv2;
+  int8_t tcOffsetdiv2;
 } encoder_control;
 
 typedef struct
@@ -109,6 +109,9 @@ int8_t  g_aucConvertToBit[LCU_WIDTH+1];
 static int8_t g_bitDepth     = 8;
 static int8_t g_uiBitIncrement = 0;
 
+#define MAX_NUM_SPU_W ((1<<(MAX_DEPTH))/4)
+static uint32_t g_auiZscanToRaster [ MAX_NUM_SPU_W*MAX_NUM_SPU_W ] = { 0, };
+static uint32_t g_auiRasterToZscan [ MAX_NUM_SPU_W*MAX_NUM_SPU_W ] = { 0, };
 static const uint8_t g_uiGroupIdx[ 32 ]    = {0,1,2,3,4,4,5,5,6,6,6,6,7,7,7,7,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,9};
 static const uint8_t g_uiMinInGroup[ 10 ]  = {0,1,2,3,4,6,8,12,16,24};
 static uint32_t g_sigLastScanCG32x32[ 64 ] = 

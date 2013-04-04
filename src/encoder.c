@@ -27,6 +27,7 @@
 #include "context.h"
 #include "transform.h"
 #include "intra.h"
+#include "filter.h"
 
 void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32_t iWidth, int32_t iHeight)
 {
@@ -310,6 +311,10 @@ void encode_one_frame(encoder_control* encoder)
   }
   */
   #endif
+  
+  /* Filtering */
+  //filter_deblock(encoder);
+
 
   /* Clear prediction data */
   /* ToDo: store as reference data */
@@ -360,7 +365,11 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 1, 1, "deblocking_filter_control_present_flag");
   //IF deblocking_filter
     WRITE_U(encoder->stream, 0, 1, "deblocking_filter_override_enabled_flag");
-    WRITE_U(encoder->stream, 1, 1, "pps_disable_deblocking_filter_flag");
+    WRITE_U(encoder->stream, 0, 1, "pps_disable_deblocking_filter_flag");
+    //IF !disabled
+     WRITE_SE(encoder->stream, encoder->betaOffsetdiv2, "beta_offset_div2");
+     WRITE_SE(encoder->stream, encoder->tcOffsetdiv2, "tc_offset_div2");
+    //ENDIF
   //ENDIF
   WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
@@ -631,7 +640,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  uint8_t split_flag = (depth<2)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = (depth<3)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -686,12 +695,13 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     cur_CU->type = CU_INTRA;
   }
 
-    /* Signal PartSize on max depth */
+    /* Signal PartSize on max depth */    
     if(depth == MAX_DEPTH)
     {
-      cabac.ctx = &g_PartSizeSCModel;
+      cabac.ctx = &g_PartSizeSCModel[0];
       CABAC_BIN(&cabac, 1, "PartSize");
     }
+    
     /*end partsize*/
 
     if(cur_CU->type == CU_INTRA)
@@ -1183,9 +1193,9 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
   int8_t CbY,CbU,CbV;
   int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)));
   
-  if(depth != 0 && depth != MAX_DEPTH)
+  if(depth != 0 && depth != MAX_DEPTH+1)
   {
-    cabac.ctx = &g_TransSubdivSCModel[5-(g_aucConvertToBit[LCU_WIDTH]+2-depth)];
+    cabac.ctx = &g_TransSubdivSCModel[5-((g_aucConvertToBit[LCU_WIDTH]+2)-depth)];
     CABAC_BIN(&cabac,split,"TransformSubdivFlag");
   }
 

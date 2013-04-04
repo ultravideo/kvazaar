@@ -210,7 +210,7 @@ void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode)
   #undef FWIDTH
 }
 
-/*! \brief Function to test best intra prediction
+/*! \brief Function to test best intra prediction mode
   \param orig original picture data
   \param origstride original picture stride
   \param rec reconstructed picture data
@@ -270,7 +270,9 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
   for(x = 0; x < (int32_t)recstride; x++)
   {
     recFiltered[y-recstride] = rec[y-recstride];
-  }
+  }    
+  /*Apply filter*/
+  intra_filter(recFiltered,recstride,width,0);
 
   /* Test DC */
   
@@ -292,8 +294,7 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
     }
   } 
   
-  /*Apply filter*/
-  intra_filter(recFiltered,recstride,width,0);
+  /**** FROM THIS POINT FORWARD, USING FILTERED PREDICTION *****/
 
   /* Test planar */    
   intra_getPlanarPred(recFiltered, recstride, xpos, ypos, width, pred, width);
@@ -312,7 +313,8 @@ int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t
       intra_getAngularPred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i);
     }
-  }  
+  }
+
   *sad = bestSAD;
   #undef COPY_PRED_TO_DST
   #undef CHECK_FOR_BEST
@@ -388,8 +390,6 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
   int32_t width_in_SCU = srcWidth/SCU_width;     /*!< picture width in SCU */
-
-  //memset(dst,0,outwidth*outwidth*sizeof(int16_t));
 
   /* Fill left column */
   if(xCtb)

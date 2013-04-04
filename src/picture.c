@@ -154,6 +154,102 @@ double imagePSNR(uint8_t *frame1, uint8_t *frame2, uint32_t x, uint32_t y)
   return psnr;
 }
 
+uint32_t Hadamard8x8(int16_t *piOrg, int16_t *piCur, int32_t iStrideOrg, int32_t iStrideCur)
+{
+  int32_t k, i, j, jj, sad=0;
+  int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
+  for( k = 0; k < 64; k += 8 )
+  {
+    diff[k+0] = piOrg[0] - piCur[0];
+    diff[k+1] = piOrg[1] - piCur[1];
+    diff[k+2] = piOrg[2] - piCur[2];
+    diff[k+3] = piOrg[3] - piCur[3];
+    diff[k+4] = piOrg[4] - piCur[4];
+    diff[k+5] = piOrg[5] - piCur[5];
+    diff[k+6] = piOrg[6] - piCur[6];
+    diff[k+7] = piOrg[7] - piCur[7];
+    
+    piCur += iStrideCur;
+    piOrg += iStrideOrg;
+  }
+  
+  //horizontal
+  for (j=0; j < 8; j++)
+  {
+    jj = j << 3;
+    m2[j][0] = diff[jj  ] + diff[jj+4];
+    m2[j][1] = diff[jj+1] + diff[jj+5];
+    m2[j][2] = diff[jj+2] + diff[jj+6];
+    m2[j][3] = diff[jj+3] + diff[jj+7];
+    m2[j][4] = diff[jj  ] - diff[jj+4];
+    m2[j][5] = diff[jj+1] - diff[jj+5];
+    m2[j][6] = diff[jj+2] - diff[jj+6];
+    m2[j][7] = diff[jj+3] - diff[jj+7];
+    
+    m1[j][0] = m2[j][0] + m2[j][2];
+    m1[j][1] = m2[j][1] + m2[j][3];
+    m1[j][2] = m2[j][0] - m2[j][2];
+    m1[j][3] = m2[j][1] - m2[j][3];
+    m1[j][4] = m2[j][4] + m2[j][6];
+    m1[j][5] = m2[j][5] + m2[j][7];
+    m1[j][6] = m2[j][4] - m2[j][6];
+    m1[j][7] = m2[j][5] - m2[j][7];
+    
+    m2[j][0] = m1[j][0] + m1[j][1];
+    m2[j][1] = m1[j][0] - m1[j][1];
+    m2[j][2] = m1[j][2] + m1[j][3];
+    m2[j][3] = m1[j][2] - m1[j][3];
+    m2[j][4] = m1[j][4] + m1[j][5];
+    m2[j][5] = m1[j][4] - m1[j][5];
+    m2[j][6] = m1[j][6] + m1[j][7];
+    m2[j][7] = m1[j][6] - m1[j][7];
+  }
+  
+  //vertical
+  for (i=0; i < 8; i++)
+  {
+    m3[0][i] = m2[0][i] + m2[4][i];
+    m3[1][i] = m2[1][i] + m2[5][i];
+    m3[2][i] = m2[2][i] + m2[6][i];
+    m3[3][i] = m2[3][i] + m2[7][i];
+    m3[4][i] = m2[0][i] - m2[4][i];
+    m3[5][i] = m2[1][i] - m2[5][i];
+    m3[6][i] = m2[2][i] - m2[6][i];
+    m3[7][i] = m2[3][i] - m2[7][i];
+    
+    m1[0][i] = m3[0][i] + m3[2][i];
+    m1[1][i] = m3[1][i] + m3[3][i];
+    m1[2][i] = m3[0][i] - m3[2][i];
+    m1[3][i] = m3[1][i] - m3[3][i];
+    m1[4][i] = m3[4][i] + m3[6][i];
+    m1[5][i] = m3[5][i] + m3[7][i];
+    m1[6][i] = m3[4][i] - m3[6][i];
+    m1[7][i] = m3[5][i] - m3[7][i];
+    
+    m2[0][i] = m1[0][i] + m1[1][i];
+    m2[1][i] = m1[0][i] - m1[1][i];
+    m2[2][i] = m1[2][i] + m1[3][i];
+    m2[3][i] = m1[2][i] - m1[3][i];
+    m2[4][i] = m1[4][i] + m1[5][i];
+    m2[5][i] = m1[4][i] - m1[5][i];
+    m2[6][i] = m1[6][i] + m1[7][i];
+    m2[7][i] = m1[6][i] - m1[7][i];
+  }
+  
+  for (i = 0; i < 8; i++)
+  {
+    for (j = 0; j < 8; j++)
+    {
+      sad += abs(m2[i][j]);
+    }
+  }
+  
+  sad=((sad+2)>>2);
+  
+  return sad;
+}
+
+
 //Sum of Absolute Difference for block
 uint32_t SAD(uint8_t *block,uint8_t* block2, uint32_t x, uint32_t y)
 {
@@ -237,6 +333,20 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t i,ii,y;
+    /*
+  int32_t x,sum = 0;
+  int32_t  iOffsetOrg = stride1<<3;
+  int32_t  iOffsetCur = stride2<<3;
+    for ( y=0; y<16; y+= 8 )
+    {
+      for ( x=0; x<16; x+= 8 )
+      {
+        sum += Hadamard8x8( &block[x], &block2[x], stride1, stride2 );
+      }
+      block += iOffsetOrg;
+      block2 += iOffsetCur;
+    }
+  */
   uint32_t sum=0;
   for(y=0;y<16;y++)
   {
@@ -259,7 +369,6 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
     sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
   }
-
   return sum;    
 }
 
