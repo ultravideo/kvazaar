@@ -365,10 +365,10 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 1, 1, "deblocking_filter_control_present_flag");
   //IF deblocking_filter
     WRITE_U(encoder->stream, 0, 1, "deblocking_filter_override_enabled_flag");
-    WRITE_U(encoder->stream, 0, 1, "pps_disable_deblocking_filter_flag");
+    WRITE_U(encoder->stream, 1, 1, "pps_disable_deblocking_filter_flag");
     //IF !disabled
-     WRITE_SE(encoder->stream, encoder->betaOffsetdiv2, "beta_offset_div2");
-     WRITE_SE(encoder->stream, encoder->tcOffsetdiv2, "tc_offset_div2");
+     //WRITE_SE(encoder->stream, encoder->betaOffsetdiv2, "beta_offset_div2");
+     //WRITE_SE(encoder->stream, encoder->tcOffsetdiv2, "tc_offset_div2");
     //ENDIF
   //ENDIF
   WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
@@ -640,7 +640,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  uint8_t split_flag = (depth<3)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = (depth<2)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -1264,6 +1264,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
     }
     if(CbU||CbV)
     {
+      int8_t chromaWidth = width>>1;
       /* Chroma scanmode */
       uiCTXIdx++;
       uiDirMode = ti->intraPredModeChroma;
@@ -1280,11 +1281,11 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
 
       if(CbU)
       {
-        encode_CoeffNxN(encoder,&ti->coeff[1][ti->idx*coeff_fourth>>1], width>>1, 2, uiScanIdx);
+        encode_CoeffNxN(encoder,&ti->coeff[1][ti->idx*coeff_fourth>>1], chromaWidth, 2, uiScanIdx);
       }
       if(CbV)
       {
-        encode_CoeffNxN(encoder,&ti->coeff[2][ti->idx*coeff_fourth>>1], width>>1, 2, uiScanIdx);
+        encode_CoeffNxN(encoder,&ti->coeff[2][ti->idx*coeff_fourth>>1], chromaWidth, 2, uiScanIdx);
       }
     }
   }

@@ -20,10 +20,10 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
 void intra_DCPredFiltering(int16_t* pSrc, int32_t iSrcStride, int16_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight );
 
 void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma);
-void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode);
+void intra_filter(int16_t* ref, int32_t stride,int32_t width, int8_t mode);
 
 /* Predictions */
-int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad);
+int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad);
 
 int16_t intra_getDCPred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width);
 void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride);

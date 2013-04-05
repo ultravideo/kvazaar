@@ -162,7 +162,7 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
 }
 
 
-void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode)
+void intra_filter(int16_t* ref, int32_t stride,int32_t width, int8_t mode)
 {
   #define FWIDTH (LCU_WIDTH*2+1)
   int16_t filtered[FWIDTH*FWIDTH];
@@ -225,7 +225,7 @@ void intra_filter(int16_t* ref, uint32_t stride,uint32_t width, int8_t mode)
  
   This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(uint8_t* orig,uint32_t origstride,int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad)
+int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, uint32_t *sad)
 {
   typedef uint32_t (*SADfunction)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
   uint32_t bestSAD = 0xffffffff;
