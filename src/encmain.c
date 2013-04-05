@@ -144,11 +144,12 @@
       fread(encoder->in.cur_pic.uData, cfg->width*cfg->height>>2,1,input);
       fread(encoder->in.cur_pic.vData, cfg->width*cfg->height>>2,1,input);
 
-      /* Clear reconstruction buffers */
+      /* Clear reconstruction buffers (not needed, for debugging) */
+      /*
       memset(encoder->in.cur_pic.yRecData, 0, cfg->width*cfg->height);
       memset(encoder->in.cur_pic.uRecData, 128, cfg->width*cfg->height>>2);
       memset(encoder->in.cur_pic.vRecData, 128, cfg->width*cfg->height>>2);
-
+      */
       /* /////////////THE ACTUAL CODING HAPPENDS HERE\\\\\\\\\\\\\\\\\\\ */
       encode_one_frame(encoder);
 
@@ -164,7 +165,7 @@
         temp_PSNR[1] = imagePSNR(encoder->in.cur_pic.uData,encoder->in.cur_pic.uRecData,cfg->width>>1,cfg->height>>1);
         temp_PSNR[2] = imagePSNR(encoder->in.cur_pic.vData,encoder->in.cur_pic.vRecData,cfg->width>>1,cfg->height>>1);
 
-        printf("[%d] %c-frame PSNR: %2.2f %2.2f %2.2f\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3],
+        printf("[%d] %c-frame PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3],
                                                         temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);
         PSNR[0]+=temp_PSNR[0];
         PSNR[1]+=temp_PSNR[1];
@@ -174,7 +175,7 @@
     }
     /* Coding finished */
 
-    printf(" Processed %d frames, AVG PSNR: %2.2f %2.2f %2.2f\n", encoder->frame,PSNR[0]/encoder->frame,PSNR[1]/encoder->frame,PSNR[2]/encoder->frame);
+    printf(" Processed %d frames, AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame,PSNR[0]/encoder->frame,PSNR[1]/encoder->frame,PSNR[2]/encoder->frame);
 
     fclose(input);
     fclose(output);

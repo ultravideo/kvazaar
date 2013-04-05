@@ -129,26 +129,26 @@
 #define PSNRMAX (255.0*255.0)
 
 //Calculates image PSNR value
-double imagePSNR(uint8_t *frame1, uint8_t *frame2, uint32_t x, uint32_t y)
+double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
 {   
-  uint64_t MSE=0;
-  uint64_t MSEtemp=0;
+  int64_t MSE=0;
+  int64_t MSEtemp=0;
   double psnr=0.0;
+  double pixels = x*y;
   int32_t index;
 
   //Calculate MSE
-  for(index=x*y-1;index>=0;index--)
+  for(index = 0; index < x*y; index++)
   {
     MSEtemp=frame1[index]-frame2[index];
     MSE+=MSEtemp*MSEtemp;
   }
-  MSE/=x*y;
 
   //Avoid division by zero
   if(MSE==0) return 99.0;
 
   //The PSNR
-  psnr=10*log10(PSNRMAX/MSE);
+  psnr=10*log10(PSNRMAX/((double)MSE/pixels));
 
   //Thats it.
   return psnr;
@@ -346,6 +346,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
       block += iOffsetOrg;
       block2 += iOffsetCur;
     }
+  
   */
   uint32_t sum=0;
   for(y=0;y<16;y++)
@@ -369,6 +370,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
     sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
   }
+  
   return sum;    
 }
 

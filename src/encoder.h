@@ -33,10 +33,10 @@ enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 typedef struct
 {
   FILE* file;
-  uint32_t width;
-  uint32_t height;
-  uint32_t height_in_LCU;
-  uint32_t width_in_LCU;
+  int32_t width;
+  int32_t height;
+  int32_t height_in_LCU;
+  int32_t width_in_LCU;
   picture cur_pic;
   uint8_t video_format;
 } encoder_input;
@@ -88,7 +88,7 @@ typedef struct
 } transform_info;
 
 void init_encoder_control(encoder_control* control,bitstream* output);
-void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height);
+void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height);
 void encode_one_frame(encoder_control* encoder);
 
 

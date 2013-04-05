@@ -192,7 +192,7 @@ void init_encoder_control(encoder_control* control,bitstream* output)
   control->stream = output;  
 }
 
-void init_encoder_input(encoder_input* input,FILE* inputfile, uint32_t width, uint32_t height)
+void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height)
 {
   int i;
   input->file = inputfile;
