@@ -6,7 +6,7 @@
 /*! \file picture.h
     \brief Picture header
     \author Marko Viitanen
-    \date 2012-06
+    \date 2013-04
     
     Contains all picture related functions and structs
 */

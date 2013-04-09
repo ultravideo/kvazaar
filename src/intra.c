@@ -43,7 +43,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
     int CUpos = y*width_in_SCU;
     for(x = xCtb; x < xCtb+block_SCU_width; x++)
     {      
-      for(d = 0; d < MAX_DEPTH; d++)
+      for(d = 0; d < MAX_DEPTH+1; d++)
       {
         pic->CU[d][CUpos+x].type = CU_INTRA;
         pic->CU[d][CUpos+x].intra.mode = mode;
@@ -290,7 +290,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     if(MIN(abs(i-26),abs(i-10)) <= threshold)
     {
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i);
+      //CHECK_FOR_BEST(i);
     }
   } 
   

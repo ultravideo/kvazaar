@@ -640,12 +640,12 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  uint8_t split_flag = (depth<2)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = (depth<3)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
-  uint8_t border_x = ((encoder->in.width)<(uint32_t)( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
-  uint8_t border_y = ((encoder->in.height)<(uint32_t)( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
+  uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
+  uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)];
 
@@ -698,7 +698,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     /* Signal PartSize on max depth */    
     if(depth == MAX_DEPTH)
     {
-      cabac.ctx = &g_PartSizeSCModel[0];
+      cabac.ctx = &g_PartSizeSCModel[(cur_CU->type == CU_INTRA)?0:999];
       CABAC_BIN(&cabac, 1, "PartSize");
     }
     
@@ -707,7 +707,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     if(cur_CU->type == CU_INTRA)
     {
       uint8_t intraPredMode = 1;
-      uint8_t intraPredModeChroma = 36; /* 36 = Chroma derived from luma */
+      uint8_t intraPredModeChroma =36; /* 36 = Chroma derived from luma */
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
       int i;
@@ -857,6 +857,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       /* Coeff */
       /* Transform tree */
       {
+        /* ToDo: dynamic memory allocation */
         int16_t coeff[LCU_WIDTH*LCU_WIDTH*2];
         int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>1];
         int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>1];
@@ -1082,7 +1083,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
           block[i++]=((int16_t)baseU[x+y*(base_stride>>1)])-predU[x+y*(pred_stride>>1)];
         }
       }
-      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
       quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 0,2,SCAN_DIAG);
       for(i = 0; i < width*width>>2; i++)
       {
@@ -1103,7 +1104,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
           block[i++]=((int16_t)baseV[x+y*(base_stride>>1)])-predV[x+y*(pred_stride>>1)];
         }
       }
-      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
       quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 0,3,SCAN_DIAG);
       for(i = 0; i < width*width>>2; i++)
       {
@@ -1119,7 +1120,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
       {
         /* RECONSTRUCT for predictions */
         dequant(encoder,coeffU,pre_quant_coeff,width>>1, width>>1,2);
-        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
 
         i = 0;
         for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
@@ -1149,7 +1150,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
       {
         /* RECONSTRUCT for predictions */
         dequant(encoder,coeffV,pre_quant_coeff,width>>1, width>>1,3);
-        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),0);
+        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
 
         i = 0;
         for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
@@ -1329,7 +1330,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
     }
   }
 
-  scanCG = g_auiSigLastScan[ scanMode ][ uiLog2BlockSize > 3 ? uiLog2BlockSize-2-1 : 0 ];
+  scanCG = g_auiSigLastScan[ scanMode ][ uiLog2BlockSize > 3 ? uiLog2BlockSize-3 : 0 ];
   if( uiLog2BlockSize == 3 )
   {
     scanCG = g_sigLastScan8x8[ scanMode ];

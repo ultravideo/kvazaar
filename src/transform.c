@@ -658,7 +658,7 @@ void partialButterflyInverse32(int16_t *src,int16_t *dst,int32_t shift, int32_t 
 *  \param coeff transform coefficients
 *  \param blockSize width of transform
 */
-void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
+void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode)
 {
 
   int32_t shift_1st = g_aucConvertToBit[blockSize]  + 1 + g_uiBitIncrement; // log2(iWidth) - 1 + g_uiBitIncrement
@@ -710,7 +710,7 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
  \param iWidth input data (width of transform)
  \param iHeight input data (height of transform)
 */
-void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int8_t uiMode)
+void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode)
   //(Int bitDepth, Short *coeff,Short *block, Int iWidth, Int iHeight, UInt uiMode)
 {
   int32_t shift_1st = 7;
