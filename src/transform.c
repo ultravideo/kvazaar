@@ -249,10 +249,10 @@ void scalinglist_processDec( int32_t *coeff, int32_t *dequantcoeff, int32_t invQ
 
 void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
 {
-  uint32_t width = g_scalingListSizeX[sizeId];
+  uint32_t width  = g_scalingListSizeX[sizeId];
   uint32_t height = g_scalingListSizeX[sizeId];
-  uint32_t ratio = g_scalingListSizeX[sizeId]/MIN(8,g_scalingListSizeX[sizeId]);
-  int32_t *quantcoeff = g_quant_coeff[sizeId][listId][qp];
+  uint32_t ratio  = g_scalingListSizeX[sizeId]/MIN(8,g_scalingListSizeX[sizeId]);
+  int32_t *quantcoeff   = g_quant_coeff[sizeId][listId][qp];
   int32_t *dequantcoeff = g_de_quant_coeff[sizeId][listId][qp];
 
   scalinglist_processEnc(coeff,quantcoeff,g_quantScales[qp]<<4,height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, 0);
@@ -667,13 +667,13 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
   
   if(blockSize== 4)
-  {
+  {/*
     if (uiMode != 65535)
     {
       fastForwardDst(block,tmp,shift_1st); // Forward DST BY FAST ALGORITHM, block input, tmp output
       fastForwardDst(tmp,coeff,shift_2nd); // Forward DST BY FAST ALGORITHM, tmp input, coeff output
     }
-    else
+    else*/
     {
       partialButterfly4(block, tmp, shift_1st, blockSize);
       partialButterfly4(tmp, coeff, shift_2nd, blockSize);
@@ -718,13 +718,13 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMod
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
   if( blockSize == 4)
-  {
+  {/*
     if (uiMode != 65535)
     {
       fastInverseDst(coeff,tmp,shift_1st);    // Inverse DST by FAST Algorithm, coeff input, tmp output
       fastInverseDst(tmp,block,shift_2nd); // Inverse DST by FAST Algorithm, tmp input, coeff output
     }
-    else
+    else*/
     {
       partialButterflyInverse4(coeff,tmp,shift_1st,blockSize);
       partialButterflyInverse4(tmp,block,shift_2nd,blockSize);
@@ -762,7 +762,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
 
   //uint32_t scanIdx = SCAN_DIAG;
 
-  scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];  
+  scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
   {
   int32_t deltaU[LCU_WIDTH*LCU_WIDTH] ;
   int32_t iQpBase = encoder->QP;

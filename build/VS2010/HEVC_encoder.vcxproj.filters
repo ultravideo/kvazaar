@@ -13,6 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\x86">
+      <UniqueIdentifier>{9e551421-7564-43be-a2b6-1ffb16d744a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x86">
+      <UniqueIdentifier>{d1533c70-cb9a-419d-9a38-5161894ec359}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\x64">
+      <UniqueIdentifier>{cbe787b6-15a0-4c72-b658-6f444735fd73}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\x64">
+      <UniqueIdentifier>{39fb72d7-bfcd-4505-9a00-7ed6bf67d9ad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\encmain.c">
@@ -83,5 +95,19 @@
     <ClInclude Include="..\..\src\filter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\x86\test.h">
+      <Filter>Header Files\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\x64\test64.h">
+      <Filter>Header Files\x86</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <YASM Include="..\..\src\x86\test.asm">
+      <Filter>Source Files\x86</Filter>
+    </YASM>
+    <YASM Include="..\..\src\x64\test64.asm">
+      <Filter>Source Files\x64</Filter>
+    </YASM>
   </ItemGroup>
 </Project>

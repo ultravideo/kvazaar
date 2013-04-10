@@ -128,7 +128,7 @@ void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32
     {
       for(blkY=0; blkY < numBlkSide; blkY++)
       {
-        uint32_t offset    = blkY * 4 * iWidth + blkX * 4;
+        uint32_t offset = blkY * 4 * iWidth + blkX * 4;
         for(x=0; x < 4; x++)
         {
           for(y=0; y < 4; y++)
@@ -640,7 +640,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {    
-  uint8_t split_flag = (depth<3)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = (depth<1)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -707,7 +707,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     if(cur_CU->type == CU_INTRA)
     {
       uint8_t intraPredMode = 1;
-      uint8_t intraPredModeChroma =36; /* 36 = Chroma derived from luma */
+      uint8_t intraPredModeChroma = 1; /* 36 = Chroma derived from luma */
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
       int i;
@@ -746,9 +746,15 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       {
         intra_DCPredFiltering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
       }
+
       
       /* ToDo: separate chroma prediction(?) */
       /* intraPredModeChroma = 1; */
+
+      if(intraPredModeChroma != 36 && intraPredModeChroma == intraPredMode)
+      {
+        intraPredModeChroma = 36;
+      }
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
       intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);

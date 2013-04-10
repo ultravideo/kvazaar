@@ -34,13 +34,23 @@ enum { CU_NOTSET = 0,CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER };
 #define SET_SPLITDATA(CU,flag) { (CU)->split=(flag); }
 
 /*!
-    \brief Struct for CU info
+    \brief Struct for CU intra info
 */
 typedef struct
 {
   uint8_t mode;
   uint32_t cost;
 } CU_info_intra;
+
+/*!
+    \brief Struct for CU inter info
+*/
+typedef struct
+{
+  uint8_t mode;
+  uint32_t cost;
+  int16_t mv[2];
+} CU_info_inter;
 
 
 /*!
@@ -49,7 +59,9 @@ typedef struct
 typedef struct
 {
   uint8_t type;
+  int8_t coded;
   CU_info_intra intra;
+  CU_info_inter inter;
   uint8_t split;
 } CU_info;
 

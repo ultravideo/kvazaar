@@ -290,7 +290,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     if(MIN(abs(i-26),abs(i-10)) <= threshold)
     {
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      //CHECK_FOR_BEST(i);
+      CHECK_FOR_BEST(i);
     }
   } 
   

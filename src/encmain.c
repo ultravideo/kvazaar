@@ -45,6 +45,12 @@
  #include "picture.h"
  #include "transform.h"
  
+ /* Assembly optimizations */
+#ifndef X64
+ #include "x86/test.h"
+#else
+ #include "x64/test64.h"
+#endif
  
  /*!
      \brief Program main function.
@@ -53,7 +59,9 @@
      \return Program exit state
  */
   int main(int argc, char* argv[])
-  {
+  {    
+    int ecx = 0,edx =0;
+    enum { BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26};
     uint32_t curFrame = 0;
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
@@ -63,6 +71,25 @@
     FILE *recout = fopen("encrec.yuv","wb");
     #endif
     encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));;
+
+    /* CPU id */
+    
+    printf("Checking for CPU features...\r\n");
+    #ifndef X64
+    cpuId(&ecx,&edx);
+    #else
+    cpuId64(&ecx,&edx);
+    #endif
+    //printf("CPUID ECX: %X EDX: %X\r\n", ecx, edx);
+    printf("CPU features enabled: ");
+    if(edx & (1<<BIT_MMX)) printf("MMX ");
+    if(edx & (1<<BIT_SSE)) printf("SSE ");
+    if(edx & (1<<BIT_SSE2)) printf("SSE2 ");
+    if(ecx & (1<<BIT_SSSE3)) printf("SSSE3 ");
+    if(ecx & (1<<BIT_SSE41)) printf("SSE4.1 ");
+    if(ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
+    printf("\r\n");
+    
  
     /* Handle configuration */
     cfg = config_alloc();
