@@ -3,6 +3,8 @@ bits 64
 section .code
 global cpuId64
 
+;void __cdecl cpuId64(int* ecx, int *edx );
+
 cpuId64:
     mov  r8, rcx ; pointer to ecx-output
     mov  r9, rdx ; pointer to edx-output

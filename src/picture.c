@@ -1,6 +1,6 @@
 /**
  *  Part of HEVC Encoder
- *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
  */
 
 /*! \file picture.c
@@ -70,7 +70,7 @@
     //allocate space for the new list
     list->pics = (picture**)malloc(sizeof(picture*)*size);
 
-    //Copy everthing from the old list to the new if needed.
+    //Copy everything from the old list to the new if needed.
     if(old_pics != NULL)
     {
       for(i = 0; i < list->used_size; i++)

@@ -1,6 +1,6 @@
 /**
  *  Part of HEVC Encoder
- *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
  */
 
 /*! \file picture.h

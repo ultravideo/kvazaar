@@ -1,6 +1,6 @@
 /**
  *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
  */
 
 /*! \file encoder.h
@@ -87,6 +87,7 @@ typedef struct
   int32_t split[4];
 } transform_info;
 
+void init_tables(void);
 void init_encoder_control(encoder_control* control,bitstream* output);
 void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height);
 void encode_one_frame(encoder_control* encoder);
@@ -102,7 +103,6 @@ void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_
 void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode);
 void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t depth);
 void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t depth, int8_t trDepth);
-void init_tables(void);
 
 static uint32_t* g_auiSigLastScan[3][7];
 int8_t  g_aucConvertToBit[LCU_WIDTH+1];
@@ -146,8 +146,8 @@ static const uint8_t g_toBits[129] =
 #define TOBITS(len) g_toBits[len]
 
 
-#define C1FLAG_NUMBER               8 // maximum number of largerThan1 flag coded in one chunk
-#define C2FLAG_NUMBER               1 // maximum number of largerThan2 flag coded in one chunk
+#define C1FLAG_NUMBER               8 /*!< maximum number of largerThan1 flag coded in one chunk */
+#define C2FLAG_NUMBER               1 /*!< maximum number of largerThan2 flag coded in one chunk */
 
 enum COEFF_SCAN_TYPE
 {

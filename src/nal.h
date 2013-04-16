@@ -1,6 +1,6 @@
 /**
  *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems 2012.
+ *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing 2013.
  */
 
 /*! \file nal.h

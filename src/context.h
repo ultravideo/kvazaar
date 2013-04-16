@@ -1,6 +1,6 @@
 /**
  *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
  */
 
 /*! \file context.h

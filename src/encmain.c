@@ -1,6 +1,6 @@
 /**
  *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Computer Systems.
+ *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
  */
 
 /*! \file decmain.c
@@ -61,7 +61,8 @@
   int main(int argc, char* argv[])
   {    
     int ecx = 0,edx =0;
-    enum { BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26};
+    /* CPU feature bits */
+    enum { BIT_SSE3 = 0,BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26, BIT_AVX = 28};
     uint32_t curFrame = 0;
     config *cfg  = NULL;       /* Global configuration */
     FILE *input  = NULL;
@@ -74,20 +75,22 @@
 
     /* CPU id */
     
-    printf("Checking for CPU features...\r\n");
     #ifndef X64
-    cpuId(&ecx,&edx);
+    //cpuId32(&ecx,&edx);
     #else
-    cpuId64(&ecx,&edx);
-    #endif
-    //printf("CPUID ECX: %X EDX: %X\r\n", ecx, edx);
+    //cpuId64(&ecx,&edx);
+    #endif    
     printf("CPU features enabled: ");
-    if(edx & (1<<BIT_MMX)) printf("MMX ");
-    if(edx & (1<<BIT_SSE)) printf("SSE ");
+    /* EDX */
+    if(edx & (1<<BIT_MMX))  printf("MMX ");
+    if(edx & (1<<BIT_SSE))  printf("SSE ");
     if(edx & (1<<BIT_SSE2)) printf("SSE2 ");
+    /* ECX */
+    if(ecx & (1<<BIT_SSE3))  printf("SSE3 ");
     if(ecx & (1<<BIT_SSSE3)) printf("SSSE3 ");
     if(ecx & (1<<BIT_SSE41)) printf("SSE4.1 ");
     if(ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
+    if(ecx & (1<<BIT_AVX))   printf("AVX ");
     printf("\r\n");
     
  
@@ -192,7 +195,7 @@
         temp_PSNR[1] = imagePSNR(encoder->in.cur_pic.uData,encoder->in.cur_pic.uRecData,cfg->width>>1,cfg->height>>1);
         temp_PSNR[2] = imagePSNR(encoder->in.cur_pic.vData,encoder->in.cur_pic.vRecData,cfg->width>>1,cfg->height>>1);
 
-        printf("[%d] %c-frame PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "IPB"[encoder->in.cur_pic.type%3],
+        printf("[%d] %c-frame PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "IPB"[encoder->in.cur_pic.slicetype%3],
                                                         temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);
         PSNR[0]+=temp_PSNR[0];
         PSNR[1]+=temp_PSNR[1];

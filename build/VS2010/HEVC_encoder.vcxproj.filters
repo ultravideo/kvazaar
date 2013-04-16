@@ -60,6 +60,9 @@
     <ClCompile Include="..\..\src\filter.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\search.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -99,7 +102,10 @@
       <Filter>Header Files\x86</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\x64\test64.h">
-      <Filter>Header Files\x86</Filter>
+      <Filter>Header Files\x64</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\search.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
