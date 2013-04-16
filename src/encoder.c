@@ -15,6 +15,7 @@
   #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,7 @@
 #include "transform.h"
 #include "intra.h"
 #include "filter.h"
+#include "search.h"
 
 void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32_t iWidth, int32_t iHeight)
 {
@@ -163,6 +165,7 @@ void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32
   }
 }
 
+
 void init_tables(void)
 {
   int i;
@@ -184,6 +187,14 @@ void init_tables(void)
 
     initSigLastScan( g_auiSigLastScan[0][i], g_auiSigLastScan[1][i], g_auiSigLastScan[2][i], c, c);
     c <<= 1;
+  }
+
+  /* Lambda cost */
+  /* ToDo: cleanup */
+  g_lambda_cost = (int16_t*)malloc(sizeof(int16_t)*55);
+  for(i = 0; i < 55; i++)
+  {
+    g_lambda_cost[i] = sqrt(0.85*pow(2.0,i/3));
   }
 
 }
@@ -271,6 +282,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = NAL_IDR_SLICE;
+    search_slice_data(encoder);
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
     encode_slice_data(encoder);
@@ -287,6 +299,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = 0;
+    search_slice_data(encoder);
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
     encode_slice_data(encoder);

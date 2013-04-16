@@ -6,7 +6,7 @@
 /*! \file picture.c
     \brief Functions to handle pictures
     \author Marko Viitanen
-    \date 2012-06
+    \date 2013-04
     
   This file contains all the needed functions to handle pictures
 

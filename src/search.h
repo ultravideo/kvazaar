@@ -14,5 +14,7 @@
 #ifndef __SEARCH_H
 #define __SEARCH_H
 
+void search_slice_data(encoder_control* encoder);
+void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 
 #endif

@@ -6,7 +6,7 @@
 /*! \file context.c
     \brief Functions for context derication
     \author Marko Viitanen
-    \date 2012-08    
+    \date 2013-04    
   This file contains context derivation functions
 */
 
