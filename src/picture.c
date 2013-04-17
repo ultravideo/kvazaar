@@ -19,6 +19,38 @@
 #include "global.h"
 #include "picture.h"
 
+
+
+/*!
+ \brief Set block coded status
+ \param pic picture to use
+ \param xCtb x CU position (smallest CU)
+ \param yCtb y CU position (smallest CU)
+ \param depth current CU depth
+ \param mode mode to set
+ \returns Void
+*/
+void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t coded)
+{
+  uint32_t x,y,d;
+  //Width in smallest CU
+  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
+  for(y = yCtb; y < yCtb+block_SCU_width; y++)
+  {
+    int CUpos = y*width_in_SCU;
+    for(x = xCtb; x < xCtb+block_SCU_width; x++)
+    {      
+      for(d = 0; d < MAX_DEPTH+1; d++)
+      {
+        pic->CU[d][CUpos+x].coded = coded;        
+      }
+    }
+  }
+}
+
+
+
 /** \defgroup picture_group Picture handler group
  *  This group contains all picture related stuff
  *  @{

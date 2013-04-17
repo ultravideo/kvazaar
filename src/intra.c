@@ -23,6 +23,7 @@
 
 const uint8_t intraHorVerDistThres[4] = {0,7,1,0};
 
+
 /*!
  \brief Set intrablock mode (and init typedata)
  \param pic picture to use
@@ -117,13 +118,13 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
   int32_t CUpos = yCtb*width_in_SCU+xCtb;
   
   // Left PU predictor
-  if(xCtb && pic->CU[depth][CUpos-1].type == CU_INTRA)
+  if(xCtb && pic->CU[depth][CUpos-1].type == CU_INTRA && pic->CU[depth][CUpos-1].coded)
   {
     iLeftIntraDir = pic->CU[depth][CUpos-1].intra.mode;
   }
 
   // Top PU predictor
-  if(yCtb && ((yCtb*(LCU_WIDTH>>MAX_DEPTH))%LCU_WIDTH)!=0 && pic->CU[depth][CUpos-width_in_SCU].type == CU_INTRA)
+  if(yCtb && ((yCtb*(LCU_WIDTH>>MAX_DEPTH))%LCU_WIDTH)!=0 && pic->CU[depth][CUpos-width_in_SCU].type == CU_INTRA && pic->CU[depth][CUpos-width_in_SCU].coded)
   {
     iAboveIntraDir = pic->CU[depth][CUpos-width_in_SCU].intra.mode;
   }
@@ -156,7 +157,7 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
     {
       preds[2] =  (iLeftIntraDir+iAboveIntraDir)<2? 26 : 1;
     }
-  } 
+  }
 
   return 1;
 }
@@ -398,7 +399,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
     for(leftColumn = 1; leftColumn < outwidth/SCU_width; leftColumn++)
     {
       /* If over the picture height or block not yet coded, stop */
-      if((yCtb+leftColumn)*SCU_width >= srcHeight || pic->CU[0][xCtb-1+(yCtb+leftColumn)*width_in_SCU].type == CU_NOTSET)
+      if((yCtb+leftColumn)*SCU_width >= srcHeight || !pic->CU[0][xCtb-1+(yCtb+leftColumn)*width_in_SCU].coded)
       {
         break;
       }
@@ -434,7 +435,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
     /* Loop top SCU's */
     for(topRow = 1; topRow < outwidth/SCU_width; topRow++)
     {
-      if((xCtb+topRow)*SCU_width >= srcWidth || pic->CU[0][xCtb+topRow+(yCtb-1)*width_in_SCU].type == CU_NOTSET)
+      if((xCtb+topRow)*SCU_width >= srcWidth || !pic->CU[0][xCtb+topRow+(yCtb-1)*width_in_SCU].coded)
       {
         break;
       }
@@ -496,8 +497,8 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
   int32_t signAng        = intraPredAngle < 0 ? -1 : 1;
 
   // Set bitshifts and scale the angle parameter to block size
-  int32_t angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32};
-  int32_t invAngTable[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; // (256 * 32) / Angle
+  const int32_t angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32};
+  const int32_t invAngTable[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; // (256 * 32) / Angle
   int32_t invAngle       = invAngTable[absAng];
 
   // Do angular predictions
@@ -516,11 +517,14 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
     for (k=0;k<blkSize+1;k++)
     {
       refAbove[k+blkSize-1] = pSrc[k-srcStride-1];
+      refLeft[k+blkSize-1] = pSrc[(k-1)*srcStride-1];
     }
+    /*
     for (k=0;k<blkSize+1;k++)
     {
       refLeft[k+blkSize-1] = pSrc[(k-1)*srcStride-1];
     }
+    */
     refMain = (modeVer ? refAbove : refLeft) + (blkSize-1);
     refSide = (modeVer ? refLeft : refAbove) + (blkSize-1);
 
@@ -536,11 +540,14 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
     for (k=0;k<2*blkSize+1;k++)
     {
       refAbove[k] = pSrc[k-srcStride-1];
+      refLeft[k] = pSrc[(k-1)*srcStride-1];
     }
+    /*
     for (k=0;k<2*blkSize+1;k++)
     {
       refLeft[k] = pSrc[(k-1)*srcStride-1];
     }
+    */
     refMain = modeVer ? refAbove : refLeft;
     refSide = modeVer ? refLeft  : refAbove;
   }
@@ -559,7 +566,8 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
     {
       for (k=0;k<blkSize;k++)
       {
-        pDst[k*dstStride] = CLIP(0, (1<<g_bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
+        pDst[k*dstStride] = (pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1)) & (1<<g_bitDepth)-1;
+          //CLIP(0, (1<<g_bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
       }
     }
   }

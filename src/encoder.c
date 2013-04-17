@@ -31,6 +31,8 @@
 #include "filter.h"
 #include "search.h"
 
+int16_t g_lambda_cost[55];
+
 void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32_t iWidth, int32_t iHeight)
 {
   uint32_t uiNumScanPos  = iWidth * iWidth;
@@ -191,10 +193,12 @@ void init_tables(void)
 
   /* Lambda cost */
   /* ToDo: cleanup */
-  g_lambda_cost = (int16_t*)malloc(sizeof(int16_t)*55);
+  //g_lambda_cost = (int16_t*)malloc(sizeof(int16_t)*55);
   for(i = 0; i < 55; i++)
   {
-    g_lambda_cost[i] = sqrt(0.85*pow(2.0,i/3));
+    if(i < 12) g_lambda_cost[i]= 0;
+    else g_lambda_cost[i] = sqrt(0.57*pow(2.0,(i-12)/3));
+    //g_lambda_cost[i] = g_lambda_cost[i]*g_lambda_cost[i];
   }
 
 }
@@ -652,20 +656,21 @@ void encode_slice_data(encoder_control* encoder)
 }
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
-{    
-  uint8_t split_flag = (depth<1)?1:0; /* ToDo: get from CU data */
+{ 
+  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  uint8_t split_flag = cur_CU->split;//(depth<1)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
   uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  
 
   /* When not in MAX_DEPTH, insert split flag and split the blocks if needed */
   if(depth != MAX_DEPTH)
   {
-    SET_SPLITDATA(cur_CU,split_flag);
+    //SET_SPLITDATA(cur_CU,split_flag);
     /* Implisit split flag when on border */
     if(!border)
     {
@@ -705,7 +710,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   
   /* Set every block as intra for now */
   {
-    cur_CU->type = CU_INTRA;
+    //cur_CU->type = CU_INTRA;
   }
 
     /* Signal PartSize on max depth */    
@@ -719,8 +724,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
     if(cur_CU->type == CU_INTRA)
     {
-      uint8_t intraPredMode = 1;
-      uint8_t intraPredModeChroma = 1; /* 36 = Chroma derived from luma */
+      uint8_t intraPredMode = cur_CU->intra.mode;
+      uint8_t intraPredModeChroma = 36; /* 36 = Chroma derived from luma */
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
       int i;
@@ -751,8 +756,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
       /* Build reconstructed block to use in prediction with extrapolated borders */      
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-
-      intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
+      intra_recon(recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,intraPredMode,0);
+      //intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
       
       /* Filter DC-prediction */
       if(intraPredMode == 1 && (LCU_WIDTH>>depth) < 32)
@@ -774,7 +779,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
       
       /* This affects reconstruction, do after that */
-      intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);
+      //intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);
+      //cur_CU->coded = 1;
+      picture_setBlockCoded(&encoder->in.cur_pic, xCtb, yCtb, depth, 1);
 
       /*
         PREDINFO CODING

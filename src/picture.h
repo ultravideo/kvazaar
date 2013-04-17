@@ -57,7 +57,7 @@ typedef struct
     \brief Struct for CU info
 */
 typedef struct
-{
+{  
   uint8_t type;
   int8_t coded;
   CU_info_intra intra;
@@ -103,6 +103,8 @@ int picture_list_resize(picture_list *list, int size);
 int picture_list_destroy(picture_list *list);
 
 int picture_destroy(picture *pic);
+
+void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t coded);
 
 
 enum { SLICE_P = 0, SLICE_B = 1, SLICE_I = 2 };

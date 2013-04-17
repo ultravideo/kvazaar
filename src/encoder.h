@@ -104,7 +104,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
 void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t depth);
 void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t depth, int8_t trDepth);
 
-static int16_t* g_lambda_cost;
+extern int16_t g_lambda_cost[55];
 static uint32_t* g_auiSigLastScan[3][7];
 int8_t g_aucConvertToBit[LCU_WIDTH+1];
 static int8_t g_bitDepth     = 8;
