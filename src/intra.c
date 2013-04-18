@@ -567,8 +567,8 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
     {
       for (k=0;k<blkSize;k++)
       {
-        pDst[k*dstStride] = (pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1)) & (1<<g_bitDepth)-1;
-          //CLIP(0, (1<<g_bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
+        pDst[k*dstStride] = //(pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1)) & (1<<g_bitDepth)-1;
+          CLIP(0, (1<<g_bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
       }
     }
   }

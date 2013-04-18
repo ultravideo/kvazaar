@@ -1080,7 +1080,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
         {
           int16_t val = block[i++]+pred[x+y*pred_stride];
           //ToDo: support 10+bits
-          recbase[x+y*recbase_stride] = (uint8_t)(val&0xff);//CLIP(0,255,val);
+          recbase[x+y*recbase_stride] = (uint8_t)/*(val&0xff);//*/CLIP(0,255,val);
         }
       }
       /* END RECONTRUCTION */
