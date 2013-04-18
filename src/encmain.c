@@ -182,6 +182,7 @@
       */
       /* /////////////THE ACTUAL CODING HAPPENDS HERE\\\\\\\\\\\\\\\\\\\ */
       encode_one_frame(encoder);
+      /* ////////////CODING NOW DONE\\\\\\\\\\\\\\\\\ */
 
       #ifdef _DEBUG
       /* Write reconstructed frame out */     
@@ -194,8 +195,8 @@
         temp_PSNR[0] = imagePSNR(encoder->in.cur_pic.yData,encoder->in.cur_pic.yRecData,cfg->width,cfg->height);
         temp_PSNR[1] = imagePSNR(encoder->in.cur_pic.uData,encoder->in.cur_pic.uRecData,cfg->width>>1,cfg->height>>1);
         temp_PSNR[2] = imagePSNR(encoder->in.cur_pic.vData,encoder->in.cur_pic.vRecData,cfg->width>>1,cfg->height>>1);
-
-        printf("[%d] %c-frame PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "IPB"[encoder->in.cur_pic.slicetype%3],
+        
+        printf("[%d] %c-frame PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "BPI"[encoder->in.cur_pic.slicetype%3],
                                                         temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);
         PSNR[0]+=temp_PSNR[0];
         PSNR[1]+=temp_PSNR[1];

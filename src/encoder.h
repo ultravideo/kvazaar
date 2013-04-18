@@ -38,21 +38,21 @@ typedef struct
   int32_t height_in_LCU;
   int32_t width_in_LCU;
   picture cur_pic;
-  uint8_t video_format;
+  int8_t video_format;
 } encoder_input;
 
 /* Encoder control options, the main struct */
 typedef struct
 {
-  uint32_t frame;
+  int32_t frame;
   config *cfg;
   encoder_input in;
   encoder_me me;
   bitstream* stream;
   FILE *output;
   picture_list *ref;
-  uint8_t QP;
-  uint8_t bitdepth;
+  int8_t QP;
+  int8_t bitdepth;
 
   /* Filtering */
   int8_t betaOffsetdiv2;

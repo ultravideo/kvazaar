@@ -197,7 +197,7 @@ void init_tables(void)
   for(i = 0; i < 55; i++)
   {
     if(i < 12) g_lambda_cost[i]= 0;
-    else g_lambda_cost[i] = sqrt(0.57*pow(2.0,(i-12)/3));
+    else g_lambda_cost[i] = (int16_t)sqrt(0.57*pow(2.0,(i-12)/3));
     //g_lambda_cost[i] = g_lambda_cost[i]*g_lambda_cost[i];
   }
 
@@ -657,7 +657,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 { 
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint8_t split_flag = cur_CU->split;//(depth<1)?1:0; /* ToDo: get from CU data */
   uint8_t split_model = 0;
 
@@ -675,11 +675,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     if(!border)
     {
       /* Get left and top block split_flags and if they are present and true, increase model number */
-      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))-1+(yCtb>>(MAX_DEPTH-depth))*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
+      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb-1+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
       {
         split_model++;
       }
-      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][(xCtb>>(MAX_DEPTH-depth))+((yCtb>>(MAX_DEPTH-depth))-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
+      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
       {
         split_model++;
       }
@@ -729,8 +729,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
       int i;
-      uint32_t flag;
-      uint32_t bestSAD;
+      uint32_t flag; 
+      int32_t bestSAD;
       uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *baseV = &encoder->in.cur_pic.vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
@@ -760,11 +760,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       //intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
       
       /* Filter DC-prediction */
-      if(intraPredMode == 1 && (LCU_WIDTH>>depth) < 32)
+      if(intraPredMode == 1 && width < 32)
       {
         intra_DCPredFiltering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
       }
-
       
       /* ToDo: separate chroma prediction(?) */
       /* intraPredModeChroma = 1; */

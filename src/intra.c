@@ -36,7 +36,7 @@ const uint8_t intraHorVerDistThres[4] = {0,7,1,0};
 void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, uint8_t mode)
 {
   uint32_t x,y,d;
-  //Width in smallest CU
+  /* Width in smallest CU */
   int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
@@ -46,6 +46,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
     {      
       for(d = 0; d < MAX_DEPTH+1; d++)
       {
+        pic->CU[d][CUpos+x].depth = depth;
         pic->CU[d][CUpos+x].type = CU_INTRA;
         pic->CU[d][CUpos+x].intra.mode = mode;
       }

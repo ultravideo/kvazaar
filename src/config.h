@@ -22,9 +22,9 @@ typedef struct
   char *input;      /*!< \brief Pointer to input filename  */
   char *output;     /*!< \brief Pointer to output filename */
   char *debug;      /*!< \brief Pointer to debug output    */
-  uint32_t frames;  /*!< \brief Number of frames to decode */
-  uint32_t width;   /*!< \brief frame width */
-  uint32_t height;  /*!< \brief frame height */
+  int32_t frames;  /*!< \brief Number of frames to decode */
+  int32_t width;   /*!< \brief frame width */
+  int32_t height;  /*!< \brief frame height */
 } config;
 
 /* Function definitions */

@@ -22,12 +22,38 @@
 
 
 /*!
- \brief Set block coded status
+ \brief Set block splitflag
  \param pic picture to use
  \param xCtb x CU position (smallest CU)
  \param yCtb y CU position (smallest CU)
  \param depth current CU depth
  \param mode mode to set
+ \returns Void
+*/
+void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t split)
+{
+  uint32_t x,y,d;
+  //Width in smallest CU
+  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
+  for(y = yCtb; y < yCtb+block_SCU_width; y++)
+  {
+    int CUpos = y*width_in_SCU;
+    for(x = xCtb; x < xCtb+block_SCU_width; x++)
+    {
+      pic->CU[depth][CUpos+x].split = split;
+    }
+  }
+}
+
+
+/*!
+ \brief Set block coded status
+ \param pic picture to use
+ \param xCtb x CU position (smallest CU)
+ \param yCtb y CU position (smallest CU)
+ \param depth current CU depth
+ \param coded coded status
  \returns Void
 */
 void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t coded)
@@ -40,15 +66,14 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
   {
     int CUpos = y*width_in_SCU;
     for(x = xCtb; x < xCtb+block_SCU_width; x++)
-    {      
+    {
       for(d = 0; d < MAX_DEPTH+1; d++)
       {
-        pic->CU[d][CUpos+x].coded = coded;        
+        pic->CU[d][CUpos+x].coded = coded;
       }
     }
   }
 }
-
 
 
 /** \defgroup picture_group Picture handler group
@@ -318,8 +343,24 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 
 uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
-  int32_t i,ii,y;
+  int32_t y;
+  
+  int32_t x,sum = 0;
+  int32_t  iOffsetOrg = stride1<<3;
+  int32_t  iOffsetCur = stride2<<3;
+  for ( y=0; y<32; y+= 8 )
+  {
+    for ( x=0; x<32; x+= 8 )
+    {
+      sum += Hadamard8x8( &block[x], &block2[x], stride1, stride2 );
+    }
+    block += iOffsetOrg;
+    block2 += iOffsetCur;
+  }
+
+  /*
   uint32_t sum=0;
+  int32_t i,ii;
   for(y=0;y<32;y++)
   {
     i = y*stride1; 
@@ -357,15 +398,15 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+30]-(int32_t)block2[ii+30]);
     sum+=abs((int32_t)block[i+31]-(int32_t)block2[ii+31]);
   }
-
+  */
   return sum;    
 }
 
 
 uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
-  int32_t i,ii,y;
-    /*
+  int32_t y;
+    
   int32_t x,sum = 0;
   int32_t  iOffsetOrg = stride1<<3;
   int32_t  iOffsetCur = stride2<<3;
@@ -379,8 +420,10 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
       block2 += iOffsetCur;
     }
   
-  */
+  
+  /*
   uint32_t sum=0;
+  int32_t i,ii;
   for(y=0;y<16;y++)
   {
     i = y*stride1; 
@@ -402,7 +445,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
     sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
   }
-  
+  */
   return sum;    
 }
 

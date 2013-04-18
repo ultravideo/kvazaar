@@ -38,7 +38,7 @@ enum { CU_NOTSET = 0,CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER };
 */
 typedef struct
 {
-  uint8_t mode;
+  int8_t mode;
   uint32_t cost;
 } CU_info_intra;
 
@@ -47,7 +47,7 @@ typedef struct
 */
 typedef struct
 {
-  uint8_t mode;
+  int8_t mode;
   uint32_t cost;
   int16_t mv[2];
 } CU_info_inter;
@@ -58,11 +58,12 @@ typedef struct
 */
 typedef struct
 {  
-  uint8_t type;
+  int8_t type;
+  int8_t depth;
   int8_t coded;
   CU_info_intra intra;
   CU_info_inter inter;
-  uint8_t split;
+  int8_t split;
 } CU_info;
 
 /*!
@@ -105,7 +106,7 @@ int picture_list_destroy(picture_list *list);
 int picture_destroy(picture *pic);
 
 void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t coded);
-
+void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t split);
 
 enum { SLICE_P = 0, SLICE_B = 1, SLICE_I = 2 };
 

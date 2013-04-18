@@ -16,5 +16,6 @@
 
 void search_slice_data(encoder_control* encoder);
 void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
+uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth);
 
 #endif
