@@ -48,8 +48,28 @@ extern cabac_ctx g_CUOneSCModel_luma[16];
 extern cabac_ctx g_CUOneSCModel_chroma[8];
 extern cabac_ctx g_cCUAbsSCModel_luma[4];
 extern cabac_ctx g_cCUAbsSCModel_chroma[2];
+extern cabac_ctx g_cCUPredModeSCModel;
+extern cabac_ctx g_cCUSkipFlagSCModel[3];
 
 #define CNU 154
+
+static const uint8_t 
+INIT_SKIP_FLAG[3][3] =  
+{
+  { 197,  185,  201, }, 
+  { 197,  185,  201, }, 
+  { CNU,  CNU,  CNU, }
+};
+
+static const uint8_t 
+INIT_PRED_MODE[3][1] = 
+{
+  { 134, }, 
+  { 149, }, 
+  { CNU, }
+};
+
+
 static const uint8_t 
 INIT_PART_SIZE[3][4] =  
 {

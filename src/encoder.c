@@ -708,9 +708,26 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
   }
   
-  /* Set every block as intra for now */
+  /* Encode skip flag */
+  if(encoder->in.cur_pic.slicetype != SLICE_I)
   {
-    //cur_CU->type = CU_INTRA;
+    int8_t uiCtxSkip = 0;
+    /* uiCtxSkip = aboveskipped + leftskipped; */
+    cabac.ctx = &g_cCUSkipFlagSCModel[uiCtxSkip];
+    CABAC_BIN(&cabac, 0, "SkipFlag");
+  }
+
+  /* IF SKIP */
+  {
+
+  }
+  /* ENDIF SKIP */
+
+  /* Prediction mode */
+  if(encoder->in.cur_pic.slicetype != SLICE_I)
+  {
+    cabac.ctx = &g_cCUPredModeSCModel;
+    CABAC_BIN(&cabac, (cur_CU->type == CU_INTRA)?1:0, "PredMode");
   }
 
     /* Signal PartSize on max depth */    
@@ -721,8 +738,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     }
     
     /*end partsize*/
+    if(cur_CU->type == CU_INTER)
+    {
 
-    if(cur_CU->type == CU_INTRA)
+    }
+    else if(cur_CU->type == CU_INTRA)
     {
       uint8_t intraPredMode = cur_CU->intra.mode;
       uint8_t intraPredModeChroma = 36; /* 36 = Chroma derived from luma */

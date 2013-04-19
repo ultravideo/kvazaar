@@ -44,7 +44,7 @@ void search_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_
     /* Loop SCU's */
     for(leftColumn = 1; leftColumn < outwidth/SCU_width; leftColumn++)
     {
-      /* If over the picture height or block not yet coded, stop */
+      /* If over the picture height or block not yet searched, stop */
       if((yCtb+leftColumn)*SCU_width >= srcHeight || pic->CU[0][xCtb-1+(yCtb+leftColumn)*width_in_SCU].type == CU_NOTSET)
       {
         break;
@@ -150,10 +150,14 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     }
   }
   
+  /* INTER SEARCH */
   if(encoder->in.cur_pic.slicetype != SLICE_I)
   {
+    /* Motion estimation on P-frame */
+    if(encoder->in.cur_pic.slicetype != SLICE_B)
+    {
 
-
+    }
   }
 
   /* INTRA SEARCH */
@@ -169,36 +173,8 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
     int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];
 
-    /* Use original pic as reference border for prediction */
-    /*
-    if(yCtb)
-    {
-      for(x = 0; x < LCU_WIDTH*2 && x < encoder->in.width-xCtb*(LCU_WIDTH>>(MAX_DEPTH)); x++)
-      {
-        rec[x] = base[x-((LCU_WIDTH>>(depth))*2+8)];
-      }
-    }
-    for(;x < LCU_WIDTH*2; x++)
-    {
-      rec[x] = 1<<(g_bitDepth-1);
-    }
-
-    if(xCtb)
-    {
-      for(y = 0; y < LCU_WIDTH*2 && y < encoder->in.height-yCtb*(LCU_WIDTH>>(MAX_DEPTH)); y++)
-      {
-        rec[y*((LCU_WIDTH>>(depth))*2+8)] = base[y*encoder->in.width-1];
-      }
-    }
-    for(;y < LCU_WIDTH*2; y++)
-    {
-      rec[y*((LCU_WIDTH>>(depth))*2+8)] = 1<<(g_bitDepth-1);
-    }
-    */
-
-    /* Build reconstructed block to use in prediction with extrapolated borders */      
+    /* Build reconstructed block to use in prediction with extrapolated borders */
     search_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-
     cur_CU->intra.mode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
   }
 
@@ -231,22 +207,24 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
     cost += search_best_mode(encoder,xCtb,yCtb+change,depth+1);
     cost += search_best_mode(encoder,xCtb+change,yCtb+change,depth+1);
 
-    /* We split if the cost is better */
+    /* We split if the cost is better (0 cost -> not checked) */
     if(cost != 0 && cost+lambdaCost < bestCost)
     {
+      /* Set split to 1 */
       picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
       bestCost = cost+lambdaCost;
     }
     /* Else, dont split and recursively set block mode */
     else
     {
-      //cur_CU->split = 0;
+      /* Set split to 0 and mode to intra.mode */
       picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
       intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
     }
   }
   else
   {
+    /* Set split to 0 and mode to intra.mode */
     picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
     intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
   }
@@ -256,7 +234,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
 
 void search_slice_data(encoder_control* encoder)
 {
-  uint16_t xCtb,yCtb;
+  int16_t xCtb,yCtb;
 
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)

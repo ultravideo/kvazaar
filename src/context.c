@@ -39,6 +39,8 @@ cabac_ctx g_CUOneSCModel_luma[16];
 cabac_ctx g_CUOneSCModel_chroma[8];
 cabac_ctx g_cCUAbsSCModel_luma[4];
 cabac_ctx g_cCUAbsSCModel_chroma[2];
+cabac_ctx g_cCUPredModeSCModel;
+cabac_ctx g_cCUSkipFlagSCModel[3];
 
 
 void init_contexts(encoder_control *encoder, int8_t SLICE)
@@ -46,6 +48,13 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   uint16_t i;
   /* Initialize contexts */
   /* ToDo: add P/B slice */
+  ctx_init(&g_cCUPredModeSCModel, encoder->QP, INIT_PRED_MODE[SLICE][0]);
+
+  ctx_init(&g_cCUSkipFlagSCModel[0], encoder->QP, INIT_SKIP_FLAG[SLICE][0]);
+  ctx_init(&g_cCUSkipFlagSCModel[1], encoder->QP, INIT_SKIP_FLAG[SLICE][1]);
+  ctx_init(&g_cCUSkipFlagSCModel[2], encoder->QP, INIT_SKIP_FLAG[SLICE][2]);
+
+
   ctx_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[SLICE][0]);
   ctx_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE][1]);
   ctx_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE][2]);
