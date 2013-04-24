@@ -577,6 +577,7 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
     int32_t deltaPos=0;
     int32_t deltaInt;
     int32_t deltaFract;
+    int32_t minusDeltaFract;
     int32_t refMainIndex;
 
     for (k=0;k<blkSize;k++)
@@ -584,14 +585,16 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
       deltaPos += intraPredAngle;
       deltaInt   = deltaPos >> 5;
       deltaFract = deltaPos & (32 - 1);
+      
 
       if (deltaFract)
       {
+        minusDeltaFract = (32-deltaFract);
         // Do linear filtering
         for (l=0;l<blkSize;l++)
         {
           refMainIndex        = l+deltaInt+1;
-          pDst[k*dstStride+l] = (int16_t) ( ((32-deltaFract)*refMain[refMainIndex]+deltaFract*refMain[refMainIndex+1]+16) >> 5 );
+          pDst[k*dstStride+l] = (int16_t) ( (minusDeltaFract*refMain[refMainIndex]+deltaFract*refMain[refMainIndex+1]+16) >> 5 );
         }
       }
       else

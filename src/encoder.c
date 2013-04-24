@@ -730,12 +730,12 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     CABAC_BIN(&cabac, (cur_CU->type == CU_INTRA)?1:0, "PredMode");
   }
 
-    /* Signal PartSize on max depth */    
-    if(depth == MAX_DEPTH)
-    {
-      cabac.ctx = &g_PartSizeSCModel[(cur_CU->type == CU_INTRA)?0:999];
-      CABAC_BIN(&cabac, 1, "PartSize");
-    }
+  /* Signal PartSize on max depth */    
+  if(depth == MAX_DEPTH)
+  {
+    cabac.ctx = &g_PartSizeSCModel[(cur_CU->type == CU_INTRA)?0:999];
+    CABAC_BIN(&cabac, 1, "PartSize");
+  }
     
     /*end partsize*/
     if(cur_CU->type == CU_INTER)
@@ -1022,7 +1022,6 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     ti->idx = 3; encode_transform_tree(encoder,ti,depth+1);
     return;
   }
-
   
   {
     uint8_t CbY = 0,CbU = 0,CbV = 0;
@@ -1249,7 +1248,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
   if(encoder->in.video_format != FORMAT_400)
   {
     /* Non-zero chroma U Tcoeffs */
-    //ToDo: fix
+    //ToDo: fix transform split
     int8_t Cb_flag = ti->cb_top[1];//(trDepth==0&&split)?ti->cb_top[1]:(ti->cb[ti->idx]&0x2);
     cabac.ctx = &g_QtCbfSCModelU[trDepth];
     if(trDepth == 0 || ti->cb_top[1])
@@ -1258,7 +1257,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
     }
     /* Non-zero chroma V Tcoeffs */
     /* NOTE: Using the same ctx as before */
-    //ToDo: fix
+    //ToDo: fix transform split
     Cb_flag = ti->cb_top[2];//(trDepth==0&&split)?ti->cb_top[2]:(ti->cb[ti->idx]&0x4);
     if(trDepth == 0 || ti->cb_top[2])
     {
