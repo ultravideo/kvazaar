@@ -158,6 +158,11 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     {
 
     }
+
+    cur_CU->type = CU_INTER;
+    cur_CU->inter.mv[0] = 1<<2;
+    cur_CU->inter.cost = 10;
+    return;
   }
 
   /* INTRA SEARCH */

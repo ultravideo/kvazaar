@@ -707,8 +707,8 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode
 /*! \brief NxN inverse transform (2D)
  \param coeff input data (transform coefficients)
  \param block output data (residual)
- \param iWidth input data (width of transform)
- \param iHeight input data (height of transform)
+ \param blockSize input data (width of transform)
+ \param uiMode
 */
 void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode)
   //(Int bitDepth, Short *coeff,Short *block, Int iWidth, Int iHeight, UInt uiMode)

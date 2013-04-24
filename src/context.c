@@ -41,13 +41,17 @@ cabac_ctx g_cCUAbsSCModel_luma[4];
 cabac_ctx g_cCUAbsSCModel_chroma[2];
 cabac_ctx g_cCUPredModeSCModel;
 cabac_ctx g_cCUSkipFlagSCModel[3];
+cabac_ctx g_cCUMergeIdxExtSCModel;
+cabac_ctx g_cCUMergeFlagExtSCModel;
 
 
 void init_contexts(encoder_control *encoder, int8_t SLICE)
 {
   uint16_t i;
   /* Initialize contexts */
-  /* ToDo: add P/B slice */
+  /* ToDo: add P/B slice */  
+  ctx_init(&g_cCUMergeFlagExtSCModel, encoder->QP, INIT_MERGE_FLAG_EXT[SLICE][0]);
+  ctx_init(&g_cCUMergeIdxExtSCModel, encoder->QP, INIT_MERGE_IDX_EXT[SLICE][0]);
   ctx_init(&g_cCUPredModeSCModel, encoder->QP, INIT_PRED_MODE[SLICE][0]);
 
   ctx_init(&g_cCUSkipFlagSCModel[0], encoder->QP, INIT_SKIP_FLAG[SLICE][0]);

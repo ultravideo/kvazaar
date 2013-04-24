@@ -301,7 +301,7 @@ void encode_one_frame(encoder_control* encoder)
     /* ToDo: add intra/inter search before encoding */
 
     cabac_start(&cabac);
-    encoder->in.cur_pic.slicetype = SLICE_I;
+    encoder->in.cur_pic.slicetype = SLICE_P;
     encoder->in.cur_pic.type = 0;
     search_slice_data(encoder);
     encode_slice_header(encoder);
@@ -621,6 +621,11 @@ void encode_slice_header(encoder_control* encoder)
     WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag" );
     */
     //ENDIF
+    if(encoder->in.cur_pic.slicetype != SLICE_I)
+    {
+      WRITE_U(encoder->stream, 0, 1, "num_ref_idx_active_override_flag");
+      WRITE_UE(encoder->stream, 0, "five_minus_max_num_merge_cand");
+    }
   /* Skip flags that are not present */
   // if !entropy_slice_flag
     WRITE_SE(encoder->stream, 0, "slice_qp_delta");
@@ -714,12 +719,37 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     int8_t uiCtxSkip = 0;
     /* uiCtxSkip = aboveskipped + leftskipped; */
     cabac.ctx = &g_cCUSkipFlagSCModel[uiCtxSkip];
-    CABAC_BIN(&cabac, 0, "SkipFlag");
+    CABAC_BIN(&cabac, (cur_CU->type == CU_SKIP)?1:0, "SkipFlag");
   }
 
   /* IF SKIP */
+  if(cur_CU->type == CU_SKIP)
   {
-
+    /* Encode merge index */
+    int16_t unaryIdx = 0;//pcCU->getMergeIndex( uiAbsPartIdx );
+    int16_t numCand = 0;//pcCU->getSlice()->getMaxNumMergeCand();
+    int32_t ui;
+    if ( numCand > 1 )
+    {
+      for(ui = 0; ui < numCand - 1; ui++ )
+      {
+        int32_t symbol = (ui == unaryIdx) ? 0 : 1;
+        if ( ui==0 )
+        {
+          cabac.ctx = &g_cCUMergeIdxExtSCModel;
+          CABAC_BIN(&cabac, symbol, "MergeIndex");
+        }
+        else
+        {          
+          CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
+        }
+        if( symbol == 0 )
+        {
+          break;
+        }
+      }
+    }
+    return;
   }
   /* ENDIF SKIP */
 
@@ -731,16 +761,85 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   }
 
   /* Signal PartSize on max depth */    
-  if(depth == MAX_DEPTH)
+  if(depth == MAX_DEPTH || cur_CU->type != CU_INTRA)
   {
-    cabac.ctx = &g_PartSizeSCModel[(cur_CU->type == CU_INTRA)?0:999];
+    /* ToDo: Handle inter sizes other than 2Nx2N */
+    cabac.ctx = &g_PartSizeSCModel[0];//(cur_CU->type == CU_INTRA)?0:999];    
     CABAC_BIN(&cabac, 1, "PartSize");
+    /* ToDo: add AMP modes */
   }
     
     /*end partsize*/
     if(cur_CU->type == CU_INTER)
     {
+      /* FOR each part */
+        /* Mergeflag */
+        cabac.ctx = &g_cCUMergeFlagExtSCModel;//(cur_CU->type == CU_INTRA)?0:999];    
+        CABAC_BIN(&cabac, 1, "MergeFlag");
+        if(1) //merge
+        {
+          /* MergeIndex */
+          int16_t unaryIdx = 0;//pcCU->getMergeIndex( uiAbsPartIdx );
+          int16_t numCand = 0;//pcCU->getSlice()->getMaxNumMergeCand();
+          int32_t ui;
+          if ( numCand > 1 )
+          {
+            for(ui = 0; ui < numCand - 1; ui++ )
+            {
+              int32_t symbol = (ui == unaryIdx) ? 0 : 1;
+              if ( ui==0 )
+              {
+                cabac.ctx = &g_cCUMergeIdxExtSCModel;
+                CABAC_BIN(&cabac, symbol, "MergeIndex");
+              }
+              else
+              {          
+                CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
+              }
+              if( symbol == 0 )
+              {
+                break;
+              }
+            }
+          }
+        }
+        else
+        {
+          /*
+          if(encoder->in.cur_pic.slicetype == SLICE_B)
+          {
+            // Code Inter Dir
+            const UInt uiInterDir = pcCU->getInterDir( uiAbsPartIdx ) - 1;
+            const UInt uiCtx      = pcCU->getCtxInterDir( uiAbsPartIdx );
+            ContextModel *pCtx    = m_cCUInterDirSCModel.get( 0 );
+            if (pcCU->getPartitionSize(uiAbsPartIdx) == SIZE_2Nx2N || pcCU->getHeight(uiAbsPartIdx) != 8 )
+            {
+              m_pcBinIf->encodeBin( uiInterDir == 2 ? 1 : 0, *( pCtx + uiCtx ) );
+            }
+            if (uiInterDir < 2)
+            {
+              m_pcBinIf->encodeBin( uiInterDir, *( pCtx + 4 ) );
+            }
+          }
+          for ( UInt uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
+          {
+            if ( pcCU->getSlice()->getNumRefIdx( RefPicList( uiRefListIdx ) ) > 0 )
+            {
+              if ( pcCU->getInterDir( uiAbsPartIdx ) & ( 1 << eRefList ) )
+              {
+                if(NumRefIdx != 1)
+                {
+                  m_pcEntropyCoderIf->codeRefFrmIdx( pcCU, uiAbsPartIdx, eRefList );
+                }
+                m_pcEntropyCoderIf->codeMvd( pcCU, uiAbsPartIdx, eRefList );
+                m_pcEntropyCoderIf->codeMVPIdx( pcCU, uiAbsPartIdx, eRefList );
+              }
+            }
+          }
+          */
+        }
 
+      /* END for each part */
     }
     else if(cur_CU->type == CU_INTRA)
     {

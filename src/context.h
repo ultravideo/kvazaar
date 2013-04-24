@@ -50,8 +50,26 @@ extern cabac_ctx g_cCUAbsSCModel_luma[4];
 extern cabac_ctx g_cCUAbsSCModel_chroma[2];
 extern cabac_ctx g_cCUPredModeSCModel;
 extern cabac_ctx g_cCUSkipFlagSCModel[3];
-
+extern cabac_ctx g_cCUMergeIdxExtSCModel;
+extern cabac_ctx g_cCUMergeFlagExtSCModel;
 #define CNU 154
+
+
+static const uint8_t
+INIT_MERGE_FLAG_EXT[3][1] = 
+{
+  { 154, }, 
+  { 110, }, 
+  { CNU, }
+};
+
+static const uint8_t 
+INIT_MERGE_IDX_EXT[3][1] =  
+{
+  { 137, }, 
+  { 122, }, 
+  { CNU, }
+};
 
 static const uint8_t 
 INIT_SKIP_FLAG[3][3] =  

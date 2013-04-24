@@ -165,6 +165,7 @@
     <ClCompile Include="..\..\src\encmain.c" />
     <ClCompile Include="..\..\src\encoder.c" />
     <ClCompile Include="..\..\src\filter.c" />
+    <ClCompile Include="..\..\src\inter.c" />
     <ClCompile Include="..\..\src\intra.c" />
     <ClCompile Include="..\..\src\nal.c" />
     <ClCompile Include="..\..\src\picture.c" />
@@ -179,6 +180,7 @@
     <ClInclude Include="..\..\src\encoder.h" />
     <ClInclude Include="..\..\src\filter.h" />
     <ClInclude Include="..\..\src\global.h" />
+    <ClInclude Include="..\..\src\inter.h" />
     <ClInclude Include="..\..\src\intra.h" />
     <ClInclude Include="..\..\src\nal.h" />
     <ClInclude Include="..\..\src\picture.h" />
