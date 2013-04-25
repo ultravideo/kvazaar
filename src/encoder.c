@@ -301,7 +301,7 @@ void encode_one_frame(encoder_control* encoder)
     /* ToDo: add intra/inter search before encoding */
 
     cabac_start(&cabac);
-    encoder->in.cur_pic.slicetype = SLICE_P;
+    encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = 0;
     search_slice_data(encoder);
     encode_slice_header(encoder);
@@ -1503,7 +1503,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
   last_coeff_y = posLast>> uiLog2BlockSize;
 
   /* Code last_coeff_x and last_coeff_y */
-  encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, 0);
+  encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, scanMode);
           
   iScanPosSig  = scanPosLast;
   iLastScanSet = (scanPosLast >> 4);
