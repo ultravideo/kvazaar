@@ -16,7 +16,7 @@
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit */
 
-#define MAX_SEARCH_DEPTH 3
+#define MAX_SEARCH_DEPTH 2
 #define MIN_SEARCH_DEPTH 1
 
 #define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */

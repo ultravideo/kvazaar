@@ -261,20 +261,21 @@ void encode_one_frame(encoder_control* encoder)
   /* output parameters before first frame */
   if(encoder->frame == 0)
   {
+
+   /* Video Parameter Set (VPS) */    
+    encode_vid_parameter_set(encoder);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_VID_PARAMETER_SET, 0);
+    bitstream_clear_buffer(encoder->stream);
+
     /* Sequence Parameter Set (SPS) */
     encode_seq_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_SEQ_PARAMETER_SET, 0);
     bitstream_clear_buffer(encoder->stream);
-
-    /* Video Parameter Set (VPS) */    
-    encode_vid_parameter_set(encoder);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_VID_PARAMETER_SET, 0);
-    bitstream_clear_buffer(encoder->stream);
-    
+        
     /* Picture Parameter Set (PPS) */
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
@@ -298,20 +299,44 @@ void encode_one_frame(encoder_control* encoder)
   }  
   else
   {
-    /* ToDo: add intra/inter search before encoding */
+    if(0)// (encoder->frame & 0xf) == 0)
+    {
+      cabac_start(&cabac);
+      encoder->in.cur_pic.slicetype = SLICE_I;
+      encoder->in.cur_pic.type = NAL_IDR_SLICE;
+      search_slice_data(encoder);
+      encode_slice_header(encoder);
+      bitstream_align(encoder->stream);
+      encode_slice_data(encoder);
+      cabac_flush(&cabac);
+      bitstream_align(encoder->stream);
+      bitstream_flush(encoder->stream);
+      nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+      bitstream_clear_buffer(encoder->stream);
+    }
+    else
+    {
+      /* Picture Parameter Set (PPS) */
+      encode_pic_parameter_set(encoder);
+      bitstream_align(encoder->stream);
+      bitstream_flush(encoder->stream);
+      nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PIC_PARAMETER_SET, 0);
+      bitstream_clear_buffer(encoder->stream);
 
-    cabac_start(&cabac);
-    encoder->in.cur_pic.slicetype = SLICE_I;
-    encoder->in.cur_pic.type = 0;
-    search_slice_data(encoder);
-    encode_slice_header(encoder);
-    bitstream_align(encoder->stream);
-    encode_slice_data(encoder);
-    cabac_flush(&cabac);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, 0, encoder->frame);
-    bitstream_clear_buffer(encoder->stream);
+      /* ToDo: add intra/inter search before encoding */
+      cabac_start(&cabac);
+      encoder->in.cur_pic.slicetype = SLICE_I;
+      encoder->in.cur_pic.type = 0;
+      search_slice_data(encoder);
+      encode_slice_header(encoder);
+      bitstream_align(encoder->stream);
+      encode_slice_data(encoder);
+      cabac_flush(&cabac);
+      bitstream_align(encoder->stream);
+      bitstream_flush(encoder->stream);
+      nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,0, 0);
+      bitstream_clear_buffer(encoder->stream);
+    }
   }  
   #ifdef _DEBUG
   /*
@@ -407,7 +432,7 @@ void encode_PTL(encoder_control *encoder)
   WRITE_U(encoder->stream, 0, 5, "XXX_profile_idc[]");
   WRITE_U(encoder->stream, 0, 32, "XXX_profile_compatibility_flag[][j]");
 
-  WRITE_U(encoder->stream, 0, 1, "general_progressive_source_flag");
+  WRITE_U(encoder->stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(encoder->stream, 0, 1, "general_interlaced_source_flag");
   WRITE_U(encoder->stream, 0, 1, "general_non_packed_constraint_flag");
   WRITE_U(encoder->stream, 0, 1, "general_frame_only_constraint_flag");
@@ -416,16 +441,16 @@ void encode_PTL(encoder_control *encoder)
   WRITE_U(encoder->stream, 0, 12, "XXX_reserved_zero_44bits[32..43]");
   
   /*end Profile Tier */
-
+  
   WRITE_U(encoder->stream, 0, 8, "general_level_idc");
-
+  
   WRITE_U(encoder->stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(encoder->stream, 0, 1, "sub_layer_level_present_flag");
   for(i = 1; i < 8; i++)
   {
     WRITE_U(encoder->stream, 0, 2, "reserved_zero_2bits");
-  }
-
+  } 
+  
   /*end PTL*/
 }
 
@@ -472,13 +497,13 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size"); /* 4x4...32x32 */
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
-
+  
   /* Use default scaling list */
   WRITE_U(encoder->stream, 1, 1, "scaling_list_enable_flag");
   //IF scaling list
     WRITE_U(encoder->stream, 0, 1, "sps_scaling_list_data_present_flag");
   //ENDIF
-
+  
   WRITE_U(encoder->stream, 0, 1, "amp_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
 
@@ -588,7 +613,7 @@ void encode_slice_header(encoder_control* encoder)
   WRITE_U(encoder->stream, 1, 1, "first_slice_segment_in_pic_flag");
   if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
   {
-    WRITE_U(encoder->stream, 0, 1, "no_output_of_prior_pics_flag");
+    WRITE_U(encoder->stream, 1, 1, "no_output_of_prior_pics_flag");
   }
   WRITE_UE(encoder->stream, 0, "slice_pic_parameter_set_id");
 
@@ -610,7 +635,9 @@ void encode_slice_header(encoder_control* encoder)
     else
     {
       WRITE_U(encoder->stream, encoder->frame, 4, "pic_order_cnt_lsb");
-      WRITE_U(encoder->stream, 1, 1, "short_term_ref_pic_set_sps_flag");
+      WRITE_U(encoder->stream, 0, 1, "short_term_ref_pic_set_sps_flag");
+      WRITE_UE(encoder->stream, 0, "num_negative_pics");
+      WRITE_UE(encoder->stream, 0, "num_positive_pics");
       //WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
     }
     //end if
@@ -849,7 +876,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int8_t mpmPred = -1;
       int i;
       uint32_t flag; 
-      int32_t bestSAD;
+      //int32_t bestSAD;
       uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *baseV = &encoder->in.cur_pic.vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
@@ -1471,7 +1498,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
     {
       num_nonzero++;
     }
-  }
+  }  
 
   scanCG = g_auiSigLastScan[ scanMode ][ uiLog2BlockSize > 3 ? uiLog2BlockSize-3 : 0 ];
   if( uiLog2BlockSize == 3 )
@@ -1498,13 +1525,13 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
     #undef POSY
     #undef POSX
   }
-          
+  
   last_coeff_x = posLast & (width-1);
   last_coeff_y = posLast>> uiLog2BlockSize;
 
   /* Code last_coeff_x and last_coeff_y */
   encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, scanMode);
-          
+  
   iScanPosSig  = scanPosLast;
   iLastScanSet = (scanPosLast >> 4);
   /* significant_coeff_flag */
@@ -1523,7 +1550,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
     if( iScanPosSig == scanPosLast )
     {
       abs_coeff[ 0 ] = abs( coeff[ posLast ] );
-      coeffSigns     = ( coeff[ posLast ] < 0 )?1:0;
+      coeffSigns     = ( coeff[ posLast ] < 0 );
       numNonZero     = 1;
       lastNZPosInCG  = iScanPosSig;
       firstNZPosInCG = iScanPosSig;
@@ -1556,7 +1583,6 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
           cabac.ctx = &baseCtx[ uiCtxSig ];
           CABAC_BIN(&cabac,uiSig,"significant_coeff_flag");
         }
-                
         if( uiSig )
         {
           abs_coeff[ numNonZero ] = abs( coeff[ uiBlkPos ] );
@@ -1612,7 +1638,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
       if (c1 == 0)
       {
         baseCtxMod = ( type==0 ) ? &g_cCUAbsSCModel_luma[uiCtxSet] : &g_cCUAbsSCModel_chroma[uiCtxSet];
-        if ( firstC2FlagIdx != -1)
+        if (firstC2FlagIdx != -1)
         {
           uint8_t symbol = (abs_coeff[ firstC2FlagIdx ] > 2)?1:0;
           cabac.ctx      = &baseCtxMod[0];
@@ -1620,7 +1646,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
         }
       }      
       
-      if( beValid && signHidden )
+      if(beValid && signHidden)
       {
         CABAC_BINS_EP(&cabac,(coeffSigns >> 1),(numNonZero-1),"");
       }
