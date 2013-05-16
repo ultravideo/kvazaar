@@ -6,6 +6,9 @@ global cpuId64
 ;void __cdecl cpuId64(int* ecx, int *edx );
 
 cpuId64:
+    push rax
+    push rcx
+    push rdx
     mov  r8, rcx ; pointer to ecx-output
     mov  r9, rdx ; pointer to edx-output
 
@@ -13,5 +16,7 @@ cpuId64:
     cpuid
     mov dword [r8], ecx
     mov dword [r9], edx
-    mov eax,0
+    pop rdx
+    pop rcx
+    pop rax
     ret

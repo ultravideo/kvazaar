@@ -100,14 +100,12 @@ void bitstream_clear_buffer(bitstream* stream)
 }
  
  
-/*
- * Put bits to bitstream
- * Input:
- *          stream = pointer bitstream to put the data
- *          data   = pointer to actual data
- *          bits   = number of bits to write      
- */
- 
+/*!
+  \brief Put bits to bitstream 
+  \param stream pointer bitstream to put the data
+  \param data pointer to actual data
+  \param bits number of bits to write      
+*/ 
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 {
   uint32_t bitsleft=32-stream->cur_bit;
@@ -158,9 +156,9 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
   } 
 }
  
-/*
- *  \brief Align the bitstream
- */
+/*!
+  \brief Align the bitstream
+*/
 void bitstream_align(bitstream* stream)
 {  
   bitstream_put(stream,1, 1);
@@ -171,7 +169,7 @@ void bitstream_align(bitstream* stream)
 }
 
 void bitstream_align_zero(bitstream* stream)
-{  
+{
   if((stream->cur_bit&7) != 0)
   {
     bitstream_put(stream,0, 8-(stream->cur_bit&7));

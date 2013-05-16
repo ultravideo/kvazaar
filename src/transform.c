@@ -667,13 +667,13 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
   
   if(blockSize== 4)
-  {/*
+  {
     if (uiMode != 65535)
     {
       fastForwardDst(block,tmp,shift_1st); // Forward DST BY FAST ALGORITHM, block input, tmp output
       fastForwardDst(tmp,coeff,shift_2nd); // Forward DST BY FAST ALGORITHM, tmp input, coeff output
     }
-    else*/
+    else
     {
       partialButterfly4(block, tmp, shift_1st, blockSize);
       partialButterfly4(tmp, coeff, shift_2nd, blockSize);
@@ -681,25 +681,27 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode
 
   }
   else
-  switch(blockSize)
   {
-    case 8:
+    switch(blockSize)
     {
-      partialButterfly8( block, tmp, shift_1st, blockSize );
-      partialButterfly8( tmp, coeff, shift_2nd, blockSize );
-      break;
-    }
-    case 16:
-    {
-      partialButterfly16( block, tmp, shift_1st, blockSize );
-      partialButterfly16( tmp, coeff, shift_2nd, blockSize );
-      break;
-    }
-    case 32:
-    {
-      partialButterfly32( block, tmp, shift_1st, blockSize );
-      partialButterfly32( tmp, coeff, shift_2nd, blockSize );
-      break;
+      case 8:
+      {
+        partialButterfly8( block, tmp, shift_1st, blockSize );
+        partialButterfly8( tmp, coeff, shift_2nd, blockSize );
+        break;
+      }
+      case 16:
+      {
+        partialButterfly16( block, tmp, shift_1st, blockSize );
+        partialButterfly16( tmp, coeff, shift_2nd, blockSize );
+        break;
+      }
+      case 32:
+      {
+        partialButterfly32( block, tmp, shift_1st, blockSize );
+        partialButterfly32( tmp, coeff, shift_2nd, blockSize );
+        break;
+      }
     }
   }
 }
@@ -718,13 +720,13 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMod
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
   if( blockSize == 4)
-  {/*
+  {
     if (uiMode != 65535)
     {
       fastInverseDst(coeff,tmp,shift_1st);    // Inverse DST by FAST Algorithm, coeff input, tmp output
       fastInverseDst(tmp,block,shift_2nd); // Inverse DST by FAST Algorithm, tmp input, coeff output
     }
-    else*/
+    else
     {
       partialButterflyInverse4(coeff,tmp,shift_1st,blockSize);
       partialButterflyInverse4(tmp,block,shift_2nd,blockSize);
@@ -843,7 +845,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
   }
   else
   {
-    qpScaled = MAX( 0, MIN(57, iQpBase));
+    qpScaled = CLIP( 0, 57, iQpBase);
     if(qpScaled < 0)
     {
       qpScaled = qpScaled;

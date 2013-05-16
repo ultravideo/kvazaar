@@ -21,7 +21,7 @@
 #include "intra.h"
 
 
-const uint8_t intraHorVerDistThres[4] = {0,7,1,0};
+const uint8_t intraHorVerDistThres[5] = {0,7,1,0,0};
 
 
 /*!
@@ -264,6 +264,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
       origBlock[i++] = origShift[x+y*origstride];      
     }
   }
+
   /* Filtered only needs the borders */
   for(y = -1; y < (int32_t)recstride; y++)
   {
@@ -273,11 +274,11 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   {
     recFiltered[y-recstride] = rec[y-recstride];
   }    
-  /*Apply filter*/
+  /*Apply filter*/  
   intra_filter(recFiltered,recstride,width,0);
+  
 
   /* Test DC */
-  
   x = intra_getDCPred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < (int32_t)(width*width); i++)
   {
@@ -286,7 +287,6 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   CHECK_FOR_BEST(1);
   
   /* Check angular not requiring filtering */
-  
   for(i = 2; i < 35; i++)
   {
     if(MIN(abs(i-26),abs(i-10)) <= threshold)
@@ -295,6 +295,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
       CHECK_FOR_BEST(i);
     }
   } 
+
   
   /**** FROM THIS POINT FORWARD, USING FILTERED PREDICTION *****/
 
@@ -302,7 +303,6 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   intra_getPlanarPred(recFiltered, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0);
   
-
   /* Test directional predictions */
   /* ToDo: add conditions to skip some modes on borders */
   
@@ -333,7 +333,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
 
   /* Filtering apply if luma and not DC */
-  if(!chroma && mode != 1/*&& width > 4*/)
+  if(!chroma && mode != 1 && width > 4)
   {
     uint8_t threshold = intraHorVerDistThres[g_toBits[width]];
     if(MIN(abs(mode-26),abs(mode-10)) > threshold)

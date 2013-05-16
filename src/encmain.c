@@ -76,9 +76,9 @@
     /* CPU id */
     
     #ifndef X64
-    //cpuId32(&ecx,&edx);
+    cpuId32(&ecx,&edx);
     #else
-    //cpuId64(&ecx,&edx);
+    cpuId64(&ecx,&edx);
     #endif    
     printf("CPU features enabled: ");
     /* EDX */

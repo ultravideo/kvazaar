@@ -320,7 +320,7 @@ uint32_t SAD(uint8_t *block,uint8_t* block2, uint32_t x, uint32_t y)
     sum+=abs((int32_t)block[i+3]-(int32_t)block2[i+3]);
   }
 
-  return sum;    
+  return sum;
 }
 
 uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
@@ -344,7 +344,7 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y;
-  
+  /*
   int32_t x,sum = 0;
   int32_t  iOffsetOrg = stride1<<3;
   int32_t  iOffsetCur = stride2<<3;
@@ -358,7 +358,7 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     block2 += iOffsetCur;
   }
 
-  /*
+  */
   uint32_t sum=0;
   int32_t i,ii;
   for(y=0;y<32;y++)
@@ -398,7 +398,7 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+30]-(int32_t)block2[ii+30]);
     sum+=abs((int32_t)block[i+31]-(int32_t)block2[ii+31]);
   }
-  */
+  
   return sum;    
 }
 
@@ -406,7 +406,7 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y;
-    
+    /*
   int32_t x,sum = 0;
   int32_t  iOffsetOrg = stride1<<3;
   int32_t  iOffsetCur = stride2<<3;
@@ -421,7 +421,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     }
   
   
-  /*
+  */
   uint32_t sum=0;
   int32_t i,ii;
   for(y=0;y<16;y++)
@@ -444,8 +444,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+13]-(int32_t)block2[ii+13]);
     sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
     sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
-  }
-  */
+  }  
   return sum;    
 }
 

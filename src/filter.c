@@ -102,7 +102,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
   int32_t iStride = encoder->in.cur_pic.width;
   int32_t iOffset = 0;
   int32_t betaOffsetDiv2 = encoder->betaOffsetdiv2;
-  int32_t tcOffsetDiv2   = encoder->betaOffsetdiv2;
+  int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
   const int8_t scu_width       = (LCU_WIDTH>>MAX_DEPTH);  
   const int8_t scu_width_log2  = TOBITS(scu_width);
   int8_t uiNumParts = 1;
@@ -165,10 +165,11 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
       #endif
       if (d < iBeta)
       { 
+        #define useStrongFiltering(offset,d,beta,tc,src) ( ((abs(src[-offset*4]-src[-offset]) + abs(src[-offset*3]-src[0])) < (beta>>3)) && (d<(beta>>2)) && ( abs(src[-offset]-src[0]) < ((tc*5+1)>>1)) )
         int8_t bFilterP = (dp < iSideThreshold)?1:0;
         int8_t bFilterQ = (dq < iSideThreshold)?1:0;          
-        int8_t sw = 0;// xUseStrongFiltering( iOffset, 2*d0, iBeta, iTc, piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+0))
-                            //&& xUseStrongFiltering( iOffset, 2*d3, iBeta, iTc, piTmpSrc+iSrcStep*(iIdx*uiPelsInPart+iBlkIdx*4+3));          
+        int8_t sw = useStrongFiltering( iOffset, 2*d0, iBeta, iTc, (piTmpSrc+iSrcStep*(iIdx*scu_width+iBlkIdx*4+0)))
+                            && useStrongFiltering( iOffset, 2*d3, iBeta, iTc, (piTmpSrc+iSrcStep*(iIdx*scu_width+iBlkIdx*4+3)));
         for (i = 0; i < 8/2; i++)
         {
           filter_luma( piTmpSrc+iSrcStep*(iIdx*scu_width+iBlkIdx*4+i), iOffset, iTc, sw, 0, 0, iThrCut, bFilterP, bFilterQ);
@@ -319,14 +320,14 @@ void filter_deblock_CU(encoder_control* encoder, int32_t xpos, int32_t ypos, int
   }
   
   UInt uiPelsInPart = g_uiMaxCUWidth >> g_uiMaxCUDepth;
-  UInt PartIdxIncr = DEBLOCK_SMALLEST_BLOCK / uiPelsInPart ? DEBLOCK_SMALLEST_BLOCK / uiPelsInPart : 1 ;
+  UInt PartIdxIncr = 8 / uiPelsInPart ? 8 / uiPelsInPart : 1 ;
   
   UInt uiSizeInPU = pcPic->getNumPartInWidth()>>(uiDepth);
   
   for ( UInt iEdge = 0; iEdge < uiSizeInPU ; iEdge+=PartIdxIncr)
   {
     xEdgeFilterLuma     ( pcCU, uiAbsZorderIdx, uiDepth, iDir, iEdge );
-    if ( (uiPelsInPart>DEBLOCK_SMALLEST_BLOCK) || (iEdge % ( (DEBLOCK_SMALLEST_BLOCK<<1)/uiPelsInPart ) ) == 0 )
+    if ( (uiPelsInPart>8) || (iEdge % ( (8<<1)/uiPelsInPart ) ) == 0 )
     {
       xEdgeFilterChroma   ( pcCU, uiAbsZorderIdx, uiDepth, iDir, iEdge );
     }
@@ -337,7 +338,7 @@ void filter_deblock(encoder_control* encoder)
 {
   int x,y;
   const int8_t scu_width = (LCU_WIDTH>>(MAX_DEPTH));
-  int16_t width = 32;
+  int16_t width = 16;
   /*
   // Horizontal filtering
   for ( UInt uiCUAddr = 0; uiCUAddr < pcPic->getNumCUsInFrame(); uiCUAddr++ )

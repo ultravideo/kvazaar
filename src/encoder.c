@@ -316,13 +316,6 @@ void encode_one_frame(encoder_control* encoder)
     }
     else
     {
-      /* Picture Parameter Set (PPS) */
-      encode_pic_parameter_set(encoder);
-      bitstream_align(encoder->stream);
-      bitstream_flush(encoder->stream);
-      nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PIC_PARAMETER_SET, 0);
-      bitstream_clear_buffer(encoder->stream);
-
       /* ToDo: add intra/inter search before encoding */
       cabac_start(&cabac);
       encoder->in.cur_pic.slicetype = SLICE_I;
@@ -449,7 +442,7 @@ void encode_PTL(encoder_control *encoder)
   for(i = 1; i < 8; i++)
   {
     WRITE_U(encoder->stream, 0, 2, "reserved_zero_2bits");
-  } 
+  }
   
   /*end PTL*/
 }
@@ -619,7 +612,6 @@ void encode_slice_header(encoder_control* encoder)
 
   //WRITE_U(encoder->stream, 0, 1, "dependent_slice_segment_flag");
   
-  /* ToDo: add more slice types */
   WRITE_UE(encoder->stream, encoder->in.cur_pic.slicetype, "slice_type");
 
   // if !entropy_slice_flag
@@ -702,20 +694,19 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   /* When not in MAX_DEPTH, insert split flag and split the blocks if needed */
   if(depth != MAX_DEPTH)
   {
-    //SET_SPLITDATA(cur_CU,split_flag);
     /* Implisit split flag when on border */
     if(!border)
     {
       /* Get left and top block split_flags and if they are present and true, increase model number */
-      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb-1+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
+      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb-1+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)]),depth) == 1)
       {
         split_model++;
       }
-      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)])) == 1)
+      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)]),depth) == 1)
       {
         split_model++;
       }
-      cabac.ctx = &g_SplitFlagSCModel[split_model];    
+      cabac.ctx = &g_SplitFlagSCModel[split_model];
       CABAC_BIN(&cabac, split_flag, "SplitFlag");
     }
     if(split_flag || border)
@@ -729,7 +720,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       }
       if(!border_y)
       {
-        encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);      
+        encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);
       }
       if(!border)
       {
@@ -767,7 +758,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           CABAC_BIN(&cabac, symbol, "MergeIndex");
         }
         else
-        {          
+        {
           CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
         }
         if( symbol == 0 )
@@ -787,11 +778,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     CABAC_BIN(&cabac, (cur_CU->type == CU_INTRA)?1:0, "PredMode");
   }
 
-  /* Signal PartSize on max depth */    
+  /* Signal PartSize on max depth */
   if(depth == MAX_DEPTH || cur_CU->type != CU_INTRA)
   {
     /* ToDo: Handle inter sizes other than 2Nx2N */
-    cabac.ctx = &g_PartSizeSCModel[0];//(cur_CU->type == CU_INTRA)?0:999];    
+    cabac.ctx = &g_PartSizeSCModel[0];
     CABAC_BIN(&cabac, 1, "PartSize");
     /* ToDo: add AMP modes */
   }
@@ -801,7 +792,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     {
       /* FOR each part */
         /* Mergeflag */
-        cabac.ctx = &g_cCUMergeFlagExtSCModel;//(cur_CU->type == CU_INTRA)?0:999];    
+        cabac.ctx = &g_cCUMergeFlagExtSCModel;
         CABAC_BIN(&cabac, 1, "MergeFlag");
         if(1) //merge
         {
@@ -875,7 +866,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int8_t intraPreds[3] = {-1, -1, -1};
       int8_t mpmPred = -1;
       int i;
-      uint32_t flag; 
+      uint32_t flag;
       //int32_t bestSAD;
       uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
@@ -900,7 +891,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
       #endif
 
-      /* Build reconstructed block to use in prediction with extrapolated borders */      
+      /* Build reconstructed block to use in prediction with extrapolated borders */
       intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
       intra_recon(recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,intraPredMode,0);
       //intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
@@ -913,7 +904,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       
       /* ToDo: separate chroma prediction(?) */
       /* intraPredModeChroma = 1; */
-
+            
       if(intraPredModeChroma != 36 && intraPredModeChroma == intraPredMode)
       {
         intraPredModeChroma = 36;
@@ -924,8 +915,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
       
       /* This affects reconstruction, do after that */
-      //intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);
-      //cur_CU->coded = 1;
+      //intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);      
       picture_setBlockCoded(&encoder->in.cur_pic, xCtb, yCtb, depth, 1);
 
       /*
@@ -966,7 +956,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       }
       else /* Else we signal the "full" predmode */
       {
-        int8_t intraPredModeTemp = intraPredMode;
+        int32_t intraPredModeTemp = intraPredMode;
         if (intraPreds[0] > intraPreds[1])
         { 
           SWAP(intraPreds[0], intraPreds[1], int8_t);
@@ -1151,7 +1141,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
   
   {
     uint8_t CbY = 0,CbU = 0,CbV = 0;
-    int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)));
+    int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)))+1;
 
     int32_t base_stride    = ti->base_stride;
     int32_t recbase_stride = ti->recbase_stride;
@@ -1362,7 +1352,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
   int8_t width = LCU_WIDTH>>depth;
   int8_t split = (ti->split[ti->idx]&(1<<depth))?1:0;
   int8_t CbY,CbU,CbV;
-  int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)));
+  int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)))+1;
   
   if(depth != 0 && depth != MAX_DEPTH+1)
   {
@@ -1375,7 +1365,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
   {
     /* Non-zero chroma U Tcoeffs */
     //ToDo: fix transform split
-    int8_t Cb_flag = ti->cb_top[1];//(trDepth==0&&split)?ti->cb_top[1]:(ti->cb[ti->idx]&0x2);
+    int8_t Cb_flag = /*ti->cb_top[1];//*/(trDepth==0)?ti->cb_top[1]:((ti->cb[ti->idx]&0x2)?1:0);
     cabac.ctx = &g_QtCbfSCModelU[trDepth];
     if(trDepth == 0 || ti->cb_top[1])
     {
@@ -1384,7 +1374,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
     /* Non-zero chroma V Tcoeffs */
     /* NOTE: Using the same ctx as before */
     //ToDo: fix transform split
-    Cb_flag = ti->cb_top[2];//(trDepth==0&&split)?ti->cb_top[2]:(ti->cb[ti->idx]&0x4);
+    Cb_flag = /*ti->cb_top[2];//*/(trDepth==0)?ti->cb_top[2]:((ti->cb[ti->idx]&0x4)?1:0);
     if(trDepth == 0 || ti->cb_top[2])
     {
       CABAC_BIN(&cabac,Cb_flag,"cbf_chroma_v");
@@ -1421,6 +1411,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
       case 64: uiCTXIdx = 1; break;
       default: uiCTXIdx = 0; break;
     }
+    uiCTXIdx -= trDepth;
     /* CoeffNxN */
     /* Residual Coding */
     if(CbY)

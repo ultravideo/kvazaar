@@ -30,7 +30,7 @@ double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y);
 
 enum { CU_NOTSET = 0,CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER };
 
-#define GET_SPLITDATA(CU) ((CU)->split)
+#define GET_SPLITDATA(CU,curDepth) ((CU)->depth > curDepth)
 #define SET_SPLITDATA(CU,flag) { (CU)->split=(flag); }
 
 /*!

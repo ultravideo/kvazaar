@@ -15,7 +15,6 @@
 
 extern const uint8_t g_aucNextStateMPS[ 128 ];
 extern const uint8_t g_aucNextStateLPS[ 128 ];
-extern const uint32_t g_entropyBits[128];
 extern uint8_t g_nextState[128][2];
 
 extern const uint8_t g_aucLPSTable[64][4];
@@ -58,7 +57,6 @@ extern cabac_data cabac;
 void cabac_start(cabac_data* data);
 void cabac_init(cabac_data* data);
 void cabac_encodeBin(cabac_data* data, uint32_t binValue );
-void cabac_encodeFlush(cabac_data* data, uint8_t end );
 void cabac_encodeBinEP(cabac_data* data, uint32_t binValue );
 void cabac_encodeBinsEP(cabac_data* data, uint32_t binValues, int numBins );
 void cabac_encodeBinTrm(cabac_data* data, uint8_t binValue );
