@@ -333,7 +333,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
 
   /* Filtering apply if luma and not DC */
-  if(!chroma && mode != 1 && width > 4)
+  if(!chroma && mode != 1 /*&& width > 4*/)
   {
     uint8_t threshold = intraHorVerDistThres[g_toBits[width]];
     if(MIN(abs(mode-26),abs(mode-10)) > threshold)
@@ -484,6 +484,9 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
   */
 }
 
+const int32_t angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32};
+const int32_t invAngTable[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; // (256 * 32) / Angle
+
 void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int32_t dstStride, int32_t width, int32_t height, int32_t dirMode, int8_t leftAvail,int8_t topAvail, int8_t filter)
 {
   int32_t k,l;
@@ -498,8 +501,6 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
   int32_t signAng        = intraPredAngle < 0 ? -1 : 1;
 
   // Set bitshifts and scale the angle parameter to block size
-  const int32_t angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32};
-  const int32_t invAngTable[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; // (256 * 32) / Angle
   int32_t invAngle       = invAngTable[absAng];
 
   // Do angular predictions

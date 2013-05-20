@@ -73,26 +73,7 @@
     #endif
     encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));;
 
-    /* CPU id */
-    
-    #ifndef X64
-    cpuId32(&ecx,&edx);
-    #else
-    cpuId64(&ecx,&edx);
-    #endif    
-    printf("CPU features enabled: ");
-    /* EDX */
-    if(edx & (1<<BIT_MMX))  printf("MMX ");
-    if(edx & (1<<BIT_SSE))  printf("SSE ");
-    if(edx & (1<<BIT_SSE2)) printf("SSE2 ");
-    /* ECX */
-    if(ecx & (1<<BIT_SSE3))  printf("SSE3 ");
-    if(ecx & (1<<BIT_SSSE3)) printf("SSSE3 ");
-    if(ecx & (1<<BIT_SSE41)) printf("SSE4.1 ");
-    if(ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
-    if(ecx & (1<<BIT_AVX))   printf("AVX ");
-    printf("\r\n");
-    
+
  
     /* Handle configuration */
     cfg = config_alloc();
@@ -114,6 +95,26 @@
       config_destroy(cfg);
       return EXIT_FAILURE;
     }
+    /* CPU id */
+    
+    #ifndef X64
+    cpuId32(&ecx,&edx);
+    #else
+    cpuId64(&ecx,&edx);
+    #endif    
+    printf("CPU features enabled: ");
+    /* EDX */
+    if(edx & (1<<BIT_MMX))  printf("MMX ");
+    if(edx & (1<<BIT_SSE))  printf("SSE ");
+    if(edx & (1<<BIT_SSE2)) printf("SSE2 ");
+    /* ECX */
+    if(ecx & (1<<BIT_SSE3))  printf("SSE3 ");
+    if(ecx & (1<<BIT_SSSE3)) printf("SSSE3 ");
+    if(ecx & (1<<BIT_SSE41)) printf("SSE4.1 ");
+    if(ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
+    if(ecx & (1<<BIT_AVX))   printf("AVX ");
+    printf("\r\n");
+    
 
 	  printf("Input: %s, output: %s\n", cfg->input, cfg->output);
     printf("  Video size: %dx%d\n", cfg->width, cfg->height);

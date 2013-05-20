@@ -620,13 +620,9 @@ void encode_slice_header(encoder_control* encoder)
       //WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-    if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
+    if(encoder->in.cur_pic.type != NAL_IDR_SLICE)
     {
-      //WRITE_UE(encoder->stream, encoder->frame&3, "idr_pic_id");      
-    }
-    else
-    {
-      WRITE_U(encoder->stream, encoder->frame, 4, "pic_order_cnt_lsb");
+      WRITE_U(encoder->stream, encoder->frame&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(encoder->stream, 0, "num_negative_pics");
       WRITE_UE(encoder->stream, 0, "num_positive_pics");
@@ -713,18 +709,18 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     {
       /* Split blocks and remember to change x and y block positions */
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
-      encode_coding_tree(encoder,xCtb,yCtb,depth+1);
-      if(!border_x)
+      encode_coding_tree(encoder,xCtb,yCtb,depth+1); /* x,y */
+      if(!border_x) /* ToDo: fix when other half of the block would not be completely over the border */
       {
-        encode_coding_tree(encoder,xCtb+change,yCtb,depth+1);
+        encode_coding_tree(encoder,xCtb+change,yCtb,depth+1); /* x+1,y */
       }
-      if(!border_y)
+      if(!border_y) /* ToDo: fix when other half of the block would not be completely over the border */
       {
-        encode_coding_tree(encoder,xCtb,yCtb+change,depth+1);
+        encode_coding_tree(encoder,xCtb,yCtb+change,depth+1); /* x,y+1 */
       }
-      if(!border)
+      if(!border) /* ToDo: fix when other half of the block would not be completely over the border */
       {
-        encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1);
+        encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1); /* x+1,y+1 */
       }
       /* We don't need to do anything else here */
       return;

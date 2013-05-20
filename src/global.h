@@ -6,7 +6,7 @@
 /*! \file global.h
     \brief Contains global includes
     \author Marko Viitanen
-    \date 2013-03
+    \date 2013-05
   
     This file should be included in every C-file.
 */

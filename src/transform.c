@@ -96,6 +96,13 @@ const int16_t g_aiT32[32][32] =
   {  4,-13, 22,-31, 38,-46, 54,-61, 67,-73, 78,-82, 85,-88, 90,-90, 90,-90, 88,-85, 82,-78, 73,-67, 61,-54, 46,-38, 31,-22, 13, -4}
 };
 
+const int32_t g_quantTSDefault4x4[16] =
+{
+  16,16,16,16,
+  16,16,16,16,
+  16,16,16,16,
+  16,16,16,16
+};
 
 const int32_t g_quantIntraDefault8x8[64] =
 {
@@ -196,7 +203,7 @@ void scalinglist_process()
     {
       for(qp=0;qp</*SCALING_LIST_REM_NUM*/6;qp++)
       {
-        scalinglist_set((int32_t *)g_quantIntraDefault8x8,list,size,qp);
+        scalinglist_set((int32_t *)((size==0)?g_quantTSDefault4x4:g_quantIntraDefault8x8),list,size,qp);
       }
     }
   }
@@ -836,7 +843,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
   int32_t iTransformShift = 15 - g_bitDepth - (g_aucConvertToBit[ iWidth ] + 2);
   int32_t qpScaled;
   int32_t iQpBase = encoder->QP;
-  int32_t scalingListType = (/*pcCU->isint32_tra(uiAbsPartIdx)*/0 ? 0 : 3) + (int8_t)("\0\3\1\2"[eTType]);
+  int32_t scalingListType = (/*pcCU->isintra(uiAbsPartIdx)*/1 ? 0 : 3) + (int8_t)("\0\3\1\2"[eTType]);
   int32_t *piDequantCoef;
 
   if(eTType == 0)
