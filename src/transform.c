@@ -199,11 +199,27 @@ void scalinglist_process()
   uint32_t size,list,qp;
   for(size=0;size</*SCALING_LIST_SIZE_NUM*/4;size++)
   {
+    int32_t* list_ptr = (int32_t *)g_quantIntraDefault8x8;
+
     for(list = 0; list < g_scalingListNum[size]; list++)
     {
+      switch(size)
+      {
+        case 0: /* 4x4 */
+          list_ptr = (int32_t *)g_quantTSDefault4x4;
+          break;
+        case 1: /* 8x8 */
+        case 2: /* 16x16 */
+          if(list > 2) list_ptr = (int32_t*)g_quantInterDefault8x8;
+          break;
+        case 3: /* 32x32 */
+          if(list > 0) list_ptr = (int32_t*)g_quantInterDefault8x8;
+          break;
+      }
+
       for(qp=0;qp</*SCALING_LIST_REM_NUM*/6;qp++)
       {
-        scalinglist_set((int32_t *)((size==0)?g_quantTSDefault4x4:g_quantIntraDefault8x8),list,size,qp);
+        scalinglist_set(list_ptr,list,size,qp);
       }
     }
   }
