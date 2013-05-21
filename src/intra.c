@@ -241,10 +241,11 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   int16_t* recFiltered = &recFilteredTemp[recstride+1];
   uint8_t *origShift = &orig[xpos+ypos*origstride];  
   int8_t filter = (width<32); //ToDo: chroma support
-  SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64};
+  SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64}; //ToDo: get SAD functions from parameters
   uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
-  #define CHECK_FOR_BEST(mode)  SAD = calcSAD(pred,width,origBlock,width); \
+  #define CHECK_FOR_BEST(mode, sad)  SAD = calcSAD(pred,width,origBlock,width); \
+                                SAD += sad;\
                                 if(SAD < bestSAD)\
                                 {\
                                   bestSAD = SAD;\
@@ -284,15 +285,16 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   {
     pred[i] = x;
   }
-  CHECK_FOR_BEST(1);
+  CHECK_FOR_BEST(1,0);
   
   /* Check angular not requiring filtering */
   for(i = 2; i < 35; i++)
   {
-    if(MIN(abs(i-26),abs(i-10)) <= threshold)
+    int distance = MIN(abs(i-26),abs(i-10));
+    if(distance <= threshold)
     {
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i);
+      CHECK_FOR_BEST(i,distance*width); /* Favor modes closer to 26 and 10 */
     }
   } 
 
@@ -301,7 +303,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
 
   /* Test planar */    
   intra_getPlanarPred(recFiltered, recstride, xpos, ypos, width, pred, width);
-  CHECK_FOR_BEST(0);
+  CHECK_FOR_BEST(0,0);
   
   /* Test directional predictions */
   /* ToDo: add conditions to skip some modes on borders */
@@ -310,10 +312,11 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   /* Test angular predictions which require filtered samples */  
   for(i = 2; i < 35; i++)
   {
-    if(MIN(abs(i-26),abs(i-10)) > threshold)
+    int distance = MIN(abs(i-26),abs(i-10));
+    if(distance > threshold)
     {
       intra_getAngularPred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i);
+      CHECK_FOR_BEST(i,distance*width); /* Favor modes closer to 26 and 10 */
     }
   }
 

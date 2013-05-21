@@ -863,21 +863,16 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int8_t mpmPred = -1;
       int i;
       uint32_t flag;
-      //int32_t bestSAD;
       uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *baseV = &encoder->in.cur_pic.vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint32_t width = LCU_WIDTH>>depth;
 
-      /* INTRAPREDICTION */
-      /* ToDo: split to a function */
+      /* INTRAPREDICTION VARIABLES */
       int16_t pred[LCU_WIDTH*LCU_WIDTH];
       int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
       int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
-      int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
-      int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
-      int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
       uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
       uint8_t *recbaseU  = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *recbaseV  = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
@@ -886,33 +881,6 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       /* Code must start after variable initialization */
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
       #endif
-
-      /* Build reconstructed block to use in prediction with extrapolated borders */
-      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-      intra_recon(recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,intraPredMode,0);
-      //intraPredMode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&bestSAD);
-      
-      /* Filter DC-prediction */
-      if(intraPredMode == 1 && width < 32)
-      {
-        intra_DCPredFiltering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
-      }
-      
-      /* ToDo: separate chroma prediction(?) */
-      /* intraPredModeChroma = 1; */
-            
-      if(intraPredModeChroma != 36 && intraPredModeChroma == intraPredMode)
-      {
-        intraPredModeChroma = 36;
-      }
-      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
-      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
-      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
-      intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,width>>1,intraPredModeChroma!=36?intraPredModeChroma:intraPredMode,1);
-      
-      /* This affects reconstruction, do after that */
-      //intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPredMode);      
-      picture_setBlockCoded(&encoder->in.cur_pic, xCtb, yCtb, depth, 1);
 
       /*
         PREDINFO CODING
@@ -1023,6 +991,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         transform_info ti;
         memset(&ti, 0, sizeof(transform_info));
 
+        ti.xCtb = xCtb; ti.yCtb = yCtb;
+
         /* Base pointers */
         ti.base =  base; ti.baseU = baseU; ti.baseV = baseV;
         ti.base_stride = encoder->in.width;
@@ -1120,7 +1090,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
   int x,y,i;
   int32_t width = LCU_WIDTH>>depth;
 
-  if(depth == 0)
+  if(depth == 0) /* Split 64x64 */
   {
     /* Prepare for multi-level splitting */
     ti->split[ti->idx] = 1<<depth;
@@ -1128,9 +1098,13 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
 
   if(ti->split[ti->idx] & (1<<depth))
   {
-    ti->idx = 0; encode_transform_tree(encoder,ti,depth+1);    
+    uint8_t change = 1<<(MAX_DEPTH-1-depth);    
+    ti->idx = 0; encode_transform_tree(encoder,ti,depth+1);
+    ti->xCtb += change;
     ti->idx = 1; encode_transform_tree(encoder,ti,depth+1);
+    ti->xCtb -= change; ti->yCtb += change;
     ti->idx = 2; encode_transform_tree(encoder,ti,depth+1);
+    ti->xCtb += change;
     ti->idx = 3; encode_transform_tree(encoder,ti,depth+1);
     return;
   }
@@ -1165,15 +1139,44 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     int16_t* coeff    = &ti->coeff[0][ti->idx*coeff_fourth];
     int16_t* coeffU   = &ti->coeff[1][ti->idx*coeff_fourth>>1];
     int16_t* coeffV   = &ti->coeff[2][ti->idx*coeff_fourth>>1];
-      
+    
     /*
       Quant and transform here...
     */
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
 
+    /* INTRA PREDICTION */
+    /* ToDo: split to a function! */
+    int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
+    int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
+    
+    /* Build reconstructed block to use in prediction with extrapolated borders */
+    intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+    intra_recon(recShift,(LCU_WIDTH>>(depth))*2+8,ti->xCtb*(LCU_WIDTH>>(MAX_DEPTH)),ti->yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,pred_stride,ti->intraPredMode,0);
+
+    /* Filter DC-prediction */
+    if(ti->intraPredMode == 1 && width < 32)
+    {
+      intra_DCPredFiltering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
+    }      
+    if(ti->intraPredModeChroma != 36 && ti->intraPredModeChroma == ti->intraPredMode)
+    {
+      ti->intraPredModeChroma = 36;
+    }
+    intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
+    intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,pred_stride>>1,ti->intraPredModeChroma!=36?ti->intraPredModeChroma:ti->intraPredMode,1);
+    intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
+    intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,pred_stride>>1,ti->intraPredModeChroma!=36?ti->intraPredModeChroma:ti->intraPredMode,1);
+    
+    /* This affects reconstruction, do after that */ 
+    picture_setBlockCoded(&encoder->in.cur_pic, ti->xCtb, ti->yCtb, depth, 1);
+
+    /* INTRA PREDICTION ENDS HERE */
+
     /* Get residual by subtracting prediction */
-    i = 0;          
+    i = 0;
     for(y = 0; y < LCU_WIDTH>>depth; y++)
     {
       for(x = 0; x < LCU_WIDTH>>depth; x++)
@@ -1182,7 +1185,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
       }
     }
 
-    /* Transform and quant residual to coeffs */          
+    /* Transform and quant residual to coeffs */
     transform2d(block,pre_quant_coeff,width,0);
     quant(encoder,pre_quant_coeff,coeff,width, width,0, 0, SCAN_DIAG);
 
@@ -1251,7 +1254,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
         }
       }
 
-      /* V */   
+      /* V */
       i = 0;
       for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
       {
@@ -1301,7 +1304,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
           }
         }
       }
-        
+      
       if(CbV)
       {
         /* RECONSTRUCT for predictions */
@@ -1357,20 +1360,20 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
   }
 
   /* Signal if chroma data is present */
+  /* Chroma data is also signaled BEFORE transform split */
+  /* Chroma data is not signaled if it was set to 0 before split */
   if(encoder->in.video_format != FORMAT_400)
   {
-    /* Non-zero chroma U Tcoeffs */
-    //ToDo: fix transform split
-    int8_t Cb_flag = /*ti->cb_top[1];//*/(trDepth==0)?ti->cb_top[1]:((ti->cb[ti->idx]&0x2)?1:0);
+    /* Non-zero chroma U Tcoeffs */    
+    int8_t Cb_flag = (trDepth==0)?ti->cb_top[1]:((ti->cb[ti->idx]&0x2)?1:0);
     cabac.ctx = &g_QtCbfSCModelU[trDepth];
     if(trDepth == 0 || ti->cb_top[1])
     {
       CABAC_BIN(&cabac,Cb_flag,"cbf_chroma_u");
     }
     /* Non-zero chroma V Tcoeffs */
-    /* NOTE: Using the same ctx as before */
-    //ToDo: fix transform split
-    Cb_flag = /*ti->cb_top[2];//*/(trDepth==0)?ti->cb_top[2]:((ti->cb[ti->idx]&0x4)?1:0);
+    /* NOTE: Using the same ctx as before */    
+    Cb_flag = (trDepth==0)?ti->cb_top[2]:((ti->cb[ti->idx]&0x4)?1:0);
     if(trDepth == 0 || ti->cb_top[2])
     {
       CABAC_BIN(&cabac,Cb_flag,"cbf_chroma_v");

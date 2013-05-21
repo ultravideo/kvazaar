@@ -85,6 +85,9 @@ typedef struct
   int8_t intraPredMode;
   int8_t intraPredModeChroma;
   int32_t split[4];
+
+  int32_t xCtb,yCtb;
+
 } transform_info;
 
 void init_tables(void);

@@ -32,7 +32,7 @@
 */
 void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t split)
 {
-  uint32_t x,y,d;
+  uint32_t x,y;//,d;
   //Width in smallest CU
   int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
@@ -211,7 +211,7 @@ double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
   return psnr;
 }
 
-uint32_t Hadamard8x8(int16_t *piOrg, int16_t *piCur, int32_t iStrideOrg, int32_t iStrideCur)
+uint32_t Hadamard8x8(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];

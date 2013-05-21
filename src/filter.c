@@ -181,7 +181,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
 
 void filter_deblock_edge_chroma(encoder_control* encoder,int32_t idx, int32_t xpos, int32_t ypos, int8_t depth, int32_t edge, int8_t dir)
 {
-  int i,iIdx;
+  //int i,iIdx;
   int32_t iStride = encoder->in.cur_pic.width;
   int32_t iOffset = 0;  
   int32_t tcOffsetDiv2   = encoder->betaOffsetdiv2;
@@ -192,7 +192,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t idx, int32_t xp
   /* ToDo: support 10+bits */
   uint8_t* src      = &encoder->in.cur_pic.yRecData[xpos+ypos*iStride];
   uint8_t* piTmpSrc = src;
-  int32_t iSrcStep;
+  //int32_t iSrcStep;
   CU_info* cu = &encoder->in.cur_pic.CU[0][(xpos>>scu_width_log2) + (ypos>>scu_width_log2)*(encoder->in.width>>scu_width_log2)];
 
   uint32_t uiEdgeNumInLCUVert = g_auiZscanToRaster[idx]%(1<<MAX_DEPTH) + edge;

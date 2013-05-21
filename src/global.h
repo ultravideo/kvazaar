@@ -17,7 +17,7 @@
 #define LCU_WIDTH 64 /*!< Largest Coding Unit */
 
 #define MAX_SEARCH_DEPTH 3
-#define MIN_SEARCH_DEPTH 1
+#define MIN_SEARCH_DEPTH 0
 
 #define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
 #define MIN_SIZE 3   /*!< log2_min_coding_block_size */

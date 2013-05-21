@@ -199,7 +199,7 @@ void scalinglist_process()
   uint32_t size,list,qp;
   for(size=0;size</*SCALING_LIST_SIZE_NUM*/4;size++)
   {
-    int32_t* list_ptr = (int32_t *)g_quantIntraDefault8x8;
+    int32_t* list_ptr = (int32_t *)g_quantIntraDefault8x8; /* Default to "8x8" intra */
 
     for(list = 0; list < g_scalingListNum[size]; list++)
     {
@@ -282,6 +282,7 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
 
   scalinglist_processDec(coeff,dequantcoeff,g_invQuantScales[qp],height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, 0);
 
+  //ToDo: support NSQT
   //if(sizeId == /*SCALING_LIST_32x32*/3 || sizeId == /*SCALING_LIST_16x16*/2) //for NSQT
   //{
   //  quantcoeff   = g_quant_coeff[listId][qp][sizeId-1][/*SCALING_LIST_VER*/1];
@@ -627,7 +628,7 @@ void partialButterflyInverse32(int16_t *src,int16_t *dst,int32_t shift, int32_t 
   int32_t add = 1<<(shift-1);
 
   for (j=0; j<line; j++)
-  {    
+  {
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k=0;k<16;k++)
     {
