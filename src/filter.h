@@ -16,7 +16,7 @@
 #define EDGE_VER 0
 #define EDGE_HOR 1
 
-
+void filter_deblock_CU(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int32_t edge);
 void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t ypos, int8_t depth, int32_t edge, int8_t dir);
 void filter_deblock_edge_chroma(encoder_control* encoder,int32_t idx, int32_t xpos, int32_t ypos, int8_t depth, int32_t edge, int8_t dir);
 void filter_deblock(encoder_control* encoder);

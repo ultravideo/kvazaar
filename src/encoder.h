@@ -55,6 +55,7 @@ typedef struct
   int8_t bitdepth;
 
   /* Filtering */
+  int8_t deblock_enable;
   int8_t betaOffsetdiv2;
   int8_t tcOffsetdiv2;
 } encoder_control;

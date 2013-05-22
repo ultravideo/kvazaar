@@ -235,9 +235,12 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   int16_t bestMode = 1;
   int32_t x,y,i;
   uint32_t (*calcSAD)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-  int16_t pred[LCU_WIDTH*LCU_WIDTH];
-  int16_t origBlock[LCU_WIDTH*LCU_WIDTH];
-  int16_t recFilteredTemp[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+  int16_t pred[LCU_WIDTH*LCU_WIDTH+1];
+  //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
+  int16_t origBlock[LCU_WIDTH*LCU_WIDTH+1];
+  //int16_t *origBlock = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
+  int16_t recFilteredTemp[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)+1];
+  //int16_t *recFilteredTemp = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
   int16_t* recFiltered = &recFilteredTemp[recstride+1];
   uint8_t *origShift = &orig[xpos+ypos*origstride];  
   int8_t filter = (width<32); //ToDo: chroma support
@@ -323,7 +326,9 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   *sad = bestSAD;
   #undef COPY_PRED_TO_DST
   #undef CHECK_FOR_BEST
-
+  //free(recFilteredTemp);
+  //free(origBlock);
+  //free(pred);
   return bestMode;
 }
 

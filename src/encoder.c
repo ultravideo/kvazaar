@@ -348,7 +348,7 @@ void encode_one_frame(encoder_control* encoder)
   #endif
   
   /* Filtering */
-  //filter_deblock(encoder);
+  filter_deblock(encoder);
 
 
   /* Clear prediction data */
@@ -400,10 +400,13 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 1, 1, "deblocking_filter_control_present_flag");
   //IF deblocking_filter
     WRITE_U(encoder->stream, 0, 1, "deblocking_filter_override_enabled_flag");
-    WRITE_U(encoder->stream, 1, 1, "pps_disable_deblocking_filter_flag");
+    WRITE_U(encoder->stream, encoder->deblock_enable?0:1, 1, "pps_disable_deblocking_filter_flag");
     //IF !disabled
-     //WRITE_SE(encoder->stream, encoder->betaOffsetdiv2, "beta_offset_div2");
-     //WRITE_SE(encoder->stream, encoder->tcOffsetdiv2, "tc_offset_div2");
+    if(encoder->deblock_enable)
+    {
+     WRITE_SE(encoder->stream, encoder->betaOffsetdiv2, "beta_offset_div2");
+     WRITE_SE(encoder->stream, encoder->tcOffsetdiv2, "tc_offset_div2");
+    }
     //ENDIF
   //ENDIF
   WRITE_U(encoder->stream, 0, 1, "pps_scaling_list_data_present_flag");
@@ -1096,6 +1099,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     ti->split[ti->idx] = 1<<depth;
   }
 
+  /* Split transform and increase depth */
   if(ti->split[ti->idx] & (1<<depth))
   {
     uint8_t change = 1<<(MAX_DEPTH-1-depth);    

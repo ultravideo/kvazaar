@@ -173,14 +173,17 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     uint32_t width = LCU_WIDTH>>depth;
 
     /* INTRAPREDICTION */
-    /* ToDo: split to a function */
-    int16_t pred[LCU_WIDTH*LCU_WIDTH];
+    int16_t pred[LCU_WIDTH*LCU_WIDTH+1];
     int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
+    //int16_t *rec = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
     int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];
 
     /* Build reconstructed block to use in prediction with extrapolated borders */
     search_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
     cur_CU->intra.mode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
+    //free(pred);
+    //free(rec);
   }
 
   /* Split and search to max_depth */
@@ -244,12 +247,9 @@ void search_slice_data(encoder_control* encoder)
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
   {
-    uint8_t lastCUy = (yCtb == (encoder->in.height_in_LCU-1))?1:0;
     for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
     {
-      uint8_t lastCUx = (xCtb == (encoder->in.width_in_LCU-1))?1:0;
       uint8_t depth = 0;
-
       /* Recursive function for looping through all the sub-blocks */
       search_tree(encoder, xCtb<<MAX_DEPTH,yCtb<<MAX_DEPTH, depth);
 

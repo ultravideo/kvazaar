@@ -105,7 +105,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
   int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
   const int8_t scu_width       = (LCU_WIDTH>>MAX_DEPTH);  
   const int8_t scu_width_log2  = TOBITS(scu_width);
-  int8_t uiNumParts = 1;
+  int8_t uiNumParts = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   int8_t uiBs       = 1; /* Filter strength */
   /* ToDo: support 10+bits */
   uint8_t* src      = &encoder->in.cur_pic.yRecData[xpos+ypos*iStride];
@@ -137,7 +137,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
     int32_t iBeta          = betatable_8x8[iIndexB]*iBitdepthScale;
     int32_t iSideThreshold = (iBeta+(iBeta>>1))>>3;
     int32_t iThrCut        = iTc*10;
-    uint32_t uiBlocksInPart= scu_width / 4 ? scu_width / 4 : 1;
+    uint32_t uiBlocksInPart= (LCU_WIDTH>>depth) / 4 ? (LCU_WIDTH>>depth) / 4 : 1;
     uint32_t iBlkIdx;
 
     for (iBlkIdx = 0; iBlkIdx < uiBlocksInPart; iBlkIdx++)
@@ -270,30 +270,37 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t idx, int32_t xp
   */
 }
 
-void filter_deblock_CU(encoder_control* encoder, int32_t xpos, int32_t ypos, int8_t depth, int32_t edge, int8_t dir)
+void filter_deblock_CU(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int32_t edge)
 {
-  /*
-  if(pcCU->getPic()==0||pcCU->getPartitionSize(uiAbsZorderIdx)==SIZE_NONE)
+  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  uint8_t split_flag = (cur_CU->depth > depth)?1:0;
+  int32_t dir = edge;
+  uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
+  uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
+  uint8_t border = border_x | border_y; /*!< are we in any border CU */
+
+  if(split_flag || border)
   {
-    return;
-  }
-  TComPic* pcPic     = pcCU->getPic();
-  UInt uiCurNumParts = pcPic->getNumPartInCU() >> (uiDepth<<1);
-  UInt uiQNumParts   = uiCurNumParts>>2;
-  
-  if( pcCU->getDepth(uiAbsZorderIdx) > uiDepth )
-  {
-    for ( UInt uiPartIdx = 0; uiPartIdx < 4; uiPartIdx++, uiAbsZorderIdx+=uiQNumParts )
+    /* Split blocks and remember to change x and y block positions */
+    uint8_t change = 1<<(MAX_DEPTH-1-depth);
+    filter_deblock_CU(encoder,xCtb,yCtb,depth+1,edge); /* x,y */
+
+    if(!border_x)
     {
-      UInt uiLPelX   = pcCU->getCUPelX() + g_auiRasterToPelX[ g_auiZscanToRaster[uiAbsZorderIdx] ];
-      UInt uiTPelY   = pcCU->getCUPelY() + g_auiRasterToPelY[ g_auiZscanToRaster[uiAbsZorderIdx] ];
-      if( ( uiLPelX < pcCU->getSlice()->getSPS()->getPicWidthInLumaSamples() ) && ( uiTPelY < pcCU->getSlice()->getSPS()->getPicHeightInLumaSamples() ) )
-      {
-        filter_deblock_CU( pcCU, uiAbsZorderIdx, uiDepth+1, Edge );
-      }
+      filter_deblock_CU(encoder,xCtb+change,yCtb,depth+1,edge); /* x+1,y */
+    }
+    if(!border_y)
+    {
+      filter_deblock_CU(encoder,xCtb,yCtb+change,depth+1,edge); /* x,y+1 */
+    }
+    if(!border_x && !border_y)
+    {
+      filter_deblock_CU(encoder,xCtb+change,yCtb+change,depth+1,edge); /* x+1,y+1 */
     }
     return;
-  }
+  }  
+  if((!xCtb && edge == EDGE_VER) || (!yCtb && edge == EDGE_HOR)) return;
+  /*
   
   xSetLoopfilterParam( pcCU, uiAbsZorderIdx );
   
@@ -333,12 +340,37 @@ void filter_deblock_CU(encoder_control* encoder, int32_t xpos, int32_t ypos, int
     }
   }
   */
+  {
+    int32_t uiSizeInPU = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
+    int32_t PartIdxIncr = 8 / (LCU_WIDTH>>depth) ? 8 / (LCU_WIDTH>>depth) : 1 ;
+    for(edge = 0; edge < uiSizeInPU; edge += PartIdxIncr)
+    {
+      filter_deblock_edge_luma(encoder, xCtb*(LCU_WIDTH>>MAX_DEPTH), yCtb*(LCU_WIDTH>>MAX_DEPTH), depth, edge, dir);
+    }
+  }
 }
 void filter_deblock(encoder_control* encoder)
 {
-  int x,y;
-  const int8_t scu_width = (LCU_WIDTH>>(MAX_DEPTH));
-  int16_t width = 16;
+  int16_t xCtb,yCtb;
+
+  /* ToDo: add threads for each LCU */
+  /* Loop through every LCU in the slice */
+  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  {
+    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    {
+      filter_deblock_CU(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_VER);
+    }
+  }
+
+  /* Loop through every LCU in the slice */
+  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  {
+    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    {
+      filter_deblock_CU(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_HOR);
+    }
+  }
   /*
   // Horizontal filtering
   for ( UInt uiCUAddr = 0; uiCUAddr < pcPic->getNumCUsInFrame(); uiCUAddr++ )
@@ -364,20 +396,6 @@ void filter_deblock(encoder_control* encoder)
     filter_deblock_CU( pcCU, 0, 0, EDGE_HOR );
   }
   */
-  for(y = width-1; y < encoder->in.height-1; y+=width)
-  {
-    for(x = width-1; x < encoder->in.width-1; x+=width)
-    {
-      filter_deblock_edge_luma(encoder, x, y, 2, EDGE_VER, 0);
-    }
-  }
 
-  for(y = width-1; y < encoder->in.height-1; y+=width)
-  {
-    for(x = width-1; x < encoder->in.width-1; x+=width)
-    {
-      filter_deblock_edge_luma(encoder, x, y, 2, EDGE_HOR, 0);
-    }
-  }
   
 }

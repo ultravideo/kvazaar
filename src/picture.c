@@ -333,7 +333,7 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     ii = y*stride2;
     for(x = 0; x < 64;x++)
     {
-      sum+=abs((int32_t)block[i+x]-(int32_t)block2[ii+x]);
+      sum+=abs((int16_t)block[i+x]-(int16_t)block2[ii+x]);
     }
 
   }

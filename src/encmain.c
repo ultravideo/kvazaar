@@ -71,7 +71,7 @@
     #ifdef _DEBUG
     FILE *recout = fopen("encrec.yuv","wb");
     #endif
-    encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));;
+    encoder_control* encoder = (encoder_control*)malloc(sizeof(encoder_control));
 
 
  
@@ -101,7 +101,7 @@
     cpuId32(&ecx,&edx);
     #else
     cpuId64(&ecx,&edx);
-    #endif    
+    #endif
     printf("CPU features enabled: ");
     /* EDX */
     if(edx & (1<<BIT_MMX))  printf("MMX ");
@@ -163,8 +163,9 @@
     encoder->frame    = 0;
     encoder->QP       = 32;
     encoder->in.video_format = FORMAT_420;
-    encoder->betaOffsetdiv2  = 0;
-    encoder->tcOffsetdiv2    = 0;
+    encoder->deblock_enable = 1;
+    encoder->betaOffsetdiv2  = 1;
+    encoder->tcOffsetdiv2    = 1;
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
     /* Start coding cycle */
