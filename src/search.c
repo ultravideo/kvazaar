@@ -118,6 +118,8 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 {   
   uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
+  uint8_t border_split_x = ((encoder->in.width)  < ( (xCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
+  uint8_t border_split_y = ((encoder->in.height) < ( (yCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
 
@@ -133,15 +135,15 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
       SET_SPLITDATA(cur_CU,1);
       search_tree(encoder,xCtb,yCtb,depth+1);
-      if(!border_x)
+      if(!border_x || border_split_x)
       {
         search_tree(encoder,xCtb+change,yCtb,depth+1);
       }
-      if(!border_y)
+      if(!border_y || border_split_y)
       {
         search_tree(encoder,xCtb,yCtb+change,depth+1);      
       }
-      if(!border)
+      if(!border || (border_split_x && border_split_y) )
       {
         search_tree(encoder,xCtb+change,yCtb+change,depth+1);
       }

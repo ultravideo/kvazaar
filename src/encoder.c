@@ -299,37 +299,19 @@ void encode_one_frame(encoder_control* encoder)
   }  
   else
   {
-    if(0)// (encoder->frame & 0xf) == 0)
-    {
-      cabac_start(&cabac);
-      encoder->in.cur_pic.slicetype = SLICE_I;
-      encoder->in.cur_pic.type = NAL_IDR_SLICE;
-      search_slice_data(encoder);
-      encode_slice_header(encoder);
-      bitstream_align(encoder->stream);
-      encode_slice_data(encoder);
-      cabac_flush(&cabac);
-      bitstream_align(encoder->stream);
-      bitstream_flush(encoder->stream);
-      nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
-      bitstream_clear_buffer(encoder->stream);
-    }
-    else
-    {
-      /* ToDo: add intra/inter search before encoding */
-      cabac_start(&cabac);
-      encoder->in.cur_pic.slicetype = SLICE_I;
-      encoder->in.cur_pic.type = 0;
-      search_slice_data(encoder);
-      encode_slice_header(encoder);
-      bitstream_align(encoder->stream);
-      encode_slice_data(encoder);
-      cabac_flush(&cabac);
-      bitstream_align(encoder->stream);
-      bitstream_flush(encoder->stream);
-      nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,0, 0);
-      bitstream_clear_buffer(encoder->stream);
-    }
+    /* ToDo: add intra/inter search before encoding */
+    cabac_start(&cabac);
+    encoder->in.cur_pic.slicetype = SLICE_I;
+    encoder->in.cur_pic.type = 0;
+    search_slice_data(encoder);
+    encode_slice_header(encoder);
+    bitstream_align(encoder->stream);
+    encode_slice_data(encoder);
+    cabac_flush(&cabac);
+    bitstream_align(encoder->stream);
+    bitstream_flush(encoder->stream);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,0, 0);
+    bitstream_clear_buffer(encoder->stream);
   }  
   #ifdef _DEBUG
   /*
@@ -348,7 +330,10 @@ void encode_one_frame(encoder_control* encoder)
   #endif
   
   /* Filtering */
-  filter_deblock(encoder);
+  if(encoder->deblock_enable)
+  {
+    filter_deblock(encoder);
+  }
 
 
   /* Clear prediction data */
@@ -501,7 +486,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //ENDIF
   
   WRITE_U(encoder->stream, 0, 1, "amp_enabled_flag");
-  WRITE_U(encoder->stream, 0, 1, "sample_adaptive_offset_enabled_flag");
+  WRITE_U(encoder->stream, encoder->sao_enable?1:0, 1, "sample_adaptive_offset_enabled_flag");
 
   WRITE_U(encoder->stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
@@ -633,12 +618,12 @@ void encode_slice_header(encoder_control* encoder)
     }
     //end if
   //end if
-    //IF sao
-    /*
-    WRITE_U(encoder->stream, 0,1, "slice_sao_luma_flag" );
-    WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag" );
-    */
-    //ENDIF
+    if(encoder->sao_enable)
+    {    
+      WRITE_U(encoder->stream, 1,1, "slice_sao_luma_flag" );
+      WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag" );
+    }
+    
     if(encoder->in.cur_pic.slicetype != SLICE_I)
     {
       WRITE_U(encoder->stream, 0, 1, "num_ref_idx_active_override_flag");
@@ -687,6 +672,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   /* Check for slice border */
   uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
+  uint8_t border_split_x = ((encoder->in.width)  < ( (xCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
+  uint8_t border_split_y = ((encoder->in.height) < ( (yCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
   
 
@@ -713,15 +700,15 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       /* Split blocks and remember to change x and y block positions */
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
       encode_coding_tree(encoder,xCtb,yCtb,depth+1); /* x,y */
-      if(!border_x) /* ToDo: fix when other half of the block would not be completely over the border */
+      if(!border_x || border_split_x) /* ToDo: fix when other half of the block would not be completely over the border */
       {
         encode_coding_tree(encoder,xCtb+change,yCtb,depth+1); /* x+1,y */
       }
-      if(!border_y) /* ToDo: fix when other half of the block would not be completely over the border */
+      if(!border_y || border_split_y) /* ToDo: fix when other half of the block would not be completely over the border */
       {
         encode_coding_tree(encoder,xCtb,yCtb+change,depth+1); /* x,y+1 */
       }
-      if(!border) /* ToDo: fix when other half of the block would not be completely over the border */
+      if(!border || (border_split_x && border_split_y) ) /* ToDo: fix when other half of the block would not be completely over the border */
       {
         encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1); /* x+1,y+1 */
       }

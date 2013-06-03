@@ -98,7 +98,7 @@
     /* CPU id */
     
     #ifndef X64
-    cpuId32(&ecx,&edx);
+    //cpuId32(&ecx,&edx);
     #else
     cpuId64(&ecx,&edx);
     #endif
@@ -161,11 +161,15 @@
     /* input init (ToDo: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
-    encoder->QP       = 32;
+    encoder->QP       = 36;
     encoder->in.video_format = FORMAT_420;
+    /* deblocking */
     encoder->deblock_enable = 1;
     encoder->betaOffsetdiv2  = 0;
     encoder->tcOffsetdiv2    = 0;
+    /* SAO */
+    encoder->sao_enable = 0;
+
     init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
     /* Start coding cycle */
