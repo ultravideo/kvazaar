@@ -32,6 +32,7 @@
 #include "search.h"
 
 int16_t g_lambda_cost[55];
+uint32_t* g_auiSigLastScan[3][7];
 
 void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32_t iWidth, int32_t iHeight)
 {
@@ -229,6 +230,8 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
 
   input->cur_pic.width  = width;
   input->cur_pic.height = height;
+  input->cur_pic.width_in_LCU  = input->width_in_LCU;
+  input->cur_pic.height_in_LCU = input->height_in_LCU;
   input->cur_pic.referenced = 0;
   /* Allocate buffers */
   input->cur_pic.yData = (uint8_t *)malloc(width*height);
@@ -859,7 +862,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       uint32_t width = LCU_WIDTH>>depth;
 
       /* INTRAPREDICTION VARIABLES */
-      int16_t pred[LCU_WIDTH*LCU_WIDTH];
+      int16_t pred[LCU_WIDTH*LCU_WIDTH+1];
       int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
       int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
@@ -867,11 +870,22 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       uint8_t *recbaseU  = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint8_t *recbaseV  = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
 
+
+      /* SEARCH BEST INTRA MODE (AGAIN) */  
+      
+      int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+      int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];      
+      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+      cur_CU->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
+      intraPredMode = cur_CU->intra.mode;
+      intra_setBlockMode(&encoder->in.cur_pic,xCtb, yCtb, depth, intraPredMode);
+      
       #if ENABLE_PCM == 1
       /* Code must start after variable initialization */
       cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
       #endif
-
+      
+      
       /*
         PREDINFO CODING
         If intra prediction mode is found from the predictors,
@@ -1142,6 +1156,8 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
     int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
     int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
+
+    uint32_t ac_sum = 0;
     
     /* Build reconstructed block to use in prediction with extrapolated borders */
     intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
@@ -1168,17 +1184,19 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
 
     /* Get residual by subtracting prediction */
     i = 0;
+    ac_sum = 0;
     for(y = 0; y < LCU_WIDTH>>depth; y++)
     {
       for(x = 0; x < LCU_WIDTH>>depth; x++)
       {
-        block[i++]=((int16_t)base[x+y*base_stride])-pred[x+y*pred_stride];
+        block[i]=((int16_t)base[x+y*base_stride])-pred[x+y*pred_stride];
+        i++;
       }
     }
 
     /* Transform and quant residual to coeffs */
     transform2d(block,pre_quant_coeff,width,0);
-    quant(encoder,pre_quant_coeff,coeff,width, width,0, 0, SCAN_DIAG);
+    quant(encoder,pre_quant_coeff,coeff,width, width,&ac_sum, 0, SCAN_DIAG);
 
     /* Check for non-zero coeffs */
     for(i = 0; i < width*width; i++)
@@ -1226,15 +1244,17 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     {
       /* U */
       i = 0;
+      ac_sum = 0;
       for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
       {
         for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
         {
-          block[i++]=((int16_t)baseU[x+y*(base_stride>>1)])-predU[x+y*(pred_stride>>1)];
+          block[i]=((int16_t)baseU[x+y*(base_stride>>1)])-predU[x+y*(pred_stride>>1)];
+          i++;
         }
       }
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
-      quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, 0,2,SCAN_DIAG);
+      quant(encoder,pre_quant_coeff,coeffU, width>>1, width>>1, &ac_sum,2,SCAN_DIAG);
       for(i = 0; i < width*width>>2; i++)
       {
         if(coeffU[i] != 0)
@@ -1247,15 +1267,17 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
 
       /* V */
       i = 0;
+      ac_sum = 0;
       for(y = 0; y < LCU_WIDTH>>(depth+1); y++)
       {
         for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
         {
-          block[i++]=((int16_t)baseV[x+y*(base_stride>>1)])-predV[x+y*(pred_stride>>1)];
+          block[i]=((int16_t)baseV[x+y*(base_stride>>1)])-predV[x+y*(pred_stride>>1)];
+          i++;
         }
       }
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
-      quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, 0,3,SCAN_DIAG);
+      quant(encoder,pre_quant_coeff,coeffV, width>>1, width>>1, &ac_sum,3,SCAN_DIAG);
       for(i = 0; i < width*width>>2; i++)
       {
         if(coeffV[i] != 0)

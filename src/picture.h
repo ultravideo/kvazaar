@@ -79,8 +79,10 @@ typedef struct
   uint8_t* uRecData;     /*!< \brief Pointer to reconstructed U-data  */
   uint8_t* vRecData;     /*!< \brief Pointer to reconstructed V-data  */
 
-  int width;          /*!< \brief Picture width */
-  int height;         /*!< \brief Picture height  */
+  int32_t width;          /*!< \brief Picture width */
+  int32_t height;         /*!< \brief Picture height  */
+  int32_t height_in_LCU;  /*!< \brief input picture width in LCU*/
+  int32_t width_in_LCU;   /*!< \brief input picture height in LCU */
   uint8_t referenced; /*!< \brief Is this picture referenced */
   CU_info** CU;     /*!< \brief info for each CU at each depth */
   uint8_t type;

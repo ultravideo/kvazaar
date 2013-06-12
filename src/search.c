@@ -36,7 +36,7 @@ void search_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_
   uint8_t* srcPic      = (!chroma)?pic->yData: ((chroma==1)?pic->uData: pic->vData); /*!< input picture pointer */  
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
-  int32_t width_in_SCU = srcWidth/SCU_width;     /*!< picture width in SCU */
+  int32_t width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;     /*!< picture width in SCU */
 
   /* Fill left column */
   if(xCtb)
@@ -205,7 +205,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint32_t bestCost = cur_CU->intra.cost;
   uint32_t cost = 0;
-  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<5;
+  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5;
 
   /* Split and search to max_depth */
   if(depth != MAX_SEARCH_DEPTH)

@@ -33,12 +33,13 @@ enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 typedef struct
 {
   FILE* file;
-  int32_t width;
-  int32_t height;
-  int32_t height_in_LCU;
-  int32_t width_in_LCU;
+  int32_t width;  /*!< \brief input picture width */
+  int32_t height; /*!< \brief input picture height */
+  int32_t height_in_LCU; /*!< \brief input picture width in LCU*/
+  int32_t width_in_LCU;  /*!< \brief input picture height in LCU */
   picture cur_pic;
   int8_t video_format;
+  int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
 } encoder_input;
 
 /* Encoder control options, the main struct */
@@ -55,10 +56,10 @@ typedef struct
   int8_t bitdepth;
 
   /* Filtering */
-  int8_t deblock_enable;
-  int8_t sao_enable;
-  int8_t betaOffsetdiv2;
-  int8_t tcOffsetdiv2;
+  int8_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
+  int8_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
+  int8_t betaOffsetdiv2; /*!< \brief (deblocking) beta offset (div 2), range -6...6 */
+  int8_t tcOffsetdiv2;   /*!< \brief (deblocking)tc offset (div 2), range -6...6 */
 } encoder_control;
 
 typedef struct
@@ -110,7 +111,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
 void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t depth, int8_t trDepth);
 
 extern int16_t g_lambda_cost[55];
-static uint32_t* g_auiSigLastScan[3][7];
+extern uint32_t* g_auiSigLastScan[3][7];
 int8_t g_aucConvertToBit[LCU_WIDTH+1];
 static int8_t g_bitDepth     = 8;
 static int8_t g_uiBitIncrement = 0;

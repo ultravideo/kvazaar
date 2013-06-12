@@ -6,7 +6,7 @@
 /*! \file picture.c
     \brief Functions to handle pictures
     \author Marko Viitanen
-    \date 2013-04
+    \date 2013-06
     
   This file contains all the needed functions to handle pictures
 
@@ -18,6 +18,12 @@
 #include <stdlib.h>
 #include "global.h"
 #include "picture.h"
+
+
+/** \defgroup picture_group Picture handler group
+ *  This group contains all picture related stuff
+ *  @{
+ */
 
 
 
@@ -34,7 +40,7 @@ void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 {
   uint32_t x,y;//,d;
   //Width in smallest CU
-  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
@@ -45,7 +51,6 @@ void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
     }
   }
 }
-
 
 /*!
  \brief Set block coded status
@@ -60,7 +65,7 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 {
   uint32_t x,y,d;
   //Width in smallest CU
-  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
@@ -75,11 +80,6 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
   }
 }
 
-
-/** \defgroup picture_group Picture handler group
- *  This group contains all picture related stuff
- *  @{
- */
 
 
 /*!
@@ -188,10 +188,10 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 //Calculates image PSNR value
 double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
 {   
-  int64_t MSE=0;
-  int64_t MSEtemp=0;
+  uint64_t MSE=0;
+  int32_t MSEtemp=0;
   double psnr=0.0;
-  double pixels = x*y;
+  int32_t pixels = x*y;
   int32_t index;
 
   //Calculate MSE
@@ -205,7 +205,7 @@ double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
   if(MSE==0) return 99.0;
 
   //The PSNR
-  psnr=10*log10(PSNRMAX/((double)MSE/pixels));
+  psnr=10*log10((pixels*PSNRMAX)/((double)MSE));
 
   //Thats it.
   return psnr;
@@ -327,6 +327,8 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 {
   int32_t i,ii,y,x;
   uint32_t sum=0;
+  /*
+
   for(y=0;y<64;y++)
   {
     i = y*stride1; 
@@ -336,6 +338,17 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
       sum+=abs((int16_t)block[i+x]-(int16_t)block2[ii+x]);
     }
 
+  }*/
+  int32_t  iOffsetOrg = stride1<<3;
+  int32_t  iOffsetCur = stride2<<3;
+  for ( y=0; y<64; y+= 8 )
+  {
+    for ( x=0; x<64; x+= 8 )
+    {
+      sum += Hadamard8x8( &block[x], stride1,&block2[x],  stride2 );
+    }
+    block += iOffsetOrg;
+    block2 += iOffsetCur;
   }
 
   return sum;    
@@ -344,7 +357,7 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y;
-  /*
+  
   int32_t x,sum = 0;
   int32_t  iOffsetOrg = stride1<<3;
   int32_t  iOffsetCur = stride2<<3;
@@ -352,13 +365,13 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
   {
     for ( x=0; x<32; x+= 8 )
     {
-      sum += Hadamard8x8( &block[x], &block2[x], stride1, stride2 );
+      sum += Hadamard8x8( &block[x], stride1,&block2[x],  stride2 );
     }
     block += iOffsetOrg;
     block2 += iOffsetCur;
   }
 
-  */
+  /*
   uint32_t sum=0;
   int32_t i,ii;
   for(y=0;y<32;y++)
@@ -398,7 +411,7 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+30]-(int32_t)block2[ii+30]);
     sum+=abs((int32_t)block[i+31]-(int32_t)block2[ii+31]);
   }
-  
+  */
   return sum;    
 }
 
@@ -406,22 +419,22 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y;
-    /*
+    
   int32_t x,sum = 0;
   int32_t  iOffsetOrg = stride1<<3;
   int32_t  iOffsetCur = stride2<<3;
-    for ( y=0; y<16; y+= 8 )
+  for ( y=0; y<16; y+= 8 )
+  {
+    for ( x=0; x<16; x+= 8 )
     {
-      for ( x=0; x<16; x+= 8 )
-      {
-        sum += Hadamard8x8( &block[x], &block2[x], stride1, stride2 );
-      }
-      block += iOffsetOrg;
-      block2 += iOffsetCur;
+      sum += Hadamard8x8( &block[x], stride1,&block2[x],  stride2 );
     }
+    block += iOffsetOrg;
+    block2 += iOffsetCur;
+  }
   
   
-  */
+  /*
   uint32_t sum=0;
   int32_t i,ii;
   for(y=0;y<16;y++)
@@ -445,6 +458,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
     sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
     sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
   }  
+  */
   return sum;    
 }
 
@@ -453,6 +467,9 @@ uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride
 {
   int32_t i,ii,y;
   uint32_t sum=0;
+  sum = Hadamard8x8( block, stride1,block2,  stride2 );
+  /*
+  
   for(y=0;y<8;y++)
   {
     i = y*stride1; 
@@ -466,6 +483,7 @@ uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride
     sum+=abs((int32_t)block[i+6]-(int32_t)block2[ii+6]);
     sum+=abs((int32_t)block[i+7]-(int32_t)block2[ii+7]);
   }
+  */
 
   return sum;    
 }

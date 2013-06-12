@@ -68,6 +68,8 @@
     FILE *input  = NULL;
     FILE *output = NULL;
     double PSNR[3] = { 0.0, 0.0, 0.0 };
+    fpos_t curpos = 0;
+    fpos_t lastpos = 0;
     #ifdef _DEBUG
     FILE *recout = fopen("encrec.yuv","wb");
     #endif
@@ -149,7 +151,7 @@
     encoder->stream->buffer_pos = 0;
     encoder->stream->output = 0;
     /* Alloc 1MB */
-    bitstream_alloc(encoder->stream, 1024*1024);
+    bitstream_alloc(encoder->stream, 1024*2*cfg->width);
 
     /* Config pointer to encoder struct */
     encoder->cfg = cfg;
@@ -161,10 +163,10 @@
     /* input init (ToDo: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
-    encoder->QP       = 36;
+    encoder->QP       = 32;
     encoder->in.video_format = FORMAT_420;
     /* deblocking */
-    encoder->deblock_enable = 1;
+    encoder->deblock_enable  = 1;
     encoder->betaOffsetdiv2  = 0;
     encoder->tcOffsetdiv2    = 0;
     /* SAO */
@@ -197,12 +199,17 @@
       fwrite(encoder->in.cur_pic.vRecData,cfg->width*cfg->height>>2,1,recout);
       #endif
       {
+        int32_t diff;
         double temp_PSNR[3];
+        fgetpos(output,&curpos);
+        diff = (int32_t)(curpos-lastpos);
+        lastpos = curpos;
+
         temp_PSNR[0] = imagePSNR(encoder->in.cur_pic.yData,encoder->in.cur_pic.yRecData,cfg->width,cfg->height);
         temp_PSNR[1] = imagePSNR(encoder->in.cur_pic.uData,encoder->in.cur_pic.uRecData,cfg->width>>1,cfg->height>>1);
         temp_PSNR[2] = imagePSNR(encoder->in.cur_pic.vData,encoder->in.cur_pic.vRecData,cfg->width>>1,cfg->height>>1);
         
-        printf("[%d] %c-frame PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "BPI"[encoder->in.cur_pic.slicetype%3],
+        printf("POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "BPI"[encoder->in.cur_pic.slicetype%3],diff<<3,
                                                         temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);
         PSNR[0]+=temp_PSNR[0];
         PSNR[1]+=temp_PSNR[1];
@@ -211,8 +218,9 @@
       encoder->frame++;
     }
     /* Coding finished */
+    fgetpos(output,&curpos);
 
-    printf(" Processed %d frames, AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame,PSNR[0]/encoder->frame,PSNR[1]/encoder->frame,PSNR[2]/encoder->frame);
+    printf(" Processed %d frames, %10d bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame,((int32_t)curpos)<<3,PSNR[0]/encoder->frame,PSNR[1]/encoder->frame,PSNR[2]/encoder->frame);
 
     fclose(input);
     fclose(output);

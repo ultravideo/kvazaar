@@ -37,7 +37,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
 {
   uint32_t x,y,d;
   /* Width in smallest CU */
-  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
@@ -65,7 +65,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
 int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth)
 {
   //Width in smallest CU
-  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
   int CUpos = yCtb*width_in_SCU+xCtb;
   if(pic->CU[depth][CUpos].type == CU_INTRA)
   {
@@ -115,7 +115,7 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
 {
   int32_t iLeftIntraDir  = 1; //DC_IDX
   int32_t iAboveIntraDir = 1; //DC_IDX
-  int32_t width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
   int32_t CUpos = yCtb*width_in_SCU+xCtb;
   
   // Left PU predictor
@@ -297,7 +297,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     if(distance <= threshold)
     {
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i,distance*width); /* Favor modes closer to 26 and 10 */
+      CHECK_FOR_BEST(i,0); /* Favor modes closer to 26 and 10 */
     }
   } 
 
@@ -319,7 +319,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     if(distance > threshold)
     {
       intra_getAngularPred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i,distance*width); /* Favor modes closer to 26 and 10 */
+      CHECK_FOR_BEST(i,0); /* Favor modes closer to 26 and 10 */
     }
   }
 
@@ -399,7 +399,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
   uint8_t* srcPic      = (!chroma)?pic->yRecData: ((chroma==1)?pic->uRecData: pic->vRecData); /*!< input picture pointer */  
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
-  int32_t width_in_SCU = srcWidth/SCU_width;     /*!< picture width in SCU */
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;     /*!< picture width in SCU */
 
   /* Fill left column */
   if(xCtb)

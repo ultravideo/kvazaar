@@ -34,7 +34,7 @@ void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
 {
   uint32_t x,y,d;
   /* Width in smallest CU */
-  int width_in_SCU = pic->width/(LCU_WIDTH>>MAX_DEPTH);
+  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {

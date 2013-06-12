@@ -781,16 +781,14 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
 {
   int16_t*   piCoef    = pSrc;
   int16_t*   piQCoef   = pDes;
-  uint32_t*  scan;
+  
  
   int8_t useRDOQForTransformSkip = 0;
   uint32_t log2BlockSize = g_aucConvertToBit[ iWidth ] + 2;
-
+  uint32_t* scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
   //uint32_t scanIdx = SCAN_DIAG;
 
-  scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
-  {
-  int32_t deltaU[LCU_WIDTH*LCU_WIDTH] ;
+  int32_t deltaU[LCU_WIDTH*LCU_WIDTH>>2];
   int32_t iQpBase = encoder->QP;
 
   int32_t qpScaled;
@@ -802,7 +800,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   }
   else
   {
-    qpScaled = MAX( -qpBDOffset, MIN(57, iQpBase));
+    qpScaled = CLIP(-qpBDOffset, 57, iQpBase);
     if(qpScaled < 0)
     {
       qpScaled = qpScaled +  qpBDOffset;
@@ -830,22 +828,140 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   int32_t iAdd = ((encoder->in.cur_pic.slicetype == SLICE_I) ? 171 : 85) << (iQBits-9);
 
   int32_t qBits8 = iQBits-8;
-  for( n = 0; n < iWidth*iHeight; n++ )
+  for(n = 0; n < iWidth*iHeight; n++)
   {
     int32_t iLevel;
     int32_t  iSign;
-    int64_t tmpLevel;
+    //int64_t tmpLevel;
     iLevel  = piCoef[n];
     iSign   = (iLevel < 0 ? -1: 1);
 
-    tmpLevel  = (int64_t)abs(iLevel) * piQuantCoeff[n];
-    iLevel    = (int32_t)((tmpLevel + iAdd ) >> iQBits);
-    deltaU[n] = (int32_t)((tmpLevel - (iLevel<<iQBits) )>> qBits8);
+    iLevel = ((int64_t)abs(iLevel) * piQuantCoeff[n] + iAdd ) >> iQBits;
+    deltaU[n] = (int32_t)( ((int64_t)abs(piCoef[n]) * piQuantCoeff[n] - (iLevel<<iQBits) )>> qBits8 );
+    
+    #if ENABLE_SIGN_HIDING == 1
+    *uiAcSum += iLevel;
+    #endif
 
-    iLevel *= iSign;        
+    iLevel *= iSign;
     piQCoef[n] = CLIP( -32768, 32767, iLevel);
   } // for n
+
+  #if ENABLE_SIGN_HIDING == 1
+  if(*uiAcSum >= 2)
+  {
+    #define SCAN_SET_SIZE 16
+    #define LOG2_SCAN_SET_SIZE 4
+    int32_t n,lastCG = -1, abssum = 0, subset, subpos;    
+    uint32_t* scan_subpos;
+    for(subset = (iWidth*iHeight-1)>>LOG2_SCAN_SET_SIZE; subset >= 0; subset--)
+    {
+      int32_t firstNZPosInCG=SCAN_SET_SIZE , lastNZPosInCG=-1;
+      subpos = subset<<LOG2_SCAN_SET_SIZE;
+      //scan_subpos = &scan[subpos];
+      abssum = 0;
+
+      /* Find last coeff pos */
+      for(n = SCAN_SET_SIZE-1; n>=0; n--)
+      {
+        if(piQCoef[scan[n + subpos]])
+        {
+          lastNZPosInCG = n;
+          break;
+        }
+      }
+
+      /* First coeff pos */
+      for(n = 0; n <SCAN_SET_SIZE; n++)
+      {
+        if(piQCoef[scan[n + subpos]])
+        {
+          firstNZPosInCG = n;
+          break;
+        }
+      }
+
+      /* Sum all quant coeffs between first and last */
+      for(n = firstNZPosInCG; n <= lastNZPosInCG; n++)
+      {
+        abssum += piQCoef[scan[n + subpos]];
+      }
+
+      if(lastNZPosInCG>=0 && lastCG==-1) 
+      {
+        lastCG = 1; 
+      }
+
+      if(lastNZPosInCG-firstNZPosInCG >= /*SBH_THRESHOLD*/4)
+      {
+        uint32_t signbit = (piQCoef[scan[subpos+firstNZPosInCG]]>0?0:1) ;
+        if(signbit != (abssum&0x1))  /* compare signbit with sum_parity */
+        {
+          int32_t minCostInc = 0x7fffffff,  minPos =-1, finalChange=0, curCost=0x7fffffff, curChange=0;
+        
+          for(n = (lastCG==1?lastNZPosInCG:SCAN_SET_SIZE-1) ; n >= 0; n--)
+          {
+            uint32_t blkPos  = scan[n+subpos];
+            if(piQCoef[blkPos] != 0)
+            {
+              if(deltaU[blkPos] > 0)
+              {
+                curCost = -deltaU[blkPos]; 
+                curChange=1;
+              }
+              else if(n == firstNZPosInCG && abs(piQCoef[blkPos]) == 1)
+              {
+                curCost=0x7fffffff;
+              }
+              else
+              {
+                curCost = deltaU[blkPos]; 
+                curChange =-1;
+              }
+            }
+            else if(n < firstNZPosInCG && ((piCoef[blkPos] >= 0)?0:1) != signbit)
+            {
+              curCost = 0x7fffffff;
+            }
+            else
+            {
+              curCost = -deltaU[blkPos];
+              curChange = 1;
+            }
+
+            if(curCost < minCostInc)
+            {
+              minCostInc = curCost;
+              finalChange = curChange;
+              minPos = blkPos;
+            }
+          } //CG loop
+
+          if(piQCoef[minPos] == 32767 || piQCoef[minPos] == -32768)
+          {
+            finalChange = -1;
+          }
+
+          if(piCoef[minPos] >= 0)
+          {
+            piQCoef[minPos] += finalChange; 
+          }
+          else 
+          {
+            piQCoef[minPos] -= finalChange;
+          }  
+        } // Hide
+      }
+      if(lastCG == 1) 
+      {
+        lastCG=0;
+      }
+    }
+
+    #undef SCAN_SET_SIZE
+    #undef LOG2_SCAN_SET_SIZE
   }
+  #endif
   }
 
 }
