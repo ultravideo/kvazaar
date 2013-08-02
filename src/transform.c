@@ -257,16 +257,26 @@ void scalinglist_processEnc( int32_t *coeff, int32_t *quantcoeff, int32_t quantS
 void scalinglist_processDec( int32_t *coeff, int32_t *dequantcoeff, int32_t invQuantScales, uint32_t height,uint32_t width, uint32_t ratio, int32_t sizuNum, uint32_t dc, uint8_t flat)
 {
   uint32_t j,i;
-  for(j=0;j<height;j++)
+  if(flat)
   {
-    for(i=0;i<width;i++)
+    for(j=0;j<height*width;j++)
     {
-      dequantcoeff[j*width + i] = invQuantScales * coeff[sizuNum * (j / ratio) + i / ratio];
+      *dequantcoeff++ = invQuantScales<<4;
     }
   }
-  if(ratio > 1)
+  else
   {
-    dequantcoeff[0] = invQuantScales * dc;
+    for(j=0;j<height;j++)
+    {
+      for(i=0;i<width;i++)
+      {
+        dequantcoeff[j*width + i] = invQuantScales * coeff[sizuNum * (j / ratio) + i / ratio];
+      }
+    }
+    if(ratio > 1)
+    {
+      dequantcoeff[0] = invQuantScales * dc;
+    }
   }
 }
 
@@ -278,9 +288,8 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
   int32_t *quantcoeff   = g_quant_coeff[sizeId][listId][qp];
   int32_t *dequantcoeff = g_de_quant_coeff[sizeId][listId][qp];
 
-  scalinglist_processEnc(coeff,quantcoeff,g_quantScales[qp]<<4,height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, 0);
-
-  scalinglist_processDec(coeff,dequantcoeff,g_invQuantScales[qp],height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, 0);
+  scalinglist_processEnc(coeff,quantcoeff,g_quantScales[qp]<<4,height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
+  scalinglist_processDec(coeff,dequantcoeff,g_invQuantScales[qp],height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
 
   //ToDo: support NSQT
   //if(sizeId == /*SCALING_LIST_32x32*/3 || sizeId == /*SCALING_LIST_16x16*/2) //for NSQT
@@ -830,21 +839,21 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   int32_t qBits8 = iQBits-8;
   for(n = 0; n < iWidth*iHeight; n++)
   {
-    int32_t iLevel;
-    int32_t  iSign;
+    int32_t level;
+    int32_t  sign;
     //int64_t tmpLevel;
-    iLevel  = piCoef[n];
-    iSign   = (iLevel < 0 ? -1: 1);
+    level  = piCoef[n];
+    sign   = (level < 0 ? -1: 1);
 
-    iLevel = ((int64_t)abs(iLevel) * piQuantCoeff[n] + iAdd ) >> iQBits;
-    deltaU[n] = (int32_t)( ((int64_t)abs(piCoef[n]) * piQuantCoeff[n] - (iLevel<<iQBits) )>> qBits8 );
-    
+    level = ((int64_t)abs(level) * piQuantCoeff[n] + iAdd ) >> iQBits;
+
     #if ENABLE_SIGN_HIDING == 1
-    *uiAcSum += iLevel;
+    deltaU[n] = (int32_t)( ((int64_t)abs(piCoef[n]) * piQuantCoeff[n] - (level<<iQBits) )>> qBits8 );
+    *uiAcSum += level;
     #endif
 
-    iLevel *= iSign;
-    piQCoef[n] = CLIP( -32768, 32767, iLevel);
+    level *= sign;
+    piQCoef[n] = CLIP( -32768, 32767, level);
   } // for n
 
   #if ENABLE_SIGN_HIDING == 1
@@ -995,17 +1004,17 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
       qpScaled = g_aucChromaScale[ qpScaled ];
     }
   }
-  piDequantCoef = g_de_quant_coeff[uiLog2TrSize-2][scalingListType][qpScaled%6];
-
-  iShift = 20 - 14 - iTransformShift;
-
-  iShift += 4;
   
+
+  iShift = 20 - QUANT_SHIFT - iTransformShift;
+  #if ENABLE_SCALING_LIST == 1
+  piDequantCoef = g_de_quant_coeff[uiLog2TrSize-2][scalingListType][qpScaled%6];
+  iShift += 4;
 
   if(iShift >qpScaled/6)
   {
     iAdd = 1 << (iShift - qpScaled/6 - 1);
-      
+    
     for(n = 0; n < iWidth*iHeight; n++ )
     {
       clipQCoef = CLIP( -32768, 32767, piQCoef[n] );
@@ -1022,15 +1031,17 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
       piCoef[n] = CLIP( -32768, 32767, iCoeffQ << ( qpScaled/6 - iShift ) );
     }
   }
-  /*
+  #else
+  {
+  int32_t scale = g_invQuantScales[encoder->QP%6] << (encoder->QP/6);
   iAdd = 1 << (iShift-1);
-  scale = g_invQuantScales[encoder->QP%6] << (encoder->QP/6);
 
-  for(n = 0; n < iWidth*iHeight; n++ )
+  for(n = 0; n < iWidth*iHeight; n++)
   {
     clipQCoef = CLIP( -32768, 32767, piQCoef[n]);
     iCoeffQ   = ( clipQCoef * scale + iAdd ) >> iShift;
     piCoef[n] = CLIP( -32768, 32767, iCoeffQ);
   }
-  */
+  }
+  #endif
 }

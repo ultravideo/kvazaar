@@ -163,6 +163,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
     cur_CU->type = CU_INTER;
     cur_CU->inter.mv[0] = 1<<2;
+    cur_CU->inter.mv[1] = -2<<2;
     cur_CU->inter.cost = 10;
     return;
   }
@@ -177,9 +178,10 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     /* INTRAPREDICTION */
     int16_t pred[LCU_WIDTH*LCU_WIDTH+1];
     int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];
+
     //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
     //int16_t *rec = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
-    int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];
 
     /* Build reconstructed block to use in prediction with extrapolated borders */
     search_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
@@ -205,7 +207,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint32_t bestCost = cur_CU->intra.cost;
   uint32_t cost = 0;
-  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5;
+  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //ToDo: Correct cost calculation
 
   /* Split and search to max_depth */
   if(depth != MAX_SEARCH_DEPTH)

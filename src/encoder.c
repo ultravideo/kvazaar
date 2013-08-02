@@ -291,6 +291,7 @@ void encode_one_frame(encoder_control* encoder)
     encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = NAL_IDR_SLICE;
     search_slice_data(encoder);
+
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
     encode_slice_data(encoder);
@@ -307,6 +308,7 @@ void encode_one_frame(encoder_control* encoder)
     encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = 0;
     search_slice_data(encoder);
+
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
     encode_slice_data(encoder);
@@ -483,10 +485,10 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
   
   /* Use default scaling list */
-  WRITE_U(encoder->stream, 1, 1, "scaling_list_enable_flag");
-  //IF scaling list
+  WRITE_U(encoder->stream, ENABLE_SCALING_LIST, 1, "scaling_list_enable_flag");  
+  #if ENABLE_SCALING_LIST == 1
     WRITE_U(encoder->stream, 0, 1, "sps_scaling_list_data_present_flag");
-  //ENDIF
+  #endif
   
   WRITE_U(encoder->stream, 0, 1, "amp_enabled_flag");
   WRITE_U(encoder->stream, encoder->sao_enable?1:0, 1, "sample_adaptive_offset_enabled_flag");
@@ -733,6 +735,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   if(cur_CU->type == CU_SKIP)
   {
     /* Encode merge index */
+    //ToDo: calculate/fetch merge candidates
     int16_t unaryIdx = 0;//pcCU->getMergeIndex( uiAbsPartIdx );
     int16_t numCand = 0;//pcCU->getSlice()->getMaxNumMergeCand();
     int32_t ui;
@@ -781,29 +784,30 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     {
       /* FOR each part */
         /* Mergeflag */
+        uint8_t mergeFlag = 0;
         cabac.ctx = &g_cCUMergeFlagExtSCModel;
-        CABAC_BIN(&cabac, 1, "MergeFlag");
-        if(1) //merge
+        CABAC_BIN(&cabac, mergeFlag, "MergeFlag");
+        if(mergeFlag) //merge
         {
           /* MergeIndex */
           int16_t unaryIdx = 0;//pcCU->getMergeIndex( uiAbsPartIdx );
-          int16_t numCand = 0;//pcCU->getSlice()->getMaxNumMergeCand();
+          int16_t numCand  = 0;//pcCU->getSlice()->getMaxNumMergeCand();
           int32_t ui;
-          if ( numCand > 1 )
+          if (numCand > 1)
           {
             for(ui = 0; ui < numCand - 1; ui++ )
             {
               int32_t symbol = (ui == unaryIdx) ? 0 : 1;
-              if ( ui==0 )
+              if (ui == 0)
               {
                 cabac.ctx = &g_cCUMergeIdxExtSCModel;
                 CABAC_BIN(&cabac, symbol, "MergeIndex");
               }
               else
-              {          
+              {
                 CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
               }
-              if( symbol == 0 )
+              if(symbol == 0)
               {
                 break;
               }
@@ -812,7 +816,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         }
         else
         {
+          uint32_t uiRefListIdx;
           /*
+          // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
           if(encoder->in.cur_pic.slicetype == SLICE_B)
           {
             // Code Inter Dir
@@ -828,7 +834,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
               m_pcBinIf->encodeBin( uiInterDir, *( pCtx + 4 ) );
             }
           }
-          for ( UInt uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
+          */
+
+          
+          for ( uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
           {
             if ( pcCU->getSlice()->getNumRefIdx( RefPicList( uiRefListIdx ) ) > 0 )
             {
@@ -836,14 +845,93 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
               {
                 if(NumRefIdx != 1)
                 {
-                  m_pcEntropyCoderIf->codeRefFrmIdx( pcCU, uiAbsPartIdx, eRefList );
+                  int32_t iRefFrame = pcCU->getCUMvField( eRefList )->getRefIdx( uiAbsPartIdx );
+                  
+                  cabac.ctx = &g_cCURefPicSCModel[0];
+                  CABAC_BIN(&cabac, (iRefFrame==0)?0:1, "ref_frame_flag");
+    
+                  if( iRefFrame > 0 )
+                  {
+                    uint32_t ui;
+                    uint32_t uiRefNum = pcCU->getSlice()->getNumRefIdx( eRefList ) - 2;
+
+                    cabac.ctx = &g_cCURefPicSCModel[1];
+                    iRefFrame--;
+                    for( ui = 0; ui < uiRefNum; ++ui )
+                    {
+                      const uint32_t uiSymbol = (ui==iRefFrame)?0:1;
+                      if( ui == 0 )
+                      {                        
+                        CABAC_BIN(&cabac, uiSymbol, "ref_frame_flag2");
+                      }
+                      else
+                      {
+                        CABAC_BIN_EP(&cabac,uiSymbol,"ref_frame_flag2");
+                      }
+                      if( uiSymbol == 0 )
+                      {
+                        break;
+                      }
+                    }
+                  }
                 }
-                m_pcEntropyCoderIf->codeMvd( pcCU, uiAbsPartIdx, eRefList );
-                m_pcEntropyCoderIf->codeMVPIdx( pcCU, uiAbsPartIdx, eRefList );
+
+
+                if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ eRefList == REF_PIC_LIST_1 /*&& pcCU->getInterDir(uiAbsPartIdx)==3)*/))
+                {
+                    /*const TComCUMvField* pcCUMvField = pcCU->getCUMvField( eRefList );*/
+                    //ToDo: calculate MV field difference
+                    const int32_t mvd_hor = cur_CU->inter.mv[0];//pcCUMvField->getMvd( uiAbsPartIdx ).getHor();
+                    const int32_t mvd_ver = cur_CU->inter.mv[1];//pcCUMvField->getMvd( uiAbsPartIdx ).getVer();
+                    const int8_t bHorAbsGr0 = mvd_hor != 0;
+                    const int8_t bVerAbsGr0 = mvd_ver != 0;
+                    const uint32_t mvd_hor_abs = abs(mvd_hor);
+                    const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+                    cabac.ctx = &g_cCUMvdSCModel[0];
+                    CABAC_BIN(&cabac, (mvd_hor!=0)?1:0, "MVD_hor_flag");
+                    CABAC_BIN(&cabac, (mvd_ver!=0)?1:0, "MVD_ver_flag");
+
+                    cabac.ctx = &g_cCUMvdSCModel[1];
+
+                    if( bHorAbsGr0 )
+                    {
+                      CABAC_BIN(&cabac, (mvd_hor_abs>1)?1:0, "MVD_hor_abs_>1_flag");
+                    }
+
+                    if( bVerAbsGr0 )
+                    {
+                      CABAC_BIN(&cabac, (mvd_ver_abs>1)?1:0, "MVD_ver_abs_>1_flag");
+                    }
+
+                    if( bHorAbsGr0 )
+                    {
+                      if( mvd_hor_abs > 1 )
+                      {
+                        cabac_writeEpExGolomb(&cabac,mvd_hor_abs-2, 1);
+                      }
+                      CABAC_BIN(&cabac, (0>mvd_hor)?1:0, "MVD_hor_sign_flag");
+                    }
+
+                    if( bVerAbsGr0 )
+                    {
+                      if( mvd_ver_abs > 1 )
+                      {
+                        cabac_writeEpExGolomb(&cabac,mvd_ver_abs-2, 1);
+                      }
+                      CABAC_BIN(&cabac, (0>mvd_ver)?1:0, "MVD_ver_sign_flag");
+                    }
+                }
+
+
+                {
+                  int32_t iSymbol = pcCU->getMVPIdx(eRefList, uiAbsPartIdx);
+                  int32_t iNum = AMVP_MAX_NUM_CANDS;                  
+                  cabac_writeUnaryMaxSymbol(&cabac,(cabac_ctx**)g_cMVPIdxSCModel, iSymbol,1,iNum-1);
+                }
               }
             }
-          }
-          */
+          }          
         }
 
       /* END for each part */
@@ -1606,7 +1694,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
 
     if( numNonZero > 0 )
     {
-      uint8_t signHidden = ( lastNZPosInCG - firstNZPosInCG >= 4 /*SBH_THRESHOLD*/ );
+      int8_t signHidden = ( lastNZPosInCG - firstNZPosInCG >= 4 /*SBH_THRESHOLD*/ )?1:0;
       uint32_t uiCtxSet  = (i > 0 && type==0) ? 2 : 0;
       cabac_ctx* baseCtxMod;
       int32_t numC1Flag,firstC2FlagIdx,idx,iFirstCoeff2;

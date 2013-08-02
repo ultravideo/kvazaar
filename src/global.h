@@ -6,7 +6,7 @@
 /*! \file global.h
     \brief Contains global includes
     \author Marko Viitanen
-    \date 2013-05
+    \date 2013-06
   
     This file should be included in every C-file.
 */
@@ -14,19 +14,23 @@
 #define __GLOBAL_H
 
 /* CONFIG VARIABLES */
-#define LCU_WIDTH 64 /*!< Largest Coding Unit */
+#define LCU_WIDTH 64 /*!< Largest Coding Unit (DO NOT TOUCH!) */
 
-#define MAX_SEARCH_DEPTH 3
-#define MIN_SEARCH_DEPTH 1
+#define MAX_SEARCH_DEPTH 3 /*!< Max search depth -> min block size (3 == 8x8) */
+#define MIN_SEARCH_DEPTH 1 /*!< Min search depth -> max block size (0 == 64x64) */
 
 #define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
 #define MIN_SIZE 3   /*!< log2_min_coding_block_size */
 
 #define ENABLE_PCM 0 /*!< Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
-#define ENABLE_SIGN_HIDING 1 /*!< NEED QUANT CHANGES! */
+#define ENABLE_SIGN_HIDING 0 /*!< DOES NOT WORK PROPERLY */
+#define ENABLE_SCALING_LIST 1 /*!< Enable usage of (default) scaling list (BREAKS CHROMA WHEN 0!) */
 
 /* END OF CONFIG VARIABLES */
 
+#define AMVP_MAX_NUM_CANDS 2
+#define AMVP_MAX_NUM_CANDS_MEM 3
+#define MRG_MAX_NUM_CANDS 5
 
 //Including stdint.h, 
 #ifdef _MSC_VER

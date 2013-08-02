@@ -43,6 +43,9 @@ cabac_ctx g_cCUPredModeSCModel;
 cabac_ctx g_cCUSkipFlagSCModel[3];
 cabac_ctx g_cCUMergeIdxExtSCModel;
 cabac_ctx g_cCUMergeFlagExtSCModel;
+cabac_ctx g_cCUMvdSCModel[2];
+cabac_ctx g_cCURefPicSCModel[2];
+cabac_ctx g_cMVPIdxSCModel[2];
 
 
 void init_contexts(encoder_control *encoder, int8_t SLICE)
@@ -70,6 +73,16 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   
   ctx_init(&g_cCUAbsSCModel_chroma[0], encoder->QP, INIT_ABS_FLAG[SLICE][4]);
   ctx_init(&g_cCUAbsSCModel_chroma[1], encoder->QP, INIT_ABS_FLAG[SLICE][5]);
+
+  //ToDo: ignore P/B contexts on intra frame
+  ctx_init(&g_cCUMvdSCModel[0], encoder->QP, INIT_MVD[SLICE][0]);
+  ctx_init(&g_cCUMvdSCModel[1], encoder->QP, INIT_MVD[SLICE][1]);
+  ctx_init(&g_cCURefPicSCModel[0], encoder->QP, INIT_REF_PIC[SLICE][0]);
+  ctx_init(&g_cCURefPicSCModel[1], encoder->QP, INIT_REF_PIC[SLICE][1]);
+  ctx_init(&g_cMVPIdxSCModel[0], encoder->QP, INIT_MVP_IDX[SLICE][0]);
+  ctx_init(&g_cMVPIdxSCModel[1], encoder->QP, INIT_MVP_IDX[SLICE][1]);
+  
+
 
   for(i = 0; i < 4; i++)
   {    

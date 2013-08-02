@@ -235,14 +235,16 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   int16_t bestMode = 1;
   int32_t x,y,i;
   uint32_t (*calcSAD)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-  int16_t pred[LCU_WIDTH*LCU_WIDTH+1];
-  //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
-  int16_t origBlock[LCU_WIDTH*LCU_WIDTH+1];
-  //int16_t *origBlock = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
+  int16_t pred[LCU_WIDTH*LCU_WIDTH+1];  
+  int16_t origBlock[LCU_WIDTH*LCU_WIDTH+1];  
   int16_t recFilteredTemp[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)+1];
+
+  //ToDo: Malloc with alignment
+  //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
+  //int16_t *origBlock = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
   //int16_t *recFilteredTemp = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
   int16_t* recFiltered = &recFilteredTemp[recstride+1];
-  uint8_t *origShift = &orig[xpos+ypos*origstride];  
+  uint8_t *origShift = &orig[xpos+ypos*origstride];
   int8_t filter = (width<32); //ToDo: chroma support
   SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64}; //ToDo: get SAD functions from parameters
   uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
@@ -265,7 +267,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   {
     for(x = 0; x < (int32_t)width; x++)
     {
-      origBlock[i++] = origShift[x+y*origstride];      
+      origBlock[i++] = origShift[x+y*origstride];
     }
   }
 
@@ -297,9 +299,9 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     if(distance <= threshold)
     {
       intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i,0); /* Favor modes closer to 26 and 10 */
+      CHECK_FOR_BEST(i,0);
     }
-  } 
+  }
 
   
   /**** FROM THIS POINT FORWARD, USING FILTERED PREDICTION *****/
@@ -319,7 +321,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     if(distance > threshold)
     {
       intra_getAngularPred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
-      CHECK_FOR_BEST(i,0); /* Favor modes closer to 26 and 10 */
+      CHECK_FOR_BEST(i,0);
     }
   }
 

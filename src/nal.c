@@ -6,7 +6,7 @@
 /*! \file nal.c
     \brief NAL
     \author Marko Viitanen
-    \date 2012-06
+    \date 2013-06
     
     NAL functions
 */
@@ -37,12 +37,13 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   const uint8_t zero = 0x00;
 
   /*start_code_prefix_one_3bytes */  
+  
   /*
   if(temporal_id == 0)
   {
     fwrite(&zero, 1, 1, output);
-  } 
-  */
+  }
+  */  
   fwrite(&zero, 1, 1, output);
   fwrite(&zero, 1, 1, output);
   fwrite(&start_code_prefix_one_3bytes, 1, 1, output);

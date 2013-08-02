@@ -342,3 +342,51 @@ void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
     cabac_encodeBinsEP(cabac,codeNumber,length);
   }
 }
+
+void cabac_writeUnaryMaxSymbol(cabac_data* data,cabac_ctx** ctx, uint32_t uiSymbol,int32_t iOffset, uint32_t uiMaxSymbol)
+{
+  int8_t bCodeLast = ( uiMaxSymbol > uiSymbol );
+
+  if (!uiMaxSymbol)  
+    return;
+  
+  data->ctx = ctx[0];
+  cabac_encodeBin(data, uiSymbol ? 1 : 0);
+  
+  if (!uiSymbol)  
+    return;
+  
+  while( --uiSymbol )
+  {
+    data->ctx = ctx[iOffset];
+    cabac_encodeBin(data, 1);
+  }
+  if( bCodeLast )
+  {
+    data->ctx = ctx[iOffset];
+    cabac_encodeBin(data, 0);
+  }
+  
+  return;
+}
+
+void cabac_writeEpExGolomb(cabac_data* data, uint32_t uiSymbol, uint32_t uiCount )
+{
+  uint32_t bins = 0;
+  int32_t numBins = 0;
+  
+  while( uiSymbol >= (uint32_t)(1<<uiCount) )
+  {
+    bins = 2 * bins + 1;
+    numBins++;
+    uiSymbol -= 1 << uiCount;
+    uiCount  ++;
+  }
+  bins = 2 * bins + 0;
+  numBins++;
+  
+  bins = (bins << uiCount) | uiSymbol;
+  numBins += uiCount;
+  
+  cabac_encodeBinsEP(data, bins, numBins);
+}

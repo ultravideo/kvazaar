@@ -112,6 +112,8 @@ void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 
 enum { SLICE_P = 0, SLICE_B = 1, SLICE_I = 2 };
 
+enum { REF_PIC_LIST_0 = 0,REF_PIC_LIST_1 = 1,REF_PIC_LIST_X = 100 };
+
 
   /** @} */ // end of group1
 

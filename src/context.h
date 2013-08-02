@@ -52,8 +52,34 @@ extern cabac_ctx g_cCUPredModeSCModel;
 extern cabac_ctx g_cCUSkipFlagSCModel[3];
 extern cabac_ctx g_cCUMergeIdxExtSCModel;
 extern cabac_ctx g_cCUMergeFlagExtSCModel;
+extern cabac_ctx g_cCUMvdSCModel[2];
+extern cabac_ctx g_cCURefPicSCModel[2];
+extern cabac_ctx g_cMVPIdxSCModel[2];
 #define CNU 154
 
+static const uint8_t 
+INIT_MVP_IDX[3][2] =  
+{
+  { 168,  CNU, }, 
+  { 168,  CNU, }, 
+  { CNU,  CNU, }, 
+};
+
+static const uint8_t 
+INIT_REF_PIC[3][2] =  
+{
+  { 153,  153 }, 
+  { 153,  153 }, 
+  { CNU,  CNU }, 
+};
+
+static const uint8_t 
+INIT_MVD[3][2] =  
+{
+  { 169,  198, }, 
+  { 140,  198, }, 
+  { CNU,  CNU, }, 
+};
 
 static const uint8_t
 INIT_MERGE_FLAG_EXT[3][1] = 
