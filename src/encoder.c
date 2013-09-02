@@ -249,7 +249,7 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
   /* Allocate memory for CU info 2D array */
   //ToDo: we don't need this much space on LCU...MAX_DEPTH-1
   input->cur_pic.CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
-  for(i=0; i < MAX_DEPTH+1; i++)
+  for(i=0; i<MAX_DEPTH+1; i++)
   {
     /* Allocate height_in_SCU x width_in_SCU x sizeof(CU_info) */
     input->cur_pic.CU[i] = (CU_info*)malloc((input->height_in_LCU<<MAX_DEPTH)*(input->width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
@@ -300,10 +300,40 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
     bitstream_clear_buffer(encoder->stream);
-  }  
+  }
+  
+  //else if(encoder->frame == 1)
+  //{
+  //  /*
+  //  cabac_start(&cabac);
+  //  encoder->in.cur_pic.slicetype = SLICE_P;
+  //  encoder->in.cur_pic.type = 1;
+
+  //  encode_slice_header(encoder);
+  //  bitstream_align(encoder->stream);
+  //  cabac_flush(&cabac);
+  //  bitstream_align(encoder->stream);
+  //  bitstream_flush(encoder->stream);
+  //  nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,1,0);
+  //  bitstream_clear_buffer(encoder->stream);*/
+
+
+  //  cabac_start(&cabac);
+  //  encoder->in.cur_pic.slicetype = SLICE_P;
+  //  encoder->in.cur_pic.type = 1;
+  //  search_slice_data(encoder);
+
+  //  encode_slice_header(encoder);
+  //  bitstream_align(encoder->stream);
+  //  encode_slice_data(encoder);
+  //  cabac_flush(&cabac);
+  //  bitstream_align(encoder->stream);
+  //  bitstream_flush(encoder->stream);
+  //  nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,1,1);
+  //  bitstream_clear_buffer(encoder->stream);
+  //}
   else
-  {
-    /* ToDo: add intra/inter search before encoding */
+  {    
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
     encoder->in.cur_pic.type = 0;
@@ -344,9 +374,9 @@ void encode_one_frame(encoder_control* encoder)
   /* Clear prediction data */
   /* ToDo: store as reference data */
   for(i=0; i < MAX_DEPTH+1; i++)
-  {    
+  {
     memset(encoder->in.cur_pic.CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
-  } 
+  }
 
 }
 
@@ -461,6 +491,8 @@ void encode_seq_parameter_set(encoder_control* encoder)
   }
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
+
+  //ToDo: conformance window when size not divisible by 8 (SCU)
   WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
   //IF window flag
   //END IF
@@ -625,14 +657,19 @@ void encode_slice_header(encoder_control* encoder)
   //end if
     if(encoder->sao_enable)
     {    
-      WRITE_U(encoder->stream, 1,1, "slice_sao_luma_flag" );
-      WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag" );
+      WRITE_U(encoder->stream, 1,1, "slice_sao_luma_flag");
+      WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag");
     }
     
     if(encoder->in.cur_pic.slicetype != SLICE_I)
     {
       WRITE_U(encoder->stream, 0, 1, "num_ref_idx_active_override_flag");
       WRITE_UE(encoder->stream, 0, "five_minus_max_num_merge_cand");
+    }
+
+    if(encoder->in.cur_pic.slicetype == SLICE_B)
+    {
+      WRITE_U(encoder->stream, 0, 1, "mvd_l1_zero_flag");
     }
   /* Skip flags that are not present */
   // if !entropy_slice_flag
@@ -837,38 +874,38 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           */
 
           
-          for ( uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++ )
+          for(uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
           {
-            if ( pcCU->getSlice()->getNumRefIdx( RefPicList( uiRefListIdx ) ) > 0 )
+            //if(encoder->ref_idx_num[uiRefListIdx] > 0)
             {
-              if ( pcCU->getInterDir( uiAbsPartIdx ) & ( 1 << eRefList ) )
+              if(cur_CU->inter.mv_dir & (1 << uiRefListIdx))
               {
-                if(NumRefIdx != 1)
+                if(0)//encoder->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
                 {
-                  int32_t iRefFrame = pcCU->getCUMvField( eRefList )->getRefIdx( uiAbsPartIdx );
+                  int32_t iRefFrame = cur_CU->inter.mv_ref;
                   
                   cabac.ctx = &g_cCURefPicSCModel[0];
                   CABAC_BIN(&cabac, (iRefFrame==0)?0:1, "ref_frame_flag");
     
-                  if( iRefFrame > 0 )
+                  if(iRefFrame > 0)
                   {
                     uint32_t ui;
-                    uint32_t uiRefNum = pcCU->getSlice()->getNumRefIdx( eRefList ) - 2;
+                    uint32_t uiRefNum = encoder->ref_idx_num[uiRefListIdx]-2;
 
                     cabac.ctx = &g_cCURefPicSCModel[1];
                     iRefFrame--;
-                    for( ui = 0; ui < uiRefNum; ++ui )
+                    for(ui = 0; ui < uiRefNum; ++ui)
                     {
                       const uint32_t uiSymbol = (ui==iRefFrame)?0:1;
-                      if( ui == 0 )
-                      {                        
+                      if(ui == 0)
+                      {
                         CABAC_BIN(&cabac, uiSymbol, "ref_frame_flag2");
                       }
                       else
                       {
                         CABAC_BIN_EP(&cabac,uiSymbol,"ref_frame_flag2");
                       }
-                      if( uiSymbol == 0 )
+                      if(uiSymbol == 0)
                       {
                         break;
                       }
@@ -877,7 +914,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                 }
 
 
-                if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ eRefList == REF_PIC_LIST_1 /*&& pcCU->getInterDir(uiAbsPartIdx)==3)*/))
+                if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder->ref_list == REF_PIC_LIST_1 && cur_CU->inter.mv_dir==3))
                 {
                     /*const TComCUMvField* pcCUMvField = pcCU->getCUMvField( eRefList );*/
                     //ToDo: calculate MV field difference
@@ -894,28 +931,28 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
                     cabac.ctx = &g_cCUMvdSCModel[1];
 
-                    if( bHorAbsGr0 )
+                    if(bHorAbsGr0)
                     {
                       CABAC_BIN(&cabac, (mvd_hor_abs>1)?1:0, "MVD_hor_abs_>1_flag");
                     }
 
-                    if( bVerAbsGr0 )
+                    if(bVerAbsGr0)
                     {
                       CABAC_BIN(&cabac, (mvd_ver_abs>1)?1:0, "MVD_ver_abs_>1_flag");
                     }
 
-                    if( bHorAbsGr0 )
+                    if(bHorAbsGr0)
                     {
-                      if( mvd_hor_abs > 1 )
+                      if(mvd_hor_abs > 1)
                       {
                         cabac_writeEpExGolomb(&cabac,mvd_hor_abs-2, 1);
                       }
                       CABAC_BIN(&cabac, (0>mvd_hor)?1:0, "MVD_hor_sign_flag");
                     }
 
-                    if( bVerAbsGr0 )
+                    if(bVerAbsGr0)
                     {
-                      if( mvd_ver_abs > 1 )
+                      if(mvd_ver_abs > 1)
                       {
                         cabac_writeEpExGolomb(&cabac,mvd_ver_abs-2, 1);
                       }
@@ -923,15 +960,31 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     }
                 }
 
-
                 {
-                  int32_t iSymbol = pcCU->getMVPIdx(eRefList, uiAbsPartIdx);
+                  int32_t iSymbol = cur_CU->inter.mv_ref;//pcCU->getMVPIdx(eRefList, uiAbsPartIdx);
                   int32_t iNum = AMVP_MAX_NUM_CANDS;                  
                   cabac_writeUnaryMaxSymbol(&cabac,(cabac_ctx**)g_cMVPIdxSCModel, iSymbol,1,iNum-1);
                 }
               }
             }
-          }          
+          }  
+
+          {
+            transform_info ti;
+            memset(&ti, 0, sizeof(transform_info));
+
+            ti.xCtb = xCtb; ti.yCtb = yCtb;
+
+            /* Coded block pattern */
+            ti.cb_top[0] = 0;
+            ti.cb_top[1] = 0;
+            ti.cb_top[2] = 0;
+            ti.split[0] = 0;
+        
+            /* Code (possible) coeffs to bitstream */
+            ti.idx = 0;
+            encode_transform_coeff(encoder, &ti,depth, 0);
+          }
         }
 
       /* END for each part */
@@ -1436,7 +1489,8 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
         }
       }
     }
-        
+    
+    /* Store coded block pattern */
     ti->cb[ti->idx] = CbY | (CbU<<1) | (CbV<<2);
     /* END INTRAPREDICTION */
     return;

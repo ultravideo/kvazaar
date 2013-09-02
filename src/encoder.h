@@ -52,6 +52,8 @@ typedef struct
   bitstream* stream;
   FILE *output;
   picture_list *ref;
+  int8_t ref_list;
+  int8_t ref_idx_num[2];
   int8_t QP;
   int8_t bitdepth;
 

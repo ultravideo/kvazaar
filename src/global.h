@@ -14,7 +14,7 @@
 #define __GLOBAL_H
 
 /* CONFIG VARIABLES */
-#define LCU_WIDTH 64 /*!< Largest Coding Unit (DO NOT TOUCH!) */
+#define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
 
 #define MAX_SEARCH_DEPTH 3 /*!< Max search depth -> min block size (3 == 8x8) */
 #define MIN_SEARCH_DEPTH 1 /*!< Min search depth -> max block size (0 == 64x64) */
@@ -56,14 +56,6 @@
 #define SIZE_Nx2N  2
 #define SIZE_NxN   3
 #define SIZE_NONE  15
-
-/*
-#define MODE_SKIP  0
-#define MODE_INTER 1
-#define MODE_INTRA 2
-#define MODE_NONE  15
-*/
-
 
 /* Inlining functions */
 #ifdef _MSC_VER /* Visual studio */

@@ -165,6 +165,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     cur_CU->inter.mv[0] = 1<<2;
     cur_CU->inter.mv[1] = -2<<2;
     cur_CU->inter.cost = 10;
+    cur_CU->inter.mv_dir = 1;
     return;
   }
 

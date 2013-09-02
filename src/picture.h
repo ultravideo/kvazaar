@@ -50,6 +50,8 @@ typedef struct
   int8_t mode;
   uint32_t cost;
   int16_t mv[2];
+  uint8_t mv_ref;
+  uint8_t mv_dir;
 } CU_info_inter;
 
 
