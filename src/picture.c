@@ -325,7 +325,7 @@ uint32_t SAD(uint8_t *block,uint8_t* block2, uint32_t x, uint32_t y)
 
 uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
-  int32_t i,ii,y,x;
+  int32_t y,x;
   uint32_t sum=0;
   /*
 
@@ -465,7 +465,6 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 
 uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
-  int32_t i,ii,y;
   uint32_t sum=0;
   sum = Hadamard8x8( block, stride1,block2,  stride2 );
   /*
