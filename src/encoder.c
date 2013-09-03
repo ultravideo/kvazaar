@@ -289,7 +289,7 @@ void encode_one_frame(encoder_control* encoder)
     /* First slice is IDR */
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
-    encoder->in.cur_pic.type = NAL_IDR_SLICE;
+    encoder->in.cur_pic.type = NAL_IDR_W_RADL;
     search_slice_data(encoder);
 
     encode_slice_header(encoder);
@@ -298,7 +298,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_SLICE, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_IDR_W_RADL, 0);
     bitstream_clear_buffer(encoder->stream);
   }
   
@@ -336,7 +336,7 @@ void encode_one_frame(encoder_control* encoder)
   {    
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
-    encoder->in.cur_pic.type = 1;
+    encoder->in.cur_pic.type = NAL_TRAIL_R;
     search_slice_data(encoder);
 
     encode_slice_header(encoder);
@@ -345,7 +345,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,1,encoder->frame);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,NAL_TRAIL_R,encoder->frame);
     bitstream_clear_buffer(encoder->stream);
   }  
   #ifdef _DEBUG
@@ -629,7 +629,7 @@ void encode_slice_header(encoder_control* encoder)
 #endif
 
   WRITE_U(encoder->stream, 1, 1, "first_slice_segment_in_pic_flag");
-  if(encoder->in.cur_pic.type == NAL_IDR_SLICE)
+  if(encoder->in.cur_pic.type >= NAL_BLA_W_LP && encoder->in.cur_pic.type <= NAL_RSV_IRAP_VCL23)
   {
     WRITE_U(encoder->stream, 1, 1, "no_output_of_prior_pics_flag");
   }
@@ -645,7 +645,7 @@ void encode_slice_header(encoder_control* encoder)
       //WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-    if(encoder->in.cur_pic.type != NAL_IDR_SLICE)
+    if(encoder->in.cur_pic.type != NAL_IDR_W_RADL && encoder->in.cur_pic.type != NAL_IDR_N_LP)
     {
       WRITE_U(encoder->stream, encoder->frame&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 0, 1, "short_term_ref_pic_set_sps_flag");
