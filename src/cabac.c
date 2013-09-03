@@ -262,7 +262,7 @@ void cabac_flush(cabac_data* data)
   cabac_encodeBinTrm(data,1);
   cabac_finish(data);
   bitstream_put(data->stream,1,1);
-  bitstream_align(data->stream);
+  bitstream_align_zero(data->stream);
   cabac_start(data);
 }
 
