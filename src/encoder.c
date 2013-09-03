@@ -336,7 +336,7 @@ void encode_one_frame(encoder_control* encoder)
   {    
     cabac_start(&cabac);
     encoder->in.cur_pic.slicetype = SLICE_I;
-    encoder->in.cur_pic.type = 0;
+    encoder->in.cur_pic.type = 1;
     search_slice_data(encoder);
 
     encode_slice_header(encoder);
@@ -345,7 +345,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,0, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,1,encoder->frame);
     bitstream_clear_buffer(encoder->stream);
   }  
   #ifdef _DEBUG
