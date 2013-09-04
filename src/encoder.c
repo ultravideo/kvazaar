@@ -335,7 +335,7 @@ void encode_one_frame(encoder_control* encoder)
   else
   {    
     cabac_start(&cabac);
-    encoder->in.cur_pic.slicetype = SLICE_I;
+    encoder->in.cur_pic.slicetype = (encoder->frame==1)?SLICE_P:SLICE_I;
     encoder->in.cur_pic.type = NAL_TRAIL_R;
     search_slice_data(encoder);
 
@@ -647,10 +647,19 @@ void encode_slice_header(encoder_control* encoder)
     //if( IdrPicFlag ) <- nal_unit_type == 5
     if(encoder->in.cur_pic.type != NAL_IDR_W_RADL && encoder->in.cur_pic.type != NAL_IDR_N_LP)
     {
+      int j;
+      int ref_negative = 1;
+      int ref_positive = 0;
       WRITE_U(encoder->stream, encoder->frame&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 0, 1, "short_term_ref_pic_set_sps_flag");
-      WRITE_UE(encoder->stream, 0, "num_negative_pics");
-      WRITE_UE(encoder->stream, 0, "num_positive_pics");
+      WRITE_UE(encoder->stream, ref_negative, "num_negative_pics");
+      WRITE_UE(encoder->stream, ref_positive, "num_positive_pics");
+      for(j=0; j <ref_negative; j++)
+      {
+        WRITE_UE(encoder->stream, 0, "delta_poc_s0_minus1");
+        WRITE_U(encoder->stream,1,1, "used_by_curr_pic_s0_flag");
+      }
+
       //WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
     }
     //end if
