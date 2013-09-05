@@ -86,3 +86,49 @@ void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_r
   }
 
 }
+
+
+/*!
+ \brief Calculate checksum for one color of the picture.
+ \param data Beginning of the pixel data for the picture.
+ \param height Height of the picture.
+ \param width Width of the picture.
+ \param stride Width of one row in the pixel array.
+ \returns Void
+*/
+static void array_checksum(uint8_t* data, const int height, const int width, const int stride, unsigned char checksum_out[])
+{
+	unsigned char mask;
+	unsigned int checksum = 0;
+	int y, x;
+	for (y = 0; y < height; ++y) {
+		for (x = 0; x < width; ++x) {
+			mask = (x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8);
+			checksum += (data[(y * stride) + x] & 0xff) ^ mask;
+			checksum &= 0xffffffff;
+		}
+	}
+
+  /* Unpack uint into byte-array.*/
+	checksum_out[0] = (checksum >> 24) & 0xff;
+	checksum_out[1] = (checksum >> 16) & 0xff;
+	checksum_out[2] = (checksum >> 8) & 0xff;
+	checksum_out[3] = (checksum) & 0xff;
+}
+
+
+/*!
+ \brief Calculate checksums for all colors of the picture.
+ \param pic The picture that checksum is calculated for.
+ \param checksum_out Result of the calculation.
+ \returns Void
+*/
+void picture_checksum(const picture* pic, unsigned char checksum_out[][16])
+{
+	int stride = pic->width; /* ToDo: != width, if there is a luma margin. */
+	array_checksum(pic->yRecData, pic->height, pic->width, pic->width, checksum_out[0]);
+
+  /* The number of chroma pixels is half that of luma. */
+	array_checksum(pic->uRecData, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[1]);
+	array_checksum(pic->vRecData, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[2]);
+}

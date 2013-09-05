@@ -22,9 +22,11 @@ enum { NAL_TRAIL_N    = 0, NAL_TRAIL_R    = 1,
        NAL_RSV_IRAP_VCL23 = 23,
 
        /* Parameter sets */       
-       NAL_VID_PARAMETER_SET = 32, NAL_SEQ_PARAMETER_SET = 33, NAL_PIC_PARAMETER_SET = 34
+       NAL_VID_PARAMETER_SET = 32, NAL_SEQ_PARAMETER_SET = 33, NAL_PIC_PARAMETER_SET = 34,
+       NAL_SUFFIT_SEI_NUT = 40
 };
 
 void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id);
+void picture_checksum(const picture* pic, unsigned char* checksum_out);
 
 #endif

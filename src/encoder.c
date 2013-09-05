@@ -34,6 +34,9 @@
 int16_t g_lambda_cost[55];
 uint32_t* g_auiSigLastScan[3][7];
 
+/* Local functions. */
+static void add_checksum(encoder_control* encoder);
+
 void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32_t iWidth, int32_t iHeight)
 {
   uint32_t uiNumScanPos  = iWidth * iWidth;
@@ -370,6 +373,8 @@ void encode_one_frame(encoder_control* encoder)
     filter_deblock(encoder);
   }
 
+  /* Calculate checksum */
+  add_checksum(encoder);
 
   /* Clear prediction data */
   /* ToDo: store as reference data */
@@ -379,6 +384,37 @@ void encode_one_frame(encoder_control* encoder)
   }
 
 }
+
+
+/*!
+ \brief Add a checksum SEI message to the bitstream.
+ \param encoder The encoder.
+ \returns Void
+ */
+static void add_checksum(encoder_control* encoder)
+{
+  unsigned char checksum[3][16];
+  uint32_t checksum_val;
+  unsigned int i;
+
+  picture_checksum(&(encoder->in.cur_pic), checksum);
+
+  WRITE_U(encoder->stream, 132, 8, "sei_type");
+  WRITE_U(encoder->stream, 13, 8, "size");
+  WRITE_U(encoder->stream, 2, 8, "hash_type"); /* 2 = checksum*/
+
+  for (i = 0; i < 3; ++i) {
+    /* Pack bits into a single 32 bit uint instead of pushing them one byte at a time. */
+    checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) + (checksum[i][2] << 8) + (checksum[i][3]);
+    WRITE_U(encoder->stream, checksum_val, 32, 'picture_checksum');
+  }
+
+  bitstream_align(encoder->stream);
+  bitstream_flush(encoder->stream);
+  nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_SUFFIT_SEI_NUT, 0);
+  bitstream_clear_buffer(encoder->stream);
+}
+
 
 void encode_pic_parameter_set(encoder_control* encoder)
 {
