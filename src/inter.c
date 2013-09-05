@@ -40,14 +40,16 @@ void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
   {
     int CUpos = y*width_in_SCU;
     for(x = xCtb; x < xCtb+block_SCU_width; x++)
-    {      
+    {
       for(d = 0; d < MAX_DEPTH+1; d++)
       {
         pic->CU[d][CUpos+x].depth = depth;
-        pic->CU[d][CUpos+x].type = CU_INTER;
-        pic->CU[d][CUpos+x].inter.mode = mode;        
+        pic->CU[d][CUpos+x].type  = CU_INTER;
+        pic->CU[d][CUpos+x].inter.mode = mode;
+        pic->CU[d][CUpos+x].inter.mv_dir = 1;
       }
     }
   }
 }
+
 

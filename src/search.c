@@ -20,6 +20,7 @@
 #include "bitstream.h"
 #include "picture.h"
 #include "intra.h"
+#include "inter.h"
 #include "encoder.h"
 #include "filter.h"
 #include "search.h"
@@ -155,17 +156,20 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   /* INTER SEARCH */
   if(encoder->in.cur_pic.slicetype != SLICE_I)
   {
-    /* Motion estimation on P-frame */
-    if(encoder->in.cur_pic.slicetype != SLICE_B)
+    if(depth >= MIN_SEARCH_DEPTH)
     {
+      /* Motion estimation on P-frame */
+      if(encoder->in.cur_pic.slicetype != SLICE_B)
+      {
 
+      }
+
+      cur_CU->type = CU_INTER;
+      cur_CU->inter.mv[0] = 0<<2;
+      cur_CU->inter.mv[1] = 0<<2;
+      cur_CU->inter.cost = 10;
+      cur_CU->inter.mv_dir = 1;
     }
-
-    cur_CU->type = CU_INTER;
-    cur_CU->inter.mv[0] = 1<<2;
-    cur_CU->inter.mv[1] = -2<<2;
-    cur_CU->inter.cost = 10;
-    cur_CU->inter.mv_dir = 1;
     return;
   }
 
@@ -206,12 +210,27 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
-  uint32_t bestCost = cur_CU->intra.cost;
+  uint32_t bestIntraCost = cur_CU->intra.cost;
+  uint32_t bestInterCost = cur_CU->inter.cost;
+  uint32_t bestCost = 0;
   uint32_t cost = 0;
   uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //ToDo: Correct cost calculation
-
+  
+  /* Force split when not at MIN_SEARCH_DEPTH */
+  if(depth < MIN_SEARCH_DEPTH)
+  {
+    picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
+    if(encoder->in.cur_pic.slicetype != SLICE_I)
+    {
+      inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
+    }
+    else
+    {
+      intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+    }
+  }
   /* Split and search to max_depth */
-  if(depth != MAX_SEARCH_DEPTH)
+  else if(depth != MAX_SEARCH_DEPTH)
   {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);
@@ -221,11 +240,19 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
     cost += search_best_mode(encoder,xCtb+change,yCtb+change,depth+1);
 
     /* We split if the cost is better (0 cost -> not checked) */
-    if(cost != 0 && cost+lambdaCost < bestCost)
+    if(cost != 0 && (cost+lambdaCost < bestIntraCost || (bestInterCost != 0 && encoder->in.cur_pic.slicetype != SLICE_I && cost+lambdaCost < bestInterCost)))
     {
       /* Set split to 1 */
       picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
       bestCost = cost+lambdaCost;
+    }
+    /* Else, check if inter cost is smaller or the same as intra */
+    else if(bestInterCost != 0 && bestInterCost <= bestIntraCost && encoder->in.cur_pic.slicetype != SLICE_I)
+    {
+      /* Set split to 0 and mode to inter.mode */
+      picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
+      inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
+      bestCost = bestInterCost;
     }
     /* Else, dont split and recursively set block mode */
     else
@@ -233,13 +260,22 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
       /* Set split to 0 and mode to intra.mode */
       picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
       intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+      bestCost = bestIntraCost;
     }
+  }
+  else if(bestInterCost != 0 && bestInterCost <= bestIntraCost && encoder->in.cur_pic.slicetype != SLICE_I)
+  {
+    /* Set split to 0 and mode to inter.mode */
+    picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
+    inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
+    bestCost = bestInterCost;
   }
   else
   {
     /* Set split to 0 and mode to intra.mode */
     picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
     intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+    bestCost = bestIntraCost;
   }
 
   return bestCost;
