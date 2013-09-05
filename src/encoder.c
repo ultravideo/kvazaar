@@ -891,10 +891,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
               {
                 if(0)//encoder->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
                 {
+                  /* parseRefFrmIdx */
                   int32_t iRefFrame = cur_CU->inter.mv_ref;
                   
                   cabac.ctx = &g_cCURefPicSCModel[0];
-                  CABAC_BIN(&cabac, (iRefFrame==0)?0:1, "ref_frame_flag");
+                  CABAC_BIN(&cabac, (iRefFrame==0)?0:1, "ref_frame_flag"); 
     
                   if(iRefFrame > 0)
                   {
@@ -956,7 +957,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                       {
                         cabac_writeEpExGolomb(&cabac,mvd_hor_abs-2, 1);
                       }
-                      CABAC_BIN(&cabac, (0>mvd_hor)?1:0, "MVD_hor_sign_flag");
+                      CABAC_BIN(&cabac, (mvd_hor>0)?0:1, "MVD_hor_sign_flag");
                     }
 
                     if(bVerAbsGr0)
@@ -965,14 +966,14 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                       {
                         cabac_writeEpExGolomb(&cabac,mvd_ver_abs-2, 1);
                       }
-                      CABAC_BIN(&cabac, (0>mvd_ver)?1:0, "MVD_ver_sign_flag");
+                      CABAC_BIN(&cabac, (mvd_ver>0)?0:1, "MVD_ver_sign_flag");
                     }
                 }
 
                 {
                   int32_t iSymbol = cur_CU->inter.mv_ref;//pcCU->getMVPIdx(eRefList, uiAbsPartIdx);
-                  int32_t iNum = AMVP_MAX_NUM_CANDS;                  
-                  cabac_writeUnaryMaxSymbol(&cabac,(cabac_ctx**)g_cMVPIdxSCModel, iSymbol,1,iNum-1);
+                  int32_t iNum = AMVP_MAX_NUM_CANDS;
+                  cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, iSymbol,1,iNum-1);
                 }
               }
             }

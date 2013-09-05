@@ -65,7 +65,7 @@ void cabac_finish(cabac_data* data);
 void cabac_flush(cabac_data* data);
 void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam );
 void cabac_writeEpExGolomb(cabac_data* data, uint32_t uiSymbol, uint32_t uiCount );
-void cabac_writeUnaryMaxSymbol(cabac_data* data,cabac_ctx** ctx, uint32_t uiSymbol,int32_t iOffset, uint32_t uiMaxSymbol);
+void cabac_writeUnaryMaxSymbol(cabac_data* data,cabac_ctx* ctx, uint32_t uiSymbol,int32_t iOffset, uint32_t uiMaxSymbol);
 
 #ifdef VERBOSE
 #define CABAC_BIN(data, value, name) {  uint32_t prev_state = (data)->ctx->ucState;\

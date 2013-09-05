@@ -343,27 +343,27 @@ void cabac_writeCoeffRemain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
   }
 }
 
-void cabac_writeUnaryMaxSymbol(cabac_data* data,cabac_ctx** ctx, uint32_t uiSymbol,int32_t iOffset, uint32_t uiMaxSymbol)
+void cabac_writeUnaryMaxSymbol(cabac_data* data,cabac_ctx* ctx, uint32_t uiSymbol,int32_t iOffset, uint32_t uiMaxSymbol)
 {
   int8_t bCodeLast = ( uiMaxSymbol > uiSymbol );
 
   if (!uiMaxSymbol)  
     return;
   
-  data->ctx = ctx[0];
+  data->ctx = &ctx[0];
   cabac_encodeBin(data, uiSymbol ? 1 : 0);
   
-  if (!uiSymbol)  
+  if (!uiSymbol)
     return;
   
   while( --uiSymbol )
   {
-    data->ctx = ctx[iOffset];
+    data->ctx = &ctx[iOffset];
     cabac_encodeBin(data, 1);
   }
   if( bCodeLast )
   {
-    data->ctx = ctx[iOffset];
+    data->ctx = &ctx[iOffset];
     cabac_encodeBin(data, 0);
   }
   
