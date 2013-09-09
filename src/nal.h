@@ -68,6 +68,6 @@ enum {
 };
 
 void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id);
-void picture_checksum(const picture* pic, unsigned char* checksum_out);
+void picture_checksum(const picture* pic, unsigned char checksum_out[][16]);
 
 #endif

@@ -797,7 +797,9 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   uint32_t* scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
   //uint32_t scanIdx = SCAN_DIAG;
 
+  #if ENABLE_SIGN_HIDING == 1
   int32_t deltaU[LCU_WIDTH*LCU_WIDTH>>2];
+  #endif
   int32_t iQpBase = encoder->QP;
 
   int32_t qpScaled;
