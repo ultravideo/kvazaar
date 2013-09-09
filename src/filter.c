@@ -125,7 +125,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
   int32_t betaOffsetDiv2 = encoder->betaOffsetdiv2;
   int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
   int8_t uiBs       = 2; /* Filter strength */
-  /* ToDo: support 10+bits */
+  /* TODO: support 10+bits */
   uint8_t* origsrc      = &encoder->in.cur_pic.yRecData[xpos+ypos*stride];
   uint8_t* src = origsrc;
   int32_t step = 1;
@@ -149,7 +149,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
     uint32_t blocks_in_part= (LCU_WIDTH>>depth) / 4;
     uint32_t block_idx;
 
-    /* ToDo: add CU based QP calculation */
+    /* TODO: add CU based QP calculation */
 
     /* For each 4-pixel part in the edge */
     for (block_idx = 0; block_idx < blocks_in_part; block_idx++)
@@ -171,7 +171,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
       d  =  d0 + d3;
 
       #if ENABLE_PCM == 1
-      //ToDo: add PCM deblocking
+      //TODO: add PCM deblocking
       #endif
       if (d < Beta)
       { 
@@ -198,7 +198,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
   int32_t stride = encoder->in.cur_pic.width>>1;
   int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
   int8_t uiNumParts = 1;
-  /* ToDo: support 10+bits */
+  /* TODO: support 10+bits */
   uint8_t* srcU      = &encoder->in.cur_pic.uRecData[xpos+ypos*stride];
   uint8_t* srcV      = &encoder->in.cur_pic.vRecData[xpos+ypos*stride];
   /* Init offset and step to EDGE_HOR */
@@ -306,7 +306,7 @@ void filter_deblock(encoder_control* encoder)
 {
   int16_t xCtb,yCtb;
 
-  /* ToDo: Optimization: add thread for each LCU */
+  /* TODO: Optimization: add thread for each LCU */
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
   {

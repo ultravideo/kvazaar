@@ -208,7 +208,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint32_t bestCost = cur_CU->intra.cost;
   uint32_t cost = 0;
-  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //ToDo: Correct cost calculation
+  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //TODO: Correct cost calculation
 
   /* Split and search to max_depth */
   if(depth != MAX_SEARCH_DEPTH)

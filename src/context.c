@@ -52,7 +52,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
 {
   uint16_t i;
   /* Initialize contexts */
-  /* ToDo: add P/B slice */  
+  /* TODO: add P/B slice */  
   ctx_init(&g_cCUMergeFlagExtSCModel, encoder->QP, INIT_MERGE_FLAG_EXT[SLICE][0]);
   ctx_init(&g_cCUMergeIdxExtSCModel, encoder->QP, INIT_MERGE_IDX_EXT[SLICE][0]);
   ctx_init(&g_cCUPredModeSCModel, encoder->QP, INIT_PRED_MODE[SLICE][0]);
@@ -74,7 +74,7 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   ctx_init(&g_cCUAbsSCModel_chroma[0], encoder->QP, INIT_ABS_FLAG[SLICE][4]);
   ctx_init(&g_cCUAbsSCModel_chroma[1], encoder->QP, INIT_ABS_FLAG[SLICE][5]);
 
-  //ToDo: ignore P/B contexts on intra frame
+  //TODO: ignore P/B contexts on intra frame
   ctx_init(&g_cCUMvdSCModel[0], encoder->QP, INIT_MVD[SLICE][0]);
   ctx_init(&g_cCUMvdSCModel[1], encoder->QP, INIT_MVD[SLICE][1]);
   ctx_init(&g_cCURefPicSCModel[0], encoder->QP, INIT_REF_PIC[SLICE][0]);

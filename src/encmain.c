@@ -160,7 +160,7 @@
     /* Set CABAC output bitstream */
     cabac.stream = encoder->stream;
 
-    /* input init (ToDo: read from commandline / config) */
+    /* input init (TODO: read from commandline / config) */
     encoder->bitdepth = 8;
     encoder->frame    = 0;
     encoder->QP       = 32;

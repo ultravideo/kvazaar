@@ -95,7 +95,7 @@ void initSigLastScan(uint32_t* pBuffD, uint32_t* pBuffH, uint32_t* pBuffV, int32
         {
           int    iPrimDim  = uiScanLine;
           int    iScndDim  = 0;
-          //ToDo: optimize
+          //TODO: optimize
           while( iPrimDim >= 4 )
           {
             iScndDim++;
@@ -196,7 +196,7 @@ void init_tables(void)
   }
 
   /* Lambda cost */
-  /* ToDo: cleanup */
+  /* TODO: cleanup */
   //g_lambda_cost = (int16_t*)malloc(sizeof(int16_t)*55);
   for(i = 0; i < 55; i++)
   {
@@ -250,7 +250,7 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
   memset(input->cur_pic.vRecData, 128, (width*height)>>2);
 
   /* Allocate memory for CU info 2D array */
-  //ToDo: we don't need this much space on LCU...MAX_DEPTH-1
+  //TODO: we don't need this much space on LCU...MAX_DEPTH-1
   input->cur_pic.CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
   for(i=0; i<MAX_DEPTH+1; i++)
   {
@@ -377,7 +377,7 @@ void encode_one_frame(encoder_control* encoder)
   add_checksum(encoder);
 
   /* Clear prediction data */
-  /* ToDo: store as reference data */
+  /* TODO: store as reference data */
   for(i=0; i < MAX_DEPTH+1; i++)
   {
     memset(encoder->in.cur_pic.CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
@@ -438,7 +438,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(encoder->stream, 0, "diff_cu_qp_delta_depth");
 
-  //ToDo: add QP offsets
+  //TODO: add QP offsets
   WRITE_SE(encoder->stream, 0, "pps_cb_qp_offset");
   WRITE_SE(encoder->stream, 0, "pps_cr_qp_offset");
   WRITE_U(encoder->stream, 0, 1, "pps_slice_chroma_qp_offsets_present_flag");
@@ -449,7 +449,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "transquant_bypass_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "tiles_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "entropy_coding_sync_enabled_flag");
-  //ToDo: enable tiles for concurrency
+  //TODO: enable tiles for concurrency
   //IF tiles
   //ENDIF
   WRITE_U(encoder->stream, 0, 1, "loop_filter_across_slice_flag");
@@ -511,7 +511,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
-  /* ToDo: profile IDC and level IDC should be defined later on */
+  /* TODO: profile IDC and level IDC should be defined later on */
   WRITE_U(encoder->stream, 0, 4, "sps_video_parameter_set_id");
   WRITE_U(encoder->stream, 1, 3, "sps_max_sub_layers_minus1");
 
@@ -528,7 +528,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  //ToDo: conformance window when size not divisible by 8 (SCU)
+  //TODO: conformance window when size not divisible by 8 (SCU)
   WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
   //IF window flag
   //END IF
@@ -581,7 +581,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
 
   WRITE_U(encoder->stream, 0, 1, "vui_parameters_present_flag");
-  //ToDo: VUI?
+  //TODO: VUI?
   //encode_VUI(encoder);
   
 	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
@@ -744,7 +744,7 @@ void encode_slice_data(encoder_control* encoder)
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 { 
   CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
-  uint8_t split_flag = cur_CU->split;//(depth<1)?1:0; /* ToDo: get from CU data */
+  uint8_t split_flag = cur_CU->split;//(depth<1)?1:0; /* TODO: get from CU data */
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -778,15 +778,15 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       /* Split blocks and remember to change x and y block positions */
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
       encode_coding_tree(encoder,xCtb,yCtb,depth+1); /* x,y */
-      if(!border_x || border_split_x) /* ToDo: fix when other half of the block would not be completely over the border */
+      if(!border_x || border_split_x) /* TODO: fix when other half of the block would not be completely over the border */
       {
         encode_coding_tree(encoder,xCtb+change,yCtb,depth+1); /* x+1,y */
       }
-      if(!border_y || border_split_y) /* ToDo: fix when other half of the block would not be completely over the border */
+      if(!border_y || border_split_y) /* TODO: fix when other half of the block would not be completely over the border */
       {
         encode_coding_tree(encoder,xCtb,yCtb+change,depth+1); /* x,y+1 */
       }
-      if(!border || (border_split_x && border_split_y) ) /* ToDo: fix when other half of the block would not be completely over the border */
+      if(!border || (border_split_x && border_split_y) ) /* TODO: fix when other half of the block would not be completely over the border */
       {
         encode_coding_tree(encoder,xCtb+change,yCtb+change,depth+1); /* x+1,y+1 */
       }
@@ -808,7 +808,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   if(cur_CU->type == CU_SKIP)
   {
     /* Encode merge index */
-    //ToDo: calculate/fetch merge candidates
+    //TODO: calculate/fetch merge candidates
     int16_t unaryIdx = 0;//pcCU->getMergeIndex( uiAbsPartIdx );
     int16_t numCand = 0;//pcCU->getSlice()->getMaxNumMergeCand();
     int32_t ui;
@@ -846,10 +846,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   /* Signal PartSize on max depth */
   if(depth == MAX_DEPTH || cur_CU->type != CU_INTRA)
   {
-    /* ToDo: Handle inter sizes other than 2Nx2N */
+    /* TODO: Handle inter sizes other than 2Nx2N */
     cabac.ctx = &g_PartSizeSCModel[0];
     CABAC_BIN(&cabac, 1, "PartSize");
-    /* ToDo: add AMP modes */
+    /* TODO: add AMP modes */
   }
     
     /*end partsize*/
@@ -953,7 +953,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                 if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder->ref_list == REF_PIC_LIST_1 && cur_CU->inter.mv_dir==3))
                 {
                     /*const TComCUMvField* pcCUMvField = pcCU->getCUMvField( eRefList );*/
-                    //ToDo: calculate MV field difference
+                    //TODO: calculate MV field difference
                     const int32_t mvd_hor = cur_CU->inter.mv[0];//pcCUMvField->getMvd( uiAbsPartIdx ).getHor();
                     const int32_t mvd_ver = cur_CU->inter.mv[1];//pcCUMvField->getMvd( uiAbsPartIdx ).getVer();
                     const int8_t bHorAbsGr0 = mvd_hor != 0;
@@ -1068,7 +1068,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         If intra prediction mode is found from the predictors,
         it can be signaled with two EP's. Otherwise we can send
         5 EP bins with the full predmode
-        ToDo: split to a function
+        TODO: split to a function
       */
       intra_getDirLumaPredictor(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPreds);
       
@@ -1163,7 +1163,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       /* Coeff */
       /* Transform tree */
       {
-        /* ToDo: dynamic memory allocation */
+        /* TODO: dynamic memory allocation */
         int16_t coeff[LCU_WIDTH*LCU_WIDTH*2];
         int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>1];
         int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>1];
@@ -1329,7 +1329,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
 
     /* INTRA PREDICTION */
-    /* ToDo: split to a function! */
+    /* TODO: split to a function! */
     int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
     int16_t *recShift  = &rec[(LCU_WIDTH>>(depth))*2+8+1];
     int16_t *recShiftU = &rec[(LCU_WIDTH>>(depth+1))*2+8+1];
@@ -1399,7 +1399,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
         for(x = 0; x < LCU_WIDTH>>depth; x++)
         {
           int16_t val = block[i++]+pred[x+y*pred_stride];
-          //ToDo: support 10+bits
+          //TODO: support 10+bits
           recbase[x+y*recbase_stride] = (uint8_t)/*(val&0xff);//*/CLIP(0,255,val);
         }
       }
@@ -1477,7 +1477,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
           for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
           {
             int16_t val = block[i++]+predU[x+y*(pred_stride>>1)];
-            //ToDo: support 10+bits
+            //TODO: support 10+bits
             recbaseU[x+y*(recbase_stride>>1)] = (uint8_t)CLIP(0,255,val);
           }
         }
@@ -1507,7 +1507,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
           for(x = 0; x < LCU_WIDTH>>(depth+1); x++)
           {
             int16_t val = block[i++]+predV[x+y*(pred_stride>>1)];
-            //ToDo: support 10+bits
+            //TODO: support 10+bits
             recbaseV[x+y*(recbase_stride>>1)] = (uint8_t)CLIP(0,255,val);
           }
         }
@@ -1622,7 +1622,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
       uiDirMode = ti->intraPredModeChroma;
       if(uiDirMode==36)
       {
-        /* ToDo: support NxN */
+        /* TODO: support NxN */
         uiDirMode = ti->intraPredMode;
       }
       uiScanIdx = SCAN_DIAG;

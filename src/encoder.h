@@ -18,7 +18,7 @@
 
 typedef struct encoder_control;
 
-/* ToDo: add ME data */
+/* TODO: add ME data */
 typedef struct
 {
   void (*IME)();
@@ -83,7 +83,7 @@ typedef struct
   int32_t recbase_stride;
   int32_t pred_stride;
   
-  /* ToDo: unify luma+chroma arrays */
+  /* TODO: unify luma+chroma arrays */
   int16_t *coeff[3];
   int8_t cb_top[3];
   int8_t cb[4];

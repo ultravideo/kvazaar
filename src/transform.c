@@ -291,7 +291,7 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
   scalinglist_processEnc(coeff,quantcoeff,g_quantScales[qp]<<4,height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
   scalinglist_processDec(coeff,dequantcoeff,g_invQuantScales[qp],height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
 
-  //ToDo: support NSQT
+  //TODO: support NSQT
   //if(sizeId == /*SCALING_LIST_32x32*/3 || sizeId == /*SCALING_LIST_16x16*/2) //for NSQT
   //{
   //  quantcoeff   = g_quant_coeff[listId][qp][sizeId-1][/*SCALING_LIST_VER*/1];
