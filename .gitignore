@@ -1,3 +1,9 @@
-
+# Build files
 /bin
 /build
+
+# Generated documentation
+/doxygen_html
+
+# Other files
+*.exe
