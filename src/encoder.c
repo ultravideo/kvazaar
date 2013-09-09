@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "global.h"
 #include "config.h"
 #include "encoder.h"
@@ -214,12 +215,23 @@ void init_encoder_control(encoder_control* control,bitstream* output)
 void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height)
 {
   int i;
+  unsigned luma_size;
+  unsigned chroma_size;
   input->file = inputfile;
   input->width = width;
   input->height = height;
+  
+  // If input dimensions are not divisible by the smallest block size, add pixels to the dimensions, so that they are.
+  // These extra pixels will be compressed along with the real ones but they will be cropped out before rendering.
+  if (width % CU_MIN_SIZE_PIXELS) {
+    input->width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
+  }
+  if (width % CU_MIN_SIZE_PIXELS) {
+    input->height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
+  }
 
   input->height_in_LCU = height / LCU_WIDTH;
-  input->width_in_LCU  =  width / LCU_WIDTH;
+  input->width_in_LCU  = width / LCU_WIDTH;
 
   /* Add one extra LCU when image not divisible by LCU_WIDTH */
   if(input->height_in_LCU * LCU_WIDTH < height)
@@ -231,23 +243,33 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
     input->width_in_LCU++;
   }
 
-  input->cur_pic.width  = width;
-  input->cur_pic.height = height;
+  luma_size = input->width * input->height;
+  chroma_size = luma_size / 4;
+
+  #ifdef _DEBUG
+  if (width != input->width || height != input->height) {
+    printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
+    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, input->cur_pic.width, height, input->cur_pic.height);
+  }
+  #endif
+
+  input->cur_pic.width  = input->width;
+  input->cur_pic.height = input->height;
   input->cur_pic.width_in_LCU  = input->width_in_LCU;
   input->cur_pic.height_in_LCU = input->height_in_LCU;
   input->cur_pic.referenced = 0;
   /* Allocate buffers */
-  input->cur_pic.yData = (uint8_t *)malloc(width*height);
-  input->cur_pic.uData = (uint8_t *)malloc((width*height)>>2);
-  input->cur_pic.vData = (uint8_t *)malloc((width*height)>>2);
+  input->cur_pic.yData = (uint8_t *)malloc(luma_size);
+  input->cur_pic.uData = (uint8_t *)malloc(chroma_size);
+  input->cur_pic.vData = (uint8_t *)malloc(chroma_size);
 
   /* Reconstruction buffers */
-  input->cur_pic.yRecData = (uint8_t *)malloc(width*height);
-  input->cur_pic.uRecData = (uint8_t *)malloc((width*height)>>2);
-  input->cur_pic.vRecData = (uint8_t *)malloc((width*height)>>2);
+  input->cur_pic.yRecData = (uint8_t *)malloc(luma_size);
+  input->cur_pic.uRecData = (uint8_t *)malloc(chroma_size);
+  input->cur_pic.vRecData = (uint8_t *)malloc(chroma_size);
 
-  memset(input->cur_pic.uRecData, 128, (width*height)>>2);
-  memset(input->cur_pic.vRecData, 128, (width*height)>>2);
+  memset(input->cur_pic.uRecData, 128, (chroma_size));
+  memset(input->cur_pic.vRecData, 128, (chroma_size));
 
   /* Allocate memory for CU info 2D array */
   //TODO: we don't need this much space on LCU...MAX_DEPTH-1
@@ -508,6 +530,8 @@ void encode_PTL(encoder_control *encoder)
 
 void encode_seq_parameter_set(encoder_control* encoder)
 {
+  encoder_input* const in = &encoder->in;
+
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
@@ -528,8 +552,20 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  //TODO: conformance window when size not divisible by 8 (SCU)
-  WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
+  if (in->width != in->cur_pic.width || in->height != in->cur_pic.height) {
+    // The standard does not seem to allow setting conf_win values such that the number of
+    // luma samples is not a multiple of 2. Options are to either hide one line or show an
+    // extra line of non-video. Neither seems like a very good option, so let's not even try.
+    assert(!(in->width % 2));
+    WRITE_U(encoder->stream, 1, 1, "conformance_window_flag");
+    WRITE_UE(encoder->stream, 0, "conf_win_left_offset");
+    WRITE_UE(encoder->stream, (in->width - in->cur_pic.width), "conf_win_right_offset");
+    WRITE_UE(encoder->stream, 0, "conf_win_top_offset");
+    WRITE_UE(encoder->stream, (in->height - in->cur_pic.height), "conf_win_bottom_offset");
+  } else {
+    WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
+  }
+  
   //IF window flag
   //END IF
   
