@@ -103,8 +103,8 @@ void bitstream_clear_buffer(bitstream* stream)
 /*!
   \brief Put bits to bitstream 
   \param stream pointer bitstream to put the data
-  \param data pointer to actual data
-  \param bits number of bits to write      
+  \param data input data
+  \param bits number of bits to write from data to stream
 */ 
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits)
 {

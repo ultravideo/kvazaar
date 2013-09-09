@@ -51,6 +51,7 @@ cabac_ctx g_cMVPIdxSCModel[2];
 void init_contexts(encoder_control *encoder, int8_t SLICE)
 {
   uint16_t i;
+
   /* Initialize contexts */
   /* ToDo: add P/B slice */  
   ctx_init(&g_cCUMergeFlagExtSCModel, encoder->QP, INIT_MERGE_FLAG_EXT[SLICE][0]);

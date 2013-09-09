@@ -1,5 +1,9 @@
-
+# Build files
 /bin
 /build
-/doxygen
+
+# Generated documentation
 /doxygen_html
+
+# Other files
+*.exe
