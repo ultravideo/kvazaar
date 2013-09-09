@@ -203,43 +203,36 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   }
 }
 
-uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
+uint32_t search_best_mode(encoder_control* encoder, uint16_t xCtb, uint16_t yCtb, uint8_t depth)
 {
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb + yCtb * (encoder->in.width_in_LCU << MAX_DEPTH)];
   uint32_t bestCost = cur_CU->intra.cost;
   uint32_t cost = 0;
-  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //TODO: Correct cost calculation
+  uint32_t lambdaCost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
 
   /* Split and search to max_depth */
-  if(depth != MAX_SEARCH_DEPTH)
-  {
+  if (depth != MAX_SEARCH_DEPTH) {
     /* Split blocks and remember to change x and y block positions */
-    uint8_t change = 1<<(MAX_DEPTH-1-depth);
-    cost = search_best_mode(encoder,xCtb,yCtb,depth+1);
-    cost += search_best_mode(encoder,xCtb+change,yCtb,depth+1);
-    cost += search_best_mode(encoder,xCtb,yCtb+change,depth+1);
-    cost += search_best_mode(encoder,xCtb+change,yCtb+change,depth+1);
+    uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
+    cost = search_best_mode(encoder, xCtb, yCtb, depth + 1);
+    cost += search_best_mode(encoder, xCtb + change, yCtb, depth + 1);
+    cost += search_best_mode(encoder, xCtb, yCtb + change, depth + 1);
+    cost += search_best_mode(encoder, xCtb + change, yCtb + change, depth + 1);
 
     /* We split if the cost is better (0 cost -> not checked) */
-    if(cost != 0 && cost+lambdaCost < bestCost)
-    {
+    if (cost != 0 && cost + lambdaCost < bestCost) {
       /* Set split to 1 */
-      picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
-      bestCost = cost+lambdaCost;
-    }
-    /* Else, dont split and recursively set block mode */
-    else
-    {
+      picture_setBlockSplit(&encoder->in.cur_pic, xCtb, yCtb, depth, 1);
+      bestCost = cost + lambdaCost;
+    } else { /* Else, dont split and recursively set block mode */
       /* Set split to 0 and mode to intra.mode */
-      picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
-      intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+      picture_setBlockSplit(&encoder->in.cur_pic, xCtb, yCtb, depth, 0);
+      intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, cur_CU->intra.mode);
     }
-  }
-  else
-  {
+  } else {
     /* Set split to 0 and mode to intra.mode */
-    picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
-    intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+    picture_setBlockSplit(&encoder->in.cur_pic, xCtb, yCtb, depth, 0);
+    intra_setBlockMode(&encoder->in.cur_pic, xCtb, yCtb, depth, cur_CU->intra.mode);
   }
 
   return bestCost;
