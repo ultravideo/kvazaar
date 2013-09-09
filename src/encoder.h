@@ -99,6 +99,7 @@ void init_tables(void);
 void init_encoder_control(encoder_control* control,bitstream* output);
 void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height);
 void encode_one_frame(encoder_control* encoder);
+void read_one_frame(FILE* file, encoder_control* encoder);
 
 
 void encode_seq_parameter_set(encoder_control* encoder);

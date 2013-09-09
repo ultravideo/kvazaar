@@ -178,9 +178,7 @@
     while(!feof(input) && (!cfg->frames || encoder->frame < cfg->frames))
     {
       /* Read one frame from the input */
-      fread(encoder->in.cur_pic.yData, cfg->width*cfg->height,1,input);
-      fread(encoder->in.cur_pic.uData, cfg->width*cfg->height>>2,1,input);
-      fread(encoder->in.cur_pic.vData, cfg->width*cfg->height>>2,1,input);
+      read_one_frame(input, encoder);
 
       /* Clear reconstruction buffers (not needed, for debugging) */
       /*

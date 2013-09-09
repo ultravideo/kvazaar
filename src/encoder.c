@@ -407,6 +407,14 @@ void encode_one_frame(encoder_control* encoder)
 
 }
 
+void read_one_frame(FILE* file, encoder_control* encoder)
+{
+  encoder_input* in = &encoder->in;
+
+  fread(in->cur_pic.yData, in->width * in->height, 1, file);
+  fread(in->cur_pic.uData, in->width * in->height >> 2, 1, file);
+  fread(in->cur_pic.vData, in->width * in->height >> 2, 1, file);
+}
 
 /*!
  \brief Add a checksum SEI message to the bitstream.
