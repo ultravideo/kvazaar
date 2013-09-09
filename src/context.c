@@ -46,7 +46,7 @@ cabac_ctx g_cCUMergeFlagExtSCModel;
 cabac_ctx g_cCUMvdSCModel[2];
 cabac_ctx g_cCURefPicSCModel[2];
 cabac_ctx g_cMVPIdxSCModel[2];
-
+cabac_ctx g_cCUQtRootCbfSCModel;
 
 void init_contexts(encoder_control *encoder, int8_t SLICE)
 {
@@ -76,6 +76,8 @@ void init_contexts(encoder_control *encoder, int8_t SLICE)
   ctx_init(&g_cCUAbsSCModel_chroma[1], encoder->QP, INIT_ABS_FLAG[SLICE][5]);
 
   //ToDo: ignore P/B contexts on intra frame
+  ctx_init(&g_cCUQtRootCbfSCModel, encoder->QP, INIT_QT_ROOT_CBF[SLICE][0]);
+
   ctx_init(&g_cCUMvdSCModel[0], encoder->QP, INIT_MVD[SLICE][0]);
   ctx_init(&g_cCUMvdSCModel[1], encoder->QP, INIT_MVD[SLICE][1]);
   ctx_init(&g_cCURefPicSCModel[0], encoder->QP, INIT_REF_PIC[SLICE][0]);

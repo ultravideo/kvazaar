@@ -55,7 +55,16 @@ extern cabac_ctx g_cCUMergeFlagExtSCModel;
 extern cabac_ctx g_cCUMvdSCModel[2];
 extern cabac_ctx g_cCURefPicSCModel[2];
 extern cabac_ctx g_cMVPIdxSCModel[2];
+extern cabac_ctx g_cCUQtRootCbfSCModel;
 #define CNU 154
+
+static const uint8_t 
+INIT_QT_ROOT_CBF[3][1] = 
+{
+  {  79, }, 
+  {  79, }, 
+  { CNU, }, 
+};
 
 static const uint8_t 
 INIT_MVP_IDX[3][2] =  

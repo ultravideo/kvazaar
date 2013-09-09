@@ -807,7 +807,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   /* Encode skip flag */
   if(encoder->in.cur_pic.slicetype != SLICE_I)
   {
-    int8_t uiCtxSkip = 0;
+    int8_t uiCtxSkip = 0;    
     /* uiCtxSkip = aboveskipped + leftskipped; */
     cabac.ctx = &g_cCUSkipFlagSCModel[uiCtxSkip];
     CABAC_BIN(&cabac, (cur_CU->type == CU_SKIP)?1:0, "SkipFlag");
@@ -972,19 +972,19 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     const uint32_t mvd_ver_abs = abs(mvd_ver);
 
                     cabac.ctx = &g_cCUMvdSCModel[0];
-                    CABAC_BIN(&cabac, (mvd_hor!=0)?1:0, "MVD_hor_flag");
-                    CABAC_BIN(&cabac, (mvd_ver!=0)?1:0, "MVD_ver_flag");
+                    CABAC_BIN(&cabac, (mvd_hor!=0)?1:0, "abs_mvd_greater0_flag_hor");
+                    CABAC_BIN(&cabac, (mvd_ver!=0)?1:0, "abs_mvd_greater0_flag_ver");
 
                     cabac.ctx = &g_cCUMvdSCModel[1];
 
                     if(bHorAbsGr0)
                     {
-                      CABAC_BIN(&cabac, (mvd_hor_abs>1)?1:0, "MVD_hor_abs_>1_flag");
+                      CABAC_BIN(&cabac, (mvd_hor_abs>1)?1:0, "abs_mvd_greater1_flag_hor");
                     }
 
                     if(bVerAbsGr0)
                     {
-                      CABAC_BIN(&cabac, (mvd_ver_abs>1)?1:0, "MVD_ver_abs_>1_flag");
+                      CABAC_BIN(&cabac, (mvd_ver_abs>1)?1:0, "abs_mvd_greater1_flag_ver");
                     }
 
                     if(bHorAbsGr0)
@@ -993,7 +993,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                       {
                         cabac_writeEpExGolomb(&cabac,mvd_hor_abs-2, 1);
                       }
-                      CABAC_BIN(&cabac, (mvd_hor>0)?0:1, "MVD_hor_sign_flag");
+                      CABAC_BIN_EP(&cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
                     }
 
                     if(bVerAbsGr0)
@@ -1002,7 +1002,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                       {
                         cabac_writeEpExGolomb(&cabac,mvd_ver_abs-2, 1);
                       }
-                      CABAC_BIN(&cabac, (mvd_ver>0)?0:1, "MVD_ver_sign_flag");
+                      CABAC_BIN_EP(&cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
                     }
                 }
 
@@ -1015,6 +1015,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
             }
           }  
 
+          cabac.ctx = &g_cCUQtRootCbfSCModel;
+          CABAC_BIN(&cabac, 0, "rqt_root_cbf");
+          if(0)
           {
             transform_info ti;
             memset(&ti, 0, sizeof(transform_info));
