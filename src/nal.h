@@ -51,9 +51,9 @@ enum {
 
   // Reserved RSV_VCL 24-31
   
-  NAL_VID_PARAMETER_SET = 32,
-  NAL_SEQ_PARAMETER_SET = 33,
-  NAL_PIC_PARAMETER_SET = 34,
+  NAL_VPS_NUT = 32,
+  NAL_SPS_NUT = 33,
+  NAL_PPS_NUT = 34,
 
   AUD_NUT = 35,
   EOS_NUT = 36,

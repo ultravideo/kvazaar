@@ -272,21 +272,21 @@ void encode_one_frame(encoder_control* encoder)
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_VID_PARAMETER_SET, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_VPS_NUT, 0);
     bitstream_clear_buffer(encoder->stream);
 
     /* Sequence Parameter Set (SPS) */
     encode_seq_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_SEQ_PARAMETER_SET, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_SPS_NUT, 0);
     bitstream_clear_buffer(encoder->stream);
         
     /* Picture Parameter Set (PPS) */
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PIC_PARAMETER_SET, 0);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0, NAL_PPS_NUT, 0);
     bitstream_clear_buffer(encoder->stream);
 
     /* First slice is IDR */
