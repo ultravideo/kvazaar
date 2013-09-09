@@ -282,7 +282,6 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
   }  
 }
 
-
 void encode_one_frame(encoder_control* encoder)
 {
   int i;
@@ -407,13 +406,45 @@ void encode_one_frame(encoder_control* encoder)
 
 }
 
+void fill_after_frame(FILE* file, unsigned height, unsigned array_width, unsigned array_height, unsigned char* data)
+{
+  unsigned char* start = data +height * array_width;
+  unsigned char* end = data + array_width * array_height;
+  memset(start, 128, sizeof(unsigned char) * (end - start));
+}
+
+void read_and_fill_frame_data(FILE* file, unsigned width, unsigned height, unsigned array_width, unsigned char* data)
+{
+  unsigned char *p, *end;
+  for (p = data, end = p + array_width * height; p < end; ++p) {
+    fread(p, sizeof(unsigned char), width, file);
+    memset(p + width, 128, array_width - width);
+  }
+}
+
 void read_one_frame(FILE* file, encoder_control* encoder)
 {
   encoder_input* in = &encoder->in;
+  unsigned width = in->width;
+  unsigned height = in->height;
+  unsigned array_width = in->cur_pic.width;
+  unsigned array_height = in->cur_pic.height;
 
-  fread(in->cur_pic.yData, in->width * in->height, 1, file);
-  fread(in->cur_pic.uData, in->width * in->height >> 2, 1, file);
-  fread(in->cur_pic.vData, in->width * in->height >> 2, 1, file);
+  if (width != array_width) {
+    read_and_fill_frame_data(file, width, array_width, array_height, in->cur_pic.yData);
+    read_and_fill_frame_data(file, width >> 1, array_width >> 1, array_height >> 1, in->cur_pic.uData);
+    read_and_fill_frame_data(file, width >> 1, array_width >> 1, array_height >> 1, in->cur_pic.vData);
+  } else {
+    fread(in->cur_pic.yData, sizeof(unsigned char), width * height, file);
+    fread(in->cur_pic.uData, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
+    fread(in->cur_pic.vData, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
+  }
+
+  if (height != array_height) {
+    fill_after_frame(file, height, array_width, array_height, in->cur_pic.yData);
+    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1, in->cur_pic.uData);
+    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1, in->cur_pic.vData);
+  }
 }
 
 /*!
