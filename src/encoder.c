@@ -436,7 +436,7 @@ static void add_checksum(encoder_control* encoder)
   for (i = 0; i < 3; ++i) {
     /* Pack bits into a single 32 bit uint instead of pushing them one byte at a time. */
     checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) + (checksum[i][2] << 8) + (checksum[i][3]);
-    WRITE_U(encoder->stream, checksum_val, 32, 'picture_checksum');
+    WRITE_U(encoder->stream, checksum_val, 32, "picture_checksum");
   }
 
   bitstream_align(encoder->stream);
