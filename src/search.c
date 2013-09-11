@@ -153,10 +153,11 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     }
   }
   
+  cur_CU->inter.cost = 0;
   /* INTER SEARCH */
-  if(encoder->in.cur_pic.slicetype != SLICE_I)
+  if(encoder->in.cur_pic.slicetype != SLICE_I)// && (xCtb == 0) && yCtb == 0)
   {
-    if(depth >= MIN_SEARCH_DEPTH)
+    //if(depth >= MIN_SEARCH_DEPTH)
     {
       /* Motion estimation on P-frame */
       if(encoder->in.cur_pic.slicetype != SLICE_B)
@@ -167,8 +168,13 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
       cur_CU->type = CU_INTER;
       cur_CU->inter.mv[0] = 0<<2;
       cur_CU->inter.mv[1] = 0<<2;
+      if(xCtb == 0 && yCtb == 0)
+      {
+        cur_CU->inter.mv[1] = 20<<2;
+      }
       cur_CU->inter.cost = 10;
       cur_CU->inter.mv_dir = 1;
+      inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
     }
     return;
   }
@@ -216,21 +222,8 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   uint32_t cost = 0;
   uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //ToDo: Correct cost calculation
   
-  /* Force split when not at MIN_SEARCH_DEPTH */
-  if(depth < MIN_SEARCH_DEPTH)
-  {
-    picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
-    if(encoder->in.cur_pic.slicetype != SLICE_I)
-    {
-      inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
-    }
-    else
-    {
-      intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
-    }
-  }
   /* Split and search to max_depth */
-  else if(depth != MAX_SEARCH_DEPTH)
+  if(depth != MAX_SEARCH_DEPTH)
   {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);
@@ -240,14 +233,15 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
     cost += search_best_mode(encoder,xCtb+change,yCtb+change,depth+1);
 
     /* We split if the cost is better (0 cost -> not checked) */
-    if(cost != 0 && (cost+lambdaCost < bestIntraCost || (bestInterCost != 0 && encoder->in.cur_pic.slicetype != SLICE_I && cost+lambdaCost < bestInterCost)))
+    if(cost != 0 &&   (bestIntraCost != 0 && cost+lambdaCost < bestIntraCost) && 
+                      (bestInterCost != 0 && cost+lambdaCost < bestInterCost && encoder->in.cur_pic.slicetype != SLICE_I))
     {
       /* Set split to 1 */
       picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
       bestCost = cost+lambdaCost;
     }
     /* Else, check if inter cost is smaller or the same as intra */
-    else if(bestInterCost != 0 && bestInterCost <= bestIntraCost && encoder->in.cur_pic.slicetype != SLICE_I)
+    else if(bestInterCost != 0 && (bestInterCost <= bestIntraCost || bestIntraCost == 0) && encoder->in.cur_pic.slicetype != SLICE_I)
     {
       /* Set split to 0 and mode to inter.mode */
       picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
@@ -263,7 +257,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
       bestCost = bestIntraCost;
     }
   }
-  else if(bestInterCost != 0 && bestInterCost <= bestIntraCost && encoder->in.cur_pic.slicetype != SLICE_I)
+  else if(bestInterCost != 0 && (bestInterCost <= bestIntraCost || bestIntraCost == 0) && encoder->in.cur_pic.slicetype != SLICE_I)
   {
     /* Set split to 0 and mode to inter.mode */
     picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
