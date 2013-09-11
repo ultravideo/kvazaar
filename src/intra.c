@@ -239,14 +239,14 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   int16_t origBlock[LCU_WIDTH*LCU_WIDTH+1];  
   int16_t recFilteredTemp[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)+1];
 
-  //ToDo: Malloc with alignment
+  //TODO: Malloc with alignment
   //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
   //int16_t *origBlock = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
   //int16_t *recFilteredTemp = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
   int16_t* recFiltered = &recFilteredTemp[recstride+1];
   uint8_t *origShift = &orig[xpos+ypos*origstride];
-  int8_t filter = (width<32); //ToDo: chroma support
-  SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64}; //ToDo: get SAD functions from parameters
+  int8_t filter = (width<32); //TODO: chroma support
+  SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64}; //TODO: get SAD functions from parameters
   uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
   #define CHECK_FOR_BEST(mode, sad)  SAD = calcSAD(pred,width,origBlock,width); \
@@ -311,7 +311,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   CHECK_FOR_BEST(0,0);
   
   /* Test directional predictions */
-  /* ToDo: add conditions to skip some modes on borders */
+  /* TODO: add conditions to skip some modes on borders */
   
   //chroma can use only 26 and 10
   /* Test angular predictions which require filtered samples */  

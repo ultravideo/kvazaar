@@ -220,11 +220,10 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   uint32_t bestInterCost = cur_CU->inter.cost;
   uint32_t bestCost = 0;
   uint32_t cost = 0;
-  uint32_t lambdaCost = 4*g_lambda_cost[encoder->QP]<<4;//<<5; //ToDo: Correct cost calculation
+  uint32_t lambdaCost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
   
   /* Split and search to max_depth */
-  if(depth != MAX_SEARCH_DEPTH)
-  {
+  if (depth != MAX_SEARCH_DEPTH) {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);
     cost = search_best_mode(encoder,xCtb,yCtb,depth+1);

@@ -83,8 +83,8 @@ typedef struct
 
   int32_t width;          /*!< \brief Picture width */
   int32_t height;         /*!< \brief Picture height  */
-  int32_t height_in_LCU;  /*!< \brief input picture width in LCU*/
-  int32_t width_in_LCU;   /*!< \brief input picture height in LCU */
+  int32_t height_in_LCU;  /*!< \brief input picture width in number of LCU's */
+  int32_t width_in_LCU;   /*!< \brief input picture height in number of LCU's */
   uint8_t referenced; /*!< \brief Is this picture referenced */
   CU_info** CU;     /*!< \brief info for each CU at each depth */
   uint8_t type;

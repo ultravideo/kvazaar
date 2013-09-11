@@ -18,7 +18,7 @@
 
 typedef struct encoder_control;
 
-/* ToDo: add ME data */
+/* TODO: add ME data */
 typedef struct
 {
   void (*IME)();
@@ -54,7 +54,7 @@ typedef struct
   picture_list *ref;
   int8_t ref_list;
   int8_t ref_idx_num[2];
-  int8_t QP;
+  int8_t QP;             /*!< \brief Quantization parameter */
   int8_t bitdepth;
 
   /* Filtering */
@@ -83,7 +83,7 @@ typedef struct
   int32_t recbase_stride;
   int32_t pred_stride;
   
-  /* ToDo: unify luma+chroma arrays */
+  /* TODO: unify luma+chroma arrays */
   int16_t *coeff[3];
   int8_t cb_top[3];
   int8_t cb[4];
@@ -99,6 +99,7 @@ void init_tables(void);
 void init_encoder_control(encoder_control* control,bitstream* output);
 void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height);
 void encode_one_frame(encoder_control* encoder);
+void read_one_frame(FILE* file, encoder_control* encoder);
 
 
 void encode_seq_parameter_set(encoder_control* encoder);

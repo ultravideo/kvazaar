@@ -291,7 +291,7 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
   scalinglist_processEnc(coeff,quantcoeff,g_quantScales[qp]<<4,height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
   scalinglist_processDec(coeff,dequantcoeff,g_invQuantScales[qp],height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
 
-  //ToDo: support NSQT
+  //TODO: support NSQT
   //if(sizeId == /*SCALING_LIST_32x32*/3 || sizeId == /*SCALING_LIST_16x16*/2) //for NSQT
   //{
   //  quantcoeff   = g_quant_coeff[listId][qp][sizeId-1][/*SCALING_LIST_VER*/1];
@@ -797,7 +797,9 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   uint32_t* scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
   //uint32_t scanIdx = SCAN_DIAG;
 
+  #if ENABLE_SIGN_HIDING == 1
   int32_t deltaU[LCU_WIDTH*LCU_WIDTH>>2];
+  #endif
   int32_t iQpBase = encoder->QP;
 
   int32_t qpScaled;
