@@ -220,18 +220,20 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
   input->file = inputfile;
   input->width = width;
   input->height = height;
+  input->real_width = width;
+  input->real_height = height;
   
   // If input dimensions are not divisible by the smallest block size, add pixels to the dimensions, so that they are.
   // These extra pixels will be compressed along with the real ones but they will be cropped out before rendering.
   if (width % CU_MIN_SIZE_PIXELS) {
     input->width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
   }
-  if (width % CU_MIN_SIZE_PIXELS) {
+  if (height % CU_MIN_SIZE_PIXELS) {
     input->height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
   }
 
-  input->height_in_LCU = height / LCU_WIDTH;
-  input->width_in_LCU  = width / LCU_WIDTH;
+  input->height_in_LCU = input->height / LCU_WIDTH;
+  input->width_in_LCU  = input->width / LCU_WIDTH;
 
   /* Add one extra LCU when image not divisible by LCU_WIDTH */
   if(input->height_in_LCU * LCU_WIDTH < height)
@@ -249,7 +251,7 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
   #ifdef _DEBUG
   if (width != input->width || height != input->height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
-    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, input->cur_pic.width, height, input->cur_pic.height);
+    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, input->width, height, input->height);
   }
   #endif
 
@@ -408,33 +410,53 @@ void encode_one_frame(encoder_control* encoder)
 
 void fill_after_frame(FILE* file, unsigned height, unsigned array_width, unsigned array_height, unsigned char* data)
 {
-  unsigned char* start = data +height * array_width;
+  unsigned char* p = data + height * array_width;
   unsigned char* end = data + array_width * array_height;
-  memset(start, 128, sizeof(unsigned char) * (end - start));
+
+  while (p < end) {
+    // Fill the line by copying the line above.
+    memcpy(p, p - array_width, array_width);
+    p += array_width;
+  }
 }
 
 void read_and_fill_frame_data(FILE* file, unsigned width, unsigned height, unsigned array_width, unsigned char* data)
 {
-  unsigned char *p, *end;
-  for (p = data, end = p + array_width * height; p < end; ++p) {
+  unsigned char* p = data;
+  unsigned char* end = data + array_width * height;
+  unsigned char fill_char;
+  unsigned i;
+
+  while (p < end) {
+    // Read the beginning of the line from input.
     fread(p, sizeof(unsigned char), width, file);
-    memset(p + width, 128, array_width - width);
+
+    // Fill the rest with the last pixel value.
+    fill_char = p[width - 1];
+    for (i = width; i < array_width; ++i) {
+      p[i] = fill_char;
+    }
+
+    p += array_width;
   }
 }
 
 void read_one_frame(FILE* file, encoder_control* encoder)
 {
   encoder_input* in = &encoder->in;
-  unsigned width = in->width;
-  unsigned height = in->height;
+  unsigned width = in->real_width;
+  unsigned height = in->real_height;
   unsigned array_width = in->cur_pic.width;
   unsigned array_height = in->cur_pic.height;
 
+
   if (width != array_width) {
-    read_and_fill_frame_data(file, width, array_width, array_height, in->cur_pic.yData);
-    read_and_fill_frame_data(file, width >> 1, array_width >> 1, array_height >> 1, in->cur_pic.uData);
-    read_and_fill_frame_data(file, width >> 1, array_width >> 1, array_height >> 1, in->cur_pic.vData);
+    // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
+    read_and_fill_frame_data(file, width, height, array_width, in->cur_pic.yData);
+    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, in->cur_pic.uData);
+    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, in->cur_pic.vData);
   } else {
+    // Otherwise the data can be read directly to the array.
     fread(in->cur_pic.yData, sizeof(unsigned char), width * height, file);
     fread(in->cur_pic.uData, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
     fread(in->cur_pic.vData, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
@@ -591,16 +613,16 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  if (in->width != in->cur_pic.width || in->height != in->cur_pic.height) {
+  if (in->width != in->real_width || in->height != in->real_height) {
     // The standard does not seem to allow setting conf_win values such that the number of
     // luma samples is not a multiple of 2. Options are to either hide one line or show an
     // extra line of non-video. Neither seems like a very good option, so let's not even try.
     assert(!(in->width % 2));
     WRITE_U(encoder->stream, 1, 1, "conformance_window_flag");
     WRITE_UE(encoder->stream, 0, "conf_win_left_offset");
-    WRITE_UE(encoder->stream, (in->width - in->cur_pic.width), "conf_win_right_offset");
+    WRITE_UE(encoder->stream, (in->width - in->real_width) >> 1, "conf_win_right_offset");
     WRITE_UE(encoder->stream, 0, "conf_win_top_offset");
-    WRITE_UE(encoder->stream, (in->height - in->cur_pic.height), "conf_win_bottom_offset");
+    WRITE_UE(encoder->stream, (in->height - in->real_height) >> 1, "conf_win_bottom_offset");
   } else {
     WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
   }

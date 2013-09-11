@@ -35,6 +35,8 @@ typedef struct
   FILE* file;
   int32_t width;  /*!< \brief input picture width */
   int32_t height; /*!< \brief input picture height */
+  int32_t real_width;  /*!< \brief real input picture width */
+  int32_t real_height; /*!< \brief real input picture width */
   int32_t height_in_LCU; /*!< \brief input picture width in LCU*/
   int32_t width_in_LCU;  /*!< \brief input picture height in LCU */
   picture cur_pic;
