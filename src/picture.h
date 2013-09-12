@@ -106,9 +106,12 @@ typedef struct
 picture_list *picture_list_init(int size);
 int picture_list_resize(picture_list *list, int size);
 int picture_list_destroy(picture_list *list);
+int picture_list_add(picture_list *list,picture* pic);
+int picture_list_rem(picture_list *list,int n);
 
-  picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU);
+picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU);
 int picture_destroy(picture *pic);
+
 
 void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t coded);
 void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t split);
