@@ -29,6 +29,7 @@
 #include "context.h"
 #include "transform.h"
 #include "intra.h"
+#include "inter.h"
 #include "filter.h"
 #include "search.h"
 
@@ -367,22 +368,15 @@ void encode_one_frame(encoder_control* encoder)
   #endif
   
   /* Filtering */
-  if(encoder->deblock_enable)
+  /* TODO: Check for correct deblock condition on inter blocks */
+  if(encoder->deblock_enable && encoder->in.cur_pic->slicetype == SLICE_I)
   {
     filter_deblock(encoder);
   }
 
+
   /* Calculate checksum */
   add_checksum(encoder);
-
-  /* TODO: add more than one reference */
-
-  /* Remove the ref pic (if present) */
-  picture_list_rem(encoder->ref, 0, 1);
-  /* Add current picture as reference */
-  picture_list_add(encoder->ref, encoder->in.cur_pic);
-  /* Allocate new memory to current picture */
-  encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_LCU, encoder->in.height_in_LCU);
 
 }
 
@@ -1027,6 +1021,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                       }
                       CABAC_BIN_EP(&cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
                     }
+
+                    /* Inter reconstruction */
+                    inter_recon(encoder->ref->pics[0],xCtb*CU_MIN_SIZE_PIXELS,yCtb*CU_MIN_SIZE_PIXELS,LCU_WIDTH>>depth,cur_CU->inter.mv,encoder->in.cur_pic);
                 }
 
                 {

@@ -214,6 +214,16 @@
         PSNR[1]+=temp_PSNR[1];
         PSNR[2]+=temp_PSNR[2];
       }
+
+      /* TODO: add more than one reference */
+
+      /* Remove the ref pic (if present) */
+      picture_list_rem(encoder->ref, 0, 1);
+      /* Add current picture as reference */
+      picture_list_add(encoder->ref, encoder->in.cur_pic);
+      /* Allocate new memory to current picture */
+      encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_LCU, encoder->in.height_in_LCU);
+
       encoder->frame++;
     }
     /* Coding finished */

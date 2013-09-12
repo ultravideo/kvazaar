@@ -170,7 +170,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
       cur_CU->inter.mv[1] = 0<<2;
       if(xCtb == 0 && yCtb == 0)
       {
-        cur_CU->inter.mv[1] = 20<<2;
+        cur_CU->inter.mv[1] = 0<<2;
       }
       cur_CU->inter.cost = 10;
       cur_CU->inter.mv_dir = 1;
