@@ -4,6 +4,7 @@
 
 # Generated documentation
 /doxygen_html
+/doxygen
 
 # Other files
 *.exe
