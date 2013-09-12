@@ -166,15 +166,145 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
   }
 
   /*!
+    \brief Add picture to picturelist
+    \param pic picture pointer to add
+    \param picture_list list to use
+    \return 1 on success
+  */
+  int picture_list_add(picture_list *list,picture* pic)
+  {
+    if(list->size == list->used_size)
+    {
+      if(!picture_list_resize(list, list->size*2))
+      {
+        return 0;
+      }
+    }
+
+    list->pics[list->used_size] = pic;
+    list->used_size++;
+    return 1;
+  }
+
+  /*!
+    \brief Add picture to picturelist
+    \param pic picture pointer to add
+    \param picture_list list to use
+    \return 1 on success
+  */
+  int picture_list_rem(picture_list *list,int n, int8_t destroy)
+  {
+    int i;
+    //Must be within list boundaries
+    if((unsigned int)n >= list->used_size)
+    {
+      return 0;
+    }
+
+    if(destroy)
+    {
+      picture_destroy(list->pics[n]);
+      free(list->pics[n]);
+    }
+
+    //The last item is easy to remove
+    if(n == list->used_size-1)
+    {
+      list->pics[n] = NULL;
+      list->used_size--;
+    }
+    else
+    {
+      //Shift all following pics one backward in the list
+      for(i = n; (unsigned int)n < list->used_size-1; n++)
+      {
+        list->pics[n] = list->pics[n+1];
+      }
+      list->pics[list->used_size-1] = NULL;
+      list->used_size--;
+    }
+
+    return 1;
+  }
+  
+  /*!
+    \brief Allocate new picture
+    \param pic picture pointer
+    \return picture pointer
+  */
+  picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU)
+  {
+    picture *pic = (picture *)malloc(sizeof(picture));    
+    unsigned int luma_size = width * height;
+    unsigned int chroma_size = luma_size / 4;
+    int i = 0;
+
+    if(!pic)
+    {
+      return 0;
+    }
+
+    memset(pic, 0, sizeof(picture));
+
+    pic->width  = width;
+    pic->height = height;
+    pic->width_in_LCU  = width_in_LCU;
+    pic->height_in_LCU = height_in_LCU;
+    pic->referenced = 0;
+    /* Allocate buffers */
+    pic->yData = (uint8_t *)malloc(luma_size);
+    pic->uData = (uint8_t *)malloc(chroma_size);
+    pic->vData = (uint8_t *)malloc(chroma_size);
+
+    /* Reconstruction buffers */
+    pic->yRecData = (uint8_t *)malloc(luma_size);
+    pic->uRecData = (uint8_t *)malloc(chroma_size);
+    pic->vRecData = (uint8_t *)malloc(chroma_size);
+
+    memset(pic->uRecData, 128, (chroma_size));
+    memset(pic->vRecData, 128, (chroma_size));
+
+    /* Allocate memory for CU info 2D array */
+    //TODO: we don't need this much space on LCU...MAX_DEPTH-1
+    pic->CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
+    for(i=0; i<MAX_DEPTH+1; i++)
+    {
+      /* Allocate height_in_SCU x width_in_SCU x sizeof(CU_info) */
+      pic->CU[i] = (CU_info*)malloc((height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+      memset(pic->CU[i], 0, (height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+    }
+
+    return pic;
+  }
+
+  /*!
     \brief Free memory allocated to picture
     \param pic picture pointer
     \return 1 on success, 0 on failure
   */
   int picture_destroy(picture *pic)
   {
+    int i;
+        
     free(pic->uData);
     free(pic->vData);
     free(pic->yData);
+    pic->yData = pic->uData = pic->vData = NULL;
+
+    free(pic->yRecData);
+    free(pic->uRecData);
+    free(pic->vRecData);
+    pic->yRecData = pic->uRecData = pic->vRecData = NULL;
+
+    for(i=0; i<MAX_DEPTH+1; i++)
+    {
+      free(pic->CU[i]);
+      pic->CU[i] = NULL;
+    }
+
+    free(pic->CU);
+    pic->CU = NULL;
+
     return 1;
   }
 

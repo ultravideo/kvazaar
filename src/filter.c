@@ -120,16 +120,16 @@ INLINE void filter_deblock_chroma( uint8_t* src, int32_t offset, int32_t tc ,int
 
 void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t ypos, int8_t depth, int8_t dir)
 {
-  int32_t stride = encoder->in.cur_pic.width;
+  int32_t stride = encoder->in.cur_pic->width;
   int32_t offset = stride;
   int32_t betaOffsetDiv2 = encoder->betaOffsetdiv2;
   int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
   int8_t uiBs       = 2; /* Filter strength */
   /* TODO: support 10+bits */
-  uint8_t* origsrc      = &encoder->in.cur_pic.yRecData[xpos+ypos*stride];
+  uint8_t* origsrc      = &encoder->in.cur_pic->yRecData[xpos+ypos*stride];
   uint8_t* src = origsrc;
   int32_t step = 1;
-  //CU_info* cu = &encoder->in.cur_pic.CU[depth][(xpos>>scu_width_log2) + (ypos>>scu_width_log2)*(encoder->in.width>>scu_width_log2)];
+  //CU_info* cu = &encoder->in.cur_pic->CU[depth][(xpos>>scu_width_log2) + (ypos>>scu_width_log2)*(encoder->in.width>>scu_width_log2)];
   
   if(dir == EDGE_VER)
   {
@@ -195,12 +195,12 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
 
 void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t ypos, int8_t depth, int8_t dir)
 {
-  int32_t stride = encoder->in.cur_pic.width>>1;
+  int32_t stride = encoder->in.cur_pic->width>>1;
   int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
   int8_t uiNumParts = 1;
   /* TODO: support 10+bits */
-  uint8_t* srcU      = &encoder->in.cur_pic.uRecData[xpos+ypos*stride];
-  uint8_t* srcV      = &encoder->in.cur_pic.vRecData[xpos+ypos*stride];
+  uint8_t* srcU      = &encoder->in.cur_pic->uRecData[xpos+ypos*stride];
+  uint8_t* srcV      = &encoder->in.cur_pic->vRecData[xpos+ypos*stride];
   /* Init offset and step to EDGE_HOR */
   int32_t offset = stride;
   int32_t step = 1;
@@ -255,7 +255,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
 */
 void filter_deblock_CU(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int32_t edge)
 {
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint8_t split_flag = (cur_CU->depth > depth)?1:0;
   uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;

@@ -122,7 +122,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   uint8_t border_split_x = ((encoder->in.width)  < ( (xCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
   uint8_t border_split_y = ((encoder->in.height) < ( (yCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
 
   cur_CU->intra.cost = 0xffffffff;
   cur_CU->inter.cost = 0xffffffff;
@@ -155,12 +155,12 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   
   cur_CU->inter.cost = 0;
   /* INTER SEARCH */
-  if(encoder->in.cur_pic.slicetype != SLICE_I)// && (xCtb == 0) && yCtb == 0)
+  if(encoder->in.cur_pic->slicetype != SLICE_I)// && (xCtb == 0) && yCtb == 0)
   {
     //if(depth >= MIN_SEARCH_DEPTH)
     {
       /* Motion estimation on P-frame */
-      if(encoder->in.cur_pic.slicetype != SLICE_B)
+      if(encoder->in.cur_pic->slicetype != SLICE_B)
       {
 
       }
@@ -170,11 +170,11 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
       cur_CU->inter.mv[1] = 0<<2;
       if(xCtb == 0 && yCtb == 0)
       {
-        cur_CU->inter.mv[1] = 20<<2;
+        cur_CU->inter.mv[1] = 0<<2;
       }
       cur_CU->inter.cost = 10;
       cur_CU->inter.mv_dir = 1;
-      inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
+      inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
     }
     return;
   }
@@ -183,7 +183,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   if(depth >= MIN_SEARCH_DEPTH)
   {
     int x = 0,y = 0;
-    uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+    uint8_t *base  = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
     uint32_t width = LCU_WIDTH>>depth;
 
     /* INTRAPREDICTION */
@@ -195,8 +195,8 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     //int16_t *rec = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
 
     /* Build reconstructed block to use in prediction with extrapolated borders */
-    search_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-    cur_CU->intra.mode = (uint8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
+    search_buildReferenceBorder(encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+    cur_CU->intra.mode = (uint8_t)intra_prediction(encoder->in.cur_pic->yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
     //free(pred);
     //free(rec);
   }
@@ -215,7 +215,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
 uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint32_t bestIntraCost = cur_CU->intra.cost;
   uint32_t bestInterCost = cur_CU->inter.cost;
   uint32_t bestCost = 0;
@@ -233,41 +233,41 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
 
     /* We split if the cost is better (0 cost -> not checked) */
     if(cost != 0 &&   (bestIntraCost != 0 && cost+lambdaCost < bestIntraCost) && 
-                      (bestInterCost != 0 && cost+lambdaCost < bestInterCost && encoder->in.cur_pic.slicetype != SLICE_I))
+                      (bestInterCost != 0 && cost+lambdaCost < bestInterCost && encoder->in.cur_pic->slicetype != SLICE_I))
     {
       /* Set split to 1 */
-      picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,1);
+      picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,1);
       bestCost = cost+lambdaCost;
     }
     /* Else, check if inter cost is smaller or the same as intra */
-    else if(bestInterCost != 0 && (bestInterCost <= bestIntraCost || bestIntraCost == 0) && encoder->in.cur_pic.slicetype != SLICE_I)
+    else if(bestInterCost != 0 && (bestInterCost <= bestIntraCost || bestIntraCost == 0) && encoder->in.cur_pic->slicetype != SLICE_I)
     {
       /* Set split to 0 and mode to inter.mode */
-      picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
-      inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
+      picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
+      inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
       bestCost = bestInterCost;
     }
     /* Else, dont split and recursively set block mode */
     else
     {
       /* Set split to 0 and mode to intra.mode */
-      picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
-      intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+      picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
+      intra_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
       bestCost = bestIntraCost;
     }
   }
-  else if(bestInterCost != 0 && (bestInterCost <= bestIntraCost || bestIntraCost == 0) && encoder->in.cur_pic.slicetype != SLICE_I)
+  else if(bestInterCost != 0 && (bestInterCost <= bestIntraCost || bestIntraCost == 0) && encoder->in.cur_pic->slicetype != SLICE_I)
   {
     /* Set split to 0 and mode to inter.mode */
-    picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
-    inter_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->inter.mode);
+    picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
+    inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
     bestCost = bestInterCost;
   }
   else
   {
     /* Set split to 0 and mode to intra.mode */
-    picture_setBlockSplit(&encoder->in.cur_pic,xCtb,yCtb,depth,0);
-    intra_setBlockMode(&encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+    picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
+    intra_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
     bestCost = bestIntraCost;
   }
 
