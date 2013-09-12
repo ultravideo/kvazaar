@@ -196,7 +196,7 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
   {
     int i;
     //Must be within list boundaries
-    if(n >= list->used_size)
+    if((unsigned int)n >= list->used_size)
     {
       return 0;
     }
@@ -216,7 +216,7 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
     else
     {
       //Shift all following pics one backward in the list
-      for(i = n; n < list->used_size-1; n++)
+      for(i = n; (unsigned int)n < list->used_size-1; n++)
       {
         list->pics[n] = list->pics[n+1];
       }
