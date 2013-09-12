@@ -370,7 +370,7 @@ void encode_one_frame(encoder_control* encoder)
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,NAL_TRAIL_R,encoder->frame);
+    nal_write(encoder->output, encoder->stream->buffer, encoder->stream->buffer_pos, 0,NAL_TRAIL_R,0);
     bitstream_clear_buffer(encoder->stream);
   }  
   #ifdef _DEBUG
