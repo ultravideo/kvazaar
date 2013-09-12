@@ -214,7 +214,6 @@ void init_encoder_control(encoder_control* control,bitstream* output)
 
 void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height)
 {
-  int i;
   input->file = inputfile;
   input->width = width;
   input->height = height;
@@ -264,7 +263,6 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
 
 void encode_one_frame(encoder_control* encoder)
 {
-  int i;
   /* output parameters before first frame */
   if(encoder->frame == 0)
   {
@@ -377,12 +375,14 @@ void encode_one_frame(encoder_control* encoder)
   /* Calculate checksum */
   add_checksum(encoder);
 
-  /* Clear prediction data */
-  /* TODO: store as reference data */
-  for(i=0; i < MAX_DEPTH+1; i++)
-  {
-    memset(encoder->in.cur_pic->CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
-  }
+  /* TODO: add more than one reference */
+
+  /* Remove the ref pic (if present) */
+  picture_list_rem(encoder->ref, 0, 1);
+  /* Add current picture as reference */
+  picture_list_add(encoder->ref, encoder->in.cur_pic);
+  /* Allocate new memory to current picture */
+  encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_LCU, encoder->in.height_in_LCU);
 
 }
 

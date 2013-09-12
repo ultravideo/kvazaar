@@ -230,6 +230,7 @@
     /* Deallocating */
     config_destroy(cfg);
     scalinglist_destroy();
+    picture_list_destroy(encoder->ref);
 
     return EXIT_SUCCESS;
   }
