@@ -30,7 +30,7 @@
  \param mode mode to set
  \returns Void
 */
-void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, uint8_t mode)
+void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, CU_info* cur_cu)
 {
   uint32_t x,y,d;
   /* Width in smallest CU */
@@ -45,8 +45,10 @@ void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
       {
         pic->CU[d][CUpos+x].depth = depth;
         pic->CU[d][CUpos+x].type  = CU_INTER;
-        pic->CU[d][CUpos+x].inter.mode = mode;
-        pic->CU[d][CUpos+x].inter.mv_dir = 1;
+        pic->CU[d][CUpos+x].inter.mode = cur_cu->inter.mode;
+        pic->CU[d][CUpos+x].inter.mv[0] = cur_cu->inter.mv[0];
+        pic->CU[d][CUpos+x].inter.mv[1] = cur_cu->inter.mv[1];
+        pic->CU[d][CUpos+x].inter.mv_dir = cur_cu->inter.mv_dir;
       }
     }
   }

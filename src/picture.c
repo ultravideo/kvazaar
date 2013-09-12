@@ -165,6 +165,57 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
     return 1;
   }
 
+  
+  /*!
+    \brief Allocate new picture
+    \param pic picture pointer
+    \return picture pointer
+  */
+  picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU)
+  {
+    picture *pic = (picture *)malloc(sizeof(picture));    
+    unsigned int luma_size = width * height;
+    unsigned int chroma_size = luma_size / 4;
+    int i = 0;
+
+    if(!pic)
+    {
+      return 0;
+    }
+
+    memset(pic, 0, sizeof(picture));
+
+    pic->width  = width;
+    pic->height = height;
+    pic->width_in_LCU  = width_in_LCU;
+    pic->height_in_LCU = height_in_LCU;
+    pic->referenced = 0;
+    /* Allocate buffers */
+    pic->yData = (uint8_t *)malloc(luma_size);
+    pic->uData = (uint8_t *)malloc(chroma_size);
+    pic->vData = (uint8_t *)malloc(chroma_size);
+
+    /* Reconstruction buffers */
+    pic->yRecData = (uint8_t *)malloc(luma_size);
+    pic->uRecData = (uint8_t *)malloc(chroma_size);
+    pic->vRecData = (uint8_t *)malloc(chroma_size);
+
+    memset(pic->uRecData, 128, (chroma_size));
+    memset(pic->vRecData, 128, (chroma_size));
+
+    /* Allocate memory for CU info 2D array */
+    //TODO: we don't need this much space on LCU...MAX_DEPTH-1
+    pic->CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
+    for(i=0; i<MAX_DEPTH+1; i++)
+    {
+      /* Allocate height_in_SCU x width_in_SCU x sizeof(CU_info) */
+      pic->CU[i] = (CU_info*)malloc((height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+      memset(pic->CU[i], 0, (height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+    }
+
+    return pic;
+  }
+
   /*!
     \brief Free memory allocated to picture
     \param pic picture pointer

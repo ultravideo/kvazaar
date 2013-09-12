@@ -37,7 +37,7 @@ typedef struct
   int32_t height; /*!< \brief input picture height */
   int32_t height_in_LCU; /*!< \brief input picture width in LCU*/
   int32_t width_in_LCU;  /*!< \brief input picture height in LCU */
-  picture cur_pic;
+  picture *cur_pic;
   int8_t video_format;
   int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
 } encoder_input;

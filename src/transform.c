@@ -836,7 +836,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
 
   int32_t iTransformShift = /*MAX_TR_DYNAMIC_RANGE*/15 - uiBitDepth - uiLog2TrSize; // Represents scaling through forward transform
   int32_t iQBits = QUANT_SHIFT + /*cQpBase.m_iPer +*/qpScaled/6 + iTransformShift;
-  int32_t iAdd = ((encoder->in.cur_pic.slicetype == SLICE_I) ? 171 : 85) << (iQBits-9);
+  int32_t iAdd = ((encoder->in.cur_pic->slicetype == SLICE_I) ? 171 : 85) << (iQBits-9);
 
   int32_t qBits8 = iQBits-8;
   for(n = 0; n < iWidth*iHeight; n++)

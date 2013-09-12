@@ -144,7 +144,8 @@
     init_exp_golomb(4096*8);
     cabac_init(&cabac);
     scalinglist_init();
-    init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream)));    
+    init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream))); 
+    encoder->ref = picture_list_init(MAX_REF_PIC_COUNT);
     
     /* Init bitstream */
     bitstream_init(encoder->stream);
@@ -182,9 +183,9 @@
 
       /* Clear reconstruction buffers (not needed, for debugging) */
       /*
-      memset(encoder->in.cur_pic.yRecData, 0, cfg->width*cfg->height);
-      memset(encoder->in.cur_pic.uRecData, 128, cfg->width*cfg->height>>2);
-      memset(encoder->in.cur_pic.vRecData, 128, cfg->width*cfg->height>>2);
+      memset(encoder->in.cur_pic->yRecData, 0, cfg->width*cfg->height);
+      memset(encoder->in.cur_pic->uRecData, 128, cfg->width*cfg->height>>2);
+      memset(encoder->in.cur_pic->vRecData, 128, cfg->width*cfg->height>>2);
       */
       /* /////////////THE ACTUAL CODING HAPPENDS HERE\\\\\\\\\\\\\\\\\\\ */
       encode_one_frame(encoder);
@@ -192,9 +193,9 @@
 
       #ifdef _DEBUG
       /* Write reconstructed frame out */     
-      fwrite(encoder->in.cur_pic.yRecData,cfg->width*cfg->height,1,recout);
-      fwrite(encoder->in.cur_pic.uRecData,cfg->width*cfg->height>>2,1,recout);
-      fwrite(encoder->in.cur_pic.vRecData,cfg->width*cfg->height>>2,1,recout);
+      fwrite(encoder->in.cur_pic->yRecData,cfg->width*cfg->height,1,recout);
+      fwrite(encoder->in.cur_pic->uRecData,cfg->width*cfg->height>>2,1,recout);
+      fwrite(encoder->in.cur_pic->vRecData,cfg->width*cfg->height>>2,1,recout);
       #endif
       {
         int32_t diff;
@@ -203,11 +204,11 @@
         diff = (int32_t)(curpos-lastpos);
         lastpos = curpos;
 
-        temp_PSNR[0] = imagePSNR(encoder->in.cur_pic.yData,encoder->in.cur_pic.yRecData,cfg->width,cfg->height);
-        temp_PSNR[1] = imagePSNR(encoder->in.cur_pic.uData,encoder->in.cur_pic.uRecData,cfg->width>>1,cfg->height>>1);
-        temp_PSNR[2] = imagePSNR(encoder->in.cur_pic.vData,encoder->in.cur_pic.vRecData,cfg->width>>1,cfg->height>>1);
+        temp_PSNR[0] = imagePSNR(encoder->in.cur_pic->yData,encoder->in.cur_pic->yRecData,cfg->width,cfg->height);
+        temp_PSNR[1] = imagePSNR(encoder->in.cur_pic->uData,encoder->in.cur_pic->uRecData,cfg->width>>1,cfg->height>>1);
+        temp_PSNR[2] = imagePSNR(encoder->in.cur_pic->vData,encoder->in.cur_pic->vRecData,cfg->width>>1,cfg->height>>1);
         
-        printf("POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "BPI"[encoder->in.cur_pic.slicetype%3],diff<<3,
+        printf("POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "BPI"[encoder->in.cur_pic->slicetype%3],diff<<3,
                                                         temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);
         PSNR[0]+=temp_PSNR[0];
         PSNR[1]+=temp_PSNR[1];

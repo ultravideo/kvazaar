@@ -215,8 +215,6 @@ void init_encoder_control(encoder_control* control,bitstream* output)
 void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int32_t height)
 {
   int i;
-  unsigned luma_size;
-  unsigned chroma_size;
   input->file = inputfile;
   input->width = width;
   input->height = height;
@@ -240,46 +238,27 @@ void init_encoder_input(encoder_input* input,FILE* inputfile, int32_t width, int
   }
   if(input->width_in_LCU * LCU_WIDTH < width)
   {
-    input->width_in_LCU++;
+    input->width_in_LCU++;  
   }
 
-  luma_size = input->width * input->height;
-  chroma_size = luma_size / 4;
+  /* Allocate the picture and CU array */
+  input->cur_pic = picture_init(input->width, input->height, input->width_in_LCU,input->height_in_LCU);
+
+  if(!input->cur_pic)
+  {
+    printf("Error allocating picture!\r\n");
+    exit(1);
+  }
 
   #ifdef _DEBUG
   if (width != input->width || height != input->height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
-    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, input->cur_pic.width, height, input->cur_pic.height);
+    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, input->cur_pic->width, height, input->cur_pic->height);
   }
   #endif
 
-  input->cur_pic.width  = input->width;
-  input->cur_pic.height = input->height;
-  input->cur_pic.width_in_LCU  = input->width_in_LCU;
-  input->cur_pic.height_in_LCU = input->height_in_LCU;
-  input->cur_pic.referenced = 0;
-  /* Allocate buffers */
-  input->cur_pic.yData = (uint8_t *)malloc(luma_size);
-  input->cur_pic.uData = (uint8_t *)malloc(chroma_size);
-  input->cur_pic.vData = (uint8_t *)malloc(chroma_size);
+  
 
-  /* Reconstruction buffers */
-  input->cur_pic.yRecData = (uint8_t *)malloc(luma_size);
-  input->cur_pic.uRecData = (uint8_t *)malloc(chroma_size);
-  input->cur_pic.vRecData = (uint8_t *)malloc(chroma_size);
-
-  memset(input->cur_pic.uRecData, 128, (chroma_size));
-  memset(input->cur_pic.vRecData, 128, (chroma_size));
-
-  /* Allocate memory for CU info 2D array */
-  //TODO: we don't need this much space on LCU...MAX_DEPTH-1
-  input->cur_pic.CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
-  for(i=0; i<MAX_DEPTH+1; i++)
-  {
-    /* Allocate height_in_SCU x width_in_SCU x sizeof(CU_info) */
-    input->cur_pic.CU[i] = (CU_info*)malloc((input->height_in_LCU<<MAX_DEPTH)*(input->width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
-    memset(input->cur_pic.CU[i], 0, (input->height_in_LCU<<MAX_DEPTH)*(input->width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
-  }  
 }
 
 
@@ -313,8 +292,8 @@ void encode_one_frame(encoder_control* encoder)
 
     /* First slice is IDR */
     cabac_start(&cabac);
-    encoder->in.cur_pic.slicetype = SLICE_I;
-    encoder->in.cur_pic.type = NAL_IDR_W_RADL;
+    encoder->in.cur_pic->slicetype = SLICE_I;
+    encoder->in.cur_pic->type = NAL_IDR_W_RADL;
     search_slice_data(encoder);
 
     encode_slice_header(encoder);
@@ -331,8 +310,8 @@ void encode_one_frame(encoder_control* encoder)
   //{
   //  /*
   //  cabac_start(&cabac);
-  //  encoder->in.cur_pic.slicetype = SLICE_P;
-  //  encoder->in.cur_pic.type = 1;
+  //  encoder->in.cur_pic->slicetype = SLICE_P;
+  //  encoder->in.cur_pic->type = 1;
 
   //  encode_slice_header(encoder);
   //  bitstream_align(encoder->stream);
@@ -344,8 +323,8 @@ void encode_one_frame(encoder_control* encoder)
 
 
   //  cabac_start(&cabac);
-  //  encoder->in.cur_pic.slicetype = SLICE_P;
-  //  encoder->in.cur_pic.type = 1;
+  //  encoder->in.cur_pic->slicetype = SLICE_P;
+  //  encoder->in.cur_pic->type = 1;
   //  search_slice_data(encoder);
 
   //  encode_slice_header(encoder);
@@ -360,8 +339,8 @@ void encode_one_frame(encoder_control* encoder)
   else
   {    
     cabac_start(&cabac);
-    encoder->in.cur_pic.slicetype = (encoder->frame==1)?SLICE_P:SLICE_I;
-    encoder->in.cur_pic.type = NAL_TRAIL_R;
+    encoder->in.cur_pic->slicetype = (encoder->frame==1)?SLICE_P:SLICE_I;
+    encoder->in.cur_pic->type = NAL_TRAIL_R;
     search_slice_data(encoder);
 
     encode_slice_header(encoder);
@@ -382,7 +361,7 @@ void encode_one_frame(encoder_control* encoder)
       for(x = 0;x < encoder->in.width_in_LCU*2;x++)
       {
         i = (x<<2)+(y<<2)*(encoder->in.width_in_LCU<<MAX_DEPTH);
-        printf("(%d,%d) Intramode: %d\n", x<<2, y<<2,encoder->in.cur_pic.CU[0][i].intra.mode);
+        printf("(%d,%d) Intramode: %d\n", x<<2, y<<2,encoder->in.cur_pic->CU[0][i].intra.mode);
       }
     }
   }
@@ -402,7 +381,7 @@ void encode_one_frame(encoder_control* encoder)
   /* TODO: store as reference data */
   for(i=0; i < MAX_DEPTH+1; i++)
   {
-    memset(encoder->in.cur_pic.CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+    memset(encoder->in.cur_pic->CU[i], 0, (encoder->in.height_in_LCU<<MAX_DEPTH)*(encoder->in.width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
   }
 
 }
@@ -411,9 +390,9 @@ void read_one_frame(FILE* file, encoder_control* encoder)
 {
   encoder_input* in = &encoder->in;
 
-  fread(in->cur_pic.yData, in->width * in->height, 1, file);
-  fread(in->cur_pic.uData, in->width * in->height >> 2, 1, file);
-  fread(in->cur_pic.vData, in->width * in->height >> 2, 1, file);
+  fread(in->cur_pic->yData, in->width * in->height, 1, file);
+  fread(in->cur_pic->uData, in->width * in->height >> 2, 1, file);
+  fread(in->cur_pic->vData, in->width * in->height >> 2, 1, file);
 }
 
 /*!
@@ -427,7 +406,7 @@ static void add_checksum(encoder_control* encoder)
   uint32_t checksum_val;
   unsigned int i;
 
-  picture_checksum(&(encoder->in.cur_pic), checksum);
+  picture_checksum(encoder->in.cur_pic, checksum);
 
   WRITE_U(encoder->stream, 132, 8, "sei_type");
   WRITE_U(encoder->stream, 13, 8, "size");
@@ -560,16 +539,16 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, encoder->in.width, "pic_width_in_luma_samples");
   WRITE_UE(encoder->stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  if (in->width != in->cur_pic.width || in->height != in->cur_pic.height) {
+  if (in->width != in->cur_pic->width || in->height != in->cur_pic->height) {
     // The standard does not seem to allow setting conf_win values such that the number of
     // luma samples is not a multiple of 2. Options are to either hide one line or show an
     // extra line of non-video. Neither seems like a very good option, so let's not even try.
     assert(!(in->width % 2));
     WRITE_U(encoder->stream, 1, 1, "conformance_window_flag");
     WRITE_UE(encoder->stream, 0, "conf_win_left_offset");
-    WRITE_UE(encoder->stream, (in->width - in->cur_pic.width), "conf_win_right_offset");
+    WRITE_UE(encoder->stream, (in->width - in->cur_pic->width), "conf_win_right_offset");
     WRITE_UE(encoder->stream, 0, "conf_win_top_offset");
-    WRITE_UE(encoder->stream, (in->height - in->cur_pic.height), "conf_win_bottom_offset");
+    WRITE_UE(encoder->stream, (in->height - in->cur_pic->height), "conf_win_bottom_offset");
   } else {
     WRITE_U(encoder->stream, 0, 1, "conformance_window_flag");
   }
@@ -709,7 +688,7 @@ void encode_slice_header(encoder_control* encoder)
 #endif
 
   WRITE_U(encoder->stream, 1, 1, "first_slice_segment_in_pic_flag");
-  if(encoder->in.cur_pic.type >= NAL_BLA_W_LP && encoder->in.cur_pic.type <= NAL_RSV_IRAP_VCL23)
+  if(encoder->in.cur_pic->type >= NAL_BLA_W_LP && encoder->in.cur_pic->type <= NAL_RSV_IRAP_VCL23)
   {
     WRITE_U(encoder->stream, 1, 1, "no_output_of_prior_pics_flag");
   }
@@ -717,7 +696,7 @@ void encode_slice_header(encoder_control* encoder)
 
   //WRITE_U(encoder->stream, 0, 1, "dependent_slice_segment_flag");
   
-  WRITE_UE(encoder->stream, encoder->in.cur_pic.slicetype, "slice_type");
+  WRITE_UE(encoder->stream, encoder->in.cur_pic->slicetype, "slice_type");
 
   // if !entropy_slice_flag
   
@@ -725,7 +704,7 @@ void encode_slice_header(encoder_control* encoder)
       //WRITE_U(encoder->stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-    if(encoder->in.cur_pic.type != NAL_IDR_W_RADL && encoder->in.cur_pic.type != NAL_IDR_N_LP)
+    if(encoder->in.cur_pic->type != NAL_IDR_W_RADL && encoder->in.cur_pic->type != NAL_IDR_N_LP)
     {
       int j;
       int ref_negative = 1;
@@ -750,13 +729,13 @@ void encode_slice_header(encoder_control* encoder)
       WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag");
     }
     
-    if(encoder->in.cur_pic.slicetype != SLICE_I)
+    if(encoder->in.cur_pic->slicetype != SLICE_I)
     {
       WRITE_U(encoder->stream, 0, 1, "num_ref_idx_active_override_flag");
       WRITE_UE(encoder->stream, 0, "five_minus_max_num_merge_cand");
     }
 
-    if(encoder->in.cur_pic.slicetype == SLICE_B)
+    if(encoder->in.cur_pic->slicetype == SLICE_B)
     {
       WRITE_U(encoder->stream, 0, 1, "mvd_l1_zero_flag");
     }
@@ -771,7 +750,7 @@ void encode_slice_data(encoder_control* encoder)
   uint16_t xCtb,yCtb;
 
   scalinglist_process();
-  init_contexts(encoder,encoder->in.cur_pic.slicetype);
+  init_contexts(encoder,encoder->in.cur_pic->slicetype);
 
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
@@ -796,7 +775,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 { 
-  CU_info *cur_CU = &encoder->in.cur_pic.CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint8_t split_flag = cur_CU->split;//(depth<1)?1:0; /* TODO: get from CU data */
   uint8_t split_model = 0;
 
@@ -815,11 +794,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     if(!border)
     {
       /* Get left and top block split_flags and if they are present and true, increase model number */
-      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb-1+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)]),depth) == 1)
+      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->CU[depth][xCtb-1+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)]),depth) == 1)
       {
         split_model++;
       }
-      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic.CU[depth][xCtb+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)]),depth) == 1)
+      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->CU[depth][xCtb+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)]),depth) == 1)
       {
         split_model++;
       }
@@ -849,7 +828,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   }
   
   /* Encode skip flag */
-  if(encoder->in.cur_pic.slicetype != SLICE_I)
+  if(encoder->in.cur_pic->slicetype != SLICE_I)
   {
     int8_t uiCtxSkip = 0;    
     /* uiCtxSkip = aboveskipped + leftskipped; */
@@ -890,7 +869,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
   /* ENDIF SKIP */
 
   /* Prediction mode */
-  if(encoder->in.cur_pic.slicetype != SLICE_I)
+  if(encoder->in.cur_pic->slicetype != SLICE_I)
   {
     cabac.ctx = &g_cCUPredModeSCModel;
     CABAC_BIN(&cabac, (cur_CU->type == CU_INTRA)?1:0, "PredMode");
@@ -945,7 +924,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           uint32_t uiRefListIdx;
           /*
           // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-          if(encoder->in.cur_pic.slicetype == SLICE_B)
+          if(encoder->in.cur_pic->slicetype == SLICE_B)
           {
             // Code Inter Dir
             const UInt uiInterDir = pcCU->getInterDir( uiAbsPartIdx ) - 1;
@@ -1090,9 +1069,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int8_t mpmPred = -1;
       int i;
       uint32_t flag;
-      uint8_t *base  = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-      uint8_t *baseU = &encoder->in.cur_pic.uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-      uint8_t *baseV = &encoder->in.cur_pic.vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *base  = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+      uint8_t *baseU = &encoder->in.cur_pic->uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *baseV = &encoder->in.cur_pic->vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint32_t width = LCU_WIDTH>>depth;
 
       /* INTRAPREDICTION VARIABLES */
@@ -1100,19 +1079,19 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
       int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
-      uint8_t *recbase   = &encoder->in.cur_pic.yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-      uint8_t *recbaseU  = &encoder->in.cur_pic.uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-      uint8_t *recbaseV  = &encoder->in.cur_pic.vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *recbase   = &encoder->in.cur_pic->yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+      uint8_t *recbaseU  = &encoder->in.cur_pic->uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *recbaseV  = &encoder->in.cur_pic->vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
 
 
       /* SEARCH BEST INTRA MODE (AGAIN) */  
       
       int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
       int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];      
-      intra_buildReferenceBorder(&encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-      cur_CU->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic.yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
+      intra_buildReferenceBorder(encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+      cur_CU->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic->yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
       intraPredMode = cur_CU->intra.mode;
-      intra_setBlockMode(&encoder->in.cur_pic,xCtb, yCtb, depth, intraPredMode);
+      intra_setBlockMode(encoder->in.cur_pic,xCtb, yCtb, depth, intraPredMode);
       
       #if ENABLE_PCM == 1
       /* Code must start after variable initialization */
@@ -1127,7 +1106,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         5 EP bins with the full predmode
         TODO: split to a function
       */
-      intra_getDirLumaPredictor(&encoder->in.cur_pic, xCtb, yCtb, depth, intraPreds);
+      intra_getDirLumaPredictor(encoder->in.cur_pic, xCtb, yCtb, depth, intraPreds);
       
       for(i = 0; i < 3; i++)
       {
@@ -1275,9 +1254,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       bitstream_align(cabac.stream);
        /* PCM sample */
       {
-        uint8_t *base   = &encoder->in.cur_pic.yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))    + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
-        uint8_t *baseCb = &encoder->in.cur_pic.uData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
-        uint8_t *baseCr = &encoder->in.cur_pic.vData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
+        uint8_t *base   = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))    + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+        uint8_t *baseCb = &encoder->in.cur_pic->uData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
+        uint8_t *baseCr = &encoder->in.cur_pic->vData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
         for(y = 0; y < LCU_WIDTH>>depth; y++)
         {
           for(x = 0; x < LCU_WIDTH>>depth; x++)
@@ -1394,7 +1373,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     uint32_t ac_sum = 0;
     
     /* Build reconstructed block to use in prediction with extrapolated borders */
-    intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+    intra_buildReferenceBorder(encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
     intra_recon(recShift,(LCU_WIDTH>>(depth))*2+8,ti->xCtb*(LCU_WIDTH>>(MAX_DEPTH)),ti->yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,pred_stride,ti->intraPredMode,0);
 
     /* Filter DC-prediction */
@@ -1406,13 +1385,13 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     {
       ti->intraPredModeChroma = 36;
     }
-    intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
+    intra_buildReferenceBorder(encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
     intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,pred_stride>>1,ti->intraPredModeChroma!=36?ti->intraPredModeChroma:ti->intraPredMode,1);
-    intra_buildReferenceBorder(&encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
+    intra_buildReferenceBorder(encoder->in.cur_pic, ti->xCtb, ti->yCtb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
     intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,pred_stride>>1,ti->intraPredModeChroma!=36?ti->intraPredModeChroma:ti->intraPredMode,1);
     
     /* This affects reconstruction, do after that */ 
-    picture_setBlockCoded(&encoder->in.cur_pic, ti->xCtb, ti->yCtb, depth, 1);
+    picture_setBlockCoded(encoder->in.cur_pic, ti->xCtb, ti->yCtb, depth, 1);
 
     /* INTRA PREDICTION ENDS HERE */
 
