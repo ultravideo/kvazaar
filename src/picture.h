@@ -107,7 +107,7 @@ picture_list *picture_list_init(int size);
 int picture_list_resize(picture_list *list, int size);
 int picture_list_destroy(picture_list *list);
 int picture_list_add(picture_list *list,picture* pic);
-int picture_list_rem(picture_list *list,int n);
+int picture_list_rem(picture_list *list,int n, int8_t destroy);
 
 picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU);
 int picture_destroy(picture *pic);

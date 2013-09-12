@@ -192,13 +192,19 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
     \param picture_list list to use
     \return 1 on success
   */
-  int picture_list_rem(picture_list *list,int n)
+  int picture_list_rem(picture_list *list,int n, int8_t destroy)
   {
     int i;
     //Must be within list boundaries
     if(n >= list->used_size)
     {
       return 0;
+    }
+
+    if(destroy)
+    {
+      picture_destroy(list->pics[n]);
+      free(list->pics[n]);
     }
 
     //The last item is easy to remove
@@ -278,9 +284,27 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
   */
   int picture_destroy(picture *pic)
   {
+    int i;
+        
     free(pic->uData);
     free(pic->vData);
     free(pic->yData);
+    pic->yData = pic->uData = pic->vData = NULL;
+
+    free(pic->yRecData);
+    free(pic->uRecData);
+    free(pic->vRecData);
+    pic->yRecData = pic->uRecData = pic->vRecData = NULL;
+
+    for(i=0; i<MAX_DEPTH+1; i++)
+    {
+      free(pic->CU[i]);
+      pic->CU[i] = NULL;
+    }
+
+    free(pic->CU);
+    pic->CU = NULL;
+
     return 1;
   }
 
