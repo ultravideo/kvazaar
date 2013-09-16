@@ -25,6 +25,38 @@
 #include "filter.h"
 #include "search.h"
 
+
+/**
+ * 
+ *
+ * pic: 
+ * pic_data: picture color data starting from the block MV is being searched for.
+ * ref_data: picture color data starting from the beginning of reference pic.
+ * cur_cu: 
+ */
+void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data, CU_info *cur_cu,  unsigned step, int x, int y)
+{
+  // TODO: Inter: Handle non-square blocks.
+  unsigned block_width = LCU_WIDTH_FROM_DEPTH(cur_cu->depth);
+  unsigned block_height = block_width;
+
+  // TODO: Inter: Calculating error outside picture borders.
+  // This prevents choosing vectors that need interpolating of borders to work.
+  if (x < 0 || y < 0 || x < pic->width - LCU_WIDTH || pic->height - LCU_WIDTH) return;
+
+  cur_cu->inter.mv[0] = x;
+  cur_cu->inter.mv[1] = y;
+  cur_cu->inter.cost = SAD(pic_data, &ref_data[y * pic->width + x], block_width, block_height, pic->width);
+
+  step /= 2;
+  if (step > 0) {
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x, y - step);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x - step, y);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x + step, y);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x, y + step);
+  }
+}
+
 void search_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
 {
   int32_t leftColumn;  /*!< left column iterator */
@@ -165,14 +197,17 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
       }
 
-      cur_CU->type = CU_INTER;
-      cur_CU->inter.mv[0] = 0<<2;
-      cur_CU->inter.mv[1] = 0<<2;
-      if(xCtb == 0 && yCtb == 0)
       {
-        cur_CU->inter.mv[1] = 0<<2;
+        unsigned mv[2] = { 0, 0 }; // TODO: Take initial MV from adjacent blocks.
+        picture *cur_pic = encoder->in.cur_pic;
+        uint8_t *cur_data = &cur_pic->yData[(mv[1] * cur_pic->width) + mv[0]];
+        
+        picture *ref_pic = encoder->ref->pics[0];
+
+        search_motion_vector(cur_pic, cur_data, ref_pic->yData, cur_CU, cur_pic->width >> 1, mv[0], mv[1]);
       }
-      cur_CU->inter.cost = 10;
+
+      cur_CU->type = CU_INTER;
       cur_CU->inter.mv_dir = 1;
       inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
     }

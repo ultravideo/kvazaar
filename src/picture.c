@@ -436,23 +436,6 @@ uint32_t Hadamard8x8(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t
   return sad;
 }
 
-
-//Sum of Absolute Difference for block
-uint32_t SAD(uint8_t *block,uint8_t* block2, uint32_t x, uint32_t y)
-{
-  uint32_t i;
-  uint32_t sum=0;
-  for(i=0;i<x*y;i+=4)
-  {
-    sum+=abs((int32_t)block[i]-(int32_t)block2[i]);
-    sum+=abs((int32_t)block[i+1]-(int32_t)block2[i+1]);
-    sum+=abs((int32_t)block[i+2]-(int32_t)block2[i+2]);
-    sum+=abs((int32_t)block[i+3]-(int32_t)block2[i+3]);
-  }
-
-  return sum;
-}
-
 uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y,x;
@@ -632,4 +615,27 @@ uint32_t SAD4x4(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride
   }
 
   return sum;
+}
+
+/**
+ * Calculate Sum of Absolute Differences (SAD) between two rectangular regions located in arbitrary points in the picture.
+ * 
+ * data1 is the starting point of the first picture.
+ * data2 is the starting point of the second picture.
+ * width is the width of the region for which SAD is calculated.
+ * height is the height of the region for which SAD is calculated.
+ * stride is the width of the pixel array.
+ */
+uint32_t SAD(uint8_t *data1, uint8_t *data2, unsigned width, unsigned height, unsigned stride)
+{
+  unsigned y, x;
+  unsigned sad = 0;
+
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x < width; ++x) {
+      sad += abs((int)data1[y * stride + x] - (int)data2[y * stride + x]);
+    }
+  }
+
+  return sad;
 }
