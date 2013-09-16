@@ -26,6 +26,9 @@
 #include "search.h"
 
 
+// Temporarily for debugging.
+#define USE_INTRA_IN_P 0
+
 /**
  * 
  *
@@ -219,7 +222,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   }
 
   /* INTRA SEARCH */
-  if(depth >= MIN_SEARCH_DEPTH)
+  if(depth >= MIN_SEARCH_DEPTH && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P))
   {
     int x = 0,y = 0;
     uint8_t *base  = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
