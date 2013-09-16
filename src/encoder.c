@@ -969,6 +969,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         else
         {
           uint32_t uiRefListIdx;
+
+          int16_t mv_cand[2][2];
+
+          
           /*
           // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
           if(encoder->in.cur_pic->slicetype == SLICE_B)
@@ -988,6 +992,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
           }
           */
 
+          
           
           for(uiRefListIdx = 0; uiRefListIdx < 2; uiRefListIdx++)
           {
@@ -1029,18 +1034,30 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                   }
                 }
 
+                /* Get MV candidates */
+                inter_get_mv_cand(encoder, xCtb, yCtb, depth, mv_cand);
+
+                /* Select better candidate */
+                cur_CU->inter.mv_ref = 0; /* Default to candidate 0 */
+                /* Only check when candidates are different */
+                if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
+                  uint16_t cand_1_diff = abs(cur_CU->inter.mv[0]-mv_cand[0][0]) + abs(cur_CU->inter.mv[1]-mv_cand[0][1]);
+                  uint16_t cand_2_diff = abs(cur_CU->inter.mv[0]-mv_cand[1][0]) + abs(cur_CU->inter.mv[1]-mv_cand[1][1]);
+                  /* Select candidate 1 if it's closer */
+                  if (cand_2_diff < cand_1_diff) {
+                    cur_CU->inter.mv_ref = 1;
+                  }
+                }
 
                 if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder->ref_list == REF_PIC_LIST_1 && cur_CU->inter.mv_dir==3))
                 {
-                    /*const TComCUMvField* pcCUMvField = pcCU->getCUMvField( eRefList );*/
-                    //TODO: calculate MV field difference
-                    const int32_t mvd_hor = cur_CU->inter.mv[0];//pcCUMvField->getMvd( uiAbsPartIdx ).getHor();
-                    const int32_t mvd_ver = cur_CU->inter.mv[1];//pcCUMvField->getMvd( uiAbsPartIdx ).getVer();
+                    const int32_t mvd_hor = cur_CU->inter.mv[0]-mv_cand[cur_CU->inter.mv_ref][0];
+                    const int32_t mvd_ver = cur_CU->inter.mv[1]-mv_cand[cur_CU->inter.mv_ref][1];
                     const int8_t bHorAbsGr0 = mvd_hor != 0;
                     const int8_t bVerAbsGr0 = mvd_ver != 0;
                     const uint32_t mvd_hor_abs = abs(mvd_hor);
                     const uint32_t mvd_ver_abs = abs(mvd_ver);
-
+                    
                     cabac.ctx = &g_cCUMvdSCModel[0];
                     CABAC_BIN(&cabac, (mvd_hor!=0)?1:0, "abs_mvd_greater0_flag_hor");
                     CABAC_BIN(&cabac, (mvd_ver!=0)?1:0, "abs_mvd_greater0_flag_ver");
@@ -1077,16 +1094,15 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
                     /* Inter reconstruction */
                     inter_recon(encoder->ref->pics[0],xCtb*CU_MIN_SIZE_PIXELS,yCtb*CU_MIN_SIZE_PIXELS,LCU_WIDTH>>depth,cur_CU->inter.mv,encoder->in.cur_pic);
-                }
 
-                {
-                  int32_t iSymbol = cur_CU->inter.mv_ref;//pcCU->getMVPIdx(eRefList, uiAbsPartIdx);
-                  int32_t iNum = AMVP_MAX_NUM_CANDS;
-                  cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, iSymbol,1,iNum-1);
+                    /* Mark this block as "coded" (can be used for predictions..) */
+                    picture_setBlockCoded(encoder->in.cur_pic,xCtb, yCtb, depth, 1);
                 }
+                /* Signal which candidate MV to use */
+                cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, cur_CU->inter.mv_ref,1,AMVP_MAX_NUM_CANDS-1);
               }
             }
-          }  
+          }
 
           cabac.ctx = &g_cCUQtRootCbfSCModel;
           CABAC_BIN(&cabac, 0, "rqt_root_cbf");

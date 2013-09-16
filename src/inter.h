@@ -14,5 +14,8 @@
 #define __INTER_H
 
 void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, CU_info* cur_cu);
-void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t mv[2], picture* dst);
+void inter_recon(picture *ref,int32_t xpos, int32_t ypos,int32_t width, int16_t mv[2], picture* dst);
+
+void inter_get_mv_cand(encoder_control *encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int16_t mv_cand[2][2]);
+
 #endif
