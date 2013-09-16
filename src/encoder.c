@@ -1036,7 +1036,18 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
 
                 /* Get MV candidates */
                 inter_get_mv_cand(encoder, xCtb, yCtb, depth, mv_cand);
-                cur_CU->inter.mv_ref = 0;
+
+                /* Select better candidate */
+                cur_CU->inter.mv_ref = 0; /* Default to candidate 0
+                /* Only check when candidates are different */
+                if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
+                  uint16_t cand_1_diff = abs(cur_CU->inter.mv[0]-mv_cand[0][0]) + abs(cur_CU->inter.mv[1]-mv_cand[0][1]);
+                  uint16_t cand_2_diff = abs(cur_CU->inter.mv[0]-mv_cand[1][0]) + abs(cur_CU->inter.mv[1]-mv_cand[1][1]);
+                  /* Select candidate 1 if it's closer */
+                  if (cand_2_diff < cand_1_diff) {
+                    cur_CU->inter.mv_ref = 1;
+                  }
+                }
 
                 if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder->ref_list == REF_PIC_LIST_1 && cur_CU->inter.mv_dir==3))
                 {
@@ -1087,13 +1098,8 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     /* Mark this block as "coded" (can be used for predictions..) */
                     picture_setBlockCoded(encoder->in.cur_pic,xCtb, yCtb, depth, 1);
                 }
-
-                {
-                  /* Signal which candidate MV to use */
-                  int32_t iSymbol = cur_CU->inter.mv_ref;
-                  int32_t iNum = AMVP_MAX_NUM_CANDS;
-                  cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, iSymbol,1,iNum-1);
-                }
+                /* Signal which candidate MV to use */
+                cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, cur_CU->inter.mv_ref,1,AMVP_MAX_NUM_CANDS-1);
               }
             }
           }  
