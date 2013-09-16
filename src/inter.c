@@ -80,31 +80,28 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
   mv[1] = mv[1]>>2;
 
   /* With overflow present, more checking */
-  if(overflow_neg_x || overflow_neg_y || overflow_pos_x || overflow_pos_y)
-  {
+  if (overflow_neg_x || overflow_neg_y || overflow_pos_x || overflow_pos_y) {
     /* Copy Luma with boundary checking */
-    for(y = ypos; y < ypos+width; y++)
-    {
-      for(x = xpos; x < xpos+width; x++)
-      {
+    for (y = ypos; y < ypos+width; y++) {
+      for (x = xpos; x < xpos+width; x++) {
         coord_x = x;
         coord_y = y;
-        overflow_neg_x = (x < 0)?1:0;
-        overflow_neg_y = (y < 0)?1:0;
+        overflow_neg_x = (x+mv[0] < 0)?1:0;
+        overflow_neg_y = (y+mv[1] < 0)?1:0;
 
-        overflow_pos_x = (x >= ref->width )?1:0;
-        overflow_pos_y = (y >= ref->height)?1:0;
+        overflow_pos_x = (x+mv[0] >= ref->width )?1:0;
+        overflow_pos_y = (y+mv[1] >= ref->height)?1:0;
 
         if(overflow_neg_x) {
-          coord_x = 0;
+          coord_x = -mv[0];
         } else if(overflow_pos_x) {
-          coord_x = ref->width-1;
+          coord_x = ref->width-1-mv[0];
         }
 
         if(overflow_neg_y) {
-          coord_y = 0;
+          coord_y = -mv[1];
         } else if(overflow_pos_y) {
-          coord_y = ref->height-1;
+          coord_y = ref->height-1-mv[1];
         }
 
         dst->yRecData[y*dst->width+x] = ref->yRecData[(coord_y+mv[1])*ref->width+(coord_x+mv[0])];
@@ -112,57 +109,48 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
     }
 
     /* Copy Chroma with boundary checking */
-    for(y = ypos>>1; y < (ypos+width)>>1; y++)
-    {
-      for(x = xpos>>1; x < (xpos+width)>>1; x++)
-      {
+    for (y = ypos>>1; y < (ypos+width)>>1; y++) {
+      for (x = xpos>>1; x < (xpos+width)>>1; x++) {
         coord_x = x;
         coord_y = y;
-        overflow_neg_x = (x < 0)?1:0;
-        overflow_neg_y = (y < 0)?1:0;
+        overflow_neg_x = (x+(mv[0]>>1) < 0)?1:0;
+        overflow_neg_y = (y+(mv[1]>>1) < 0)?1:0;
 
-        overflow_pos_x = (x >= ref->width>>1 )?1:0;
-        overflow_pos_y = (y >= ref->height>>1)?1:0;
+        overflow_pos_x = (x+(mv[0]>>1) >= ref->width>>1 )?1:0;
+        overflow_pos_y = (y+(mv[1]>>1) >= ref->height>>1)?1:0;
 
         if(overflow_neg_x) {
-          coord_x = 0;
+          coord_x = -(mv[0]>>1);
         } else if(overflow_pos_x) {
-          coord_x = (ref->width>>1)-1;
+          coord_x = ((ref->width-mv[0])>>1)-1;
         }
 
         if(overflow_neg_y) {
-          coord_y = 0;
+          coord_y = -(mv[1]>>1);
         } else if(overflow_pos_y) {
-          coord_y = (ref->height>>1)-1;
+          coord_y = ((ref->height-mv[1])>>1)-1;
         }
 
-        dst->uRecData[y*(dst->width>>1)+x] = ref->uRecData[(coord_y+(mv[1]>>1))*ref->width+(coord_x+(mv[0]>>1))];
-        dst->vRecData[y*(dst->width>>1)+x] = ref->vRecData[(coord_y+(mv[1]>>1))*ref->width+(coord_x+(mv[0]>>1))];
+        dst->uRecData[y*(dst->width>>1)+x] = ref->uRecData[(coord_y+(mv[1]>>1))*(ref->width>>1)+(coord_x+(mv[0]>>1))];
+        dst->vRecData[y*(dst->width>>1)+x] = ref->vRecData[(coord_y+(mv[1]>>1))*(ref->width>>1)+(coord_x+(mv[0]>>1))];
       }
     }
-  }
-  else
-  {
+  } else {
     /* Copy Luma */
-    for(y = ypos; y < ypos+width; y++)
-    {
-      for(x = xpos; x < xpos+width; x++)
-      {
+    for (y = ypos; y < ypos+width; y++) {
+      for (x = xpos; x < xpos+width; x++) {
         dst->yRecData[y*dst->width+x] = ref->yRecData[(y+mv[1])*ref->width+x+mv[0]];
       }
     }
 
     /* Copy Chroma */
-    for(y = ypos>>1; y < (ypos+width)>>1; y++)
-    {
-      for(x = xpos>>1; x < (xpos+width)>>1; x++)
-      {
+    for (y = ypos>>1; y < (ypos+width)>>1; y++) {
+      for (x = xpos>>1; x < (xpos+width)>>1; x++) {
         dst->uRecData[y*(dst->width>>1)+x] = ref->uRecData[(y+(mv[1]>>1))*(ref->width>>1)+x+(mv[0]>>1)];
         dst->vRecData[y*(dst->width>>1)+x] = ref->vRecData[(y+(mv[1]>>1))*(ref->width>>1)+x+(mv[0]>>1)];
       }
     }
   }
-
 }
 
 /*!

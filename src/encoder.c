@@ -1038,7 +1038,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                 inter_get_mv_cand(encoder, xCtb, yCtb, depth, mv_cand);
 
                 /* Select better candidate */
-                cur_CU->inter.mv_ref = 0; /* Default to candidate 0
+                cur_CU->inter.mv_ref = 0; /* Default to candidate 0 */
                 /* Only check when candidates are different */
                 if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
                   uint16_t cand_1_diff = abs(cur_CU->inter.mv[0]-mv_cand[0][0]) + abs(cur_CU->inter.mv[1]-mv_cand[0][1]);
@@ -1102,7 +1102,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                 cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, cur_CU->inter.mv_ref,1,AMVP_MAX_NUM_CANDS-1);
               }
             }
-          }  
+          }
 
           cabac.ctx = &g_cCUQtRootCbfSCModel;
           CABAC_BIN(&cabac, 0, "rqt_root_cbf");
