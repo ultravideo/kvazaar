@@ -19,9 +19,9 @@
 #include "config.h"
 #include "bitstream.h"
 #include "picture.h"
+#include "encoder.h"
 #include "intra.h"
 #include "inter.h"
-#include "encoder.h"
 #include "filter.h"
 #include "search.h"
 

@@ -164,3 +164,92 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
   }
 
 }
+
+/*!
+ \brief Get MV prediction for current block
+ \param encoder encoder control struct to use
+ \param xCtb block x position in SCU
+ \param yCtb block y position in SCU
+ \param depth current block depth
+ \param mv_pred[2][2] 2x motion vector prediction
+ \returns Void
+*/
+void inter_get_mv_cand(encoder_control *encoder,int32_t xCtb, int32_t yCtb,int8_t depth, int16_t mv_cand[2][2])
+{
+  uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS;
+  CU_info *cur_cu = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  uint8_t candidates = 0;
+
+  /*
+  Predictor block locations
+  ____      ______
+  |B2|______|B1|B0|
+     |         |
+     |  Cur CU |
+   __|         |
+  |A1|_________|
+  |A0|
+  */
+  CU_info *b0, *b1, *b2, *a0, *a1;
+
+  b0 = b1 = b2 = a0 = a1 = NULL;
+
+  if (xCtb != 0) {    
+    a1 = &encoder->in.cur_pic->CU[depth][xCtb-1+(yCtb+cur_block_in_scu-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+    if(!a1->coded) a1 = NULL;
+
+    if (yCtb+cur_block_in_scu < encoder->in.height_in_LCU<<MAX_DEPTH) {
+      a0 = &encoder->in.cur_pic->CU[depth][xCtb-1+(yCtb+cur_block_in_scu)*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+      if(!a0->coded) a0 = NULL;
+    }
+  }
+
+  if (yCtb != 0) {
+    b0 = &encoder->in.cur_pic->CU[depth][xCtb+cur_block_in_scu+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+    if (!b0->coded) b0 = NULL;
+    b1 = &encoder->in.cur_pic->CU[depth][xCtb+cur_block_in_scu-1+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+    if (!b1->coded) b1 = NULL;
+
+    if (xCtb != 0) {
+      b2 = &encoder->in.cur_pic->CU[depth][xCtb-1+(yCtb-1)*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+      if(!b2->coded) b2 = NULL;
+    }
+  }
+
+  /* Left predictors */
+  if (a0 && a0->type == CU_INTER) {
+    mv_cand[candidates][0] = a0->inter.mv[0];
+    mv_cand[candidates][1] = a0->inter.mv[1];
+    candidates++;
+  } else if (a1 && a1->type == CU_INTER) {
+    mv_cand[candidates][0] = a1->inter.mv[0];
+    mv_cand[candidates][1] = a1->inter.mv[1];
+    candidates++;
+  }
+
+  /* Top predictors */
+  if (b0 && b0->type == CU_INTER) {
+    mv_cand[candidates][0] = b0->inter.mv[0];
+    mv_cand[candidates][1] = b0->inter.mv[1];
+    candidates++;
+  } else if (b1 && b1->type == CU_INTER) {
+    mv_cand[candidates][0] = b1->inter.mv[0];
+    mv_cand[candidates][1] = b1->inter.mv[1];
+    candidates++;
+  } else if(b2 && b2->type == CU_INTER) {
+    mv_cand[candidates][0] = b2->inter.mv[0];
+    mv_cand[candidates][1] = b2->inter.mv[1];
+    candidates++;
+  }
+
+  if(candidates < 2) {
+    //TODO: add temporal mv predictor
+  }
+
+  for (;candidates < 2; candidates++) {
+    mv_cand[candidates][0] = 0;
+    mv_cand[candidates][1] = 0;
+    candidates++;
+  }
+
+}
