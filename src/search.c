@@ -34,26 +34,30 @@
  * ref_data: picture color data starting from the beginning of reference pic.
  * cur_cu: 
  */
-void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data, CU_info *cur_cu,  unsigned step, int x, int y)
+void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data, CU_info *cur_cu, unsigned step, int orig_x, int orig_y, int x, int y, unsigned depth)
 {
   // TODO: Inter: Handle non-square blocks.
-  unsigned block_width = LCU_WIDTH_FROM_DEPTH(cur_cu->depth);
+  unsigned block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned block_height = block_width;
+  unsigned cost;
 
   // TODO: Inter: Calculating error outside picture borders.
   // This prevents choosing vectors that need interpolating of borders to work.
-  if (x < 0 || y < 0 || x < pic->width - LCU_WIDTH || pic->height - LCU_WIDTH) return;
+  if (orig_x + x < 0 || orig_y + y < 0 || orig_x + x > pic->width - block_width || orig_y + y > pic->height - block_height) return;
 
-  cur_cu->inter.mv[0] = x;
-  cur_cu->inter.mv[1] = y;
-  cur_cu->inter.cost = SAD(pic_data, &ref_data[y * pic->width + x], block_width, block_height, pic->width);
+  cost = SAD(pic_data, &ref_data[(orig_y + y) * pic->width + (orig_x + x)], block_width, block_height, pic->width) + 1;
+  if (cost < cur_cu->inter.cost) {
+    cur_cu->inter.cost = cost;
+    cur_cu->inter.mv[0] = x << 2;
+    cur_cu->inter.mv[1] = y << 2;
+  }
 
   step /= 2;
   if (step > 0) {
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x, y - step);
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x - step, y);
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x + step, y);
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, x, y + step);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y, x, y - step, depth);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y, x - step, y, depth);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y, x + step, y, depth);
+    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y, x, y + step, depth);
   }
 }
 
@@ -185,7 +189,6 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
     }
   }
   
-  cur_CU->inter.cost = 0;
   /* INTER SEARCH */
   if(encoder->in.cur_pic->slicetype != SLICE_I)// && (xCtb == 0) && yCtb == 0)
   {
@@ -200,18 +203,19 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
       {
         unsigned mv[2] = { 0, 0 }; // TODO: Take initial MV from adjacent blocks.
         picture *cur_pic = encoder->in.cur_pic;
-        uint8_t *cur_data = &cur_pic->yData[(mv[1] * cur_pic->width) + mv[0]];
         
         picture *ref_pic = encoder->ref->pics[0];
 
-        search_motion_vector(cur_pic, cur_data, ref_pic->yData, cur_CU, cur_pic->width >> 1, mv[0], mv[1]);
+        int x = xCtb * CU_MIN_SIZE_PIXELS;
+        int y = yCtb * CU_MIN_SIZE_PIXELS;
+        uint8_t *cur_data = &cur_pic->yData[(y * cur_pic->width) + x];
+        search_motion_vector(cur_pic, cur_data, ref_pic->yData, cur_CU, 8, x, y, 0, 0, depth);
       }
 
       cur_CU->type = CU_INTER;
       cur_CU->inter.mv_dir = 1;
       inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
     }
-    return;
   }
 
   /* INTRA SEARCH */
