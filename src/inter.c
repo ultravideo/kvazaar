@@ -165,12 +165,11 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
 void inter_get_mv_cand(encoder_control *encoder,int32_t xCtb, int32_t yCtb,int8_t depth, int16_t mv_cand[2][2])
 {
   uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS;
-  CU_info *cur_cu = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint8_t candidates = 0;
 
   /*
   Predictor block locations
-  ____      ______
+  ____      _______
   |B2|______|B1|B0|
      |         |
      |  Cur CU |
@@ -230,11 +229,18 @@ void inter_get_mv_cand(encoder_control *encoder,int32_t xCtb, int32_t yCtb,int8_
     candidates++;
   }
 
+  /* Remove identical candidate */
+  if(candidates == 2 && mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]) {
+    candidates = 1;
+  }
+
+#if ENABLE_TEMPORAL_MVP
   if(candidates < 2) {
     //TODO: add temporal mv predictor
   }
+#endif
 
-  for (;candidates < 2; candidates++) {
+  while (candidates < 2) {
     mv_cand[candidates][0] = 0;
     mv_cand[candidates][1] = 0;
     candidates++;

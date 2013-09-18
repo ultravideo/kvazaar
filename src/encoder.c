@@ -646,7 +646,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "long_term_ref_pics_present_flag");
   //IF long_term_ref_pics_present
   //ENDIF
-  WRITE_U(encoder->stream, 0, 1, "sps_temporal_mvp_enable_flag");
+  WRITE_U(encoder->stream, ENABLE_TEMPORAL_MVP, 1, "sps_temporal_mvp_enable_flag");
 
   WRITE_U(encoder->stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
 
@@ -823,7 +823,7 @@ void encode_slice_data(encoder_control* encoder)
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 { 
   CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
-  uint8_t split_flag = cur_CU->split;//(depth<1)?1:0; /* TODO: get from CU data */
+  uint8_t split_flag = cur_CU->split;
   uint8_t split_model = 0;
 
   /* Check for slice border */

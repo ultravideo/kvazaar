@@ -27,6 +27,8 @@
 #define ENABLE_SIGN_HIDING 0 /*!< DOES NOT WORK PROPERLY */
 #define ENABLE_SCALING_LIST 1 /*!< Enable usage of (default) scaling list (BREAKS CHROMA WHEN 0!) */
 
+#define ENABLE_TEMPORAL_MVP 0 /*!< Enable usage of temporal Motion Vector Prediction */
+
 /* END OF CONFIG VARIABLES */
 
 #define MAX_REF_PIC_COUNT 5
