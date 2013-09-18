@@ -40,11 +40,11 @@ void printf_bitstream(char *msg, ...)
 } 
 #endif
 
-bitTable *g_exp_table;
+bit_table *g_exp_table;
 
 //From wikipedia
 //http://en.wikipedia.org/wiki/Binary_logarithm#Algorithm
-int floorLog2(unsigned int n) {
+int floor_log2(unsigned int n) {
   int pos = 0;
   if (n >= 1<<16) { n >>= 16; pos += 16; }
   if (n >= 1<< 8) { n >>=  8; pos +=  8; }
@@ -60,11 +60,11 @@ void init_exp_golomb(uint32_t len)
     uint32_t code_num;
     uint32_t M;
     uint32_t info;
-    g_exp_table=(bitTable*)malloc(len*sizeof(bitTable));    
+    g_exp_table=(bit_table*)malloc(len*sizeof(bit_table));    
     
     for(code_num=0;code_num<len;code_num++)
     {
-        M=(uint32_t)floorLog2(code_num+1);
+        M=(uint32_t)floor_log2(code_num+1);
         info=code_num+1-(uint32_t)pow(2,M);        
         g_exp_table[code_num].len=M*2+1;
         g_exp_table[code_num].value=(1<<M)|info;

@@ -15,7 +15,7 @@ typedef struct
 {
     uint32_t data[32];
     uint8_t  cur_byte;
-    uint8_t  cur_bit; 
+    uint8_t  cur_bit;
     FILE*    output;
     uint8_t* buffer;
     uint32_t buffer_pos;
@@ -26,11 +26,11 @@ typedef struct
 {
   uint8_t len;
   uint32_t value;
-}bitTable;
+} bit_table;
 
-extern bitTable *g_exp_table;
+extern bit_table *g_exp_table;
 
-int floorLog2(unsigned int n);
+int floor_log2(unsigned int n);
  
 void bitstream_alloc(bitstream* stream, uint32_t alloc);
 void bitstream_clear_buffer(bitstream* stream);
