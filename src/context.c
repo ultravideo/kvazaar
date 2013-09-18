@@ -20,129 +20,129 @@
 
 
 /* CONTEXTS */
-cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */
-cabac_ctx g_IntraModeSCModel;    /*<! \brief intra mode context models */
-cabac_ctx g_ChromaPredSCModel[2];
-cabac_ctx g_TransSubdivSCModel[3];    /*<! \brief intra mode context models */
-cabac_ctx g_QtCbfSCModelY[3];
-cabac_ctx g_QtCbfSCModelU[3];
+cabac_ctx g_split_flag_model[3]; /*<! \brief split flag context models */
+cabac_ctx g_intra_mode_model;    /*<! \brief intra mode context models */
+cabac_ctx g_chroma_pred_model[2];
+cabac_ctx g_trans_subdiv_model[3];    /*<! \brief intra mode context models */
+cabac_ctx g_qt_cbf_model_luma[3];
+cabac_ctx g_qt_cbf_model_chroma[3];
 //cabac_ctx g_QtCbfSCModelV[3];
-cabac_ctx g_PartSizeSCModel[4];
-cabac_ctx g_CUSigCoeffGroupSCModel[4];
-cabac_ctx g_CUSigSCModel_luma[27];
-cabac_ctx g_CUSigSCModel_chroma[15];
-cabac_ctx g_CuCtxLastY_luma[15];
-cabac_ctx g_CuCtxLastY_chroma[15];
-cabac_ctx g_CuCtxLastX_luma[15];
-cabac_ctx g_CuCtxLastX_chroma[15];
-cabac_ctx g_CUOneSCModel_luma[16];
-cabac_ctx g_CUOneSCModel_chroma[8];
-cabac_ctx g_cCUAbsSCModel_luma[4];
-cabac_ctx g_cCUAbsSCModel_chroma[2];
-cabac_ctx g_cCUPredModeSCModel;
-cabac_ctx g_cCUSkipFlagSCModel[3];
-cabac_ctx g_cCUMergeIdxExtSCModel;
-cabac_ctx g_cCUMergeFlagExtSCModel;
-cabac_ctx g_cCUMvdSCModel[2];
-cabac_ctx g_cCURefPicSCModel[2];
-cabac_ctx g_cMVPIdxSCModel[2];
-cabac_ctx g_cCUQtRootCbfSCModel;
+cabac_ctx g_part_size_model[4];
+cabac_ctx g_cu_sig_coeff_group_model[4];
+cabac_ctx g_cu_sig_model_luma[27];
+cabac_ctx g_cu_sig_model_chroma[15];
+cabac_ctx g_cu_ctx_last_y_luma[15];
+cabac_ctx g_cu_ctx_last_y_chroma[15];
+cabac_ctx g_cu_ctx_last_x_luma[15];
+cabac_ctx g_cu_ctx_last_x_chroma[15];
+cabac_ctx g_cu_one_model_luma[16];
+cabac_ctx g_cu_one_model_chroma[8];
+cabac_ctx g_cu_abs_model_luma[4];
+cabac_ctx g_cu_abs_model_chroma[2];
+cabac_ctx g_cu_pred_mode_model;
+cabac_ctx g_cu_skip_flag_model[3];
+cabac_ctx g_cu_merge_idx_ext_model;
+cabac_ctx g_cu_merge_flag_ext_model;
+cabac_ctx g_cu_mvd_model[2];
+cabac_ctx g_cu_ref_pic_model[2];
+cabac_ctx g_mvp_idx_model[2];
+cabac_ctx g_cu_qt_root_cbf_model;
 
-void init_contexts(encoder_control *encoder, int8_t SLICE)
+void init_contexts(encoder_control *encoder, int8_t slice)
 {
   uint16_t i;
 
   /* Initialize contexts */
   /* TODO: add P/B slice */  
-  ctx_init(&g_cCUMergeFlagExtSCModel, encoder->QP, INIT_MERGE_FLAG_EXT[SLICE][0]);
-  ctx_init(&g_cCUMergeIdxExtSCModel, encoder->QP, INIT_MERGE_IDX_EXT[SLICE][0]);
-  ctx_init(&g_cCUPredModeSCModel, encoder->QP, INIT_PRED_MODE[SLICE][0]);
+  ctx_init(&g_cu_merge_flag_ext_model, encoder->QP, INIT_MERGE_FLAG_EXT[slice][0]);
+  ctx_init(&g_cu_merge_idx_ext_model, encoder->QP, INIT_MERGE_IDX_EXT[slice][0]);
+  ctx_init(&g_cu_pred_mode_model, encoder->QP, INIT_PRED_MODE[slice][0]);
 
-  ctx_init(&g_cCUSkipFlagSCModel[0], encoder->QP, INIT_SKIP_FLAG[SLICE][0]);
-  ctx_init(&g_cCUSkipFlagSCModel[1], encoder->QP, INIT_SKIP_FLAG[SLICE][1]);
-  ctx_init(&g_cCUSkipFlagSCModel[2], encoder->QP, INIT_SKIP_FLAG[SLICE][2]);
+  ctx_init(&g_cu_skip_flag_model[0], encoder->QP, INIT_SKIP_FLAG[slice][0]);
+  ctx_init(&g_cu_skip_flag_model[1], encoder->QP, INIT_SKIP_FLAG[slice][1]);
+  ctx_init(&g_cu_skip_flag_model[2], encoder->QP, INIT_SKIP_FLAG[slice][2]);
 
 
-  ctx_init(&g_SplitFlagSCModel[0], encoder->QP, INIT_SPLIT_FLAG[SLICE][0]);
-  ctx_init(&g_SplitFlagSCModel[1], encoder->QP, INIT_SPLIT_FLAG[SLICE][1]);
-  ctx_init(&g_SplitFlagSCModel[2], encoder->QP, INIT_SPLIT_FLAG[SLICE][2]);
+  ctx_init(&g_split_flag_model[0], encoder->QP, INIT_SPLIT_FLAG[slice][0]);
+  ctx_init(&g_split_flag_model[1], encoder->QP, INIT_SPLIT_FLAG[slice][1]);
+  ctx_init(&g_split_flag_model[2], encoder->QP, INIT_SPLIT_FLAG[slice][2]);
 
-  ctx_init(&g_IntraModeSCModel, encoder->QP, INIT_INTRA_PRED_MODE[SLICE]);  
+  ctx_init(&g_intra_mode_model, encoder->QP, INIT_INTRA_PRED_MODE[slice]);  
 
-  ctx_init(&g_ChromaPredSCModel[0], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE][0]);
-  ctx_init(&g_ChromaPredSCModel[1], encoder->QP, INIT_CHROMA_PRED_MODE[SLICE][1]);
+  ctx_init(&g_chroma_pred_model[0], encoder->QP, INIT_CHROMA_PRED_MODE[slice][0]);
+  ctx_init(&g_chroma_pred_model[1], encoder->QP, INIT_CHROMA_PRED_MODE[slice][1]);
   
-  ctx_init(&g_cCUAbsSCModel_chroma[0], encoder->QP, INIT_ABS_FLAG[SLICE][4]);
-  ctx_init(&g_cCUAbsSCModel_chroma[1], encoder->QP, INIT_ABS_FLAG[SLICE][5]);
+  ctx_init(&g_cu_abs_model_chroma[0], encoder->QP, INIT_ABS_FLAG[slice][4]);
+  ctx_init(&g_cu_abs_model_chroma[1], encoder->QP, INIT_ABS_FLAG[slice][5]);
 
   //TODO: ignore P/B contexts on intra frame
-  ctx_init(&g_cCUQtRootCbfSCModel, encoder->QP, INIT_QT_ROOT_CBF[SLICE][0]);
+  ctx_init(&g_cu_qt_root_cbf_model, encoder->QP, INIT_QT_ROOT_CBF[slice][0]);
 
-  ctx_init(&g_cCUMvdSCModel[0], encoder->QP, INIT_MVD[SLICE][0]);
-  ctx_init(&g_cCUMvdSCModel[1], encoder->QP, INIT_MVD[SLICE][1]);
-  ctx_init(&g_cCURefPicSCModel[0], encoder->QP, INIT_REF_PIC[SLICE][0]);
-  ctx_init(&g_cCURefPicSCModel[1], encoder->QP, INIT_REF_PIC[SLICE][1]);
-  ctx_init(&g_cMVPIdxSCModel[0], encoder->QP, INIT_MVP_IDX[SLICE][0]);
-  ctx_init(&g_cMVPIdxSCModel[1], encoder->QP, INIT_MVP_IDX[SLICE][1]);
+  ctx_init(&g_cu_mvd_model[0], encoder->QP, INIT_MVD[slice][0]);
+  ctx_init(&g_cu_mvd_model[1], encoder->QP, INIT_MVD[slice][1]);
+  ctx_init(&g_cu_ref_pic_model[0], encoder->QP, INIT_REF_PIC[slice][0]);
+  ctx_init(&g_cu_ref_pic_model[1], encoder->QP, INIT_REF_PIC[slice][1]);
+  ctx_init(&g_mvp_idx_model[0], encoder->QP, INIT_MVP_IDX[slice][0]);
+  ctx_init(&g_mvp_idx_model[1], encoder->QP, INIT_MVP_IDX[slice][1]);
   
 
 
   for(i = 0; i < 4; i++)
   {    
-    ctx_init(&g_CUSigCoeffGroupSCModel[i], encoder->QP, INIT_SIG_CG_FLAG[SLICE][i]);
-    ctx_init(&g_cCUAbsSCModel_luma[i], encoder->QP, INIT_ABS_FLAG[SLICE][i]);
-    ctx_init(&g_PartSizeSCModel[i], encoder->QP, INIT_PART_SIZE[SLICE][i]);
+    ctx_init(&g_cu_sig_coeff_group_model[i], encoder->QP, INIT_SIG_CG_FLAG[slice][i]);
+    ctx_init(&g_cu_abs_model_luma[i], encoder->QP, INIT_ABS_FLAG[slice][i]);
+    ctx_init(&g_part_size_model[i], encoder->QP, INIT_PART_SIZE[slice][i]);
   }
   for(i = 0; i < 3; i++)
   {
-    ctx_init(&g_TransSubdivSCModel[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[SLICE][i]);
-    ctx_init(&g_QtCbfSCModelY[i], encoder->QP, INIT_QT_CBF[SLICE][i]);
-    ctx_init(&g_QtCbfSCModelU[i], encoder->QP, INIT_QT_CBF[SLICE][i+3]);
+    ctx_init(&g_trans_subdiv_model[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
+    ctx_init(&g_qt_cbf_model_luma[i], encoder->QP, INIT_QT_CBF[slice][i]);
+    ctx_init(&g_qt_cbf_model_chroma[i], encoder->QP, INIT_QT_CBF[slice][i+3]);
     //cxt_init(&g_QtCbfSCModelV[i], encoder->QP, INIT_QT_CBF[SLICE][i]);
   }
 
   for(i = 0; i < 8; i++)
   {
-    ctx_init(&g_CUOneSCModel_chroma[i], encoder->QP, INIT_ONE_FLAG[SLICE][i+16]);
+    ctx_init(&g_cu_one_model_chroma[i], encoder->QP, INIT_ONE_FLAG[slice][i+16]);
   }
 
   for(i = 0; i < 15; i++)
   {
-    ctx_init(&g_CuCtxLastY_luma[i], encoder->QP, INIT_LAST[SLICE][i] );
-    ctx_init(&g_CuCtxLastX_luma[i], encoder->QP, INIT_LAST[SLICE][i] );
+    ctx_init(&g_cu_ctx_last_y_luma[i], encoder->QP, INIT_LAST[slice][i] );
+    ctx_init(&g_cu_ctx_last_x_luma[i], encoder->QP, INIT_LAST[slice][i] );
 
-    ctx_init(&g_CuCtxLastY_chroma[i], encoder->QP, INIT_LAST[SLICE][i+15] );
-    ctx_init(&g_CuCtxLastX_chroma[i], encoder->QP, INIT_LAST[SLICE][i+15] );
+    ctx_init(&g_cu_ctx_last_y_chroma[i], encoder->QP, INIT_LAST[slice][i+15] );
+    ctx_init(&g_cu_ctx_last_x_chroma[i], encoder->QP, INIT_LAST[slice][i+15] );
 
-    ctx_init(&g_CUOneSCModel_luma[i], encoder->QP, INIT_ONE_FLAG[SLICE][i]);
+    ctx_init(&g_cu_one_model_luma[i], encoder->QP, INIT_ONE_FLAG[slice][i]);
   }
-  ctx_init(&g_CUOneSCModel_luma[15], encoder->QP, INIT_ONE_FLAG[SLICE][15]);
+  ctx_init(&g_cu_one_model_luma[15], encoder->QP, INIT_ONE_FLAG[slice][15]);
   
   for(i = 0; i < 27; i++)
   { 
 
-    ctx_init(&g_CUSigSCModel_luma[i], encoder->QP, INIT_SIG_FLAG[SLICE][i]);
+    ctx_init(&g_cu_sig_model_luma[i], encoder->QP, INIT_SIG_FLAG[slice][i]);
     if(i < 15)
     {
-      ctx_init(&g_CUSigSCModel_chroma[i], encoder->QP, INIT_SIG_FLAG[SLICE][i+27]);
+      ctx_init(&g_cu_sig_model_chroma[i], encoder->QP, INIT_SIG_FLAG[slice][i+27]);
     }
   }
 
 }
 
-uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,
-                                    uint32_t uiCGPosX,
-                                    uint32_t uiCGPosY,                                    
+uint32_t context_get_sig_coeff_group( uint32_t* sig_coeff_group_flag,
+                                    uint32_t pos_x,
+                                    uint32_t pos_y,
                                     int32_t width)
 {
   uint32_t uiRight = 0;
   uint32_t uiLower = 0;
   width >>= 2;
-  if( uiCGPosX < (uint32_t)width - 1 )
-    uiRight = (uiSigCoeffGroupFlag[ uiCGPosY * width + uiCGPosX + 1 ] != 0);
+  if( pos_x < (uint32_t)width - 1 )
+    uiRight = (sig_coeff_group_flag[ pos_y * width + pos_x + 1 ] != 0);
 
-  if (uiCGPosY < (uint32_t)width - 1 )
-    uiLower = (uiSigCoeffGroupFlag[ (uiCGPosY  + 1 ) * width + uiCGPosX ] != 0);
+  if (pos_y < (uint32_t)width - 1 )
+    uiLower = (sig_coeff_group_flag[ (pos_y  + 1 ) * width + pos_x ] != 0);
 
   return (uiRight || uiLower);
 }
@@ -158,7 +158,7 @@ uint32_t context_get_sigCoeffGroup( uint32_t* uiSigCoeffGroupFlag,
  \returns pattern for current coefficient group
 */
  
-int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t posXCG, uint32_t posYCG, int32_t width)
+int32_t context_calc_pattern_sig_ctx( const uint32_t* sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width)
 {
   if( width == 4) return -1;
 
@@ -166,13 +166,13 @@ int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t 
   uint32_t sigRight = 0;
   uint32_t sigLower = 0;
   width >>= 2;
-  if( posXCG < (uint32_t)width - 1 )
+  if( pos_x < (uint32_t)width - 1 )
   {
-    sigRight = (sigCoeffGroupFlag[ posYCG * width + posXCG + 1 ] != 0);
+    sigRight = (sig_coeff_group_flag[ pos_y * width + pos_x + 1 ] != 0);
   }
-  if (posYCG < (uint32_t)width - 1 )
+  if (pos_y < (uint32_t)width - 1 )
   {
-    sigLower = (sigCoeffGroupFlag[ (posYCG  + 1 ) * width + posXCG ] != 0);
+    sigLower = (sig_coeff_group_flag[ (pos_y  + 1 ) * width + pos_x ] != 0);
   }
   
   return sigRight + (sigLower<<1);
@@ -191,11 +191,11 @@ int32_t  context_calcPatternSigCtx( const uint32_t* sigCoeffGroupFlag, uint32_t 
  \returns ctxInc for current scan position
 */
 
-int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX,
-                             int32_t posY,int32_t blockType,int32_t width,
-                             int8_t textureType)
+int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
+                             int32_t pos_y,int32_t block_type,int32_t width,
+                             int8_t texture_type)
 {
-  const int32_t ctxIndMap[16] =
+  const int32_t ctx_ind_map[16] =
   {
     0, 1, 4, 5,
     2, 3, 4, 5,
@@ -203,27 +203,27 @@ int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX
     7, 7, 8, 8
   };
 
-  if( posX + posY == 0 )
+  if( pos_x + pos_y == 0 )
     return 0;
 
-  if ( blockType == 2 )
-    return ctxIndMap[ 4 * posY + posX ];
+  if ( block_type == 2 )
+    return ctx_ind_map[ 4 * pos_y + pos_x ];
 
   {
   int32_t cnt = 0;
-  int32_t offset = blockType == 3 ? (scanIdx==SCAN_DIAG ? 9 : 15) : (textureType == 0 ? 21 : 12);
-  int32_t posXinSubset = posX-((posX>>2)<<2);
-  int32_t posYinSubset = posY-((posY>>2)<<2);
+  int32_t offset = block_type == 3 ? (scan_idx==SCAN_DIAG ? 9 : 15) : (texture_type == 0 ? 21 : 12);
+  int32_t posXinSubset = pos_x-((pos_x>>2)<<2);
+  int32_t posYinSubset = pos_y-((pos_y>>2)<<2);
   
-  if(patternSigCtx==0)
+  if(pattern_sig_ctx==0)
   {
     cnt = posXinSubset+posYinSubset<=2 ? (posXinSubset+posYinSubset==0 ? 2 : 1) : 0;
   }
-  else if(patternSigCtx==1)
+  else if(pattern_sig_ctx==1)
   {
     cnt = posYinSubset<=1 ? (posYinSubset==0 ? 2 : 1) : 0;
   }
-  else if(patternSigCtx==2)
+  else if(pattern_sig_ctx==2)
   {
     cnt = posXinSubset<=1 ? (posXinSubset==0 ? 2 : 1) : 0;
   }
@@ -231,7 +231,7 @@ int32_t context_getSigCtxInc(int32_t patternSigCtx,uint32_t scanIdx,int32_t posX
   {
     cnt = 2;
   }
-  return (( textureType == 0 && ((posX>>2) + (posY>>2)) > 0 ) ? 3 : 0) + offset + cnt;
+  return (( texture_type == 0 && ((pos_x>>2) + (pos_y>>2)) > 0 ) ? 3 : 0) + offset + cnt;
   }
 }
 
