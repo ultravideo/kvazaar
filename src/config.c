@@ -53,8 +53,8 @@ int config_init(config* cfg)
 */
 int config_destroy(config* cfg)
 {
-  free_pointer(cfg->input);
-  free_pointer(cfg->output);
+  FREE_POINTER(cfg->input);
+  FREE_POINTER(cfg->output);
   free(cfg);
 
   return 1;
