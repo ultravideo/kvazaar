@@ -1155,10 +1155,10 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       
       int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
       int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];      
-      intra_buildReferenceBorder(encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+      intra_build_reference_border(encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
       cur_CU->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
       intraPredMode = cur_CU->intra.mode;
-      intra_setBlockMode(encoder->in.cur_pic,xCtb, yCtb, depth, intraPredMode);
+      intra_set_block_mode(encoder->in.cur_pic,xCtb, yCtb, depth, intraPredMode);
       
       #if ENABLE_PCM == 1
       /* Code must start after variable initialization */
@@ -1173,7 +1173,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
         5 EP bins with the full predmode
         TODO: split to a function
       */
-      intra_getDirLumaPredictor(encoder->in.cur_pic, xCtb, yCtb, depth, intraPreds);
+      intra_get_dir_luma_predictor(encoder->in.cur_pic, xCtb, yCtb, depth, intraPreds);
       
       for(i = 0; i < 3; i++)
       {
@@ -1440,21 +1440,21 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     uint32_t ac_sum = 0;
     
     /* Build reconstructed block to use in prediction with extrapolated borders */
-    intra_buildReferenceBorder(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
+    intra_build_reference_border(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
     intra_recon(recShift,(LCU_WIDTH>>(depth))*2+8,ti->x_ctb*(LCU_WIDTH>>(MAX_DEPTH)),ti->y_ctb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,pred_stride,ti->intra_pred_mode,0);
 
     /* Filter DC-prediction */
     if(ti->intra_pred_mode == 1 && width < 32)
     {
-      intra_DCPredFiltering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
+      intra_dc_pred_filtering(recShift,(LCU_WIDTH>>(depth))*2+8,pred,width,LCU_WIDTH>>depth,LCU_WIDTH>>depth);
     }      
     if(ti->intra_pred_mode_chroma != 36 && ti->intra_pred_mode_chroma == ti->intra_pred_mode)
     {
       ti->intra_pred_mode_chroma = 36;
     }
-    intra_buildReferenceBorder(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
+    intra_build_reference_border(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 1);
     intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predU,pred_stride>>1,ti->intra_pred_mode_chroma!=36?ti->intra_pred_mode_chroma:ti->intra_pred_mode,1);
-    intra_buildReferenceBorder(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
+    intra_build_reference_border(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,(LCU_WIDTH>>(depth+1))*2+8, rec, (LCU_WIDTH>>(depth+1))*2+8, 2);
     intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,pred_stride>>1,ti->intra_pred_mode_chroma!=36?ti->intra_pred_mode_chroma:ti->intra_pred_mode,1);
     
     /* This affects reconstruction, do after that */ 

@@ -33,7 +33,7 @@ const uint8_t intraHorVerDistThres[5] = {0,7,1,0,0};
  \param mode mode to set
  \returns Void
 */
-void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, uint8_t mode)
+void intra_set_block_mode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, uint8_t mode)
 {
   uint32_t x,y,d;
   /* Width in smallest CU */
@@ -62,7 +62,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
  \param depth current CU depth
  \returns mode if it's present, otherwise -1
 */
-int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth)
+int8_t intra_get_block_mode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth)
 {
   //Width in smallest CU
   int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
@@ -82,7 +82,7 @@ int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t dep
 \param width block width
 \returns DC prediction
 */
-int16_t intra_getDCPred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width)
+int16_t intra_get_dc_pred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width)
 {
   int32_t i, iSum = 0;
   int16_t pDcVal = 1<<(g_bitdepth-1);  
@@ -111,7 +111,7 @@ int16_t intra_getDCPred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t 
   \param preds output buffer for 3 predictions 
   \returns (predictions are found)?1:0
 */
-int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t* preds)
+int8_t intra_get_dir_luma_predictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, int8_t* preds)
 {
   int32_t iLeftIntraDir  = 1; //DC_IDX
   int32_t iAboveIntraDir = 1; //DC_IDX
@@ -285,7 +285,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   
 
   /* Test DC */
-  x = intra_getDCPred(rec, recstride, xpos, ypos, width);
+  x = intra_get_dc_pred(rec, recstride, xpos, ypos, width);
   for(i = 0; i < (int32_t)(width*width); i++)
   {
     pred[i] = x;
@@ -298,7 +298,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     int distance = MIN(abs(i-26),abs(i-10));
     if(distance <= threshold)
     {
-      intra_getAngularPred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
+      intra_get_angular_pred(rec,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i,0);
     }
   }
@@ -307,7 +307,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   /**** FROM THIS POINT FORWARD, USING FILTERED PREDICTION *****/
 
   /* Test planar */    
-  intra_getPlanarPred(recFiltered, recstride, xpos, ypos, width, pred, width);
+  intra_get_planar_pred(recFiltered, recstride, xpos, ypos, width, pred, width);
   CHECK_FOR_BEST(0,0);
   
   /* Test directional predictions */
@@ -320,7 +320,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
     int distance = MIN(abs(i-26),abs(i-10));
     if(distance > threshold)
     {
-      intra_getAngularPred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
+      intra_get_angular_pred(recFiltered,recstride,pred, width,width,width,i, xpos?1:0, ypos?1:0, filter);
       CHECK_FOR_BEST(i,0);
     }
   }
@@ -355,12 +355,12 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   /* planar */  
   if(mode == 0)
   {
-    intra_getPlanarPred(rec, recstride, xpos, ypos, width, pred, width); 
+    intra_get_planar_pred(rec, recstride, xpos, ypos, width, pred, width); 
   }
   /* DC */
   else if(mode == 1)
   {
-    i = intra_getDCPred(rec, recstride, xpos, ypos, width);
+    i = intra_get_dc_pred(rec, recstride, xpos, ypos, width);
     for(y = 0; y < (int32_t)width; y++)
     {
       for(x = 0; x < (int32_t)width; x++)
@@ -373,7 +373,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   /* directional predictions */
   else
   {
-    intra_getAngularPred(rec, recstride,pred, width,width,width,mode, xpos?1:0, ypos?1:0, filter);
+    intra_get_angular_pred(rec, recstride,pred, width,width,width,mode, xpos?1:0, ypos?1:0, filter);
   }
 
   COPY_PRED_TO_DST();
@@ -389,7 +389,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
     
 
 */
-void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
+void intra_build_reference_border(picture* pic, int32_t xCtb, int32_t yCtb,int16_t outwidth, int16_t* dst, int32_t dststride, int8_t chroma)
 {
   int32_t leftColumn;  /*!< left column iterator */
   int16_t val;         /*!< variable to store extrapolated value */
@@ -497,7 +497,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
 const int32_t angTable[9]    = {0,    2,    5,   9,  13,  17,  21,  26,  32};
 const int32_t invAngTable[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; // (256 * 32) / Angle
 
-void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int32_t dstStride, int32_t width, int32_t height, int32_t dirMode, int8_t leftAvail,int8_t topAvail, int8_t filter)
+void intra_get_angular_pred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int32_t dstStride, int32_t width, int32_t height, int32_t dirMode, int8_t leftAvail,int8_t topAvail, int8_t filter)
 {
   int32_t k,l;
   int32_t blkSize        = width;
@@ -639,7 +639,7 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
 
 
 
-void intra_DCPredFiltering(int16_t* pSrc, int32_t iSrcStride, int16_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight )
+void intra_dc_pred_filtering(int16_t* pSrc, int32_t iSrcStride, int16_t* rpDst, int32_t iDstStride, int32_t iWidth, int32_t iHeight )
 {
   int16_t* pDst = rpDst;
   int32_t x, y, iDstStride2, iSrcStride2;
@@ -670,7 +670,7 @@ void intra_DCPredFiltering(int16_t* pSrc, int32_t iSrcStride, int16_t* rpDst, in
  
   This function derives the prediction samples for planar mode (intra coding).
 */
-void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
+void intra_get_planar_pred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
 {
   int16_t pDcVal = 1<<(g_bitdepth-1);
   int32_t k, l, bottomLeft, topRight;

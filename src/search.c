@@ -294,7 +294,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
     {
       /* Set split to 0 and mode to intra.mode */
       picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
-      intra_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+      intra_set_block_mode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
       bestCost = bestIntraCost;
     }
   }
@@ -309,7 +309,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   {
     /* Set split to 0 and mode to intra.mode */
     picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
-    intra_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
+    intra_set_block_mode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU->intra.mode);
     bestCost = bestIntraCost;
   }
 
