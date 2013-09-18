@@ -70,14 +70,14 @@ void search_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_
   int32_t leftColumn;  /*!< left column iterator */
   int16_t val;         /*!< variable to store extrapolated value */
   int32_t i;           /*!< index iterator */
-  int16_t dcVal        = 1<<(g_bitDepth-1); /*!< default predictor value */
+  int16_t dcVal        = 1<<(g_bitdepth-1); /*!< default predictor value */
   int32_t topRow;      /*!< top row iterator */
   int32_t srcWidth     = (pic->width>>(chroma?1:0)); /*!< source picture width */
   int32_t srcHeight    = (pic->height>>(chroma?1:0));/*!< source picture height */
   uint8_t* srcPic      = (!chroma)?pic->yData: ((chroma==1)?pic->uData: pic->vData); /*!< input picture pointer */  
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
-  int32_t width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;     /*!< picture width in SCU */
+  int32_t width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;     /*!< picture width in SCU */
 
   /* Fill left column */
   if(xCtb)
@@ -162,7 +162,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   uint8_t border_split_x = ((encoder->in.width)  < ( (xCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
   uint8_t border_split_y = ((encoder->in.height) < ( (yCtb+1)*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>(depth+1)) ))?0:1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
-  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
 
   cur_CU->intra.cost = 0xffffffff;
   cur_CU->inter.cost = 0xffffffff;
@@ -257,7 +257,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
 uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 {
-  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
   uint32_t bestIntraCost = cur_CU->intra.cost;
   uint32_t bestInterCost = cur_CU->inter.cost;
   uint32_t bestCost = 0;
@@ -328,9 +328,9 @@ void search_slice_data(encoder_control* encoder)
 
 
   /* Loop through every LCU in the slice */
-  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  for(yCtb = 0; yCtb < encoder->in.height_in_lcu; yCtb++)
   {
-    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    for(xCtb = 0; xCtb < encoder->in.width_in_lcu; xCtb++)
     {
       uint8_t depth = 0;
       /* Recursive function for looping through all the sub-blocks */

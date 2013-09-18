@@ -168,8 +168,8 @@
     encoder->in.video_format = FORMAT_420;
     /* deblocking */
     encoder->deblock_enable  = 1;
-    encoder->betaOffsetdiv2  = 0;
-    encoder->tcOffsetdiv2    = 0;
+    encoder->beta_offset_div2  = 0;
+    encoder->tc_offset_div2    = 0;
     /* SAO */
     encoder->sao_enable = 0;
 
@@ -222,7 +222,7 @@
       /* Add current picture as reference */
       picture_list_add(encoder->ref, encoder->in.cur_pic);
       /* Allocate new memory to current picture */
-      encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_LCU, encoder->in.height_in_LCU);
+      encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
 
       encoder->frame++;
     }

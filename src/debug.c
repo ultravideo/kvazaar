@@ -31,7 +31,7 @@ void close_cu_file(FILE *fp) {
  */
 unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t xCtb, uint16_t yCtb, FILE *fp)
 {
-  CU_info *cu = &encoder->in.cur_pic->CU[depth][xCtb + yCtb * (encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cu = &encoder->in.cur_pic->CU[depth][xCtb + yCtb * (encoder->in.width_in_lcu<<MAX_DEPTH)];
   unsigned lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4;
   unsigned sum = 0;
   unsigned best_cost = -1;

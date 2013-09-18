@@ -37,7 +37,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
 {
   uint32_t x,y,d;
   /* Width in smallest CU */
-  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
+  int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
@@ -65,7 +65,7 @@ void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth
 int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth)
 {
   //Width in smallest CU
-  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
+  int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
   int CUpos = yCtb*width_in_SCU+xCtb;
   if(pic->CU[depth][CUpos].type == CU_INTRA)
   {
@@ -85,7 +85,7 @@ int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t dep
 int16_t intra_getDCPred(int16_t* pic, uint16_t picwidth,uint32_t xpos, uint32_t ypos, uint8_t width)
 {
   int32_t i, iSum = 0;
-  int16_t pDcVal = 1<<(g_bitDepth-1);  
+  int16_t pDcVal = 1<<(g_bitdepth-1);  
   
   /* Average of pixels on top and left */
   for (i = -picwidth; i < width-picwidth ; i++)
@@ -115,7 +115,7 @@ int8_t intra_getDirLumaPredictor(picture* pic,uint32_t xCtb, uint32_t yCtb, uint
 {
   int32_t iLeftIntraDir  = 1; //DC_IDX
   int32_t iAboveIntraDir = 1; //DC_IDX
-  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
+  int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
   int32_t CUpos = yCtb*width_in_SCU+xCtb;
   
   // Left PU predictor
@@ -247,7 +247,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   uint8_t *origShift = &orig[xpos+ypos*origstride];
   int8_t filter = (width<32); //TODO: chroma support
   SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64}; //TODO: get SAD functions from parameters
-  uint8_t threshold = intraHorVerDistThres[g_toBits[width]]; /*!< Intra filtering threshold */
+  uint8_t threshold = intraHorVerDistThres[g_to_bits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
   #define CHECK_FOR_BEST(mode, sad)  SAD = calcSAD(pred,width,origBlock,width); \
                                 SAD += sad;\
@@ -259,7 +259,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
                                 }
 
   /* Choose SAD function according to width */
-  calcSAD = SADarray[g_toBits[width]];
+  calcSAD = SADarray[g_to_bits[width]];
 
   /* Store original block for SAD computation */
   i = 0;
@@ -345,7 +345,7 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
   /* Filtering apply if luma and not DC */
   if(!chroma && mode != 1 /*&& width > 4*/)
   {
-    uint8_t threshold = intraHorVerDistThres[g_toBits[width]];
+    uint8_t threshold = intraHorVerDistThres[g_to_bits[width]];
     if(MIN(abs(mode-26),abs(mode-10)) > threshold)
     {
       intra_filter(rec,recstride,width,0);
@@ -394,14 +394,14 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
   int32_t leftColumn;  /*!< left column iterator */
   int16_t val;         /*!< variable to store extrapolated value */
   int32_t i;           /*!< index iterator */
-  int16_t dcVal        = 1<<(g_bitDepth-1); /*!< default predictor value */
+  int16_t dcVal        = 1<<(g_bitdepth-1); /*!< default predictor value */
   int32_t topRow;      /*!< top row iterator */
   int32_t srcWidth     = (pic->width>>(chroma?1:0)); /*!< source picture width */
   int32_t srcHeight    = (pic->height>>(chroma?1:0));/*!< source picture height */
   uint8_t* srcPic      = (!chroma)?pic->yRecData: ((chroma==1)?pic->uRecData: pic->vRecData); /*!< input picture pointer */  
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
-  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;     /*!< picture width in SCU */
+  int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;     /*!< picture width in SCU */
 
   /* Fill left column */
   if(xCtb)
@@ -579,7 +579,7 @@ void intra_getAngularPred(int16_t* pSrc, int32_t srcStride, int16_t* rpDst, int3
       for (k=0;k<blkSize;k++)
       {
         pDst[k*dstStride] = //(pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1)) & (1<<g_bitDepth)-1;
-          CLIP(0, (1<<g_bitDepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
+          CLIP(0, (1<<g_bitdepth)-1, pDst[k*dstStride] + (( refSide[k+1] - refSide[0] ) >> 1) );
       }
     }
   }
@@ -672,13 +672,13 @@ void intra_DCPredFiltering(int16_t* pSrc, int32_t iSrcStride, int16_t* rpDst, in
 */
 void intra_getPlanarPred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
 {
-  int16_t pDcVal = 1<<(g_bitDepth-1);
+  int16_t pDcVal = 1<<(g_bitdepth-1);
   int32_t k, l, bottomLeft, topRight;
   int32_t horPred;
   int32_t leftColumn[LCU_WIDTH+1], topRow[LCU_WIDTH+1], bottomRow[LCU_WIDTH+1], rightColumn[LCU_WIDTH+1];
   uint32_t blkSize = width;
   uint32_t offset2D = width;
-  uint32_t shift1D = g_aucConvertToBit[ width ] + 2;
+  uint32_t shift1D = g_convert_to_bit[ width ] + 2;
   uint32_t shift2D = shift1D + 1;
 
 

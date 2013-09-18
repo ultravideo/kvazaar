@@ -39,7 +39,7 @@ void picture_setBlockSplit(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 {
   uint32_t x,y;//,d;
   //Width in smallest CU
-  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
+  int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
@@ -64,7 +64,7 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 {
   uint32_t x,y,d;
   //Width in smallest CU
-  int width_in_SCU = pic->width_in_LCU<<MAX_DEPTH;
+  int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   for(y = yCtb; y < yCtb+block_SCU_width; y++)
   {
@@ -247,8 +247,8 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 
     pic->width  = width;
     pic->height = height;
-    pic->width_in_LCU  = width_in_LCU;
-    pic->height_in_LCU = height_in_LCU;
+    pic->width_in_lcu  = width_in_LCU;
+    pic->height_in_lcu = height_in_LCU;
     pic->referenced = 0;
     /* Allocate buffers */
     pic->yData = (uint8_t *)malloc(luma_size);

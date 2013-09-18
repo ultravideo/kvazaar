@@ -66,19 +66,19 @@ INLINE void filter_deblock_luma( uint8_t* src, int32_t offset, int32_t tc , int8
     {
       int32_t tc2 = tc>>1;
       delta = CLIP(-tc, tc, delta);        
-      src[-offset] = CLIP(0,(1 << g_bitDepth)-1,(m3+delta));
-      src[0] = CLIP(0,(1 << g_bitDepth)-1,(m4-delta));
+      src[-offset] = CLIP(0,(1 << g_bitdepth)-1,(m3+delta));
+      src[0] = CLIP(0,(1 << g_bitdepth)-1,(m4-delta));
 
       
       if(filter_second_P)
       {
         int32_t delta1 = CLIP(-tc2, tc2, (( ((m1+m3+1)>>1)- m2+delta)>>1));
-        src[-offset*2] = CLIP(0,(1 << g_bitDepth)-1,(m2+delta1));
+        src[-offset*2] = CLIP(0,(1 << g_bitdepth)-1,(m2+delta1));
       }
       if(filter_second_Q)
       {
         int32_t delta2 = CLIP(-tc2, tc2, (( ((m6+m4+1)>>1)- m5-delta)>>1));
-        src[ offset] = CLIP(0,(1 << g_bitDepth)-1,(m5+delta2));
+        src[ offset] = CLIP(0,(1 << g_bitdepth)-1,(m5+delta2));
       }
     }
   }
@@ -109,11 +109,11 @@ INLINE void filter_deblock_chroma( uint8_t* src, int32_t offset, int32_t tc ,int
   delta = CLIP(-tc,tc, (((( m4 - m3 ) << 2 ) + m2 - m5 + 4 ) >> 3) );
   if(!part_P_nofilter)
   {
-    src[-offset] = CLIP(0,(1 << g_bitDepth)-1,m3+delta);
+    src[-offset] = CLIP(0,(1 << g_bitdepth)-1,m3+delta);
   }
   if(!part_Q_nofilter)
   {
-    src[0] = CLIP(0,(1 << g_bitDepth)-1,m4-delta);
+    src[0] = CLIP(0,(1 << g_bitdepth)-1,m4-delta);
   }
 }
 
@@ -121,8 +121,8 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
 {
   int32_t stride = encoder->in.cur_pic->width;
   int32_t offset = stride;
-  int32_t betaOffsetDiv2 = encoder->betaOffsetdiv2;
-  int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
+  int32_t betaOffsetDiv2 = encoder->beta_offset_div2;
+  int32_t tcOffsetDiv2   = encoder->tc_offset_div2;
   int8_t uiBs       = 2; /* Filter strength */
   /* TODO: support 10+bits */
   uint8_t* origsrc      = &encoder->in.cur_pic->yRecData[xpos+ypos*stride];
@@ -138,7 +138,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
   
   {
     int32_t QP             = encoder->QP;
-    int32_t bitdepth_scale = 1 << (g_bitDepth-8);
+    int32_t bitdepth_scale = 1 << (g_bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(uiBs-1) + (tcOffsetDiv2 << 1)));
     int32_t B_index        = CLIP(0, 51, QP + (betaOffsetDiv2 << 1));
     int32_t Tc             = tctable_8x8[TC_index]*bitdepth_scale;
@@ -195,7 +195,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
 void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t ypos, int8_t depth, int8_t dir)
 {
   int32_t stride = encoder->in.cur_pic->width>>1;
-  int32_t tcOffsetDiv2   = encoder->tcOffsetdiv2;
+  int32_t tcOffsetDiv2   = encoder->tc_offset_div2;
   int8_t uiNumParts = 1;
   /* TODO: support 10+bits */
   uint8_t* srcU      = &encoder->in.cur_pic->uRecData[xpos+ypos*stride];
@@ -219,7 +219,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
   // For each subpart
   {
     int32_t QP             = g_aucChromaScale[encoder->QP];
-    int32_t bitdepth_scale = 1 << (g_bitDepth-8);
+    int32_t bitdepth_scale = 1 << (g_bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2 + (tcOffsetDiv2 << 1)));    
     int32_t Tc             = tctable_8x8[TC_index]*bitdepth_scale;
     uint32_t blocks_in_part= (LCU_WIDTH>>(depth+1)) / 4;
@@ -254,7 +254,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
 */
 void filter_deblock_CU(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int32_t edge)
 {
-  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
+  CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
   uint8_t split_flag = (cur_CU->depth > depth)?1:0;
   uint8_t border_x = ((encoder->in.width)<( xCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
   uint8_t border_y = ((encoder->in.height)<( yCtb*(LCU_WIDTH>>MAX_DEPTH) + (LCU_WIDTH>>depth) ))?1:0;
@@ -307,18 +307,18 @@ void filter_deblock(encoder_control* encoder)
 
   /* TODO: Optimization: add thread for each LCU */
   /* Loop through every LCU in the slice */
-  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  for(yCtb = 0; yCtb < encoder->in.height_in_lcu; yCtb++)
   {
-    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    for(xCtb = 0; xCtb < encoder->in.width_in_lcu; xCtb++)
     {
       filter_deblock_CU(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_VER);
     }
   }
 
   /* Loop through every LCU in the slice */
-  for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
+  for(yCtb = 0; yCtb < encoder->in.height_in_lcu; yCtb++)
   {
-    for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
+    for(xCtb = 0; xCtb < encoder->in.width_in_lcu; xCtb++)
     {
       filter_deblock_CU(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_HOR);
     }

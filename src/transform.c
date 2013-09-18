@@ -694,8 +694,8 @@ void partialButterflyInverse32(int16_t *src,int16_t *dst,int32_t shift, int32_t 
 void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode)
 {
 
-  int32_t shift_1st = g_aucConvertToBit[blockSize]  + 1 + g_uiBitIncrement; // log2(iWidth) - 1 + g_uiBitIncrement
-  int32_t shift_2nd = g_aucConvertToBit[blockSize]  + 8;                   // log2(iHeight) + 6
+  int32_t shift_1st = g_convert_to_bit[blockSize]  + 1 + g_bit_increment; // log2(iWidth) - 1 + g_uiBitIncrement
+  int32_t shift_2nd = g_convert_to_bit[blockSize]  + 8;                   // log2(iHeight) + 6
 
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
   
@@ -749,7 +749,7 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMod
   //(Int bitDepth, Short *coeff,Short *block, Int iWidth, Int iHeight, UInt uiMode)
 {
   int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (g_bitDepth-8);
+  int32_t shift_2nd = 12 - (g_bitdepth-8);
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
   if( blockSize == 4)
@@ -793,8 +793,8 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   
  
   int8_t useRDOQForTransformSkip = 0;
-  uint32_t log2BlockSize = g_aucConvertToBit[ iWidth ] + 2;
-  uint32_t* scan = g_auiSigLastScan[ scanIdx ][ log2BlockSize - 1 ];
+  uint32_t log2BlockSize = g_convert_to_bit[ iWidth ] + 2;
+  uint32_t* scan = g_sig_last_scan[ scanIdx ][ log2BlockSize - 1 ];
   //uint32_t scanIdx = SCAN_DIAG;
 
   #if ENABLE_SIGN_HIDING == 1
@@ -827,12 +827,12 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
   int32_t n;
   uint32_t dir = 0;//SCALING_LIST_SQT;
     
-  uint32_t uiLog2TrSize = g_aucConvertToBit[ iWidth ] + 2;
+  uint32_t uiLog2TrSize = g_convert_to_bit[ iWidth ] + 2;
   int32_t scalingListType = (/*pcCU->isint32_tra(uiAbsPartIdx)*/0 ? 0 : 3) + (int8_t)("\0\3\1\2"[eTType]);
   
   int32_t *piQuantCoeff = g_quant_coeff[uiLog2TrSize-2][scalingListType][/*m_cQP.m_iRem*/qpScaled%6];
 
-  uint32_t uiBitDepth = g_bitDepth;
+  uint32_t uiBitDepth = g_bitdepth;
 
   int32_t iTransformShift = /*MAX_TR_DYNAMIC_RANGE*/15 - uiBitDepth - uiLog2TrSize; // Represents scaling through forward transform
   int32_t iQBits = QUANT_SHIFT + /*cQpBase.m_iPer +*/qpScaled/6 + iTransformShift;
@@ -981,10 +981,10 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
 void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_t iWidth, int32_t iHeight,int8_t eTType)
 {
   int32_t iShift,iAdd,iCoeffQ;
-  uint32_t uiLog2TrSize = g_aucConvertToBit[ iWidth ] + 2;
+  uint32_t uiLog2TrSize = g_convert_to_bit[ iWidth ] + 2;
   int16_t clipQCoef;
   int32_t n;
-  int32_t iTransformShift = 15 - g_bitDepth - (g_aucConvertToBit[ iWidth ] + 2);
+  int32_t iTransformShift = 15 - g_bitdepth - (g_convert_to_bit[ iWidth ] + 2);
   int32_t qpScaled;
   int32_t iQpBase = encoder->QP;
   int32_t scalingListType = (/*pcCU->isintra(uiAbsPartIdx)*/1 ? 0 : 3) + (int8_t)("\0\3\1\2"[eTType]);
