@@ -23,7 +23,7 @@
 #include "cabac.h"
 
 
-extern const uint8_t g_aucChromaScale[58];
+extern const uint8_t g_chroma_scale[58];
 const uint8_t tctable_8x8[54] =
 {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,5,5,6,6,7,8,9,10,11,13,14,16,18,20,22,24
@@ -218,7 +218,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
 
   // For each subpart
   {
-    int32_t QP             = g_aucChromaScale[encoder->QP];
+    int32_t QP             = g_chroma_scale[encoder->QP];
     int32_t bitdepth_scale = 1 << (g_bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2 + (tcOffsetDiv2 << 1)));    
     int32_t Tc             = tctable_8x8[TC_index]*bitdepth_scale;

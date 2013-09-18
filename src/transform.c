@@ -20,7 +20,7 @@
 #include "nal.h"
 
 
-const int16_t g_aiT4[4][4] =
+const int16_t g_t4[4][4] =
 {
   { 64, 64, 64, 64},
   { 83, 36,-36,-83},
@@ -28,7 +28,7 @@ const int16_t g_aiT4[4][4] =
   { 36,-83, 83,-36}
 };
 
-const int16_t g_aiT8[8][8] =
+const int16_t g_t8[8][8] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64},
   { 89, 75, 50, 18,-18,-50,-75,-89},
@@ -40,7 +40,7 @@ const int16_t g_aiT8[8][8] =
   { 18,-50, 75,-89, 89,-75, 50,-18}
 };
 
-const int16_t g_aiT16[16][16] =
+const int16_t g_t16[16][16] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64},
   { 90, 87, 80, 70, 57, 43, 25,  9, -9,-25,-43,-57,-70,-80,-87,-90},
@@ -60,7 +60,7 @@ const int16_t g_aiT16[16][16] =
   {  9,-25, 43,-57, 70,-80, 87,-90, 90,-87, 80,-70, 57,-43, 25, -9}
 };
 
-const int16_t g_aiT32[32][32] =
+const int16_t g_t32[32][32] =
 {
   { 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64},
   { 90, 90, 88, 85, 82, 78, 73, 67, 61, 54, 46, 38, 31, 22, 13,  4, -4,-13,-22,-31,-38,-46,-54,-61,-67,-73,-78,-82,-85,-88,-90,-90},
@@ -96,7 +96,7 @@ const int16_t g_aiT32[32][32] =
   {  4,-13, 22,-31, 38,-46, 54,-61, 67,-73, 78,-82, 85,-88, 90,-90, 90,-90, 88,-85, 82,-78, 73,-67, 61,-54, 46,-38, 31,-22, 13, -4}
 };
 
-const int32_t g_quantTSDefault4x4[16] =
+const int32_t g_quant_default_4x4[16] =
 {
   16,16,16,16,
   16,16,16,16,
@@ -104,7 +104,7 @@ const int32_t g_quantTSDefault4x4[16] =
   16,16,16,16
 };
 
-const int32_t g_quantIntraDefault8x8[64] =
+const int32_t g_quant_intra_default_8x8[64] =
 {
   16,16,16,16,17,18,21,24,
   16,16,16,16,17,19,22,25,
@@ -116,7 +116,7 @@ const int32_t g_quantIntraDefault8x8[64] =
   24,25,29,36,47,65,88,115
 };
 
-const int32_t g_quantInterDefault8x8[64] =
+const int32_t g_quant_inter_default_8x8[64] =
 {
   16,16,16,16,17,18,20,24,
   16,16,16,17,18,20,24,25,
@@ -128,7 +128,7 @@ const int32_t g_quantInterDefault8x8[64] =
   24,25,28,33,41,54,71,91
 };
 
-const uint8_t g_aucChromaScale[58]=
+const uint8_t g_chroma_scale[58]=
 {
    0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,
   17,18,19,20,21,22,23,24,25,26,27,28,29,29,30,31,32,
@@ -139,11 +139,11 @@ const uint8_t g_aucChromaScale[58]=
 int32_t* g_quant_coeff[4][6][6];
 int32_t* g_de_quant_coeff[4][6][6];
 
-const  uint8_t g_scalingListNum[4]={6,6,6,2};
-const  uint16_t g_scalingListSize[4] = {16,64,256,1024}; 
-const  uint8_t g_scalingListSizeX[4] = { 4, 8, 16,  32};
-const int16_t g_quantScales[6] = { 26214,23302,20560,18396,16384,14564 };
-const int16_t g_invQuantScales[6] = { 40,45,51,57,64,72 };
+const  uint8_t g_scaling_list_num[4]={6,6,6,2};
+const  uint16_t g_scaling_list_size[4] = {16,64,256,1024}; 
+const  uint8_t g_scaling_list_size_x[4] = { 4, 8, 16,  32};
+const int16_t g_quant_scales[6] = { 26214,23302,20560,18396,16384,14564 };
+const int16_t g_inv_quant_scales[6] = { 40,45,51,57,64,72 };
 //static int32_t  m_scalingListDC[4][6];
 
 void scalinglist_init()
@@ -151,16 +151,16 @@ void scalinglist_init()
   uint32_t sizeId,listId,qp;
   for(sizeId = 0; sizeId < 4; sizeId++)
   {
-    for(listId = 0; listId < g_scalingListNum[sizeId]; listId++)
+    for(listId = 0; listId < g_scaling_list_num[sizeId]; listId++)
     {
       for(qp = 0; qp < 6; qp++)
       {
         if(!(sizeId == 3 && listId == 3))
         {
-          g_quant_coeff   [sizeId][listId][qp] = (int32_t*)malloc(sizeof(int32_t)*g_scalingListSize[sizeId]);
-          memset(g_quant_coeff[sizeId][listId][qp],0,sizeof(int32_t)*g_scalingListSize[sizeId]);
-          g_de_quant_coeff   [sizeId][listId][qp] = (int32_t*)malloc(sizeof(int32_t)*g_scalingListSize[sizeId]);
-          memset(g_de_quant_coeff[sizeId][listId][qp],0,sizeof(int32_t)*g_scalingListSize[sizeId]);
+          g_quant_coeff   [sizeId][listId][qp] = (int32_t*)malloc(sizeof(int32_t)*g_scaling_list_size[sizeId]);
+          memset(g_quant_coeff[sizeId][listId][qp],0,sizeof(int32_t)*g_scaling_list_size[sizeId]);
+          g_de_quant_coeff   [sizeId][listId][qp] = (int32_t*)malloc(sizeof(int32_t)*g_scaling_list_size[sizeId]);
+          memset(g_de_quant_coeff[sizeId][listId][qp],0,sizeof(int32_t)*g_scaling_list_size[sizeId]);
         
         //m_dequantCoef [sizeId][listId][qp][SCALING_LIST_SQT] = new Int [g_scalingListSize[sizeId]];
         //m_errScale    [sizeId][listId][qp][SCALING_LIST_SQT] = new double [g_scalingListSize[sizeId]];
@@ -182,7 +182,7 @@ void scalinglist_destroy()
   uint32_t sizeId,listId,qp;
   for(sizeId = 0; sizeId < 4; sizeId++)
   {
-    for(listId = 0; listId < g_scalingListNum[sizeId]; listId++)
+    for(listId = 0; listId < g_scaling_list_num[sizeId]; listId++)
     {
       for(qp = 0; qp < 6; qp++)
       {
@@ -199,21 +199,21 @@ void scalinglist_process()
   uint32_t size,list,qp;
   for(size=0;size</*SCALING_LIST_SIZE_NUM*/4;size++)
   {
-    int32_t* list_ptr = (int32_t *)g_quantIntraDefault8x8; /* Default to "8x8" intra */
+    int32_t* list_ptr = (int32_t *)g_quant_intra_default_8x8; /* Default to "8x8" intra */
 
-    for(list = 0; list < g_scalingListNum[size]; list++)
+    for(list = 0; list < g_scaling_list_num[size]; list++)
     {
       switch(size)
       {
         case 0: /* 4x4 */
-          list_ptr = (int32_t *)g_quantTSDefault4x4;
+          list_ptr = (int32_t *)g_quant_default_4x4;
           break;
         case 1: /* 8x8 */
         case 2: /* 16x16 */
-          if(list > 2) list_ptr = (int32_t*)g_quantInterDefault8x8;
+          if(list > 2) list_ptr = (int32_t*)g_quant_inter_default_8x8;
           break;
         case 3: /* 32x32 */
-          if(list > 0) list_ptr = (int32_t*)g_quantInterDefault8x8;
+          if(list > 0) list_ptr = (int32_t*)g_quant_inter_default_8x8;
           break;
       }
 
@@ -225,7 +225,7 @@ void scalinglist_process()
   }
 }
 
-void scalinglist_processEnc( int32_t *coeff, int32_t *quantcoeff, int32_t quantScales, uint32_t height,uint32_t width, uint32_t ratio, int32_t sizuNum, uint32_t dc, uint8_t flat)
+void scalinglist_process_enc( int32_t *coeff, int32_t *quantcoeff, int32_t quantScales, uint32_t height,uint32_t width, uint32_t ratio, int32_t sizuNum, uint32_t dc, uint8_t flat)
 {
   uint32_t j,i;
   int32_t nsqth = (height < width) ? 4: 1; //height ratio for NSQT
@@ -282,14 +282,14 @@ void scalinglist_processDec( int32_t *coeff, int32_t *dequantcoeff, int32_t invQ
 
 void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
 {
-  uint32_t width  = g_scalingListSizeX[sizeId];
-  uint32_t height = g_scalingListSizeX[sizeId];
-  uint32_t ratio  = g_scalingListSizeX[sizeId]/MIN(8,g_scalingListSizeX[sizeId]);
+  uint32_t width  = g_scaling_list_size_x[sizeId];
+  uint32_t height = g_scaling_list_size_x[sizeId];
+  uint32_t ratio  = g_scaling_list_size_x[sizeId]/MIN(8,g_scaling_list_size_x[sizeId]);
   int32_t *quantcoeff   = g_quant_coeff[sizeId][listId][qp];
   int32_t *dequantcoeff = g_de_quant_coeff[sizeId][listId][qp];
 
-  scalinglist_processEnc(coeff,quantcoeff,g_quantScales[qp]<<4,height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
-  scalinglist_processDec(coeff,dequantcoeff,g_invQuantScales[qp],height,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
+  scalinglist_process_enc(coeff,quantcoeff,g_quant_scales[qp]<<4,height,width,ratio,MIN(8,g_scaling_list_size_x[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
+  scalinglist_processDec(coeff,dequantcoeff,g_inv_quant_scales[qp],height,width,ratio,MIN(8,g_scaling_list_size_x[sizeId]),/*SCALING_LIST_DC*/16, ENABLE_SCALING_LIST?0:1);
 
   //TODO: support NSQT
   //if(sizeId == /*SCALING_LIST_32x32*/3 || sizeId == /*SCALING_LIST_16x16*/2) //for NSQT
@@ -303,7 +303,7 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
 }
 
 
-void partialButterfly4(short *src,short *dst,int32_t shift, int32_t line)
+void partial_butterfly_4(short *src,short *dst,int32_t shift, int32_t line)
 {
   int32_t j;  
   int32_t E[2],O[2];
@@ -317,17 +317,17 @@ void partialButterfly4(short *src,short *dst,int32_t shift, int32_t line)
     E[1] = src[1] + src[2];
     O[1] = src[1] - src[2];
 
-    dst[0] = (g_aiT4[0][0]*E[0] + g_aiT4[0][1]*E[1] + add)>>shift;
-    dst[2*line] = (g_aiT4[2][0]*E[0] + g_aiT4[2][1]*E[1] + add)>>shift;
-    dst[line] = (g_aiT4[1][0]*O[0] + g_aiT4[1][1]*O[1] + add)>>shift;
-    dst[3*line] = (g_aiT4[3][0]*O[0] + g_aiT4[3][1]*O[1] + add)>>shift;
+    dst[0] = (g_t4[0][0]*E[0] + g_t4[0][1]*E[1] + add)>>shift;
+    dst[2*line] = (g_t4[2][0]*E[0] + g_t4[2][1]*E[1] + add)>>shift;
+    dst[line] = (g_t4[1][0]*O[0] + g_t4[1][1]*O[1] + add)>>shift;
+    dst[3*line] = (g_t4[3][0]*O[0] + g_t4[3][1]*O[1] + add)>>shift;
 
     src += 4;
     dst ++;
   }
 }
 
-void partialButterflyInverse4(short *src,short *dst,int shift, int line)
+void partial_butterfly_inverse_4(short *src,short *dst,int shift, int line)
 {
   int j;
   int E[2],O[2];
@@ -336,10 +336,10 @@ void partialButterflyInverse4(short *src,short *dst,int shift, int line)
   for (j=0; j<line; j++)
   {    
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */    
-    O[0] = g_aiT4[1][0]*src[line] + g_aiT4[3][0]*src[3*line];
-    O[1] = g_aiT4[1][1]*src[line] + g_aiT4[3][1]*src[3*line];
-    E[0] = g_aiT4[0][0]*src[0] + g_aiT4[2][0]*src[2*line];
-    E[1] = g_aiT4[0][1]*src[0] + g_aiT4[2][1]*src[2*line];
+    O[0] = g_t4[1][0]*src[line] + g_t4[3][0]*src[3*line];
+    O[1] = g_t4[1][1]*src[line] + g_t4[3][1]*src[3*line];
+    E[0] = g_t4[0][0]*src[0] + g_t4[2][0]*src[2*line];
+    E[1] = g_t4[0][1]*src[0] + g_t4[2][1]*src[2*line];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
     dst[0] = CLIP( -32768, 32767, (E[0] + O[0] + add)>>shift );
@@ -354,7 +354,7 @@ void partialButterflyInverse4(short *src,short *dst,int shift, int line)
 
 // Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm 
 // give identical results
-void fastForwardDst(short *block,short *coeff,int32_t shift)  // input block, output coeff
+void fast_forward_dst(short *block,short *coeff,int32_t shift)  // input block, output coeff
 {
   int32_t i, c[4];
   int32_t rnd_factor = 1<<(shift-1);
@@ -373,7 +373,7 @@ void fastForwardDst(short *block,short *coeff,int32_t shift)  // input block, ou
   }
 }
 
-void fastInverseDst(short *tmp,short *block,int shift)  // input tmp, output block
+void fast_inverse_dst(short *tmp,short *block,int shift)  // input tmp, output block
 {
   int i, c[4];
   int rnd_factor = 1<<(shift-1);
@@ -393,7 +393,7 @@ void fastInverseDst(short *tmp,short *block,int shift)  // input tmp, output blo
 }
 
 
-void partialButterfly8(short *src,short *dst,int32_t shift, int32_t line)
+void partial_butterfly_8(short *src,short *dst,int32_t shift, int32_t line)
 {
   int32_t j,k;  
   int32_t E[4],O[4];
@@ -414,22 +414,22 @@ void partialButterfly8(short *src,short *dst,int32_t shift, int32_t line)
     EE[1] = E[1] + E[2];
     EO[1] = E[1] - E[2];
 
-    dst[0] = (g_aiT8[0][0]*EE[0] + g_aiT8[0][1]*EE[1] + add)>>shift;
-    dst[4*line] = (g_aiT8[4][0]*EE[0] + g_aiT8[4][1]*EE[1] + add)>>shift; 
-    dst[2*line] = (g_aiT8[2][0]*EO[0] + g_aiT8[2][1]*EO[1] + add)>>shift;
-    dst[6*line] = (g_aiT8[6][0]*EO[0] + g_aiT8[6][1]*EO[1] + add)>>shift; 
+    dst[0] = (g_t8[0][0]*EE[0] + g_t8[0][1]*EE[1] + add)>>shift;
+    dst[4*line] = (g_t8[4][0]*EE[0] + g_t8[4][1]*EE[1] + add)>>shift; 
+    dst[2*line] = (g_t8[2][0]*EO[0] + g_t8[2][1]*EO[1] + add)>>shift;
+    dst[6*line] = (g_t8[6][0]*EO[0] + g_t8[6][1]*EO[1] + add)>>shift; 
 
-    dst[line] = (g_aiT8[1][0]*O[0] + g_aiT8[1][1]*O[1] + g_aiT8[1][2]*O[2] + g_aiT8[1][3]*O[3] + add)>>shift;
-    dst[3*line] = (g_aiT8[3][0]*O[0] + g_aiT8[3][1]*O[1] + g_aiT8[3][2]*O[2] + g_aiT8[3][3]*O[3] + add)>>shift;
-    dst[5*line] = (g_aiT8[5][0]*O[0] + g_aiT8[5][1]*O[1] + g_aiT8[5][2]*O[2] + g_aiT8[5][3]*O[3] + add)>>shift;
-    dst[7*line] = (g_aiT8[7][0]*O[0] + g_aiT8[7][1]*O[1] + g_aiT8[7][2]*O[2] + g_aiT8[7][3]*O[3] + add)>>shift;
+    dst[line] = (g_t8[1][0]*O[0] + g_t8[1][1]*O[1] + g_t8[1][2]*O[2] + g_t8[1][3]*O[3] + add)>>shift;
+    dst[3*line] = (g_t8[3][0]*O[0] + g_t8[3][1]*O[1] + g_t8[3][2]*O[2] + g_t8[3][3]*O[3] + add)>>shift;
+    dst[5*line] = (g_t8[5][0]*O[0] + g_t8[5][1]*O[1] + g_t8[5][2]*O[2] + g_t8[5][3]*O[3] + add)>>shift;
+    dst[7*line] = (g_t8[7][0]*O[0] + g_t8[7][1]*O[1] + g_t8[7][2]*O[2] + g_t8[7][3]*O[3] + add)>>shift;
 
     src += 8;
     dst ++;
   }
 }
 
-void partialButterflyInverse8(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
+void partial_butterfly_inverse_8(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t E[4],O[4];
@@ -441,13 +441,13 @@ void partialButterflyInverse8(int16_t *src,int16_t *dst,int32_t shift, int32_t l
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k=0;k<4;k++)
     {
-      O[k] = g_aiT8[ 1][k]*src[line] + g_aiT8[ 3][k]*src[3*line] + g_aiT8[ 5][k]*src[5*line] + g_aiT8[ 7][k]*src[7*line];
+      O[k] = g_t8[ 1][k]*src[line] + g_t8[ 3][k]*src[3*line] + g_t8[ 5][k]*src[5*line] + g_t8[ 7][k]*src[7*line];
     }
 
-    EO[0] = g_aiT8[2][0]*src[ 2*line ] + g_aiT8[6][0]*src[ 6*line ];
-    EO[1] = g_aiT8[2][1]*src[ 2*line ] + g_aiT8[6][1]*src[ 6*line ];
-    EE[0] = g_aiT8[0][0]*src[ 0      ] + g_aiT8[4][0]*src[ 4*line ];
-    EE[1] = g_aiT8[0][1]*src[ 0      ] + g_aiT8[4][1]*src[ 4*line ];
+    EO[0] = g_t8[2][0]*src[ 2*line ] + g_t8[6][0]*src[ 6*line ];
+    EO[1] = g_t8[2][1]*src[ 2*line ] + g_t8[6][1]*src[ 6*line ];
+    EE[0] = g_t8[0][0]*src[ 0      ] + g_t8[4][0]*src[ 4*line ];
+    EE[1] = g_t8[0][1]*src[ 0      ] + g_t8[4][1]*src[ 4*line ];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */ 
     E[0] = EE[0] + EO[0];
@@ -466,7 +466,7 @@ void partialButterflyInverse8(int16_t *src,int16_t *dst,int32_t shift, int32_t l
 
 
 
-void partialButterfly16(short *src,short *dst,int32_t shift, int32_t line)
+void partial_butterfly_16(short *src,short *dst,int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t E[8],O[8];
@@ -494,20 +494,20 @@ void partialButterfly16(short *src,short *dst,int32_t shift, int32_t line)
     EEE[1] = EE[1] + EE[2];
     EEO[1] = EE[1] - EE[2];
 
-    dst[ 0      ] = (g_aiT16[ 0][0]*EEE[0] + g_aiT16[ 0][1]*EEE[1] + add)>>shift;        
-    dst[ 8*line ] = (g_aiT16[ 8][0]*EEE[0] + g_aiT16[ 8][1]*EEE[1] + add)>>shift;    
-    dst[ 4*line ] = (g_aiT16[ 4][0]*EEO[0] + g_aiT16[ 4][1]*EEO[1] + add)>>shift;        
-    dst[ 12*line] = (g_aiT16[12][0]*EEO[0] + g_aiT16[12][1]*EEO[1] + add)>>shift;
+    dst[ 0      ] = (g_t16[ 0][0]*EEE[0] + g_t16[ 0][1]*EEE[1] + add)>>shift;        
+    dst[ 8*line ] = (g_t16[ 8][0]*EEE[0] + g_t16[ 8][1]*EEE[1] + add)>>shift;    
+    dst[ 4*line ] = (g_t16[ 4][0]*EEO[0] + g_t16[ 4][1]*EEO[1] + add)>>shift;        
+    dst[ 12*line] = (g_t16[12][0]*EEO[0] + g_t16[12][1]*EEO[1] + add)>>shift;
 
     for (k=2;k<16;k+=4)
     {
-      dst[ k*line ] = (g_aiT16[k][0]*EO[0] + g_aiT16[k][1]*EO[1] + g_aiT16[k][2]*EO[2] + g_aiT16[k][3]*EO[3] + add)>>shift;      
+      dst[ k*line ] = (g_t16[k][0]*EO[0] + g_t16[k][1]*EO[1] + g_t16[k][2]*EO[2] + g_t16[k][3]*EO[3] + add)>>shift;      
     }
 
     for (k=1;k<16;k+=2)
     {
-      dst[ k*line ] = (g_aiT16[k][0]*O[0] + g_aiT16[k][1]*O[1] + g_aiT16[k][2]*O[2] + g_aiT16[k][3]*O[3] + 
-        g_aiT16[k][4]*O[4] + g_aiT16[k][5]*O[5] + g_aiT16[k][6]*O[6] + g_aiT16[k][7]*O[7] + add)>>shift;
+      dst[ k*line ] = (g_t16[k][0]*O[0] + g_t16[k][1]*O[1] + g_t16[k][2]*O[2] + g_t16[k][3]*O[3] + 
+        g_t16[k][4]*O[4] + g_t16[k][5]*O[5] + g_t16[k][6]*O[6] + g_t16[k][7]*O[7] + add)>>shift;
     }
 
     src += 16;
@@ -517,7 +517,7 @@ void partialButterfly16(short *src,short *dst,int32_t shift, int32_t line)
 }
 
 
-void partialButterflyInverse16(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
+void partial_butterfly_inverse_16(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t E[8],O[8];
@@ -530,17 +530,17 @@ void partialButterflyInverse16(int16_t *src,int16_t *dst,int32_t shift, int32_t 
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k=0;k<8;k++)
     {
-      O[k] = g_aiT16[ 1][k]*src[ line] + g_aiT16[ 3][k]*src[ 3*line] + g_aiT16[ 5][k]*src[ 5*line] + g_aiT16[ 7][k]*src[ 7*line] + 
-        g_aiT16[ 9][k]*src[ 9*line] + g_aiT16[11][k]*src[11*line] + g_aiT16[13][k]*src[13*line] + g_aiT16[15][k]*src[15*line];
+      O[k] = g_t16[ 1][k]*src[ line] + g_t16[ 3][k]*src[ 3*line] + g_t16[ 5][k]*src[ 5*line] + g_t16[ 7][k]*src[ 7*line] + 
+        g_t16[ 9][k]*src[ 9*line] + g_t16[11][k]*src[11*line] + g_t16[13][k]*src[13*line] + g_t16[15][k]*src[15*line];
     }
     for (k=0;k<4;k++)
     {
-      EO[k] = g_aiT16[ 2][k]*src[ 2*line] + g_aiT16[ 6][k]*src[ 6*line] + g_aiT16[10][k]*src[10*line] + g_aiT16[14][k]*src[14*line];
+      EO[k] = g_t16[ 2][k]*src[ 2*line] + g_t16[ 6][k]*src[ 6*line] + g_t16[10][k]*src[10*line] + g_t16[14][k]*src[14*line];
     }
-    EEO[0] = g_aiT16[4][0]*src[ 4*line ] + g_aiT16[12][0]*src[ 12*line ];
-    EEE[0] = g_aiT16[0][0]*src[ 0      ] + g_aiT16[ 8][0]*src[ 8*line  ];
-    EEO[1] = g_aiT16[4][1]*src[ 4*line ] + g_aiT16[12][1]*src[ 12*line ];
-    EEE[1] = g_aiT16[0][1]*src[ 0      ] + g_aiT16[ 8][1]*src[ 8*line  ];
+    EEO[0] = g_t16[4][0]*src[ 4*line ] + g_t16[12][0]*src[ 12*line ];
+    EEE[0] = g_t16[0][0]*src[ 0      ] + g_t16[ 8][0]*src[ 8*line  ];
+    EEO[1] = g_t16[4][1]*src[ 4*line ] + g_t16[12][1]*src[ 12*line ];
+    EEE[1] = g_t16[0][1]*src[ 0      ] + g_t16[ 8][1]*src[ 8*line  ];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */ 
     for (k=0;k<2;k++)
@@ -566,7 +566,7 @@ void partialButterflyInverse16(int16_t *src,int16_t *dst,int32_t shift, int32_t 
 
 
 
-void partialButterfly32(short *src,short *dst,int32_t shift, int32_t line)
+void partial_butterfly_32(short *src,short *dst,int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t E[16],O[16];
@@ -601,25 +601,25 @@ void partialButterfly32(short *src,short *dst,int32_t shift, int32_t line)
     EEEE[1] = EEE[1] + EEE[2];
     EEEO[1] = EEE[1] - EEE[2];
 
-    dst[ 0       ] = (g_aiT32[ 0][0]*EEEE[0] + g_aiT32[ 0][1]*EEEE[1] + add)>>shift;
-    dst[ 16*line ] = (g_aiT32[16][0]*EEEE[0] + g_aiT32[16][1]*EEEE[1] + add)>>shift;
-    dst[ 8*line  ] = (g_aiT32[ 8][0]*EEEO[0] + g_aiT32[ 8][1]*EEEO[1] + add)>>shift; 
-    dst[ 24*line ] = (g_aiT32[24][0]*EEEO[0] + g_aiT32[24][1]*EEEO[1] + add)>>shift;
+    dst[ 0       ] = (g_t32[ 0][0]*EEEE[0] + g_t32[ 0][1]*EEEE[1] + add)>>shift;
+    dst[ 16*line ] = (g_t32[16][0]*EEEE[0] + g_t32[16][1]*EEEE[1] + add)>>shift;
+    dst[ 8*line  ] = (g_t32[ 8][0]*EEEO[0] + g_t32[ 8][1]*EEEO[1] + add)>>shift; 
+    dst[ 24*line ] = (g_t32[24][0]*EEEO[0] + g_t32[24][1]*EEEO[1] + add)>>shift;
     for (k=4;k<32;k+=8)
     {
-      dst[ k*line ] = (g_aiT32[k][0]*EEO[0] + g_aiT32[k][1]*EEO[1] + g_aiT32[k][2]*EEO[2] + g_aiT32[k][3]*EEO[3] + add)>>shift;
+      dst[ k*line ] = (g_t32[k][0]*EEO[0] + g_t32[k][1]*EEO[1] + g_t32[k][2]*EEO[2] + g_t32[k][3]*EEO[3] + add)>>shift;
     }       
     for (k=2;k<32;k+=4)
     {
-      dst[ k*line ] = (g_aiT32[k][0]*EO[0] + g_aiT32[k][1]*EO[1] + g_aiT32[k][2]*EO[2] + g_aiT32[k][3]*EO[3] + 
-        g_aiT32[k][4]*EO[4] + g_aiT32[k][5]*EO[5] + g_aiT32[k][6]*EO[6] + g_aiT32[k][7]*EO[7] + add)>>shift;
+      dst[ k*line ] = (g_t32[k][0]*EO[0] + g_t32[k][1]*EO[1] + g_t32[k][2]*EO[2] + g_t32[k][3]*EO[3] + 
+        g_t32[k][4]*EO[4] + g_t32[k][5]*EO[5] + g_t32[k][6]*EO[6] + g_t32[k][7]*EO[7] + add)>>shift;
     }       
     for (k=1;k<32;k+=2)
     {
-      dst[ k*line ] = (g_aiT32[k][ 0]*O[ 0] + g_aiT32[k][ 1]*O[ 1] + g_aiT32[k][ 2]*O[ 2] + g_aiT32[k][ 3]*O[ 3] + 
-        g_aiT32[k][ 4]*O[ 4] + g_aiT32[k][ 5]*O[ 5] + g_aiT32[k][ 6]*O[ 6] + g_aiT32[k][ 7]*O[ 7] +
-        g_aiT32[k][ 8]*O[ 8] + g_aiT32[k][ 9]*O[ 9] + g_aiT32[k][10]*O[10] + g_aiT32[k][11]*O[11] + 
-        g_aiT32[k][12]*O[12] + g_aiT32[k][13]*O[13] + g_aiT32[k][14]*O[14] + g_aiT32[k][15]*O[15] + add)>>shift;
+      dst[ k*line ] = (g_t32[k][ 0]*O[ 0] + g_t32[k][ 1]*O[ 1] + g_t32[k][ 2]*O[ 2] + g_t32[k][ 3]*O[ 3] + 
+        g_t32[k][ 4]*O[ 4] + g_t32[k][ 5]*O[ 5] + g_t32[k][ 6]*O[ 6] + g_t32[k][ 7]*O[ 7] +
+        g_t32[k][ 8]*O[ 8] + g_t32[k][ 9]*O[ 9] + g_t32[k][10]*O[10] + g_t32[k][11]*O[11] + 
+        g_t32[k][12]*O[12] + g_t32[k][13]*O[13] + g_t32[k][14]*O[14] + g_t32[k][15]*O[15] + add)>>shift;
     }
     src += 32;
     dst ++;
@@ -627,7 +627,7 @@ void partialButterfly32(short *src,short *dst,int32_t shift, int32_t line)
 }
 
 
-void partialButterflyInverse32(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
+void partial_butterfly_inverse_32(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t E[16],O[16];
@@ -641,24 +641,24 @@ void partialButterflyInverse32(int16_t *src,int16_t *dst,int32_t shift, int32_t 
     /* Utilizing symmetry properties to the maximum to minimize the number of multiplications */
     for (k=0;k<16;k++)
     {
-      O[k] = g_aiT32[ 1][k]*src[ line  ] + g_aiT32[ 3][k]*src[ 3*line  ] + g_aiT32[ 5][k]*src[ 5*line  ] + g_aiT32[ 7][k]*src[ 7*line  ] + 
-        g_aiT32[ 9][k]*src[ 9*line  ] + g_aiT32[11][k]*src[ 11*line ] + g_aiT32[13][k]*src[ 13*line ] + g_aiT32[15][k]*src[ 15*line ] + 
-        g_aiT32[17][k]*src[ 17*line ] + g_aiT32[19][k]*src[ 19*line ] + g_aiT32[21][k]*src[ 21*line ] + g_aiT32[23][k]*src[ 23*line ] + 
-        g_aiT32[25][k]*src[ 25*line ] + g_aiT32[27][k]*src[ 27*line ] + g_aiT32[29][k]*src[ 29*line ] + g_aiT32[31][k]*src[ 31*line ];
+      O[k] = g_t32[ 1][k]*src[ line  ] + g_t32[ 3][k]*src[ 3*line  ] + g_t32[ 5][k]*src[ 5*line  ] + g_t32[ 7][k]*src[ 7*line  ] + 
+        g_t32[ 9][k]*src[ 9*line  ] + g_t32[11][k]*src[ 11*line ] + g_t32[13][k]*src[ 13*line ] + g_t32[15][k]*src[ 15*line ] + 
+        g_t32[17][k]*src[ 17*line ] + g_t32[19][k]*src[ 19*line ] + g_t32[21][k]*src[ 21*line ] + g_t32[23][k]*src[ 23*line ] + 
+        g_t32[25][k]*src[ 25*line ] + g_t32[27][k]*src[ 27*line ] + g_t32[29][k]*src[ 29*line ] + g_t32[31][k]*src[ 31*line ];
     }
     for (k=0;k<8;k++)
     {
-      EO[k] = g_aiT32[ 2][k]*src[ 2*line  ] + g_aiT32[ 6][k]*src[ 6*line  ] + g_aiT32[10][k]*src[ 10*line ] + g_aiT32[14][k]*src[ 14*line ] + 
-        g_aiT32[18][k]*src[ 18*line ] + g_aiT32[22][k]*src[ 22*line ] + g_aiT32[26][k]*src[ 26*line ] + g_aiT32[30][k]*src[ 30*line ];
+      EO[k] = g_t32[ 2][k]*src[ 2*line  ] + g_t32[ 6][k]*src[ 6*line  ] + g_t32[10][k]*src[ 10*line ] + g_t32[14][k]*src[ 14*line ] + 
+        g_t32[18][k]*src[ 18*line ] + g_t32[22][k]*src[ 22*line ] + g_t32[26][k]*src[ 26*line ] + g_t32[30][k]*src[ 30*line ];
     }
     for (k=0;k<4;k++)
     {
-      EEO[k] = g_aiT32[4][k]*src[ 4*line ] + g_aiT32[12][k]*src[ 12*line ] + g_aiT32[20][k]*src[ 20*line ] + g_aiT32[28][k]*src[ 28*line ];
+      EEO[k] = g_t32[4][k]*src[ 4*line ] + g_t32[12][k]*src[ 12*line ] + g_t32[20][k]*src[ 20*line ] + g_t32[28][k]*src[ 28*line ];
     }
-    EEEO[0] = g_aiT32[8][0]*src[ 8*line ] + g_aiT32[24][0]*src[ 24*line ];
-    EEEO[1] = g_aiT32[8][1]*src[ 8*line ] + g_aiT32[24][1]*src[ 24*line ];
-    EEEE[0] = g_aiT32[0][0]*src[ 0      ] + g_aiT32[16][0]*src[ 16*line ];    
-    EEEE[1] = g_aiT32[0][1]*src[ 0      ] + g_aiT32[16][1]*src[ 16*line ];
+    EEEO[0] = g_t32[8][0]*src[ 8*line ] + g_t32[24][0]*src[ 24*line ];
+    EEEO[1] = g_t32[8][1]*src[ 8*line ] + g_t32[24][1]*src[ 24*line ];
+    EEEE[0] = g_t32[0][0]*src[ 0      ] + g_t32[16][0]*src[ 16*line ];    
+    EEEE[1] = g_t32[0][1]*src[ 0      ] + g_t32[16][1]*src[ 16*line ];
 
     /* Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector */
     EEE[0] = EEEE[0] + EEEO[0];
@@ -703,13 +703,13 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode
   {
     if (uiMode != 65535)
     {
-      fastForwardDst(block,tmp,shift_1st); // Forward DST BY FAST ALGORITHM, block input, tmp output
-      fastForwardDst(tmp,coeff,shift_2nd); // Forward DST BY FAST ALGORITHM, tmp input, coeff output
+      fast_forward_dst(block,tmp,shift_1st); // Forward DST BY FAST ALGORITHM, block input, tmp output
+      fast_forward_dst(tmp,coeff,shift_2nd); // Forward DST BY FAST ALGORITHM, tmp input, coeff output
     }
     else
     {
-      partialButterfly4(block, tmp, shift_1st, blockSize);
-      partialButterfly4(tmp, coeff, shift_2nd, blockSize);
+      partial_butterfly_4(block, tmp, shift_1st, blockSize);
+      partial_butterfly_4(tmp, coeff, shift_2nd, blockSize);
     }
 
   }
@@ -719,20 +719,20 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMode
     {
       case 8:
       {
-        partialButterfly8( block, tmp, shift_1st, blockSize );
-        partialButterfly8( tmp, coeff, shift_2nd, blockSize );
+        partial_butterfly_8( block, tmp, shift_1st, blockSize );
+        partial_butterfly_8( tmp, coeff, shift_2nd, blockSize );
         break;
       }
       case 16:
       {
-        partialButterfly16( block, tmp, shift_1st, blockSize );
-        partialButterfly16( tmp, coeff, shift_2nd, blockSize );
+        partial_butterfly_16( block, tmp, shift_1st, blockSize );
+        partial_butterfly_16( tmp, coeff, shift_2nd, blockSize );
         break;
       }
       case 32:
       {
-        partialButterfly32( block, tmp, shift_1st, blockSize );
-        partialButterfly32( tmp, coeff, shift_2nd, blockSize );
+        partial_butterfly_32( block, tmp, shift_1st, blockSize );
+        partial_butterfly_32( tmp, coeff, shift_2nd, blockSize );
         break;
       }
     }
@@ -756,29 +756,29 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t blockSize, int32_t uiMod
   {
     if (uiMode != 65535)
     {
-      fastInverseDst(coeff,tmp,shift_1st);    // Inverse DST by FAST Algorithm, coeff input, tmp output
-      fastInverseDst(tmp,block,shift_2nd); // Inverse DST by FAST Algorithm, tmp input, coeff output
+      fast_inverse_dst(coeff,tmp,shift_1st);    // Inverse DST by FAST Algorithm, coeff input, tmp output
+      fast_inverse_dst(tmp,block,shift_2nd); // Inverse DST by FAST Algorithm, tmp input, coeff output
     }
     else
     {
-      partialButterflyInverse4(coeff,tmp,shift_1st,blockSize);
-      partialButterflyInverse4(tmp,block,shift_2nd,blockSize);
+      partial_butterfly_inverse_4(coeff,tmp,shift_1st,blockSize);
+      partial_butterfly_inverse_4(tmp,block,shift_2nd,blockSize);
     }
   }
   else if( blockSize == 8)
   {
-    partialButterflyInverse8(coeff,tmp,shift_1st,blockSize);
-    partialButterflyInverse8(tmp,block,shift_2nd,blockSize);
+    partial_butterfly_inverse_8(coeff,tmp,shift_1st,blockSize);
+    partial_butterfly_inverse_8(tmp,block,shift_2nd,blockSize);
   }
   else if( blockSize == 16)
   {
-    partialButterflyInverse16(coeff,tmp,shift_1st,blockSize);
-    partialButterflyInverse16(tmp,block,shift_2nd,blockSize);
+    partial_butterfly_inverse_16(coeff,tmp,shift_1st,blockSize);
+    partial_butterfly_inverse_16(tmp,block,shift_2nd,blockSize);
   }
   else if( blockSize == 32)
   {
-    partialButterflyInverse32(coeff,tmp,shift_1st,blockSize);
-    partialButterflyInverse32(tmp,block,shift_2nd,blockSize);
+    partial_butterfly_inverse_32(coeff,tmp,shift_1st,blockSize);
+    partial_butterfly_inverse_32(tmp,block,shift_2nd,blockSize);
   }
 }
 
@@ -818,7 +818,7 @@ void quant(encoder_control* encoder, int16_t* pSrc, int16_t* pDes, int32_t iWidt
     }
     else
     {
-      qpScaled = g_aucChromaScale[ qpScaled ] + qpBDOffset;
+      qpScaled = g_chroma_scale[ qpScaled ] + qpBDOffset;
     }
   }
   
@@ -1003,7 +1003,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
     }
     else
     {
-      qpScaled = g_aucChromaScale[ qpScaled ];
+      qpScaled = g_chroma_scale[ qpScaled ];
     }
   }
   
@@ -1035,7 +1035,7 @@ void dequant(encoder_control* encoder, int16_t* piQCoef, int16_t* piCoef, int32_
   }
   #else
   {
-  int32_t scale = g_invQuantScales[encoder->QP%6] << (encoder->QP/6);
+  int32_t scale = g_inv_quant_scales[encoder->QP%6] << (encoder->QP/6);
   iAdd = 1 << (iShift-1);
 
   for(n = 0; n < iWidth*iHeight; n++)
