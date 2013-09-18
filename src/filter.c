@@ -252,7 +252,7 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
   until the coded block size has been achived. Calls luma and chroma filtering
   functions for each coded CU size
 */
-void filter_deblock_CU(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int32_t edge)
+void filter_deblock_cu(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int8_t depth, int32_t edge)
 {
   CU_info *cur_CU = &encoder->in.cur_pic->CU[depth][xCtb+yCtb*(encoder->in.width_in_LCU<<MAX_DEPTH)];
   uint8_t split_flag = (cur_CU->depth > depth)?1:0;
@@ -268,19 +268,19 @@ void filter_deblock_CU(encoder_control* encoder, int32_t xCtb, int32_t yCtb, int
   {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);
-    filter_deblock_CU(encoder,xCtb,yCtb,depth+1,edge); /* x,y */
+    filter_deblock_cu(encoder,xCtb,yCtb,depth+1,edge); /* x,y */
 
     if(!border_x || border_split_x)
     {
-      filter_deblock_CU(encoder,xCtb+change,yCtb,depth+1,edge); /* x+1,y */
+      filter_deblock_cu(encoder,xCtb+change,yCtb,depth+1,edge); /* x+1,y */
     }
     if(!border_y || border_split_y)
     {
-      filter_deblock_CU(encoder,xCtb,yCtb+change,depth+1,edge); /* x,y+1 */
+      filter_deblock_cu(encoder,xCtb,yCtb+change,depth+1,edge); /* x,y+1 */
     }
     if((!border_x && !border_y) || (border_split_x && border_split_y) )
     {
-      filter_deblock_CU(encoder,xCtb+change,yCtb+change,depth+1,edge); /* x+1,y+1 */
+      filter_deblock_cu(encoder,xCtb+change,yCtb+change,depth+1,edge); /* x+1,y+1 */
     }
     return;
   }
@@ -311,7 +311,7 @@ void filter_deblock(encoder_control* encoder)
   {
     for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
     {
-      filter_deblock_CU(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_VER);
+      filter_deblock_cu(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_VER);
     }
   }
 
@@ -320,7 +320,7 @@ void filter_deblock(encoder_control* encoder)
   {
     for(xCtb = 0; xCtb < encoder->in.width_in_LCU; xCtb++)
     {
-      filter_deblock_CU(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_HOR);
+      filter_deblock_cu(encoder, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, 0, EDGE_HOR);
     }
   }
   
