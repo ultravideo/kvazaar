@@ -24,10 +24,12 @@
 #include "inter.h"
 #include "filter.h"
 #include "search.h"
+#include "debug.h"
 
 
 // Temporarily for debugging.
 #define USE_INTRA_IN_P 0
+#define RENDER_CU 1
 
 /**
  * 
@@ -319,6 +321,13 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
 void search_slice_data(encoder_control* encoder)
 {
   int16_t xCtb,yCtb;
+  FILE *fp = 0, *fp2 = 0;
+
+  if (RENDER_CU && encoder->frame == 1) {
+    fp = open_cu_file("cu_search.html");
+    fp2 = open_cu_file("cu_best.html");
+  }
+
 
   /* Loop through every LCU in the slice */
   for(yCtb = 0; yCtb < encoder->in.height_in_LCU; yCtb++)
@@ -328,9 +337,20 @@ void search_slice_data(encoder_control* encoder)
       uint8_t depth = 0;
       /* Recursive function for looping through all the sub-blocks */
       search_tree(encoder, xCtb<<MAX_DEPTH,yCtb<<MAX_DEPTH, depth);
+      if (RENDER_CU && encoder->frame == 1) render_cu_file(encoder, depth, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, fp);
 
       /* Decide actual coding modes */
       search_best_mode(encoder, xCtb<<MAX_DEPTH,yCtb<<MAX_DEPTH, depth);
+      if (RENDER_CU && encoder->frame == 1) render_cu_file(encoder, depth, xCtb<<MAX_DEPTH, yCtb<<MAX_DEPTH, fp2);
     }
+  }
+
+  if (RENDER_CU && fp) {
+    close_cu_file(fp);
+    fp = 0;
+  }
+  if (RENDER_CU && fp2) {
+    close_cu_file(fp2);
+    fp2 = 0;
   }
 }
