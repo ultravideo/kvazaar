@@ -8,6 +8,8 @@
 #ifndef _BITSTREAM_H
 #define _BITSTREAM_H
  
+#include "global.h"
+
  
 typedef struct
 {

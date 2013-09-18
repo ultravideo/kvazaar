@@ -11,19 +11,16 @@
     NAL functions
 */
 
+#include "nal.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
 #include "config.h"
 #include "bitstream.h"
-#include "picture.h"
 #include "cabac.h"
 #include "encoder.h"
 
-
-#include "nal.h"
 
 void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id)
 {

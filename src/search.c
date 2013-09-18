@@ -11,19 +11,18 @@
     Search related functions
 */
 
+#include "search.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
 #include "config.h"
 #include "bitstream.h"
 #include "picture.h"
-#include "encoder.h"
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"
-#include "search.h"
 #include "debug.h"
 
 

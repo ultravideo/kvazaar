@@ -10,6 +10,7 @@
 #include "global.h"
 
 #include <stdio.h>
+
 #include "encoder.h"
 
 

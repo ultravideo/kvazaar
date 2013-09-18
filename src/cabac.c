@@ -10,12 +10,12 @@
     
     Content-adaptive binary arithmetic coder
 */
+
+#include "cabac.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include "global.h"
-#include "bitstream.h"
-#include "cabac.h"
 
 
 const uint8_t g_aucNextStateMPS[ 128 ] =

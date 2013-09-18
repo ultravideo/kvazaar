@@ -13,6 +13,13 @@
 #ifndef __NAL_H
 #define __NAL_H
 
+#include "global.h"
+
+#include <stdio.h>
+
+#include "picture.h"
+
+
 /*!
  * \brief NAL unit type codes
  * 

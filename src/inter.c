@@ -11,14 +11,14 @@
     Inter functions
 */
 
+#include "inter.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
 #include "config.h"
-#include "encoder.h"
-#include "picture.h"
-#include "inter.h"
+
 
 /*!
  \brief Set block mode (and init typedata)

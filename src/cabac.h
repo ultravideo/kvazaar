@@ -13,6 +13,11 @@
 #ifndef __CABAC_H
 #define __CABAC_H
 
+#include "global.h"
+
+#include "bitstream.h"
+
+
 extern const uint8_t g_aucNextStateMPS[ 128 ];
 extern const uint8_t g_aucNextStateLPS[ 128 ];
 extern uint8_t g_nextState[128][2];

@@ -10,14 +10,14 @@
     
     Transform functions
 */
+#include "transform.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "global.h"
+
 #include "config.h"
-#include "encoder.h"
 #include "nal.h"
-#include "transform.h"
 
 
 const int16_t g_aiT4[4][4] =

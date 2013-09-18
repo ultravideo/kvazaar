@@ -13,6 +13,11 @@
 #ifndef __INTRA_H
 #define __INTRA_H
 
+#include "global.h"
+
+#include "picture.h"
+
+
 void intra_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, uint8_t mode);
 int8_t intra_getBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth);
 

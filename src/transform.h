@@ -13,6 +13,11 @@
 #ifndef __TRANSFORM_H
 #define __TRANSFORM_H
 
+#include "global.h"
+
+#include "encoder.h"
+
+
 extern int32_t* g_quant_coeff[4][6][6];
 extern const int32_t g_quantIntraDefault8x8[64];
 

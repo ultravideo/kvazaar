@@ -12,12 +12,11 @@
 
 */
 
+#include "picture.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "global.h"
-#include "picture.h"
 
 
 /** \defgroup picture_group Picture handler group

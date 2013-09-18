@@ -15,14 +15,15 @@
   #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#include "encoder.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "global.h"
+
 #include "config.h"
-#include "encoder.h"
 #include "cabac.h"
 #include "picture.h"
 #include "nal.h"

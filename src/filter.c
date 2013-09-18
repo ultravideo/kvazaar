@@ -11,17 +11,16 @@
     Filtering functions
 */
 
+#include "filter.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
 #include "config.h"
 #include "bitstream.h"
 #include "picture.h"
 #include "cabac.h"
-#include "encoder.h"
-#include "filter.h"
 
 
 extern const uint8_t g_aucChromaScale[58];

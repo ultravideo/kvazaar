@@ -13,9 +13,12 @@
 #ifndef __ENCODER_H
 #define __ENCODER_H
 
+#include "global.h"
+
 #include "picture.h"
 #include "bitstream.h"
 #include "config.h"
+
 
 /* TODO: add ME data */
 typedef struct

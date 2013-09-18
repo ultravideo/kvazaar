@@ -13,8 +13,10 @@
 #ifndef __CONTEXT_H
 #define __CONTEXT_H
 
+#include "global.h"
 
-
+#include "encoder.h"
+#include "cabac.h"
 
 
 void init_contexts(encoder_control *encoder, int8_t SLICE);

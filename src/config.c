@@ -11,11 +11,11 @@
     This file has all configuration related functions
 */
 
+#include "config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
-#include "config.h"
 
 
 /*!

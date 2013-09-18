@@ -11,14 +11,14 @@
     Intra functions
 */
 
+#include "intra.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
 #include "config.h"
 #include "encoder.h"
-#include "picture.h"
-#include "intra.h"
 
 
 const uint8_t intraHorVerDistThres[5] = {0,7,1,0,0};

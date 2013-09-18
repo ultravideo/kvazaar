@@ -11,6 +11,8 @@
     This file has all bitstream functions
 */
 
+#include "bitstream.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -23,8 +25,6 @@
 #include <net/hton.h>
 #endif
  
-#include "global.h"
-#include "bitstream.h"
 
 //#define VERBOSE
 

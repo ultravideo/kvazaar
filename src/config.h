@@ -14,6 +14,9 @@
 #ifndef _CONFIG_H_
 #define _CONFIG_H_
 
+#include "global.h"
+
+
 /*!
     \brief Struct which contains all configuration data
 */

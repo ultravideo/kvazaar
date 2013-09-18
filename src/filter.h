@@ -13,6 +13,11 @@
 #ifndef __FILTER_H
 #define __FILTER_H
 
+#include "global.h"
+
+#include "encoder.h"
+
+
 #define EDGE_VER 0
 #define EDGE_HOR 1
 

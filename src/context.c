@@ -10,14 +10,14 @@
   This file contains context derivation functions
 */
 
+#include "context.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
 #include "config.h"
-#include "encoder.h"
-#include "cabac.h"
-#include "context.h"
+
 
 /* CONTEXTS */
 cabac_ctx g_SplitFlagSCModel[3]; /*<! \brief split flag context models */

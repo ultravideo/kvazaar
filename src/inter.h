@@ -13,6 +13,12 @@
 #ifndef __INTER_H
 #define __INTER_H
 
+#include "global.h"
+
+#include "picture.h"
+#include "encoder.h"
+
+
 void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, CU_info* cur_cu);
 void inter_recon(picture *ref,int32_t xpos, int32_t ypos,int32_t width, int16_t mv[2], picture* dst);
 

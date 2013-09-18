@@ -14,6 +14,8 @@
 #ifndef _PICTURE_H_
 #define _PICTURE_H_
 
+#include "global.h"
+
 
 /* Functions */
 uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
