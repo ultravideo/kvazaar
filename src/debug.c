@@ -46,7 +46,7 @@ unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t xCtb,
     cu->inter.cost, cu->inter.mv[0], cu->inter.mv[1]);
 
 
-  if(depth != MAX_SEARCH_DEPTH)
+  if(depth != MAX_INTER_SEARCH_DEPTH)
   {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);

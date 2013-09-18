@@ -194,37 +194,36 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   }
   
   /* INTER SEARCH */
-  if(encoder->in.cur_pic->slicetype != SLICE_I)// && (xCtb == 0) && yCtb == 0)
-  {
-    //if(depth >= MIN_SEARCH_DEPTH)
+  if(depth >= MIN_INTER_SEARCH_DEPTH
+      && depth <= MAX_INTER_SEARCH_DEPTH 
+      && encoder->in.cur_pic->slicetype != SLICE_I) {
+    /* Motion estimation on P-frame */
+    if(encoder->in.cur_pic->slicetype != SLICE_B)
     {
-      /* Motion estimation on P-frame */
-      if(encoder->in.cur_pic->slicetype != SLICE_B)
-      {
 
-      }
-
-      {
-        unsigned mv[2] = { 0, 0 }; // TODO: Take initial MV from adjacent blocks.
-        picture *cur_pic = encoder->in.cur_pic;
-        
-        picture *ref_pic = encoder->ref->pics[0];
-
-        int x = xCtb * CU_MIN_SIZE_PIXELS;
-        int y = yCtb * CU_MIN_SIZE_PIXELS;
-        uint8_t *cur_data = &cur_pic->yData[(y * cur_pic->width) + x];
-        search_motion_vector(cur_pic, cur_data, ref_pic->yData, cur_CU, 8, x, y, 0, 0, depth);
-      }
-
-      cur_CU->type = CU_INTER;
-      cur_CU->inter.mv_dir = 1;
-      inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
     }
+
+    {
+      unsigned mv[2] = { 0, 0 }; // TODO: Take initial MV from adjacent blocks.
+      picture *cur_pic = encoder->in.cur_pic;
+        
+      picture *ref_pic = encoder->ref->pics[0];
+
+      int x = xCtb * CU_MIN_SIZE_PIXELS;
+      int y = yCtb * CU_MIN_SIZE_PIXELS;
+      uint8_t *cur_data = &cur_pic->yData[(y * cur_pic->width) + x];
+      search_motion_vector(cur_pic, cur_data, ref_pic->yData, cur_CU, 8, x, y, 0, 0, depth);
+    }
+
+    cur_CU->type = CU_INTER;
+    cur_CU->inter.mv_dir = 1;
+    inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
   }
 
   /* INTRA SEARCH */
-  if(depth >= MIN_SEARCH_DEPTH && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P))
-  {
+  if (depth >= MIN_INTRA_SEARCH_DEPTH 
+      && depth <= MAX_INTRA_SEARCH_DEPTH 
+      && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P)) {
     int x = 0,y = 0;
     uint8_t *base  = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
     uint32_t width = LCU_WIDTH>>depth;
@@ -245,7 +244,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
   }
 
   /* Split and search to max_depth */
-  if(depth != MAX_SEARCH_DEPTH)
+  if(depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH)
   {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);
@@ -266,7 +265,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   uint32_t lambdaCost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
   
   /* Split and search to max_depth */
-  if (depth != MAX_SEARCH_DEPTH) {
+  if (depth != MAX_INTRA_SEARCH_DEPTH) {
     /* Split blocks and remember to change x and y block positions */
     uint8_t change = 1<<(MAX_DEPTH-1-depth);
     cost = search_best_mode(encoder,xCtb,yCtb,depth+1);
