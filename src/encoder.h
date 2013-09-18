@@ -15,8 +15,7 @@
 
 #include "picture.h"
 #include "bitstream.h"
-
-typedef struct encoder_control;
+#include "config.h"
 
 /* TODO: add ME data */
 typedef struct
