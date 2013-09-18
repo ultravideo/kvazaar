@@ -815,7 +815,7 @@ void encode_slice_data(encoder_control* encoder)
       /* signal Terminating bit */
       if(!lastCUx || !lastCUy)
       {
-        cabac_encodeBinTrm(&cabac, 0);
+        cabac_encode_bin_trm(&cabac, 0);
       }
     }
   }
@@ -1079,7 +1079,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     {
                       if(mvd_hor_abs > 1)
                       {
-                        cabac_writeEpExGolomb(&cabac,mvd_hor_abs-2, 1);
+                        cabac_write_ep_ex_golomb(&cabac,mvd_hor_abs-2, 1);
                       }
                       CABAC_BIN_EP(&cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
                     }
@@ -1088,7 +1088,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     {
                       if(mvd_ver_abs > 1)
                       {
-                        cabac_writeEpExGolomb(&cabac,mvd_ver_abs-2, 1);
+                        cabac_write_ep_ex_golomb(&cabac,mvd_ver_abs-2, 1);
                       }
                       CABAC_BIN_EP(&cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
                     }
@@ -1100,7 +1100,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     picture_setBlockCoded(encoder->in.cur_pic,xCtb, yCtb, depth, 1);
                 }
                 /* Signal which candidate MV to use */
-                cabac_writeUnaryMaxSymbol(&cabac,g_cMVPIdxSCModel, cur_CU->inter.mv_ref,1,AMVP_MAX_NUM_CANDS-1);
+                cabac_write_unary_max_symbol(&cabac,g_cMVPIdxSCModel, cur_CU->inter.mv_ref,1,AMVP_MAX_NUM_CANDS-1);
               }
             }
           }
@@ -1162,7 +1162,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       
       #if ENABLE_PCM == 1
       /* Code must start after variable initialization */
-      cabac_encodeBinTrm(&cabac, 0); /* IPCMFlag == 0 */
+      cabac_encode_bin_trm(&cabac, 0); /* IPCMFlag == 0 */
       #endif
       
       
@@ -1316,7 +1316,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     /* Code IPCM block */
     else if(cur_CU->type == CU_PCM)
     {
-      cabac_encodeBinTrm(&cabac, 1); /* IPCMFlag == 1 */
+      cabac_encode_bin_trm(&cabac, 1); /* IPCMFlag == 1 */
       cabac_finish(&cabac);
       bitstream_align(cabac.stream);
        /* PCM sample */
@@ -1948,7 +1948,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
 
           if( abs_coeff[ idx ] >= baseLevel)
           {
-            cabac_writeCoeffRemain(&cabac, abs_coeff[ idx ] - baseLevel, uiGoRiceParam );
+            cabac_write_coeff_remain(&cabac, abs_coeff[ idx ] - baseLevel, uiGoRiceParam );
             if(abs_coeff[idx] > 3*(1<<uiGoRiceParam))
             {
                 uiGoRiceParam = MIN(uiGoRiceParam+1, 4);
