@@ -1,15 +1,19 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Header that is included in every other header.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * 
+ * This file contains global constants that can be referred to from any header
+ * or source file. It also contains some helper macros and includes stdint.h
+ * so that any file can refer to integer types with exact widths.
  */
 
-/*! \file global.h
-    \brief Contains global includes
-    \author Marko Viitanen
-    \date 2013-06
-  
-    This file should be included in every C-file.
-*/
 #ifndef __GLOBAL_H
 #define __GLOBAL_H
 

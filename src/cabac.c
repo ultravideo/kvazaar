@@ -1,15 +1,13 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file cabac.c
-    \brief CABAC
-    \author Marko Viitanen
-    \date 2012-06
-    
-    Content-adaptive binary arithmetic coder
-*/
 
 #include "cabac.h"
 

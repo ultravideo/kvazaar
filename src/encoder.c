@@ -1,16 +1,14 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file encoder.c
-    \brief Encoding related functions
-    \author Marko Viitanen
-    \date 2013-03
-    
-    Encoder main level
-*/
-/* Suppress some visual studio warnings */
 #ifdef WIN32
   #define _CRT_SECURE_NO_WARNINGS
 #endif

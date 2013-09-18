@@ -1,15 +1,14 @@
 /**
- *  Part of HEVC Encoder
- *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Coding Unit (CU) and picture data related functions.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file picture.h
-    \brief Picture header
-    \author Marko Viitanen
-    \date 2013-04
-    
-    Contains all picture related functions and structs
-*/
 
 #ifndef _PICTURE_H_
 #define _PICTURE_H_

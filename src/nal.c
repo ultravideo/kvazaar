@@ -1,15 +1,13 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file nal.c
-    \brief NAL
-    \author Marko Viitanen
-    \date 2013-06
-    
-    NAL functions
-*/
 
 #include "nal.h"
 

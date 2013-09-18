@@ -1,16 +1,13 @@
 /**
- *  Part of HEVC Encoder
- *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file picture.c
-    \brief Functions to handle pictures
-    \author Marko Viitanen
-    \date 2013-06
-    
-  This file contains all the needed functions to handle pictures
-
-*/
 
 #include "picture.h"
 

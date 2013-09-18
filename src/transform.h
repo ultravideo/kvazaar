@@ -1,15 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Transformations, such as quantization and DST.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file transform.h
-    \brief Transform functions
-    \author Marko Viitanen
-    \date 2012-09
-    
-    Transform functions
-*/
 #ifndef __TRANSFORM_H
 #define __TRANSFORM_H
 

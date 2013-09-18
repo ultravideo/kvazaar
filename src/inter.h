@@ -1,15 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Handling Coding Units (CU's) for inter frames.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file inter.h
-    \brief Inter function headers
-    \author Marko Viitanen
-    \date 2013-04
-    
-    Inter functions
-*/
 #ifndef __INTER_H
 #define __INTER_H
 

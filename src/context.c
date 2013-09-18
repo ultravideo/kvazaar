@@ -1,14 +1,13 @@
 /**
- *  Part of HEVC Encoder
- *  By Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file context.c
-    \brief Functions for context derication
-    \author Marko Viitanen
-    \date 2013-04    
-  This file contains context derivation functions
-*/
 
 #include "context.h"
 

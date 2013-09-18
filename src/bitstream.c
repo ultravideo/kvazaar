@@ -1,15 +1,13 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ),
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ),
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file bitstream.c
-    \brief Bitstream related functions
-    \author Marko Viitanen
-    \date 2013-02
-    
-    This file has all bitstream functions
-*/
 
 #include "bitstream.h"
 

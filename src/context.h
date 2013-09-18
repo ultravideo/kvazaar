@@ -1,15 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Context derivation for CABAC.
+
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file context.h
-    \brief Context
-    \author Marko Viitanen
-    \date 2012-08
-    
-    Context derivation function headers
-*/
 #ifndef __CONTEXT_H
 #define __CONTEXT_H
 

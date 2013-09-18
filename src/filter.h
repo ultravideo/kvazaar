@@ -1,15 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing 2013.
+ * \file
+ * \brief Filtering, such as deblocking.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file filter.h
-    \brief filter
-    \author Marko Viitanen
-    \date 2013-05
-    
-    Filtering function headers
-*/
 #ifndef __FILTER_H
 #define __FILTER_H
 

@@ -1,15 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing 2013.
+ * \file
+ * \brief Network Abstraction Layer (NAL) messages.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file nal.h
-    \brief NAL
-    \author Marko Viitanen
-    \date 2013-02
-    
-    NAL function headers
-*/
 #ifndef __NAL_H
 #define __NAL_H
 

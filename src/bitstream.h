@@ -1,10 +1,15 @@
-/*! \file bitstream.h
-    \brief Bitstream related functions
-    \author Marko Viitanen
-    \date 2012-05
-    
-    This file has all bitstream headers
-*/
+/**
+ * \file
+ * \brief Bitstream can be written to one or several bits at a time.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ),
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ),
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ */
+
 #ifndef _BITSTREAM_H
 #define _BITSTREAM_H
  

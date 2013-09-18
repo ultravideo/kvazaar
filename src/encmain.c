@@ -1,27 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
- */
-
-/*! \file decmain.c
-    \brief main file for the Decoder
-    \author Marko Viitanen
-    \date 2012-05
-    
-    This file contains main() function
-*/
-
-/*! \mainpage HEVC Encoder
- *
- * \section Coding style
- *
- * Coding style is explained in it's own document.
- *
- * \section usage_sec Usage
- *
- * \subsection encode_subsec Basic Decoding:
- * Use encmain.exe -i input.yuv -o output.hevc
+ * \file
+ * \brief User interface for the encoder.
  * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ *
+ * TODO: Check that these usage instructions are correct.
  * \subsection options_subsec All program options:
  *            - -i <filename>: input
  *            - -o <filename>: output

@@ -1,7 +1,13 @@
 /**
- * HEVC Encoder
- * - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing 2013.
- * - Ari Koivula (ari at koivu.la ), Tampere University of Technology, Department of Pervasive Computing 2013.
+ * \file
+ * \brief Tools for visualizing and debugging the encoder.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
 #ifndef __DEBUG_H

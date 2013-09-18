@@ -1,15 +1,15 @@
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Handling Coding Units (CU's) for intra frames.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
-/*! \file intra.h
-    \brief Intra function headers
-    \author Marko Viitanen
-    \date 2013-03
-    
-    Intra functions
-*/
 #ifndef __INTRA_H
 #define __INTRA_H
 
