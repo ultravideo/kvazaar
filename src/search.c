@@ -49,7 +49,7 @@ void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data, CU
   // This prevents choosing vectors that need interpolating of borders to work.
   if (orig_x + x < 0 || orig_y + y < 0 || orig_x + x > pic->width - block_width || orig_y + y > pic->height - block_height) return;
 
-  cost = SAD(pic_data, &ref_data[(orig_y + y) * pic->width + (orig_x + x)], block_width, block_height, pic->width) + 1;
+  cost = sad(pic_data, &ref_data[(orig_y + y) * pic->width + (orig_x + x)], block_width, block_height, pic->width) + 1;
   if (cost < cur_cu->inter.cost) {
     cur_cu->inter.cost = cost;
     cur_cu->inter.mv[0] = x << 2;
@@ -74,7 +74,7 @@ void search_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_
   int32_t topRow;      /*!< top row iterator */
   int32_t srcWidth     = (pic->width>>(chroma?1:0)); /*!< source picture width */
   int32_t srcHeight    = (pic->height>>(chroma?1:0));/*!< source picture height */
-  uint8_t* srcPic      = (!chroma)?pic->yData: ((chroma==1)?pic->uData: pic->vData); /*!< input picture pointer */  
+  uint8_t* srcPic      = (!chroma)?pic->y_data: ((chroma==1)?pic->u_data: pic->v_data); /*!< input picture pointer */  
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
   int32_t width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;     /*!< picture width in SCU */
@@ -211,8 +211,8 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
       int x = xCtb * CU_MIN_SIZE_PIXELS;
       int y = yCtb * CU_MIN_SIZE_PIXELS;
-      uint8_t *cur_data = &cur_pic->yData[(y * cur_pic->width) + x];
-      search_motion_vector(cur_pic, cur_data, ref_pic->yData, cur_CU, 8, x, y, 0, 0, depth);
+      uint8_t *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
+      search_motion_vector(cur_pic, cur_data, ref_pic->y_data, cur_CU, 8, x, y, 0, 0, depth);
     }
 
     cur_CU->type = CU_INTER;
@@ -225,7 +225,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
       && depth <= MAX_INTRA_SEARCH_DEPTH 
       && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P)) {
     int x = 0,y = 0;
-    uint8_t *base  = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+    uint8_t *base  = &encoder->in.cur_pic->y_data[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
     uint32_t width = LCU_WIDTH>>depth;
 
     /* INTRAPREDICTION */
@@ -238,7 +238,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
     /* Build reconstructed block to use in prediction with extrapolated borders */
     search_buildReferenceBorder(encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-    cur_CU->intra.mode = (uint8_t)intra_prediction(encoder->in.cur_pic->yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
+    cur_CU->intra.mode = (uint8_t)intra_prediction(encoder->in.cur_pic->y_data,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
     //free(pred);
     //free(rec);
   }

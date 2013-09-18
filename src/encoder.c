@@ -426,20 +426,20 @@ void read_one_frame(FILE* file, encoder_control* encoder)
 
   if (width != array_width) {
     // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-    read_and_fill_frame_data(file, width, height, array_width, in->cur_pic->yData);
-    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, in->cur_pic->uData);
-    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, in->cur_pic->vData);
+    read_and_fill_frame_data(file, width, height, array_width, in->cur_pic->y_data);
+    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, in->cur_pic->u_data);
+    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, in->cur_pic->v_data);
   } else {
     // Otherwise the data can be read directly to the array.
-    fread(in->cur_pic->yData, sizeof(unsigned char), width * height, file);
-    fread(in->cur_pic->uData, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
-    fread(in->cur_pic->vData, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
+    fread(in->cur_pic->y_data, sizeof(unsigned char), width * height, file);
+    fread(in->cur_pic->u_data, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
+    fread(in->cur_pic->v_data, sizeof(unsigned char), (width >> 1) * (height >> 1), file);
   }
 
   if (height != array_height) {
-    fill_after_frame(file, height, array_width, array_height, in->cur_pic->yData);
-    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1, in->cur_pic->uData);
-    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1, in->cur_pic->vData);
+    fill_after_frame(file, height, array_width, array_height, in->cur_pic->y_data);
+    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1, in->cur_pic->u_data);
+    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1, in->cur_pic->v_data);
   }
 }
 
@@ -1136,9 +1136,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int8_t mpmPred = -1;
       int i;
       uint32_t flag;
-      uint8_t *base  = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-      uint8_t *baseU = &encoder->in.cur_pic->uData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-      uint8_t *baseV = &encoder->in.cur_pic->vData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *base  = &encoder->in.cur_pic->y_data[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+      uint8_t *baseU = &encoder->in.cur_pic->u_data[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *baseV = &encoder->in.cur_pic->v_data[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
       uint32_t width = LCU_WIDTH>>depth;
 
       /* INTRAPREDICTION VARIABLES */
@@ -1146,9 +1146,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
       int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
-      uint8_t *recbase   = &encoder->in.cur_pic->yRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-      uint8_t *recbaseU  = &encoder->in.cur_pic->uRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-      uint8_t *recbaseV  = &encoder->in.cur_pic->vRecData[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *recbase   = &encoder->in.cur_pic->y_recdata[xCtb*(LCU_WIDTH>>(MAX_DEPTH))   + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+      uint8_t *recbaseU  = &encoder->in.cur_pic->u_recdata[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+      uint8_t *recbaseV  = &encoder->in.cur_pic->v_recdata[xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
 
 
       /* SEARCH BEST INTRA MODE (AGAIN) */  
@@ -1156,7 +1156,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
       int16_t *recShift = &rec[(LCU_WIDTH>>(depth))*2+8+1];      
       intra_buildReferenceBorder(encoder->in.cur_pic, xCtb, yCtb,(LCU_WIDTH>>(depth))*2+8, rec, (LCU_WIDTH>>(depth))*2+8, 0);
-      cur_CU->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic->yData,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
+      cur_CU->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,encoder->in.width,recShift,(LCU_WIDTH>>(depth))*2+8,xCtb*(LCU_WIDTH>>(MAX_DEPTH)),yCtb*(LCU_WIDTH>>(MAX_DEPTH)),width,pred,width,&cur_CU->intra.cost);
       intraPredMode = cur_CU->intra.mode;
       intra_setBlockMode(encoder->in.cur_pic,xCtb, yCtb, depth, intraPredMode);
       
@@ -1321,9 +1321,9 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
       bitstream_align(cabac.stream);
        /* PCM sample */
       {
-        uint8_t *base   = &encoder->in.cur_pic->yData[xCtb*(LCU_WIDTH>>(MAX_DEPTH))    + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
-        uint8_t *baseCb = &encoder->in.cur_pic->uData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
-        uint8_t *baseCr = &encoder->in.cur_pic->vData[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
+        uint8_t *base   = &encoder->in.cur_pic->y_data[xCtb*(LCU_WIDTH>>(MAX_DEPTH))    + (yCtb*(LCU_WIDTH>>(MAX_DEPTH)))*encoder->in.width];
+        uint8_t *baseCb = &encoder->in.cur_pic->u_data[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
+        uint8_t *baseCr = &encoder->in.cur_pic->v_data[(xCtb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (yCtb*(LCU_WIDTH>>(MAX_DEPTH+1)))*encoder->in.width/2)];
         for(y = 0; y < LCU_WIDTH>>depth; y++)
         {
           for(x = 0; x < LCU_WIDTH>>depth; x++)

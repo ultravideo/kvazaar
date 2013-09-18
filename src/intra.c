@@ -246,7 +246,7 @@ int16_t intra_prediction(uint8_t* orig,int32_t origstride,int16_t* rec,int32_t r
   int16_t* recFiltered = &recFilteredTemp[recstride+1];
   uint8_t *origShift = &orig[xpos+ypos*origstride];
   int8_t filter = (width<32); //TODO: chroma support
-  SADfunction SADarray[5] = {&SAD4x4,&SAD8x8,&SAD16x16,&SAD32x32,&SAD64x64}; //TODO: get SAD functions from parameters
+  SADfunction SADarray[5] = {&sad4x4,&sad8x8,&sad16x16,&sad32x32,&sad64x64}; //TODO: get SAD functions from parameters
   uint8_t threshold = intraHorVerDistThres[g_to_bits[width]]; /*!< Intra filtering threshold */
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  {   for(x = 0; x < (int32_t)width; x++)  {  dst[x+y*dststride] = pred[x+y*width];  }   }
   #define CHECK_FOR_BEST(mode, sad)  SAD = calcSAD(pred,width,origBlock,width); \
@@ -398,7 +398,7 @@ void intra_buildReferenceBorder(picture* pic, int32_t xCtb, int32_t yCtb,int16_t
   int32_t topRow;      /*!< top row iterator */
   int32_t srcWidth     = (pic->width>>(chroma?1:0)); /*!< source picture width */
   int32_t srcHeight    = (pic->height>>(chroma?1:0));/*!< source picture height */
-  uint8_t* srcPic      = (!chroma)?pic->yRecData: ((chroma==1)?pic->uRecData: pic->vRecData); /*!< input picture pointer */  
+  uint8_t* srcPic      = (!chroma)?pic->y_recdata: ((chroma==1)?pic->u_recdata: pic->v_recdata); /*!< input picture pointer */  
   int16_t SCU_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); /*!< Smallest Coding Unit width */
   uint8_t* srcShifted  = &srcPic[xCtb*SCU_width+(yCtb*SCU_width)*srcWidth];  /*!< input picture pointer shifted to start from the left-top corner of the current block */
   int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;     /*!< picture width in SCU */

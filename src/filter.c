@@ -125,7 +125,7 @@ void filter_deblock_edge_luma(encoder_control* encoder, int32_t xpos, int32_t yp
   int32_t tcOffsetDiv2   = encoder->tc_offset_div2;
   int8_t uiBs       = 2; /* Filter strength */
   /* TODO: support 10+bits */
-  uint8_t* origsrc      = &encoder->in.cur_pic->yRecData[xpos+ypos*stride];
+  uint8_t* origsrc      = &encoder->in.cur_pic->y_recdata[xpos+ypos*stride];
   uint8_t* src = origsrc;
   int32_t step = 1;
   //CU_info* cu = &encoder->in.cur_pic->CU[depth][(xpos>>scu_width_log2) + (ypos>>scu_width_log2)*(encoder->in.width>>scu_width_log2)];
@@ -198,8 +198,8 @@ void filter_deblock_edge_chroma(encoder_control* encoder,int32_t xpos, int32_t y
   int32_t tcOffsetDiv2   = encoder->tc_offset_div2;
   int8_t uiNumParts = 1;
   /* TODO: support 10+bits */
-  uint8_t* srcU      = &encoder->in.cur_pic->uRecData[xpos+ypos*stride];
-  uint8_t* srcV      = &encoder->in.cur_pic->vRecData[xpos+ypos*stride];
+  uint8_t* srcU      = &encoder->in.cur_pic->u_recdata[xpos+ypos*stride];
+  uint8_t* srcV      = &encoder->in.cur_pic->v_recdata[xpos+ypos*stride];
   /* Init offset and step to EDGE_HOR */
   int32_t offset = stride;
   int32_t step = 1;

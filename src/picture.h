@@ -18,14 +18,14 @@
 
 
 /* Functions */
-uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-uint32_t SAD4x4(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
-uint32_t SAD(uint8_t *data1, uint8_t *data2, unsigned width, unsigned height, unsigned stride);
+uint32_t sad64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+uint32_t sad32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+uint32_t sad16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+uint32_t sad8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+uint32_t sad4x4(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+uint32_t sad(uint8_t *data1, uint8_t *data2, unsigned width, unsigned height, unsigned stride);
 
-double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y);
+double image_psnr(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y);
 
 /** \defgroup picture_group Picture handler group
  *  This group contains all picture related stuff
@@ -77,13 +77,13 @@ typedef struct
 */
 typedef struct
 {
-  uint8_t* yData;     /*!< \brief Pointer to Y-data  */
-  uint8_t* uData;     /*!< \brief Pointer to U-data  */
-  uint8_t* vData;     /*!< \brief Pointer to V-data  */
+  uint8_t* y_data;     /*!< \brief Pointer to Y-data  */
+  uint8_t* u_data;     /*!< \brief Pointer to U-data  */
+  uint8_t* v_data;     /*!< \brief Pointer to V-data  */
 
-  uint8_t* yRecData;     /*!< \brief Pointer to reconstructed Y-data  */
-  uint8_t* uRecData;     /*!< \brief Pointer to reconstructed U-data  */
-  uint8_t* vRecData;     /*!< \brief Pointer to reconstructed V-data  */
+  uint8_t* y_recdata;     /*!< \brief Pointer to reconstructed Y-data  */
+  uint8_t* u_recdata;     /*!< \brief Pointer to reconstructed U-data  */
+  uint8_t* v_recdata;     /*!< \brief Pointer to reconstructed V-data  */
 
   int32_t width;          /*!< \brief Picture width */
   int32_t height;         /*!< \brief Picture height  */

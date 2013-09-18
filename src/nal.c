@@ -123,9 +123,9 @@ static void array_checksum(const uint8_t* data, const int height, const int widt
 void picture_checksum(const picture* pic, unsigned char checksum_out[][16])
 {
 	int stride = pic->width; /* TODO: != width, if there is a luma margin. */
-	array_checksum(pic->yRecData, pic->height, pic->width, pic->width, checksum_out[0]);
+	array_checksum(pic->y_recdata, pic->height, pic->width, pic->width, checksum_out[0]);
 
   /* The number of chroma pixels is half that of luma. */
-	array_checksum(pic->uRecData, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[1]);
-	array_checksum(pic->vRecData, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[2]);
+	array_checksum(pic->u_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[1]);
+	array_checksum(pic->v_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[2]);
 }

@@ -193,9 +193,9 @@
 
       #ifdef _DEBUG
       /* Write reconstructed frame out */     
-      fwrite(encoder->in.cur_pic->yRecData,cfg->width*cfg->height,1,recout);
-      fwrite(encoder->in.cur_pic->uRecData,cfg->width*cfg->height>>2,1,recout);
-      fwrite(encoder->in.cur_pic->vRecData,cfg->width*cfg->height>>2,1,recout);
+      fwrite(encoder->in.cur_pic->y_recdata,cfg->width*cfg->height,1,recout);
+      fwrite(encoder->in.cur_pic->u_recdata,cfg->width*cfg->height>>2,1,recout);
+      fwrite(encoder->in.cur_pic->v_recdata,cfg->width*cfg->height>>2,1,recout);
       #endif
       {
         int32_t diff;
@@ -204,9 +204,9 @@
         diff = (int32_t)(curpos-lastpos);
         lastpos = curpos;
 
-        temp_PSNR[0] = imagePSNR(encoder->in.cur_pic->yData,encoder->in.cur_pic->yRecData,cfg->width,cfg->height);
-        temp_PSNR[1] = imagePSNR(encoder->in.cur_pic->uData,encoder->in.cur_pic->uRecData,cfg->width>>1,cfg->height>>1);
-        temp_PSNR[2] = imagePSNR(encoder->in.cur_pic->vData,encoder->in.cur_pic->vRecData,cfg->width>>1,cfg->height>>1);
+        temp_PSNR[0] = image_psnr(encoder->in.cur_pic->y_data,encoder->in.cur_pic->y_recdata,cfg->width,cfg->height);
+        temp_PSNR[1] = image_psnr(encoder->in.cur_pic->u_data,encoder->in.cur_pic->u_recdata,cfg->width>>1,cfg->height>>1);
+        temp_PSNR[2] = image_psnr(encoder->in.cur_pic->v_data,encoder->in.cur_pic->v_recdata,cfg->width>>1,cfg->height>>1);
         
         printf("POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, "BPI"[encoder->in.cur_pic->slicetype%3],diff<<3,
                                                         temp_PSNR[0],temp_PSNR[1],temp_PSNR[2]);

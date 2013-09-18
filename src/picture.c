@@ -251,17 +251,17 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
     pic->height_in_lcu = height_in_LCU;
     pic->referenced = 0;
     /* Allocate buffers */
-    pic->yData = (uint8_t *)malloc(luma_size);
-    pic->uData = (uint8_t *)malloc(chroma_size);
-    pic->vData = (uint8_t *)malloc(chroma_size);
+    pic->y_data = (uint8_t *)malloc(luma_size);
+    pic->u_data = (uint8_t *)malloc(chroma_size);
+    pic->v_data = (uint8_t *)malloc(chroma_size);
 
     /* Reconstruction buffers */
-    pic->yRecData = (uint8_t *)malloc(luma_size);
-    pic->uRecData = (uint8_t *)malloc(chroma_size);
-    pic->vRecData = (uint8_t *)malloc(chroma_size);
+    pic->y_recdata = (uint8_t *)malloc(luma_size);
+    pic->u_recdata = (uint8_t *)malloc(chroma_size);
+    pic->v_recdata = (uint8_t *)malloc(chroma_size);
 
-    memset(pic->uRecData, 128, (chroma_size));
-    memset(pic->vRecData, 128, (chroma_size));
+    memset(pic->u_recdata, 128, (chroma_size));
+    memset(pic->v_recdata, 128, (chroma_size));
 
     /* Allocate memory for CU info 2D array */
     //TODO: we don't need this much space on LCU...MAX_DEPTH-1
@@ -285,15 +285,15 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
   {
     int i;
         
-    free(pic->uData);
-    free(pic->vData);
-    free(pic->yData);
-    pic->yData = pic->uData = pic->vData = NULL;
+    free(pic->u_data);
+    free(pic->v_data);
+    free(pic->y_data);
+    pic->y_data = pic->u_data = pic->v_data = NULL;
 
-    free(pic->yRecData);
-    free(pic->uRecData);
-    free(pic->vRecData);
-    pic->yRecData = pic->uRecData = pic->vRecData = NULL;
+    free(pic->y_recdata);
+    free(pic->u_recdata);
+    free(pic->v_recdata);
+    pic->y_recdata = pic->u_recdata = pic->v_recdata = NULL;
 
     for(i=0; i<MAX_DEPTH+1; i++)
     {
@@ -315,7 +315,7 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 #define PSNRMAX (255.0*255.0)
 
 //Calculates image PSNR value
-double imagePSNR(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
+double image_psnr(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
 {   
   uint64_t MSE=0;
   int32_t MSEtemp=0;
@@ -435,7 +435,7 @@ uint32_t Hadamard8x8(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t
   return sad;
 }
 
-uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
+uint32_t sad64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y,x;
   uint32_t sum=0;
@@ -466,7 +466,7 @@ uint32_t SAD64x64(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
   return sum;    
 }
 
-uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
+uint32_t sad32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y;
   
@@ -528,7 +528,7 @@ uint32_t SAD32x32(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 }
 
 
-uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
+uint32_t sad16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t y;
     
@@ -575,7 +575,7 @@ uint32_t SAD16x16(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stri
 }
 
 
-uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
+uint32_t sad8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   uint32_t sum=0;
   sum = Hadamard8x8( block, stride1,block2,  stride2 );
@@ -599,7 +599,7 @@ uint32_t SAD8x8(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride
   return sum;    
 }
 
-uint32_t SAD4x4(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
+uint32_t sad4x4(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2)
 {
   int32_t i,ii,y;
   uint32_t sum=0;
@@ -625,7 +625,7 @@ uint32_t SAD4x4(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride
  * height is the height of the region for which SAD is calculated.
  * stride is the width of the pixel array.
  */
-uint32_t SAD(uint8_t *data1, uint8_t *data2, unsigned width, unsigned height, unsigned stride)
+uint32_t sad(uint8_t *data1, uint8_t *data2, unsigned width, unsigned height, unsigned stride)
 {
   unsigned y, x;
   unsigned sad = 0;

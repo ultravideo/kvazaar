@@ -29,16 +29,16 @@
  \param mode mode to set
  \returns Void
 */
-void inter_setBlockMode(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t depth, CU_info* cur_cu)
+void inter_setBlockMode(picture* pic,uint32_t x_cu, uint32_t y_cu, uint8_t depth, CU_info* cur_cu)
 {
   uint32_t x,y,d;
   /* Width in smallest CU */
   int width_in_SCU = pic->width_in_lcu<<MAX_DEPTH;
   int block_SCU_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
-  for(y = yCtb; y < yCtb+block_SCU_width; y++)
+  for(y = y_cu; y < y_cu+block_SCU_width; y++)
   {
     int CUpos = y*width_in_SCU;
-    for(x = xCtb; x < xCtb+block_SCU_width; x++)
+    for(x = x_cu; x < x_cu+block_SCU_width; x++)
     {
       for(d = 0; d < MAX_DEPTH+1; d++)
       {
@@ -104,7 +104,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
           coord_y = ref->height-1-mv[1];
         }
 
-        dst->yRecData[y*dst->width+x] = ref->yRecData[(coord_y+mv[1])*ref->width+(coord_x+mv[0])];
+        dst->y_recdata[y*dst->width+x] = ref->y_recdata[(coord_y+mv[1])*ref->width+(coord_x+mv[0])];
       }
     }
 
@@ -131,23 +131,23 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
           coord_y = ((ref->height-mv[1])>>1)-1;
         }
 
-        dst->uRecData[y*(dst->width>>1)+x] = ref->uRecData[(coord_y+(mv[1]>>1))*(ref->width>>1)+(coord_x+(mv[0]>>1))];
-        dst->vRecData[y*(dst->width>>1)+x] = ref->vRecData[(coord_y+(mv[1]>>1))*(ref->width>>1)+(coord_x+(mv[0]>>1))];
+        dst->u_recdata[y*(dst->width>>1)+x] = ref->u_recdata[(coord_y+(mv[1]>>1))*(ref->width>>1)+(coord_x+(mv[0]>>1))];
+        dst->v_recdata[y*(dst->width>>1)+x] = ref->v_recdata[(coord_y+(mv[1]>>1))*(ref->width>>1)+(coord_x+(mv[0]>>1))];
       }
     }
   } else {
     /* Copy Luma */
     for (y = ypos; y < ypos+width; y++) {
       for (x = xpos; x < xpos+width; x++) {
-        dst->yRecData[y*dst->width+x] = ref->yRecData[(y+mv[1])*ref->width+x+mv[0]];
+        dst->y_recdata[y*dst->width+x] = ref->y_recdata[(y+mv[1])*ref->width+x+mv[0]];
       }
     }
 
     /* Copy Chroma */
     for (y = ypos>>1; y < (ypos+width)>>1; y++) {
       for (x = xpos>>1; x < (xpos+width)>>1; x++) {
-        dst->uRecData[y*(dst->width>>1)+x] = ref->uRecData[(y+(mv[1]>>1))*(ref->width>>1)+x+(mv[0]>>1)];
-        dst->vRecData[y*(dst->width>>1)+x] = ref->vRecData[(y+(mv[1]>>1))*(ref->width>>1)+x+(mv[0]>>1)];
+        dst->u_recdata[y*(dst->width>>1)+x] = ref->u_recdata[(y+(mv[1]>>1))*(ref->width>>1)+x+(mv[0]>>1)];
+        dst->v_recdata[y*(dst->width>>1)+x] = ref->v_recdata[(y+(mv[1]>>1))*(ref->width>>1)+x+(mv[0]>>1)];
       }
     }
   }
