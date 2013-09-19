@@ -15,15 +15,10 @@
 #include "global.h"
 
 #include "bitstream.h"
+#include "context.h"
 
 
 // Types
-typedef struct
-{
-  uint8_t  uc_state;
-  uint32_t bins_coded;
-} cabac_ctx;
-
 typedef struct
 {
   cabac_ctx *ctx;
@@ -48,8 +43,6 @@ extern cabac_data cabac;
 
 
 // Functions
-void ctx_init(cabac_ctx* ctx, uint32_t qp, uint32_t init_value);
-
 void cabac_start(cabac_data *data);
 void cabac_init(cabac_data *data);
 void cabac_encode_bin(cabac_data *data, uint32_t bin_value);

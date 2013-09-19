@@ -65,23 +65,6 @@ const uint8_t g_auc_renorm_table[32] =
 
 cabac_data cabac;
 
-/**
- * \brief Initialize struct cabac_ctx.
- */
-void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
-{
-  int slope = (init_value >> 4) * 5 - 45;
-  int offset = ((init_value & 15) << 3) - 16;
-  int init_state = MIN(MAX(1, ((slope * (int)qp) >> 4) + offset), 126);
-  uint8_t mp_state = (init_state >= 64) ? 1 : 0;
-
-  if (mp_state) {
-    ctx->uc_state = (init_state - 64) << 1 + mp_state;
-  } else {
-    ctx->uc_state = (63 - init_state) << 1;
-  }
-  ctx->bins_coded = 0;
-}
 
 /**
  * \brief Initialize struct cabac_data.

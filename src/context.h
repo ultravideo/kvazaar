@@ -15,8 +15,18 @@
 #include "global.h"
 
 #include "encoder.h"
-#include "cabac.h"
 
+
+// Types
+typedef struct
+{
+  uint8_t  uc_state;
+  uint32_t bins_coded;
+} cabac_ctx;
+
+
+// Functions
+void ctx_init(cabac_ctx* ctx, uint32_t qp, uint32_t init_value);
 void init_contexts(encoder_control *encoder, int8_t slice);
 int32_t context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
 
