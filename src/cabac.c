@@ -16,7 +16,7 @@
 #include <math.h>
 
 
-const uint8_t g_auc_next_state_mps[ 128 ] =
+const uint8_t g_auc_next_state_mps[128] =
 {
     2,   3,   4,   5,   6,   7,   8,   9,  10,  11,  12,  13,  14,  15,  16,  17,
    18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,  32,  33,
@@ -28,7 +28,7 @@ const uint8_t g_auc_next_state_mps[ 128 ] =
   114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 124, 125, 126, 127
 };
 
-const uint8_t g_auc_next_state_lps[ 128 ] =
+const uint8_t g_auc_next_state_lps[128] =
 {
    1,  0,  0,  1,  2,  3,  4,  5,  4,  5,  8,  9,  8,  9,  10,  11,
   12, 13, 14, 15, 16, 17, 18, 19, 18, 19, 22, 23, 22, 23,  24,  25,
@@ -63,8 +63,6 @@ const uint8_t g_auc_renorm_table[32] =
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
 
-uint8_t g_next_state[128][2];
-
 cabac_data cabac;
 
 /**
@@ -86,29 +84,6 @@ void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
 }
 
 /**
- * \brief Initialize global g_next_state array.
- */
-void ctx_build_next_state_table()
-{
-  int i, j;
-
-  for (i = 0; i < 128; i++) {
-    for (j = 0; j < 2; j++) {
-      if ((i & 1) == j) {
-        g_next_state[i][j] = g_auc_next_state_mps[i];
-      } else {
-        g_next_state[i][j] = g_auc_next_state_lps[i];
-      }
-    }
-  }
-}
-
-INLINE void ctx_update(cabac_ctx *ctx, int val)
-{
-  ctx->uc_state = g_next_state[ctx->uc_state][val];
-}
-
-/**
  * \brief Initialize struct cabac_data.
  */
 void cabac_init(cabac_data* data)
@@ -116,7 +91,6 @@ void cabac_init(cabac_data* data)
   data->frac_bits = 0;
   data->bin_count_increment = 0;
   data->bins_coded = 0;
-  ctx_build_next_state_table();
 }
 
 /**
