@@ -18,15 +18,15 @@
 #include "cabac.h"
 
 void init_contexts(encoder_control *encoder, int8_t slice);
-int32_t context_calc_pattern_sig_ctx( const uint32_t* sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
+int32_t context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
 
-uint32_t context_get_sig_coeff_group( uint32_t* sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
+uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
 
 
 int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
                                 int32_t pos_y,int32_t block_type,int32_t width, int8_t texture_type);
 
-/* CONTEXTS */
+// CONTEXTS
 extern cabac_ctx g_split_flag_model[3];
 extern cabac_ctx g_intra_mode_model;
 extern cabac_ctx g_chroma_pred_model[2];
