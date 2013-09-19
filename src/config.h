@@ -29,9 +29,9 @@ typedef struct
 } config;
 
 /* Function definitions */
-config* config_alloc();
-int config_init(config* cfg);
-int config_destroy(config* cfg);
-int config_read(config* cfg,int argc, char* argv[]);
+config *config_alloc();
+int config_init(config *cfg);
+int config_destroy(config *cfg);
+int config_read(config *cfg,int argc, char *argv[]);
 
 #endif
