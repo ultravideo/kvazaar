@@ -19,6 +19,8 @@
 
 extern int32_t* g_quant_coeff[4][6][6];
 extern const int32_t g_quant_intra_default_8x8[64];
+extern const uint8_t g_chroma_scale[58];
+
 
 void quant(encoder_control* encoder, int16_t* p_src, int16_t* p_des, int32_t width,
            int32_t height, uint32_t *ac_sum, int8_t type, int8_t scan_idx );
