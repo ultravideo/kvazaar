@@ -22,7 +22,7 @@ extern const uint8_t g_auc_next_state_lps[ 128 ];
 extern uint8_t g_next_state[128][2];
 
 extern const uint8_t g_auc_lpst_table[64][4];
-extern const uint8_t g_aucRenormTable[32];
+extern const uint8_t g_auc_renorm_table[32];
 
 typedef struct
 {
@@ -44,16 +44,16 @@ void ctx_update(cabac_ctx* ctx, int val );
 
 typedef struct
 {
-  cabac_ctx  *ctx;
-  uint32_t   ui_low;
-  uint32_t   ui_range;
-  uint32_t   buffered_ryte;
+  cabac_ctx *ctx;
+  uint32_t   low;
+  uint32_t   range;
+  uint32_t   buffered_byte;
   int32_t    num_buffered_bytes;
   int32_t    bits_left;
-  uint32_t   ui_bins_coded;
+  uint32_t   bins_coded;
   int32_t    bin_count_increment;
   uint64_t   frac_bits;
-  bitstream* stream;
+  bitstream *stream;
 } cabac_data;
 
 extern cabac_data cabac;

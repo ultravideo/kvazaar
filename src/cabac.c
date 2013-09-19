@@ -57,7 +57,7 @@ const uint8_t g_auc_lpst_table[64][4] =
   {  6,   8,   9,  11},  {  6,   7,   9,  10},  {  6,   7,   8,   9},  {  2,   2,   2,   2}
 };
 
-const uint8_t g_aucRenormTable[32] = {  6, 5, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2,
+const uint8_t g_auc_renorm_table[32] = {  6, 5, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2,
                                         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
 
@@ -66,13 +66,13 @@ uint8_t g_next_state[128][2];
 cabac_data cabac;
 
 
-void ctx_init(cabac_ctx* ctx, uint32_t qp, uint32_t initValue )
+void ctx_init(cabac_ctx* ctx, uint32_t qp, uint32_t init_value )
 {
-  int  slope       = (initValue>>4)*5 - 45;
-  int  offset      = ((initValue&15)<<3)-16;
-  int  initState   =  MIN( MAX( 1, ( ( ( slope * (int)qp ) >> 4 ) + offset ) ), 126 );
-  uint8_t mpState  = (initState >= 64 )?1:0;
-  ctx->uc_state     = ( (mpState? (initState - 64):(63 - initState)) <<1) + mpState;
+  int  slope       = (init_value>>4)*5 - 45;
+  int  offset      = ((init_value&15)<<3)-16;
+  int  init_state   =  MIN( MAX( 1, ( ( ( slope * (int)qp ) >> 4 ) + offset ) ), 126 );
+  uint8_t mp_state  = (init_state >= 64 )?1:0;
+  ctx->uc_state     = ( (mp_state? (init_state - 64):(63 - init_state)) <<1) + mp_state;
   ctx->bins_coded   = 0;
 }
 
@@ -97,47 +97,47 @@ void cabac_init(cabac_data* data)
 {
   data->frac_bits = 0;
   data->bin_count_increment = 0;
-  data->ui_bins_coded = 0;
+  data->bins_coded = 0;
   ctx_build_next_state_table();
 }
 
 void cabac_start(cabac_data* data)
 {
-  data->ui_low            = 0;
-  data->ui_range          = 510;
+  data->low            = 0;
+  data->range          = 510;
   data->bits_left         = 23;
   data->num_buffered_bytes = 0;
-  data->buffered_ryte     = 0xff;
+  data->buffered_byte     = 0xff;
 }
 
-void cabac_encode_bin(cabac_data* data, uint32_t binValue )
+void cabac_encode_bin(cabac_data* data, uint32_t bin_value )
 {
-  uint32_t uiLPS;
+  uint32_t lps;
   //printf("\tdecodeBin m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
-  data->ui_bins_coded += data->bin_count_increment;
+  data->bins_coded += data->bin_count_increment;
   data->ctx->bins_coded = 1;
   
-  uiLPS   = g_auc_lpst_table[ CTX_STATE(data->ctx) ][ ( data->ui_range >> 6 ) & 3 ];
-  data->ui_range    -= uiLPS;
+  lps   = g_auc_lpst_table[ CTX_STATE(data->ctx) ][ ( data->range >> 6 ) & 3 ];
+  data->range    -= lps;
   #ifdef _DEBUG
   //printf("\tencodeBin m_uiRange %d uiLPS %d m_uiValue %d ", data->uiRange,uiLPS,data->uiLow);
   #endif
   
   //Not the Most Probable Symbol?
-  if( binValue != CTX_MPS(data->ctx) )
+  if( bin_value != CTX_MPS(data->ctx) )
   {
-    int numBits   = g_aucRenormTable[ uiLPS >> 3 ];
-    data->ui_low   = ( data->ui_low + data->ui_range ) << numBits;
-    data->ui_range = uiLPS << numBits;
+    int num_bits   = g_auc_renorm_table[ lps >> 3 ];
+    data->low   = ( data->low + data->range ) << num_bits;
+    data->range = lps << num_bits;
     
     ctx_update_LPS(data->ctx);
     
-    data->bits_left -= numBits;
+    data->bits_left -= num_bits;
   }
   else
   {
     ctx_update_MPS(data->ctx);
-    if (  data->ui_range >= 256 )
+    if (  data->range >= 256 )
     {
       #ifdef _DEBUG
       //printf("enduiValue %d \n",data->uiLow);
@@ -145,8 +145,8 @@ void cabac_encode_bin(cabac_data* data, uint32_t binValue )
       return;
     }
     
-    data->ui_low <<= 1;
-    data->ui_range <<= 1;
+    data->low <<= 1;
+    data->range <<= 1;
     data->bits_left--;
   }
   
@@ -161,11 +161,11 @@ void cabac_encode_bin(cabac_data* data, uint32_t binValue )
 
 void cabac_write(cabac_data* data)
 {
-  uint32_t leadByte = data->ui_low >> (24 - data->bits_left);
+  uint32_t lead_byte = data->low >> (24 - data->bits_left);
   data->bits_left += 8;
-  data->ui_low &= 0xffffffffu >> data->bits_left;
+  data->low &= 0xffffffffu >> data->bits_left;
   
-  if ( leadByte == 0xff )
+  if ( lead_byte == 0xff )
   {
     data->num_buffered_bytes++;
   }
@@ -173,9 +173,9 @@ void cabac_write(cabac_data* data)
   {
     if ( data->num_buffered_bytes > 0 )
     {
-      uint32_t carry = leadByte >> 8;
-      uint32_t byte = data->buffered_ryte + carry;
-      data->buffered_ryte = leadByte & 0xff;
+      uint32_t carry = lead_byte >> 8;
+      uint32_t byte = data->buffered_byte + carry;
+      data->buffered_byte = lead_byte & 0xff;
       bitstream_put(data->stream,byte,8);
 
       byte = ( 0xff + carry ) & 0xff;
@@ -188,28 +188,28 @@ void cabac_write(cabac_data* data)
     else
     {
       data->num_buffered_bytes = 1;
-      data->buffered_ryte = leadByte;
+      data->buffered_byte = lead_byte;
     }
   }
 }
 
 void cabac_finish(cabac_data* data)
 {
-  if ( data->ui_low >> ( 32 - data->bits_left ) )
+  if ( data->low >> ( 32 - data->bits_left ) )
   {
-    bitstream_put(data->stream,data->buffered_ryte + 1, 8 );
+    bitstream_put(data->stream,data->buffered_byte + 1, 8 );
     while ( data->num_buffered_bytes > 1 )
     {
       bitstream_put(data->stream,0, 8 );
       data->num_buffered_bytes--;
     }
-    data->ui_low -= 1 << ( 32 - data->bits_left );
+    data->low -= 1 << ( 32 - data->bits_left );
   }
   else
   {
     if ( data->num_buffered_bytes > 0 )
     {
-      bitstream_put(data->stream,data->buffered_ryte, 8 );
+      bitstream_put(data->stream,data->buffered_byte, 8 );
     }
     while ( data->num_buffered_bytes > 1 )
     {
@@ -217,35 +217,35 @@ void cabac_finish(cabac_data* data)
       data->num_buffered_bytes--;
     }
   }
-  bitstream_put(data->stream, data->ui_low >> 8, 24 - data->bits_left );
+  bitstream_put(data->stream, data->low >> 8, 24 - data->bits_left );
 }
 
 /*!
   \brief Encode terminating bin
   \param binValue bin value
 */
-void cabac_encode_bin_trm(cabac_data* data, uint8_t binValue )
+void cabac_encode_bin_trm(cabac_data* data, uint8_t bin_value )
 {
   #ifdef _DEBUG
   //printf("\tencodeBinTrm m_uiRange %d uivalue %d\n", data->uiRange, data->uiLow);
   #endif
-  data->ui_bins_coded += data->bin_count_increment;
-  data->ui_range -= 2;
-  if( binValue )
+  data->bins_coded += data->bin_count_increment;
+  data->range -= 2;
+  if( bin_value )
   {
-    data->ui_low  += data->ui_range;
-    data->ui_low <<= 7;
-    data->ui_range = 2 << 7;
+    data->low  += data->range;
+    data->low <<= 7;
+    data->range = 2 << 7;
     data->bits_left -= 7;
   }
-  else if ( data->ui_range >= 256 )
+  else if ( data->range >= 256 )
   {
     return;
   }
   else
   {
-    data->ui_low   <<= 1;
-    data->ui_range <<= 1;
+    data->low   <<= 1;
+    data->range <<= 1;
     data->bits_left--;
   }
   
@@ -264,13 +264,13 @@ void cabac_flush(cabac_data* data)
   cabac_start(data);
 }
 
-void cabac_encode_bin_ep(cabac_data* data, uint32_t binValue )
+void cabac_encode_bin_ep(cabac_data* data, uint32_t bin_value )
 {
-  data->ui_bins_coded += data->bin_count_increment;
-  data->ui_low <<= 1;
-  if( binValue )
+  data->bins_coded += data->bin_count_increment;
+  data->low <<= 1;
+  if( bin_value )
   {
-    data->ui_low += data->ui_range;
+    data->low += data->range;
   }
   data->bits_left--;
 
@@ -280,18 +280,18 @@ void cabac_encode_bin_ep(cabac_data* data, uint32_t binValue )
   }
 }
 
-void cabac_encode_bins_ep(cabac_data* data, uint32_t binValues, int numBins )
+void cabac_encode_bins_ep(cabac_data* data, uint32_t bin_values, int num_bins )
 {
   uint32_t pattern;
-  data->ui_bins_coded += numBins & -data->bin_count_increment;
+  data->bins_coded += num_bins & -data->bin_count_increment;
 
-  while ( numBins > 8 )
+  while ( num_bins > 8 )
   {
-    numBins -= 8;
-    pattern = binValues >> numBins;
-    data->ui_low <<= 8;
-    data->ui_low += data->ui_range * pattern;
-    binValues -= pattern << numBins;
+    num_bins -= 8;
+    pattern = bin_values >> num_bins;
+    data->low <<= 8;
+    data->low += data->range * pattern;
+    bin_values -= pattern << num_bins;
     data->bits_left -= 8;
     
     if(data->bits_left < 12)
@@ -300,9 +300,9 @@ void cabac_encode_bins_ep(cabac_data* data, uint32_t binValues, int numBins )
     }
   }
   
-  data->ui_low <<= numBins;
-  data->ui_low += data->ui_range * binValues;
-  data->bits_left -= numBins;
+  data->low <<= num_bins;
+  data->low += data->range * bin_values;
+  data->bits_left -= num_bins;
   
   if(data->bits_left < 12)
   {
@@ -318,73 +318,73 @@ void cabac_encode_bins_ep(cabac_data* data, uint32_t binValues, int numBins )
   \param ruiGoRiceParam reference to Rice parameter
   \returns Void
 */
-void cabac_write_coeff_remain(cabac_data* cabac,uint32_t symbol, uint32_t rParam )
+void cabac_write_coeff_remain(cabac_data* cabac, uint32_t symbol, uint32_t r_param )
 {
-  int32_t codeNumber = symbol;
+  int32_t code_number = symbol;
   uint32_t length;
-  if (codeNumber < (3 << rParam))
+  if (code_number < (3 << r_param))
   {
-    length = codeNumber>>rParam;
+    length = code_number>>r_param;
     cabac_encode_bins_ep(cabac, (1<<(length+1))-2 , length+1);
-    cabac_encode_bins_ep(cabac,(codeNumber%(1<<rParam)),rParam);
+    cabac_encode_bins_ep(cabac,(code_number%(1<<r_param)),r_param);
   }
   else
   {
-    length = rParam;
-    codeNumber  = codeNumber - ( 3 << rParam);
-    while (codeNumber >= (1<<length))
+    length = r_param;
+    code_number  = code_number - ( 3 << r_param);
+    while (code_number >= (1<<length))
     {
-      codeNumber -=  (1<<(length++));    
+      code_number -=  (1<<(length++));    
     }
-    cabac_encode_bins_ep(cabac,(1<<(3+length+1-rParam))-2,3+length+1-rParam);
-    cabac_encode_bins_ep(cabac,codeNumber,length);
+    cabac_encode_bins_ep(cabac,(1<<(3+length+1-r_param))-2,3+length+1-r_param);
+    cabac_encode_bins_ep(cabac,code_number,length);
   }
 }
 
-void cabac_write_unary_max_symbol(cabac_data* data,cabac_ctx* ctx, uint32_t uiSymbol,int32_t iOffset, uint32_t uiMaxSymbol)
+void cabac_write_unary_max_symbol(cabac_data* data,cabac_ctx* ctx, uint32_t symbol,int32_t offset, uint32_t max_symbol)
 {
-  int8_t bCodeLast = ( uiMaxSymbol > uiSymbol );
+  int8_t code_last = ( max_symbol > symbol );
 
-  if (!uiMaxSymbol)  
+  if (!max_symbol)  
     return;
   
   data->ctx = &ctx[0];
-  cabac_encode_bin(data, uiSymbol ? 1 : 0);
+  cabac_encode_bin(data, symbol ? 1 : 0);
   
-  if (!uiSymbol)
+  if (!symbol)
     return;
   
-  while( --uiSymbol )
+  while( --symbol )
   {
-    data->ctx = &ctx[iOffset];
+    data->ctx = &ctx[offset];
     cabac_encode_bin(data, 1);
   }
-  if( bCodeLast )
+  if( code_last )
   {
-    data->ctx = &ctx[iOffset];
+    data->ctx = &ctx[offset];
     cabac_encode_bin(data, 0);
   }
   
   return;
 }
 
-void cabac_write_ep_ex_golomb(cabac_data* data, uint32_t uiSymbol, uint32_t uiCount )
+void cabac_write_ep_ex_golomb(cabac_data* data, uint32_t symbol, uint32_t count )
 {
   uint32_t bins = 0;
-  int32_t numBins = 0;
+  int32_t num_bins = 0;
   
-  while( uiSymbol >= (uint32_t)(1<<uiCount) )
+  while( symbol >= (uint32_t)(1<<count) )
   {
     bins = 2 * bins + 1;
-    numBins++;
-    uiSymbol -= 1 << uiCount;
-    uiCount  ++;
+    num_bins++;
+    symbol -= 1 << count;
+    count  ++;
   }
   bins = 2 * bins + 0;
-  numBins++;
+  num_bins++;
   
-  bins = (bins << uiCount) | uiSymbol;
-  numBins += uiCount;
+  bins = (bins << count) | symbol;
+  num_bins += count;
   
-  cabac_encode_bins_ep(data, bins, numBins);
+  cabac_encode_bins_ep(data, bins, num_bins);
 }
