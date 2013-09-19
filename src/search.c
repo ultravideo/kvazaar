@@ -215,7 +215,7 @@ void search_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t d
 
     cur_CU->type = CU_INTER;
     cur_CU->inter.mv_dir = 1;
-    inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
+    inter_set_block(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
   }
 
   /* INTRA SEARCH */
@@ -284,7 +284,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
     {
       /* Set split to 0 and mode to inter.mode */
       picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
-      inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
+      inter_set_block(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
       bestCost = bestInterCost;
     }
     /* Else, dont split and recursively set block mode */
@@ -300,7 +300,7 @@ uint32_t search_best_mode(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, 
   {
     /* Set split to 0 and mode to inter.mode */
     picture_setBlockSplit(encoder->in.cur_pic,xCtb,yCtb,depth,0);
-    inter_setBlockMode(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
+    inter_set_block(encoder->in.cur_pic,xCtb,yCtb,depth,cur_CU);
     bestCost = bestInterCost;
   }
   else
