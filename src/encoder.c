@@ -448,7 +448,7 @@ void read_one_frame(FILE* file, encoder_control* encoder)
  */
 static void add_checksum(encoder_control* encoder)
 {
-  unsigned char checksum[3][16];
+  unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
   unsigned int i;
 

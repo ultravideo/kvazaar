@@ -19,8 +19,11 @@
 #include "picture.h"
 
 
-/*!
- * \brief NAL unit type codes
+//////////////////////////////////////////////////////////////////////////
+// TYPES
+
+/**
+ * \brief NAL unit type codes.
  * 
  * These are the nal_unit_type codes from Table 7-1 ITU-T H.265 v1.0.
  * The type codes have been prefixed with "NAL_".
@@ -73,7 +76,15 @@ enum {
   // Unspecified UNSPEC 48-63
 };
 
-void nal_write(FILE* output, uint8_t* buffer, uint32_t buffer_len, uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id);
-void picture_checksum(const picture* pic, unsigned char checksum_out[][16]);
+#define SEI_HASH_MAX_LENGTH 4
+
+//////////////////////////////////////////////////////////////////////////
+// FUNCTIONS
+void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
+               uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id);
+void picture_checksum(const picture *pic,
+                      unsigned char checksum_out[][SEI_HASH_MAX_LENGTH]);
+
+
 
 #endif
