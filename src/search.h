@@ -1,3 +1,5 @@
+#ifndef SEARCH_H_
+#define SEARCH_H_
 /**
  * \file
  * \brief Searching of parameters for intra and inter frames.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __SEARCH_H
-#define __SEARCH_H
 
 #include "global.h"
 

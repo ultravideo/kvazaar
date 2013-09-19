@@ -1,3 +1,5 @@
+#ifndef DEBUG_H_
+#define DEBUG_H_
 /**
  * \file
  * \brief Tools for visualizing and debugging the encoder.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __DEBUG_H
-#define __DEBUG_H
 
 #include "global.h"
 

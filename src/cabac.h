@@ -1,3 +1,5 @@
+#ifndef CABAC_H_
+#define CABAC_H_
 /**
  * \file
  * \brief The Content Adaptive Binary Arithmetic Coder (CABAC).
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __CABAC_H
-#define __CABAC_H
 
 #include "global.h"
 

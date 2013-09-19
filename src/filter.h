@@ -1,3 +1,5 @@
+#ifndef FILTER_H_
+#define FILTER_H_
 /**
  * \file
  * \brief Filtering, such as deblocking.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __FILTER_H
-#define __FILTER_H
 
 #include "global.h"
 

@@ -1,3 +1,5 @@
+#ifndef TRANSFORM_H_
+#define TRANSFORM_H_
 /**
  * \file
  * \brief Transformations, such as quantization and DST.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __TRANSFORM_H
-#define __TRANSFORM_H
 
 #include "global.h"
 

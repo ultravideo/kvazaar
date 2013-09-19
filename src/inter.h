@@ -1,3 +1,5 @@
+#ifndef INTER_H_
+#define INTER_H_
 /**
  * \file
  * \brief Handling Coding Units (CU's) for inter frames.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __INTER_H
-#define __INTER_H
 
 #include "global.h"
 

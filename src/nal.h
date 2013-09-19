@@ -1,3 +1,5 @@
+#ifndef NAL_H_
+#define NAL_H_
 /**
  * \file
  * \brief Network Abstraction Layer (NAL) messages.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __NAL_H
-#define __NAL_H
 
 #include "global.h"
 

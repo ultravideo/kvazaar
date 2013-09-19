@@ -1,3 +1,5 @@
+#ifndef PICTURE_H_
+#define PICTURE_H_
 /**
  * \file
  * \brief Coding Unit (CU) and picture data related functions.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef _PICTURE_H_
-#define _PICTURE_H_
 
 #include "global.h"
 

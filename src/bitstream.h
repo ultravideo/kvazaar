@@ -1,3 +1,5 @@
+#ifndef BITSTREAM_H_
+#define BITSTREAM_H_
 /**
  * \file
  * \brief Bitstream can be written to one or several bits at a time.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef _BITSTREAM_H
-#define _BITSTREAM_H
  
 #include "global.h"
 

@@ -1,3 +1,5 @@
+#ifndef GLOBAL_H_
+#define GLOBAL_H_
 /**
  * \file
  * \brief Header that is included in every other header.
@@ -14,8 +16,12 @@
  * so that any file can refer to integer types with exact widths.
  */
 
-#ifndef __GLOBAL_H
-#define __GLOBAL_H
+#ifdef _MSC_VER
+  #include "../include/stdint.h"
+#else
+  #include <stdint.h>
+#endif
+
 
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
@@ -44,13 +50,6 @@
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
 #define MRG_MAX_NUM_CANDS 5
-
-//Including stdint.h, 
-#ifdef _MSC_VER
-  #include "../include/stdint.h"
-#else
-  #include <stdint.h>
-#endif
 
 /* Some tools */
 #define MAX(a,b) (((a)>(b))?(a):(b))

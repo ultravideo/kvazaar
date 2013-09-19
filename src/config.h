@@ -1,3 +1,5 @@
+#ifndef CONFIG_H_
+#define CONFIG_H_
 /**
  * \file
  * \brief Handles parsing and storing of configuration of the encoder.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
 
 #include "global.h"
 

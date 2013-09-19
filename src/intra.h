@@ -1,3 +1,5 @@
+#ifndef INTRA_H_
+#define INTRA_H_
 /**
  * \file
  * \brief Handling Coding Units (CU's) for intra frames.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __INTRA_H
-#define __INTRA_H
 
 #include "global.h"
 

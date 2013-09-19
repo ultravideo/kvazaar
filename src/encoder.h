@@ -1,3 +1,5 @@
+#ifndef ENCODER_H_
+#define ENCODER_H_
 /**
  * \file
  * \brief The highest level of the encoder.
@@ -9,9 +11,6 @@
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */
-
-#ifndef __ENCODER_H
-#define __ENCODER_H
 
 #include "global.h"
 
