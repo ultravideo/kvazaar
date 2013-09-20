@@ -1095,7 +1095,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
                     inter_recon(encoder->ref->pics[0],xCtb*CU_MIN_SIZE_PIXELS,yCtb*CU_MIN_SIZE_PIXELS,LCU_WIDTH>>depth,cur_CU->inter.mv,encoder->in.cur_pic);
 
                     /* Mark this block as "coded" (can be used for predictions..) */
-                    picture_setBlockCoded(encoder->in.cur_pic,xCtb, yCtb, depth, 1);
+                    picture_set_block_coded(encoder->in.cur_pic,xCtb, yCtb, depth, 1);
                 }
                 /* Signal which candidate MV to use */
                 cabac_write_unary_max_symbol(&cabac,g_mvp_idx_model, cur_CU->inter.mv_ref,1,AMVP_MAX_NUM_CANDS-1);
@@ -1456,7 +1456,7 @@ void encode_transform_tree(encoder_control* encoder,transform_info* ti,uint8_t d
     intra_recon(recShiftU,(LCU_WIDTH>>(depth+1))*2+8,ti->x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)),ti->y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)),width>>1,predV,pred_stride>>1,ti->intra_pred_mode_chroma!=36?ti->intra_pred_mode_chroma:ti->intra_pred_mode,1);
     
     /* This affects reconstruction, do after that */ 
-    picture_setBlockCoded(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb, depth, 1);
+    picture_set_block_coded(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb, depth, 1);
 
     /* INTRA PREDICTION ENDS HERE */
 
