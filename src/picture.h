@@ -33,7 +33,7 @@ typedef struct
 {
   int8_t mode;
   uint32_t cost;
-} CU_info_intra;
+} cu_info_intra;
 
 /**
  * \brief Struct for CU inter info
@@ -45,7 +45,7 @@ typedef struct
   int16_t mv[2];
   uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
   uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
-} CU_info_inter;
+} cu_info_inter;
 
 /**
  * \brief Struct for CU info
@@ -55,10 +55,10 @@ typedef struct
   int8_t type;
   int8_t depth;
   int8_t coded;
-  CU_info_intra intra;
-  CU_info_inter inter;
+  cu_info_intra intra;
+  cu_info_inter inter;
   int8_t split;
-} CU_info;
+} cu_info;
 
 /**
  * \brief Struct which contains all picture data
@@ -78,7 +78,7 @@ typedef struct
   int32_t height_in_lcu;  // \brief Picture width in number of LCU's.
   int32_t width_in_lcu;   // \brief Picture height in number of LCU's.
   uint8_t referenced;     // \brief Whether this picture is referenced.
-  CU_info** cu_array;           // \brief Info for each CU at each depth.
+  cu_info** cu_array;           // \brief Info for each CU at each depth.
   uint8_t type;
   uint8_t slicetype;
 } picture;

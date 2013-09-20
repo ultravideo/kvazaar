@@ -234,14 +234,14 @@ picture *picture_init(int32_t width, int32_t height,
 
   // Allocate memory for CU info 2D array
   // TODO: we don't need this much space on LCU...MAX_DEPTH-1
-  pic->cu_array = (CU_info**)malloc(sizeof(CU_info*) * (MAX_DEPTH + 1));
+  pic->cu_array = (cu_info**)malloc(sizeof(cu_info*) * (MAX_DEPTH + 1));
   for (i = 0; i <= MAX_DEPTH; ++i) {
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
     unsigned height_in_scu = height_in_lcu << MAX_DEPTH;
     unsigned width_in_scu = width_in_lcu << MAX_DEPTH;
     unsigned cu_array_size = height_in_scu * width_in_scu;
-    pic->cu_array[i] = (CU_info*)malloc(sizeof(CU_info) * cu_array_size);
-    memset(pic->cu_array[i], 0, sizeof(CU_info) * cu_array_size);
+    pic->cu_array[i] = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
+    memset(pic->cu_array[i], 0, sizeof(cu_info) * cu_array_size);
   }
 
   return pic;

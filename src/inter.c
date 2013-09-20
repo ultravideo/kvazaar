@@ -27,7 +27,7 @@
  * \param cur_cu CU to take the settings from
  * \returns Void
 */
-void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, CU_info* cur_cu)
+void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info* cur_cu)
 {
   uint32_t x,y,d;
   // Width in smallest CU
@@ -186,7 +186,7 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
   |A1|_________|
   |A0|
   */
-  CU_info *b0, *b1, *b2, *a0, *a1;
+  cu_info *b0, *b1, *b2, *a0, *a1;
 
   b0 = b1 = b2 = a0 = a1 = NULL;
 

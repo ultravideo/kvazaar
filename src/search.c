@@ -38,7 +38,7 @@
  * \param cur_cu
  */
 void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
-                          CU_info *cur_cu, unsigned step, 
+                          cu_info *cur_cu, unsigned step, 
                           int orig_x, int orig_y, int x, int y, unsigned depth)
 {
   // TODO: Inter: Handle non-square blocks.
@@ -163,7 +163,7 @@ void search_tree(encoder_control *encoder,
   uint8_t border_split_x = ((encoder->in.width) < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; // are we in any border CU
-  CU_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   cur_cu->intra.cost = 0xffffffff;
   cur_cu->inter.cost = 0xffffffff;
@@ -258,7 +258,7 @@ void search_tree(encoder_control *encoder,
 uint32_t search_best_mode(encoder_control *encoder, 
                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  CU_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb
+  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb
       + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint32_t best_intra_cost = cur_cu->intra.cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;

@@ -821,7 +821,7 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 { 
-  CU_info *cur_CU = &encoder->in.cur_pic->cu_array[depth][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
+  cu_info *cur_CU = &encoder->in.cur_pic->cu_array[depth][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
   uint8_t split_flag = cur_CU->split;
   uint8_t split_model = 0;
 
