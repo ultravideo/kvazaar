@@ -125,7 +125,6 @@ int main(int argc, char *argv[])
   // Initialization
   init_tables();
   init_exp_golomb(4096*8); //Allocate and init exp golomb table
-  cabac_init(&cabac);
   scalinglist_init();
   init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream))); 
   encoder->ref = picture_list_init(MAX_REF_PIC_COUNT);

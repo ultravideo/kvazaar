@@ -27,9 +27,6 @@ typedef struct
   uint32_t   buffered_byte;
   int32_t    num_buffered_bytes;
   int32_t    bits_left;
-  uint32_t   bins_coded;
-  int32_t    bin_count_increment;
-  uint64_t   frac_bits;
   bitstream *stream;
 } cabac_data;
 
@@ -44,7 +41,6 @@ extern cabac_data cabac;
 
 // Functions
 void cabac_start(cabac_data *data);
-void cabac_init(cabac_data *data);
 void cabac_encode_bin(cabac_data *data, uint32_t bin_value);
 void cabac_encode_bin_ep(cabac_data *data, uint32_t bin_value);
 void cabac_encode_bins_ep(cabac_data *data, uint32_t bin_values, int num_bins);

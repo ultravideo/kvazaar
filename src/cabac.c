@@ -69,16 +69,6 @@ cabac_data cabac;
 /**
  * \brief Initialize struct cabac_data.
  */
-void cabac_init(cabac_data* data)
-{
-  data->frac_bits = 0;
-  data->bin_count_increment = 0;
-  data->bins_coded = 0;
-}
-
-/**
- * \brief Initialize struct cabac_data.
- */
 void cabac_start(cabac_data *data)
 {
   data->low = 0;
@@ -95,7 +85,6 @@ void cabac_encode_bin(cabac_data *data, uint32_t bin_value)
 {
   uint32_t lps;
   
-  data->bins_coded += data->bin_count_increment;
   data->ctx->bins_coded = 1;
   
   lps = g_auc_lpst_table[CTX_STATE(data->ctx)][(data->range >> 6) & 3];
@@ -184,7 +173,6 @@ void cabac_finish(cabac_data *data)
 */
 void cabac_encode_bin_trm(cabac_data *data, uint8_t bin_value)
 {
-  data->bins_coded += data->bin_count_increment;
   data->range -= 2;
   if(bin_value) {
     data->low += data->range;
@@ -221,7 +209,6 @@ void cabac_flush(cabac_data *data)
  */
 void cabac_encode_bin_ep(cabac_data *data, uint32_t bin_value)
 {
-  data->bins_coded += data->bin_count_increment;
   data->low <<= 1;
   if (bin_value) {
     data->low += data->range;
@@ -239,7 +226,6 @@ void cabac_encode_bin_ep(cabac_data *data, uint32_t bin_value)
 void cabac_encode_bins_ep(cabac_data *data, uint32_t bin_values, int num_bins)
 {
   uint32_t pattern;
-  data->bins_coded += num_bins & -data->bin_count_increment;
 
   while (num_bins > 8) {
     num_bins -= 8;
