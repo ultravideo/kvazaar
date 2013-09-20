@@ -79,230 +79,230 @@ void picture_setBlockCoded(picture* pic,uint32_t xCtb, uint32_t yCtb, uint8_t de
 
 
 /*!
-    \brief Allocate memory for picture_list
-    \param size initial array size
-    \return picture_list pointer, NULL on failure
+  \brief Allocate memory for picture_list
+  \param size initial array size
+  \return picture_list pointer, NULL on failure
 */
-  picture_list *picture_list_init(int size)
+picture_list *picture_list_init(int size)
+{
+  picture_list *list = (picture_list *)malloc(sizeof(picture_list));
+  list->size = size;
+  if(size > 0)
   {
-    picture_list *list = (picture_list *)malloc(sizeof(picture_list));
-    list->size = size;
-    if(size > 0)
-    {
-      list->pics = (picture**)malloc(sizeof(picture*)*size);
-    }
-
-    list->used_size = 0;
-
-    return list;
-  }
-
-  /*!
-    \brief Resize picture_list array
-    \param list picture_list pointer
-    \param size new array size
-    \return 1 on success, 0 on failure
-  */
-  int picture_list_resize(picture_list *list, int size)
-  {
-    unsigned int i;
-    picture** old_pics = NULL;
-
-    //No need to do anything when resizing to same size
-    if(size == list->size)
-    {
-      return 1;
-    }
-
-    //Save the old list
-    if(list->used_size > 0)
-    {
-      old_pics = list->pics;
-    }
-
-    //allocate space for the new list
     list->pics = (picture**)malloc(sizeof(picture*)*size);
+  }
 
-    //Copy everything from the old list to the new if needed.
-    if(old_pics != NULL)
-    {
-      for(i = 0; i < list->used_size; i++)
-      {
-        list->pics[i] = old_pics[i];
-      }
+  list->used_size = 0;
 
-      free(old_pics);
-    }
+  return list;
+}
 
+/*!
+  \brief Resize picture_list array
+  \param list picture_list pointer
+  \param size new array size
+  \return 1 on success, 0 on failure
+*/
+int picture_list_resize(picture_list *list, int size)
+{
+  unsigned int i;
+  picture** old_pics = NULL;
+
+  //No need to do anything when resizing to same size
+  if(size == list->size)
+  {
     return 1;
   }
 
-  /*!
-    \brief Free memory allocated to the picture_list
-    \param list picture_list pointer
-    \return 1 on success, 0 on failure
-  */
-  int picture_list_destroy(picture_list *list)
+  //Save the old list
+  if(list->used_size > 0)
   {
-    unsigned int i;
-    if(list->used_size > 0)
+    old_pics = list->pics;
+  }
+
+  //allocate space for the new list
+  list->pics = (picture**)malloc(sizeof(picture*)*size);
+
+  //Copy everything from the old list to the new if needed.
+  if(old_pics != NULL)
+  {
+    for(i = 0; i < list->used_size; i++)
     {
-      for(i = 0; i < list->used_size; i++)
-      {
-        picture_destroy(list->pics[i]);
-      }
+      list->pics[i] = old_pics[i];
     }
+
+    free(old_pics);
+  }
+
+  return 1;
+}
+
+/*!
+  \brief Free memory allocated to the picture_list
+  \param list picture_list pointer
+  \return 1 on success, 0 on failure
+*/
+int picture_list_destroy(picture_list *list)
+{
+  unsigned int i;
+  if(list->used_size > 0)
+  {
+    for(i = 0; i < list->used_size; i++)
+    {
+      picture_destroy(list->pics[i]);
+    }
+  }
     
-    if(list->size > 0)
-    {
-      free(list->pics);
-    }
-    free(list);
-    return 1;
-  }
-
-  /*!
-    \brief Add picture to picturelist
-    \param pic picture pointer to add
-    \param picture_list list to use
-    \return 1 on success
-  */
-  int picture_list_add(picture_list *list,picture* pic)
+  if(list->size > 0)
   {
-    if(list->size == list->used_size)
-    {
-      if(!picture_list_resize(list, list->size*2))
-      {
-        return 0;
-      }
-    }
-
-    list->pics[list->used_size] = pic;
-    list->used_size++;
-    return 1;
+    free(list->pics);
   }
+  free(list);
+  return 1;
+}
 
-  /*!
-    \brief Add picture to picturelist
-    \param pic picture pointer to add
-    \param picture_list list to use
-    \return 1 on success
-  */
-  int picture_list_rem(picture_list *list,int n, int8_t destroy)
+/*!
+  \brief Add picture to picturelist
+  \param pic picture pointer to add
+  \param picture_list list to use
+  \return 1 on success
+*/
+int picture_list_add(picture_list *list,picture* pic)
+{
+  if(list->size == list->used_size)
   {
-    int i;
-    //Must be within list boundaries
-    if((unsigned int)n >= list->used_size)
+    if(!picture_list_resize(list, list->size*2))
     {
       return 0;
     }
-
-    if(destroy)
-    {
-      picture_destroy(list->pics[n]);
-      free(list->pics[n]);
-    }
-
-    //The last item is easy to remove
-    if(n == list->used_size-1)
-    {
-      list->pics[n] = NULL;
-      list->used_size--;
-    }
-    else
-    {
-      //Shift all following pics one backward in the list
-      for(i = n; (unsigned int)n < list->used_size-1; n++)
-      {
-        list->pics[n] = list->pics[n+1];
-      }
-      list->pics[list->used_size-1] = NULL;
-      list->used_size--;
-    }
-
-    return 1;
   }
+
+  list->pics[list->used_size] = pic;
+  list->used_size++;
+  return 1;
+}
+
+/*!
+  \brief Add picture to picturelist
+  \param pic picture pointer to add
+  \param picture_list list to use
+  \return 1 on success
+*/
+int picture_list_rem(picture_list *list,int n, int8_t destroy)
+{
+  int i;
+  //Must be within list boundaries
+  if((unsigned int)n >= list->used_size)
+  {
+    return 0;
+  }
+
+  if(destroy)
+  {
+    picture_destroy(list->pics[n]);
+    free(list->pics[n]);
+  }
+
+  //The last item is easy to remove
+  if(n == list->used_size-1)
+  {
+    list->pics[n] = NULL;
+    list->used_size--;
+  }
+  else
+  {
+    //Shift all following pics one backward in the list
+    for(i = n; (unsigned int)n < list->used_size-1; n++)
+    {
+      list->pics[n] = list->pics[n+1];
+    }
+    list->pics[list->used_size-1] = NULL;
+    list->used_size--;
+  }
+
+  return 1;
+}
   
-  /*!
-    \brief Allocate new picture
-    \param pic picture pointer
-    \return picture pointer
-  */
-  picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU)
+/*!
+  \brief Allocate new picture
+  \param pic picture pointer
+  \return picture pointer
+*/
+picture *picture_init(int32_t width, int32_t height, int32_t width_in_LCU, int32_t height_in_LCU)
+{
+  picture *pic = (picture *)malloc(sizeof(picture));    
+  unsigned int luma_size = width * height;
+  unsigned int chroma_size = luma_size / 4;
+  int i = 0;
+
+  if(!pic)
   {
-    picture *pic = (picture *)malloc(sizeof(picture));    
-    unsigned int luma_size = width * height;
-    unsigned int chroma_size = luma_size / 4;
-    int i = 0;
-
-    if(!pic)
-    {
-      return 0;
-    }
-
-    memset(pic, 0, sizeof(picture));
-
-    pic->width  = width;
-    pic->height = height;
-    pic->width_in_lcu  = width_in_LCU;
-    pic->height_in_lcu = height_in_LCU;
-    pic->referenced = 0;
-    /* Allocate buffers */
-    pic->y_data = (uint8_t *)malloc(luma_size);
-    pic->u_data = (uint8_t *)malloc(chroma_size);
-    pic->v_data = (uint8_t *)malloc(chroma_size);
-
-    /* Reconstruction buffers */
-    pic->y_recdata = (uint8_t *)malloc(luma_size);
-    pic->u_recdata = (uint8_t *)malloc(chroma_size);
-    pic->v_recdata = (uint8_t *)malloc(chroma_size);
-
-    memset(pic->u_recdata, 128, (chroma_size));
-    memset(pic->v_recdata, 128, (chroma_size));
-
-    /* Allocate memory for CU info 2D array */
-    //TODO: we don't need this much space on LCU...MAX_DEPTH-1
-    pic->CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
-    for(i=0; i<MAX_DEPTH+1; i++)
-    {
-      /* Allocate height_in_SCU x width_in_SCU x sizeof(CU_info) */
-      pic->CU[i] = (CU_info*)malloc((height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
-      memset(pic->CU[i], 0, (height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
-    }
-
-    return pic;
+    return 0;
   }
 
-  /*!
-    \brief Free memory allocated to picture
-    \param pic picture pointer
-    \return 1 on success, 0 on failure
-  */
-  int picture_destroy(picture *pic)
+  memset(pic, 0, sizeof(picture));
+
+  pic->width  = width;
+  pic->height = height;
+  pic->width_in_lcu  = width_in_LCU;
+  pic->height_in_lcu = height_in_LCU;
+  pic->referenced = 0;
+  /* Allocate buffers */
+  pic->y_data = (uint8_t *)malloc(luma_size);
+  pic->u_data = (uint8_t *)malloc(chroma_size);
+  pic->v_data = (uint8_t *)malloc(chroma_size);
+
+  /* Reconstruction buffers */
+  pic->y_recdata = (uint8_t *)malloc(luma_size);
+  pic->u_recdata = (uint8_t *)malloc(chroma_size);
+  pic->v_recdata = (uint8_t *)malloc(chroma_size);
+
+  memset(pic->u_recdata, 128, (chroma_size));
+  memset(pic->v_recdata, 128, (chroma_size));
+
+  /* Allocate memory for CU info 2D array */
+  //TODO: we don't need this much space on LCU...MAX_DEPTH-1
+  pic->CU = (CU_info**)malloc((MAX_DEPTH+1)*sizeof(CU_info*));
+  for(i=0; i<MAX_DEPTH+1; i++)
   {
-    int i;
+    /* Allocate height_in_SCU x width_in_SCU x sizeof(CU_info) */
+    pic->CU[i] = (CU_info*)malloc((height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+    memset(pic->CU[i], 0, (height_in_LCU<<MAX_DEPTH)*(width_in_LCU<<MAX_DEPTH)*sizeof(CU_info));
+  }
+
+  return pic;
+}
+
+/*!
+  \brief Free memory allocated to picture
+  \param pic picture pointer
+  \return 1 on success, 0 on failure
+*/
+int picture_destroy(picture *pic)
+{
+  int i;
         
-    free(pic->u_data);
-    free(pic->v_data);
-    free(pic->y_data);
-    pic->y_data = pic->u_data = pic->v_data = NULL;
+  free(pic->u_data);
+  free(pic->v_data);
+  free(pic->y_data);
+  pic->y_data = pic->u_data = pic->v_data = NULL;
 
-    free(pic->y_recdata);
-    free(pic->u_recdata);
-    free(pic->v_recdata);
-    pic->y_recdata = pic->u_recdata = pic->v_recdata = NULL;
+  free(pic->y_recdata);
+  free(pic->u_recdata);
+  free(pic->v_recdata);
+  pic->y_recdata = pic->u_recdata = pic->v_recdata = NULL;
 
-    for(i=0; i<MAX_DEPTH+1; i++)
-    {
-      free(pic->CU[i]);
-      pic->CU[i] = NULL;
-    }
-
-    free(pic->CU);
-    pic->CU = NULL;
-
-    return 1;
+  for(i=0; i<MAX_DEPTH+1; i++)
+  {
+    free(pic->CU[i]);
+    pic->CU[i] = NULL;
   }
+
+  free(pic->CU);
+  pic->CU = NULL;
+
+  return 1;
+}
 
 
   /** @} */ // end of group1
