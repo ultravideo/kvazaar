@@ -274,7 +274,7 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
  */
 void filter_deblock_cu(encoder_control *encoder, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
-  CU_info *cur_cu = &encoder->in.cur_pic->CU[depth][x + y*(encoder->in.width_in_lcu << MAX_DEPTH)];
+  CU_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x + y*(encoder->in.width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
   uint8_t border_x = (encoder->in.width  < x*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;
   uint8_t border_y = (encoder->in.height < y*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;

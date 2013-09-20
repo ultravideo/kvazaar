@@ -78,7 +78,7 @@ typedef struct
   int32_t height_in_lcu;  // \brief Picture width in number of LCU's.
   int32_t width_in_lcu;   // \brief Picture height in number of LCU's.
   uint8_t referenced;     // \brief Whether this picture is referenced.
-  CU_info** CU;           // \brief Info for each CU at each depth.
+  CU_info** cu_array;           // \brief Info for each CU at each depth.
   uint8_t type;
   uint8_t slicetype;
 } picture;

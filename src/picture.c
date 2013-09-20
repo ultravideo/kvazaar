@@ -38,7 +38,7 @@ void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
   for (y = y_scu; y < y_scu + block_scu_width; ++y) {
     int cu_row = y * width_in_scu;
     for (x = x_scu; x < x_scu + block_scu_width; ++x) {
-      pic->CU[depth][cu_row + x].split = split;
+      pic->cu_array[depth][cu_row + x].split = split;
     }
   }
 }
@@ -62,7 +62,7 @@ void picture_set_block_coded(picture *pic, uint32_t x_scu, uint32_t y_scu,
     int cu_row = y * width_in_scu;
     for (x = x_scu; x < x_scu + block_scu_width; ++x) {
       for (d = 0; d < MAX_DEPTH + 1; ++d) {
-        pic->CU[d][cu_row + x].coded = coded;
+        pic->cu_array[d][cu_row + x].coded = coded;
       }
     }
   }
@@ -234,14 +234,14 @@ picture *picture_init(int32_t width, int32_t height,
 
   // Allocate memory for CU info 2D array
   // TODO: we don't need this much space on LCU...MAX_DEPTH-1
-  pic->CU = (CU_info**)malloc(sizeof(CU_info*) * (MAX_DEPTH + 1));
+  pic->cu_array = (CU_info**)malloc(sizeof(CU_info*) * (MAX_DEPTH + 1));
   for (i = 0; i <= MAX_DEPTH; ++i) {
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
     unsigned height_in_scu = height_in_lcu << MAX_DEPTH;
     unsigned width_in_scu = width_in_lcu << MAX_DEPTH;
     unsigned cu_array_size = height_in_scu * width_in_scu;
-    pic->CU[i] = (CU_info*)malloc(sizeof(CU_info) * cu_array_size);
-    memset(pic->CU[i], 0, sizeof(CU_info) * cu_array_size);
+    pic->cu_array[i] = (CU_info*)malloc(sizeof(CU_info) * cu_array_size);
+    memset(pic->cu_array[i], 0, sizeof(CU_info) * cu_array_size);
   }
 
   return pic;
@@ -268,12 +268,12 @@ int picture_destroy(picture *pic)
 
   for (i = 0; i <= MAX_DEPTH; ++i)
   {
-    free(pic->CU[i]);
-    pic->CU[i] = NULL;
+    free(pic->cu_array[i]);
+    pic->cu_array[i] = NULL;
   }
 
-  free(pic->CU);
-  pic->CU = NULL;
+  free(pic->cu_array);
+  pic->cu_array = NULL;
 
   return 1;
 }

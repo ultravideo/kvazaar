@@ -97,7 +97,7 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
     for (left_col = 1; left_col < outwidth / scu_width; left_col++) {
       // If over the picture height or block not yet searched, stop
       if ((y_ctb + left_col) * scu_width >= src_height
-          || pic->CU[0][x_ctb - 1 + (y_ctb + left_col) * width_in_scu].type == CU_NOTSET) {
+          || pic->cu_array[0][x_ctb - 1 + (y_ctb + left_col) * width_in_scu].type == CU_NOTSET) {
         break;
       }
     }
@@ -125,7 +125,7 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
     // Loop top SCU's
     for (top_row = 1; top_row < outwidth / scu_width; top_row++) {
       if ((x_ctb + top_row) * scu_width >= src_width
-          || pic->CU[0][x_ctb + top_row + (y_ctb - 1) * width_in_scu].type
+          || pic->cu_array[0][x_ctb + top_row + (y_ctb - 1) * width_in_scu].type
               == CU_NOTSET) {
         break;
       }
@@ -163,7 +163,7 @@ void search_tree(encoder_control *encoder,
   uint8_t border_split_x = ((encoder->in.width) < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; // are we in any border CU
-  CU_info *cur_cu = &encoder->in.cur_pic->CU[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  CU_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   cur_cu->intra.cost = 0xffffffff;
   cur_cu->inter.cost = 0xffffffff;
@@ -258,7 +258,7 @@ void search_tree(encoder_control *encoder,
 uint32_t search_best_mode(encoder_control *encoder, 
                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  CU_info *cur_cu = &encoder->in.cur_pic->CU[depth][x_ctb
+  CU_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb
       + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint32_t best_intra_cost = cur_cu->intra.cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;
