@@ -1,18 +1,16 @@
+#ifndef CONFIG_H_
+#define CONFIG_H_
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Handles parsing and storing of configuration of the encoder.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
-
-/*! \file config.h
-    \brief Configuration header
-    \author Marko Viitanen
-    \date 2012-05
-    
-    Contains all configuration system related functions and structs
-*/
-
-#ifndef _CONFIG_H_
-#define _CONFIG_H_
 
 #include "global.h"
 
@@ -31,9 +29,9 @@ typedef struct
 } config;
 
 /* Function definitions */
-config* config_alloc();
-int config_init(config* cfg);
-int config_destroy(config* cfg);
-int config_read(config* cfg,int argc, char* argv[]);
+config *config_alloc();
+int config_init(config *cfg);
+int config_destroy(config *cfg);
+int config_read(config *cfg,int argc, char *argv[]);
 
 #endif

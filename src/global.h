@@ -1,17 +1,27 @@
+#ifndef GLOBAL_H_
+#define GLOBAL_H_
 /**
- *  HEVC Encoder
- *  - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing.
+ * \file
+ * \brief Header that is included in every other header.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * 
+ * This file contains global constants that can be referred to from any header
+ * or source file. It also contains some helper macros and includes stdint.h
+ * so that any file can refer to integer types with exact widths.
  */
 
-/*! \file global.h
-    \brief Contains global includes
-    \author Marko Viitanen
-    \date 2013-06
-  
-    This file should be included in every C-file.
-*/
-#ifndef __GLOBAL_H
-#define __GLOBAL_H
+#ifdef _MSC_VER
+  #include "../include/stdint.h"
+#else
+  #include <stdint.h>
+#endif
+
 
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
@@ -41,13 +51,6 @@
 #define AMVP_MAX_NUM_CANDS_MEM 3
 #define MRG_MAX_NUM_CANDS 5
 
-//Including stdint.h, 
-#ifdef _MSC_VER
-  #include "../include/stdint.h"
-#else
-  #include <stdint.h>
-#endif
-
 /* Some tools */
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -75,6 +78,6 @@
   #define INLINE inline
 #endif
 
-#define free_pointer(pointer) { free(pointer); pointer = NULL; }
+#define FREE_POINTER(pointer) { free(pointer); pointer = NULL; }
 
 #endif

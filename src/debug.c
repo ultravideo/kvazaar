@@ -1,7 +1,12 @@
 /**
- * HEVC Encoder
- * - Marko Viitanen ( fador at iki.fi ), Tampere University of Technology, Department of Pervasive Computing 2013.
- * - Ari Koivula (ari at koivu.la ), Tampere University of Technology, Department of Pervasive Computing 2013.
+ * \file
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ), 
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
  */
 
 #include "debug.h"
@@ -31,7 +36,7 @@ void close_cu_file(FILE *fp) {
  */
 unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t xCtb, uint16_t yCtb, FILE *fp)
 {
-  CU_info *cu = &encoder->in.cur_pic->CU[depth][xCtb + yCtb * (encoder->in.width_in_LCU<<MAX_DEPTH)];
+  cu_info *cu = &encoder->in.cur_pic->cu_array[depth][xCtb + yCtb * (encoder->in.width_in_lcu<<MAX_DEPTH)];
   unsigned lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4;
   unsigned sum = 0;
   unsigned best_cost = -1;

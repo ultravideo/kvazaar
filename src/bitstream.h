@@ -1,12 +1,16 @@
-/*! \file bitstream.h
-    \brief Bitstream related functions
-    \author Marko Viitanen
-    \date 2012-05
-    
-    This file has all bitstream headers
-*/
-#ifndef _BITSTREAM_H
-#define _BITSTREAM_H
+#ifndef BITSTREAM_H_
+#define BITSTREAM_H_
+/**
+ * \file
+ * \brief Bitstream can be written to one or several bits at a time.
+ * 
+ * \author Marko Viitanen ( fador@iki.fi ),
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ * \author Ari Koivula ( ari@koivu.la ),
+ *         Tampere University of Technology,
+ *         Department of Pervasive Computing.
+ */
  
 #include "global.h"
 
@@ -15,7 +19,7 @@ typedef struct
 {
     uint32_t data[32];
     uint8_t  cur_byte;
-    uint8_t  cur_bit; 
+    uint8_t  cur_bit;
     FILE*    output;
     uint8_t* buffer;
     uint32_t buffer_pos;
@@ -26,11 +30,11 @@ typedef struct
 {
   uint8_t len;
   uint32_t value;
-}bitTable;
+} bit_table;
 
-extern bitTable *g_exp_table;
+extern bit_table *g_exp_table;
 
-int floorLog2(unsigned int n);
+int floor_log2(unsigned int n);
  
 void bitstream_alloc(bitstream* stream, uint32_t alloc);
 void bitstream_clear_buffer(bitstream* stream);
