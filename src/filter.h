@@ -35,6 +35,11 @@ void filter_deblock_luma(uint8_t *src, int32_t offset, int32_t tc , int8_t sw,
                          int8_t filter_second_p, int8_t filter_second_q);
 void filter_deblock_chroma(uint8_t *src, int32_t offset, int32_t tc,
                            int8_t part_p_nofilter, int8_t part_q_nofilter);
+
+// INTERPOLATION
+void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, 
+                                 int height, int16_t *dst, int16_t dst_stride);
+
 // SAO
 
 //////////////////////////////////////////////////////////////////////////

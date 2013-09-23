@@ -43,6 +43,26 @@ const uint8_t g_beta_table_8x8[52] =
   62, 64
 };
 
+const int16_t g_luma_filter[4][8] =
+{
+  {  0, 0,   0, 64,  0,   0, 0,  0 },
+  { -1, 4, -10, 58, 17,  -5, 1,  0 },
+  { -1, 4, -11, 40, 40, -11, 4, -1 },
+  {  0, 1,  -5, 17, 58, -10, 4, -1 }
+};
+
+const int16_t g_chroma_filter[8][4] =
+{
+  {  0, 64,  0,  0 },
+  { -2, 58, 10, -2 },
+  { -4, 54, 16, -2 },
+  { -6, 46, 28, -4 },
+  { -4, 36, 36, -4 },
+  { -4, 28, 46, -6 },
+  { -2, 16, 54, -4 },
+  { -2, 10, 58, -2 }
+};
+
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 
@@ -336,6 +356,64 @@ void filter_deblock(encoder_control* encoder)
     for (x = 0; x < encoder->in.width_in_lcu; x++)
     {
       filter_deblock_cu(encoder, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_HOR);
+    }
+  }
+}
+
+
+/** 
+ * \brief Interpolation for chroma half-pixel
+ * \param src source image in integer pels (-2..width+3, -2..height+3)
+ * \param src_stride stride of source image
+ * \param width width of source image block
+ * \param height height of source image block
+ * \param dst destination image in half-pixel resolution
+ * \param dst_stride stride of destination image
+ *
+ */
+void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride)
+{
+  /* ____________
+   * | B0,0|ae0,0|
+   * |ea0,0|ee0,0|
+   * 
+   * ae0,0 = ( -4 * B-1,0 + 36 * B0,0 + 36 * B1,0 - 4 * B2,0 )  >>  shift1
+   * ea0,0 = ( -4 * B0,-1 + 36 * B0,0 + 36 * B0,1 - 4 * B0,2 )  >>  shift1
+   * ee0,0 = ( -4 * ae0,-1 + 36 * ae0,0 + 36 * ae0,1 - 4 * ae0,2 )  >>  shift2
+   */
+
+  int32_t x, y;
+  int32_t shift1 = g_bitdepth - 8;
+  int32_t shift2 = 6;
+
+  // Loop source pixels and generate four filtered half-pel pixels on each round
+  for (y = 0; y < height; y++) {
+    int dst_pos_y = (y<<1)*dst_stride;
+    int src_pos_y = y*src_stride;
+    for (x = 0; x < width; x++) {
+
+      // Calculate current dst and src pixel positions
+      int dst_pos = dst_pos_y+(x<<1);
+      int src_pos = src_pos_y+x;
+
+      // Temporary variables..
+      int ae_temp1,ae_temp2,ae_temp3;
+
+      dst[dst_pos] = src[src_pos]; //B0,0
+      dst[dst_pos + 1]            = (-4*src[src_pos - 1]           + 36*src[src_pos] + 36*src[src_pos + 1]          - 4*src[src_pos + 2]) >> shift1; //ae0,0
+      dst[dst_pos + 1*dst_stride] = ( -4*src[src_pos - src_stride] + 36*src[src_pos] + 36*src[src_pos + src_stride] - 4*src[src_pos + 2*src_stride] ) >> shift1; //ea0,0
+
+      // Calculate temporary values..
+      
+      //TODO: optimization, store these values
+      src_pos -= src_stride;  //0,-1
+      ae_temp1 = (-4*src[src_pos - 1]           + 36*src[src_pos] + 36*src[src_pos + 1]          - 4*src[src_pos + 2]) >> shift1; //ae0,-1
+      src_pos += src_stride;  //0,1
+      ae_temp2 = (-4*src[src_pos - 1]           + 36*src[src_pos] + 36*src[src_pos + 1]          - 4*src[src_pos + 2]) >> shift1; //ae0,1
+      src_pos += src_stride;  //0,2
+      ae_temp2 = (-4*src[src_pos - 1]           + 36*src[src_pos] + 36*src[src_pos + 1]          - 4*src[src_pos + 2]) >> shift1; //ae0,2
+
+      dst[dst_pos + 1*dst_stride + 1] = ( -4*ae_temp1 + 36 * dst[dst_pos+1] + 36*ae_temp2 - 4*ae_temp2) >> shift2; //ee0,0
     }
   }
 }
