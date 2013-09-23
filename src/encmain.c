@@ -22,10 +22,10 @@
  #ifdef WIN32
    #define _CRT_SECURE_NO_WARNINGS
  #endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "global.h"
 #include "config.h"
 #include "encoder.h"
@@ -34,10 +34,10 @@
 #include "transform.h"
  
 // Assembly optimization headers
-#ifndef X64
- #include "x86/test.h"
+#ifdef X86_64
+  #include "x64/test64.h" 
 #else
- #include "x64/test64.h"
+  #include "x86/test.h" 
 #endif
  
 /**
@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     
   // Handle configuration
   cfg = config_alloc();
-    
+  
   // If problem with configuration, print banner and shutdown
   if (!config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr, "/***********************************************/\r\n");
