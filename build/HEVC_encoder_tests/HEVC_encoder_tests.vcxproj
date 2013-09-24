@@ -20,12 +20,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\seatest\src\seatest.c" />
+    <ClCompile Include="..\..\tests\picture_list_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VS2010\HEVC_encoder.vcxproj">
       <Project>{eea3bdd1-8a08-41c1-ba57-e05d5c2cd8ff}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\tests\picture_list_tests.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{3CD1C68B-542C-46D8-9B8A-6C91C5A3F312}</ProjectGuid>
