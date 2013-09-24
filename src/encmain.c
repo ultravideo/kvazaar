@@ -84,10 +84,10 @@ int main(int argc, char *argv[])
   }
 
   // Dig CPU features with cpuid
-  #ifndef X64
-  //cpuId32(&ecx,&edx);
-  #else
+  #ifdef X86_64
   cpuId64(&ecx,&edx);
+  #else
+  cpuId32(&ecx,&edx);
   #endif
   printf("CPU features enabled: ");
   // EDX
