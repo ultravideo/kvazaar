@@ -9,10 +9,6 @@
  *         Department of Pervasive Computing.
  */
 
-#ifdef WIN32
-  #define _CRT_SECURE_NO_WARNINGS
-#endif
-
 #include "encoder.h"
 
 #include <math.h>

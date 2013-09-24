@@ -19,102 +19,71 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}</ProjectGuid>
+    <ProjectGuid>{C755308D-9B3E-4712-99AB-7F6F4E2DA567}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>HEVC_encoder</RootNamespace>
+    <RootNamespace>HEVC_interface</RootNamespace>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
 
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="..\..\yasm\vsyasm.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <Import Project="..\C_Properties.props" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
     <Import Project="..\C_Properties.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <Import Project="..\C_Properties.props" />
     <Import Project="..\Release_Optimizations.props" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="..\C_Properties.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="..\C_Properties.props" />
     <Import Project="..\Release_Optimizations.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
+    <TargetName>HEVC_encoder</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
+    <TargetName>HEVC_encoder</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>HEVC_encoder</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
+    <TargetName>HEVC_encoder</TargetName>
   </PropertyGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\bitstream.c" />
-    <ClCompile Include="..\..\src\cabac.c" />
-    <ClCompile Include="..\..\src\config.c" />
-    <ClCompile Include="..\..\src\context.c" />
-    <ClCompile Include="..\..\src\debug.c" />
-    <ClCompile Include="..\..\src\encmain.c" />
-    <ClCompile Include="..\..\src\encoder.c" />
-    <ClCompile Include="..\..\src\filter.c" />
-    <ClCompile Include="..\..\src\inter.c" />
-    <ClCompile Include="..\..\src\intra.c" />
-    <ClCompile Include="..\..\src\nal.c" />
-    <ClCompile Include="..\..\src\picture.c" />
-    <ClCompile Include="..\..\src\search.c" />
-    <ClCompile Include="..\..\src\transform.c" />
+    <ProjectReference Include="..\VS2010\HEVC_encoder.vcxproj">
+      <Project>{eea3bdd1-8a08-41c1-ba57-e05d5c2cd8ff}</Project>
+      <Private>false</Private>
+      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
+      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\bitstream.h" />
-    <ClInclude Include="..\..\src\cabac.h" />
-    <ClInclude Include="..\..\src\config.h" />
-    <ClInclude Include="..\..\src\context.h" />
-    <ClInclude Include="..\..\src\debug.h" />
-    <ClInclude Include="..\..\src\encoder.h" />
-    <ClInclude Include="..\..\src\filter.h" />
-    <ClInclude Include="..\..\src\global.h" />
-    <ClInclude Include="..\..\src\inter.h" />
-    <ClInclude Include="..\..\src\intra.h" />
-    <ClInclude Include="..\..\src\nal.h" />
-    <ClInclude Include="..\..\src\picture.h" />
-    <ClInclude Include="..\..\src\search.h" />
-    <ClInclude Include="..\..\src\transform.h" />
-    <ClInclude Include="..\..\src\x64\test64.h" />
-    <ClInclude Include="..\..\src\x86\test.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <YASM Include="..\..\src\x64\test64.asm" />
-    <YASM Include="..\..\src\x86\test.asm" />
+    <ClCompile Include="..\..\src\interface_main.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\..\yasm\vsyasm.targets" />
   </ImportGroup>
 </Project>

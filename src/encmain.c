@@ -18,14 +18,10 @@
  *            - -n <n>: encode only n frames
  */
 
- // Suppress some visual studio warnings
- #ifdef WIN32
-   #define _CRT_SECURE_NO_WARNINGS
- #endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "global.h"
 #include "config.h"
 #include "encoder.h"
@@ -34,10 +30,10 @@
 #include "transform.h"
  
 // Assembly optimization headers
-#ifndef X64
- #include "x86/test.h"
+#ifdef X86_64
+  #include "x64/test64.h" 
 #else
- #include "x64/test64.h"
+  #include "x86/test.h" 
 #endif
  
 /**
@@ -65,7 +61,7 @@ int main(int argc, char *argv[])
     
   // Handle configuration
   cfg = config_alloc();
-    
+  
   // If problem with configuration, print banner and shutdown
   if (!config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr, "/***********************************************/\r\n");
@@ -84,10 +80,10 @@ int main(int argc, char *argv[])
   }
 
   // Dig CPU features with cpuid
-  #ifndef X64
-  //cpuId32(&ecx,&edx);
-  #else
+  #ifdef X86_64
   cpuId64(&ecx,&edx);
+  #else
+  cpuId32(&ecx,&edx);
   #endif
   printf("CPU features enabled: ");
   // EDX
