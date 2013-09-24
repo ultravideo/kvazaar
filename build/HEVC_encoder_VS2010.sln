@@ -8,6 +8,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		HEVC_encoder_VS2010.vsd = HEVC_encoder_VS2010.vsd
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HEVC_interface", "HEVC_interface\HEVC_interface.vcxproj", "{C755308D-9B3E-4712-99AB-7F6F4E2DA567}"
+	ProjectSection(ProjectDependencies) = postProject
+		{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF} = {EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -24,6 +29,13 @@ Global
 		{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}.Release|Win32.Build.0 = Release|Win32
 		{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}.Release|x64.ActiveCfg = Release|x64
 		{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}.Release|x64.Build.0 = Release|x64
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Debug|Win32.Build.0 = Debug|Win32
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Debug|x64.ActiveCfg = Debug|x64
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Debug|x64.Build.0 = Debug|x64
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Release|Win32.ActiveCfg = Release|Win32
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Release|Win32.Build.0 = Release|Win32
+		{C755308D-9B3E-4712-99AB-7F6F4E2DA567}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
