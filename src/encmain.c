@@ -18,10 +18,6 @@
  *            - -n <n>: encode only n frames
  */
 
- // Suppress some visual studio warnings
- #ifdef WIN32
-   #define _CRT_SECURE_NO_WARNINGS
- #endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
