@@ -68,69 +68,69 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
   int32_t ref_width_c = ref->width>>1; //!< Reference picture width in chroma pixels
 
   // negative overflow flag
-  int8_t overflow_neg_x = (xpos + mv[0] < 0)?1:0;
-  int8_t overflow_neg_y = (ypos + mv[1] < 0)?1:0;
+  int8_t overflow_neg_x = (xpos + (mv[0]>>2) < 0)?1:0;
+  int8_t overflow_neg_y = (ypos + (mv[1]>>2) < 0)?1:0;
 
   // positive overflow flag
-  int8_t overflow_pos_x = (xpos + mv[0] + width > ref->width )?1:0;
-  int8_t overflow_pos_y = (ypos + mv[1] + width > ref->height)?1:0;
+  int8_t overflow_pos_x = (xpos + (mv[0]>>2) + width >= ref->width )?1:0;
+  int8_t overflow_pos_y = (ypos + (mv[1]>>2) + width >= ref->height)?1:0;
 
   // Chroma half-pel
   #define HALFPEL_CHROMA_WIDTH ((LCU_WIDTH>>1) + 8)
-  int8_t chroma_halfpel = (mv[0]&4 || mv[1]&4); //!< third lsb is set -> chroma is half-pel
+  int8_t chroma_halfpel = ((mv[0]>>2)&1) | ((mv[1]>>2)&1); //!< third lsb is set -> chroma is half-pel
   int16_t halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH];
   int16_t halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH];
   int16_t *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH*4 + 4]; //!< halfpel_src_u with offset (-4,-4)
   int16_t *halfpel_src_off_v = &halfpel_src_v[HALFPEL_CHROMA_WIDTH*4 + 4]; //!< halfpel_src_v with offset (-4,-4)
-  int16_t halfpel_u[LCU_WIDTH * LCU_WIDTH];  
-  int16_t halfpel_v[LCU_WIDTH * LCU_WIDTH];
+  int16_t halfpel_u[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2X x 2Y block (u)
+  int16_t halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2X x 2Y block (v)
 
   // TODO: Fractional pixel support
   mv[0] = mv[0]>>2;
   mv[1] = mv[1]>>2;
 
   // Chroma half-pel
+  // get half-pel interpolated block and push it to output
   if(chroma_halfpel) {
     int halfpel_y,halfpel_x;
-    int abs_mv_x = abs(mv[0])&1;
-    int abs_mv_y = abs(mv[1])&1;
-
+    int abs_mv_x = mv[0]&1;
+    int abs_mv_y = mv[1]&1;
     for (halfpel_y = 0, y = (ypos>>1) - 4; y < ((ypos + width)>>1) + 4; halfpel_y++, y++) {
       // calculate y-pixel offset
       coord_y = (y + (mv[1]>>1));
 
-      overflow_neg_y = (y + (mv[1]>>1) < 0)?1:0;
-      overflow_pos_y = (coord_y >= ref->height>>1)?1:0;     
-
       // On y-overflow set coord_y accordingly
-      if(overflow_neg_y) coord_y = 0;
-      else if(overflow_pos_y) coord_y = ((ref->height>>1) - 1);
+      overflow_neg_y = (coord_y < 0)?1:0;
+      overflow_pos_y = (coord_y >= ref->height>>1)?1:0;     
+      if (overflow_neg_y) coord_y = 0;
+      else if (overflow_pos_y) coord_y = ((ref->height>>1) - 1);
 
       coord_y *= ref_width_c;
 
       for (halfpel_x = 0, x = (xpos>>1) - 4; x < ((xpos + width)>>1) + 4; halfpel_x++, x++) {
         coord_x = x + (mv[0]>>1);
 
-        overflow_neg_x = (coord_x < 0)?1:0;
-        overflow_pos_x = (coord_x >= ref->width>>1 )?1:0;
         // On x-overflow set coord_x accordingly
-        if(overflow_neg_x) coord_x = 0;
-        else if(overflow_pos_x) coord_x = (ref->width>>1) - 1;
+        overflow_neg_x = (coord_x < 0) ? 1 : 0;
+        overflow_pos_x = (coord_x >= ref->width>>1) ? 1 : 0;
+        if (overflow_neg_x) coord_x = 0;
+        else if (overflow_pos_x) coord_x = (ref->width>>1) - 1;
 
+        // Store source block data (with extended borders)
         halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->u_recdata[coord_y + coord_x];
-        halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->v_recdata[coord_y + coord_x];
+        halfpel_src_v[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->v_recdata[coord_y + coord_x];
       }
     }
-    filter_inter_halfpel_chroma(halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH);
-    filter_inter_halfpel_chroma(halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH);
 
-    for (y = ypos>>1; y < (ypos + width)>>1; y++) {
-      halfpel_y = (y-(ypos>>1))<<1;      
-      coord_y = (y + (mv[1]>>1)) * ref_width_c; // pre-calculate
-      for (x = xpos>>1; x < (xpos + width)>>1; x++) {
-        halfpel_x = (x-(xpos>>1))<<1;
-        dst->u_recdata[y*dst_width_c + x] = (uint8_t)halfpel_u[(halfpel_y + abs_mv_y)*LCU_WIDTH + halfpel_x + abs_mv_x];
-        dst->v_recdata[y*dst_width_c + x] = (uint8_t)halfpel_v[(halfpel_y + abs_mv_y)*LCU_WIDTH + halfpel_x + abs_mv_x]; 
+    // Filter the block to half-pel resolution
+    filter_inter_halfpel_chroma(halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH, abs_mv_x, abs_mv_y);
+    filter_inter_halfpel_chroma(halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
+
+    // Assign filtered pixels to output
+    for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {      
+      for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
+        dst->u_recdata[y*dst_width_c + x] = (uint8_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
+        dst->v_recdata[y*dst_width_c + x] = (uint8_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
       }
     }
   }
@@ -167,7 +167,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
       }
     }
 
-    if(chroma_halfpel) {
+    if(!chroma_halfpel) {
       // Copy Chroma with boundary checking
       // TODO: chroma fractional pixel interpolation
       for (y = ypos>>1; y < (ypos + width)>>1; y++) {
@@ -211,7 +211,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
       }
     }
 
-    if(chroma_halfpel) {
+    if(!chroma_halfpel) {
       // Copy Chroma
       // TODO: chroma fractional pixel interpolation
       for (y = ypos>>1; y < (ypos + width)>>1; y++) {
