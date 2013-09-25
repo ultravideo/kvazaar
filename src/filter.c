@@ -377,9 +377,9 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
    * | B0,0|ae0,0|
    * |ea0,0|ee0,0|
    * 
-   * ae0,0 = ( -4 * B-1,0 + 36 * B0,0 + 36 * B1,0 - 4 * B2,0 )  >>  shift1
-   * ea0,0 = ( -4 * B0,-1 + 36 * B0,0 + 36 * B0,1 - 4 * B0,2 )  >>  shift1
-   * ee0,0 = ( -4 * ae0,-1 + 36 * ae0,0 + 36 * ae0,1 - 4 * ae0,2 )  >>  shift2
+   * ae0,0 = (-4*B-1,0  + 36*B0,0  + 36*B1,0  - 4*B2,0)  >> shift1
+   * ea0,0 = (-4*B0,-1  + 36*B0,0  + 36*B0,1  - 4*B0,2)  >> shift1
+   * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
    */
 
   int32_t x, y;
@@ -398,30 +398,33 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
       int src_pos = src_pos_y+x;
 
       // Temporary variables..
-      int32_t ae_temp1,ae_temp2,ae_temp3;
+      int32_t ae_temp1, ae_temp2, ae_temp3;
 
       // Original pixel (not really needed)
-      //dst[dst_pos] = src[src_pos]; //B0,0
+      dst[dst_pos] = src[src_pos]; //B0,0
 
-      // We need this only when hor_flag and for ee0,0
+      // ae0,0 - We need this only when hor_flag and for ee0,0
       if (hor_flag) {     
-        dst[dst_pos + 1]            = ((-4*src[src_pos - 1]          + 36*src[src_pos] + 36*src[src_pos + 1]          - 4*src[src_pos + 2]) >> shift1) >> shift3; //ae0,0
-      } else if(ver_flag) { // This one only needed if ver_flag and !hor_flag
-        dst[dst_pos + 1*dst_stride] = ((-4*src[src_pos - src_stride] + 36*src[src_pos] + 36*src[src_pos + src_stride] - 4*src[src_pos + 2*src_stride] ) >> shift1) >> shift3; //ea0,0
+        dst[dst_pos + 1] = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; // ae0,0
+      }
+      // ea0,0 - needed only when ver_flag
+      if(ver_flag) {
+        dst[dst_pos + 1*dst_stride] = ((-4*src[src_pos - src_stride] + 36*src[src_pos] + 36*src[src_pos + src_stride] 
+                                        - 4*src[src_pos + 2*src_stride] ) >> shift1) >> shift3; // ea0,0
       }
 
-      // When both flags, we _only_ use this pixel (but still need ae0,0 for it)
-      if (hor_flag && ver_flag) {      
+      // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
+      if (hor_flag && ver_flag) {
         // Calculate temporary values..
         //TODO: optimization, store these values
         src_pos -= src_stride;  //0,-1
-        ae_temp1 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; //ae0,-1
+        ae_temp1 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; // ae0,-1
         src_pos += src_stride;  //0,1
-        ae_temp2 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; //ae0,1
+        ae_temp2 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; // ae0,1
         src_pos += src_stride;  //0,2
-        ae_temp2 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; //ae0,2
+        ae_temp3 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2]) >> shift1) >> shift3; // ae0,2
 
-        dst[dst_pos + 1*dst_stride + 1] = (( -4*ae_temp1 + 36*dst[dst_pos + 1] + 36*ae_temp2 - 4*ae_temp2) >> shift2); //ee0,0
+        dst[dst_pos + 1*dst_stride + 1] = (( -4*ae_temp1 + 36*dst[dst_pos + 1] + 36*ae_temp2 - 4*ae_temp3) >> shift2); // ee0,0
       }
     }
   }
