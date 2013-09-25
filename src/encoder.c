@@ -334,7 +334,7 @@ void encode_one_frame(encoder_control* encoder)
   else
   {    
     cabac_start(&cabac);
-    encoder->in.cur_pic->slicetype = (encoder->frame==1)?SLICE_P:SLICE_I;
+    encoder->in.cur_pic->slicetype = SLICE_P;
     encoder->in.cur_pic->type = NAL_TRAIL_R;
     search_slice_data(encoder);
 
