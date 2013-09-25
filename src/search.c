@@ -55,6 +55,17 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
   }
 
   while (step > 0) {
+    // Stop if current best vector is already really good.
+    // This is an experimental condition.
+    // The constant 1.8 is there because there is some SAD cost when comparing
+    // against the reference even if the frame doesn't change. This is probably
+    // due to quantization. It's value is just a guess based on the first
+    // blocks of the BQMall sequence, which don't move.
+    // TODO: Quantization factor probably affects what the constant should be.
+    if (best_cost <= block_width * block_width * 1.8) {
+      break;
+    }
+
     // above
     cost = get_sad(orig_x + x, orig_y + y - step, pic->width, pic->height, block_width, pic_data, ref_data);
     if (cost > 0 && cost < best_cost) {
