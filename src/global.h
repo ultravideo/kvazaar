@@ -65,6 +65,7 @@
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
+#define NO_SCU_IN_LCU(no_lcu) ((no_lcu) << MAX_DEPTH)
 
 #define VERSION_STRING "0.2               "
 #define VERSION 0.2
