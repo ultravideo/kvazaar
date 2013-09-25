@@ -278,11 +278,8 @@ void search_tree(encoder_control *encoder,
     }
 
     {
-      unsigned mv[2] = { 0, 0 }; // TODO: Take initial MV from adjacent blocks.
       picture *cur_pic = encoder->in.cur_pic;
-
       picture *ref_pic = encoder->ref->pics[0];
-
       int x = x_ctb * CU_MIN_SIZE_PIXELS;
       int y = y_ctb * CU_MIN_SIZE_PIXELS;
       uint8_t *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
@@ -293,7 +290,6 @@ void search_tree(encoder_control *encoder,
 
     cur_cu->type = CU_INTER;
     cur_cu->inter.mv_dir = 1;
-    inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
   }
 
   // INTRA SEARCH
