@@ -28,6 +28,75 @@
 #define USE_INTRA_IN_P 0
 #define RENDER_CU 1
 
+#define IN_FRAME(x, y, width, height, block) ((x) >= 0 && (y) >= 0 && (x) + (block) <= (width) && (y) + (block) <= (height))
+
+
+unsigned get_sad(int x, int y, int width, int height, int block, uint8_t *pic_data, uint8_t *ref_data)
+{
+  if (!IN_FRAME(x, y, width, height, block)) return 0; // This means invalid, for now.
+
+  return 1 + sad(pic_data, &ref_data[y * width + x], block, block, width);
+}
+
+void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
+               cu_info *cur_cu,  int orig_x, int orig_y, int x, int y, 
+               unsigned depth)
+{
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+
+  unsigned cost = get_sad(orig_x + x, orig_y + y, pic->width, pic->height, block_width, pic_data, ref_data);
+  unsigned best_cost = -1;
+  unsigned step = 8;
+
+  if (cost > 0) {
+    best_cost = cost;
+    cur_cu->inter.mv[0] = x;
+    cur_cu->inter.mv[1] = y;
+  }
+
+  while (step > 0) {
+    // above
+    cost = get_sad(orig_x + x, orig_y + y - step, pic->width, pic->height, block_width, pic_data, ref_data);
+    if (cost > 0 && cost < best_cost) {
+      best_cost = cost;
+      cur_cu->inter.mv[0] = x;
+      cur_cu->inter.mv[1] = y - step;
+    }
+
+    // left
+    cost = get_sad(orig_x + x - step, orig_y + y, pic->width, pic->height, block_width, pic_data, ref_data);
+    if (cost > 0 && cost < best_cost) {
+      best_cost = cost;
+      cur_cu->inter.mv[0] = x - step;
+      cur_cu->inter.mv[1] = y;
+    }
+
+    // right
+    cost = get_sad(orig_x + x + step, orig_y + y, pic->width, pic->height, block_width, pic_data, ref_data);
+    if (cost > 0 && cost < best_cost) {
+      best_cost = cost;
+      cur_cu->inter.mv[0] = x + step;
+      cur_cu->inter.mv[1] = y;
+    }
+
+    // below
+    cost = get_sad(orig_x + x, orig_y + y + step, pic->width, pic->height, block_width, pic_data, ref_data);
+    if (cost > 0 && cost < best_cost) {
+      best_cost = cost;
+      cur_cu->inter.mv[0] = x;
+      cur_cu->inter.mv[1] = y + step;
+    }
+
+    // Change center of search to best point and reduce search area by half.
+    x = cur_cu->inter.mv[0];
+    y = cur_cu->inter.mv[1];
+    step /= 2;
+  }
+
+  cur_cu->inter.cost = best_cost + 1; // +1 so that cost is > 0.
+  cur_cu->inter.mv[0] <<= 2;
+  cur_cu->inter.mv[1] <<= 2;
+}
 
 /**
  * \brief Search motions vectors for a block and all it's sub-blocks.
@@ -37,9 +106,9 @@
  * \param ref_data  picture color data starting from the beginning of reference pic.
  * \param cur_cu
  */
-void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
-                          cu_info *cur_cu, unsigned step, 
-                          int orig_x, int orig_y, int x, int y, unsigned depth)
+void search_mv_full(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
+                    cu_info *cur_cu, unsigned step, 
+                    int orig_x, int orig_y, int x, int y, unsigned depth)
 {
   // TODO: Inter: Handle non-square blocks.
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
@@ -61,13 +130,13 @@ void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
 
   step /= 2;
   if (step > 0) {
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
+    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
                          x, y - step, depth);
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
+    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
                          x - step, y, depth);
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
+    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
                          x + step, y, depth);
-    search_motion_vector(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
+    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
                          x, y + step, depth);
   }
 }
@@ -206,8 +275,9 @@ void search_tree(encoder_control *encoder,
       int x = x_ctb * CU_MIN_SIZE_PIXELS;
       int y = y_ctb * CU_MIN_SIZE_PIXELS;
       uint8_t *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
-      search_motion_vector(cur_pic, cur_data, ref_pic->y_data, cur_cu, 8, x, y,
-                           0, 0, depth);
+      //search_mv_full(cur_pic, cur_data, ref_pic->y_data, cur_cu, 8, x, y,
+      //               0, 0, depth);
+      search_mv(cur_pic, cur_data, ref_pic->y_data, cur_cu, x, y, 0, 0, depth);
     }
 
     cur_cu->type = CU_INTER;
