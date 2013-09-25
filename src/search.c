@@ -27,6 +27,7 @@
 // Temporarily for debugging.
 #define USE_INTRA_IN_P 0
 #define RENDER_CU 0
+#define USE_FULL_SEARCH 0
 
 #define IN_FRAME(x, y, width, height, block) ((x) >= 0 && (y) >= 0 && (x) + (block) <= (width) && (y) + (block) <= (height))
 
@@ -285,8 +286,6 @@ void search_tree(encoder_control *encoder,
       int x = x_ctb * CU_MIN_SIZE_PIXELS;
       int y = y_ctb * CU_MIN_SIZE_PIXELS;
       uint8_t *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
-      //search_mv_full(cur_pic, cur_data, ref_pic->y_data, cur_cu, 8, x, y,
-      //               0, 0, depth);
       
       int start_x = 0;
       int start_y = 0;
@@ -295,7 +294,16 @@ void search_tree(encoder_control *encoder,
         int start_x = ref_cu->inter.mv[0] >> 2;
         int start_y = ref_cu->inter.mv[1] >> 2;
       }
-      search_mv(cur_pic, cur_data, ref_pic->y_data, cur_cu, x, y, start_x, start_y, depth);
+
+      if (USE_FULL_SEARCH) {
+        search_mv_full(cur_pic, cur_data, ref_pic->y_data, 
+                       cur_cu, 8, x, y,
+                       start_x, start_y, depth);
+      } else {
+        search_mv(cur_pic, cur_data, ref_pic->y_data, 
+                  cur_cu, x, y, 
+                  start_x, start_y, depth);
+      }
     }
 
     cur_cu->type = CU_INTER;
