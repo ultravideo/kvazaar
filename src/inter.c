@@ -77,7 +77,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
 
   // Chroma half-pel
   #define HALFPEL_CHROMA_WIDTH ((LCU_WIDTH>>1) + 8)
-  int8_t chroma_halfpel = ((mv[0]>>2)&1) | ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
+  int8_t chroma_halfpel = ((mv[0]>>2)&1) || ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
   int16_t halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< U source block for interpolation
   int16_t halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< V source block for interpolation
   int16_t *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH*4 + 4]; //!< halfpel_src_u with offset (4,4)
@@ -106,7 +106,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
       overflow_neg_y = (coord_y < 0) ? 1 : 0;
       overflow_pos_y = (coord_y >= ref->height>>1) ? 1 : 0;     
       if (overflow_neg_y)      coord_y = 0;
-      else if (overflow_pos_y) coord_y = ((ref->height>>1) - 1);
+      else if (overflow_pos_y) coord_y = (ref->height>>1) - 1;
       coord_y *= ref_width_c;
 
       for (halfpel_x = 0, x = (xpos>>1) - 4; x < ((xpos + width)>>1) + 4; halfpel_x++, x++) {
@@ -114,9 +114,9 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
 
         // On x-overflow set coord_x accordingly
         overflow_neg_x = (coord_x < 0) ? 1 : 0;
-        overflow_pos_x = (coord_x >= ref->width>>1) ? 1 : 0;
+        overflow_pos_x = (coord_x >= ref_width_c) ? 1 : 0;
         if (overflow_neg_x)      coord_x = 0;
-        else if (overflow_pos_x) coord_x = (ref->width>>1) - 1;
+        else if (overflow_pos_x) coord_x = ref_width_c - 1;
 
         // Store source block data (with extended borders)
         halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->u_recdata[coord_y + coord_x];
