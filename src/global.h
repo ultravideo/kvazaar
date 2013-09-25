@@ -22,6 +22,14 @@
   #include <stdint.h>
 #endif
 
+#if _MSC_VER && _M_AMD64
+  #define X86_64
+#endif
+
+#if __GNUC__ && __x86_64__
+  #define X86_64
+#endif
+
 
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */

@@ -42,8 +42,8 @@ void search_motion_vector(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
                           int orig_x, int orig_y, int x, int y, unsigned depth)
 {
   // TODO: Inter: Handle non-square blocks.
-  unsigned block_width = CU_WIDTH_FROM_DEPTH(depth);
-  unsigned block_height = block_width;
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+  int block_height = block_width;
   unsigned cost;
 
   // TODO: Inter: Calculating error outside picture borders.

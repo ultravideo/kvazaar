@@ -17,7 +17,7 @@
 #include <string.h>
 #include <stdarg.h>
 //for hton
-#ifdef WIN32
+#ifdef _WIN32
 #include <Winsock2.h>
 #else
 #include <net/hton.h>
