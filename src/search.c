@@ -97,7 +97,7 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
     for (left_col = 1; left_col < outwidth / scu_width; left_col++) {
       // If over the picture height or block not yet searched, stop
       if ((y_ctb + left_col) * scu_width >= src_height
-          || pic->cu_array[0][x_ctb - 1 + (y_ctb + left_col) * width_in_scu].type == CU_NOTSET) {
+          || pic->cu_array[MAX_DEPTH][x_ctb - 1 + (y_ctb + left_col) * width_in_scu].type == CU_NOTSET) {
         break;
       }
     }
@@ -125,7 +125,7 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
     // Loop top SCU's
     for (top_row = 1; top_row < outwidth / scu_width; top_row++) {
       if ((x_ctb + top_row) * scu_width >= src_width
-          || pic->cu_array[0][x_ctb + top_row + (y_ctb - 1) * width_in_scu].type
+          || pic->cu_array[MAX_DEPTH][x_ctb + top_row + (y_ctb - 1) * width_in_scu].type
               == CU_NOTSET) {
         break;
       }

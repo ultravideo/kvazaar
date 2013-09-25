@@ -817,8 +817,8 @@ void encode_slice_data(encoder_control* encoder)
 
 void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, uint8_t depth)
 { 
-  cu_info *cur_CU = &encoder->in.cur_pic->cu_array[depth][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
-  uint8_t split_flag = cur_CU->split;
+  cu_info *cur_CU = &encoder->in.cur_pic->cu_array[MAX_DEPTH][xCtb+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)];
+  uint8_t split_flag = GET_SPLITDATA(cur_CU, depth);
   uint8_t split_model = 0;
 
   /* Check for slice border */
@@ -836,11 +836,11 @@ void encode_coding_tree(encoder_control* encoder,uint16_t xCtb,uint16_t yCtb, ui
     if(!border)
     {
       /* Get left and top block split_flags and if they are present and true, increase model number */
-      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->cu_array[depth][xCtb-1+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)]),depth) == 1)
+      if(xCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->cu_array[MAX_DEPTH][xCtb-1+yCtb*(encoder->in.width_in_lcu<<MAX_DEPTH)]),depth) == 1)
       {
         split_model++;
       }
-      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->cu_array[depth][xCtb+(yCtb-1)*(encoder->in.width_in_lcu<<MAX_DEPTH)]),depth) == 1)
+      if(yCtb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->cu_array[MAX_DEPTH][xCtb+(yCtb-1)*(encoder->in.width_in_lcu<<MAX_DEPTH)]),depth) == 1)
       {
         split_model++;
       }

@@ -29,7 +29,7 @@
 */
 void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info* cur_cu)
 {
-  uint32_t x,y,d;
+  uint32_t x, y;
   // Width in smallest CU
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
@@ -37,15 +37,13 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     int cu_pos = y * width_in_scu; //!< calculate y-position once, use with every x
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      // reset all depths to the same MV/inter data
-      for(d = 0; d < MAX_DEPTH + 1; d++) {
-        pic->cu_array[d][cu_pos + x].depth = depth;
-        pic->cu_array[d][cu_pos + x].type  = CU_INTER;
-        pic->cu_array[d][cu_pos + x].inter.mode   = cur_cu->inter.mode;
-        pic->cu_array[d][cu_pos + x].inter.mv[0]  = cur_cu->inter.mv[0];
-        pic->cu_array[d][cu_pos + x].inter.mv[1]  = cur_cu->inter.mv[1];
-        pic->cu_array[d][cu_pos + x].inter.mv_dir = cur_cu->inter.mv_dir;
-      }
+      // Set all SCU's to this blocks values at the bottom most depth.
+      pic->cu_array[MAX_DEPTH][cu_pos + x].depth = depth;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].type  = CU_INTER;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mode   = cur_cu->inter.mode;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[0]  = cur_cu->inter.mv[0];
+      pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[1]  = cur_cu->inter.mv[1];
+      pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv_dir = cur_cu->inter.mv_dir;
     }
   }
 }
@@ -256,24 +254,24 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
 
   // A0 and A1 availability testing
   if (x_cu != 0) {    
-    a1 = &encoder->in.cur_pic->cu_array[depth][x_cu - 1 + (y_cu + cur_block_in_scu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    a1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
     if (!a1->coded) a1 = NULL;
 
     if (y_cu + cur_block_in_scu < encoder->in.height_in_lcu<<MAX_DEPTH) {
-      a0 = &encoder->in.cur_pic->cu_array[depth][x_cu - 1 + (y_cu + cur_block_in_scu) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      a0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
       if (!a0->coded) a0 = NULL;
     }
   }
 
   // B0, B1 and B2 availability testing
   if (y_cu != 0) {
-    b0 = &encoder->in.cur_pic->cu_array[depth][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
     if (!b0->coded) b0 = NULL;
-    b1 = &encoder->in.cur_pic->cu_array[depth][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    b1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
     if (!b1->coded) b1 = NULL;
 
     if (x_cu != 0) {
-      b2 = &encoder->in.cur_pic->cu_array[depth][x_cu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      b2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
       if(!b2->coded) b2 = NULL;
     }
   }
