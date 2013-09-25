@@ -26,7 +26,7 @@
 
 // Temporarily for debugging.
 #define USE_INTRA_IN_P 0
-#define RENDER_CU 1
+#define RENDER_CU 0
 
 #define IN_FRAME(x, y, width, height, block) ((x) >= 0 && (y) >= 0 && (x) + (block) <= (width) && (y) + (block) <= (height))
 
