@@ -55,6 +55,18 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     cur_cu->inter.mv[1] = y;
   }
 
+  // If initial vector is farther away than the step, try the (0, 0) vector
+  // in addition to the initial vector.
+  if (abs(x) > step || abs(y) > step) {
+    cost = get_sad(orig_x, orig_y, pic->width, pic->height, block_width, pic_data, ref_data);
+
+    if (cost > 0 && cost < best_cost) {
+      best_cost = cost;
+      cur_cu->inter.mv[0] = x;
+      cur_cu->inter.mv[1] = y - step;
+    }
+  }
+
   while (step > 0) {
     // Stop if current best vector is already really good.
     // This is an experimental condition.
@@ -66,6 +78,10 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     if (best_cost <= block_width * block_width * 1.8) {
       break;
     }
+
+    // Change center of search to the current best point.
+    x = cur_cu->inter.mv[0];
+    y = cur_cu->inter.mv[1];
 
     // above
     cost = get_sad(orig_x + x, orig_y + y - step, pic->width, pic->height, block_width, pic_data, ref_data);
@@ -99,9 +115,7 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
       cur_cu->inter.mv[1] = y + step;
     }
 
-    // Change center of search to best point and reduce search area by half.
-    x = cur_cu->inter.mv[0];
-    y = cur_cu->inter.mv[1];
+    // Reduce search area by half.
     step /= 2;
   }
 
