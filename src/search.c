@@ -74,9 +74,11 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     // due to quantization. It's value is just a guess based on the first
     // blocks of the BQMall sequence, which don't move.
     // TODO: Quantization factor probably affects what the constant should be.
+    /*
     if (best_cost <= block_width * block_width * 1.8) {
       break;
     }
+    */
 
     // Change center of search to the current best point.
     x = cur_cu->inter.mv[0];
