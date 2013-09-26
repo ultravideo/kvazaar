@@ -55,15 +55,14 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     cur_cu->inter.mv[1] = y;
   }
 
-  // If initial vector is farther away than the step, try the (0, 0) vector
-  // in addition to the initial vector.
-  if (abs(x) > step || abs(y) > step) {
+  // If initial vector is long, also try the (0, 0) vector just in case.
+  if (x != 0 || y != 0) {
     cost = get_sad(orig_x, orig_y, pic->width, pic->height, block_width, pic_data, ref_data);
 
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
-      cur_cu->inter.mv[0] = x;
-      cur_cu->inter.mv[1] = y - step;
+      cur_cu->inter.mv[0] = 0;
+      cur_cu->inter.mv[1] = 0;
     }
   }
 
