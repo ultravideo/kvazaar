@@ -306,8 +306,8 @@ void search_tree(encoder_control *encoder,
       int start_y = 0;
       // Convert from sub-pixel accuracy.
       if (ref_cu->type == CU_INTER) {
-        int start_x = ref_cu->inter.mv[0] >> 2;
-        int start_y = ref_cu->inter.mv[1] >> 2;
+        start_x = ref_cu->inter.mv[0] >> 2;
+        start_y = ref_cu->inter.mv[1] >> 2;
       }
 
       if (USE_FULL_SEARCH) {
