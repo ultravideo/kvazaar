@@ -1709,7 +1709,7 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
       {
         uiScanIdx = abs((int32_t) uiDirMode - 26) < 5 ? 1 : (abs((int32_t)uiDirMode - 10) < 5 ? 2 : 0);
       }
-      encode_CoeffNxN(encoder,&ti->coeff[0][ti->idx*coeff_fourth], width, 0, uiScanIdx);
+      encode_coeff_nxn(encoder,&ti->coeff[0][ti->idx*coeff_fourth], width, 0, uiScanIdx);
     }
     if(CbU||CbV)
     {
@@ -1730,17 +1730,17 @@ void encode_transform_coeff(encoder_control* encoder,transform_info* ti,int8_t d
 
       if(CbU)
       {
-        encode_CoeffNxN(encoder,&ti->coeff[1][ti->idx*coeff_fourth>>1], chromaWidth, 2, uiScanIdx);
+        encode_coeff_nxn(encoder,&ti->coeff[1][ti->idx*coeff_fourth>>1], chromaWidth, 2, uiScanIdx);
       }
       if(CbV)
       {
-        encode_CoeffNxN(encoder,&ti->coeff[2][ti->idx*coeff_fourth>>1], chromaWidth, 2, uiScanIdx);
+        encode_coeff_nxn(encoder,&ti->coeff[2][ti->idx*coeff_fourth>>1], chromaWidth, 2, uiScanIdx);
       }
     }
   }
 }
 
-void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode)
+void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, uint8_t type, int8_t scanMode)
 {
   int c1 = 1;
   uint8_t last_coeff_x = 0;
@@ -1808,7 +1808,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
   last_coeff_y = posLast>> uiLog2BlockSize;
 
   /* Code last_coeff_x and last_coeff_y */
-  encode_lastSignificantXY(encoder,last_coeff_x, last_coeff_y, width, width, type, scanMode);
+  encode_last_significant_xy(encoder,last_coeff_x, last_coeff_y, width, width, type, scanMode);
   
   iScanPosSig  = scanPosLast;
   iLastScanSet = (scanPosLast >> 4);
@@ -1969,7 +1969,7 @@ void encode_CoeffNxN(encoder_control* encoder,int16_t* coeff, uint8_t width, uin
  
  This method encodes the X and Y component within a block of the last significant coefficient.
 */
-void encode_lastSignificantXY(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
+void encode_last_significant_xy(encoder_control* encoder,uint8_t lastpos_x, uint8_t lastpos_y, uint8_t width, uint8_t height, uint8_t type, uint8_t scan)
 {
   uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
   uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
