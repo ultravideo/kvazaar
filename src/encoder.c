@@ -62,7 +62,7 @@ void init_sig_last_scan(uint32_t* buff_d, uint32_t* buff_h, uint32_t* buff_v, in
       }
       while( primary_dim >= 0 && second_dim < width )
       {
-        buff_tmp[ next_scan_pos ] = primary_dim * width + second_dim ;
+        buff_tmp[next_scan_pos] = primary_dim * width + second_dim ;
         next_scan_pos++;
         second_dim++;
         primary_dim--;
@@ -73,15 +73,15 @@ void init_sig_last_scan(uint32_t* buff_d, uint32_t* buff_h, uint32_t* buff_v, in
   {
     uint32_t num_blk_side = width >> 2;
     uint32_t num_blks    = num_blk_side * num_blk_side;
-    uint32_t log2_blk      = g_convert_to_bit[ num_blk_side ] + 1;
+    uint32_t log2_blk      = g_convert_to_bit[num_blk_side] + 1;
 
     for(blk = 0; blk < num_blks; blk++ )
     {      
-      uint32_t init_blk_pos = g_sig_last_scan[ SCAN_DIAG ][ log2_blk ][ blk ];
+      uint32_t init_blk_pos = g_sig_last_scan[SCAN_DIAG][log2_blk][blk];
       next_scan_pos   = 0;
       if( width == 32 )
       {
-        init_blk_pos = g_sig_last_scan_32x32[ blk ];
+        init_blk_pos = g_sig_last_scan_32x32[blk];
       }
       {
         uint32_t offset_y    = init_blk_pos / num_blk_side;
@@ -100,7 +100,7 @@ void init_sig_last_scan(uint32_t* buff_d, uint32_t* buff_h, uint32_t* buff_v, in
           }
           while( primary_dim >= 0 && second_dim < 4 )
           {
-            buff_d[ next_scan_pos + offset_scan ] = primary_dim * width + second_dim + offset_d;
+            buff_d[next_scan_pos + offset_scan] = primary_dim * width + second_dim + offset_d;
             next_scan_pos++;
             second_dim++;
             primary_dim--;
@@ -1230,7 +1230,7 @@ void encode_coding_tree(encoder_control* encoder,uint16_t x_ctb,uint16_t y_ctb, 
         {
           int8_t intra_pred_mode_chroma_temp = intra_pred_mode_chroma;
           /* Default chroma predictors */
-          uint32_t allowed_chroma_dir[ 5 ] = { 0, 26, 10, 1, 36 };
+          uint32_t allowed_chroma_dir[5] = { 0, 26, 10, 1, 36 };
           
           /* If intra is the same as one of the default predictors, replace it */
           for(i = 0; i < 4; i++ )
@@ -1760,8 +1760,8 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
 
   /* CONSTANTS */
   const uint32_t num_blk_side    = width >> shift;
-  const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
-  const uint32_t* scan           = g_sig_last_scan[ scanMode ][ log2_block_size - 1 ];
+  const uint32_t log2_block_size = g_convert_to_bit[width] + 2;
+  const uint32_t* scan           = g_sig_last_scan[scanMode][log2_block_size - 1];
   const uint32_t* scan_cg         = NULL;
 
   /* Init base contexts according to block type */
@@ -1778,10 +1778,10 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
     }
   }  
 
-  scan_cg = g_sig_last_scan[ scanMode ][ log2_block_size > 3 ? log2_block_size-3 : 0 ];
+  scan_cg = g_sig_last_scan[scanMode][log2_block_size > 3 ? log2_block_size-3 : 0];
   if( log2_block_size == 3 )
   {
-    scan_cg = g_sig_last_scan_8x8[ scanMode ];
+    scan_cg = g_sig_last_scan_8x8[scanMode];
   }
   else if( log2_block_size == 5 )
   {
@@ -1792,14 +1792,14 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
   /* Significance mapping */
   while(num_nonzero > 0)
   {
-    posLast = scan[ ++scanPosLast ];
+    posLast = scan[++scanPosLast];
     #define POSY (posLast >> log2_block_size)
     #define POSX (posLast - ( POSY << log2_block_size ))
-    if( coeff[ posLast ] != 0 )
+    if( coeff[posLast] != 0 )
     {
       sig_coeffgroup_flag[(num_blk_side * (POSY >> shift) + (POSX >> shift))] = 1;
     }
-    num_nonzero -= ( coeff[ posLast ] != 0 )?1:0;
+    num_nonzero -= ( coeff[posLast] != 0 )?1:0;
     #undef POSY
     #undef POSX
   }
@@ -1817,7 +1817,7 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
   {
     int32_t sub_pos       = i << 4 /*LOG2_SCAN_SET_SIZE*/;
     int32_t abs_coeff[16];
-    int32_t cg_blk_pos     = scan_cg[ i ];
+    int32_t cg_blk_pos     = scan_cg[i];
     int32_t cg_pos_y       = cg_blk_pos / num_blk_side;
     int32_t cg_pos_x       = cg_blk_pos - (cg_pos_y * num_blk_side);
     uint32_t coeff_signs   = 0;
@@ -1827,8 +1827,8 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
 
     if( scan_pos_sig == scanPosLast )
     {
-      abs_coeff[ 0 ] = abs( coeff[ posLast ] );
-      coeff_signs     = ( coeff[ posLast ] < 0 );
+      abs_coeff[0] = abs( coeff[posLast] );
+      coeff_signs     = ( coeff[posLast] < 0 );
       num_non_zero     = 1;
       last_nz_pos_in_cg  = scan_pos_sig;
       first_nz_pos_in_cg = scan_pos_sig;
@@ -1836,35 +1836,35 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
     }
     if( i == last_scan_set || i == 0)
     {
-      sig_coeffgroup_flag[ cg_blk_pos ] = 1;
+      sig_coeffgroup_flag[cg_blk_pos] = 1;
     }
     else
     {
-      uint32_t sig_coeff_group   = (sig_coeffgroup_flag[ cg_blk_pos ] != 0);
+      uint32_t sig_coeff_group   = (sig_coeffgroup_flag[cg_blk_pos] != 0);
       uint32_t ctx_sig  = context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x, cg_pos_y,width);
-      cabac.ctx = &base_coeff_group_ctx[ ctx_sig ];
+      cabac.ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(&cabac,sig_coeff_group,"significant_coeff_group");
     }
 
-    if( sig_coeffgroup_flag[ cg_blk_pos ] )
+    if( sig_coeffgroup_flag[cg_blk_pos] )
     {
       int32_t pattern_sig_ctx = context_calc_pattern_sig_ctx( sig_coeffgroup_flag, cg_pos_x, cg_pos_y, width);
       for( ; scan_pos_sig >= sub_pos; scan_pos_sig-- )
       {
-        blk_pos = scan[ scan_pos_sig ]; 
+        blk_pos = scan[scan_pos_sig]; 
         pos_y   = blk_pos >> log2_block_size;
         pos_x   = blk_pos - ( pos_y << log2_block_size );
-        sig    = (coeff[ blk_pos ] != 0)?1:0;
+        sig    = (coeff[blk_pos] != 0)?1:0;
         if( scan_pos_sig > sub_pos || i == 0 || num_non_zero )
         {
           ctx_sig  = context_get_sig_ctx_inc( pattern_sig_ctx, scanMode, pos_x, pos_y, log2_block_size, width, type );
-          cabac.ctx = &baseCtx[ ctx_sig ];
+          cabac.ctx = &baseCtx[ctx_sig];
           CABAC_BIN(&cabac,sig,"significant_coeff_flag");
         }
         if( sig )
         {
-          abs_coeff[ num_non_zero ] = abs( coeff[ blk_pos ] );
-          coeff_signs              = 2 * coeff_signs + ( coeff[ blk_pos ] < 0 );
+          abs_coeff[num_non_zero] = abs( coeff[blk_pos] );
+          coeff_signs              = 2 * coeff_signs + ( coeff[blk_pos] < 0 );
           num_non_zero++;
           if( last_nz_pos_in_cg == -1 )
           {
@@ -1896,7 +1896,7 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
       first_c2_flag_idx = -1;
       for(idx = 0; idx < num_c1_flag; idx++ )
       {
-        uint32_t symbol = (abs_coeff[ idx ] > 1)?1:0;
+        uint32_t symbol = (abs_coeff[idx] > 1)?1:0;
         cabac.ctx = &base_ctx_mod[c1];
         CABAC_BIN(&cabac,symbol,"significant_coeff2_flag");
         if( symbol )
@@ -1918,7 +1918,7 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
         base_ctx_mod = ( type==0 ) ? &g_cu_abs_model_luma[ctx_set] : &g_cu_abs_model_chroma[ctx_set];
         if (first_c2_flag_idx != -1)
         {
-          uint8_t symbol = (abs_coeff[ first_c2_flag_idx ] > 2)?1:0;
+          uint8_t symbol = (abs_coeff[first_c2_flag_idx] > 2)?1:0;
           cabac.ctx      = &base_ctx_mod[0];
           CABAC_BIN(&cabac,symbol,"first_c2_flag");
         }
@@ -1940,15 +1940,15 @@ void encode_coeff_nxn(encoder_control* encoder,int16_t* coeff, uint8_t width, ui
         {
           int32_t base_level  = (idx < C1FLAG_NUMBER)? (2 + first_coeff2 ) : 1;
 
-          if( abs_coeff[ idx ] >= base_level)
+          if( abs_coeff[idx] >= base_level)
           {
-            cabac_write_coeff_remain(&cabac, abs_coeff[ idx ] - base_level, go_rice_param );
+            cabac_write_coeff_remain(&cabac, abs_coeff[idx] - base_level, go_rice_param );
             if(abs_coeff[idx] > 3*(1<<go_rice_param))
             {
                 go_rice_param = MIN(go_rice_param+1, 4);
             }
           }
-          if(abs_coeff[ idx ] >= 2)
+          if(abs_coeff[idx] >= 2)
           {
             first_coeff2 = 0;
           }
