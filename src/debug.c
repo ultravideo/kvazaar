@@ -37,6 +37,7 @@ void close_cu_file(FILE *fp) {
 unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t xCtb, uint16_t yCtb, FILE *fp)
 {
   cu_info *cu = &encoder->in.cur_pic->cu_array[depth][xCtb + yCtb * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+  cu_info *final_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][xCtb + yCtb * (encoder->in.width_in_lcu<<MAX_DEPTH)];
   unsigned lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4;
   unsigned sum = 0;
   unsigned best_cost = -1;
@@ -44,10 +45,10 @@ unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t xCtb,
 
   fprintf(fp, 
     "\n<table class=d%u><tr><td colspan=2>"
-    "%u (%u, %u), %d, %c, "
+    "%u (%u, %u), %c, "
     "c=%u, mv=(%d, %d)</td></tr>\n", 
     depth,
-    depth, xCtb, yCtb, cu->split, (cu->type == CU_INTRA ? 'I' : 'P'),
+    depth, xCtb, yCtb, (cu->type == CU_INTRA ? 'I' : 'P'),
     cu->inter.cost, cu->inter.mv[0], cu->inter.mv[1]);
 
 
@@ -77,6 +78,16 @@ unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t xCtb,
     }
   } else {
     best_cost = cu->inter.cost;
+  }
+
+  if (depth == 0) {
+    fprintf(fp, 
+      "<tr><td colspan=2>"
+      "best depth=%u, %c, "
+      "c=%u, mv=(%d, %d)</td></tr>\n"
+      "</td></tr>", 
+      final_cu->depth, (final_cu->type == CU_INTRA ? 'I' : 'P'),
+      final_cu->inter.cost, final_cu->inter.mv[0], final_cu->inter.mv[1]);
   }
 
   fprintf(fp, "</table>");
