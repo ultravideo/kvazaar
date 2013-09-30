@@ -30,7 +30,10 @@
 #define USE_FULL_SEARCH 0
 #define USE_CHROMA_IN_MV_SEARCH 0
 
-#define IN_FRAME(x, y, width, height, block) ((x) >= 0 && (y) >= 0 && (x) + (block) <= (width) && (y) + (block) <= (height))
+#define IN_FRAME(x, y, width, height, block_width, block_height) \
+  ((x) >= 0 && (y) >= 0 \
+  && (x) + (block_width) <= (width) \
+  && (y) + (block_height) <= (height))
 
 
 /**
@@ -52,16 +55,15 @@ unsigned get_block_sad(picture *pic, picture *ref,
   uint8_t *pic_data, *ref_data;
   int width = pic->width;
   int height = pic->height;
-  int block = pic->width;
 
   unsigned result = 1; // Start from 1 so result is never 0.
 
   // 0 means invalid, for now.
-  if (!IN_FRAME(ref_x, ref_y, width, height, block)) return 0;
+  if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
 
   pic_data = &pic->y_data[pic_y * width + pic_x];
   ref_data = &ref->y_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block, block, width);
+  result += sad(pic_data, ref_data, block_width, block_height, width);
 
   #if USE_CHROMA_IN_MV_SEARCH
   // Halve everything because chroma is half the resolution.
@@ -74,11 +76,11 @@ unsigned get_block_sad(picture *pic, picture *ref,
 
   pic_data = &pic->u_data[pic_y * width + pic_x];
   ref_data = &ref->u_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block, block, width);
+  result += sad(pic_data, ref_data, block_width, block_height, width);
 
   pic_data = &pic->v_data[pic_y * width + pic_x];
   ref_data = &ref->v_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block, block, width);
+  result += sad(pic_data, ref_data, block_width, block_height, width);
   #endif
 
   return result;
