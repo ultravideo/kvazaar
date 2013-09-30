@@ -327,7 +327,6 @@ void search_tree(encoder_control *encoder,
     if (border) {
       // Split blocks and remember to change x and y block positions
       uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-      SET_SPLITDATA(cur_cu, 1);
       search_tree(encoder, x_ctb, y_ctb, depth + 1);
       if (!border_x || border_split_x) {
         search_tree(encoder, x_ctb + change, y_ctb, depth + 1);
@@ -451,19 +450,16 @@ uint32_t search_best_mode(encoder_control *encoder,
             && encoder->in.cur_pic->slicetype != SLICE_I))
     {
       // Set split to 1
-      picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);
       best_cost = cost + lambdaCost;
     } else if (best_inter_cost != 0 // Else, check if inter cost is smaller or the same as intra 
         && (best_inter_cost <= best_intra_cost || best_intra_cost == 0)
         && encoder->in.cur_pic->slicetype != SLICE_I)
     {
       // Set split to 0 and mode to inter.mode
-      picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
       inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
       best_cost = best_inter_cost;
     } else { // Else, dont split and recursively set block mode
       // Set split to 0 and mode to intra.mode
-      picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
       intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
           cur_cu->intra.mode);
       best_cost = best_intra_cost;
@@ -473,12 +469,10 @@ uint32_t search_best_mode(encoder_control *encoder,
              && encoder->in.cur_pic->slicetype != SLICE_I)
   {
     // Set split to 0 and mode to inter.mode
-    picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
     inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
     best_cost = best_inter_cost;
   } else {
     // Set split to 0 and mode to intra.mode
-    picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
         cur_cu->intra.mode);
     best_cost = best_intra_cost;
