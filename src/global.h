@@ -34,7 +34,7 @@
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
 
-#define MAX_INTER_SEARCH_DEPTH 2
+#define MAX_INTER_SEARCH_DEPTH 3
 #define MIN_INTER_SEARCH_DEPTH 0
 
 #define MAX_INTRA_SEARCH_DEPTH 3 /*!< Max search depth -> min block size (3 == 8x8) */
