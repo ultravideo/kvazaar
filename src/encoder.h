@@ -94,6 +94,8 @@ typedef struct
   int8_t intra_pred_mode_chroma;
   int32_t split[4];
 
+  int8_t block_type;
+
   int32_t x_ctb,y_ctb;
 
 } transform_info;
