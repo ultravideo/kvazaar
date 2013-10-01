@@ -26,6 +26,7 @@
 
 // Temporarily for debugging.
 #define USE_INTRA_IN_P 0
+//#define RENDER_CU encoder->frame==2
 #define RENDER_CU 0
 #define USE_FULL_SEARCH 0
 #define USE_CHROMA_IN_MV_SEARCH 0
@@ -489,7 +490,7 @@ void search_slice_data(encoder_control *encoder)
   int16_t x_lcu, y_lcu;
   FILE *fp = 0, *fp2 = 0;
 
-  if (RENDER_CU && encoder->frame == 1) {
+  if (RENDER_CU) {
     fp = open_cu_file("cu_search.html");
     fp2 = open_cu_file("cu_best.html");
   }
@@ -500,14 +501,14 @@ void search_slice_data(encoder_control *encoder)
       uint8_t depth = 0;
       // Recursive function for looping through all the sub-blocks
       search_tree(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
-      if (RENDER_CU && encoder->frame == 1) {
-        render_cu_file(encoder, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp);
+      if (RENDER_CU) {
+        render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp);
       }
 
       // Decide actual coding modes
       search_best_mode(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
-      if (RENDER_CU && encoder->frame == 1) {
-        render_cu_file(encoder, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
+      if (RENDER_CU) {
+        render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
       }
     }
   }
