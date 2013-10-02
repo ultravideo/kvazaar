@@ -65,7 +65,7 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
   unsigned char yuv[3] = { 0, 0, 0 };
   unsigned char rgb[3] = { 0, 0, 0 };
 
-  if (x > pic->width || y > pic->width) {
+  if (x >= pic->width || y >= pic->height) {
     // Don't output anything for CU's completely outside the botders.
     return 0;
   }
