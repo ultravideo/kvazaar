@@ -157,13 +157,19 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   int32_t stride = encoder->in.cur_pic->width;
   int32_t offset = stride;
   int32_t beta_offset_div2 = encoder->beta_offset_div2;
-  int32_t tc_offset_div2   = encoder->tc_offset_div2;
-  int8_t strength = 2; // Filter strength
+  int32_t tc_offset_div2   = encoder->tc_offset_div2;  
   // TODO: support 10+bits
   uint8_t *orig_src = &encoder->in.cur_pic->y_recdata[xpos + ypos*stride];
   uint8_t *src = orig_src;
   int32_t step = 1;
-  
+  cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((xpos>>MIN_SIZE)-(dir == EDGE_VER)) +
+                                                            ((ypos>>MIN_SIZE)-(dir == EDGE_HOR)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  int8_t strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
+                    ((abs(cu_q->inter.mv[0]-cu_p->inter.mv[0]) >= 4 || abs(cu_q->inter.mv[1]-cu_p->inter.mv[1]) >= 4) ? 1 : 0)); // Filter strength
+
+  if(!strength) return;
+
   if(dir == EDGE_VER) {
     offset = 1;
     step = stride;
@@ -242,9 +248,14 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   // Init offset and step to EDGE_HOR
   int32_t offset = stride;
   int32_t step = 1;
+  cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((x>>(MIN_SIZE-1))-(dir == EDGE_VER)) +
+                                                            ((y>>(MIN_SIZE-1))-(dir == EDGE_HOR)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  int8_t strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
+                    ((abs(cu_q->inter.mv[0]-cu_p->inter.mv[0]) >= 4 || abs(cu_q->inter.mv[1]-cu_p->inter.mv[1]) >= 4) ? 1 : 0)); // Filter strength
 
   // We cannot filter edges not on 8x8 grid
-  if(depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) )
+  if(strength != 2 && depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) )
   {
     return;
   }
@@ -259,7 +270,7 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   {
     int32_t QP             = g_chroma_scale[encoder->QP];
     int32_t bitdepth_scale = 1 << (g_bitdepth-8);
-    int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2 + (tc_offset_div2 << 1)));    
+    int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));    
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
     uint32_t blocks_in_part= (LCU_WIDTH>>(depth+1)) / 4;
     uint32_t blk_idx;
