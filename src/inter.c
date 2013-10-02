@@ -266,8 +266,11 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
 
   // B0, B1 and B2 availability testing
   if (y_cu != 0) {
-    b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-    if (!b0->coded) b0 = NULL;
+
+    if (x_cu + cur_block_in_scu < encoder->in.width_in_lcu<<MAX_DEPTH) {
+      b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      if (!b0->coded) b0 = NULL;
+    }
     b1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
     if (!b1->coded) b1 = NULL;
 
