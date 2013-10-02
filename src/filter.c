@@ -425,7 +425,7 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
         src_pos += src_stride;  //0,2
         ae_temp3 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1) + offset; // ae0,2
 
-        dst[dst_pos + 1*dst_stride + 1] = ((( -4*ae_temp1 + 36*dst[dst_pos + 1] + 36*ae_temp2 - 4*ae_temp3 ) >> shift2) + offset) >> shift3; // ee0,0
+        dst[dst_pos + 1*dst_stride + 1] = ((( -4*ae_temp1 + 36*ae_temp + 36*ae_temp2 - 4*ae_temp3 ) >> shift2) + offset) >> shift3; // ee0,0
       }
 
       if(hor_flag) {
