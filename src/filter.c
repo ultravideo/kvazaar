@@ -251,11 +251,10 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
   cu_info *cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((x>>(MIN_SIZE-1))-(dir == EDGE_VER)) +
                                                             ((y>>(MIN_SIZE-1))-(dir == EDGE_HOR)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  int8_t strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
-                    ((abs(cu_q->inter.mv[0]-cu_p->inter.mv[0]) >= 4 || abs(cu_q->inter.mv[1]-cu_p->inter.mv[1]) >= 4) ? 1 : 0)); // Filter strength
+  int8_t strength = (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 0; // Filter strength
 
   // We cannot filter edges not on 8x8 grid
-  if(strength != 2 && depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) )
+  if(strength != 2 || (depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
   {
     return;
   }
