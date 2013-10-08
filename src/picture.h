@@ -57,7 +57,6 @@ typedef struct
   int8_t coded;
   cu_info_intra intra;
   cu_info_inter inter;
-  int8_t split;
 } cu_info;
 
 /**

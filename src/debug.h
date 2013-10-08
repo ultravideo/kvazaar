@@ -21,6 +21,6 @@
 
 FILE * open_cu_file(char *filename);
 void close_cu_file(FILE *fp);
-unsigned render_cu_file(encoder_control *encoder, unsigned depth, uint16_t x_cu, uint16_t y_cu, FILE *fp);
+unsigned render_cu_file(encoder_control *encoder, picture *pic, unsigned depth, uint16_t x_cu, uint16_t y_cu, FILE *fp);
 
 #endif

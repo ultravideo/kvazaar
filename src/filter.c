@@ -157,13 +157,16 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   int32_t stride = encoder->in.cur_pic->width;
   int32_t offset = stride;
   int32_t beta_offset_div2 = encoder->beta_offset_div2;
-  int32_t tc_offset_div2   = encoder->tc_offset_div2;
-  int8_t strength = 2; // Filter strength
+  int32_t tc_offset_div2   = encoder->tc_offset_div2;  
   // TODO: support 10+bits
   uint8_t *orig_src = &encoder->in.cur_pic->y_recdata[xpos + ypos*stride];
   uint8_t *src = orig_src;
   int32_t step = 1;
+  cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cu_p = 0;
+  int8_t strength = 0;
   
+
   if(dir == EDGE_VER) {
     offset = 1;
     step = stride;
@@ -171,23 +174,31 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   
   {
     int32_t qp              = encoder->QP;
-    int32_t bitdepth_scale  = 1 << (g_bitdepth - 8);
-    int32_t tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
+    int32_t bitdepth_scale  = 1 << (g_bitdepth - 8);    
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
-    int32_t tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
     int32_t beta            = g_beta_table_8x8[b_index] * bitdepth_scale;
     int32_t side_threshold  = (beta + (beta >>1 )) >> 3;
-    int32_t thr_cut         = tc * 10;
     uint32_t blocks_in_part = (LCU_WIDTH >> depth) / 4;
     uint32_t block_idx;
-
+    int32_t tc_index,tc,thr_cut;
     // TODO: add CU based QP calculation 
 
     // For each 4-pixel part in the edge
-    for (block_idx = 0; block_idx < blocks_in_part; ++block_idx)
-    {
+    for (block_idx = 0; block_idx < blocks_in_part; ++block_idx) {      
       int32_t dp0, dq0, dp3, dq3, d0, d3, dp, dq, d;
-
+      if((block_idx & 1) == 0)
+      {
+        // CU in the side we are filtering, update every 8-pixels
+        cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((xpos>>MIN_SIZE)-(dir == EDGE_VER)+(dir == EDGE_HOR?block_idx/2:0)) +
+                                                         ((ypos>>MIN_SIZE)-(dir == EDGE_HOR)+(dir == EDGE_VER?block_idx/2:0)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        // Filter strength
+        strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
+                   (((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) ? 1 : 0));
+        tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
+        tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
+        thr_cut         = tc * 10;
+      }
+      if(!strength) continue;
       // Check conditions for filtering
       // TODO: Get rid of these inline defines.
       #define calc_DP(s,o) abs( (int16_t)s[-o*3] - (int16_t)2*s[-o*2] + (int16_t)s[-o] )
@@ -242,9 +253,13 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   // Init offset and step to EDGE_HOR
   int32_t offset = stride;
   int32_t step = 1;
+  cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((x>>(MIN_SIZE-1))-(dir == EDGE_VER)) +
+                                                            ((y>>(MIN_SIZE-1))-(dir == EDGE_HOR)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  int8_t strength = (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 0; // Filter strength
 
   // We cannot filter edges not on 8x8 grid
-  if(depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) )
+  if(strength != 2 || (depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
   {
     return;
   }
@@ -259,7 +274,7 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   {
     int32_t QP             = g_chroma_scale[encoder->QP];
     int32_t bitdepth_scale = 1 << (g_bitdepth-8);
-    int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2 + (tc_offset_div2 << 1)));    
+    int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));    
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
     uint32_t blocks_in_part= (LCU_WIDTH>>(depth+1)) / 4;
     uint32_t blk_idx;
@@ -386,7 +401,9 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
   int32_t shift1 = g_bitdepth-8;
   int32_t shift2 = 6;
   int32_t shift3 = 14-g_bitdepth;
-  int32_t offset = 1<<(shift2-1); //!< offset for rounding purposes
+  int32_t offset = 1 << (shift2 - 1); //!< offset for rounding purposes
+  int32_t offset3 = 1 << (shift3 - 1);
+  int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   // Loop source pixels and generate four filtered half-pel pixels on each round
   for (y = 0; y < height; y++) {
@@ -406,12 +423,12 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
 
       // ae0,0 - We need this only when hor_flag and for ee0,0
       if (hor_flag) {
-        ae_temp = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1) + offset; // ae0,0
+        ae_temp = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1); // ae0,0
       }
       // ea0,0 - needed only when ver_flag
       if(ver_flag) {
         dst[dst_pos + 1*dst_stride] = (((-4*src[src_pos - src_stride] + 36*src[src_pos] + 36*src[src_pos + src_stride] 
-                                        - 4*src[src_pos + 2*src_stride]  ) >> shift1) + offset) >> shift3; // ea0,0
+                                        - 4*src[src_pos + 2*src_stride]  ) >> shift1) + (1<<(shift3-1))) >> shift3; // ea0,0
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
@@ -419,17 +436,17 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
         // Calculate temporary values..
         //TODO: optimization, store these values
         src_pos -= src_stride;  //0,-1
-        ae_temp1 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1) + offset; // ae0,-1
-        src_pos += src_stride;  //0,1
-        ae_temp2 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1) + offset; // ae0,1
+        ae_temp1 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1); // ae0,-1
+        src_pos += 2*src_stride;  //0,1
+        ae_temp2 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1); // ae0,1
         src_pos += src_stride;  //0,2
-        ae_temp3 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1) + offset; // ae0,2
+        ae_temp3 = ((-4*src[src_pos - 1] + 36*src[src_pos] + 36*src[src_pos + 1] - 4*src[src_pos + 2] ) >> shift1); // ae0,2
 
-        dst[dst_pos + 1*dst_stride + 1] = ((( -4*ae_temp1 + 36*dst[dst_pos + 1] + 36*ae_temp2 - 4*ae_temp3 ) >> shift2) + offset) >> shift3; // ee0,0
+        dst[dst_pos + 1*dst_stride + 1] = (((-4*ae_temp1 + 36*ae_temp + 36*ae_temp2 - 4*ae_temp3 ) + offset23) >> shift2) >> shift3; // ee0,0
       }
 
       if(hor_flag) {
-        dst[dst_pos + 1] = ae_temp >> shift3;
+        dst[dst_pos + 1] = (ae_temp + offset3) >> shift3;
       }
     }
   }

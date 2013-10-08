@@ -26,26 +26,76 @@
 
 // Temporarily for debugging.
 #define USE_INTRA_IN_P 0
+//#define RENDER_CU encoder->frame==2
 #define RENDER_CU 0
 #define USE_FULL_SEARCH 0
+#define USE_CHROMA_IN_MV_SEARCH 0
 
-#define IN_FRAME(x, y, width, height, block) ((x) >= 0 && (y) >= 0 && (x) + (block) <= (width) && (y) + (block) <= (height))
+#define IN_FRAME(x, y, width, height, block_width, block_height) \
+  ((x) >= 0 && (y) >= 0 \
+  && (x) + (block_width) <= (width) \
+  && (y) + (block_height) <= (height))
 
 
-unsigned get_sad(int x, int y, int width, int height, int block, uint8_t *pic_data, uint8_t *ref_data)
+/**
+ * \brief  Get Sum of Absolute Differences (SAD) between two blocks in two
+ *         different frames.
+ * \param pic  First frame.
+ * \param ref  Second frame.
+ * \param pic_x  X coordinate of the first block.
+ * \param pic_y  Y coordinate of the first block.
+ * \param ref_x  X coordinate of the second block.
+ * \param ref_y  Y coordinate of the second block.
+ * \param block_width  Width of the blocks.
+ * \param block_height  Height of the blocks.
+ */
+unsigned get_block_sad(picture *pic, picture *ref, 
+                       int pic_x, int pic_y, int ref_x, int ref_y, 
+                       int block_width, int block_height)
 {
-  if (!IN_FRAME(x, y, width, height, block)) return 0; // This means invalid, for now.
+  uint8_t *pic_data, *ref_data;
+  int width = pic->width;
+  int height = pic->height;
 
-  return 1 + sad(pic_data, &ref_data[y * width + x], block, block, width);
+  unsigned result = 1; // Start from 1 so result is never 0.
+
+  // 0 means invalid, for now.
+  if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
+
+  pic_data = &pic->y_data[pic_y * width + pic_x];
+  ref_data = &ref->y_data[ref_y * width + ref_x];
+  result += sad(pic_data, ref_data, block_width, block_height, width);
+
+  #if USE_CHROMA_IN_MV_SEARCH
+  // Halve everything because chroma is half the resolution.
+  width >>= 2;
+  pic_x >>= 2;
+  pic_y >>= 2;
+  ref_x >>= 2;
+  ref_y >>= 2;
+  block >>= 2;
+
+  pic_data = &pic->u_data[pic_y * width + pic_x];
+  ref_data = &ref->u_data[ref_y * width + ref_x];
+  result += sad(pic_data, ref_data, block_width, block_height, width);
+
+  pic_data = &pic->v_data[pic_y * width + pic_x];
+  ref_data = &ref->v_data[ref_y * width + ref_x];
+  result += sad(pic_data, ref_data, block_width, block_height, width);
+  #endif
+
+  return result;
 }
 
-void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
+void search_mv(picture *pic, picture *ref,
                cu_info *cur_cu,  int orig_x, int orig_y, int x, int y, 
                unsigned depth)
 {
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
 
-  unsigned cost = get_sad(orig_x + x, orig_y + y, pic->width, pic->height, block_width, pic_data, ref_data);
+  // Get cost for the predicted motion vector.
+  unsigned cost = get_block_sad(pic, ref, orig_x, orig_y, orig_x + x, orig_y + y,
+                                block_width, block_width);
   unsigned best_cost = -1;
   unsigned step = 8;
 
@@ -55,15 +105,15 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     cur_cu->inter.mv[1] = y;
   }
 
-  // If initial vector is farther away than the step, try the (0, 0) vector
-  // in addition to the initial vector.
-  if (abs(x) > step || abs(y) > step) {
-    cost = get_sad(orig_x, orig_y, pic->width, pic->height, block_width, pic_data, ref_data);
+  // If initial vector is long, also try the (0, 0) vector just in case.
+  if (x != 0 || y != 0) {
+    cost = get_block_sad(pic, ref, orig_x, orig_y, orig_x, orig_y,
+                         block_width, block_width);
 
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
-      cur_cu->inter.mv[0] = x;
-      cur_cu->inter.mv[1] = y - step;
+      cur_cu->inter.mv[0] = 0;
+      cur_cu->inter.mv[1] = 0;
     }
   }
 
@@ -75,16 +125,20 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     // due to quantization. It's value is just a guess based on the first
     // blocks of the BQMall sequence, which don't move.
     // TODO: Quantization factor probably affects what the constant should be.
+    /*
     if (best_cost <= block_width * block_width * 1.8) {
       break;
     }
+    */
 
     // Change center of search to the current best point.
     x = cur_cu->inter.mv[0];
     y = cur_cu->inter.mv[1];
 
     // above
-    cost = get_sad(orig_x + x, orig_y + y - step, pic->width, pic->height, block_width, pic_data, ref_data);
+    cost = get_block_sad(pic, ref, orig_x, orig_y,
+                         orig_x + x, orig_y + y - step,
+                         block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       cur_cu->inter.mv[0] = x;
@@ -92,7 +146,9 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     }
 
     // left
-    cost = get_sad(orig_x + x - step, orig_y + y, pic->width, pic->height, block_width, pic_data, ref_data);
+    cost = get_block_sad(pic, ref, orig_x, orig_y,
+                         orig_x + x - step, orig_y + y,
+                         block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       cur_cu->inter.mv[0] = x - step;
@@ -100,7 +156,9 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     }
 
     // right
-    cost = get_sad(orig_x + x + step, orig_y + y, pic->width, pic->height, block_width, pic_data, ref_data);
+    cost = get_block_sad(pic, ref, orig_x, orig_y,
+                         orig_x + x + step, orig_y + y,
+                         block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       cur_cu->inter.mv[0] = x + step;
@@ -108,7 +166,9 @@ void search_mv(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
     }
 
     // below
-    cost = get_sad(orig_x + x, orig_y + y + step, pic->width, pic->height, block_width, pic_data, ref_data);
+    cost = get_block_sad(pic, ref, orig_x, orig_y,
+                         orig_x + x, orig_y + y + step,
+                         block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       cur_cu->inter.mv[0] = x;
@@ -157,13 +217,13 @@ void search_mv_full(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
   step /= 2;
   if (step > 0) {
     search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                         x, y - step, depth);
+                   x, y - step, depth);
     search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                         x - step, y, depth);
+                   x - step, y, depth);
     search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                         x + step, y, depth);
+                   x + step, y, depth);
     search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                         x, y + step, depth);
+                   x, y + step, depth);
   }
 }
 
@@ -268,7 +328,6 @@ void search_tree(encoder_control *encoder,
     if (border) {
       // Split blocks and remember to change x and y block positions
       uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-      SET_SPLITDATA(cur_cu, 1);
       search_tree(encoder, x_ctb, y_ctb, depth + 1);
       if (!border_x || border_split_x) {
         search_tree(encoder, x_ctb + change, y_ctb, depth + 1);
@@ -305,8 +364,8 @@ void search_tree(encoder_control *encoder,
       int start_y = 0;
       // Convert from sub-pixel accuracy.
       if (ref_cu->type == CU_INTER) {
-        int start_x = ref_cu->inter.mv[0] >> 2;
-        int start_y = ref_cu->inter.mv[1] >> 2;
+        start_x = ref_cu->inter.mv[0] >> 2;
+        start_y = ref_cu->inter.mv[1] >> 2;
       }
 
       if (USE_FULL_SEARCH) {
@@ -314,7 +373,7 @@ void search_tree(encoder_control *encoder,
                        cur_cu, 8, x, y,
                        start_x, start_y, depth);
       } else {
-        search_mv(cur_pic, cur_data, ref_pic->y_data, 
+        search_mv(cur_pic, ref_pic, 
                   cur_cu, x, y, 
                   start_x, start_y, depth);
       }
@@ -385,26 +444,24 @@ uint32_t search_best_mode(encoder_control *encoder,
     cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
 
     // We split if the cost is better (0 cost -> not checked)
-    if (cost != 0 
+    if ( (encoder->in.cur_pic->slicetype == SLICE_I && depth < MIN_INTRA_SEARCH_DEPTH) ||
+        (cost != 0 
         && (best_intra_cost != 0 && cost + lambdaCost < best_intra_cost)
         && (best_inter_cost != 0
             && cost + lambdaCost < best_inter_cost
-            && encoder->in.cur_pic->slicetype != SLICE_I))
+            && encoder->in.cur_pic->slicetype != SLICE_I)))
     {
       // Set split to 1
-      picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);
       best_cost = cost + lambdaCost;
     } else if (best_inter_cost != 0 // Else, check if inter cost is smaller or the same as intra 
         && (best_inter_cost <= best_intra_cost || best_intra_cost == 0)
         && encoder->in.cur_pic->slicetype != SLICE_I)
     {
       // Set split to 0 and mode to inter.mode
-      picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
       inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
       best_cost = best_inter_cost;
     } else { // Else, dont split and recursively set block mode
       // Set split to 0 and mode to intra.mode
-      picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
       intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
           cur_cu->intra.mode);
       best_cost = best_intra_cost;
@@ -414,12 +471,10 @@ uint32_t search_best_mode(encoder_control *encoder,
              && encoder->in.cur_pic->slicetype != SLICE_I)
   {
     // Set split to 0 and mode to inter.mode
-    picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
     inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
     best_cost = best_inter_cost;
   } else {
     // Set split to 0 and mode to intra.mode
-    picture_set_block_split(encoder->in.cur_pic, x_ctb, y_ctb, depth, 0);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
         cur_cu->intra.mode);
     best_cost = best_intra_cost;
@@ -436,7 +491,7 @@ void search_slice_data(encoder_control *encoder)
   int16_t x_lcu, y_lcu;
   FILE *fp = 0, *fp2 = 0;
 
-  if (RENDER_CU && encoder->frame == 1) {
+  if (RENDER_CU) {
     fp = open_cu_file("cu_search.html");
     fp2 = open_cu_file("cu_best.html");
   }
@@ -447,14 +502,14 @@ void search_slice_data(encoder_control *encoder)
       uint8_t depth = 0;
       // Recursive function for looping through all the sub-blocks
       search_tree(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
-      if (RENDER_CU && encoder->frame == 1) {
-        render_cu_file(encoder, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp);
+      if (RENDER_CU) {
+        render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp);
       }
 
       // Decide actual coding modes
       search_best_mode(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
-      if (RENDER_CU && encoder->frame == 1) {
-        render_cu_file(encoder, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
+      if (RENDER_CU) {
+        render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
       }
     }
   }

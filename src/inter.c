@@ -58,9 +58,10 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
  * \param dst destination picture
  * \returns Void
 */
-void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t mv[2], picture *dst)
+void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], picture *dst)
 {
   int x,y,coord_x,coord_y;
+  int16_t mv[2] = { mv_param[0], mv_param[1] };
 
   int32_t dst_width_c = dst->width>>1; //!< Destination picture width in chroma pixels
   int32_t ref_width_c = ref->width>>1; //!< Reference picture width in chroma pixels
@@ -84,8 +85,8 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, int16_t 
   int16_t halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
 
   // TODO: Fractional pixel support
-  mv[0] = mv[0]>>2;
-  mv[1] = mv[1]>>2;
+  mv[0] >>= 2;
+  mv[1] >>= 2;
 
   // Chroma half-pel
   // get half-pel interpolated block and push it to output
@@ -265,8 +266,11 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
 
   // B0, B1 and B2 availability testing
   if (y_cu != 0) {
-    b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-    if (!b0->coded) b0 = NULL;
+
+    if (x_cu + cur_block_in_scu < encoder->in.width_in_lcu<<MAX_DEPTH) {
+      b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      if (!b0->coded) b0 = NULL;
+    }
     b1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
     if (!b1->coded) b1 = NULL;
 

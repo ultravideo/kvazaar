@@ -21,29 +21,6 @@
 
 
 /**
- * \brief Set block splitflag
- * \param pic    picture to use
- * \param x_scu  x SCU position (smallest CU)
- * \param y_scu  y SCU position (smallest CU)
- * \param depth  current CU depth
- * \param mode   mode to set
- */
-void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                             uint8_t depth, int8_t split)
-{
-  uint32_t x, y;
-  int width_in_scu = pic->width_in_lcu << MAX_DEPTH;
-  int block_scu_width = (LCU_WIDTH >> depth) / (LCU_WIDTH >> MAX_DEPTH);
-
-  for (y = y_scu; y < y_scu + block_scu_width; ++y) {
-    int cu_row = y * width_in_scu;
-    for (x = x_scu; x < x_scu + block_scu_width; ++x) {
-      pic->cu_array[depth][cu_row + x].split = split;
-    }
-  }
-}
-
-/**
  * \brief Set block coded status
  * \param pic    picture to use
  * \param x_scu  x SCU position (smallest CU)
