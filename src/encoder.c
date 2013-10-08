@@ -1080,7 +1080,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
     // END for each part
   } else if (cur_cu->type == CU_INTRA) {
-    uint8_t intra_perd_mode = cur_cu->intra.mode;
+    uint8_t intra_pred_mode = cur_cu->intra.mode;
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
     int8_t intra_preds[3] = { -1, -1, -1};
     int8_t mpm_preds = -1;
@@ -1114,9 +1114,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
                                                   y_ctb * (LCU_WIDTH >> (MAX_DEPTH)), 
                                                   width, pred_y, width, 
                                                   &cur_cu->intra.cost);
-    intra_perd_mode = cur_cu->intra.mode;
+    intra_pred_mode = cur_cu->intra.mode;
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-                         intra_perd_mode);
+                         intra_pred_mode);
 
 #if ENABLE_PCM == 1
     // Code must start after variable initialization
@@ -1131,7 +1131,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
                                  intra_preds);
 
     for (i = 0; i < 3; i++) {
-      if (intra_preds[i] == intra_perd_mode) {
+      if (intra_preds[i] == intra_pred_mode) {
         mpm_preds = i;
         break;
       }
@@ -1155,7 +1155,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       }
     } else { 
       // we signal the "full" predmode
-      int32_t intra_pred_mode_temp = intra_perd_mode;
+      int32_t intra_pred_mode_temp = intra_pred_mode;
 
       if (intra_preds[0] > intra_preds[1]) {
         SWAP(intra_preds[0], intra_preds[1], int8_t);
@@ -1191,7 +1191,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
         // If intra is the same as one of the default predictors, replace it
         for (i = 0; i < 4; i++) {
-          if (intra_perd_mode == allowed_chroma_dir[i]) {
+          if (intra_pred_mode == allowed_chroma_dir[i]) {
             allowed_chroma_dir[i] = 34; /* VER+8 mode */
             break;
           }
@@ -1240,7 +1240,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       ti.coeff[0] = coeff_y; ti.coeff[1] = coeff_u; ti.coeff[2] = coeff_v;
 
       // Prediction info
-      ti.intra_pred_mode = intra_perd_mode;
+      ti.intra_pred_mode = intra_pred_mode;
       ti.intra_pred_mode_chroma = intra_pred_mode_chroma;
 
       // Handle transforms, quant and reconstruction
