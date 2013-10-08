@@ -163,12 +163,9 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   uint8_t *src = orig_src;
   int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  cu_info *cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((xpos>>MIN_SIZE)-(dir == EDGE_VER)) +
-                                                            ((ypos>>MIN_SIZE)-(dir == EDGE_HOR)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  int8_t strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
-                    ((abs(cu_q->inter.mv[0]-cu_p->inter.mv[0]) >= 4 || abs(cu_q->inter.mv[1]-cu_p->inter.mv[1]) >= 4) ? 1 : 0)); // Filter strength
-
-  if(!strength) return;
+  cu_info *cu_p = 0;
+  int8_t strength = 0;
+  
 
   if(dir == EDGE_VER) {
     offset = 1;
@@ -177,23 +174,31 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   
   {
     int32_t qp              = encoder->QP;
-    int32_t bitdepth_scale  = 1 << (g_bitdepth - 8);
-    int32_t tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
+    int32_t bitdepth_scale  = 1 << (g_bitdepth - 8);    
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
-    int32_t tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
     int32_t beta            = g_beta_table_8x8[b_index] * bitdepth_scale;
     int32_t side_threshold  = (beta + (beta >>1 )) >> 3;
-    int32_t thr_cut         = tc * 10;
     uint32_t blocks_in_part = (LCU_WIDTH >> depth) / 4;
     uint32_t block_idx;
-
+    int32_t tc_index,tc,thr_cut;
     // TODO: add CU based QP calculation 
 
     // For each 4-pixel part in the edge
-    for (block_idx = 0; block_idx < blocks_in_part; ++block_idx)
-    {
+    for (block_idx = 0; block_idx < blocks_in_part; ++block_idx) {      
       int32_t dp0, dq0, dp3, dq3, d0, d3, dp, dq, d;
-
+      if((block_idx & 1) == 0)
+      {
+        // CU in the side we are filtering, update every 8-pixels
+        cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((xpos>>MIN_SIZE)-(dir == EDGE_VER)+(dir == EDGE_HOR?block_idx/2:0)) +
+                                                         ((ypos>>MIN_SIZE)-(dir == EDGE_HOR)+(dir == EDGE_VER?block_idx/2:0)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        // Filter strength
+        strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
+                   (((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) ? 1 : 0));
+        tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
+        tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
+        thr_cut         = tc * 10;
+      }
+      if(!strength) continue;
       // Check conditions for filtering
       // TODO: Get rid of these inline defines.
       #define calc_DP(s,o) abs( (int16_t)s[-o*3] - (int16_t)2*s[-o*2] + (int16_t)s[-o] )
