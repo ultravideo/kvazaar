@@ -139,6 +139,31 @@ void hexagon_search(picture *pic, picture *ref,
       best_index = i;
     }
   }
+
+  // Try the 0,0 vector.
+  if (!(x == 0 && y == 0)) {
+    unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
+                                  orig_x, orig_y,
+                                  block_width, block_width);
+    if (cost > 0 && cost < best_cost) {
+      best_cost = cost;
+      best_index = 0;
+      x = 0;
+      y = 0;
+
+      // Redo the search around the 0,0 point.
+      for (i = 1; i < 7; ++i) {
+        const vector2d *pattern = large_hexbs + i;
+        unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
+                              orig_x + pattern->x, orig_y + pattern->y,
+                              block_width, block_width);
+        if (cost > 0 && cost < best_cost) {
+          best_cost = cost;
+          best_index = i;
+        }
+      }
+    }
+  }
   
   // Iteratively search the 3 new points around the best match, until the best
   // match is in the center.
