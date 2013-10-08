@@ -19,7 +19,9 @@
  */
 FILE * open_cu_file(char *filename) {
   FILE *fp = fopen(filename, "w");
-  fprintf(fp, "<html><head><link rel='stylesheet' type='text/css' href='cu_style.css' /></head><body>");
+  fprintf(fp, "<?xml version='1.0' encoding='UTF-8' ?>\r\n"
+          "<html xmlns='http://www.w3.org/1999/xhtml' xml:lang='en'>\r\n"
+          "<head><link rel='stylesheet' type='text/css' href='cu_style.css' /></head><body>");
   return fp;
 }
 
@@ -94,7 +96,7 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
   }
 
   fprintf(fp, 
-    "\n<table class=d%u bgcolor=#%02x%02x%02x><tr><td colspan=2>"
+    "\n<table class='d%u' bgcolor='#%02x%02x%02x'><tr><td colspan='2'>"
     "%u (%u, %u), %c, "
     "c=%u, mv=(%d, %d)</td></tr>\n", 
     depth, rgb[0], rgb[1], rgb[2],
@@ -119,7 +121,7 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
     sum += render_cu_file(encoder, pic, depth + 1, xCtb + change, yCtb + change, fp);
     fprintf(fp, "</td></tr>");
 
-    fprintf(fp, "<tr><td colspan=2>sum=%u, sum+lambda=%u</td></tr>",
+    fprintf(fp, "<tr><td colspan='2'>sum=%u, sum+lambda=%u</td></tr>",
       sum, sum + lambda_cost);
     if (sum + lambda_cost < cu->inter.cost) {
       best_cost = sum + lambda_cost;
@@ -132,7 +134,7 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
 
   if (depth == 0) {
     fprintf(fp, 
-      "<tr><td colspan=2>"
+      "<tr><td colspan='2'>"
       "best depth=%u, %c, "
       "c=%u, mv=(%d, %d)</td></tr>\n"
       "</td></tr>", 
