@@ -444,11 +444,12 @@ uint32_t search_best_mode(encoder_control *encoder,
     cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
 
     // We split if the cost is better (0 cost -> not checked)
-    if (cost != 0 
+    if ( (encoder->in.cur_pic->slicetype == SLICE_I && depth < MIN_INTRA_SEARCH_DEPTH) ||
+        (cost != 0 
         && (best_intra_cost != 0 && cost + lambdaCost < best_intra_cost)
         && (best_inter_cost != 0
             && cost + lambdaCost < best_inter_cost
-            && encoder->in.cur_pic->slicetype != SLICE_I))
+            && encoder->in.cur_pic->slicetype != SLICE_I)))
     {
       // Set split to 1
       best_cost = cost + lambdaCost;
