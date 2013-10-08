@@ -318,10 +318,7 @@ void encode_one_frame(encoder_control *encoder)
   }
 
   // Filtering
-  // TODO: Check for correct deblock condition on inter blocks
-  if (encoder->deblock_enable && encoder->in.cur_pic->slicetype == SLICE_I) {
-    filter_deblock(encoder);
-  }
+  filter_deblock(encoder);
 
   // Calculate checksum
   add_checksum(encoder);
