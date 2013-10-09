@@ -164,6 +164,7 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
   cu_info *cu_p = 0;
+  int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
   int8_t strength = 0;
   
 
@@ -189,12 +190,22 @@ void filter_deblock_edge_luma(encoder_control *encoder,
       if((block_idx & 1) == 0)
       {
         // CU in the side we are filtering, update every 8-pixels
-        cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((xpos>>MIN_SIZE)-(dir == EDGE_VER)+(dir == EDGE_HOR?block_idx/2:0)) +
-                                                         ((ypos>>MIN_SIZE)-(dir == EDGE_HOR)+(dir == EDGE_VER?block_idx/2:0)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx/2 : 0)) +
+                                                         (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx/2 : 0))
+                                                          * (encoder->in.width_in_lcu << MAX_DEPTH)];
         // Filter strength
-        strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
-                   (((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4) || 
-                    cu_q->residual || cu_p->residual ) ? 1 : 0));
+        strength = 0;
+        // Intra blocks have strength 2
+        if(cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
+          strength = 2;          
+          // Non-zero residual and transform boundary
+        } else if((cu_q->residual || cu_p->residual) && (cu_q->depth==0 ? !((dir == EDGE_VER ? y_cu + (block_idx>>1) : x_cu + (block_idx>>1) )&0x3) : 1 ) ) {
+          strength = 1;
+          // Absolute motion vector diff between blocks >= 1 (Integer pixel)
+        } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {
+          strength = 1;
+         
+        }
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
         thr_cut         = tc * 10;
