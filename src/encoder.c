@@ -1077,6 +1077,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             int16_t coeff_y[LCU_WIDTH*LCU_WIDTH*2];
             int16_t coeff_u[LCU_WIDTH*LCU_WIDTH>>1];
             int16_t coeff_v[LCU_WIDTH*LCU_WIDTH>>1];
+            int8_t residual = 0;
 
             /* Initialize helper structure for transform */
             transform_info ti;
@@ -1109,12 +1110,14 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             ti.cb_top[1] = (ti.cb[0] & 0x2 || ti.cb[1] & 0x2 || ti.cb[2] & 0x2 || ti.cb[3] & 0x2)?1:0;
             ti.cb_top[2] = (ti.cb[0] & 0x4 || ti.cb[1] & 0x4 || ti.cb[2] & 0x4 || ti.cb[3] & 0x4)?1:0;
         
+            residual = ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2];
+            picture_set_block_residual(encoder->in.cur_pic,x_ctb,y_ctb,depth,residual);
 
             cabac.ctx = &g_cu_qt_root_cbf_model;
-            CABAC_BIN(&cabac, ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2], "rqt_root_cbf");
+            CABAC_BIN(&cabac, residual, "rqt_root_cbf");
             // Code (possible) coeffs to bitstream
             ti.idx = 0;
-            if(ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2]) {
+            if(residual) {
               encode_transform_coeff(encoder, &ti,depth, 0);
             }
           }

@@ -193,7 +193,8 @@ void filter_deblock_edge_luma(encoder_control *encoder,
                                                          ((ypos>>MIN_SIZE)-(dir == EDGE_HOR)+(dir == EDGE_VER?block_idx/2:0)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
         // Filter strength
         strength = ((cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 
-                   (((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) ? 1 : 0));
+                   (((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4) || 
+                    cu_q->residual || cu_p->residual ) ? 1 : 0));
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
         thr_cut         = tc * 10;
