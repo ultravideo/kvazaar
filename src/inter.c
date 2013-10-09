@@ -95,27 +95,27 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
     int halfpel_y, halfpel_x;
     int abs_mv_x = mv[0]&1;
     int abs_mv_y = mv[1]&1;
-
+    int8_t overflow_neg_y_temp,overflow_pos_y_temp,overflow_neg_x_temp,overflow_pos_x_temp;
     // Fill source blocks with data from reference, -4...width+4
     for (halfpel_y = 0, y = (ypos>>1) - 4; y < ((ypos + width)>>1) + 4; halfpel_y++, y++) {
       // calculate y-pixel offset
       coord_y = y + (mv[1]>>1);
 
       // On y-overflow set coord_y accordingly
-      overflow_neg_y = (coord_y < 0) ? 1 : 0;
-      overflow_pos_y = (coord_y >= ref->height>>1) ? 1 : 0;     
-      if (overflow_neg_y)      coord_y = 0;
-      else if (overflow_pos_y) coord_y = (ref->height>>1) - 1;
+      overflow_neg_y_temp = (coord_y < 0) ? 1 : 0;
+      overflow_pos_y_temp = (coord_y >= ref->height>>1) ? 1 : 0;     
+      if (overflow_neg_y_temp)      coord_y = 0;
+      else if (overflow_pos_y_temp) coord_y = (ref->height>>1) - 1;
       coord_y *= ref_width_c;
 
       for (halfpel_x = 0, x = (xpos>>1) - 4; x < ((xpos + width)>>1) + 4; halfpel_x++, x++) {
         coord_x = x + (mv[0]>>1);
 
         // On x-overflow set coord_x accordingly
-        overflow_neg_x = (coord_x < 0) ? 1 : 0;
-        overflow_pos_x = (coord_x >= ref_width_c) ? 1 : 0;
-        if (overflow_neg_x)      coord_x = 0;
-        else if (overflow_pos_x) coord_x = ref_width_c - 1;
+        overflow_neg_x_temp = (coord_x < 0) ? 1 : 0;
+        overflow_pos_x_temp = (coord_x >= ref_width_c) ? 1 : 0;
+        if (overflow_neg_x_temp)      coord_x = 0;
+        else if (overflow_pos_x_temp) coord_x = ref_width_c - 1;
 
         // Store source block data (with extended borders)
         halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->u_recdata[coord_y + coord_x];
