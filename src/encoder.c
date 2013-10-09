@@ -1057,9 +1057,8 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             }
           }
 
-          cabac.ctx = &g_cu_qt_root_cbf_model;
-          CABAC_BIN(&cabac, 0, "rqt_root_cbf");
-          if (0) {
+          
+          if (1) {
             uint8_t *base_y  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
             uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
             uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
@@ -1110,9 +1109,14 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             ti.cb_top[1] = (ti.cb[0] & 0x2 || ti.cb[1] & 0x2 || ti.cb[2] & 0x2 || ti.cb[3] & 0x2)?1:0;
             ti.cb_top[2] = (ti.cb[0] & 0x4 || ti.cb[1] & 0x4 || ti.cb[2] & 0x4 || ti.cb[3] & 0x4)?1:0;
         
+
+            cabac.ctx = &g_cu_qt_root_cbf_model;
+            CABAC_BIN(&cabac, ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2], "rqt_root_cbf");
             // Code (possible) coeffs to bitstream
             ti.idx = 0;
-            encode_transform_coeff(encoder, &ti,depth, 0);
+            if(ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2]) {
+              encode_transform_coeff(encoder, &ti,depth, 0);
+            }
           }
         }
 
