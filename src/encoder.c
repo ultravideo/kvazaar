@@ -1058,11 +1058,11 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
           }
 
           cabac.ctx = &g_cu_qt_root_cbf_model;
-          CABAC_BIN(&cabac, 1, "rqt_root_cbf");
-          if (1) {
-            uint8_t *base  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-            uint8_t *baseU = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-            uint8_t *baseV = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+          CABAC_BIN(&cabac, 0, "rqt_root_cbf");
+          if (0) {
+            uint8_t *base_y  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+            uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
             uint32_t width = LCU_WIDTH>>depth;
 
             /* INTRAPREDICTION VARIABLES */
@@ -1070,14 +1070,14 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
             int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
-            uint8_t *recbase   = &encoder->in.cur_pic->y_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-            uint8_t *recbaseU  = &encoder->in.cur_pic->u_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-            uint8_t *recbaseV  = &encoder->in.cur_pic->v_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            uint8_t *recbase_y   = &encoder->in.cur_pic->y_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+            uint8_t *recbase_u  = &encoder->in.cur_pic->u_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            uint8_t *recbase_v  = &encoder->in.cur_pic->v_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
 
             /* TODO: dynamic memory allocation */
-            int16_t coeff[LCU_WIDTH*LCU_WIDTH*2];
-            int16_t coeffU[LCU_WIDTH*LCU_WIDTH>>1];
-            int16_t coeffV[LCU_WIDTH*LCU_WIDTH>>1];
+            int16_t coeff_y[LCU_WIDTH*LCU_WIDTH*2];
+            int16_t coeff_u[LCU_WIDTH*LCU_WIDTH>>1];
+            int16_t coeff_v[LCU_WIDTH*LCU_WIDTH>>1];
 
             /* Initialize helper structure for transform */
             transform_info ti;
@@ -1086,7 +1086,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             ti.x_ctb = x_ctb; ti.y_ctb = y_ctb;
 
             /* Base pointers */
-            ti.base =  base; ti.base_u = baseU; ti.base_v = baseV;
+            ti.base =  base_y; ti.base_u = base_u; ti.base_v = base_v;
             ti.base_stride = encoder->in.width;
 
             // Prediction pointers
@@ -1094,11 +1094,11 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             ti.pred_stride = (LCU_WIDTH>>depth);
 
             // Reconstruction pointers
-            ti.recbase = recbase; ti.recbase_u = recbaseU; ti.recbase_v = recbaseV;
+            ti.recbase = recbase_y; ti.recbase_u = recbase_u; ti.recbase_v = recbase_v;
             ti.recbase_stride = encoder->in.width;
 
             // Coeff pointers
-            ti.coeff[0] = coeff; ti.coeff[1] = coeffU; ti.coeff[2] = coeffV;
+            ti.coeff[0] = coeff_y; ti.coeff[1] = coeff_u; ti.coeff[2] = coeff_v;
             ti.block_type = CU_INTER;
        
             // Handle transforms, quant and reconstruction
@@ -1122,24 +1122,24 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
     int8_t intra_preds[3] = { -1, -1, -1};
     int8_t mpm_preds = -1;
-      int i;
-      uint32_t flag;
-    uint8_t *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))   + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))  * encoder->in.width];
+    int i;
+    uint32_t flag;
+    uint8_t *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
     uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
     uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
-      uint32_t width = LCU_WIDTH>>depth;
+    uint32_t width = LCU_WIDTH>>depth;
 
     // INTRAPREDICTION VARIABLES
     int16_t pred_y[LCU_WIDTH * LCU_WIDTH + 1];
     int16_t pred_u[LCU_WIDTH * LCU_WIDTH >> 2];
     int16_t pred_v[LCU_WIDTH * LCU_WIDTH >> 2];
 
-    uint8_t *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))   + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))  * encoder->in.width];
+    uint8_t *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
     uint8_t *recbase_u = &encoder->in.cur_pic->u_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
     uint8_t *recbase_v = &encoder->in.cur_pic->v_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
 
     // SEARCH BEST INTRA MODE (AGAIN)
-      int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
     int16_t *rec_shift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
                                  (LCU_WIDTH >> (depth)) * 2 + 8, rec, 
@@ -1156,10 +1156,10 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
                          intra_pred_mode);
       
-      #if ENABLE_PCM == 1
+    #if ENABLE_PCM == 1
     // Code must start after variable initialization
     cabac_encode_bin_trm(&cabac, 0); // IPCMFlag == 0
-      #endif
+    #endif
       
     // PREDINFO CODING
     // If intra prediction mode is found from the predictors,
@@ -1218,7 +1218,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // If we have chroma, signal it
     if (encoder->in.video_format != FORMAT_400) {
       // Chroma intra prediction
-        cabac.ctx = &g_chroma_pred_model[0];
+      cabac.ctx = &g_chroma_pred_model[0];
       CABAC_BIN(&cabac, ((intra_pred_mode_chroma != 36) ? 1 : 0), "IntraPredChroma");
 
       // If not copied from luma, signal it
@@ -1238,63 +1238,63 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
         for (i = 0; i < 4; i++) {
           if (intra_pred_mode_chroma_temp == allowed_chroma_dir[i]) {
             intra_pred_mode_chroma_temp = i;
-              break;
-            }
+            break;
           }
+        }
 
         CABAC_BINS_EP(&cabac, intra_pred_mode_chroma_temp, 2, "intraPredModeChroma");
-        }
       }
+    }
 
     // END OF PREDINFO CODING
     
     // Coeff
     // Transform tree
       {
-      // TODO: dynamic memory allocation
-      int16_t coeff_y[LCU_WIDTH * LCU_WIDTH * 2];
-      int16_t coeff_u[LCU_WIDTH * LCU_WIDTH >> 1];
-      int16_t coeff_v[LCU_WIDTH * LCU_WIDTH >> 1];
+        // TODO: dynamic memory allocation
+        int16_t coeff_y[LCU_WIDTH * LCU_WIDTH * 2];
+        int16_t coeff_u[LCU_WIDTH * LCU_WIDTH >> 1];
+        int16_t coeff_v[LCU_WIDTH * LCU_WIDTH >> 1];
 
-      // Initialize helper structure for transform
+        // Initialize helper structure for transform
         transform_info ti;
         memset(&ti, 0, sizeof(transform_info));
 
-      ti.x_ctb = x_ctb; ti.y_ctb = y_ctb;
+        ti.x_ctb = x_ctb; ti.y_ctb = y_ctb;
 
-      // Base pointers
-      ti.base =  base_y; ti.base_u = base_u; ti.base_v = base_v;
+        // Base pointers
+        ti.base =  base_y; ti.base_u = base_u; ti.base_v = base_v;
         ti.base_stride = encoder->in.width;
 
-      // Prediction pointers
-      ti.pred =  pred_y; ti.pred_u = pred_u; ti.pred_v = pred_v;
+        // Prediction pointers
+        ti.pred =  pred_y; ti.pred_u = pred_u; ti.pred_v = pred_v;
         ti.pred_stride = (LCU_WIDTH>>depth);
 
-      // Reconstruction pointers
-      ti.recbase = recbase_y; ti.recbase_u = recbase_u; ti.recbase_v = recbase_v;
+        // Reconstruction pointers
+        ti.recbase = recbase_y; ti.recbase_u = recbase_u; ti.recbase_v = recbase_v;
         ti.recbase_stride = encoder->in.width;
 
-      // Coeff pointers
-      ti.coeff[0] = coeff_y; ti.coeff[1] = coeff_u; ti.coeff[2] = coeff_v;
+        // Coeff pointers
+        ti.coeff[0] = coeff_y; ti.coeff[1] = coeff_u; ti.coeff[2] = coeff_v;
 
-      // Prediction info
-      ti.intra_pred_mode = intra_pred_mode;
-      ti.intra_pred_mode_chroma = intra_pred_mode_chroma;
+        // Prediction info
+        ti.intra_pred_mode = intra_pred_mode;
+        ti.intra_pred_mode_chroma = intra_pred_mode_chroma;
         
-      // Handle transforms, quant and reconstruction
+        // Handle transforms, quant and reconstruction
         ti.idx = 0;
         ti.block_type = CU_INTRA;
         encode_transform_tree(encoder,&ti, depth);
 
-      // Coded block pattern
-      ti.cb_top[0] = (ti.cb[0] & 0x1 || ti.cb[1] & 0x1 || ti.cb[2] & 0x1
-                      || ti.cb[3] & 0x1) ? 1 : 0;
-      ti.cb_top[1] = (ti.cb[0] & 0x2 || ti.cb[1] & 0x2 || ti.cb[2] & 0x2
-                      || ti.cb[3] & 0x2) ? 1 : 0;
-      ti.cb_top[2] = (ti.cb[0] & 0x4 || ti.cb[1] & 0x4 || ti.cb[2] & 0x4
-                      || ti.cb[3] & 0x4) ? 1 : 0;
+        // Coded block pattern
+        ti.cb_top[0] = (ti.cb[0] & 0x1 || ti.cb[1] & 0x1 || ti.cb[2] & 0x1
+                        || ti.cb[3] & 0x1) ? 1 : 0;
+        ti.cb_top[1] = (ti.cb[0] & 0x2 || ti.cb[1] & 0x2 || ti.cb[2] & 0x2
+                        || ti.cb[3] & 0x2) ? 1 : 0;
+        ti.cb_top[2] = (ti.cb[0] & 0x4 || ti.cb[1] & 0x4 || ti.cb[2] & 0x4
+                        || ti.cb[3] & 0x4) ? 1 : 0;
         
-      // Code (possible) coeffs to bitstream
+        // Code (possible) coeffs to bitstream
         ti.idx = 0;
         encode_transform_coeff(encoder, &ti,depth, 0);
       }
@@ -1728,6 +1728,7 @@ void encode_transform_coeff(encoder_control *encoder, transform_info *ti,
       case  2:
         ctx_idx = 6; 
         break;
+
       case  4:
         ctx_idx = 5;
         break;
@@ -1764,14 +1765,13 @@ void encode_transform_coeff(encoder_control *encoder, transform_info *ti,
         // Luma (Intra) scanmode
         dir_mode = ti->intra_pred_mode;
 
-        if (ctx_idx > 3
-            && ctx_idx < 6) { //if multiple scans supported for transform size
+        //if multiple scans supported for transform size
+        if (ctx_idx > 3 && ctx_idx < 6) {
           scan_idx = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
         }
       }
 
-      encode_coeff_nxn(encoder, &ti->coeff[0][ti->idx * coeff_fourth], 
-                       width, 0, scan_idx);
+      encode_coeff_nxn(encoder, &ti->coeff[0][ti->idx * coeff_fourth], width, 0, scan_idx);
     }
 
     if (cb_u || cb_v) {
