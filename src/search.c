@@ -57,7 +57,7 @@ unsigned get_block_sad(picture *pic, picture *ref,
   int width = pic->width;
   int height = pic->height;
 
-  unsigned result = 1; // Start from 1 so result is never 0.
+  unsigned result = 0;
 
   // 0 means invalid, for now.
   if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
