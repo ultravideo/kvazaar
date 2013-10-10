@@ -1449,8 +1449,41 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
     int16_t *rec_shift_u = &rec[(LCU_WIDTH >> (depth + 1)) * 2 + 8 + 1];
 
     uint32_t ac_sum = 0;
+    uint32_t ctx_idx;
+    uint32_t scan_idx_luma = SCAN_DIAG;
+    uint32_t scan_idx_chroma = SCAN_DIAG;
+    uint8_t dir_mode;
+
+    switch (width) {
+      case  2: ctx_idx = 6; break;
+      case  4: ctx_idx = 5; break;
+      case  8: ctx_idx = 4; break;
+      case 16: ctx_idx = 3; break;
+      case 32: ctx_idx = 2; break;
+      case 64: ctx_idx = 1; break;
+      default: ctx_idx = 0; break;
+    }
+
     if(ti->block_type == CU_INTRA)
     {
+      //if multiple scans supported for transform size
+      if (ctx_idx > 3 && ctx_idx < 6) {
+        scan_idx_luma = abs((int32_t) ti->intra_pred_mode - 26) < 5 ? 1 : (abs((int32_t)ti->intra_pred_mode - 10) < 5 ? 2 : 0);
+      }
+
+      // Chroma scanmode
+      ctx_idx++;
+      dir_mode = ti->intra_pred_mode_chroma;
+
+      if (dir_mode == 36) {
+        // TODO: support NxN
+        dir_mode = ti->intra_pred_mode;
+      }
+
+      if (ctx_idx > 4 && ctx_idx < 7) { // if multiple scans supported for transform size
+        scan_idx_chroma = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
+      }
+
       // Build reconstructed block to use in prediction with extrapolated borders
       intra_build_reference_border(encoder->in.cur_pic, ti->x_ctb, ti->y_ctb,
                                    (LCU_WIDTH >> (depth)) * 2 + 8, rec, (LCU_WIDTH >> (depth)) * 2 + 8, 0);
@@ -1526,7 +1559,7 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
 
     // Transform and quant residual to coeffs
     transform2d(block,pre_quant_coeff,width,0);
-    quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, SCAN_DIAG, ti->block_type);
+    quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, ti->block_type);
 
     // Check for non-zero coeffs
     for (i = 0; i < width * width; i++) {
@@ -1577,7 +1610,7 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
 
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
       quant(encoder, pre_quant_coeff, coeff_u, width >> 1, width >> 1, &ac_sum, 2,
-            SCAN_DIAG, ti->block_type);
+            scan_idx_chroma, ti->block_type);
 
       for (i = 0; i < width *width >> 2; i++) {
         if (coeff_u[i] != 0) {
@@ -1601,7 +1634,7 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
 
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
       quant(encoder, pre_quant_coeff, coeff_v, width >> 1, width >> 1, &ac_sum, 3,
-            SCAN_DIAG, ti->block_type);
+            scan_idx_chroma, ti->block_type);
 
       for (i = 0; i < width *width >> 2; i++) {
         if (coeff_v[i] != 0) {
@@ -1733,33 +1766,13 @@ void encode_transform_coeff(encoder_control *encoder, transform_info *ti,
     uint32_t dir_mode;
 
     switch (width) {
-      case  2:
-        ctx_idx = 6; 
-        break;
-
-      case  4:
-        ctx_idx = 5;
-        break;
-
-      case  8:
-        ctx_idx = 4;
-        break;
-
-      case 16:
-        ctx_idx = 3;
-        break;
-
-      case 32:
-        ctx_idx = 2;
-        break;
-
-      case 64:
-        ctx_idx = 1;
-        break;
-
-      default:
-        ctx_idx = 0;
-        break;
+      case  2: ctx_idx = 6; break;
+      case  4: ctx_idx = 5; break;
+      case  8: ctx_idx = 4; break;
+      case 16: ctx_idx = 3; break;
+      case 32: ctx_idx = 2; break;
+      case 64: ctx_idx = 1; break;
+      default: ctx_idx = 0; break;
     }
 
     ctx_idx -= tr_depth;
