@@ -36,6 +36,51 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
+unsigned corner_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                    unsigned block_width, unsigned block_height, unsigned width)
+{
+  unsigned char ref = *ref_data;
+  unsigned x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * width + x] - ref);
+    }
+  }
+
+  return sad;
+}
+
+unsigned vertical_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                      unsigned block_width, unsigned block_height, unsigned width)
+{
+  unsigned x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * width + x] - ref_data[x]);
+    }
+  }
+
+  return sad;
+}
+
+unsigned horizontal_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                        unsigned block_width, unsigned block_height, unsigned width)
+{
+  unsigned x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * width + x] - ref_data[y * width]);
+    }
+  }
+
+  return sad;
+}
 
 /**
  * \brief  Get Sum of Absolute Differences (SAD) between two blocks in two
@@ -56,15 +101,53 @@ unsigned get_block_sad(picture *pic, picture *ref,
   uint8_t *pic_data, *ref_data;
   int width = pic->width;
   int height = pic->height;
+  int left = ref_x < 0;
+  int right = ref_x + block_width > width;
+  int top = ref_y < 0;
+  int bottom = ref_y + block_height > height;
 
   unsigned result = 0;
 
   // 0 means invalid, for now.
-  if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
+  //if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
 
-  pic_data = &pic->y_data[pic_y * width + pic_x];
-  ref_data = &ref->y_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block_width, block_height, width);
+  if (left && top) {
+    pic_data = &pic->y_data[0];
+    ref_data = &ref->y_data[0];
+    result += corner_sad(pic_data, ref_data, -ref_x, -ref_y, width);
+
+    pic_data = &pic->y_data[-ref_x];
+    ref_data = &ref->y_data[0];
+    result += vertical_sad(pic_data, ref_data, block_width + ref_x, -ref_y, width);
+
+    pic_data = &pic->y_data[-ref_y * width];
+    ref_data = &ref->y_data[0];
+    result += horizontal_sad(pic_data, ref_data, -ref_x, block_height + ref_y, width);
+
+    pic_data = &pic->y_data[(pic_y - ref_y) * width + pic_x - ref_x];
+    ref_data = &ref->y_data[0];
+    result += sad(pic_data, ref_data, block_width + ref_x, block_height + ref_y, width);
+  } else if (top) {
+
+  } else if (top && right) {
+
+  } else if (left) {
+
+  } else if (right) {
+
+  } else if (bottom && left) {
+
+  } else if (bottom) { 
+
+  } else if (bottom && right) {
+
+  } else {
+    pic_data = &pic->y_data[pic_y * width + pic_x];
+    ref_data = &ref->y_data[ref_y * width + ref_x];
+    result += sad(pic_data, ref_data, block_width, block_height, width);
+  }
+  
+  
 
   #if USE_CHROMA_IN_MV_SEARCH
   // Halve everything because chroma is half the resolution.
