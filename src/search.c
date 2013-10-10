@@ -36,8 +36,8 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-unsigned corner_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                    unsigned block_width, unsigned block_height, unsigned width)
+unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                 unsigned block_width, unsigned block_height, unsigned width)
 {
   unsigned char ref = *ref_data;
   unsigned x, y;
@@ -52,8 +52,8 @@ unsigned corner_sad(unsigned char* pic_data, unsigned char* ref_data,
   return sad;
 }
 
-unsigned vertical_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                      unsigned block_width, unsigned block_height, unsigned width)
+unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                 unsigned block_width, unsigned block_height, unsigned width)
 {
   unsigned x, y;
   unsigned sad = 0;
@@ -67,8 +67,8 @@ unsigned vertical_sad(unsigned char* pic_data, unsigned char* ref_data,
   return sad;
 }
 
-unsigned horizontal_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                        unsigned block_width, unsigned block_height, unsigned width)
+unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                 unsigned block_width, unsigned block_height, unsigned width)
 {
   unsigned x, y;
   unsigned sad = 0;
@@ -103,72 +103,55 @@ unsigned get_block_sad(picture *pic, picture *ref,
   int mv_y = ref_y - pic_y;
   int width = pic->width;
   int height = pic->height;
-  int left = ref_x < 0;
-  int right = ref_x + block_width > width;
-  int top = ref_y < 0;
-  int bottom = ref_y + block_height > height;
+
+  // These are the number of pixels by how far the movement vector points
+  // outside the frame. They are always >= 0. If all of them are 0, the
+  // movement vector doesn't point outside the frame.
+  int left   = (ref_x < 0) ? -ref_x : 0;
+  int top    = (ref_y < 0) ? -ref_y : 0;
+  int right  = (ref_x + block_width  > width)  ? ref_x - width : 0;
+  int bottom = (ref_y + block_height > height) ? ref_y - height : 0;
 
   unsigned result = 0;
 
-  // Center both picture buffer and reference buffer to the picture block, so 
-  // that further references are relative to the block rather than the
-  // top-left corner of the picture.
+  // Center picture to the current block and reference to the point where
+  // movement vector is pointing to. That point might be outside the buffer,
+  // but that is ok because we project the movement vector to the buffer
+  // before dereferencing the pointer.
   pic_data = &pic->y_data[pic_y * width + pic_x];
-  ref_data = &ref->y_data[pic_y * width + pic_x];
+  ref_data = &ref->y_data[ref_y * width + ref_x];
 
   // 0 means invalid, for now.
   //if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
 
+  // The handling of movement vectors that point outside the picture is done
+  // in the following way.
+  // - Correct the index of ref_data so that it points to the top-left
+  //   of the area we want to compare against.
+  // - Correct the index of pic_data to point inside the current block, so
+  //   that we compare the right part of the block to the ref_data.
+  // - Reduce block_width and block_height so that the the size of the area
+  //   being compared is correct.
   if (left && top) {
-    result += corner_sad(pic_data, ref_data,
-                         -ref_x, -ref_y, width);
-
-    result += vertical_sad(&pic_data[-ref_x], ref_data,
-                           block_width - -ref_x, -ref_y, width);
-
-    result += horizontal_sad(&pic_data[-ref_y * width], ref_data,
-                             -ref_x, block_height - -ref_y, width);
-
-    result += sad(&pic_data[-ref_y * width + -ref_x], ref_data,
-                  block_width - -ref_x, block_height - -ref_y, width);
-  } else if (top) {
 
   } else if (top && right) {
+
+  } else if (top) {
+
+  } else if (bottom && left) {
+
+  } else if (bottom && right) {
 
   } else if (left) {
 
   } else if (right) {
 
-  } else if (bottom && left) {
-
   } else if (bottom) { 
 
-  } else if (bottom && right) {
-
   } else {
-    result += sad(pic_data, &ref_data[mv_y * width + mv_x], block_width, block_height, width);
+    result += sad(pic_data, ref_data, block_width, block_height, width);
   }
   
-  
-
-  #if USE_CHROMA_IN_MV_SEARCH
-  // Halve everything because chroma is half the resolution.
-  width >>= 2;
-  pic_x >>= 2;
-  pic_y >>= 2;
-  ref_x >>= 2;
-  ref_y >>= 2;
-  block >>= 2;
-
-  pic_data = &pic->u_data[pic_y * width + pic_x];
-  ref_data = &ref->u_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block_width, block_height, width);
-
-  pic_data = &pic->v_data[pic_y * width + pic_x];
-  ref_data = &ref->v_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block_width, block_height, width);
-  #endif
-
   return result;
 }
 
