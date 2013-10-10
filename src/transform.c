@@ -903,7 +903,7 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
  * \brief inverse quantize transformed and quantized coefficents
  * 
  */
-void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type)
+void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
   int32_t shift,add,coeff_q;
   uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
@@ -912,7 +912,7 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
   int32_t transform_shift = 15 - g_bitdepth - (g_convert_to_bit[ width ] + 2);
   int32_t qp_scaled;
   int32_t qp_base = encoder->QP;
-  int32_t scalinglist_type = (/*pcCU->isintra(uiAbsPartIdx)*/1 ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+  int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
   int32_t *dequant_coef;
 
   if (type == 0) {

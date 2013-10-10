@@ -1573,7 +1573,7 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
     // if non-zero coeffs
     if (cb_y) {
       // RECONSTRUCT for predictions
-      dequant(encoder, coeff_y, pre_quant_coeff, width, width, 0);
+      dequant(encoder, coeff_y, pre_quant_coeff, width, width, 0, ti->block_type);
       itransform2d(block,pre_quant_coeff,width,0);
 
       i = 0;
@@ -1646,7 +1646,7 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
           
       if (cb_u) {
         // RECONSTRUCT for predictions
-        dequant(encoder, coeff_u, pre_quant_coeff, width >> 1, width >> 1, 2);
+        dequant(encoder, coeff_u, pre_quant_coeff, width >> 1, width >> 1, 2, ti->block_type);
         itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
 
         i = 0;
@@ -1672,7 +1672,7 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
       
       if (cb_v) {
         // RECONSTRUCT for predictions
-        dequant(encoder, coeff_v, pre_quant_coeff, width >> 1, width >> 1, 3);
+        dequant(encoder, coeff_v, pre_quant_coeff, width >> 1, width >> 1, 3, ti->block_type);
         itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
 
         i = 0;
