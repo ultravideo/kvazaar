@@ -786,7 +786,7 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
   int32_t n;
   uint32_t dir = 0;    
   uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
-  int32_t scalinglist_type = (block_type == CU_INTRA ? 1 : 3) + (int8_t)("\0\3\1\2"[type]);
+  int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
   
   int32_t *quant_coeff = g_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
 
