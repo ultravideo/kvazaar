@@ -63,64 +63,64 @@ void sad_teardown(void)
 void test_topleft(void)
 {
   assert_ulong_equal(
-    1*(5*5) + (2+4)*(3*5) + 5*(3*3) - 64,
-    TEST_SAD(-4, -4));
+    1*(4*4) + (2+4)*(4*4) + 5*(4*4) - 64,
+    TEST_SAD(-3, -3));
 }
 
 void test_top(void)
 {
   assert_ulong_equal(
-    1*5 + 2*(6*5) + 3*5 + (4+6)*3 + 5*(6*3) - 64,
-    TEST_SAD(0, -4));
+    (1+3)*4 + 2*(6*4) + (4+6)*4 + 5*(6*4) - 64,
+    TEST_SAD(0, -3));
 }
 
 void test_topright(void)
 {
   assert_ulong_equal(
-    3*(5*5) + (2+6)*(3*5) + 5*(3*3) - 64,
-    TEST_SAD(4, -4));
+    3*(4*4) + (2+6)*(4*4) + 5*(4*4) - 64,
+    TEST_SAD(3, -3));
 }
 
 void test_left(void)
 {
   assert_ulong_equal(
-    1*5 + 4*(6*5) + 7*5 + (2+8)*3 + 5*(6*3) - 64,
-    TEST_SAD(-4, 0));
+    (1+7)*4 + 4*(6*4) + (2+8)*4 + 5*(6*4) - 64,
+    TEST_SAD(-3, 0));
 }
 
 void test_no_offset(void)
 {
   assert_ulong_equal(
-    (1+3+7+9) + (2+4+6+8)*6 + 6*(6*5) - 64,
+    (1+3+7+9) + (2+4+6+8)*6 + 5*(6*6) - 64,
     TEST_SAD(0, 0));
 }
 
 void test_right(void)
 {
   assert_ulong_equal(
-    (3+9)*5 + 6*(5*6) + (2+8)*3 + 5*(6*3) - 64,
-    TEST_SAD(4, 0));
+    (3+9)*4 + 6*(4*6) + (2+8)*4 + 5*(6*4) - 64,
+    TEST_SAD(3, 0));
 }
 
 void test_bottomleft(void)
 {
   assert_ulong_equal(
-    7*(5*5) + (4+8)*(3*5) + 5*(3*3) - 64,
-    TEST_SAD(-4, 4));
+    7*(4*4) + (4+8)*(4*4) + 5*(4*4) - 64,
+    TEST_SAD(-3, 3));
 }
 
 void test_bottom(void)
 {
   assert_ulong_equal(
-    (7+9)*5 + 8*(6*5) + (4+6)*3 + 5*(6*3) - 64,
-    TEST_SAD(0, 4));
+    (7+9)*4 + 8*(6*4) + (4+6)*4 + 5*(6*4) - 64,
+    TEST_SAD(0, 3));
 }
 
 void test_bottomright(void)
 {
   assert_ulong_equal(
-    9*(5*5) + (6+8)*(3*5) + 5*(3*3) - 64,
-    TEST_SAD(-4, 4));
+    9*(4*4) + (6+8)*(4*4) + 5*(4*4) - 64,
+    TEST_SAD(-3, 3));
 }
 
 //////////////////////////////////////////////////////////////////////////
