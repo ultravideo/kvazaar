@@ -106,21 +106,21 @@ void test_bottomleft(void)
 {
   assert_ulong_equal(
     7*(5*5) + (4+8)*(3*5) + 5*(3*3) - 64,
-    TEST_SAD(-4, -4));
+    TEST_SAD(-4, 4));
 }
 
 void test_bottom(void)
 {
   assert_ulong_equal(
     (7+9)*5 + 8*(6*5) + (4+6)*3 + 5*(6*3) - 64,
-    TEST_SAD(0, -4));
+    TEST_SAD(0, 4));
 }
 
 void test_bottomright(void)
 {
   assert_ulong_equal(
     9*(5*5) + (6+8)*(3*5) + 5*(3*3) - 64,
-    TEST_SAD(-4, -4));
+    TEST_SAD(-4, 4));
 }
 
 //////////////////////////////////////////////////////////////////////////
