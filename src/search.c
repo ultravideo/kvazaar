@@ -99,6 +99,8 @@ unsigned get_block_sad(picture *pic, picture *ref,
                        int block_width, int block_height)
 {
   uint8_t *pic_data, *ref_data;
+  int mv_x = ref_x - pic_x;
+  int mv_y = ref_y - pic_y;
   int width = pic->width;
   int height = pic->height;
   int left = ref_x < 0;
@@ -108,25 +110,27 @@ unsigned get_block_sad(picture *pic, picture *ref,
 
   unsigned result = 0;
 
+  // Center both picture buffer and reference buffer to the picture block, so 
+  // that further references are relative to the block rather than the
+  // top-left corner of the picture.
+  pic_data = &pic->y_data[pic_y * width + pic_x];
+  ref_data = &ref->y_data[pic_y * width + pic_x];
+
   // 0 means invalid, for now.
   //if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
 
   if (left && top) {
-    pic_data = &pic->y_data[0];
-    ref_data = &ref->y_data[0];
-    result += corner_sad(pic_data, ref_data, -ref_x, -ref_y, width);
+    result += corner_sad(pic_data, ref_data,
+                         -ref_x, -ref_y, width);
 
-    pic_data = &pic->y_data[-ref_x];
-    ref_data = &ref->y_data[0];
-    result += vertical_sad(pic_data, ref_data, block_width + ref_x, -ref_y, width);
+    result += vertical_sad(&pic_data[-ref_x], ref_data,
+                           block_width - -ref_x, -ref_y, width);
 
-    pic_data = &pic->y_data[-ref_y * width];
-    ref_data = &ref->y_data[0];
-    result += horizontal_sad(pic_data, ref_data, -ref_x, block_height + ref_y, width);
+    result += horizontal_sad(&pic_data[-ref_y * width], ref_data,
+                             -ref_x, block_height - -ref_y, width);
 
-    pic_data = &pic->y_data[(pic_y - ref_y) * width + pic_x - ref_x];
-    ref_data = &ref->y_data[0];
-    result += sad(pic_data, ref_data, block_width + ref_x, block_height + ref_y, width);
+    result += sad(&pic_data[-ref_y * width + -ref_x], ref_data,
+                  block_width - -ref_x, block_height - -ref_y, width);
   } else if (top) {
 
   } else if (top && right) {
@@ -142,9 +146,7 @@ unsigned get_block_sad(picture *pic, picture *ref,
   } else if (bottom && right) {
 
   } else {
-    pic_data = &pic->y_data[pic_y * width + pic_x];
-    ref_data = &ref->y_data[ref_y * width + ref_x];
-    result += sad(pic_data, ref_data, block_width, block_height, width);
+    result += sad(pic_data, &ref_data[mv_y * width + mv_x], block_width, block_height, width);
   }
   
   
