@@ -55,6 +55,7 @@ typedef struct
   int8_t type;
   int8_t depth;
   int8_t coded;
+  int8_t residual;
   cu_info_intra intra;
   cu_info_inter inter;
 } cu_info;
@@ -101,6 +102,8 @@ picture * picture_init(int32_t width, int32_t height,
 int picture_destroy(picture *pic);
 void picture_set_block_coded(picture *pic, uint32_t x_scu, uint32_t y_scu,
                              uint8_t depth, int8_t coded);
+void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
+                                uint8_t depth, int8_t residual);
 void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
                              uint8_t depth, int8_t split);
 
