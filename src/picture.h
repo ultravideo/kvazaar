@@ -120,8 +120,15 @@ uint32_t sad8x8(int16_t *block1, uint32_t stride1,
                 int16_t* block2, uint32_t stride2);
 uint32_t sad4x4(int16_t *block1, uint32_t stride1,
                 int16_t* block2, uint32_t stride2);
-uint32_t sad(uint8_t *data1, uint8_t *data2, 
-             unsigned width, unsigned height, unsigned stride);
+
+uint32_t cor_sad(uint8_t *data1, uint8_t *data2, 
+                 unsigned width, unsigned height, unsigned stride);
+uint32_t ver_sad(uint8_t *data1, uint8_t *data2, 
+                 unsigned width, unsigned height, unsigned stride);
+uint32_t hor_sad(uint8_t *data1, uint8_t *data2, 
+                 unsigned width, unsigned height, unsigned stride);
+uint32_t reg_sad(uint8_t *data1, uint8_t *data2, 
+                 unsigned width, unsigned height, unsigned stride);
 
 double image_psnr(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y);
 

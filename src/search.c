@@ -36,52 +36,6 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                 unsigned block_width, unsigned block_height, unsigned width)
-{
-  unsigned char ref = *ref_data;
-  unsigned x, y;
-  unsigned sad = 0;
-
-  for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * width + x] - ref);
-    }
-  }
-
-  return sad;
-}
-
-unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                 unsigned block_width, unsigned block_height, unsigned width)
-{
-  unsigned x, y;
-  unsigned sad = 0;
-
-  for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * width + x] - ref_data[x]);
-    }
-  }
-
-  return sad;
-}
-
-unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                 unsigned block_width, unsigned block_height, unsigned width)
-{
-  unsigned x, y;
-  unsigned sad = 0;
-
-  for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * width + x] - ref_data[y * width]);
-    }
-  }
-
-  return sad;
-}
-
 /**
  * \brief  Get Sum of Absolute Differences (SAD) between two blocks in two
  *         different frames.
@@ -149,7 +103,7 @@ unsigned get_block_sad(picture *pic, picture *ref,
   } else if (bottom) { 
 
   } else {
-    result += sad(pic_data, ref_data, block_width, block_height, width);
+    result += reg_sad(pic_data, ref_data, block_width, block_height, width);
   }
   
   return result;
@@ -406,8 +360,8 @@ void search_mv_full(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
   if (orig_x + x < 0 || orig_y + y < 0 || orig_x + x > pic->width - block_width
       || orig_y + y > pic->height - block_height) return;
 
-  cost = sad(pic_data, &ref_data[(orig_y + y) * pic->width + (orig_x + x)],
-      block_width, block_height, pic->width) + 1;
+  cost = reg_sad(pic_data, &ref_data[(orig_y + y) * pic->width + (orig_x + x)],
+                 block_width, block_height, pic->width) + 1;
   if (cost < cur_cu->inter.cost) {
     cur_cu->inter.cost = cost;
     cur_cu->inter.mv[0] = x << 2;

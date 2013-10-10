@@ -559,6 +559,52 @@ uint32_t sad4x4(int16_t *block1, uint32_t stride1,
   return sum;
 }
 
+unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                 unsigned block_width, unsigned block_height, unsigned width)
+{
+  unsigned char ref = *ref_data;
+  unsigned x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * width + x] - ref);
+    }
+  }
+
+  return sad;
+}
+
+unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                 unsigned block_width, unsigned block_height, unsigned width)
+{
+  unsigned x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * width + x] - ref_data[x]);
+    }
+  }
+
+  return sad;
+}
+
+unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data, 
+                 unsigned block_width, unsigned block_height, unsigned width)
+{
+  unsigned x, y;
+  unsigned sad = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      sad += abs(pic_data[y * width + x] - ref_data[y * width]);
+    }
+  }
+
+  return sad;
+}
+
 /**
  * \brief Calculate Sum of Absolute Differences (SAD)
  * 
@@ -573,7 +619,7 @@ uint32_t sad4x4(int16_t *block1, uint32_t stride1,
  * 
  * \returns Sum of Absolute Differences
  */
-uint32_t sad(uint8_t *data1, uint8_t *data2, 
+uint32_t reg_sad(uint8_t *data1, uint8_t *data2, 
              unsigned width, unsigned height, unsigned stride)
 {
   unsigned y, x;
