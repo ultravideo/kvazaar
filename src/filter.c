@@ -190,21 +190,20 @@ void filter_deblock_edge_luma(encoder_control *encoder,
       if((block_idx & 1) == 0)
       {
         // CU in the side we are filtering, update every 8-pixels
-        cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx/2 : 0)) +
-                                                         (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx/2 : 0))
+        cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx>>1 : 0)) +
+                                                         (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx>>1 : 0))
                                                           * (encoder->in.width_in_lcu << MAX_DEPTH)];
         // Filter strength
-        strength = 0;
+        strength = 0;        
         // Intra blocks have strength 2
         if(cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
           strength = 2;          
           // Non-zero residual and transform boundary
-        } else if((cu_q->residual || cu_p->residual) && (cu_q->depth==0 ? !((dir == EDGE_VER ? y_cu + (block_idx>>1) : x_cu + (block_idx>>1) )&0x3) : 1 ) ) {
+        } else if(cu_q->residual || cu_p->residual) {
           strength = 1;
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
         } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {
-          strength = 1;
-         
+          strength = 1;         
         }
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;

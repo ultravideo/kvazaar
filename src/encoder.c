@@ -1112,7 +1112,15 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             ti.cb_top[2] = (ti.cb[0] & 0x4 || ti.cb[1] & 0x4 || ti.cb[2] & 0x4 || ti.cb[3] & 0x4)?1:0;
 
             residual = ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2];
-            picture_set_block_residual(encoder->in.cur_pic,x_ctb,y_ctb,depth,ti.cb_top[0]);
+            if(depth == 0)  {
+              picture_set_block_residual(encoder->in.cur_pic,x_ctb    ,y_ctb    ,depth+1,ti.cb[0] & 0x1);
+              picture_set_block_residual(encoder->in.cur_pic,x_ctb + 4,y_ctb    ,depth+1,ti.cb[1] & 0x1);
+              picture_set_block_residual(encoder->in.cur_pic,x_ctb    ,y_ctb + 4,depth+1,ti.cb[2] & 0x1);
+              picture_set_block_residual(encoder->in.cur_pic,x_ctb + 4,y_ctb + 4,depth+1,ti.cb[3] & 0x1);
+            } else  {
+              picture_set_block_residual(encoder->in.cur_pic,x_ctb,y_ctb,depth,ti.cb_top[0]);
+            }
+            
 
             cabac.ctx = &g_cu_qt_root_cbf_model;
             CABAC_BIN(&cabac, residual, "rqt_root_cbf");
