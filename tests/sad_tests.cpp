@@ -45,11 +45,16 @@ picture *g_ref = 0;
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
 void sad_setup(void)
 {
+  unsigned i;
   g_pic = picture_init(8, 8, 1, 1);
-  memcpy(g_pic->y_data, pic_data, 64);
+  for (i = 0; i < 64; ++i) {
+    g_pic->y_data[i] = pic_data[i] + 48;
+  }
 
   g_ref = picture_init(8, 8, 1, 1);
-  memcpy(g_ref->y_data, ref_data, 64);
+  for (i = 0; i < 64; ++i) {
+    g_ref->y_data[i] = ref_data[i] + 48;
+  }
 }
 
 void sad_teardown(void)
