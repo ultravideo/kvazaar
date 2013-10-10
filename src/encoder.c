@@ -1110,7 +1110,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             ti.cb_top[0] = (ti.cb[0] & 0x1 || ti.cb[1] & 0x1 || ti.cb[2] & 0x1 || ti.cb[3] & 0x1)?1:0;
             ti.cb_top[1] = (ti.cb[0] & 0x2 || ti.cb[1] & 0x2 || ti.cb[2] & 0x2 || ti.cb[3] & 0x2)?1:0;
             ti.cb_top[2] = (ti.cb[0] & 0x4 || ti.cb[1] & 0x4 || ti.cb[2] & 0x4 || ti.cb[3] & 0x4)?1:0;
-        
+
             residual = ti.cb_top[0] | ti.cb_top[1] | ti.cb_top[2];
             picture_set_block_residual(encoder->in.cur_pic,x_ctb,y_ctb,depth,ti.cb_top[0]);
 
@@ -1453,6 +1453,9 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
     uint32_t scan_idx_luma = SCAN_DIAG;
     uint32_t scan_idx_chroma = SCAN_DIAG;
     uint8_t dir_mode;
+    #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
+    uint32_t residual_sum = 0;
+    #endif
 
     switch (width) {
       case  2: ctx_idx = 6; break;
@@ -1553,9 +1556,18 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
       for (x = 0; x < LCU_WIDTH >> depth; x++) {
         block[i] = ((int16_t)base_y[x + y * base_stride]) -
                    pred_y[x + y * pred_stride];
+        #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
+        residual_sum += block[i];
+        #endif
         i++;
       }
     }
+    #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
+    #define RESIDUAL_THRESHOLD 500
+    if(residual_sum < RESIDUAL_THRESHOLD/(LCU_WIDTH >> depth)) {
+      memset(block, 0, sizeof(int16_t)*(LCU_WIDTH >> depth)*(LCU_WIDTH >> depth));
+    }
+    #endif
 
     // Transform and quant residual to coeffs
     transform2d(block,pre_quant_coeff,width,0);

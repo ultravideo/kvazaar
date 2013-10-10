@@ -51,6 +51,8 @@
 
 #define ENABLE_TEMPORAL_MVP 0 /*!< Enable usage of temporal Motion Vector Prediction */
 
+#define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0 /*!< skip residual coding when it's under _some_ threshold */
+
 /* END OF CONFIG VARIABLES */
 
 #define MAX_REF_PIC_COUNT 5
