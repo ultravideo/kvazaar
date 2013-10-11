@@ -6,13 +6,13 @@
 
 //////////////////////////////////////////////////////////////////////////
 // EXTERNAL FUNCTIONS
-unsigned get_block_sad(picture *pic, picture *ref, 
-                       int pic_x, int pic_y, int ref_x, int ref_y, 
-                       int block_width, int block_height);
+unsigned calc_sad(picture *pic, picture *ref, 
+                  int pic_x, int pic_y, int ref_x, int ref_y, 
+                  int block_width, int block_height);
 
 //////////////////////////////////////////////////////////////////////////
 // DEFINES
-#define TEST_SAD(X, Y) get_block_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8)
+#define TEST_SAD(X, Y) calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8)
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
