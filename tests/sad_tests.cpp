@@ -64,7 +64,7 @@ void sad_teardown(void)
 }
 
 //////////////////////////////////////////////////////////////////////////
-// TESTS
+// OVERLAPPING BOUNDARY TESTS
 void test_topleft(void)
 {
   assert_ulong_equal(
@@ -129,12 +129,73 @@ void test_bottomright(void)
 }
 
 //////////////////////////////////////////////////////////////////////////
+// OUT OF FRAME TESTS
+
+void test_topleft_out(void)
+{
+  assert_ulong_equal(
+    1*(8*8) - 64,
+    TEST_SAD(-8, -8));
+}
+
+void test_top_out(void)
+{
+  assert_ulong_equal(
+    (1+3)*8 + 2*(6*8) - 64,
+    TEST_SAD(0, -8));
+}
+
+void test_topright_out(void)
+{
+  assert_ulong_equal(
+    3*(8*8) - 64,
+    TEST_SAD(8, -8));
+}
+
+void test_left_out(void)
+{
+  assert_ulong_equal(
+    (1+7)*8 + 4*(6*8) - 64,
+    TEST_SAD(-8, 0));
+}
+
+void test_right_out(void)
+{
+  assert_ulong_equal(
+    (3+9)*8 + 6*(6*8) - 64,
+    TEST_SAD(8, 0));
+}
+
+void test_bottomleft_out(void)
+{
+  assert_ulong_equal(
+    7*(8*8) - 64,
+    TEST_SAD(-8, 8));
+}
+
+void test_bottom_out(void)
+{
+  assert_ulong_equal(
+    (7+9)*8 + 8*(6*8) - 64,
+    TEST_SAD(0, 8));
+}
+
+void test_bottomright_out(void)
+{
+  assert_ulong_equal(
+    9*(8*8) - 64,
+    TEST_SAD(8, 8));
+}
+
+//////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
 void sad_tests(void)
 {
   test_fixture_start();
   fixture_setup(sad_setup);
 
+
+  // Tests for movement vectors that overlap frame.
   run_test(test_topleft);
   run_test(test_top);
   run_test(test_topright);
@@ -146,6 +207,19 @@ void sad_tests(void)
   run_test(test_bottomleft);
   run_test(test_bottom);
   run_test(test_bottomright);
+
+  // Tests for movement vectors that are outside the frame.
+  run_test(test_topleft_out);
+  run_test(test_top_out);
+  run_test(test_topright_out);
+
+  run_test(test_left_out);
+  run_test(test_right_out);
+
+  run_test(test_bottomleft_out);
+  run_test(test_bottom_out);
+  run_test(test_bottomright_out);
+
 
   fixture_teardown(sad_teardown);
   test_fixture_end();
