@@ -28,64 +28,12 @@
 #define USE_INTRA_IN_P 0
 //#define RENDER_CU encoder->frame==2
 #define RENDER_CU 0
-#define USE_FULL_SEARCH 0
 #define USE_CHROMA_IN_MV_SEARCH 0
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
-
-
-/**
- * \brief  Get Sum of Absolute Differences (SAD) between two blocks in two
- *         different frames.
- * \param pic  First frame.
- * \param ref  Second frame.
- * \param pic_x  X coordinate of the first block.
- * \param pic_y  Y coordinate of the first block.
- * \param ref_x  X coordinate of the second block.
- * \param ref_y  Y coordinate of the second block.
- * \param block_width  Width of the blocks.
- * \param block_height  Height of the blocks.
- */
-unsigned get_block_sad(picture *pic, picture *ref, 
-                       int pic_x, int pic_y, int ref_x, int ref_y, 
-                       int block_width, int block_height)
-{
-  uint8_t *pic_data, *ref_data;
-  int width = pic->width;
-  int height = pic->height;
-
-  unsigned result = 1; // Start from 1 so result is never 0.
-
-  // 0 means invalid, for now.
-  if (!IN_FRAME(ref_x, ref_y, width, height, block_width, block_height)) return 0;
-
-  pic_data = &pic->y_data[pic_y * width + pic_x];
-  ref_data = &ref->y_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block_width, block_height, width);
-
-  #if USE_CHROMA_IN_MV_SEARCH
-  // Halve everything because chroma is half the resolution.
-  width >>= 2;
-  pic_x >>= 2;
-  pic_y >>= 2;
-  ref_x >>= 2;
-  ref_y >>= 2;
-  block >>= 2;
-
-  pic_data = &pic->u_data[pic_y * width + pic_x];
-  ref_data = &ref->u_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block_width, block_height, width);
-
-  pic_data = &pic->v_data[pic_y * width + pic_x];
-  ref_data = &ref->v_data[ref_y * width + ref_x];
-  result += sad(pic_data, ref_data, block_width, block_height, width);
-  #endif
-
-  return result;
-}
 
 typedef struct {
   int x;
@@ -131,9 +79,9 @@ void hexagon_search(picture *pic, picture *ref,
   // Search the initial 7 points of the hexagon.
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = large_hexbs + i;
-    unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
-                         orig_x + x + pattern->x, orig_y + y + pattern->y,
-                         block_width, block_width);
+    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
+                             orig_x + x + pattern->x, orig_y + y + pattern->y,
+                             block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       best_index = i;
@@ -142,9 +90,9 @@ void hexagon_search(picture *pic, picture *ref,
 
   // Try the 0,0 vector.
   if (!(x == 0 && y == 0)) {
-    unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
-                                  orig_x, orig_y,
-                                  block_width, block_width);
+    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
+                             orig_x, orig_y,
+                             block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       best_index = 0;
@@ -154,9 +102,9 @@ void hexagon_search(picture *pic, picture *ref,
       // Redo the search around the 0,0 point.
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = large_hexbs + i;
-        unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
-                              orig_x + pattern->x, orig_y + pattern->y,
-                              block_width, block_width);
+        unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
+                                 orig_x + pattern->x, orig_y + pattern->y,
+                                 block_width, block_width);
         if (cost > 0 && cost < best_cost) {
           best_cost = cost;
           best_index = i;
@@ -185,9 +133,9 @@ void hexagon_search(picture *pic, picture *ref,
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = large_hexbs + start + i;
-      unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
-                                    orig_x + x + offset->x, orig_y + y + offset->y,
-                                    block_width, block_width);
+      unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
+                               orig_x + x + offset->x, orig_y + y + offset->y,
+                               block_width, block_width);
       if (cost > 0 && cost < best_cost) {
         best_cost = cost;
         best_index = start + i;
@@ -202,9 +150,9 @@ void hexagon_search(picture *pic, picture *ref,
   best_index = 0;
   for (i = 1; i < 5; ++i) {
     const vector2d *offset = small_hexbs + i;
-    unsigned cost = get_block_sad(pic, ref, orig_x, orig_y,
-                                  orig_x + x + offset->x, orig_y + y + offset->y,
-                                  block_width, block_width);
+    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
+                             orig_x + x + offset->x, orig_y + y + offset->y,
+                             block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       best_index = i;
@@ -217,146 +165,6 @@ void hexagon_search(picture *pic, picture *ref,
   cur_cu->inter.cost = best_cost + 1; // +1 so that cost is > 0.
   cur_cu->inter.mv[0] = x << 2;
   cur_cu->inter.mv[1] = y << 2;
-}
-
-void search_mv(picture *pic, picture *ref,
-               cu_info *cur_cu,  int orig_x, int orig_y, int x, int y, 
-               unsigned depth)
-{
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
-
-  // Get cost for the predicted motion vector.
-  unsigned cost = get_block_sad(pic, ref, orig_x, orig_y, orig_x + x, orig_y + y,
-                                block_width, block_width);
-  unsigned best_cost = -1;
-  unsigned step = 8;
-
-  if (cost > 0) {
-    best_cost = cost;
-    cur_cu->inter.mv[0] = x;
-    cur_cu->inter.mv[1] = y;
-  }
-
-  // If initial vector is long, also try the (0, 0) vector just in case.
-  if (x != 0 || y != 0) {
-    cost = get_block_sad(pic, ref, orig_x, orig_y, orig_x, orig_y,
-                         block_width, block_width);
-
-    if (cost > 0 && cost < best_cost) {
-      best_cost = cost;
-      cur_cu->inter.mv[0] = 0;
-      cur_cu->inter.mv[1] = 0;
-    }
-  }
-
-  while (step > 0) {
-    // Stop if current best vector is already really good.
-    // This is an experimental condition.
-    // The constant 1.8 is there because there is some SAD cost when comparing
-    // against the reference even if the frame doesn't change. This is probably
-    // due to quantization. It's value is just a guess based on the first
-    // blocks of the BQMall sequence, which don't move.
-    // TODO: Quantization factor probably affects what the constant should be.
-    /*
-    if (best_cost <= block_width * block_width * 1.8) {
-      break;
-    }
-    */
-
-    // Change center of search to the current best point.
-    x = cur_cu->inter.mv[0];
-    y = cur_cu->inter.mv[1];
-
-    // above
-    cost = get_block_sad(pic, ref, orig_x, orig_y,
-                         orig_x + x, orig_y + y - step,
-                         block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
-      best_cost = cost;
-      cur_cu->inter.mv[0] = x;
-      cur_cu->inter.mv[1] = y - step;
-    }
-
-    // left
-    cost = get_block_sad(pic, ref, orig_x, orig_y,
-                         orig_x + x - step, orig_y + y,
-                         block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
-      best_cost = cost;
-      cur_cu->inter.mv[0] = x - step;
-      cur_cu->inter.mv[1] = y;
-    }
-
-    // right
-    cost = get_block_sad(pic, ref, orig_x, orig_y,
-                         orig_x + x + step, orig_y + y,
-                         block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
-      best_cost = cost;
-      cur_cu->inter.mv[0] = x + step;
-      cur_cu->inter.mv[1] = y;
-    }
-
-    // below
-    cost = get_block_sad(pic, ref, orig_x, orig_y,
-                         orig_x + x, orig_y + y + step,
-                         block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
-      best_cost = cost;
-      cur_cu->inter.mv[0] = x;
-      cur_cu->inter.mv[1] = y + step;
-    }
-
-    // Reduce search area by half.
-    step /= 2;
-  }
-
-  cur_cu->inter.cost = best_cost + 1; // +1 so that cost is > 0.
-  cur_cu->inter.mv[0] <<= 2;
-  cur_cu->inter.mv[1] <<= 2;
-}
-
-/**
- * \brief Search motions vectors for a block and all it's sub-blocks.
- *
- * \param pic
- * \param pic_data  picture color data starting from the block MV is being searched for.
- * \param ref_data  picture color data starting from the beginning of reference pic.
- * \param cur_cu
- */
-void search_mv_full(picture *pic, uint8_t *pic_data, uint8_t *ref_data,
-                    cu_info *cur_cu, unsigned step, 
-                    int orig_x, int orig_y, int x, int y, unsigned depth)
-{
-  // TODO: Inter: Handle non-square blocks.
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
-  int block_height = block_width;
-  unsigned cost;
-
-  // TODO: Inter: Calculating error outside picture borders.
-  // This prevents choosing vectors that need interpolating of borders to work.
-  if (orig_x + x < 0 || orig_y + y < 0 || orig_x + x > pic->width - block_width
-      || orig_y + y > pic->height - block_height) return;
-
-  cost = sad(pic_data, &ref_data[(orig_y + y) * pic->width + (orig_x + x)],
-      block_width, block_height, pic->width) + 1;
-  if (cost < cur_cu->inter.cost) {
-    cur_cu->inter.cost = cost;
-    cur_cu->inter.mv[0] = x << 2;
-    cur_cu->inter.mv[1] = y << 2;
-  }
-
-  step /= 2;
-  if (step > 0) {
-    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                   x, y - step, depth);
-    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                   x - step, y, depth);
-    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                   x + step, y, depth);
-    search_mv_full(pic, pic_data, ref_data, cur_cu, step, orig_x, orig_y,
-                   x, y + step, depth);
-  }
 }
 
 /**
@@ -500,20 +308,9 @@ void search_tree(encoder_control *encoder,
         start_y = ref_cu->inter.mv[1] >> 2;
       }
 
-      if (USE_FULL_SEARCH) {
-        search_mv_full(cur_pic, cur_data, ref_pic->y_data, 
-                       cur_cu, 8, x, y,
-                       start_x, start_y, depth);
-      } else {
-        /*
-        search_mv(cur_pic, ref_pic, 
-                  cur_cu, x, y, 
-                  start_x, start_y, depth);
-        */
-        hexagon_search(cur_pic, ref_pic, 
-                       cur_cu, x, y, 
-                       start_x, start_y, depth);
-      }
+      hexagon_search(cur_pic, ref_pic, 
+                     cur_cu, x, y, 
+                     start_x, start_y, depth);
     }
 
     cur_cu->type = CU_INTER;

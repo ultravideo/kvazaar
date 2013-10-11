@@ -123,8 +123,10 @@ uint32_t sad8x8(int16_t *block1, uint32_t stride1,
                 int16_t* block2, uint32_t stride2);
 uint32_t sad4x4(int16_t *block1, uint32_t stride1,
                 int16_t* block2, uint32_t stride2);
-uint32_t sad(uint8_t *data1, uint8_t *data2, 
-             unsigned width, unsigned height, unsigned stride);
+
+unsigned calc_sad(picture *pic, picture *ref, 
+                  int pic_x, int pic_y, int ref_x, int ref_y, 
+                  int block_width, int block_height);
 
 double image_psnr(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y);
 

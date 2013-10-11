@@ -24,9 +24,15 @@
     <ClCompile Include="..\..\tests\picture_list_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\sad_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tests\picture_list_tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tests\sad_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
