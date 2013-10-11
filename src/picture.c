@@ -560,10 +560,10 @@ uint32_t sad4x4(int16_t *block1, uint32_t stride1,
 }
 
 unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                 unsigned block_width, unsigned block_height, unsigned width)
+                 int block_width, int block_height, unsigned width)
 {
   unsigned char ref = *ref_data;
-  unsigned x, y;
+  int x, y;
   unsigned sad = 0;
 
   for (y = 0; y < block_height; ++y) {
@@ -576,9 +576,9 @@ unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data,
 }
 
 unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                 unsigned block_width, unsigned block_height, unsigned width)
+                 int block_width, int block_height, unsigned width)
 {
-  unsigned x, y;
+  int x, y;
   unsigned sad = 0;
 
   for (y = 0; y < block_height; ++y) {
@@ -591,9 +591,9 @@ unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data,
 }
 
 unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data, 
-                 unsigned block_width, unsigned block_height, unsigned width)
+                 int block_width, int block_height, unsigned width)
 {
-  unsigned x, y;
+  int x, y;
   unsigned sad = 0;
 
   for (y = 0; y < block_height; ++y) {
@@ -619,10 +619,10 @@ unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-uint32_t reg_sad(uint8_t *data1, uint8_t *data2, 
-             unsigned width, unsigned height, unsigned stride)
+unsigned reg_sad(uint8_t *data1, uint8_t *data2, 
+                 int width, int height, unsigned stride)
 {
-  unsigned y, x;
+  int y, x;
   unsigned sad = 0;
 
   for (y = 0; y < height; ++y) {
