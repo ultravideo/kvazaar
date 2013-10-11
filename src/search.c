@@ -87,29 +87,37 @@ unsigned get_block_sad(picture *pic, picture *ref,
   // - Reduce block_width and block_height so that the the size of the area
   //   being compared is correct.
   if (left && top) {
-    result += cor_sad(pic_data, &ref_data[top * width + left],
+    result += cor_sad(pic_data,
+                      &ref_data[top * width + left],
                       left, top, width);
-    result += ver_sad(&pic_data[left], &ref_data[top * width + left],
+    result += ver_sad(&pic_data[left],
+                      &ref_data[top * width + left],
                       block_width - left, top, width);
-    result += hor_sad(&pic_data[top * width], &ref_data[top * width + left],
+    result += hor_sad(&pic_data[top * width],
+                      &ref_data[top * width + left],
                       left, block_height - top, width);
-    result += reg_sad(&pic_data[top * width + left], &ref_data[top * width + left],
+    result += reg_sad(&pic_data[top * width + left],
+                      &ref_data[top * width + left],
                       block_width - left, block_height - top, width);
   } else if (top && right) {
-    result += ver_sad(pic_data, &ref_data[top * width],
+    result += ver_sad(pic_data,
+                      &ref_data[top * width],
                       block_width - right, top, width);
     result += cor_sad(&pic_data[block_width - right],
                       &ref_data[top * width + (block_width - right - 1)],
                       right, top, width);
-    result += reg_sad(&pic_data[top * width], &ref_data[top * width],
+    result += reg_sad(&pic_data[top * width],
+                      &ref_data[top * width],
                       block_width - right, block_height - top, width);
     result += hor_sad(&pic_data[top * width + (block_width - right)],
                       &ref_data[top * width + (block_width - right - 1)],
                       right, block_height - top, width);
   } else if (top) {
-    result += ver_sad(pic_data, &ref_data[top * width],
+    result += ver_sad(pic_data,
+                      &ref_data[top * width],
                       block_width, top, width);
-    result += reg_sad(&pic_data[top * width], &ref_data[top * width],
+    result += reg_sad(&pic_data[top * width],
+                      &ref_data[top * width],
                       block_width, block_height - top, width);
   } else if (bottom && left) {
 
