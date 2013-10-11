@@ -559,6 +559,17 @@ uint32_t sad4x4(int16_t *block1, uint32_t stride1,
   return sum;
 }
 
+/**
+ * \brief Diagonally interpolate SAD outside the frame.
+ * 
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param width  Width of the pixel array.
+ * 
+ * \returns Sum of Absolute Differences
+ */
 unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data, 
                  int block_width, int block_height, unsigned width)
 {
@@ -575,6 +586,17 @@ unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data,
   return sad;
 }
 
+/**
+ * \brief Vertically interpolate SAD outside the frame.
+ * 
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param width  Width of the pixel array.
+ * 
+ * \returns Sum of Absolute Differences
+ */
 unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data, 
                  int block_width, int block_height, unsigned width)
 {
@@ -590,6 +612,17 @@ unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data,
   return sad;
 }
 
+/**
+ * \brief Horizontally interpolate SAD outside the frame.
+ * 
+ * \param data1   Starting point of the first picture.
+ * \param data2   Starting point of the second picture.
+ * \param width   Width of the region for which SAD is calculated.
+ * \param height  Height of the region for which SAD is calculated.
+ * \param width   Width of the pixel array.
+ * 
+ * \returns Sum of Absolute Differences
+ */
 unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data, 
                  int block_width, int block_height, unsigned width)
 {
@@ -632,4 +665,168 @@ unsigned reg_sad(uint8_t *data1, uint8_t *data2,
   }
 
   return sad;
+}
+
+/**
+ * \brief  Handle special cases of comparing blocks that are not completely
+ *         inside the frame.
+ * 
+ * \param pic  First frame.
+ * \param ref  Second frame.
+ * \param pic_x  X coordinate of the first block.
+ * \param pic_y  Y coordinate of the first block.
+ * \param ref_x  X coordinate of the second block.
+ * \param ref_y  Y coordinate of the second block.
+ * \param block_width  Width of the blocks.
+ * \param block_height  Height of the blocks.
+ */
+unsigned interpolated_sad(picture *pic, picture *ref, 
+                          int pic_x, int pic_y, int ref_x, int ref_y, 
+                          int block_width, int block_height)
+{
+  uint8_t *pic_data, *ref_data;
+  int width = pic->width;
+  int height = pic->height;
+
+  // These are the number of pixels by how far the movement vector points
+  // outside the frame. They are always >= 0. If all of them are 0, the
+  // movement vector doesn't point outside the frame.
+  int left   = (ref_x < 0) ? -ref_x : 0;
+  int top    = (ref_y < 0) ? -ref_y : 0;
+  int right  = (ref_x + block_width  > width)  ? ref_x + block_width  - width  : 0;
+  int bottom = (ref_y + block_height > height) ? ref_y + block_height - height : 0;
+
+  unsigned result = 0;
+
+  // Center picture to the current block and reference to the point where
+  // movement vector is pointing to. That point might be outside the buffer,
+  // but that is ok because we project the movement vector to the buffer
+  // before dereferencing the pointer.
+  pic_data = &pic->y_data[pic_y * width + pic_x];
+  ref_data = &ref->y_data[ref_y * width + ref_x];
+
+  // The handling of movement vectors that point outside the picture is done
+  // in the following way.
+  // - Correct the index of ref_data so that it points to the top-left
+  //   of the area we want to compare against.
+  // - Correct the index of pic_data to point inside the current block, so
+  //   that we compare the right part of the block to the ref_data.
+  // - Reduce block_width and block_height so that the the size of the area
+  //   being compared is correct.
+  if (top && left) {
+    result += cor_sad(pic_data,
+                      &ref_data[top * width + left],
+                      left, top, width);
+    result += ver_sad(&pic_data[left],
+                      &ref_data[top * width + left],
+                      block_width - left, top, width);
+    result += hor_sad(&pic_data[top * width],
+                      &ref_data[top * width + left],
+                      left, block_height - top, width);
+    result += reg_sad(&pic_data[top * width + left],
+                      &ref_data[top * width + left],
+                      block_width - left, block_height - top, width);
+  } else if (top && right) {
+    result += ver_sad(pic_data,
+                      &ref_data[top * width],
+                      block_width - right, top, width);
+    result += cor_sad(&pic_data[block_width - right],
+                      &ref_data[top * width + (block_width - right - 1)],
+                      right, top, width);
+    result += reg_sad(&pic_data[top * width],
+                      &ref_data[top * width],
+                      block_width - right, block_height - top, width);
+    result += hor_sad(&pic_data[top * width + (block_width - right)],
+                      &ref_data[top * width + (block_width - right - 1)],
+                      right, block_height - top, width);
+  } else if (bottom && left) {
+    result += hor_sad(pic_data,
+                      &ref_data[left],
+                      left, block_height - bottom, width);
+    result += reg_sad(&pic_data[left],
+                      &ref_data[left],
+                      block_width - left, block_height - bottom, width);
+    result += cor_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width + left],
+                      left, bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width + left],
+                      &ref_data[(block_height - bottom - 1) * width + left],
+                      block_width - left, bottom, width);
+  } else if (bottom && right) {
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width - right, block_height - bottom, width);
+    result += hor_sad(&pic_data[block_width - right],
+                      &ref_data[block_width - right - 1],
+                      right, block_height - bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width],
+                      block_width - right, bottom, width);
+    result += cor_sad(&pic_data[(block_height - bottom) * width + block_width - right],
+                      &ref_data[(block_height - bottom - 1) * width + block_width - right - 1],
+                      right, bottom, width);
+  } else if (top) {
+    result += ver_sad(pic_data,
+                      &ref_data[top * width],
+                      block_width, top, width);
+    result += reg_sad(&pic_data[top * width],
+                      &ref_data[top * width],
+                      block_width, block_height - top, width);
+  } else if (bottom) { 
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width, block_height - bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width],
+                      block_width, bottom, width);
+  } else if (left) {
+    result += hor_sad(pic_data,
+                      &ref_data[left],
+                      left, block_height, width);
+    result += reg_sad(&pic_data[left],
+                      &ref_data[left],
+                      block_width - left, block_height, width);
+  } else if (right) {
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width - right, block_height, width);
+    result += hor_sad(&pic_data[block_width - right],
+                      &ref_data[block_width - right - 1],
+                      right, block_height, width);
+  } else {
+    result += reg_sad(pic_data, ref_data, block_width, block_height, width);
+  }
+  
+  return result;
+}
+
+/**
+ * \brief  Get Sum of Absolute Differences (SAD) between two blocks in two
+ *         different frames.
+ *
+ * \param pic  First frame.
+ * \param ref  Second frame.
+ * \param pic_x  X coordinate of the first block.
+ * \param pic_y  Y coordinate of the first block.
+ * \param ref_x  X coordinate of the second block.
+ * \param ref_y  Y coordinate of the second block.
+ * \param block_width  Width of the blocks.
+ * \param block_height  Height of the blocks.
+ */
+unsigned calc_sad(picture *pic, picture *ref, 
+                  int pic_x, int pic_y, int ref_x, int ref_y, 
+                  int block_width, int block_height)
+{
+  if (ref_x >= 0 && ref_x <= pic->width  - block_width &&
+      ref_y >= 0 && ref_y <= pic->height - block_height)
+  {
+    // Reference block is completely inside the frame, so just calculate the
+    // SAD directly. This is the most common case, which is why it's first.
+    uint8_t *pic_data = &pic->y_data[pic_y * pic->width + pic_x];
+    uint8_t *ref_data = &ref->y_data[ref_y * pic->width + ref_x];
+    return reg_sad(pic_data, ref_data, block_width, block_height, pic->width);
+  } else {
+    // Call a routine that knows how to interpolate pixels outside the frame.
+    return interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height);
+  }
 }
