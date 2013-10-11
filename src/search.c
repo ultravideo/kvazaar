@@ -120,15 +120,52 @@ unsigned get_block_sad(picture *pic, picture *ref,
                       &ref_data[top * width],
                       block_width, block_height - top, width);
   } else if (bottom && left) {
-
+    result += hor_sad(pic_data,
+                      &ref_data[left],
+                      left, block_height - bottom, width);
+    result += reg_sad(&pic_data[left],
+                      &ref_data[left],
+                      block_width - left, block_height - bottom, width);
+    result += cor_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width + left],
+                      left, bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width + left],
+                      &ref_data[(block_height - bottom - 1) * width + left],
+                      block_width - left, bottom, width);
   } else if (bottom && right) {
-
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width - right, block_height - bottom, width);
+    result += hor_sad(&pic_data[block_width - right],
+                      &ref_data[block_width - right - 1],
+                      right, block_height - bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width],
+                      block_width - right, bottom, width);
+    result += cor_sad(&pic_data[(block_height - bottom) * width + block_width - right],
+                      &ref_data[(block_height - bottom - 1) * width + block_width - right - 1],
+                      right, bottom, width);
   } else if (left) {
-
+    result += hor_sad(pic_data,
+                      &ref_data[left],
+                      left, block_height, width);
+    result += reg_sad(&pic_data[left],
+                      &ref_data[left],
+                      block_width - left, block_height, width);
   } else if (right) {
-
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width - right, block_height, width);
+    result += hor_sad(&pic_data[block_width - right],
+                      &ref_data[block_width - right - 1],
+                      right, block_height, width);
   } else if (bottom) { 
-
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width, block_height - bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width],
+                      block_width, bottom, width);
   } else {
     result += reg_sad(pic_data, ref_data, block_width, block_height, width);
   }
