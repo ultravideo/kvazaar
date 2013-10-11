@@ -86,7 +86,7 @@ unsigned get_block_sad(picture *pic, picture *ref,
   //   that we compare the right part of the block to the ref_data.
   // - Reduce block_width and block_height so that the the size of the area
   //   being compared is correct.
-  if (left && top) {
+  if (top && left) {
     result += cor_sad(pic_data,
                       &ref_data[top * width + left],
                       left, top, width);
@@ -112,13 +112,6 @@ unsigned get_block_sad(picture *pic, picture *ref,
     result += hor_sad(&pic_data[top * width + (block_width - right)],
                       &ref_data[top * width + (block_width - right - 1)],
                       right, block_height - top, width);
-  } else if (top) {
-    result += ver_sad(pic_data,
-                      &ref_data[top * width],
-                      block_width, top, width);
-    result += reg_sad(&pic_data[top * width],
-                      &ref_data[top * width],
-                      block_width, block_height - top, width);
   } else if (bottom && left) {
     result += hor_sad(pic_data,
                       &ref_data[left],
@@ -145,6 +138,20 @@ unsigned get_block_sad(picture *pic, picture *ref,
     result += cor_sad(&pic_data[(block_height - bottom) * width + block_width - right],
                       &ref_data[(block_height - bottom - 1) * width + block_width - right - 1],
                       right, bottom, width);
+  } else if (top) {
+    result += ver_sad(pic_data,
+                      &ref_data[top * width],
+                      block_width, top, width);
+    result += reg_sad(&pic_data[top * width],
+                      &ref_data[top * width],
+                      block_width, block_height - top, width);
+  } else if (bottom) { 
+    result += reg_sad(pic_data,
+                      ref_data,
+                      block_width, block_height - bottom, width);
+    result += ver_sad(&pic_data[(block_height - bottom) * width],
+                      &ref_data[(block_height - bottom - 1) * width],
+                      block_width, bottom, width);
   } else if (left) {
     result += hor_sad(pic_data,
                       &ref_data[left],
@@ -159,13 +166,6 @@ unsigned get_block_sad(picture *pic, picture *ref,
     result += hor_sad(&pic_data[block_width - right],
                       &ref_data[block_width - right - 1],
                       right, block_height, width);
-  } else if (bottom) { 
-    result += reg_sad(pic_data,
-                      ref_data,
-                      block_width, block_height - bottom, width);
-    result += ver_sad(&pic_data[(block_height - bottom) * width],
-                      &ref_data[(block_height - bottom - 1) * width],
-                      block_width, bottom, width);
   } else {
     result += reg_sad(pic_data, ref_data, block_width, block_height, width);
   }
