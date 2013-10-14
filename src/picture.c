@@ -281,7 +281,7 @@ int picture_destroy(picture *pic)
 /**
  * \brief Calculates image PSNR value
  */
-double image_psnr(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y)
+double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
 {
   uint64_t error_sum = 0;
   int32_t error = 0;
@@ -593,10 +593,10 @@ uint32_t sad4x4(int16_t *block1, uint32_t stride1,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data, 
+unsigned cor_sad(pixel *pic_data, pixel *ref_data, 
                  int block_width, int block_height, unsigned width)
 {
-  unsigned char ref = *ref_data;
+  pixel ref = *ref_data;
   int x, y;
   unsigned sad = 0;
 
@@ -620,7 +620,7 @@ unsigned cor_sad(unsigned char* pic_data, unsigned char* ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data, 
+unsigned ver_sad(pixel *pic_data, pixel *ref_data, 
                  int block_width, int block_height, unsigned width)
 {
   int x, y;
@@ -646,7 +646,7 @@ unsigned ver_sad(unsigned char* pic_data, unsigned char* ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data, 
+unsigned hor_sad(pixel *pic_data, pixel *ref_data, 
                  int block_width, int block_height, unsigned width)
 {
   int x, y;
@@ -675,7 +675,7 @@ unsigned hor_sad(unsigned char* pic_data, unsigned char* ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned reg_sad(uint8_t *data1, uint8_t *data2, 
+unsigned reg_sad(pixel *data1, pixel *data2, 
                  int width, int height, unsigned stride)
 {
   int y, x;
@@ -707,7 +707,7 @@ unsigned interpolated_sad(picture *pic, picture *ref,
                           int pic_x, int pic_y, int ref_x, int ref_y, 
                           int block_width, int block_height)
 {
-  uint8_t *pic_data, *ref_data;
+  pixel *pic_data, *ref_data;
   int width = pic->width;
   int height = pic->height;
 
@@ -845,8 +845,8 @@ unsigned calc_sad(picture *pic, picture *ref,
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    uint8_t *pic_data = &pic->y_data[pic_y * pic->width + pic_x];
-    uint8_t *ref_data = &ref->y_data[ref_y * pic->width + ref_x];
+    pixel *pic_data = &pic->y_data[pic_y * pic->width + pic_x];
+    pixel *ref_data = &ref->y_data[ref_y * pic->width + ref_x];
     return reg_sad(pic_data, ref_data, block_width, block_height, pic->width);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.

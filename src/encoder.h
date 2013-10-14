@@ -70,13 +70,13 @@ typedef struct
 typedef struct
 {
   int8_t idx;
-  uint8_t *base;
-  uint8_t *base_u;
-  uint8_t *base_v;
+  pixel *base;
+  pixel *base_u;
+  pixel *base_v;
   
-  uint8_t *recbase;
-  uint8_t *recbase_u;
-  uint8_t *recbase_v;
+  pixel *recbase;
+  pixel *recbase_u;
+  pixel *recbase_v;
   
   int16_t *pred;
   int16_t *pred_u;

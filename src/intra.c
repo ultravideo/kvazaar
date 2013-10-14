@@ -213,7 +213,7 @@ void intra_filter(int16_t *ref, int32_t stride,int32_t width, int8_t mode)
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(uint8_t *orig, int32_t origstride, int16_t *rec, int32_t recstride, uint32_t xpos,
+int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t recstride, uint32_t xpos,
                          uint32_t ypos, uint32_t width, int16_t *dst, int32_t dststride, uint32_t *sad_out)
 {
   typedef uint32_t (*sad_function)(int16_t *block,uint32_t stride1,int16_t *block2, uint32_t stride2);
@@ -221,7 +221,7 @@ int16_t intra_prediction(uint8_t *orig, int32_t origstride, int16_t *rec, int32_
   uint32_t sad = 0;
   int16_t best_mode = 1;
   int32_t x,y,i;
-  uint32_t (*calc_sad)(int16_t *block,uint32_t stride1,int16_t* block2, uint32_t stride2);
+  sad_function calc_sad;
 
   // Temporary block arrays
   // TODO: alloc with alignment
@@ -230,7 +230,7 @@ int16_t intra_prediction(uint8_t *orig, int32_t origstride, int16_t *rec, int32_
   int16_t rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
   
   int16_t* rec_filtered = &rec_filtered_temp[recstride + 1]; //!< pointer to rec_filtered_temp with offset of (1,1)
-  uint8_t *orig_shift = &orig[xpos + ypos*origstride];  //!< pointer to orig with offset of (1,1)
+  pixel *orig_shift = &orig[xpos + ypos*origstride];  //!< pointer to orig with offset of (1,1)
   int8_t filter = (width<32); // TODO: chroma support
 
   sad_function sad_array[5] = {&sad4x4,&sad8x8,&sad16x16,&sad32x32,&sad64x64}; //TODO: get SAD functions from parameters
@@ -375,9 +375,9 @@ void intra_build_reference_border(picture *pic, int32_t x_cu, int32_t y_cu,int16
   int32_t top_row;     //!< top row iterator
   int32_t src_width    = (pic->width>>(chroma?1:0)); //!< source picture width
   int32_t src_height   = (pic->height>>(chroma?1:0));//!< source picture height
-  uint8_t *src         = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata); //!< input picture pointer
+  pixel *src         = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata); //!< input picture pointer
   int16_t scu_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); //!< Smallest Coding Unit width
-  uint8_t* src_shifted = &src[x_cu * scu_width + (y_cu * scu_width) * src_width];  //!< input picture pointer shifted to start from the left-top corner of the current block
+  pixel *src_shifted = &src[x_cu * scu_width + (y_cu * scu_width) * src_width];  //!< input picture pointer shifted to start from the left-top corner of the current block
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;     //!< picture width in smallest CU
 
   // Fill left column when not on the border

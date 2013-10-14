@@ -181,9 +181,9 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
   int32_t top_row;  // top row iterator
   int32_t src_width = (pic->width >> (chroma ? 1 : 0));   // source picture width
   int32_t src_height = (pic->height >> (chroma ? 1 : 0)); // source picture height
-  uint8_t *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
+  pixel *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
   int16_t scu_width = LCU_WIDTH >> (MAX_DEPTH + (chroma ? 1 : 0)); // Smallest Coding Unit width
-  uint8_t *src_shifted = &src_pic[x_ctb * scu_width + (y_ctb * scu_width) * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
+  pixel *src_shifted = &src_pic[x_ctb * scu_width + (y_ctb * scu_width) * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
   int32_t width_in_scu = pic->width_in_lcu << MAX_DEPTH; // picture width in SCU
 
   // Fill left column

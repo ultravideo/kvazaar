@@ -30,6 +30,16 @@
   #define X86_64
 #endif
 
+#define BIT_DEPTH 8
+#define PIXEL_MIN 0
+#define PIXEL_MAX (1 << BIT_DEPTH)
+
+#if BIT_DEPTH == 8
+typedef uint8_t pixel;
+#else
+typedef uint16_t pixel;
+#endif
+typedef int16_t coefficient;
 
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
@@ -68,6 +78,7 @@
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define NO_SCU_IN_LCU(no_lcu) ((no_lcu) << MAX_DEPTH)
+#define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
 
 #define VERSION_STRING "0.2               "
 #define VERSION 0.2

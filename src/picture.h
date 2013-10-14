@@ -65,13 +65,13 @@ typedef struct
  */
 typedef struct
 {
-  uint8_t* y_data;        // \brief Pointer to luma pixel array.
-  uint8_t* u_data;        // \brief Pointer to chroma U pixel array.
-  uint8_t* v_data;        // \brief Pointer to chroma V pixel array.
+  pixel* y_data;        // \brief Pointer to luma pixel array.
+  pixel* u_data;        // \brief Pointer to chroma U pixel array.
+  pixel* v_data;        // \brief Pointer to chroma V pixel array.
 
-  uint8_t* y_recdata;     // \brief Pointer to reconstructed Y-data.
-  uint8_t* u_recdata;     // \brief Pointer to reconstructed U-data.
-  uint8_t* v_recdata;     // \brief Pointer to reconstructed V-data.
+  pixel* y_recdata;     // \brief Pointer to reconstructed Y-data.
+  pixel* u_recdata;     // \brief Pointer to reconstructed U-data.
+  pixel* v_recdata;     // \brief Pointer to reconstructed V-data.
 
   int32_t width;          // \brief Luma pixel array width.
   int32_t height;         // \brief Luma pixel array height.
@@ -128,7 +128,7 @@ unsigned calc_sad(picture *pic, picture *ref,
                   int pic_x, int pic_y, int ref_x, int ref_y, 
                   int block_width, int block_height);
 
-double image_psnr(uint8_t *frame1, uint8_t *frame2, int32_t x, int32_t y);
+double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y);
 
 
 //////////////////////////////////////////////////////////////////////////
