@@ -39,9 +39,9 @@ void yuv2rgb(unsigned char yuv[3], unsigned char rgb[3])
   int u = yuv[1];
   int v = yuv[2];
 
-  int r = 1.164 * y + 1.596 * (v - 128);
-  int g = 1.165 * y - 0.392 * (u - 128) - 0.813 * (v - 128);
-  int b = 1.164 * y + 2.017 * (u - 128);
+  int r = (int)(1.164 * y + 1.596 * (v - 128));
+  int g = (int)(1.165 * y - 0.392 * (u - 128) - 0.813 * (v - 128));
+  int b = (int)(1.164 * y + 2.017 * (u - 128));
 
   rgb[0] = CLIP(0, 255, r);
   rgb[1] = CLIP(0, 255, g);
@@ -60,8 +60,8 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
   unsigned sum = 0;
   unsigned best_cost = -1;
   char type = cu->type == CU_INTRA ? 'I' : 'P';
-  unsigned x = xCtb * CU_MIN_SIZE_PIXELS;
-  unsigned y = yCtb * CU_MIN_SIZE_PIXELS;
+  int x = xCtb * CU_MIN_SIZE_PIXELS;
+  int y = yCtb * CU_MIN_SIZE_PIXELS;
   unsigned luma = y * pic->width + x;
   unsigned chroma = (y >> 1) * (pic->width >> 1) + (x >> 1);
   unsigned char yuv[3] = { 0, 0, 0 };
