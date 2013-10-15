@@ -181,9 +181,9 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
   int32_t top_row;  // top row iterator
   int32_t src_width = (pic->width >> (chroma ? 1 : 0));   // source picture width
   int32_t src_height = (pic->height >> (chroma ? 1 : 0)); // source picture height
-  uint8_t *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
+  pixel *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
   int16_t scu_width = LCU_WIDTH >> (MAX_DEPTH + (chroma ? 1 : 0)); // Smallest Coding Unit width
-  uint8_t *src_shifted = &src_pic[x_ctb * scu_width + (y_ctb * scu_width) * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
+  pixel *src_shifted = &src_pic[x_ctb * scu_width + (y_ctb * scu_width) * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
   int32_t width_in_scu = pic->width_in_lcu << MAX_DEPTH; // picture width in SCU
 
   // Fill left column
@@ -298,7 +298,7 @@ void search_tree(encoder_control *encoder,
       cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
       int x = x_ctb * CU_MIN_SIZE_PIXELS;
       int y = y_ctb * CU_MIN_SIZE_PIXELS;
-      uint8_t *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
+      pixel *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
       
       int start_x = 0;
       int start_y = 0;
@@ -321,7 +321,7 @@ void search_tree(encoder_control *encoder,
   if (depth >= MIN_INTRA_SEARCH_DEPTH && depth <= MAX_INTRA_SEARCH_DEPTH
       && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P)) {
     int x = 0, y = 0;
-    uint8_t *base = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
+    pixel *base = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
     uint32_t width = LCU_WIDTH >> depth;
 
     // INTRAPREDICTION

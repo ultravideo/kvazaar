@@ -69,7 +69,7 @@ const int16_t g_chroma_filter[8][4] =
 /**
  * \brief
  */
-INLINE void filter_deblock_luma(uint8_t *src, int32_t offset,
+INLINE void filter_deblock_luma(pixel *src, int32_t offset,
                                 int32_t tc, int8_t sw,
                                 int8_t part_P_nofilter, int8_t part_Q_nofilter,
                                 int32_t thr_cut,
@@ -129,7 +129,7 @@ INLINE void filter_deblock_luma(uint8_t *src, int32_t offset,
 /**
  * \brief
  */
-INLINE void filter_deblock_chroma(uint8_t *src, int32_t offset, int32_t tc,
+INLINE void filter_deblock_chroma(pixel *src, int32_t offset, int32_t tc,
                                   int8_t part_P_nofilter, int8_t part_Q_nofilter)
 {
   int32_t delta;
@@ -159,8 +159,8 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   int32_t beta_offset_div2 = encoder->beta_offset_div2;
   int32_t tc_offset_div2   = encoder->tc_offset_div2;  
   // TODO: support 10+bits
-  uint8_t *orig_src = &encoder->in.cur_pic->y_recdata[xpos + ypos*stride];
-  uint8_t *src = orig_src;
+  pixel *orig_src = &encoder->in.cur_pic->y_recdata[xpos + ypos*stride];
+  pixel *src = orig_src;
   int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
   cu_info *cu_p = 0;
@@ -259,8 +259,8 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   int32_t tc_offset_div2 = encoder->tc_offset_div2;
   int8_t num_parts = 1;
   // TODO: support 10+bits
-  uint8_t* src_u = &encoder->in.cur_pic->u_recdata[x + y*stride];
-  uint8_t* src_v = &encoder->in.cur_pic->v_recdata[x + y*stride];
+  pixel *src_u = &encoder->in.cur_pic->u_recdata[x + y*stride];
+  pixel *src_v = &encoder->in.cur_pic->v_recdata[x + y*stride];
   // Init offset and step to EDGE_HOR
   int32_t offset = stride;
   int32_t step = 1;

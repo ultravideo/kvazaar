@@ -326,10 +326,10 @@ void encode_one_frame(encoder_control* encoder)
 }
 
 void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
-                      unsigned array_height, unsigned char *data)
+                      unsigned array_height, pixel *data)
 {
-  unsigned char* p = data + height * array_width;
-  unsigned char* end = data + array_width * array_height;
+  pixel* p = data + height * array_width;
+  pixel* end = data + array_width * array_height;
 
   while (p < end) {
     // Fill the line by copying the line above.
@@ -339,11 +339,11 @@ void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
 }
 
 void read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
-                              unsigned array_width, unsigned char *data)
+                              unsigned array_width, pixel *data)
 {
-  unsigned char* p = data;
-  unsigned char* end = data + array_width * height;
-  unsigned char fill_char;
+  pixel* p = data;
+  pixel* end = data + array_width * height;
+  pixel fill_char;
   unsigned i;
 
   while (p < end) {
@@ -1060,9 +1060,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
           
           if (1) {
-            uint8_t *base_y  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-            uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-            uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            pixel *base_y  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+            pixel *base_u = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            pixel *base_v = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
             uint32_t width = LCU_WIDTH>>depth;
 
             /* INTRAPREDICTION VARIABLES */
@@ -1070,9 +1070,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             int16_t predU[LCU_WIDTH*LCU_WIDTH>>2];
             int16_t predV[LCU_WIDTH*LCU_WIDTH>>2];
 
-            uint8_t *recbase_y   = &encoder->in.cur_pic->y_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-            uint8_t *recbase_u  = &encoder->in.cur_pic->u_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-            uint8_t *recbase_v  = &encoder->in.cur_pic->v_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            pixel *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+            pixel *recbase_u = &encoder->in.cur_pic->u_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            pixel *recbase_v = &encoder->in.cur_pic->v_recdata[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
 
             /* TODO: dynamic memory allocation */
             int16_t coeff_y[LCU_WIDTH*LCU_WIDTH*2];
@@ -1140,9 +1140,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     int8_t mpm_preds = -1;
     int i;
     uint32_t flag;
-    uint8_t *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
-    uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
-    uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
+    pixel *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
+    pixel *base_u = &encoder->in.cur_pic->u_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
+    pixel *base_v = &encoder->in.cur_pic->v_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
     uint32_t width = LCU_WIDTH>>depth;
 
     // INTRAPREDICTION VARIABLES
@@ -1150,9 +1150,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     int16_t pred_u[LCU_WIDTH * LCU_WIDTH >> 2];
     int16_t pred_v[LCU_WIDTH * LCU_WIDTH >> 2];
 
-    uint8_t *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
-    uint8_t *recbase_u = &encoder->in.cur_pic->u_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
-    uint8_t *recbase_v = &encoder->in.cur_pic->v_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
+    pixel *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
+    pixel *recbase_u = &encoder->in.cur_pic->u_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
+    pixel *recbase_v = &encoder->in.cur_pic->v_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
 
     // SEARCH BEST INTRA MODE (AGAIN)
     int16_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
@@ -1329,9 +1329,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       {
       unsigned y, x;
 
-      uint8_t *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))    + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
-      uint8_t *base_u = &encoder->in.cur_pic->u_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
-      uint8_t *base_v = &encoder->in.cur_pic->v_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
+      pixel *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))    + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
+      pixel *base_u = &encoder->in.cur_pic->u_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
+      pixel *base_v = &encoder->in.cur_pic->v_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
 
       // Luma
       for (y = 0; y < LCU_WIDTH >> depth; y++) {
@@ -1430,13 +1430,13 @@ void encode_transform_tree(encoder_control *encoder, transform_info *ti,
       (ti->pred_stride >> 1) * (width >> 1)   + (width >> 1) 
     };
     
-    uint8_t *base_y    = &ti->base[base_offset[ti->idx]];
-    uint8_t *base_u    = &ti->base_u[base_offset_c[ti->idx]];
-    uint8_t *base_v    = &ti->base_v[base_offset_c[ti->idx]];
+    pixel *base_y    = &ti->base[base_offset[ti->idx]];
+    pixel *base_u    = &ti->base_u[base_offset_c[ti->idx]];
+    pixel *base_v    = &ti->base_v[base_offset_c[ti->idx]];
     
-    uint8_t *recbase_y = &ti->recbase[recbase_offset[ti->idx]];
-    uint8_t *recbase_u = &ti->recbase_u[recbase_offset_c[ti->idx]];
-    uint8_t *recbase_v = &ti->recbase_v[recbase_offset_c[ti->idx]];
+    pixel *recbase_y = &ti->recbase[recbase_offset[ti->idx]];
+    pixel *recbase_u = &ti->recbase_u[recbase_offset_c[ti->idx]];
+    pixel *recbase_v = &ti->recbase_v[recbase_offset_c[ti->idx]];
     
     int16_t *pred_y    = &ti->pred[pred_offset[ti->idx]];
     int16_t *pred_u    = &ti->pred_u[pred_offset_c[ti->idx]];

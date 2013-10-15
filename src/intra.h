@@ -27,7 +27,7 @@ void intra_build_reference_border(picture* pic, int32_t x_ctb, int32_t y_ctb, in
 void intra_filter(int16_t* ref, int32_t stride, int32_t width, int8_t mode);
 
 /* Predictions */
-int16_t intra_prediction(uint8_t* orig, int32_t orig_stride, int16_t* rec, int32_t rec_stride,  uint32_t x_pos, uint32_t ypos, uint32_t width, int16_t* dst, int32_t dst_stride, uint32_t *sad);
+int16_t intra_prediction(pixel* orig, int32_t orig_stride, int16_t* rec, int32_t rec_stride,  uint32_t x_pos, uint32_t ypos, uint32_t width, int16_t* dst, int32_t dst_stride, uint32_t *sad);
 
 int16_t intra_get_dc_pred(int16_t* pic, uint16_t pic_width, uint32_t x_pos, uint32_t y_pos, uint8_t width);
 void intra_get_planar_pred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride);
