@@ -154,6 +154,9 @@ int main(int argc, char *argv[])
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
+  // Init coeff data table
+  encoder->in.cur_pic->coeff = MALLOC(coefficient, cfg->width * cfg->height);
+
   // Start coding cycle while data on input and not on the last frame
   while(!feof(input) && (!cfg->frames || encoder->frame < cfg->frames)) {
     int32_t diff;
@@ -201,6 +204,10 @@ int main(int argc, char *argv[])
     // Allocate new memory to current picture
     // TODO: reuse memory from old reference
     encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+
+    // Copy pointer from the last cur_pic because we don't want to reallocate it
+    encoder->in.cur_pic->coeff = encoder->ref->pics[0]->coeff;
+    encoder->ref->pics[0]->coeff = NULL;
 
     encoder->frame++;
   }

@@ -244,6 +244,8 @@ picture *picture_init(int32_t width, int32_t height,
     memset(pic->cu_array[i], 0, sizeof(cu_info) * cu_array_size);
   }
 
+  pic->coeff = NULL;
+
   return pic;
 }
 
@@ -274,6 +276,9 @@ int picture_destroy(picture *pic)
 
   free(pic->cu_array);
   pic->cu_array = NULL;
+
+  free(pic->coeff);
+  pic->coeff = NULL;
 
   return 1;
 }

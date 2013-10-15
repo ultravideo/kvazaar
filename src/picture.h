@@ -73,6 +73,8 @@ typedef struct
   pixel* u_recdata;     // \brief Pointer to reconstructed U-data.
   pixel* v_recdata;     // \brief Pointer to reconstructed V-data.
 
+  coefficient* coeff;   //!< \brief coefficient pointer
+
   int32_t width;          // \brief Luma pixel array width.
   int32_t height;         // \brief Luma pixel array height.
   int32_t height_in_lcu;  // \brief Picture width in number of LCU's.
