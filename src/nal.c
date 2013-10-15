@@ -80,7 +80,7 @@ void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len, uint8_t nal_r
  * \param width Width of the picture.
  * \param stride Width of one row in the pixel array.
  */
-static void array_checksum(const uint8_t* data, 
+static void array_checksum(const pixel* data, 
                            const int height, const int width,
                            const int stride, 
                            unsigned char checksum_out[SEI_HASH_MAX_LENGTH])

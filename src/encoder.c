@@ -326,10 +326,10 @@ void encode_one_frame(encoder_control* encoder)
 }
 
 void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
-                      unsigned array_height, unsigned char *data)
+                      unsigned array_height, pixel *data)
 {
-  unsigned char* p = data + height * array_width;
-  unsigned char* end = data + array_width * array_height;
+  pixel* p = data + height * array_width;
+  pixel* end = data + array_width * array_height;
 
   while (p < end) {
     // Fill the line by copying the line above.
@@ -339,11 +339,11 @@ void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
 }
 
 void read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
-                              unsigned array_width, unsigned char *data)
+                              unsigned array_width, pixel *data)
 {
-  unsigned char* p = data;
-  unsigned char* end = data + array_width * height;
-  unsigned char fill_char;
+  pixel* p = data;
+  pixel* end = data + array_width * height;
+  pixel fill_char;
   unsigned i;
 
   while (p < end) {
@@ -1060,9 +1060,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
           
           if (1) {
-            uint8_t *base_y  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
-            uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
-            uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            pixel *base_y  = &encoder->in.cur_pic->y_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH))   + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH)))  *encoder->in.width];
+            pixel *base_u = &encoder->in.cur_pic->u_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
+            pixel *base_v = &encoder->in.cur_pic->v_data[x_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)) + (y_ctb*(LCU_WIDTH>>(MAX_DEPTH+1)))*(encoder->in.width>>1)];
             uint32_t width = LCU_WIDTH>>depth;
 
             /* INTRAPREDICTION VARIABLES */
@@ -1140,9 +1140,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     int8_t mpm_preds = -1;
     int i;
     uint32_t flag;
-    uint8_t *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
-    uint8_t *base_u = &encoder->in.cur_pic->u_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
-    uint8_t *base_v = &encoder->in.cur_pic->v_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
+    pixel *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
+    pixel *base_u = &encoder->in.cur_pic->u_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
+    pixel *base_v = &encoder->in.cur_pic->v_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
     uint32_t width = LCU_WIDTH>>depth;
 
     // INTRAPREDICTION VARIABLES

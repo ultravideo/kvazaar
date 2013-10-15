@@ -33,7 +33,7 @@ void close_cu_file(FILE *fp) {
   fclose(fp);
 }
 
-void yuv2rgb(unsigned char yuv[3], unsigned char rgb[3])
+void yuv2rgb(pixel yuv[3], pixel rgb[3])
 {
   int y = yuv[0];
   int u = yuv[1];
@@ -64,8 +64,8 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
   int y = yCtb * CU_MIN_SIZE_PIXELS;
   unsigned luma = y * pic->width + x;
   unsigned chroma = (y >> 1) * (pic->width >> 1) + (x >> 1);
-  unsigned char yuv[3] = { 0, 0, 0 };
-  unsigned char rgb[3] = { 0, 0, 0 };
+  pixel yuv[3] = { 0, 0, 0 };
+  pixel rgb[3] = { 0, 0, 0 };
 
   if (x >= pic->width || y >= pic->height) {
     // Don't output anything for CU's completely outside the botders.

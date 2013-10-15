@@ -100,6 +100,13 @@ typedef int16_t coefficient;
   #define INLINE inline
 #endif
 
+#ifdef _MSC_VER
+// Buggy VS2010 throws intellisense warnings if void* is not casted.
+  #define MALLOC(type, num) (type *)malloc(sizeof(type) * num)
+#else
+  #define MALLOC(type, num) malloc(sizeof(type) * num)
+#endif
+
 #define FREE_POINTER(pointer) { free(pointer); pointer = NULL; }
 
 #endif

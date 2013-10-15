@@ -298,7 +298,7 @@ void search_tree(encoder_control *encoder,
       cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
       int x = x_ctb * CU_MIN_SIZE_PIXELS;
       int y = y_ctb * CU_MIN_SIZE_PIXELS;
-      uint8_t *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
+      pixel *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
       
       int start_x = 0;
       int start_y = 0;
@@ -321,7 +321,7 @@ void search_tree(encoder_control *encoder,
   if (depth >= MIN_INTRA_SEARCH_DEPTH && depth <= MAX_INTRA_SEARCH_DEPTH
       && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P)) {
     int x = 0, y = 0;
-    uint8_t *base = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
+    pixel *base = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
     uint32_t width = LCU_WIDTH >> depth;
 
     // INTRAPREDICTION

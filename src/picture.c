@@ -220,14 +220,14 @@ picture *picture_init(int32_t width, int32_t height,
   pic->height_in_lcu = height_in_lcu;
   pic->referenced = 0;
   // Allocate buffers
-  pic->y_data = (uint8_t *)malloc(sizeof(uint8_t) * luma_size);
-  pic->u_data = (uint8_t *)malloc(sizeof(uint8_t) * chroma_size);
-  pic->v_data = (uint8_t *)malloc(sizeof(uint8_t) * chroma_size);
+  pic->y_data = MALLOC(pixel, luma_size);
+  pic->u_data = MALLOC(pixel, chroma_size);
+  pic->v_data = MALLOC(pixel, chroma_size);
 
   // Reconstruction buffers
-  pic->y_recdata = (uint8_t *)malloc(sizeof(uint8_t) * luma_size);
-  pic->u_recdata = (uint8_t *)malloc(sizeof(uint8_t) * chroma_size);
-  pic->v_recdata = (uint8_t *)malloc(sizeof(uint8_t) * chroma_size);
+  pic->y_recdata = MALLOC(pixel, luma_size);
+  pic->u_recdata = MALLOC(pixel, chroma_size);
+  pic->v_recdata = MALLOC(pixel, chroma_size);
 
   memset(pic->u_recdata, 128, (chroma_size));
   memset(pic->v_recdata, 128, (chroma_size));
