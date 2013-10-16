@@ -300,12 +300,13 @@ double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
 }
 
 /**
- * \brief 
+ * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
  */
-uint32_t Hadamard8x8(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t iStrideCur)
+unsigned satd_16bit_8x8_general(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
+
   for (k = 0; k < 64; k += 8) {
     diff[k+0] = piOrg[0] - piCur[0];
     diff[k+1] = piOrg[1] - piCur[1];
@@ -392,194 +393,144 @@ uint32_t Hadamard8x8(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t
   return sad;
 }
 
-/**
- * \brief 
- */
-uint32_t sad64x64(int16_t *block1, uint32_t stride1, 
-                  int16_t *block2, uint32_t stride2)
-{
-  int32_t y, x;
-  uint32_t sum = 0;
-  /*
-  for (y=0; y<64; y++) {
-    i = y * stride1; 
-    ii = y * stride2;
-    for (x = 0; x < 64; x++) {
-      sum += abs((int16_t)block1[i + x] - (int16_t)block2[ii + x]);
-    }
-  }
-  }*/
-  int32_t  iOffsetOrg = stride1 << 3;
-  int32_t  iOffsetCur = stride2 << 3;
-  for (y = 0; y < 64; y += 8) {
-    for (x = 0; x < 64; x += 8) {
-      sum += Hadamard8x8(&block1[x], stride1, &block2[x], stride2);
-    }
-    block1 += iOffsetOrg;
-    block2 += iOffsetCur;
+// Function macro for defining hadamart calculating functions 
+// for fixed size blocks. They calculate hadamart for integer
+// multiples of 8x8 with the 8x8 hadamart function.
+#define SATD_NXN(n, pixel_type, suffix) \
+  unsigned satd_ ## suffix ## _ ## n ## x ## n ## ( \
+                    pixel_type *block1, pixel_type *block2) \
+  { \
+    unsigned y, x; \
+    unsigned sum = 0; \
+    for (y = 0; y < (n); y += 8) { \
+      unsigned row = y * (n); \
+      for (x = 0; x < (n); x += 8) { \
+        sum += satd_16bit_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
+      } \
+    } \
+    return sum; \
   }
 
-  return sum;    
+// These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
+SATD_NXN(8, int16_t, 16bit)
+SATD_NXN(16, int16_t, 16bit)
+SATD_NXN(32, int16_t, 16bit)
+SATD_NXN(64, int16_t, 16bit)
+
+
+// Function macro for defining SAD calculating functions 
+// for fixed size blocks.
+#define SAD_NXN(n, pixel_type, suffix) \
+  unsigned sad_ ## suffix ## _ ##  n ## x ## n ## ( \
+               pixel_type *block1, pixel_type *block2) \
+  { \
+    unsigned x, y, row; \
+    unsigned sum = 0; \
+    for(y = 0; y < (n); y++) { \
+      row = y * (n); \
+      for (x = 0; x < (n); ++x) { \
+        sum += abs(block1[row + x] - block2[row + x]); \
+      } \
+    } \
+    return sum; \
+  }
+
+// These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
+// with function signatures of cost_16bit_nxn_func.
+// They are used through get_sad_16bit_nxn_func.
+SAD_NXN(4, int16_t, 16bit)
+SAD_NXN(8, int16_t, 16bit)
+SAD_NXN(16, int16_t, 16bit)
+SAD_NXN(32, int16_t, 16bit)
+SAD_NXN(64, int16_t, 16bit)
+
+/**
+ * \brief  Get a function that calculates SATD for NxN block.
+ * 
+ * \param n  Width of the region for which SATD is calculated.
+ * 
+ * \returns  Pointer to cost_16bit_nxn_func.
+ */
+cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
+{
+  switch (n) {
+  case 8:
+    return &satd_16bit_8x8;
+  case 16:
+    return &satd_16bit_16x16;
+  case 32:
+    return &satd_16bit_32x32;
+  case 64:
+    return &satd_16bit_64x64;
+  default:
+    return NULL;
+  }
 }
 
 /**
- * \brief 
+ * \brief  Get a function that calculates SAD for NxN block.
+ * 
+ * \param n  Width of the region for which SAD is calculated.
+ * 
+ * \returns  Pointer to cost_16bit_nxn_func.
  */
-uint32_t sad32x32(int16_t *block1, uint32_t stride1, 
-                  int16_t *block2, uint32_t stride2)
+cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
 {
-  int32_t x, y;
-  int32_t sum = 0;
-  int32_t iOffsetOrg = stride1 << 3;
-  int32_t iOffsetCur = stride2 << 3;
-  
-  for (y = 0; y < 32; y += 8) {
-    for ( x = 0; x < 32; x += 8 ) {
-      sum += Hadamard8x8(&block1[x], stride1, &block2[x], stride2);
+  switch (n) {
+  case 4:
+    return &sad_16bit_4x4;
+  case 8:
+    return &sad_16bit_8x8;
+  case 16:
+    return &sad_16bit_16x16;
+  case 32:
+    return &sad_16bit_32x32;
+  case 64:
+    return &sad_16bit_64x64;
+  default:
+    return NULL;
+  }
+}
+
+/**
+ * \brief  Calculate SATD for NxN block of size N.
+ * 
+ * \param block1  Start of the first block.
+ * \param block2  Start of the second block.
+ * \param n       Width of the region for which SAD is calculated.
+ * 
+ * \returns       Sum of Absolute Transformed Differences (SATD)
+ */
+unsigned satd_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
+{
+  cost_16bit_nxn_func sad_func = get_satd_16bit_nxn_func(n);
+  return sad_func(block1, block2);
+}
+
+/**
+ * \brief Calculate SAD for NxN block of size N.
+ * 
+ * \param block1  Start of the first block.
+ * \param block2  Start of the second block.
+ * \param n       Width of the region for which SAD is calculated.
+ * 
+ * \returns       Sum of Absolute Differences
+ */
+unsigned sad_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
+{
+  cost_16bit_nxn_func sad_func = get_sad_16bit_nxn_func(n);
+  if (sad_func) {
+    return sad_func(block1, block2);
+  } else {
+    unsigned row, x;
+    unsigned sum = 0;
+    for (row = 0; row < n; row += n) {
+      for (x = 0; x < n; ++x) {
+        sum += abs(block1[row + x] - block2[row + x]);
+      }
     }
-    block1 += iOffsetOrg;
-    block2 += iOffsetCur;
+    return sum;
   }
-
-  /*
-  uint32_t sum=0;
-  int32_t i,ii;
-  for(y=0;y<32;y++)
-  {
-    i = y*stride1; 
-    ii = y*stride2;
-    sum+=abs((int32_t)block[i]-(int32_t)block2[ii]);
-    sum+=abs((int32_t)block[i+1]-(int32_t)block2[ii+1]);
-    sum+=abs((int32_t)block[i+2]-(int32_t)block2[ii+2]);
-    sum+=abs((int32_t)block[i+3]-(int32_t)block2[ii+3]);
-    sum+=abs((int32_t)block[i+4]-(int32_t)block2[ii+4]);
-    sum+=abs((int32_t)block[i+5]-(int32_t)block2[ii+5]);
-    sum+=abs((int32_t)block[i+6]-(int32_t)block2[ii+6]);
-    sum+=abs((int32_t)block[i+7]-(int32_t)block2[ii+7]);
-    sum+=abs((int32_t)block[i+8]-(int32_t)block2[ii+8]);
-    sum+=abs((int32_t)block[i+9]-(int32_t)block2[ii+9]);
-    sum+=abs((int32_t)block[i+10]-(int32_t)block2[ii+10]);
-    sum+=abs((int32_t)block[i+11]-(int32_t)block2[ii+11]);
-    sum+=abs((int32_t)block[i+12]-(int32_t)block2[ii+12]);
-    sum+=abs((int32_t)block[i+13]-(int32_t)block2[ii+13]);
-    sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
-    sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
-    sum+=abs((int32_t)block[i+16]-(int32_t)block2[ii+16]);
-    sum+=abs((int32_t)block[i+17]-(int32_t)block2[ii+17]);
-    sum+=abs((int32_t)block[i+18]-(int32_t)block2[ii+18]);
-    sum+=abs((int32_t)block[i+19]-(int32_t)block2[ii+19]);
-    sum+=abs((int32_t)block[i+20]-(int32_t)block2[ii+20]);
-    sum+=abs((int32_t)block[i+21]-(int32_t)block2[ii+21]);
-    sum+=abs((int32_t)block[i+22]-(int32_t)block2[ii+22]);
-    sum+=abs((int32_t)block[i+23]-(int32_t)block2[ii+23]);
-    sum+=abs((int32_t)block[i+24]-(int32_t)block2[ii+24]);
-    sum+=abs((int32_t)block[i+25]-(int32_t)block2[ii+25]);
-    sum+=abs((int32_t)block[i+26]-(int32_t)block2[ii+26]);
-    sum+=abs((int32_t)block[i+27]-(int32_t)block2[ii+27]);
-    sum+=abs((int32_t)block[i+28]-(int32_t)block2[ii+28]);
-    sum+=abs((int32_t)block[i+29]-(int32_t)block2[ii+29]);
-    sum+=abs((int32_t)block[i+30]-(int32_t)block2[ii+30]);
-    sum+=abs((int32_t)block[i+31]-(int32_t)block2[ii+31]);
-  }
-  */
-  return sum;    
-}
-
-/**
- * \brief 
- */
-uint32_t sad16x16(int16_t *block1, uint32_t stride1, 
-                  int16_t* block2, uint32_t stride2)
-{
-  int32_t x, y;
-    
-  int32_t sum = 0;
-  int32_t iOffsetOrg = stride1 << 3;
-  int32_t iOffsetCur = stride2 << 3;
-
-  for (y = 0; y < 16; y += 8) {
-    for (x = 0; x < 16; x += 8) {
-      sum += Hadamard8x8(&block1[x], stride1, &block2[x],  stride2);
-    }
-    block1 += iOffsetOrg;
-    block2 += iOffsetCur;
-  }
-  
-  /*
-  uint32_t sum=0;
-  int32_t i,ii;
-  for(y=0;y<16;y++)
-  {
-    i = y*stride1; 
-    ii = y*stride2;
-    sum+=abs((int32_t)block[i]-(int32_t)block2[ii]);
-    sum+=abs((int32_t)block[i+1]-(int32_t)block2[ii+1]);
-    sum+=abs((int32_t)block[i+2]-(int32_t)block2[ii+2]);
-    sum+=abs((int32_t)block[i+3]-(int32_t)block2[ii+3]);
-    sum+=abs((int32_t)block[i+4]-(int32_t)block2[ii+4]);
-    sum+=abs((int32_t)block[i+5]-(int32_t)block2[ii+5]);
-    sum+=abs((int32_t)block[i+6]-(int32_t)block2[ii+6]);
-    sum+=abs((int32_t)block[i+7]-(int32_t)block2[ii+7]);
-    sum+=abs((int32_t)block[i+8]-(int32_t)block2[ii+8]);
-    sum+=abs((int32_t)block[i+9]-(int32_t)block2[ii+9]);
-    sum+=abs((int32_t)block[i+10]-(int32_t)block2[ii+10]);
-    sum+=abs((int32_t)block[i+11]-(int32_t)block2[ii+11]);
-    sum+=abs((int32_t)block[i+12]-(int32_t)block2[ii+12]);
-    sum+=abs((int32_t)block[i+13]-(int32_t)block2[ii+13]);
-    sum+=abs((int32_t)block[i+14]-(int32_t)block2[ii+14]);
-    sum+=abs((int32_t)block[i+15]-(int32_t)block2[ii+15]);
-  }  
-  */
-  return sum;    
-}
-
-/**
- * \brief 
- */
-uint32_t sad8x8(int16_t *block1, uint32_t stride1, 
-                int16_t* block2, uint32_t stride2)
-{
-  uint32_t sum = 0;
-  sum = Hadamard8x8(block1, stride1, block2, stride2);
-  /*
-  
-  for(y=0;y<8;y++)
-  {
-    i = y*stride1; 
-    ii = y*stride2;
-    sum+=abs((int32_t)block[i]-(int32_t)block2[ii]);
-    sum+=abs((int32_t)block[i+1]-(int32_t)block2[ii+1]);
-    sum+=abs((int32_t)block[i+2]-(int32_t)block2[ii+2]);
-    sum+=abs((int32_t)block[i+3]-(int32_t)block2[ii+3]);
-    sum+=abs((int32_t)block[i+4]-(int32_t)block2[ii+4]);
-    sum+=abs((int32_t)block[i+5]-(int32_t)block2[ii+5]);
-    sum+=abs((int32_t)block[i+6]-(int32_t)block2[ii+6]);
-    sum+=abs((int32_t)block[i+7]-(int32_t)block2[ii+7]);
-  }
-  */
-
-  return sum;    
-}
-
-/**
- * \brief 
- */
-uint32_t sad4x4(int16_t *block1, uint32_t stride1, 
-                int16_t *block2, uint32_t stride2)
-{
-  int32_t i, ii, y;
-  uint32_t sum = 0;
-
-  for (y = 0; y < 4; y++) {
-    i = y * stride1; 
-    ii = y * stride2;
-    sum += abs((int32_t)block1[i]   - (int32_t)block2[ii]);
-    sum += abs((int32_t)block1[i+1] - (int32_t)block2[ii+1]);
-    sum += abs((int32_t)block1[i+2] - (int32_t)block2[ii+2]);
-    sum += abs((int32_t)block1[i+3] - (int32_t)block2[ii+3]);
-  }
-
-  return sum;
 }
 
 /**
