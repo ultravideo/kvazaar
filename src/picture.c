@@ -26,10 +26,10 @@
  * \param x_scu  x SCU position (smallest CU)
  * \param y_scu  y SCU position (smallest CU)
  * \param depth  current CU depth
- * \param residual  residual status
+ * \param coeff_y  residual status
  */
 void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                                uint8_t depth, int8_t residual)
+                                uint8_t depth, int8_t coeff_y)
 {
   uint32_t x, y;
   int width_in_scu = pic->width_in_lcu << MAX_DEPTH;
@@ -38,7 +38,7 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
   for (y = y_scu; y < y_scu + block_scu_width; ++y) {
     int cu_row = y * width_in_scu;
     for (x = x_scu; x < x_scu + block_scu_width; ++x) {
-      pic->cu_array[MAX_DEPTH][cu_row + x].residual = residual;
+      pic->cu_array[MAX_DEPTH][cu_row + x].coeff_y = coeff_y;
     }
   }
 }

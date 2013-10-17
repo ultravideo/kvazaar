@@ -52,10 +52,14 @@ typedef struct
  */
 typedef struct
 {  
-  int8_t type;
-  int8_t depth;
-  int8_t coded;
-  int8_t residual;
+  int8_t type;       //!< \brief block type, CU_INTER / CU_INTRA
+  int8_t depth;      //!< \brief depth / size of this block
+  int8_t part_size;  //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
+  int8_t tr_depth;   //!< \brief transform depth
+  int8_t coded;      //!< \brief flag to indicate this block is coded and reconstructed
+  int8_t coeff_y;    //!< \brief is there coded coeffs Y
+  int8_t coeff_u;    //!< \brief is there coded coeffs U
+  int8_t coeff_v;    //!< \brief is there coded coeffs V
   cu_info_intra intra;
   cu_info_inter inter;
 } cu_info;
@@ -65,22 +69,22 @@ typedef struct
  */
 typedef struct
 {
-  pixel* y_data;        // \brief Pointer to luma pixel array.
-  pixel* u_data;        // \brief Pointer to chroma U pixel array.
-  pixel* v_data;        // \brief Pointer to chroma V pixel array.
+  pixel* y_data;        //!< \brief Pointer to luma pixel array.
+  pixel* u_data;        //!< \brief Pointer to chroma U pixel array.
+  pixel* v_data;        //!< \brief Pointer to chroma V pixel array.
 
-  pixel* y_recdata;     // \brief Pointer to reconstructed Y-data.
-  pixel* u_recdata;     // \brief Pointer to reconstructed U-data.
-  pixel* v_recdata;     // \brief Pointer to reconstructed V-data.
+  pixel* y_recdata;     //!< \brief Pointer to reconstructed Y-data.
+  pixel* u_recdata;     //!< \brief Pointer to reconstructed U-data.
+  pixel* v_recdata;     //!< \brief Pointer to reconstructed V-data.
 
   coefficient* coeff;   //!< \brief coefficient pointer
 
-  int32_t width;          // \brief Luma pixel array width.
-  int32_t height;         // \brief Luma pixel array height.
-  int32_t height_in_lcu;  // \brief Picture width in number of LCU's.
-  int32_t width_in_lcu;   // \brief Picture height in number of LCU's.
-  uint8_t referenced;     // \brief Whether this picture is referenced.
-  cu_info** cu_array;           // \brief Info for each CU at each depth.
+  int32_t width;          //!< \brief Luma pixel array width.
+  int32_t height;         //!< \brief Luma pixel array height.
+  int32_t height_in_lcu;  //!< \brief Picture width in number of LCU's.
+  int32_t width_in_lcu;   //!< \brief Picture height in number of LCU's.
+  uint8_t referenced;     //!< \brief Whether this picture is referenced.
+  cu_info** cu_array;     //!< \brief Info for each CU at each depth.
   uint8_t type;
   uint8_t slicetype;
 } picture;
@@ -90,8 +94,8 @@ typedef struct
  */
 typedef struct
 {
-  picture** pics;          // \brief Pointer to array of picture pointers.
-  unsigned int size;       // \brief Array size.
+  picture** pics;          //!< \brief Pointer to array of picture pointers.
+  unsigned int size;       //!< \brief Array size.
   unsigned int used_size;
 } picture_list;
 
