@@ -155,7 +155,14 @@ int main(int argc, char *argv[])
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
   // Init coeff data table
-  encoder->in.cur_pic->coeff = MALLOC(coefficient, cfg->width * cfg->height);
+  encoder->in.cur_pic->coeff_y = MALLOC(coefficient, cfg->width * cfg->height);
+  encoder->in.cur_pic->coeff_u = MALLOC(coefficient, (cfg->width * cfg->height) >> 2);
+  encoder->in.cur_pic->coeff_v = MALLOC(coefficient, (cfg->width * cfg->height) >> 2);
+
+  // Init predicted data table
+  encoder->in.cur_pic->pred_y = MALLOC(pixel, cfg->width * cfg->height);
+  encoder->in.cur_pic->pred_u = MALLOC(pixel, (cfg->width * cfg->height) >> 2);
+  encoder->in.cur_pic->pred_v = MALLOC(pixel, (cfg->width * cfg->height) >> 2);
 
   // Start coding cycle while data on input and not on the last frame
   while(!feof(input) && (!cfg->frames || encoder->frame < cfg->frames)) {
@@ -206,8 +213,13 @@ int main(int argc, char *argv[])
     encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
 
     // Copy pointer from the last cur_pic because we don't want to reallocate it
-    encoder->in.cur_pic->coeff = encoder->ref->pics[0]->coeff;
-    encoder->ref->pics[0]->coeff = NULL;
+    MOVE_POINTER(encoder->in.cur_pic->coeff_y,encoder->ref->pics[0]->coeff_y);
+    MOVE_POINTER(encoder->in.cur_pic->coeff_u,encoder->ref->pics[0]->coeff_u);
+    MOVE_POINTER(encoder->in.cur_pic->coeff_v,encoder->ref->pics[0]->coeff_v);
+    
+    MOVE_POINTER(encoder->in.cur_pic->pred_y,encoder->ref->pics[0]->pred_y);
+    MOVE_POINTER(encoder->in.cur_pic->pred_u,encoder->ref->pics[0]->pred_u);
+    MOVE_POINTER(encoder->in.cur_pic->pred_v,encoder->ref->pics[0]->pred_v);
 
     encoder->frame++;
   }

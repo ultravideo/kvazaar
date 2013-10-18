@@ -67,39 +67,6 @@ typedef struct
   int8_t tc_offset_div2;   // \brief (deblocking)tc offset (div 2), range -6...6
 } encoder_control;
 
-typedef struct
-{
-  int8_t idx;
-  pixel *base;
-  pixel *base_u;
-  pixel *base_v;
-  
-  pixel *recbase;
-  pixel *recbase_u;
-  pixel *recbase_v;
-  
-  int16_t *pred;
-  int16_t *pred_u;
-  int16_t *pred_v;
-
-  int32_t base_stride;
-  int32_t recbase_stride;
-  int32_t pred_stride;
-  
-  // TODO: unify luma+chroma arrays
-  int16_t *coeff[3];
-  int8_t cb_top[3];
-  int8_t cb[4];
-  int8_t intra_pred_mode;
-  int8_t intra_pred_mode_chroma;
-  int32_t split[4];
-
-  int8_t block_type;
-
-  int32_t x_ctb,y_ctb;
-
-} transform_info;
-
 void init_tables(void);
 void init_encoder_control(encoder_control *control, bitstream *output);
 void init_encoder_input(encoder_input *input, FILE* inputfile,
@@ -119,9 +86,9 @@ void encode_last_significant_xy(encoder_control *encoder, uint8_t lastpos_x,
                                 uint8_t type, uint8_t scan);
 void encode_coeff_nxn(encoder_control *encoder, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode);
-void encode_transform_tree(encoder_control *encoder, transform_info *ti,
+void encode_transform_tree(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
                            uint8_t depth);
-void encode_transform_coeff(encoder_control *encoder, transform_info *ti,
+void encode_transform_coeff(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth);
 
 extern int16_t g_lambda_cost[55];

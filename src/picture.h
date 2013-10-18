@@ -32,6 +32,7 @@ enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
 typedef struct
 {
   int8_t mode;
+  int8_t mode_chroma;
   uint32_t cost;
 } cu_info_intra;
 
@@ -57,9 +58,15 @@ typedef struct
   int8_t part_size;  //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
   int8_t tr_depth;   //!< \brief transform depth
   int8_t coded;      //!< \brief flag to indicate this block is coded and reconstructed
+  int8_t skipped;    //!< \brief flag to indicate this block is skipped
+  int8_t merged;     //!< \brief flag to indicate this block is merged
   int8_t coeff_y;    //!< \brief is there coded coeffs Y
   int8_t coeff_u;    //!< \brief is there coded coeffs U
   int8_t coeff_v;    //!< \brief is there coded coeffs V
+
+  int8_t coeff_top_y;    //!< \brief is there coded coeffs Y in top level
+  int8_t coeff_top_u;    //!< \brief is there coded coeffs U in top level
+  int8_t coeff_top_v;    //!< \brief is there coded coeffs V in top level
   cu_info_intra intra;
   cu_info_inter inter;
 } cu_info;
@@ -77,7 +84,13 @@ typedef struct
   pixel* u_recdata;     //!< \brief Pointer to reconstructed U-data.
   pixel* v_recdata;     //!< \brief Pointer to reconstructed V-data.
 
-  coefficient* coeff;   //!< \brief coefficient pointer
+  pixel* pred_y;        //!< \brief Pointer to predicted Y
+  pixel* pred_u;        //!< \brief Pointer to predicted U
+  pixel* pred_v;        //!< \brief Pointer to predicted V
+
+  coefficient* coeff_y;   //!< \brief coefficient pointer Y
+  coefficient* coeff_u;   //!< \brief coefficient pointer U
+  coefficient* coeff_v;   //!< \brief coefficient pointer V
 
   int32_t width;          //!< \brief Luma pixel array width.
   int32_t height;         //!< \brief Luma pixel array height.
@@ -120,6 +133,7 @@ int picture_list_add(picture_list *list, picture *pic);
 int picture_list_rem(picture_list *list, int n, int8_t destroy);
 
 typedef unsigned (*cost_16bit_nxn_func)(int16_t *block1, int16_t *block2);
+
 
 cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n);
 cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n);

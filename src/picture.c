@@ -244,7 +244,8 @@ picture *picture_init(int32_t width, int32_t height,
     memset(pic->cu_array[i], 0, sizeof(cu_info) * cu_array_size);
   }
 
-  pic->coeff = NULL;
+  pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
+  pic->pred_y = NULL; pic->pred_u = NULL; pic->pred_v = NULL;
 
   return pic;
 }
@@ -277,8 +278,13 @@ int picture_destroy(picture *pic)
   free(pic->cu_array);
   pic->cu_array = NULL;
 
-  free(pic->coeff);
-  pic->coeff = NULL;
+  FREE_POINTER(pic->coeff_y);
+  FREE_POINTER(pic->coeff_u);
+  FREE_POINTER(pic->coeff_v);
+
+  FREE_POINTER(pic->pred_y);
+  FREE_POINTER(pic->pred_u);
+  FREE_POINTER(pic->pred_v);
 
   return 1;
 }
@@ -414,7 +420,7 @@ unsigned satd_16bit_8x8_general(int16_t *piOrg, int32_t iStrideOrg, int16_t *piC
       } \
     } \
     return sum; \
-  }
+    }
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
 SATD_NXN(8, int16_t, 16bit)
@@ -422,7 +428,7 @@ SATD_NXN(16, int16_t, 16bit)
 SATD_NXN(32, int16_t, 16bit)
 SATD_NXN(64, int16_t, 16bit)
 
-
+  for (y = 0; y < 32; y += 8) {
 // Function macro for defining SAD calculating functions 
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type, suffix) \
@@ -438,7 +444,7 @@ SATD_NXN(64, int16_t, 16bit)
       } \
     } \
     return sum; \
-  }
+    }
 
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
@@ -469,9 +475,9 @@ cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
     return &satd_16bit_64x64;
   default:
     return NULL;
+    }
   }
-}
-
+  
 /**
  * \brief  Get a function that calculates SAD for NxN block.
  * 
@@ -480,7 +486,7 @@ cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
  * \returns  Pointer to cost_16bit_nxn_func.
  */
 cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
-{
+  {
   switch (n) {
   case 4:
     return &sad_16bit_4x4;
@@ -494,7 +500,7 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
     return &sad_16bit_64x64;
   default:
     return NULL;
-  }
+  }  
 }
 
 /**
@@ -510,7 +516,7 @@ unsigned satd_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_satd_16bit_nxn_func(n);
   return sad_func(block1, block2);
-}
+  }
 
 /**
  * \brief Calculate SAD for NxN block of size N.
@@ -532,10 +538,10 @@ unsigned sad_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
     for (row = 0; row < n; row += n) {
       for (x = 0; x < n; ++x) {
         sum += abs(block1[row + x] - block2[row + x]);
-      }
-    }
-    return sum;
   }
+    }
+  return sum;
+}
 }
 
 /**
