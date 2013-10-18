@@ -67,20 +67,23 @@ const vector2d small_hexbs[5] = {
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
 
-void hexagon_search(picture *pic, picture *ref,
-                    cu_info *cur_cu,  int orig_x, int orig_y, int x, int y, 
-                    unsigned depth)
+unsigned hexagon_search(unsigned depth, 
+                        picture *pic, picture *ref,
+                        vector2d *orig, vector2d *mv)
 {
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = -1;
   unsigned i;
-  unsigned best_index = 0; // in large_hexbs[]
+  unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
+
+  mv->x >>= 2;
+  mv->y >>= 2;
 
   // Search the initial 7 points of the hexagon.
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = large_hexbs + i;
-    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                             orig_x + x + pattern->x, orig_y + y + pattern->y,
+    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                             orig->x + mv->x + pattern->x, orig->y + mv->y + pattern->y,
                              block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
@@ -89,21 +92,21 @@ void hexagon_search(picture *pic, picture *ref,
   }
 
   // Try the 0,0 vector.
-  if (!(x == 0 && y == 0)) {
-    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                             orig_x, orig_y,
+  if (!(mv->x == 0 && mv->y == 0)) {
+    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                             orig->x, orig->y,
                              block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       best_index = 0;
-      x = 0;
-      y = 0;
+      mv->x = 0;
+      mv->y = 0;
 
       // Redo the search around the 0,0 point.
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = large_hexbs + i;
-        unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                                 orig_x + pattern->x, orig_y + pattern->y,
+        unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                                 orig->x + pattern->x, orig->y + pattern->y,
                                  block_width, block_width);
         if (cost > 0 && cost < best_cost) {
           best_cost = cost;
@@ -126,15 +129,16 @@ void hexagon_search(picture *pic, picture *ref,
     }
 
     // Move the center to the best match.
-    x += large_hexbs[best_index].x;
-    y += large_hexbs[best_index].y;
+    mv->x += large_hexbs[best_index].x;
+    mv->y += large_hexbs[best_index].y;
     best_index = 0;
 
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = large_hexbs + start + i;
-      unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                               orig_x + x + offset->x, orig_y + y + offset->y,
+      unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                               orig->x + mv->x + offset->x, 
+                               orig->y + mv->y + offset->y,
                                block_width, block_width);
       if (cost > 0 && cost < best_cost) {
         best_cost = cost;
@@ -145,13 +149,13 @@ void hexagon_search(picture *pic, picture *ref,
   }
 
   // Do the final step of the search with a small pattern.
-  x += large_hexbs[best_index].x;
-  y += large_hexbs[best_index].y;
+  mv->x += large_hexbs[best_index].x;
+  mv->y += large_hexbs[best_index].y;
   best_index = 0;
   for (i = 1; i < 5; ++i) {
     const vector2d *offset = small_hexbs + i;
-    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                             orig_x + x + offset->x, orig_y + y + offset->y,
+    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                             orig->x + mv->x + offset->x, orig->y + mv->y + offset->y,
                              block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
@@ -159,12 +163,12 @@ void hexagon_search(picture *pic, picture *ref,
     }
   }
 
-  x += small_hexbs[best_index].x;
-  y += small_hexbs[best_index].y;
-  best_index = 0;
-  cur_cu->inter.cost = best_cost;
-  cur_cu->inter.mv[0] = x << 2;
-  cur_cu->inter.mv[1] = y << 2;
+  mv->x += small_hexbs[best_index].x;
+  mv->y += small_hexbs[best_index].y;
+  mv->x <<= 2;
+  mv->y <<= 2;
+
+  return best_cost;
 }
 
 /**
@@ -290,22 +294,21 @@ void search_tree(encoder_control *encoder,
     picture *ref_pic = encoder->ref->pics[0];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
     cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
-    int x = x_ctb * CU_MIN_SIZE_PIXELS;
-    int y = y_ctb * CU_MIN_SIZE_PIXELS;
-    
-    int start_x = 0;
-    int start_y = 0;
-    // Convert from sub-pixel accuracy.
+
+    vector2d orig, mv;
+    orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
+    orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
+    mv.x = 0;
+    mv.y = 0;
     if (ref_cu->type == CU_INTER) {
-      start_x = ref_cu->inter.mv[0] >> 2;
-      start_y = ref_cu->inter.mv[1] >> 2;
+      mv.x = ref_cu->inter.mv[0];
+      mv.y = ref_cu->inter.mv[1];
     }
 
-    hexagon_search(cur_pic, ref_pic, 
-                   cur_cu, x, y, 
-                   start_x, start_y, depth);
-
+    cur_cu->inter.cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
     cur_cu->inter.mv_dir = 1;
+    cur_cu->inter.mv[0] = mv.x;
+    cur_cu->inter.mv[1] = mv.y;
   }
 
   // INTRA SEARCH
