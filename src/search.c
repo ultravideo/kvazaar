@@ -360,47 +360,34 @@ void search_tree(encoder_control *encoder,
 uint32_t search_best_mode(encoder_control *encoder, 
                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb
-      + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth]
+                     [x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint32_t best_intra_cost = cur_cu->intra.cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;
-  uint32_t best_cost = 0;
-  uint32_t cost = 0;
-  uint32_t lambdaCost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
+  uint32_t lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
 
-  if (depth != MAX_INTRA_SEARCH_DEPTH) {
-    // Split blocks and remember to change x and y block positions
+  if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
+    uint32_t cost = lambda_cost;
     uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
     cost =  search_best_mode(encoder, x_ctb,          y_ctb,          depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb,          depth + 1);
     cost += search_best_mode(encoder, x_ctb,          y_ctb + change, depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
 
-    // If search hasn't been peformed at all for this block, the cost will be
-    // max value, so it is safe to just compare costs. It just has to be made
-    // sure that no value overflows.
-    if (cost + lambdaCost < best_intra_cost && cost + lambdaCost < best_inter_cost)
+    if (cost < best_intra_cost && cost < best_inter_cost)
     {
-      best_cost = cost + lambdaCost;
-    } else if (best_inter_cost <= best_intra_cost) {
-      inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
-      best_cost = best_inter_cost;
-    } else {
-      intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-          cur_cu->intra.mode);
-      best_cost = best_intra_cost;
+      // Better value was found at a lower level.
+      return cost;
     }
-  } else if (best_inter_cost <= best_intra_cost
-             && encoder->in.cur_pic->slicetype != SLICE_I) {
+  } 
+  if (best_inter_cost <= best_intra_cost) {
     inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
-    best_cost = best_inter_cost;
+    return best_inter_cost;
   } else {
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
         cur_cu->intra.mode);
-    best_cost = best_intra_cost;
+    return best_intra_cost;
   }
-
-  return best_cost;
 }
 
 /**
