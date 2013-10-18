@@ -1369,7 +1369,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       // Filter DC-prediction
       if (cur_cu->intra.mode == 1 && width < 32) {
         intra_dc_pred_filtering(rec_shift, (LCU_WIDTH >> (depth)) * 2 + 8, pred_y,
-                                width, LCU_WIDTH >> depth, LCU_WIDTH >> depth);
+                                pred_stride, LCU_WIDTH >> depth, LCU_WIDTH >> depth);
       }
       
       // TODO : chroma intra prediction
@@ -1628,12 +1628,12 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
   if (encoder->in.video_format != FORMAT_400) {
     uint8_t offset = 1<<(MAX_DEPTH-1-depth);
 
-    cu_info *cur_cu_idx_2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    cu_info *cur_cu_idx_3 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    cu_info *cur_cu_idx_4 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+    //cu_info *cur_cu_idx_2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+    //cu_info *cur_cu_idx_3 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+    //cu_info *cur_cu_idx_4 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
     // Non-zero chroma U Tcoeffs
-    int8_t cb_flag = (!split) ? cur_cu->coeff_u : (cur_cu->coeff_u | cur_cu_idx_2->coeff_u | cur_cu_idx_3->coeff_u  | cur_cu_idx_4->coeff_u);
+    int8_t cb_flag = (!split) ? cur_cu->coeff_u : cur_cu->coeff_u;//(cur_cu->coeff_u | cur_cu_idx_2->coeff_u | cur_cu_idx_3->coeff_u  | cur_cu_idx_4->coeff_u);
     cabac.ctx = &g_qt_cbf_model_chroma[tr_depth];
 
     if (tr_depth == 0 /*|| ti->cb_top[1]*/) {
@@ -1642,7 +1642,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
 
     // Non-zero chroma V Tcoeffs
     // NOTE: Using the same ctx as before
-    cb_flag = (!split) ? cur_cu->coeff_v : (cur_cu->coeff_v | cur_cu_idx_2->coeff_v | cur_cu_idx_3->coeff_v  | cur_cu_idx_4->coeff_v);
+    cb_flag = (!split) ? cur_cu->coeff_v : cur_cu->coeff_v;//(cur_cu->coeff_v | cur_cu_idx_2->coeff_v | cur_cu_idx_3->coeff_v  | cur_cu_idx_4->coeff_v);
 
     if (tr_depth == 0 /*|| ti->cb_top[2]*/) {
       CABAC_BIN(&cabac, cb_flag, "cbf_chroma_v");
