@@ -1457,6 +1457,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
         
     // if non-zero coeffs
     if (cur_cu->coeff_y) {
+
+      picture_set_block_residual(encoder->in.cur_pic,x_cu,y_cu,depth,1);
       i = 0;
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
