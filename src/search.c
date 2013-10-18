@@ -68,8 +68,8 @@ const vector2d small_hexbs[5] = {
 };
 
 unsigned hexagon_search(unsigned depth, 
-                        picture *pic, picture *ref,
-                        vector2d *orig, vector2d *mv_in_out)
+                        const picture *pic, const picture *ref,
+                        const vector2d *orig, vector2d *mv_in_out)
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
