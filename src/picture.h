@@ -121,7 +121,7 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n);
 unsigned satd_16bit_nxn(int16_t *block1, int16_t *block2, unsigned n);
 unsigned sad_16bit_nxn(int16_t *block1, int16_t *block2, unsigned n);
 
-unsigned calc_sad(picture *pic, picture *ref, 
+unsigned calc_sad(const picture *pic, const picture *ref, 
                   int pic_x, int pic_y, int ref_x, int ref_y, 
                   int block_width, int block_height);
 
