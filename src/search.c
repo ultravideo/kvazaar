@@ -162,7 +162,7 @@ void hexagon_search(picture *pic, picture *ref,
   x += small_hexbs[best_index].x;
   y += small_hexbs[best_index].y;
   best_index = 0;
-  cur_cu->inter.cost = best_cost + 1; // +1 so that cost is > 0.
+  cur_cu->inter.cost = best_cost;
   cur_cu->inter.mv[0] = x << 2;
   cur_cu->inter.mv[1] = y << 2;
 }
@@ -258,7 +258,9 @@ void search_tree(encoder_control *encoder,
   uint8_t border_split_x = ((encoder->in.width) < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; // are we in any border CU
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+
+  picture *cur_pic = encoder->in.cur_pic;
+  cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   cur_cu->intra.cost = 0xffffffff;
   cur_cu->inter.cost = 0xffffffff;
@@ -266,7 +268,6 @@ void search_tree(encoder_control *encoder,
   // Force split on border
   if (depth != MAX_DEPTH) {
     if (border) {
-      // Split blocks and remember to change x and y block positions
       uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
       search_tree(encoder, x_ctb, y_ctb, depth + 1);
       if (!border_x || border_split_x) {
@@ -278,42 +279,32 @@ void search_tree(encoder_control *encoder,
       if (!border || (border_split_x && border_split_y)) {
         search_tree(encoder, x_ctb + change, y_ctb + change, depth + 1);
       }
-      // We don't need to do anything else here
       return;
     }
   }
 
   // INTER SEARCH
-  if (depth >= MIN_INTER_SEARCH_DEPTH && depth <= MAX_INTER_SEARCH_DEPTH
-      && encoder->in.cur_pic->slicetype != SLICE_I) {
-    // Motion estimation on P-frame
-    if (encoder->in.cur_pic->slicetype != SLICE_B) {
-
+  if (cur_pic->slicetype != SLICE_I
+      && depth >= MIN_INTER_SEARCH_DEPTH && depth <= MAX_INTER_SEARCH_DEPTH) {
+    
+    picture *ref_pic = encoder->ref->pics[0];
+    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
+    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
+    int x = x_ctb * CU_MIN_SIZE_PIXELS;
+    int y = y_ctb * CU_MIN_SIZE_PIXELS;
+    
+    int start_x = 0;
+    int start_y = 0;
+    // Convert from sub-pixel accuracy.
+    if (ref_cu->type == CU_INTER) {
+      start_x = ref_cu->inter.mv[0] >> 2;
+      start_y = ref_cu->inter.mv[1] >> 2;
     }
 
-    {
-      picture *cur_pic = encoder->in.cur_pic;
-      picture *ref_pic = encoder->ref->pics[0];
-      unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-      cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
-      int x = x_ctb * CU_MIN_SIZE_PIXELS;
-      int y = y_ctb * CU_MIN_SIZE_PIXELS;
-      pixel *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
-      
-      int start_x = 0;
-      int start_y = 0;
-      // Convert from sub-pixel accuracy.
-      if (ref_cu->type == CU_INTER) {
-        start_x = ref_cu->inter.mv[0] >> 2;
-        start_y = ref_cu->inter.mv[1] >> 2;
-      }
+    hexagon_search(cur_pic, ref_pic, 
+                   cur_cu, x, y, 
+                   start_x, start_y, depth);
 
-      hexagon_search(cur_pic, ref_pic, 
-                     cur_cu, x, y, 
-                     start_x, start_y, depth);
-    }
-
-    cur_cu->type = CU_INTER;
     cur_cu->inter.mv_dir = 1;
   }
 
@@ -380,6 +371,10 @@ uint32_t search_best_mode(encoder_control *encoder,
       return cost;
     }
   } 
+
+  // If search hasn't been peformed at all for this block, the cost will be
+  // max value, so it is safe to just compare costs. It just has to be made
+  // sure that no value overflows.
   if (best_inter_cost <= best_intra_cost) {
     inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
     return best_inter_cost;
