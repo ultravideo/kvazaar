@@ -313,7 +313,7 @@ double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
 /**
  * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
  */
-unsigned satd_16bit_8x8_general(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t iStrideCur)
+unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
@@ -423,12 +423,11 @@ unsigned satd_16bit_8x8_general(int16_t *piOrg, int32_t iStrideOrg, int16_t *piC
     }
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, int16_t, 16bit)
-SATD_NXN(16, int16_t, 16bit)
-SATD_NXN(32, int16_t, 16bit)
-SATD_NXN(64, int16_t, 16bit)
+SATD_NXN(8, pixel, 16bit)
+SATD_NXN(16, pixel, 16bit)
+SATD_NXN(32, pixel, 16bit)
+SATD_NXN(64, pixel, 16bit)
 
-  for (y = 0; y < 32; y += 8) {
 // Function macro for defining SAD calculating functions 
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type, suffix) \
@@ -444,16 +443,16 @@ SATD_NXN(64, int16_t, 16bit)
       } \
     } \
     return sum; \
-    }
+  }
 
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
 // They are used through get_sad_16bit_nxn_func.
-SAD_NXN(4, int16_t, 16bit)
-SAD_NXN(8, int16_t, 16bit)
-SAD_NXN(16, int16_t, 16bit)
-SAD_NXN(32, int16_t, 16bit)
-SAD_NXN(64, int16_t, 16bit)
+SAD_NXN(4, pixel, 16bit)
+SAD_NXN(8, pixel, 16bit)
+SAD_NXN(16, pixel, 16bit)
+SAD_NXN(32, pixel, 16bit)
+SAD_NXN(64, pixel, 16bit)
 
 /**
  * \brief  Get a function that calculates SATD for NxN block.
@@ -512,7 +511,7 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
  * 
  * \returns       Sum of Absolute Transformed Differences (SATD)
  */
-unsigned satd_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
+unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_satd_16bit_nxn_func(n);
   return sad_func(block1, block2);
@@ -527,7 +526,7 @@ unsigned satd_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
  * 
  * \returns       Sum of Absolute Differences
  */
-unsigned sad_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
+unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_sad_16bit_nxn_func(n);
   if (sad_func) {
