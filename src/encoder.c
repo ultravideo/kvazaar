@@ -1474,9 +1474,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
 
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
-          int16_t val = block[i++] + pred_y[x + y * pred_stride];
+          int val = block[i++] + pred_y[x + y * pred_stride];
           //TODO: support 10+bits
-          recbase_y[x + y * recbase_stride] = (uint8_t)CLIP(0, 255, val);
+          recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, val);
         }
       }
       // END RECONTRUCTION
@@ -1484,7 +1484,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       // without coeffs, we only use the prediction
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
-          recbase_y[x + y * recbase_stride] = (uint8_t)CLIP(0, 255, pred_y[x + y * pred_stride]);
+          recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, pred_y[x + y * pred_stride]);
         }
       }
     }
