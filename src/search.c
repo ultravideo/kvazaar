@@ -368,7 +368,6 @@ uint32_t search_best_mode(encoder_control *encoder,
   uint32_t cost = 0;
   uint32_t lambdaCost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
 
-  // Split and search to max_depth
   if (depth != MAX_INTRA_SEARCH_DEPTH) {
     // Split blocks and remember to change x and y block positions
     uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
@@ -377,37 +376,25 @@ uint32_t search_best_mode(encoder_control *encoder,
     cost += search_best_mode(encoder, x_ctb,          y_ctb + change, depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
 
-    // We split if the cost is better (0 cost -> not checked)
-    if ( (encoder->in.cur_pic->slicetype == SLICE_I && depth < MIN_INTRA_SEARCH_DEPTH) ||
-        (cost != 0 
-        && (best_intra_cost != 0 && cost + lambdaCost < best_intra_cost)
-        && (best_inter_cost != 0
-            && cost + lambdaCost < best_inter_cost)))
+    // If search hasn't been peformed at all for this block, the cost will be
+    // max value, so it is safe to just compare costs. It just has to be made
+    // sure that no value overflows.
+    if (cost + lambdaCost < best_intra_cost && cost + lambdaCost < best_inter_cost)
     {
-      // Set split to 1
       best_cost = cost + lambdaCost;
-    } else if (best_inter_cost != 0 // Else, check if inter cost is smaller or the same as intra 
-        && (best_inter_cost <= best_intra_cost || best_intra_cost == 0)
-        && encoder->in.cur_pic->slicetype != SLICE_I)
-    {
-      // Set split to 0 and mode to inter.mode
+    } else if (best_inter_cost <= best_intra_cost) {
       inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
       best_cost = best_inter_cost;
-    } else { // Else, dont split and recursively set block mode
-      // Set split to 0 and mode to intra.mode
+    } else {
       intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
           cur_cu->intra.mode);
       best_cost = best_intra_cost;
     }
-  } else if (best_inter_cost != 0
-             && (best_inter_cost <= best_intra_cost || best_intra_cost == 0)
-             && encoder->in.cur_pic->slicetype != SLICE_I)
-  {
-    // Set split to 0 and mode to inter.mode
+  } else if (best_inter_cost <= best_intra_cost
+             && encoder->in.cur_pic->slicetype != SLICE_I) {
     inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
     best_cost = best_inter_cost;
   } else {
-    // Set split to 0 and mode to intra.mode
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
         cur_cu->intra.mode);
     best_cost = best_intra_cost;
