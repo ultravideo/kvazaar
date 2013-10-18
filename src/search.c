@@ -382,8 +382,7 @@ uint32_t search_best_mode(encoder_control *encoder,
         (cost != 0 
         && (best_intra_cost != 0 && cost + lambdaCost < best_intra_cost)
         && (best_inter_cost != 0
-            && cost + lambdaCost < best_inter_cost
-            && encoder->in.cur_pic->slicetype != SLICE_I)))
+            && cost + lambdaCost < best_inter_cost)))
     {
       // Set split to 1
       best_cost = cost + lambdaCost;

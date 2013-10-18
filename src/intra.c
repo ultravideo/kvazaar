@@ -216,12 +216,12 @@ void intra_filter(int16_t *ref, int32_t stride,int32_t width, int8_t mode)
 int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t recstride, uint32_t xpos,
                          uint32_t ypos, uint32_t width, int16_t *dst, int32_t dststride, uint32_t *sad_out)
 {
-  typedef uint32_t (*sad_function)(int16_t *block,uint32_t stride1,int16_t *block2, uint32_t stride2);
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
   int16_t best_mode = 1;
   int32_t x,y,i;
-  sad_function calc_sad;
+
+  cost_16bit_nxn_func cost_func = get_satd_16bit_nxn_func(width);
 
   // Temporary block arrays
   // TODO: alloc with alignment
@@ -233,11 +233,10 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t 
   pixel *orig_shift = &orig[xpos + ypos*origstride];  //!< pointer to orig with offset of (1,1)
   int8_t filter = (width<32); // TODO: chroma support
 
-  sad_function sad_array[5] = {&sad4x4,&sad8x8,&sad16x16,&sad32x32,&sad64x64}; //TODO: get SAD functions from parameters
   uint8_t threshold = intra_hor_ver_dist_thres[g_to_bits[width]]; //!< Intra filtering threshold
 
   #define COPY_PRED_TO_DST() for (y = 0; y < (int32_t)width; y++)  { for (x = 0; x < (int32_t)width; x++) { dst[x + y*dststride] = pred[x + y*width]; } }
-  #define CHECK_FOR_BEST(mode, additional_sad)  sad = calc_sad(pred,width,orig_block,width); \
+  #define CHECK_FOR_BEST(mode, additional_sad)  sad = cost_func(pred, orig_block); \
                                                 sad += additional_sad;\
                                                 if(sad < best_sad)\
                                                 {\
@@ -245,9 +244,6 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t 
                                                   best_mode = mode;\
                                                   COPY_PRED_TO_DST();\
                                                 }
-
-  // Choose SAD function according to width
-  calc_sad = sad_array[g_to_bits[width]];
 
   // Store original block for SAD computation
   i = 0;

@@ -98,10 +98,12 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
   fprintf(fp, 
     "\n<table class='d%u' bgcolor='#%02x%02x%02x'><tr><td colspan='2'>"
     "%u (%u, %u), %c, "
-    "c=%u, mv=(%d, %d)</td></tr>\n", 
+    "c=%u, mv=(%d, %d), intra_cost=%d, intra_mode=%d"
+    "</td></tr>\n", 
     depth, rgb[0], rgb[1], rgb[2],
     depth, xCtb, yCtb, (cu->type == CU_INTRA ? 'I' : 'P'),
-    cu->inter.cost, cu->inter.mv[0], cu->inter.mv[1]);
+    cu->inter.cost, cu->inter.mv[0], cu->inter.mv[1],
+    cu->intra.cost, cu->intra.mode);
 
 
   if(depth != MAX_INTER_SEARCH_DEPTH)
