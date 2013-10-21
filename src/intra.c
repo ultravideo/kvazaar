@@ -221,7 +221,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t 
   int16_t best_mode = 1;
   int32_t x,y,i;
 
-  cost_16bit_nxn_func cost_func = get_satd_16bit_nxn_func(width);
+  cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
 
   // Temporary block arrays
   // TODO: alloc with alignment
