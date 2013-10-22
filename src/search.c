@@ -469,7 +469,7 @@ uint32_t search_best_mode(encoder_control *encoder,
   if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
     uint32_t cost = lambda_cost;
     uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-    cost =  search_best_mode(encoder, x_ctb,          y_ctb,          depth + 1);
+    cost += search_best_mode(encoder, x_ctb,          y_ctb,          depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb,          depth + 1);
     cost += search_best_mode(encoder, x_ctb,          y_ctb + change, depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
