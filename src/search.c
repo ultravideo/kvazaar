@@ -67,6 +67,27 @@ const vector2d small_hexbs[5] = {
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
 
+
+/**
+ * \brief Do motion search using the HEXBS algorithm.
+ *
+ * \param depth      log2 depth of the search
+ * \param pic        Picture motion vector is searched for.
+ * \param ref        Picture motion vector is searched from.
+ * \param orig       Top left corner of the searched for block.
+ * \param mv_in_out  Predicted mv in and best out. Quarter pixel precision.
+ *
+ * \returns  Cost of the motion vector.
+ *
+ * Motion vector is searched by first searching iteratively with the large
+ * hexagon pattern until the best match is at the center of the hexagon.
+ * As a final step a smaller hexagon is used to check the adjacent pixels.
+ *
+ * If a non 0,0 predicted motion vector predictor is given as mv_in_out,
+ * the 0,0 vector is also tried. This is hoped to help in the case where
+ * the predicted motion vector is way off. In the future even more additional
+ * points like 0,0 might be used, such as vectors from top or left.
+ */
 unsigned hexagon_search(unsigned depth, 
                         const picture *pic, const picture *ref,
                         const vector2d *orig, vector2d *mv_in_out)
@@ -79,11 +100,11 @@ unsigned hexagon_search(unsigned depth,
 
   // Search the initial 7 points of the hexagon.
   for (i = 0; i < 7; ++i) {
-    const vector2d *pattern = large_hexbs + i;
+    const vector2d *pattern = &large_hexbs[i];
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
+    if (cost < best_cost) {
       best_cost = cost;
       best_index = i;
     }
@@ -94,19 +115,21 @@ unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x, orig->y,
                              block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
+    
+    // If the 0,0 is better, redo the hexagon around that point.
+    if (cost < best_cost) {
       best_cost = cost;
       best_index = 0;
       mv.x = 0;
       mv.y = 0;
 
-      // Redo the search around the 0,0 point.
       for (i = 1; i < 7; ++i) {
-        const vector2d *pattern = large_hexbs + i;
+        const vector2d *pattern = &large_hexbs[i];
         unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                                 orig->x + pattern->x, orig->y + pattern->y,
+                                 orig->x + pattern->x, 
+                                 orig->y + pattern->y,
                                  block_width, block_width);
-        if (cost > 0 && cost < best_cost) {
+        if (cost < best_cost) {
           best_cost = cost;
           best_index = i;
         }
@@ -133,12 +156,12 @@ unsigned hexagon_search(unsigned depth,
 
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
-      const vector2d *offset = large_hexbs + start + i;
+      const vector2d *offset = &large_hexbs[start + i];
       unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                                orig->x + mv.x + offset->x, 
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
-      if (cost > 0 && cost < best_cost) {
+      if (cost < best_cost) {
         best_cost = cost;
         best_index = start + i;
       }
@@ -146,14 +169,17 @@ unsigned hexagon_search(unsigned depth,
     }
   }
 
-  // Do the final step of the search with a small pattern.
+  // Move the center to the best match.
   mv.x += large_hexbs[best_index].x;
   mv.y += large_hexbs[best_index].y;
   best_index = 0;
+
+  // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
-    const vector2d *offset = small_hexbs + i;
+    const vector2d *offset = &small_hexbs[i];
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             orig->x + mv.x + offset->x, orig->y + mv.y + offset->y,
+                             orig->x + mv.x + offset->x,
+                             orig->y + mv.y + offset->y,
                              block_width, block_width);
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
@@ -161,8 +187,11 @@ unsigned hexagon_search(unsigned depth,
     }
   }
 
+  // Adjust the movement vector according to the final best match.
   mv.x += small_hexbs[best_index].x;
   mv.y += small_hexbs[best_index].y;
+
+  // Return final movement vector in quarter-pixel precision.
   mv_in_out->x = mv.x << 2;
   mv_in_out->y = mv.y << 2;
 
