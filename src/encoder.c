@@ -1069,7 +1069,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // Code (possible) coeffs to bitstream
      
     if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
-      encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0);
+      encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0, 0, 0);
     }
 
 
@@ -1206,7 +1206,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // Coeff
     // Transform tree
     encode_transform_tree(encoder, x_ctb, y_ctb, depth);
-    encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0);
+    encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0, 0, 0);
     // end Transform tree
     // end Coeff
 
@@ -1619,12 +1619,15 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
 }
 
 void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
-                            int8_t depth, int8_t tr_depth)
+                            int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
   int8_t width = LCU_WIDTH>>depth;
   int8_t split = (cur_cu->tr_depth > depth||!depth);
   int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)))+1;
+
+  int8_t cb_flag_u = !split ? cur_cu->coeff_u : cur_cu->coeff_top_u[depth];
+  int8_t cb_flag_v = !split ? cur_cu->coeff_v : cur_cu->coeff_top_v[depth];
   
   if (depth != 0 && depth != MAX_DEPTH + 1) {
     cabac.ctx = &g_trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) -
@@ -1639,19 +1642,17 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
     uint8_t offset = 1<<(MAX_DEPTH-1-depth);
 
     // Non-zero chroma U Tcoeffs
-    int8_t cb_flag = !split ? cur_cu->coeff_u : cur_cu->coeff_top_u[depth];
     cabac.ctx = &g_qt_cbf_model_chroma[tr_depth];
 
-    if (tr_depth == 0  || cur_cu->coeff_top_u[depth-1]) {
-      CABAC_BIN(&cabac, cb_flag, "cbf_chroma_u");
+    if (tr_depth == 0  || parent_coeff_u) {
+      CABAC_BIN(&cabac, cb_flag_u, "cbf_chroma_u");
     }
 
     // Non-zero chroma V Tcoeffs
     // NOTE: Using the same ctx as before
-    cb_flag = !split ? cur_cu->coeff_v : cur_cu->coeff_top_v[depth];
 
-    if (tr_depth == 0  || cur_cu->coeff_top_v[depth-1]) {
-      CABAC_BIN(&cabac, cb_flag, "cbf_chroma_v");
+    if (tr_depth == 0  || parent_coeff_v) {
+      CABAC_BIN(&cabac, cb_flag_v, "cbf_chroma_v");
     }
   }
   
@@ -1660,16 +1661,10 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
     cu_info *cu_a =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
     cu_info *cu_b =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
     cu_info *cu_c =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    encode_transform_coeff(encoder, x_cu, y_cu, depth + 1, tr_depth + 1);
-    cu_a->coeff_top_y[depth] = cur_cu->coeff_top_y[depth]; cu_a->coeff_top_u[depth] = cur_cu->coeff_top_u[depth];
-    cu_a->coeff_top_v[depth] = cur_cu->coeff_top_v[depth];
-    encode_transform_coeff(encoder, x_cu + offset, y_cu,  depth + 1, tr_depth + 1);
-    cu_b->coeff_top_y[depth] = cur_cu->coeff_top_y[depth]; cu_b->coeff_top_u[depth] = cur_cu->coeff_top_u[depth];
-    cu_b->coeff_top_v[depth] = cur_cu->coeff_top_v[depth];
-    encode_transform_coeff(encoder, x_cu, y_cu + offset,  depth + 1, tr_depth + 1);
-    cu_c->coeff_top_y[depth] = cur_cu->coeff_top_y[depth]; cu_c->coeff_top_u[depth] = cur_cu->coeff_top_u[depth];
-    cu_c->coeff_top_v[depth] = cur_cu->coeff_top_v[depth];
-    encode_transform_coeff(encoder, x_cu + offset, y_cu + offset,  depth + 1, tr_depth + 1);
+    encode_transform_coeff(encoder, x_cu, y_cu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_cu + offset, y_cu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_cu, y_cu + offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_cu + offset, y_cu + offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 

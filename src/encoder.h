@@ -89,7 +89,7 @@ void encode_coeff_nxn(encoder_control *encoder, int16_t *coeff, uint8_t width,
 void encode_transform_tree(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
                            uint8_t depth);
 void encode_transform_coeff(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
-                            int8_t depth, int8_t tr_depth);
+                            int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 
 extern int16_t g_lambda_cost[55];
 extern uint32_t* g_sig_last_scan[3][7];
