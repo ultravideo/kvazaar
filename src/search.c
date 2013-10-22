@@ -413,6 +413,8 @@ uint32_t search_best_mode(encoder_control *encoder,
   return best_cost;
 }
 
+
+
 /**
  * \brief
  */
@@ -441,8 +443,13 @@ void search_slice_data(encoder_control *encoder)
       if (RENDER_CU) {
         render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
       }
+
+      encode_block_residual(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
+
     }
   }
+
+
 
   if (RENDER_CU && fp) {
     close_cu_file(fp);
