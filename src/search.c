@@ -28,7 +28,7 @@
 #define USE_INTRA_IN_P 0
 //#define RENDER_CU encoder->frame==2
 #define RENDER_CU 0
-#define USE_CHROMA_IN_MV_SEARCH 0
+#define SEARCH_MV_FULL_RADIUS 0
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
@@ -67,45 +67,95 @@ const vector2d small_hexbs[5] = {
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
 
-void hexagon_search(picture *pic, picture *ref,
-                    cu_info *cur_cu,  int orig_x, int orig_y, int x, int y, 
-                    unsigned depth)
+int calc_mvd_cost(int x, int y, const vector2d *pred)
 {
+  int cost = 0;
+
+  // Get the absolute difference vector and count the bits.
+  x = abs(abs(x) - abs(pred->x));
+  y = abs(abs(y) - abs(pred->y));
+  while (x >>= 1) {
+    ++cost;
+  }
+  while (y >>= 1) {
+    ++cost;
+  }
+
+  // I don't know what is a good cost function for this. It probably doesn't
+  // have to aproximate the actual cost of encoding the vector, but it's a
+  // place to start.
+
+  // Add two for quarter pixel resolution and multiply by two for Exp-Golomb.
+  return (cost ? (cost + 2) << 1 : 0);
+}
+
+/**
+ * \brief Do motion search using the HEXBS algorithm.
+ *
+ * \param depth      log2 depth of the search
+ * \param pic        Picture motion vector is searched for.
+ * \param ref        Picture motion vector is searched from.
+ * \param orig       Top left corner of the searched for block.
+ * \param mv_in_out  Predicted mv in and best out. Quarter pixel precision.
+ *
+ * \returns  Cost of the motion vector.
+ *
+ * Motion vector is searched by first searching iteratively with the large
+ * hexagon pattern until the best match is at the center of the hexagon.
+ * As a final step a smaller hexagon is used to check the adjacent pixels.
+ *
+ * If a non 0,0 predicted motion vector predictor is given as mv_in_out,
+ * the 0,0 vector is also tried. This is hoped to help in the case where
+ * the predicted motion vector is way off. In the future even more additional
+ * points like 0,0 might be used, such as vectors from top or left.
+ */
+unsigned hexagon_search(unsigned depth, 
+                        const picture *pic, const picture *ref,
+                        const vector2d *orig, vector2d *mv_in_out)
+{
+  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = -1;
   unsigned i;
-  unsigned best_index = 0; // in large_hexbs[]
+  unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
 
   // Search the initial 7 points of the hexagon.
   for (i = 0; i < 7; ++i) {
-    const vector2d *pattern = large_hexbs + i;
-    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                             orig_x + x + pattern->x, orig_y + y + pattern->y,
+    const vector2d *pattern = &large_hexbs[i];
+    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                             orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
+    cost += calc_mvd_cost(mv.x + pattern->x, orig->y + mv.y + pattern->y, mv_in_out);
+
+    if (cost < best_cost) {
       best_cost = cost;
       best_index = i;
     }
   }
 
   // Try the 0,0 vector.
-  if (!(x == 0 && y == 0)) {
-    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                             orig_x, orig_y,
+  if (!(mv.x == 0 && mv.y == 0)) {
+    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                             orig->x, orig->y,
                              block_width, block_width);
-    if (cost > 0 && cost < best_cost) {
+    cost += calc_mvd_cost(0, 0, mv_in_out);
+    
+    // If the 0,0 is better, redo the hexagon around that point.
+    if (cost < best_cost) {
       best_cost = cost;
       best_index = 0;
-      x = 0;
-      y = 0;
+      mv.x = 0;
+      mv.y = 0;
 
-      // Redo the search around the 0,0 point.
       for (i = 1; i < 7; ++i) {
-        const vector2d *pattern = large_hexbs + i;
-        unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                                 orig_x + pattern->x, orig_y + pattern->y,
+        const vector2d *pattern = &large_hexbs[i];
+        unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                                 orig->x + pattern->x, 
+                                 orig->y + pattern->y,
                                  block_width, block_width);
-        if (cost > 0 && cost < best_cost) {
+        cost += calc_mvd_cost(pattern->x, pattern->y, mv_in_out);
+
+        if (cost < best_cost) {
           best_cost = cost;
           best_index = i;
         }
@@ -126,17 +176,20 @@ void hexagon_search(picture *pic, picture *ref,
     }
 
     // Move the center to the best match.
-    x += large_hexbs[best_index].x;
-    y += large_hexbs[best_index].y;
+    mv.x += large_hexbs[best_index].x;
+    mv.y += large_hexbs[best_index].y;
     best_index = 0;
 
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
-      const vector2d *offset = large_hexbs + start + i;
-      unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                               orig_x + x + offset->x, orig_y + y + offset->y,
+      const vector2d *offset = &large_hexbs[start + i];
+      unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                               orig->x + mv.x + offset->x, 
+                               orig->y + mv.y + offset->y,
                                block_width, block_width);
-      if (cost > 0 && cost < best_cost) {
+      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out);
+
+      if (cost < best_cost) {
         best_cost = cost;
         best_index = start + i;
       }
@@ -144,27 +197,79 @@ void hexagon_search(picture *pic, picture *ref,
     }
   }
 
-  // Do the final step of the search with a small pattern.
-  x += large_hexbs[best_index].x;
-  y += large_hexbs[best_index].y;
+  // Move the center to the best match.
+  mv.x += large_hexbs[best_index].x;
+  mv.y += large_hexbs[best_index].y;
   best_index = 0;
+
+  // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
-    const vector2d *offset = small_hexbs + i;
-    unsigned cost = calc_sad(pic, ref, orig_x, orig_y,
-                             orig_x + x + offset->x, orig_y + y + offset->y,
+    const vector2d *offset = &small_hexbs[i];
+    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                             orig->x + mv.x + offset->x,
+                             orig->y + mv.y + offset->y,
                              block_width, block_width);
+    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out);
+
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       best_index = i;
     }
   }
 
-  x += small_hexbs[best_index].x;
-  y += small_hexbs[best_index].y;
-  best_index = 0;
-  cur_cu->inter.cost = best_cost + 1; // +1 so that cost is > 0.
-  cur_cu->inter.mv[0] = x << 2;
-  cur_cu->inter.mv[1] = y << 2;
+  // Adjust the movement vector according to the final best match.
+  mv.x += small_hexbs[best_index].x;
+  mv.y += small_hexbs[best_index].y;
+
+  // Return final movement vector in quarter-pixel precision.
+  mv_in_out->x = mv.x << 2;
+  mv_in_out->y = mv.y << 2;
+
+  return best_cost;
+}
+
+unsigned search_mv_full(unsigned depth, 
+                        const picture *pic, const picture *ref,
+                        const vector2d *orig, vector2d *mv_in_out)
+{
+  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+  unsigned best_cost = -1;
+  int x, y;
+  vector2d min_mv, max_mv;
+
+  /*if (abs(mv.x) > SEARCH_MV_FULL_RADIUS || abs(mv.y) > SEARCH_MV_FULL_RADIUS) {
+    best_cost = calc_sad(pic, ref, orig->x, orig->y, 
+                         orig->x, orig->y,
+                         block_width, block_width);
+    mv.x = 0;
+    mv.y = 0;
+  }*/
+
+  min_mv.x = mv.x - SEARCH_MV_FULL_RADIUS;
+  min_mv.y = mv.y - SEARCH_MV_FULL_RADIUS;
+  max_mv.x = mv.x + SEARCH_MV_FULL_RADIUS;
+  max_mv.y = mv.y + SEARCH_MV_FULL_RADIUS;
+
+  for (y = min_mv.y; y < max_mv.y; ++y) {
+    for (x = min_mv.x; x < max_mv.x; ++x) {
+      unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                               orig->x + x,
+                               orig->y + y,
+                               block_width, block_width);
+      cost += calc_mvd_cost(x, y, mv_in_out);
+      if (cost < best_cost) {
+        best_cost = cost;
+        mv.x = x;
+        mv.y = y;
+      }
+    }
+  }
+
+  mv_in_out->x = mv.x << 2;
+  mv_in_out->y = mv.y << 2;
+
+  return best_cost;
 }
 
 /**
@@ -258,7 +363,9 @@ void search_tree(encoder_control *encoder,
   uint8_t border_split_x = ((encoder->in.width) < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; // are we in any border CU
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+
+  picture *cur_pic = encoder->in.cur_pic;
+  cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   cur_cu->intra.cost = 0xffffffff;
   cur_cu->inter.cost = 0xffffffff;
@@ -266,7 +373,6 @@ void search_tree(encoder_control *encoder,
   // Force split on border
   if (depth != MAX_DEPTH) {
     if (border) {
-      // Split blocks and remember to change x and y block positions
       uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
       search_tree(encoder, x_ctb, y_ctb, depth + 1);
       if (!border_x || border_split_x) {
@@ -278,43 +384,37 @@ void search_tree(encoder_control *encoder,
       if (!border || (border_split_x && border_split_y)) {
         search_tree(encoder, x_ctb + change, y_ctb + change, depth + 1);
       }
-      // We don't need to do anything else here
       return;
     }
   }
 
   // INTER SEARCH
-  if (depth >= MIN_INTER_SEARCH_DEPTH && depth <= MAX_INTER_SEARCH_DEPTH
-      && encoder->in.cur_pic->slicetype != SLICE_I) {
-    // Motion estimation on P-frame
-    if (encoder->in.cur_pic->slicetype != SLICE_B) {
+  if (cur_pic->slicetype != SLICE_I
+      && depth >= MIN_INTER_SEARCH_DEPTH && depth <= MAX_INTER_SEARCH_DEPTH) {
+    
+    picture *ref_pic = encoder->ref->pics[0];
+    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
+    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
 
+    vector2d orig, mv;
+    orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
+    orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
+    mv.x = 0;
+    mv.y = 0;
+    if (ref_cu->type == CU_INTER) {
+      mv.x = ref_cu->inter.mv[0];
+      mv.y = ref_cu->inter.mv[1];
     }
 
-    {
-      picture *cur_pic = encoder->in.cur_pic;
-      picture *ref_pic = encoder->ref->pics[0];
-      unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-      cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
-      int x = x_ctb * CU_MIN_SIZE_PIXELS;
-      int y = y_ctb * CU_MIN_SIZE_PIXELS;
-      pixel *cur_data = &cur_pic->y_data[(y * cur_pic->width) + x];
-      
-      int start_x = 0;
-      int start_y = 0;
-      // Convert from sub-pixel accuracy.
-      if (ref_cu->type == CU_INTER) {
-        start_x = ref_cu->inter.mv[0] >> 2;
-        start_y = ref_cu->inter.mv[1] >> 2;
-      }
-
-      hexagon_search(cur_pic, ref_pic, 
-                     cur_cu, x, y, 
-                     start_x, start_y, depth);
-    }
-
-    cur_cu->type = CU_INTER;
+#if SEARCH_MV_FULL_RADIUS
+    cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
+#else
+    cur_cu->inter.cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
+#endif
+    
     cur_cu->inter.mv_dir = 1;
+    cur_cu->inter.mv[0] = mv.x;
+    cur_cu->inter.mv[1] = mv.y;
   }
 
   // INTRA SEARCH
@@ -360,60 +460,38 @@ void search_tree(encoder_control *encoder,
 uint32_t search_best_mode(encoder_control *encoder, 
                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth][x_ctb
-      + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth]
+                     [x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint32_t best_intra_cost = cur_cu->intra.cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;
-  uint32_t best_cost = 0;
-  uint32_t cost = 0;
-  uint32_t lambdaCost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
+  uint32_t lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
 
-  // Split and search to max_depth
-  if (depth != MAX_INTRA_SEARCH_DEPTH) {
-    // Split blocks and remember to change x and y block positions
+  if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
+    uint32_t cost = lambda_cost;
     uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-    cost =  search_best_mode(encoder, x_ctb,          y_ctb,          depth + 1);
+    cost += search_best_mode(encoder, x_ctb,          y_ctb,          depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb,          depth + 1);
     cost += search_best_mode(encoder, x_ctb,          y_ctb + change, depth + 1);
     cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
 
-    // We split if the cost is better (0 cost -> not checked)
-    if ( (encoder->in.cur_pic->slicetype == SLICE_I && depth < MIN_INTRA_SEARCH_DEPTH) ||
-        (cost != 0 
-        && (best_intra_cost != 0 && cost + lambdaCost < best_intra_cost)
-        && (best_inter_cost != 0
-            && cost + lambdaCost < best_inter_cost)))
+    if (cost < best_intra_cost && cost < best_inter_cost)
     {
-      // Set split to 1
-      best_cost = cost + lambdaCost;
-    } else if (best_inter_cost != 0 // Else, check if inter cost is smaller or the same as intra 
-        && (best_inter_cost <= best_intra_cost || best_intra_cost == 0)
-        && encoder->in.cur_pic->slicetype != SLICE_I)
-    {
-      // Set split to 0 and mode to inter.mode
-      inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
-      best_cost = best_inter_cost;
-    } else { // Else, dont split and recursively set block mode
-      // Set split to 0 and mode to intra.mode
-      intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-          cur_cu->intra.mode);
-      best_cost = best_intra_cost;
+      // Better value was found at a lower level.
+      return cost;
     }
-  } else if (best_inter_cost != 0
-             && (best_inter_cost <= best_intra_cost || best_intra_cost == 0)
-             && encoder->in.cur_pic->slicetype != SLICE_I)
-  {
-    // Set split to 0 and mode to inter.mode
+  } 
+
+  // If search hasn't been peformed at all for this block, the cost will be
+  // max value, so it is safe to just compare costs. It just has to be made
+  // sure that no value overflows.
+  if (best_inter_cost <= best_intra_cost) {
     inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
-    best_cost = best_inter_cost;
+    return best_inter_cost;
   } else {
-    // Set split to 0 and mode to intra.mode
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
         cur_cu->intra.mode);
-    best_cost = best_intra_cost;
+    return best_intra_cost;
   }
-
-  return best_cost;
 }
 
 /**

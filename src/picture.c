@@ -544,7 +544,7 @@ unsigned sad_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned cor_sad(pixel *pic_data, pixel *ref_data, 
+unsigned cor_sad(const pixel *pic_data, const pixel *ref_data, 
                  int block_width, int block_height, unsigned width)
 {
   pixel ref = *ref_data;
@@ -571,7 +571,7 @@ unsigned cor_sad(pixel *pic_data, pixel *ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned ver_sad(pixel *pic_data, pixel *ref_data, 
+unsigned ver_sad(const pixel *pic_data, const pixel *ref_data, 
                  int block_width, int block_height, unsigned width)
 {
   int x, y;
@@ -597,7 +597,7 @@ unsigned ver_sad(pixel *pic_data, pixel *ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned hor_sad(pixel *pic_data, pixel *ref_data, 
+unsigned hor_sad(const pixel *pic_data, const pixel *ref_data, 
                  int block_width, int block_height, unsigned width)
 {
   int x, y;
@@ -626,7 +626,7 @@ unsigned hor_sad(pixel *pic_data, pixel *ref_data,
  * 
  * \returns Sum of Absolute Differences
  */
-unsigned reg_sad(pixel *data1, pixel *data2, 
+unsigned reg_sad(const pixel *data1, const pixel *data2, 
                  int width, int height, unsigned stride)
 {
   int y, x;
@@ -654,7 +654,7 @@ unsigned reg_sad(pixel *data1, pixel *data2,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-unsigned interpolated_sad(picture *pic, picture *ref, 
+unsigned interpolated_sad(const picture *pic, const picture *ref, 
                           int pic_x, int pic_y, int ref_x, int ref_y, 
                           int block_width, int block_height)
 {
@@ -787,7 +787,7 @@ unsigned interpolated_sad(picture *pic, picture *ref,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-unsigned calc_sad(picture *pic, picture *ref, 
+unsigned calc_sad(const picture *pic, const picture *ref, 
                   int pic_x, int pic_y, int ref_x, int ref_y, 
                   int block_width, int block_height)
 {
@@ -796,8 +796,8 @@ unsigned calc_sad(picture *pic, picture *ref,
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    pixel *pic_data = &pic->y_data[pic_y * pic->width + pic_x];
-    pixel *ref_data = &ref->y_data[ref_y * pic->width + ref_x];
+    const pixel *pic_data = &pic->y_data[pic_y * pic->width + pic_x];
+    const pixel *ref_data = &ref->y_data[ref_y * pic->width + ref_x];
     return reg_sad(pic_data, ref_data, block_width, block_height, pic->width);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
