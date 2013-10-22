@@ -45,7 +45,7 @@ typedef int16_t coefficient;
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
 
 #define MAX_INTER_SEARCH_DEPTH 3
-#define MIN_INTER_SEARCH_DEPTH 1
+#define MIN_INTER_SEARCH_DEPTH 0
 
 #define MAX_INTRA_SEARCH_DEPTH 3 /*!< Max search depth -> min block size (3 == 8x8) */
 #define MIN_INTRA_SEARCH_DEPTH 1 /*!< Min search depth -> max block size (0 == 64x64) */
