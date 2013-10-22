@@ -28,7 +28,7 @@
 #define USE_INTRA_IN_P 0
 //#define RENDER_CU encoder->frame==2
 #define RENDER_CU 0
-#define USE_CHROMA_IN_MV_SEARCH 0
+#define SEARCH_MV_FULL_RADIUS 0
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
@@ -69,7 +69,7 @@ const vector2d small_hexbs[5] = {
 
 int calc_mvd_cost(int x, int y, const vector2d *pred)
 {
-  int cost = 2; // 2 is due to the quarter pixel resolution.
+  int cost = 0;
 
   // Get the absolute difference vector and count the bits.
   x = abs(abs(x) - abs(pred->x));
@@ -81,7 +81,12 @@ int calc_mvd_cost(int x, int y, const vector2d *pred)
     ++cost;
   }
 
-  return cost;
+  // I don't know what is a good cost function for this. It probably doesn't
+  // have to aproximate the actual cost of encoding the vector, but it's a
+  // place to start.
+
+  // Add two for quarter pixel resolution and multiply by two for Exp-Golomb.
+  return (cost ? (cost + 2) << 1 : 0);
 }
 
 /**
@@ -223,6 +228,50 @@ unsigned hexagon_search(unsigned depth,
   return best_cost;
 }
 
+unsigned search_mv_full(unsigned depth, 
+                        const picture *pic, const picture *ref,
+                        const vector2d *orig, vector2d *mv_in_out)
+{
+  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+  unsigned best_cost = -1;
+  int x, y;
+  vector2d min_mv, max_mv;
+
+  /*if (abs(mv.x) > SEARCH_MV_FULL_RADIUS || abs(mv.y) > SEARCH_MV_FULL_RADIUS) {
+    best_cost = calc_sad(pic, ref, orig->x, orig->y, 
+                         orig->x, orig->y,
+                         block_width, block_width);
+    mv.x = 0;
+    mv.y = 0;
+  }*/
+
+  min_mv.x = mv.x - SEARCH_MV_FULL_RADIUS;
+  min_mv.y = mv.y - SEARCH_MV_FULL_RADIUS;
+  max_mv.x = mv.x + SEARCH_MV_FULL_RADIUS;
+  max_mv.y = mv.y + SEARCH_MV_FULL_RADIUS;
+
+  for (y = min_mv.y; y < max_mv.y; ++y) {
+    for (x = min_mv.x; x < max_mv.x; ++x) {
+      unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+                               orig->x + x,
+                               orig->y + y,
+                               block_width, block_width);
+      cost += calc_mvd_cost(x, y, mv_in_out);
+      if (cost < best_cost) {
+        best_cost = cost;
+        mv.x = x;
+        mv.y = y;
+      }
+    }
+  }
+
+  mv_in_out->x = mv.x << 2;
+  mv_in_out->y = mv.y << 2;
+
+  return best_cost;
+}
+
 /**
  * \brief
  */
@@ -357,7 +406,12 @@ void search_tree(encoder_control *encoder,
       mv.y = ref_cu->inter.mv[1];
     }
 
+#if SEARCH_MV_FULL_RADIUS
+    cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
+#else
     cur_cu->inter.cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
+#endif
+    
     cur_cu->inter.mv_dir = 1;
     cur_cu->inter.mv[0] = mv.x;
     cur_cu->inter.mv[1] = mv.y;
