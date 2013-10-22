@@ -43,7 +43,9 @@ typedef struct
 {
   int8_t mode;
   uint32_t cost;
+
   int16_t mv[2];
+  int16_t mvd[2];
   uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
   uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
 } cu_info_inter;

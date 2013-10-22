@@ -932,8 +932,6 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       }
     } else {
       uint32_t ref_list_idx;
-      int16_t mv_cand[2][2];
-
       /*
       // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
       if(encoder->in.cur_pic->slicetype == SLICE_B)
@@ -982,30 +980,11 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
                   if (symbol == 0) break;
                 }
               }
-            }
-
-            // Get MV candidates
-            inter_get_mv_cand(encoder, x_ctb, y_ctb, depth, mv_cand);
-
-            // Select better candidate
-            cur_cu->inter.mv_ref = 0; // Default to candidate 0
-
-            // Only check when candidates are different
-            if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
-              uint16_t cand_1_diff = abs(cur_cu->inter.mv[0] - mv_cand[0][0]) + abs(
-                                       cur_cu->inter.mv[1] - mv_cand[0][1]);
-              uint16_t cand_2_diff = abs(cur_cu->inter.mv[0] - mv_cand[1][0]) + abs(
-                                       cur_cu->inter.mv[1] - mv_cand[1][1]);
-
-              // Select candidate 1 if it's closer
-              if (cand_2_diff < cand_1_diff) {
-                cur_cu->inter.mv_ref = 1;
-              }
-            }
+            }            
 
             if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-              const int32_t mvd_hor = cur_cu->inter.mv[0] - mv_cand[cur_cu->inter.mv_ref][0];
-              const int32_t mvd_ver = cur_cu->inter.mv[1] - mv_cand[cur_cu->inter.mv_ref][1];
+              const int32_t mvd_hor = cur_cu->inter.mvd[0];
+              const int32_t mvd_ver = cur_cu->inter.mvd[1];
               const int8_t hor_abs_gr0 = mvd_hor != 0;
               const int8_t ver_abs_gr0 = mvd_ver != 0;
               const uint32_t mvd_hor_abs = abs(mvd_hor);
@@ -2030,7 +2009,7 @@ void encode_block_residual(encoder_control *encoder,
     pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
     pixel *rec_shift_u = &rec[(LCU_WIDTH >> (depth + 1)) * 2 + 8 + 1];
 
-    cur_cu->intra.mode_chroma = 36;
+    cur_cu->intra.mode_chroma = 36; // TODO: Chroma intra prediction
     
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
                                  (LCU_WIDTH >> (depth)) * 2 + 8, rec,
@@ -2044,7 +2023,7 @@ void encode_block_residual(encoder_control *encoder,
                                                   width, pred_y, width,
                                                   &cur_cu->intra.cost);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-                         cur_cu->intra.mode);    
+                         cur_cu->intra.mode);
     
     // Build reconstructed block to use in prediction with extrapolated borders
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
@@ -2093,6 +2072,28 @@ void encode_block_residual(encoder_control *encoder,
                 1);
 
   } else {
+    int16_t mv_cand[2][2];
+    // Get MV candidates
+    inter_get_mv_cand(encoder, x_ctb, y_ctb, depth, mv_cand);
+
+    // Select better candidate
+    cur_cu->inter.mv_ref = 0; // Default to candidate 0
+
+    // Only check when candidates are different
+    if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
+      uint16_t cand_1_diff = abs(cur_cu->inter.mv[0] - mv_cand[0][0]) + abs(
+                                cur_cu->inter.mv[1] - mv_cand[0][1]);
+      uint16_t cand_2_diff = abs(cur_cu->inter.mv[0] - mv_cand[1][0]) + abs(
+                                cur_cu->inter.mv[1] - mv_cand[1][1]);
+
+      // Select candidate 1 if it's closer
+      if (cand_2_diff < cand_1_diff) {
+        cur_cu->inter.mv_ref = 1;
+      }
+    }
+    cur_cu->inter.mvd[0] = cur_cu->inter.mv[0] - mv_cand[cur_cu->inter.mv_ref][0];
+    cur_cu->inter.mvd[1] = cur_cu->inter.mv[1] - mv_cand[cur_cu->inter.mv_ref][1];
+
     // Inter reconstruction
     inter_recon(encoder->ref->pics[0], x_ctb * CU_MIN_SIZE_PIXELS,
                 y_ctb * CU_MIN_SIZE_PIXELS, LCU_WIDTH >> depth, cur_cu->inter.mv,
