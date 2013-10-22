@@ -844,40 +844,57 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     }
   }
   
-  // Encode skip flag
+
+
+    // Encode skip flag
   if (encoder->in.cur_pic->slicetype != SLICE_I) {
-    int8_t ctx_skip = 0;
-    // uiCtxSkip = aboveskipped + leftskipped;
-    cabac.ctx = &g_cu_skip_flag_model[ctx_skip];
-    CABAC_BIN(&cabac, (cur_cu->type == CU_SKIP) ? 1 : 0, "SkipFlag");
-  }
+    int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
+    int ui;
+    int16_t unary_idx = 0; 
+    int8_t skipflag = 0;
+    int16_t merge_cand[MRG_MAX_NUM_CANDS][2];
+    int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand);   
 
-  // IF SKIP
-  if (cur_cu->type == CU_SKIP) {
-    // Encode merge index
-    //TODO: calculate/fetch merge candidates
-    int16_t unary_idx = 0; //pcCU->getMergeIndex( uiAbsPartIdx );
-    int16_t num_cand = 0; //pcCU->getSlice()->getMaxNumMergeCand();
-    int32_t ui;
-
-    if (num_cand > 1) {
-      for (ui = 0; ui < num_cand - 1; ui++) {
-        int32_t symbol = (ui == unary_idx) ? 0 : 1;
-
-        if (ui == 0) {
-          cabac.ctx = &g_cu_merge_idx_ext_model;
-          CABAC_BIN(&cabac, symbol, "MergeIndex");
-        } else {
-          CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
-        }
-
-        if (symbol == 0) {
+    if (!cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
+      // Encode merge index       
+      for(unary_idx = 0; unary_idx < num_cand; unary_idx++) {
+        if(merge_cand[unary_idx][0] == cur_cu->inter.mv[0] &&
+           merge_cand[unary_idx][1] == cur_cu->inter.mv[1]) {
+          //cur_cu->skipped = 1;
           break;
         }
       }
     }
+    // Get left and top skipped flags and if they are present and true, increase model number
+    if (x_ctb > 0 && (&encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
+      ctx_skip++;
+    }
 
-    return;
+    if (y_ctb > 0 && (&encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
+      ctx_skip++;
+    }
+
+    cabac.ctx = &g_cu_skip_flag_model[ctx_skip];
+    CABAC_BIN(&cabac, cur_cu->skipped, "SkipFlag");
+  
+    // IF SKIP  
+    if (cur_cu->skipped) {
+      if (num_cand > 1) {
+        for (ui = 0; ui < num_cand - 1; ui++) {
+          int32_t symbol = (ui != unary_idx);
+          if (ui == 0) {
+            cabac.ctx = &g_cu_merge_idx_ext_model;
+            CABAC_BIN(&cabac, symbol, "MergeIndex");
+          } else {
+            CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
+          }
+          if (symbol == 0) {
+            break;
+          }
+        }
+      }
+      return;
+    }
   }
 
   // ENDIF SKIP
@@ -899,34 +916,31 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
   //end partsize
   if (cur_cu->type == CU_INTER) {
     // FOR each part
-    // Mergeflag
-    uint8_t merge_flag = 0;
+    // Mergeflag    
     int16_t unary_idx = 0;
     int16_t merge_cand[MRG_MAX_NUM_CANDS][2];
     int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand);    
     for(unary_idx = 0; unary_idx < num_cand; unary_idx++) {
       if(merge_cand[unary_idx][0] == cur_cu->inter.mv[0] &&
          merge_cand[unary_idx][1] == cur_cu->inter.mv[1]) {
-        //merge_flag = 1;
+        //cur_cu->merged = 1;
         break;
       }
-    }
+    }    
     cabac.ctx = &g_cu_merge_flag_ext_model;
-    CABAC_BIN(&cabac, merge_flag, "MergeFlag");
-
-    if (merge_flag) { //merge
+    CABAC_BIN(&cabac, cur_cu->merged, "MergeFlag");
+    num_cand = MRG_MAX_NUM_CANDS;
+    if (cur_cu->merged) { //merge
       if (num_cand > 1) {
         int32_t ui;
         for (ui = 0; ui < num_cand - 1; ui++) {
           int32_t symbol = (ui != unary_idx);
-
           if (ui == 0) {
                 cabac.ctx = &g_cu_merge_idx_ext_model;
                 CABAC_BIN(&cabac, symbol, "MergeIndex");
           } else {
                 CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
           }
-
           if (symbol == 0) break;
         }
       }
