@@ -840,8 +840,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       }
       if (!border || (border_split_x && border_split_y)) {
         encode_coding_tree(encoder, x_ctb + change, y_ctb + change, depth + 1);
-      }
-      
+      }      
       return;
     }
   }
@@ -1057,21 +1056,19 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     inter_recon(encoder->ref->pics[0], x_ctb * CU_MIN_SIZE_PIXELS,
                 y_ctb * CU_MIN_SIZE_PIXELS, LCU_WIDTH >> depth, cur_cu->inter.mv,
                 encoder->in.cur_pic);
-
     // Mark this block as "coded" (can be used for predictions..)
     picture_set_block_coded(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);
-
     encode_transform_tree(encoder,x_ctb, y_ctb, depth);
 
     // Only need to signal coded block flag if not skipped or merged
     // skip = no coded residual, merge = coded residual
     if (!cur_cu->merged) {
       cabac.ctx = &g_cu_qt_root_cbf_model;
-      CABAC_BIN(&cabac, cur_cu->coeff_y | cur_cu->coeff_u | cur_cu->coeff_v, "rqt_root_cbf");
+      CABAC_BIN(&cabac, cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth], "rqt_root_cbf");
     }
     // Code (possible) coeffs to bitstream
      
-    if(cur_cu->coeff_y | cur_cu->coeff_u | cur_cu->coeff_v) {
+    if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
       encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0);
     }
 
@@ -1277,10 +1274,23 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     uint8_t offset = 1<<(MAX_DEPTH-1-depth);
+    cu_info *cu_a =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+    cu_info *cu_b =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+    cu_info *cu_c =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
     encode_transform_tree(encoder, x_cu, y_cu, depth+1);
     encode_transform_tree(encoder, x_cu + offset, y_cu, depth+1);
     encode_transform_tree(encoder, x_cu, y_cu + offset, depth+1);
     encode_transform_tree(encoder, x_cu + offset, y_cu + offset, depth+1);
+
+    // Derive coded coeff flags from the next depth
+    cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cu_a->coeff_top_y[depth+1] | cu_b->coeff_top_y[depth+1]
+                                  | cu_c->coeff_top_y[depth+1];        
+    cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1] | cu_a->coeff_top_u[depth+1] | cu_b->coeff_top_u[depth+1]
+                                  | cu_c->coeff_top_u[depth+1];
+    cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1] | cu_a->coeff_top_v[depth+1] | cu_b->coeff_top_v[depth+1]
+                                  | cu_c->coeff_top_v[depth+1];
+
+
     return;
   }
   
@@ -1301,7 +1311,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
     pixel *pred_v    = &encoder->in.cur_pic->pred_v[x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
     int32_t pred_stride = encoder->in.width;
 
-    coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
+    coefficient coeff_y[LCU_WIDTH*LCU_WIDTH<<2];
     coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient *orig_coeff_y   = &encoder->in.cur_pic->coeff_y[x_cu * (LCU_WIDTH >> (MAX_DEPTH))     + (y_cu * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
@@ -1450,7 +1460,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
-        cur_cu->coeff_y = 1;
+        cur_cu->coeff_top_y[depth] = cur_cu->coeff_y = 1;
         break;
       }
     }
@@ -1509,7 +1519,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       for (i = 0; i < width *width >> 2; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
-          cur_cu->coeff_u = 1;
+          cur_cu->coeff_top_u[depth] = cur_cu->coeff_u = 1;
           break;
         }
       }
@@ -1533,7 +1543,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       for (i = 0; i < width *width >> 2; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
-          cur_cu->coeff_v = 1;
+          cur_cu->coeff_top_v[depth] = cur_cu->coeff_v = 1;
           break;
         }
       }
@@ -1628,23 +1638,19 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
   if (encoder->in.video_format != FORMAT_400) {
     uint8_t offset = 1<<(MAX_DEPTH-1-depth);
 
-    //cu_info *cur_cu_idx_2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    //cu_info *cur_cu_idx_3 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    //cu_info *cur_cu_idx_4 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-
     // Non-zero chroma U Tcoeffs
-    int8_t cb_flag = (!split) ? cur_cu->coeff_u : cur_cu->coeff_u;//(cur_cu->coeff_u | cur_cu_idx_2->coeff_u | cur_cu_idx_3->coeff_u  | cur_cu_idx_4->coeff_u);
+    int8_t cb_flag = (!split) ? cur_cu->coeff_u : cur_cu->coeff_top_u[depth];
     cabac.ctx = &g_qt_cbf_model_chroma[tr_depth];
 
-    if (tr_depth == 0 /*|| ti->cb_top[1]*/) {
+    if (tr_depth == 0  || cur_cu->coeff_top_u[depth]) {
       CABAC_BIN(&cabac, cb_flag, "cbf_chroma_u");
     }
 
     // Non-zero chroma V Tcoeffs
     // NOTE: Using the same ctx as before
-    cb_flag = (!split) ? cur_cu->coeff_v : cur_cu->coeff_v;//(cur_cu->coeff_v | cur_cu_idx_2->coeff_v | cur_cu_idx_3->coeff_v  | cur_cu_idx_4->coeff_v);
+    cb_flag = (!split) ? cur_cu->coeff_v : cur_cu->coeff_top_v[depth];
 
-    if (tr_depth == 0 /*|| ti->cb_top[2]*/) {
+    if (tr_depth == 0  || cur_cu->coeff_top_v[depth]) {
       CABAC_BIN(&cabac, cb_flag, "cbf_chroma_v");
     }
   }
@@ -1666,7 +1672,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
 
 
   {
-    coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
+    coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];
     coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
     int32_t coeff_stride = encoder->in.width;
@@ -1800,7 +1806,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
     if (coeff[i] != 0) {
       num_nonzero++;
     }
-  }  
+  }
 
   scan_cg = g_sig_last_scan[scan_mode][log2_block_size > 3 ? log2_block_size - 3 : 0];
 
@@ -1820,7 +1826,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
 
     if (coeff[pos_last] != 0) {
       sig_coeffgroup_flag[(num_blk_side * (POSY >> shift) + (POSX >> shift))] = 1;
-  }
+    }
 
     num_nonzero -= (coeff[pos_last] != 0) ? 1 : 0;
     #undef POSY
@@ -1885,7 +1891,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
                                              log2_block_size, width, type);
           cabac.ctx = &baseCtx[ctx_sig];
           CABAC_BIN(&cabac, sig, "significant_coeff_flag");
-    }
+        }
 
         if (sig) {
           abs_coeff[num_non_zero] = abs(coeff[blk_pos]);
@@ -1894,14 +1900,14 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
 
           if (last_nz_pos_in_cg == -1) {
             last_nz_pos_in_cg = scan_pos_sig;
-        }
+          }
 
           first_nz_pos_in_cg  = scan_pos_sig;
-          }
         }
+      }
     } else {
       scan_pos_sig = sub_pos - 1;
-      }
+    }
 
     if (num_non_zero > 0) {
       int8_t sign_hidden = (last_nz_pos_in_cg - first_nz_pos_in_cg >=
@@ -1912,7 +1918,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
 
       if (c1 == 0) {
         ctx_set++;
-    }
+      }
 
       c1 = 1;
 
