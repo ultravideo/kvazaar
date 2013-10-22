@@ -67,6 +67,22 @@ const vector2d small_hexbs[5] = {
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
 
+int calc_mvd_cost(int x, int y, const vector2d *pred)
+{
+  int cost = 2; // 2 is due to the quarter pixel resolution.
+
+  // Get the absolute difference vector and count the bits.
+  x = abs(abs(x) - abs(pred->x));
+  y = abs(abs(y) - abs(pred->y));
+  while (x >>= 1) {
+    ++cost;
+  }
+  while (y >>= 1) {
+    ++cost;
+  }
+
+  return cost;
+}
 
 /**
  * \brief Do motion search using the HEXBS algorithm.
@@ -104,6 +120,8 @@ unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
+    cost += calc_mvd_cost(mv.x + pattern->x, orig->y + mv.y + pattern->y, mv_in_out);
+
     if (cost < best_cost) {
       best_cost = cost;
       best_index = i;
@@ -115,6 +133,7 @@ unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x, orig->y,
                              block_width, block_width);
+    cost += calc_mvd_cost(0, 0, mv_in_out);
     
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
@@ -129,6 +148,8 @@ unsigned hexagon_search(unsigned depth,
                                  orig->x + pattern->x, 
                                  orig->y + pattern->y,
                                  block_width, block_width);
+        cost += calc_mvd_cost(pattern->x, pattern->y, mv_in_out);
+
         if (cost < best_cost) {
           best_cost = cost;
           best_index = i;
@@ -161,6 +182,8 @@ unsigned hexagon_search(unsigned depth,
                                orig->x + mv.x + offset->x, 
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
+      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out);
+
       if (cost < best_cost) {
         best_cost = cost;
         best_index = start + i;
@@ -181,6 +204,8 @@ unsigned hexagon_search(unsigned depth,
                              orig->x + mv.x + offset->x,
                              orig->y + mv.y + offset->y,
                              block_width, block_width);
+    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out);
+
     if (cost > 0 && cost < best_cost) {
       best_cost = cost;
       best_index = i;
