@@ -62,6 +62,7 @@ typedef struct
   int8_t coded;      //!< \brief flag to indicate this block is coded and reconstructed
   int8_t skipped;    //!< \brief flag to indicate this block is skipped
   int8_t merged;     //!< \brief flag to indicate this block is merged
+  int8_t merge_idx;  //!< \brief merge index
   int8_t coeff_y;    //!< \brief is there coded coeffs Y
   int8_t coeff_u;    //!< \brief is there coded coeffs U
   int8_t coeff_v;    //!< \brief is there coded coeffs V
@@ -127,7 +128,8 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
                                 uint8_t depth, int8_t residual);
 void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
                              uint8_t depth, int8_t split);
-
+void picture_set_block_skipped(picture *pic, uint32_t x_scu, uint32_t y_scu,
+                                uint8_t depth, int8_t skipped);
 picture_list * picture_list_init(int size);
 int picture_list_resize(picture_list *list, int size);
 int picture_list_destroy(picture_list *list);

@@ -860,12 +860,12 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       for(unary_idx = 0; unary_idx < num_cand; unary_idx++) {
         if(merge_cand[unary_idx][0] == cur_cu->inter.mv[0] &&
            merge_cand[unary_idx][1] == cur_cu->inter.mv[1]) {
-          //cur_cu->skipped = 1;
+          //picture_set_block_skipped(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);
           break;
         }
       }
     }
-    // Get left and top skipped flags and if they are present and true, increase model number
+    // Get left and top skipped flags and if they are present and true, increase context number
     if (x_ctb > 0 && (&encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
       ctx_skip++;
     }
@@ -917,16 +917,20 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
   if (cur_cu->type == CU_INTER) {
     // FOR each part
     // Mergeflag    
-    int16_t unary_idx = 0;
+    int16_t num_cand = 0;
+    /*
     int16_t merge_cand[MRG_MAX_NUM_CANDS][2];
-    int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand);    
-    for(unary_idx = 0; unary_idx < num_cand; unary_idx++) {
-      if(merge_cand[unary_idx][0] == cur_cu->inter.mv[0] &&
-         merge_cand[unary_idx][1] == cur_cu->inter.mv[1]) {
-        //cur_cu->merged = 1;
-        break;
+    int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand);
+    if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
+      for(unary_idx = 0; unary_idx < num_cand; unary_idx++) {
+        if(merge_cand[unary_idx][0] == cur_cu->inter.mv[0] &&
+           merge_cand[unary_idx][1] == cur_cu->inter.mv[1]) {
+          cur_cu->merged = 1;
+          break;
+        }
       }
-    }    
+    }
+    */
     cabac.ctx = &g_cu_merge_flag_ext_model;
     CABAC_BIN(&cabac, cur_cu->merged, "MergeFlag");
     num_cand = MRG_MAX_NUM_CANDS;
@@ -934,12 +938,12 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       if (num_cand > 1) {
         int32_t ui;
         for (ui = 0; ui < num_cand - 1; ui++) {
-          int32_t symbol = (ui != unary_idx);
+          int32_t symbol = (ui != cur_cu->merge_idx);
           if (ui == 0) {
-                cabac.ctx = &g_cu_merge_idx_ext_model;
-                CABAC_BIN(&cabac, symbol, "MergeIndex");
+            cabac.ctx = &g_cu_merge_idx_ext_model;
+            CABAC_BIN(&cabac, symbol, "MergeIndex");
           } else {
-                CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
+            CABAC_BIN_EP(&cabac,symbol,"MergeIndex");
           }
           if (symbol == 0) break;
         }
@@ -2087,6 +2091,18 @@ void encode_block_residual(encoder_control *encoder,
 
   } else {
     int16_t mv_cand[2][2];
+    
+    int16_t merge_cand[MRG_MAX_NUM_CANDS][2];
+    int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand);    
+    for(cur_cu->merge_idx = 0; cur_cu->merge_idx < num_cand; cur_cu->merge_idx++) {
+      if(merge_cand[cur_cu->merge_idx][0] == cur_cu->inter.mv[0] &&
+          merge_cand[cur_cu->merge_idx][1] == cur_cu->inter.mv[1]) {
+        cur_cu->merged = 1;
+        break;
+      }
+    }
+    
+    
     // Get MV candidates
     inter_get_mv_cand(encoder, x_ctb, y_ctb, depth, mv_cand);
 
@@ -2111,11 +2127,16 @@ void encode_block_residual(encoder_control *encoder,
     // Inter reconstruction
     inter_recon(encoder->ref->pics[0], x_ctb * CU_MIN_SIZE_PIXELS,
                 y_ctb * CU_MIN_SIZE_PIXELS, LCU_WIDTH >> depth, cur_cu->inter.mv,
-                encoder->in.cur_pic);    
+                encoder->in.cur_pic);
   }
 
   // Mark this block as "coded" (can be used for predictions..)
   picture_set_block_coded(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);    
   encode_transform_tree(encoder,x_ctb, y_ctb, depth);
+
+  if(cur_cu->merged &&!cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
+    cur_cu->merged = 0;
+    //cur_cu->skipped = 1;
+  }
 
 }
