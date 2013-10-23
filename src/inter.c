@@ -359,9 +359,9 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
 
-#define CHECK_DUPLICATE(X,Y) {duplicate = 0; for(i = 0; i < candidates; i++) { \
-                                               if(mv_cand[i][0] == (X) && mv_cand[i][1] == (Y)) { \
-                                               duplicate = 1; break; } }}
+#define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
+                                                     (CU1)->inter.mv[0] == (CU2)->inter.mv[0] && \
+                                                     (CU1)->inter.mv[1] == (CU2)->inter.mv[1]) duplicate = 1; }
 
   if (a1 && a1->type == CU_INTER) {
       mv_cand[candidates][0] = a1->inter.mv[0];
@@ -370,7 +370,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   }
 
   if (b1 && b1->type == CU_INTER) {
-    if(candidates) CHECK_DUPLICATE(b1->inter.mv[0],b1->inter.mv[1]);
+    if(candidates) CHECK_DUPLICATE(b1, a1);
     if(!duplicate) {
       mv_cand[candidates][0] = b1->inter.mv[0];
       mv_cand[candidates][1] = b1->inter.mv[1];
@@ -379,7 +379,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   }
 
   if (b0 && b0->type == CU_INTER) {
-    if(candidates) CHECK_DUPLICATE(b0->inter.mv[0],b0->inter.mv[1]);
+    if(candidates) CHECK_DUPLICATE(b0,b1);
     if(!duplicate) {
       mv_cand[candidates][0] = b0->inter.mv[0];
       mv_cand[candidates][1] = b0->inter.mv[1];
@@ -388,7 +388,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   }
 
   if (a0 && a0->type == CU_INTER) {
-    if(candidates) CHECK_DUPLICATE(a0->inter.mv[0],a0->inter.mv[1]);
+    if(candidates) CHECK_DUPLICATE(a0,a1);
     if(!duplicate) {
       mv_cand[candidates][0] = a0->inter.mv[0];
       mv_cand[candidates][1] = a0->inter.mv[1];
@@ -396,12 +396,17 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
     }
   }
 
-  if(b2 && b2->type == CU_INTER) {
-    if(candidates) CHECK_DUPLICATE(b2->inter.mv[0],b2->inter.mv[1]);
-    if(!duplicate) {
-      mv_cand[candidates][0] = b2->inter.mv[0];
-      mv_cand[candidates][1] = b2->inter.mv[1];
-      candidates++;
+  if (candidates != 4) {
+    if(b2 && b2->type == CU_INTER) {
+      CHECK_DUPLICATE(b2,a1);
+      if(!duplicate) {
+        CHECK_DUPLICATE(b2,b1);
+        if(!duplicate) {
+          mv_cand[candidates][0] = b2->inter.mv[0];
+          mv_cand[candidates][1] = b2->inter.mv[1];
+          candidates++;
+        }
+      }
     }
   }
 
@@ -412,8 +417,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   }
 #endif
 
-  // Fill with (0,0)  
-  //i = candidates;
+  // Fill with (0,0)
   /*
   while (candidates < MRG_MAX_NUM_CANDS) {
     mv_cand[candidates][0] = 0;
