@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
   encoder->beta_offset_div2  = 0;
   encoder->tc_offset_div2    = 0;
   // SAO
-  encoder->sao_enable = 0;
+  encoder->sao_enable = 1;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 

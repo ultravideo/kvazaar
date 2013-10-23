@@ -705,6 +705,8 @@ void encode_VUI(encoder_control* encoder)
 
 void encode_slice_header(encoder_control* encoder)
 {
+  picture *cur_pic = encoder->in.cur_pic;
+
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
 #endif
@@ -749,9 +751,9 @@ void encode_slice_header(encoder_control* encoder)
     //end if
   //end if
   if (encoder->sao_enable) {
-      WRITE_U(encoder->stream, 1,1, "slice_sao_luma_flag");
-      WRITE_U(encoder->stream, 0,1, "slice_sao_chroma_flag");
-    }
+    WRITE_U(encoder->stream, cur_pic->slice_sao_luma_flag, 1, "slice_sao_luma_flag");
+    WRITE_U(encoder->stream, cur_pic->slice_sao_chroma_flag, 1, "slice_sao_chroma_flag");
+  }
     
   if (encoder->in.cur_pic->slicetype != SLICE_I) {
       WRITE_U(encoder->stream, 0, 1, "num_ref_idx_active_override_flag");
@@ -768,6 +770,126 @@ void encode_slice_header(encoder_control* encoder)
     //WRITE_U(encoder->stream, 1, 1, "alignment");
 }
 
+
+  // TODO: move somewhere else (sao.h?)
+#define SAO_TYPE_NONE 0
+#define SAO_TYPE_EDGE 1
+#define SAO_TYPE_BAND 2
+#define Y_INDEX 0
+#define U_INDEX 1
+#define V_INDEX 2
+#define YUV_INDEX_END 3
+
+#define NUM_COLORS 3
+#define NUM_SAO_OFFSETS 4
+
+typedef enum { COLOR_Y = 0, COLOR_U = 1, COLOR_V = 2 } color_index;
+
+typedef struct {
+  int type;
+  int merge_left_flag;
+  int merge_up_flag;
+  int offsets[NUM_SAO_OFFSETS];
+  int eo_class;
+} sao_info;
+
+void encode_sao_offsets(encoder_control *encoder, sao_info *sao)
+{
+  int i;
+
+  for (i = 0; i < NUM_SAO_OFFSETS; ++i) {
+    CABAC_BIN(&cabac, sao->offsets[i] > 0 ? 0 : 1, "sao_offset_sign");
+  }
+
+  if (sao->type == SAO_TYPE_EDGE) {
+    for (i = 0; i < NUM_SAO_OFFSETS; ++i) {
+      if (sao->offsets[i] != 0) {
+        // For edge SAO positive sign is encoded as 0.
+        CABAC_BIN(&cabac, sao->offsets[i] > 0 ? 0 : 1, "sao_offset_sign");
+        // TODO: CABAC_BIN sao_band_position[color_i]
+      } else {
+        // TODO: CABAC_BIN sao_eo_class[color_i]
+      }
+    }
+  }
+}
+
+void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color_i)
+{
+  picture *pic = encoder->in.cur_pic;
+
+  // Skip colors with no SAO.
+  if (color_i == COLOR_Y && !pic->slice_sao_luma_flag) {
+    return;
+  } else if (!pic->slice_sao_chroma_flag) {
+    return;
+  }
+
+  if (color_i == COLOR_Y) {
+    cabac.ctx = &g_sao_type_idx_luma_model;
+    CABAC_BIN(&cabac, sao->type, "sao_type_idx_luma");
+  } else {
+    cabac.ctx = &g_sao_type_idx_chroma_model;
+    CABAC_BIN(&cabac, sao->type, "sao_type_idx_chroma");
+  }
+
+  if (sao->type != SAO_TYPE_NONE) {
+    encode_sao_offsets(encoder, 0);
+  }
+}
+
+void encode_sao_merge_flags(encoder_control *encoder, sao_info *sao,
+                            unsigned x_ctb, unsigned y_ctb)
+{
+  // SAO merge flags are not present if merge candidate is not in the same
+  // slice AND tile, but there isn't any such segmentation right now.
+  assert(!USE_SLICES && !USE_TILES);
+
+  // SAO merge flags are not present for the first row and column.
+  if (x_ctb > 0) {
+    cabac.ctx = &g_sao_merge_left_flag_model;
+    CABAC_BIN(&cabac, sao->merge_left_flag ? 1 : 0, "sao_merge_left_flag");
+  }
+  if (y_ctb > 0 && !sao->merge_left_flag) {
+    cabac.ctx = &g_sao_merge_up_flag_model;
+    CABAC_BIN(&cabac, sao->merge_up_flag ? 1 : 0, "sao_merge_up_flag");
+  }
+}
+
+/**
+ * \brief Stub that encodes all LCU's as none type.
+ */
+void encode_sao(encoder_control *encoder, unsigned x_lcu, uint16_t y_lcu)
+{
+  unsigned sao_type[3] = {SAO_TYPE_NONE, SAO_TYPE_NONE, SAO_TYPE_NONE};
+  picture *pic = encoder->in.cur_pic;
+  sao_info tmp_sao[3];
+  sao_info *sao = &tmp_sao[0];
+  
+  // The tmp_sao and these assignments are temporary. The sao pointer will
+  // be given to this function.
+  sao[0].merge_left_flag = 0;
+  sao[0].merge_up_flag = 0;
+  sao[0].type = SAO_TYPE_NONE;
+
+  sao[1].merge_left_flag = 0;
+  sao[1].merge_up_flag = 0;
+  sao[1].type = SAO_TYPE_NONE;
+
+  sao[2].merge_left_flag = 0;
+  sao[2].merge_up_flag = 0;
+  sao[2].type = SAO_TYPE_NONE;
+
+  encode_sao_merge_flags(encoder, sao, x_lcu, y_lcu);
+
+  // If SAO is merged, nothing else needs to be coded.
+  if (!sao->merge_left_flag && !sao->merge_up_flag) {
+    encode_sao_color(encoder, &sao[COLOR_Y], COLOR_Y);
+    encode_sao_color(encoder, &sao[COLOR_U], COLOR_U);
+    encode_sao_color(encoder, &sao[COLOR_V], COLOR_V);
+  }
+}
+
 void encode_slice_data(encoder_control* encoder)
 {
   uint16_t x_ctb, y_ctb;
@@ -782,6 +904,10 @@ void encode_slice_data(encoder_control* encoder)
     for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
       uint8_t last_cu_x = (x_ctb == (encoder->in.width_in_lcu - 1)) ? 1 : 0;
       uint8_t depth = 0;
+
+      if (encoder->sao_enable) {
+        encode_sao(encoder, x_ctb, y_ctb);
+      }
 
       // Recursive function for looping through all the sub-blocks
       encode_coding_tree(encoder, x_ctb << MAX_DEPTH, y_ctb << MAX_DEPTH, depth);

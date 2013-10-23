@@ -244,6 +244,9 @@ picture *picture_init(int32_t width, int32_t height,
     memset(pic->cu_array[i], 0, sizeof(cu_info) * cu_array_size);
   }
 
+  pic->slice_sao_luma_flag = 1;
+  pic->slice_sao_chroma_flag = 1;
+
   return pic;
 }
 

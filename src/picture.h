@@ -81,6 +81,8 @@ typedef struct
   cu_info** cu_array;           // \brief Info for each CU at each depth.
   uint8_t type;
   uint8_t slicetype;
+  uint8_t slice_sao_luma_flag;
+  uint8_t slice_sao_chroma_flag;
 } picture;
 
 /**

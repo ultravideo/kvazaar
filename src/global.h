@@ -92,6 +92,12 @@ typedef int16_t coefficient;
 #define SIZE_NxN   3
 #define SIZE_NONE  15
 
+// These are for marking incomplete implementations that break if slices or
+// tiles are used with asserts. They should be set to 1 if they are ever
+// implemented.
+#define USE_SLICES 0
+#define USE_TILES 0
+
 /* Inlining functions */
 #ifdef _MSC_VER /* Visual studio */
   #define INLINE __forceinline
