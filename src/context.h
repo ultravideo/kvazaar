@@ -68,7 +68,7 @@ extern cabac_ctx g_cu_qt_root_cbf_model;
 #define CNU 154
 
 static const uint8_t INIT_SAO_MERGE_FLAG[3] = { 153, 153, 153 };
-static const uint8_t INIT_SAO_TYPE_IDX[3] = { 200, 185, 160 };
+static const uint8_t INIT_SAO_TYPE_IDX[3] = { 160, 185, 200 };
 
 static const uint8_t 
 INIT_QT_ROOT_CBF[3][1] = 
