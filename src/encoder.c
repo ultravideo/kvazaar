@@ -825,11 +825,10 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
     return;
   }
 
+  cabac.ctx = &g_sao_type_idx_model;
   if (color_i == COLOR_Y) {
-    cabac.ctx = &g_sao_type_idx_luma_model;
     CABAC_BIN(&cabac, sao->type, "sao_type_idx_luma");
   } else {
-    cabac.ctx = &g_sao_type_idx_chroma_model;
     CABAC_BIN(&cabac, sao->type, "sao_type_idx_chroma");
   }
 
@@ -847,11 +846,11 @@ void encode_sao_merge_flags(encoder_control *encoder, sao_info *sao,
 
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
-    cabac.ctx = &g_sao_merge_left_flag_model;
+    cabac.ctx = &g_sao_merge_flag_model;
     CABAC_BIN(&cabac, sao->merge_left_flag ? 1 : 0, "sao_merge_left_flag");
   }
   if (y_ctb > 0 && !sao->merge_left_flag) {
-    cabac.ctx = &g_sao_merge_up_flag_model;
+    cabac.ctx = &g_sao_merge_flag_model;
     CABAC_BIN(&cabac, sao->merge_up_flag ? 1 : 0, "sao_merge_up_flag");
   }
 }

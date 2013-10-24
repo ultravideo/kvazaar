@@ -37,10 +37,8 @@ int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_
                                 int32_t pos_y,int32_t block_type,int32_t width, int8_t texture_type);
 
 // CONTEXTS
-extern cabac_ctx g_sao_merge_left_flag_model;
-extern cabac_ctx g_sao_merge_up_flag_model;
-extern cabac_ctx g_sao_type_idx_luma_model;
-extern cabac_ctx g_sao_type_idx_chroma_model;
+extern cabac_ctx g_sao_merge_flag_model;
+extern cabac_ctx g_sao_type_idx_model;
 extern cabac_ctx g_split_flag_model[3];
 extern cabac_ctx g_intra_mode_model;
 extern cabac_ctx g_chroma_pred_model[2];
