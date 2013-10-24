@@ -828,7 +828,8 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   cabac.ctx = &g_sao_type_idx_model;
   if (color_i == COLOR_Y) {
     CABAC_BIN(&cabac, sao->type, "sao_type_idx_luma");
-  } else {
+  } else if (color_i == COLOR_U) {
+    // SAO type is only coded for the first chroma.
     CABAC_BIN(&cabac, sao->type, "sao_type_idx_chroma");
   }
 
