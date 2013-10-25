@@ -198,8 +198,8 @@ void filter_deblock_edge_luma(encoder_control *encoder,
         // Intra blocks have strength 2
         if(cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
           strength = 2;          
-          // Non-zero residual and transform boundary
-        } else if(cu_q->residual || cu_p->residual) {
+          // Non-zero residual/coeffs and transform boundary
+        } else if(cu_q->coeff_y || cu_p->coeff_y) {
           strength = 1;
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
         } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {

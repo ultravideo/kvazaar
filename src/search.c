@@ -276,13 +276,13 @@ unsigned search_mv_full(unsigned depth,
  * \brief
  */
 void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
-                                 int16_t outwidth, int16_t *dst, 
+                                 int16_t outwidth, pixel *dst, 
                                  int32_t dststride, int8_t chroma)
 {
   int32_t left_col; // left column iterator
-  int16_t val;      // variable to store extrapolated value
+  pixel val;      // variable to store extrapolated value
   int32_t i;        // index iterator
-  int16_t dc_val = 1 << (g_bitdepth - 1); // default predictor value
+  pixel dc_val = 1 << (g_bitdepth - 1); // default predictor value
   int32_t top_row;  // top row iterator
   int32_t src_width = (pic->width >> (chroma ? 1 : 0));   // source picture width
   int32_t src_height = (pic->height >> (chroma ? 1 : 0)); // source picture height
@@ -425,12 +425,9 @@ void search_tree(encoder_control *encoder,
     uint32_t width = LCU_WIDTH >> depth;
 
     // INTRAPREDICTION
-    int16_t pred[LCU_WIDTH * LCU_WIDTH + 1];
-    int16_t rec[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8)];
-    int16_t *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
-
-    //int16_t *pred = (int16_t*)malloc(LCU_WIDTH*LCU_WIDTH*sizeof(int16_t));
-    //int16_t *rec = (int16_t*)malloc((LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)*sizeof(int16_t));
+    pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
+    pixel rec[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8)];
+    pixel *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
 
     // Build reconstructed block to use in prediction with extrapolated borders
     search_buildReferenceBorder(encoder->in.cur_pic, x_ctb, y_ctb,
@@ -494,6 +491,8 @@ uint32_t search_best_mode(encoder_control *encoder,
   }
 }
 
+
+
 /**
  * \brief
  */
@@ -522,8 +521,13 @@ void search_slice_data(encoder_control *encoder)
       if (RENDER_CU) {
         render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
       }
+
+      encode_block_residual(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
+
     }
   }
+
+
 
   if (RENDER_CU && fp) {
     close_cu_file(fp);
