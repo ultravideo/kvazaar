@@ -44,6 +44,37 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
 }
 
 /**
+ * \brief BLock Image Transfer from one buffer to another.
+ *
+ * It's a stupidly simple loop that copies pixels.
+ *
+ * \param orig  Start of the originating buffer.
+ * \param dst  Start of the destination buffer.
+ * \param width  Width of the copied region.
+ * \param height  Height of the copied region.
+ * \param orig_stride  Width of a row in the originating buffer.
+ * \param dst_stride  Width of a row in the destination buffer.
+ *
+ * This should be inlined, but it's defined here for now to see if Visual
+ * Studios LTCG will inline it.
+ */
+void picture_blit_pixels(const pixel* orig, pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride)
+{
+  unsigned y, x;
+
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x < width; ++x) {
+      dst[x] = orig[x];
+    }
+    // Move pointers to the next row.
+    orig += orig_stride;
+    dst += dst_stride;
+  }
+}
+
+/**
  * \brief Set block coded status
  * \param pic    picture to use
  * \param x_scu  x SCU position (smallest CU)

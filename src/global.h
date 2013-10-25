@@ -65,6 +65,9 @@ typedef int16_t coefficient;
 
 /* END OF CONFIG VARIABLES */
 
+#define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
+#define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
+
 #define MAX_REF_PIC_COUNT 5
 
 #define AMVP_MAX_NUM_CANDS 2
@@ -79,6 +82,12 @@ typedef int16_t coefficient;
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define NO_SCU_IN_LCU(no_lcu) ((no_lcu) << MAX_DEPTH)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
+
+#define LOG2_LCU_WIDTH 6
+// CU_TO_PIXEL = y * lcu_width * pic_width + x * lcu_width
+#define CU_TO_PIXEL(x, y, depth, width) (((y) << (LOG2_LCU_WIDTH - (depth))) * (width) \
+                                         + ((x) << (LOG2_LCU_WIDTH - (depth))))
+
 
 #define VERSION_STRING "0.2               "
 #define VERSION 0.2

@@ -772,26 +772,207 @@ void encode_slice_header(encoder_control* encoder)
 
 
   // TODO: move somewhere else (sao.h?)
-#define SAO_TYPE_NONE 0
-#define SAO_TYPE_EDGE 1
-#define SAO_TYPE_BAND 2
 #define Y_INDEX 0
 #define U_INDEX 1
 #define V_INDEX 2
 #define YUV_INDEX_END 3
-
-#define NUM_COLORS 3
 #define NUM_SAO_OFFSETS 4
 
-typedef enum { COLOR_Y = 0, COLOR_U = 1, COLOR_V = 2 } color_index;
+typedef enum { COLOR_Y = 0, COLOR_U = 1, COLOR_V = 2, NUM_COLORS } color_index;
+typedef enum { SAO_TYPE_NONE = 0, SAO_TYPE_BAND, SAO_TYPE_EDGE } sao_type;
+typedef enum { SAO_EO0 = 0, SAO_EO1, SAO_EO2, SAO_EO3, SAO_NUM_EO } sao_eo_class;
+typedef enum { SAO_EO_CAT0 = 0, SAO_EO_CAT1, SAO_EO_CAT2, SAO_EO_CAT3, SAO_EO_CAT4, NUM_SAO_EDGE_CATEGORIES } sao_eo_cat;
 
 typedef struct {
-  int type;
+  sao_type type;
+  sao_eo_class eo_class;
+  int ddistortion;
   int merge_left_flag;
   int merge_up_flag;
   int offsets[NUM_SAO_OFFSETS];
-  int eo_class;
 } sao_info;
+
+//#define SIGN3(x) ((x) > 0) ? +1 : ((x) == 0 ? 0 : -1)
+#define SIGN3(x) (((x) > 0) - ((x) < 0))
+#define NUM_SAO_EDGE_DIRS 4;
+
+typedef struct {
+  int x;
+  int y;
+} vector2d;
+
+// Offsets of a and b in relation to c.
+// dir_offset[dir][a or b]
+// |       |   a   | a     |     a |
+// | a c b |   c   |   c   |   c   |
+// |       |   b   |     b | b     |
+static const vector2d g_sao_edge_offsets[4][2] = { 
+  { { 0, -1 }, { 0, 1 } },
+  { { -1, 0 }, { 1, 0 } },
+  { { -1, -1 }, { 1, 1 } },
+  { { -1, 1 }, { 1, -1 } }
+};
+// Mapping of edge_idx values to eo-classes.
+static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
+// Mapping relationships between a, b and c to eo_idx.
+#define EO_IDX(a, b, c) (2 + SIGN3((c) - (a)) + SIGN3((c) - (b)))
+
+/**
+ * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
+ * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
+ * \param dir_offsets
+ * \param is_chroma  0 for luma, 1 for chroma. Indicates 
+ */
+void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
+                       int eo_class, int block_width,
+                       int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
+{
+  int y, x;
+  vector2d a_ofs = g_sao_edge_offsets[eo_class][0];
+  vector2d b_ofs = g_sao_edge_offsets[eo_class][1];
+  // Arrays orig_data and rec_data are quarter size for chroma.
+
+  // Don't sample the edge pixels because this function doesn't have access to
+  // their neighbours.
+  for (y = 1; y < block_width - 1; ++y) {
+    for (x = 1; x < block_width - 1; ++x) {
+      const pixel *c_data = &rec_data[y * block_width + x];
+      pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
+      pixel c = c_data[0];
+      pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
+      
+      int eo_idx = EO_IDX(a, b, c);
+      int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
+
+      cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + x] - c;
+      cat_sum_cnt[1][eo_cat] += 1;
+    }
+  }
+}
+
+void sao_reconstruct_color(pixel *rec_data, const sao_info *sao, color_index color)
+{
+  unsigned y, x;
+  vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
+  vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
+  // Arrays orig_data and rec_data are quarter size for chroma.
+  unsigned block_width = LCU_WIDTH >> !(color == COLOR_Y);
+
+  for (y = 0; y < block_width; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      pixel *c_data = &rec_data[y * block_width + x];
+      pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
+      pixel c = c_data[0];
+      pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
+      
+      int eo_idx = EO_IDX(a, b, c);
+      int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
+
+      c_data[0] += sao->offsets[eo_cat];
+    }
+  }
+}
+
+void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb, 
+                     const sao_info *sao_luma, const sao_info *sao_chroma)
+{
+  pixel rec_y[LCU_LUMA_SIZE];
+  pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  // TODO: sao chroma reconstruct
+
+  // Data to tmp buffer.
+  picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+
+  sao_reconstruct_color(rec_y, sao_luma, COLOR_Y);
+  //sao_reconstruct_color(rec_u, sao_chroma, COLOR_U);
+  //sao_reconstruct_color(rec_v, sao_chroma, COLOR_V);
+  
+  // Copy reconstructed block from tmp buffer to rec image.
+  picture_blit_pixels(rec_y, y_recdata, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH, pic->width);
+}
+
+void sao_search_best_mode(const pixel *data, const pixel *recdata, 
+                          unsigned block_width, unsigned buf_size, unsigned buf_cnt,
+                          sao_info *sao_out)
+{
+  sao_eo_class edge_class;
+  // This array is used to calculate the mean offset used to minimize distortion.
+  int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES];
+  memset(cat_sum_cnt, 0, 2 * NUM_SAO_EDGE_CATEGORIES);
+
+  sao_out->ddistortion = 0;
+
+  for (edge_class = SAO_EO0; edge_class <= SAO_EO3; ++edge_class) {
+    int edge_offset[NUM_SAO_EDGE_CATEGORIES];
+    int sum_ddistortion = 0;
+    sao_eo_cat edge_cat;
+
+    // Call calc_sao_edge_dir once for luma and twice for chroma.
+    while (buf_cnt--) {
+      calc_sao_edge_dir(data, recdata, edge_class, block_width, cat_sum_cnt);
+      data += buf_size;
+      recdata += buf_size;
+    }
+    
+    for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
+      int cat_sum = cat_sum_cnt[0][edge_cat];
+      int cat_cnt = cat_sum_cnt[1][edge_cat];
+      
+      // The optimum offset can be calculated by getting the minima of the
+      // fast ddistortion estimation formula. The minima is the mean error
+      // and we round that to the nearest integer.
+      int offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
+      edge_offset[edge_cat] = offset;
+      // The ddistortion is amount by which the SSE of data changes. It should
+      // be negative for all categories, if offset was chosen correctly.
+      // ddistortion = N * h^2 - 2 * h * E, where N is the number of samples 
+      // and E is the sum of errors.
+      // It basically says that all pixels that are not improved by offset
+      // increase increase SSE by h^2 and all pixels that are improved by
+      // offset decrease SSE by h*E.
+      sum_ddistortion += cat_cnt * offset * offset - 2 * offset * cat_sum;
+    }
+    // SAO is not applied for category 0.
+    edge_offset[SAO_EO_CAT0] = 0;
+
+    // Choose the offset class that offers the least error after offset.
+    if (sum_ddistortion < sao_out->ddistortion) {
+      sao_out->eo_class = edge_class;
+      sao_out->ddistortion = sum_ddistortion;
+      memcpy(sao_out->offsets, edge_offset, NUM_SAO_EDGE_CATEGORIES);
+    }
+  }
+}
+
+sao_info sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb)
+{
+  sao_info sao;
+  sao.merge_left_flag = 0;
+  sao.merge_up_flag = 0;
+  sao.type = SAO_TYPE_NONE;
+  return sao;
+}
+
+sao_info sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb)
+{
+  // These buffers are needed only until we switch to a LCU based data
+  // structure for pixels. Then we can give pointers directly to that structure
+  // without making copies.
+  // It's 2-dimensional because sao_search_best_mode takes arguments as arrays.
+  pixel orig_y[LCU_LUMA_SIZE];
+  pixel rec_y[LCU_LUMA_SIZE];
+  pixel *y_data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  sao_info sao_params;
+
+  // Fill temporary buffers with picture data.
+  picture_blit_pixels(y_data, orig_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+  picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+
+  sao_search_best_mode(orig_y, rec_y, LCU_WIDTH, LCU_LUMA_SIZE, 1, &sao_params);
+
+  return sao_params;
+}
 
 void encode_sao_offsets(encoder_control *encoder, sao_info *sao)
 {
@@ -859,34 +1040,20 @@ void encode_sao_merge_flags(encoder_control *encoder, sao_info *sao,
 /**
  * \brief Stub that encodes all LCU's as none type.
  */
-void encode_sao(encoder_control *encoder, unsigned x_lcu, uint16_t y_lcu)
+void encode_sao(encoder_control *encoder, unsigned x_lcu, uint16_t y_lcu,
+                sao_info *sao_luma, sao_info *sao_chroma)
 {
   unsigned sao_type[3] = {SAO_TYPE_NONE, SAO_TYPE_NONE, SAO_TYPE_NONE};
   picture *pic = encoder->in.cur_pic;
-  sao_info tmp_sao[3];
-  sao_info *sao = &tmp_sao[0];
   
-  // The tmp_sao and these assignments are temporary. The sao pointer will
-  // be given to this function.
-  sao[0].merge_left_flag = 0;
-  sao[0].merge_up_flag = 0;
-  sao[0].type = SAO_TYPE_NONE;
-
-  sao[1].merge_left_flag = 0;
-  sao[1].merge_up_flag = 0;
-  sao[1].type = SAO_TYPE_NONE;
-
-  sao[2].merge_left_flag = 0;
-  sao[2].merge_up_flag = 0;
-  sao[2].type = SAO_TYPE_NONE;
-
-  encode_sao_merge_flags(encoder, sao, x_lcu, y_lcu);
+  // TODO: transmit merge flags outside sao_info
+  encode_sao_merge_flags(encoder, sao_luma, x_lcu, y_lcu);
 
   // If SAO is merged, nothing else needs to be coded.
-  if (!sao->merge_left_flag && !sao->merge_up_flag) {
-    encode_sao_color(encoder, &sao[COLOR_Y], COLOR_Y);
-    encode_sao_color(encoder, &sao[COLOR_U], COLOR_U);
-    encode_sao_color(encoder, &sao[COLOR_V], COLOR_V);
+  if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
+    encode_sao_color(encoder, sao_luma, COLOR_Y);
+    encode_sao_color(encoder, sao_chroma, COLOR_U);
+    encode_sao_color(encoder, sao_chroma, COLOR_V);
   }
 }
 
@@ -906,7 +1073,12 @@ void encode_slice_data(encoder_control* encoder)
       uint8_t depth = 0;
 
       if (encoder->sao_enable) {
-        encode_sao(encoder, x_ctb, y_ctb);
+        sao_info sao_luma = sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb);
+        sao_info sao_chroma = sao_search_chroma(encoder->in.cur_pic, x_ctb, y_ctb);
+        
+        // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+        // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+        encode_sao(encoder, x_ctb, y_ctb, &sao_luma, &sao_chroma);
       }
 
       // Recursive function for looping through all the sub-blocks

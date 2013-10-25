@@ -108,6 +108,9 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
                                 uint8_t depth, int8_t residual);
 void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
                              uint8_t depth, int8_t split);
+void picture_blit_pixels(const pixel* orig, pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride);
 
 picture_list * picture_list_init(int size);
 int picture_list_resize(picture_list *list, int size);
