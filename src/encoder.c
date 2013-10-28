@@ -259,6 +259,7 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
 
 void encode_one_frame(encoder_control* encoder)
 {
+
   // output parameters before first frame
   if (encoder->frame == 0) {
     // Video Parameter Set (VPS)
@@ -289,8 +290,9 @@ void encode_one_frame(encoder_control* encoder)
     cabac_start(&cabac);
     encoder->in.cur_pic->slicetype = SLICE_I;
     encoder->in.cur_pic->type = NAL_IDR_W_RADL;
-    search_slice_data(encoder);
-
+    scalinglist_process();
+    search_slice_data(encoder);    
+    
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
     encode_slice_data(encoder);
@@ -304,8 +306,9 @@ void encode_one_frame(encoder_control* encoder)
     cabac_start(&cabac);
     encoder->in.cur_pic->slicetype = SLICE_P;
     encoder->in.cur_pic->type = NAL_TRAIL_R;
+    scalinglist_process();
     search_slice_data(encoder);
-
+    
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
     encode_slice_data(encoder);
@@ -1961,8 +1964,6 @@ void encode_block_residual(encoder_control *encoder,
   uint8_t border_split_x = ((encoder->in.width)  < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
-
-  scalinglist_process();
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
