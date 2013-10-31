@@ -81,11 +81,14 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
  * This should be inlined, but it's defined here for now to see if Visual
  * Studios LTCG will inline it.
  */
-void picture_blit_pixels(const pixel* orig, pixel *dst,
+void picture_blit_pixels(const pixel *orig, pixel *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride)
 {
   unsigned y, x;
+
+  const pixel *borig = orig;
+  const pixel *bdst = dst;
 
   for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {

@@ -775,11 +775,8 @@ void encode_slice_header(encoder_control* encoder)
 
 
   // TODO: move somewhere else (sao.h?)
-#define Y_INDEX 0
-#define U_INDEX 1
-#define V_INDEX 2
-#define YUV_INDEX_END 3
-#define NUM_SAO_OFFSETS 4
+#define SAO_ABS_OFFSET_MAX ((1 << (MIN(BIT_DEPTH, 10) - 5)) - 1)
+//#define SAO_ABS_OFFSET_MAX 7
 
 typedef enum { COLOR_Y = 0, COLOR_U = 1, COLOR_V = 2, NUM_COLORS } color_index;
 typedef enum { SAO_TYPE_NONE = 0, SAO_TYPE_BAND, SAO_TYPE_EDGE } sao_type;
@@ -792,7 +789,7 @@ typedef struct {
   int ddistortion;
   int merge_left_flag;
   int merge_up_flag;
-  int offsets[NUM_SAO_OFFSETS];
+  int offsets[NUM_SAO_EDGE_CATEGORIES];
 } sao_info;
 
 //#define SIGN3(x) ((x) > 0) ? +1 : ((x) == 0 ? 0 : -1)
@@ -853,16 +850,17 @@ void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
   }
 }
 
-void sao_reconstruct_color(pixel *rec_data, const sao_info *sao, color_index color)
+void sao_reconstruct_color(pixel *rec_data, const sao_info *sao, int block_width)
 {
-  unsigned y, x;
+  int y, x;
   vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
   vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
   // Arrays orig_data and rec_data are quarter size for chroma.
-  unsigned block_width = LCU_WIDTH >> !(color == COLOR_Y);
 
-  for (y = 0; y < block_width; ++y) {
-    for (x = 0; x < block_width; ++x) {
+  // Don't sample the edge pixels because this function doesn't have access to
+  // their neighbours.
+  for (y = 1; y < block_width - 1; ++y) {
+    for (x = 1; x < block_width - 1; ++x) {
       pixel *c_data = &rec_data[y * block_width + x];
       pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
       pixel c = c_data[0];
@@ -886,7 +884,7 @@ void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb,
   // Data to tmp buffer.
   picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
-  sao_reconstruct_color(rec_y, sao_luma, COLOR_Y);
+  sao_reconstruct_color(rec_y, sao_luma, LCU_WIDTH);
   //sao_reconstruct_color(rec_u, sao_chroma, COLOR_U);
   //sao_reconstruct_color(rec_v, sao_chroma, COLOR_V);
   
@@ -901,20 +899,19 @@ void sao_search_best_mode(const pixel *data, const pixel *recdata,
   sao_eo_class edge_class;
   // This array is used to calculate the mean offset used to minimize distortion.
   int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES];
-  memset(cat_sum_cnt, 0, 2 * NUM_SAO_EDGE_CATEGORIES);
+  memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
 
-  sao_out->ddistortion = 0;
+  sao_out->ddistortion = INT_MAX;
 
   for (edge_class = SAO_EO0; edge_class <= SAO_EO3; ++edge_class) {
     int edge_offset[NUM_SAO_EDGE_CATEGORIES];
     int sum_ddistortion = 0;
     sao_eo_cat edge_cat;
+    unsigned i = 0;
 
     // Call calc_sao_edge_dir once for luma and twice for chroma.
-    while (buf_cnt--) {
-      calc_sao_edge_dir(data, recdata, edge_class, block_width, cat_sum_cnt);
-      data += buf_size;
-      recdata += buf_size;
+    for (i = 0; i < buf_cnt; ++i) {
+      calc_sao_edge_dir(data + i * buf_size, recdata + i * buf_size, edge_class, block_width, cat_sum_cnt);
     }
     
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
@@ -924,7 +921,11 @@ void sao_search_best_mode(const pixel *data, const pixel *recdata,
       // The optimum offset can be calculated by getting the minima of the
       // fast ddistortion estimation formula. The minima is the mean error
       // and we round that to the nearest integer.
-      int offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
+      int offset = 0;
+      if (cat_cnt != 0) {
+        offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
+        offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
+      }
       edge_offset[edge_cat] = offset;
       // The ddistortion is amount by which the SSE of data changes. It should
       // be negative for all categories, if offset was chosen correctly.
@@ -942,7 +943,7 @@ void sao_search_best_mode(const pixel *data, const pixel *recdata,
     if (sum_ddistortion < sao_out->ddistortion) {
       sao_out->eo_class = edge_class;
       sao_out->ddistortion = sum_ddistortion;
-      memcpy(sao_out->offsets, edge_offset, NUM_SAO_EDGE_CATEGORIES);
+      memcpy(sao_out->offsets, edge_offset, sizeof(int) * NUM_SAO_EDGE_CATEGORIES);
     }
   }
 }
@@ -966,36 +967,19 @@ sao_info sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb)
   pixel rec_y[LCU_LUMA_SIZE];
   pixel *y_data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
-  sao_info sao_params;
+  
+  sao_info sao;
+  sao.merge_left_flag = 0;
+  sao.merge_up_flag = 0;
+  sao.type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
   picture_blit_pixels(y_data, orig_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
   picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
-  sao_search_best_mode(orig_y, rec_y, LCU_WIDTH, LCU_LUMA_SIZE, 1, &sao_params);
+  sao_search_best_mode(orig_y, rec_y, LCU_WIDTH, LCU_LUMA_SIZE, 1, &sao);
 
-  return sao_params;
-}
-
-void encode_sao_offsets(encoder_control *encoder, sao_info *sao)
-{
-  int i;
-
-  for (i = 0; i < NUM_SAO_OFFSETS; ++i) {
-    CABAC_BIN(&cabac, sao->offsets[i] > 0 ? 0 : 1, "sao_offset_sign");
-  }
-
-  if (sao->type == SAO_TYPE_EDGE) {
-    for (i = 0; i < NUM_SAO_OFFSETS; ++i) {
-      if (sao->offsets[i] != 0) {
-        // For edge SAO positive sign is encoded as 0.
-        CABAC_BIN(&cabac, sao->offsets[i] > 0 ? 0 : 1, "sao_offset_sign");
-        // TODO: CABAC_BIN sao_band_position[color_i]
-      } else {
-        // TODO: CABAC_BIN sao_eo_class[color_i]
-      }
-    }
-  }
+  return sao;
 }
 
 void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color_i)
@@ -1009,16 +993,44 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
     return;
   }
 
-  cabac.ctx = &g_sao_type_idx_model;
-  if (color_i == COLOR_Y) {
-    CABAC_BIN(&cabac, sao->type, "sao_type_idx_luma");
-  } else if (color_i == COLOR_U) {
-    // SAO type is only coded for the first chroma.
-    CABAC_BIN(&cabac, sao->type, "sao_type_idx_chroma");
+  if (color_i != COLOR_V) {
+    //CABAC_BIN(&cabac, sao->type, "sao_type_idx");
+    // TR cMax=2
+    // HM codes only the first bin with context.
+    //cabac_write_unary_max_symbol(&cabac, &g_sao_type_idx_model, sao->type, 0, 2);
+    cabac.ctx = &g_sao_type_idx_model;
+    CABAC_BIN(&cabac, sao->type == 0 ? 0 : 1, "sao_type_idx");
+    if (sao->type == SAO_TYPE_BAND) {
+      CABAC_BIN_EP(&cabac, 0, "sao_type_idx_ep");
+    } else if (sao->type == SAO_TYPE_EDGE) {
+      CABAC_BIN_EP(&cabac, 1, "sao_type_idx_ep");
+    }
   }
 
   if (sao->type != SAO_TYPE_NONE) {
-    encode_sao_offsets(encoder, 0);
+    sao_eo_cat i;
+  
+    for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
+      //CABAC_BIN_EP(&cabac, abs(sao->offsets[i]), "sao_offset_abs");
+      // TR cMax=7 (for 8bit), cRiseParam=0
+      cabac_write_unary_max_symbol_ep(&cabac, abs(sao->offsets[i]), 
+                                      SAO_ABS_OFFSET_MAX);
+    }
+
+    if (sao->type == SAO_TYPE_BAND) {
+      for (i = SAO_EO_CAT1; i < SAO_EO_CAT4; ++i) {
+        // Parahprasing spec: "If offset_sign is equal to 0, offsetSign is set
+        // equal to 1. Otherwise to -1."
+        // follows: >=0 is coded as 0, <0 is coded as 1
+        // FL cMax=1 (1 bit)
+        CABAC_BIN_EP(&cabac, sao->offsets[i] >= 0 ? 0 : 1, "sao_offset_sign");
+      }
+      // TODO: sao_band_position
+      // FL cMax=31 (6 bits)
+    } else if (color_i != COLOR_V) {
+      // FL cMax=3 (2 bits)
+      CABAC_BINS_EP(&cabac, sao->eo_class, 2, "sao_eo_class");
+    }
   }
 }
 
@@ -1080,6 +1092,9 @@ void encode_slice_data(encoder_control* encoder)
         
         // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
         // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+
+        sao_reconstruct(encoder->in.cur_pic, x_ctb, y_ctb, &sao_luma, &sao_chroma);
+
         encode_sao(encoder, x_ctb, y_ctb, &sao_luma, &sao_chroma);
       }
 
