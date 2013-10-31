@@ -77,7 +77,7 @@ int8_t intra_get_block_mode(picture *pic, uint32_t x_cu, uint32_t y_cu, uint8_t 
  * \param width block width
  * \returns DC prediction
 */
-int16_t intra_get_dc_pred(int16_t *pic, uint16_t picwidth, uint32_t xpos, uint32_t ypos, uint8_t width)
+int16_t intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint32_t xpos, uint32_t ypos, uint8_t width)
 {
   int32_t i, sum = 0;
 
@@ -155,11 +155,11 @@ int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_cu, uint32_t y_cu, 
  * \param preds output buffer for 3 predictions 
  * \returns (predictions are found)?1:0
  */
-void intra_filter(int16_t *ref, int32_t stride,int32_t width, int8_t mode)
+void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
 {
   #define FWIDTH (LCU_WIDTH*2+1)
-  int16_t filtered[FWIDTH * FWIDTH]; //!< temporary buffer for filtered samples
-  int16_t *filteredShift = &filtered[FWIDTH+1]; //!< pointer to temporary buffer with offset (1,1)
+  pixel filtered[FWIDTH * FWIDTH]; //!< temporary buffer for filtered samples
+  pixel *filteredShift = &filtered[FWIDTH+1]; //!< pointer to temporary buffer with offset (1,1)
   int x,y;
 
   if (!mode) {
@@ -213,8 +213,8 @@ void intra_filter(int16_t *ref, int32_t stride,int32_t width, int8_t mode)
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t recstride, uint32_t xpos,
-                         uint32_t ypos, uint32_t width, int16_t *dst, int32_t dststride, uint32_t *sad_out)
+int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t recstride, uint32_t xpos,
+                         uint32_t ypos, uint32_t width, pixel *dst, int32_t dststride, uint32_t *sad_out)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
@@ -225,11 +225,11 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t 
 
   // Temporary block arrays
   // TODO: alloc with alignment
-  int16_t pred[LCU_WIDTH * LCU_WIDTH + 1];  
-  int16_t orig_block[LCU_WIDTH * LCU_WIDTH + 1];  
-  int16_t rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  pixel pred[LCU_WIDTH * LCU_WIDTH + 1];  
+  pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];  
+  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
   
-  int16_t* rec_filtered = &rec_filtered_temp[recstride + 1]; //!< pointer to rec_filtered_temp with offset of (1,1)
+  pixel* rec_filtered = &rec_filtered_temp[recstride + 1]; //!< pointer to rec_filtered_temp with offset of (1,1)
   pixel *orig_shift = &orig[xpos + ypos*origstride];  //!< pointer to orig with offset of (1,1)
   int8_t filter = (width<32); // TODO: chroma support
 
@@ -318,10 +318,10 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, int16_t *rec, int32_t 
  * \param chroma chroma-block flag
 
 */
-void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, pixel* dst,int32_t dststride, int8_t mode, int8_t chroma)
 {
   int32_t x,y,i;
-  int16_t pred[LCU_WIDTH * LCU_WIDTH];
+  pixel pred[LCU_WIDTH * LCU_WIDTH];
   int8_t filter = !chroma&&(width<32);
   #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  { for(x = 0; x < (int32_t)width; x++) { dst[x+y*dststride] = pred[x+y*width]; } }
 
@@ -362,12 +362,12 @@ void intra_recon(int16_t* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,u
  * \param chroma signaling if chroma is used, 0 = luma, 1 = U and 2 = V    
  *
  */
-void intra_build_reference_border(picture *pic, int32_t x_cu, int32_t y_cu,int16_t outwidth, int16_t *dst, int32_t dststride, int8_t chroma)
+void intra_build_reference_border(picture *pic, int32_t x_cu, int32_t y_cu,int16_t outwidth, pixel *dst, int32_t dststride, int8_t chroma)
 {
   int32_t left_column; //!< left column iterator
-  int16_t val;         //!< variable to store extrapolated value
+  pixel val;         //!< variable to store extrapolated value
   int32_t i;           //!< index iterator
-  int16_t dc_val       = 1<<(g_bitdepth-1); //!< default predictor value
+  pixel dc_val       = 1<<(g_bitdepth-1); //!< default predictor value
   int32_t top_row;     //!< top row iterator
   int32_t src_width    = (pic->width>>(chroma?1:0)); //!< source picture width
   int32_t src_height   = (pic->height>>(chroma?1:0));//!< source picture height
@@ -443,7 +443,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(int16_t* src, int32_t src_stride, int16_t* dst, int32_t dst_stride, int32_t width,
+void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width,
                            int32_t height, int32_t dir_mode, int8_t left_avail,int8_t top_avail, int8_t filter)
 {
   int32_t k,l;
@@ -460,10 +460,10 @@ void intra_get_angular_pred(int16_t* src, int32_t src_stride, int16_t* dst, int3
   int32_t inv_angle       = inv_ang_table[abs_ang];
 
   // Do angular predictions
-  int16_t *ref_main;
-  int16_t *ref_side;
-  int16_t  ref_above[2 * LCU_WIDTH + 1];
-  int16_t  ref_left[2 * LCU_WIDTH + 1];
+  pixel *ref_main;
+  pixel *ref_side;
+  pixel  ref_above[2 * LCU_WIDTH + 1];
+  pixel  ref_left[2 * LCU_WIDTH + 1];
 
   abs_ang           = ang_table[abs_ang];
   intra_pred_angle  = sign_ang * abs_ang;
@@ -522,7 +522,7 @@ void intra_get_angular_pred(int16_t* src, int32_t src_stride, int16_t* dst, int3
         // Do linear filtering
         for (l = 0; l < blk_size; l++) {
           ref_main_index        = l + delta_int + 1;
-          dst[k * dst_stride + l] = (int16_t) ( (minus_delta_fract * ref_main[ref_main_index]
+          dst[k * dst_stride + l] = (pixel) ( (minus_delta_fract * ref_main[ref_main_index]
                                                  + delta_fract * ref_main[ref_main_index + 1] + 16) >> 5);
         }
       } else {
@@ -536,7 +536,7 @@ void intra_get_angular_pred(int16_t* src, int32_t src_stride, int16_t* dst, int3
 
   // Flip the block if this is the horizontal mode
   if (mode_hor) {
-    int16_t tmp;
+    pixel tmp;
     for (k=0;k<blk_size-1;k++) {
       for (l=k+1;l<blk_size;l++) {
         tmp                 = dst[k * dst_stride + l];
@@ -551,7 +551,7 @@ void intra_get_angular_pred(int16_t* src, int32_t src_stride, int16_t* dst, int3
 
 
 
-void intra_dc_pred_filtering(int16_t *src, int32_t src_stride, int16_t *dst, int32_t dst_stride, int32_t width, int32_t height )
+void intra_dc_pred_filtering(pixel *src, int32_t src_stride, pixel *dst, int32_t dst_stride, int32_t width, int32_t height )
 {
   int32_t x, y, dst_stride2, src_stride2;
 
@@ -580,9 +580,8 @@ void intra_dc_pred_filtering(int16_t *src, int32_t src_stride, int16_t *dst, int
  
   This function derives the prediction samples for planar mode (intra coding).
 */
-void intra_get_planar_pred(int16_t* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, int16_t* dst,int32_t dststride)
+void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, pixel* dst,int32_t dststride)
 {
-  int16_t dc_val = 1<<(g_bitdepth-1);
   int32_t k, l, bottom_left, top_right;
   int32_t hor_pred;
   int32_t left_column[LCU_WIDTH+1], top_row[LCU_WIDTH+1], bottom_row[LCU_WIDTH+1], right_column[LCU_WIDTH+1];

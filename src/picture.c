@@ -21,15 +21,15 @@
 
 
 /**
- * \brief Set block residual status
+ * \brief Set block skipped
  * \param pic    picture to use
  * \param x_scu  x SCU position (smallest CU)
  * \param y_scu  y SCU position (smallest CU)
  * \param depth  current CU depth
- * \param residual  residual status
+ * \param skipped skipped flag
  */
-void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                                uint8_t depth, int8_t residual)
+void picture_set_block_skipped(picture *pic, uint32_t x_scu, uint32_t y_scu,
+                                uint8_t depth, int8_t skipped)
 {
   uint32_t x, y;
   int width_in_scu = pic->width_in_lcu << MAX_DEPTH;
@@ -38,7 +38,30 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
   for (y = y_scu; y < y_scu + block_scu_width; ++y) {
     int cu_row = y * width_in_scu;
     for (x = x_scu; x < x_scu + block_scu_width; ++x) {
-      pic->cu_array[MAX_DEPTH][cu_row + x].residual = residual;
+      pic->cu_array[MAX_DEPTH][cu_row + x].skipped = skipped;
+    }
+  }
+}
+
+/**
+ * \brief Set block residual status
+ * \param pic    picture to use
+ * \param x_scu  x SCU position (smallest CU)
+ * \param y_scu  y SCU position (smallest CU)
+ * \param depth  current CU depth
+ * \param coeff_y  residual status
+ */
+void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
+                                uint8_t depth, int8_t coeff_y)
+{
+  uint32_t x, y;
+  int width_in_scu = pic->width_in_lcu << MAX_DEPTH;
+  int block_scu_width = (LCU_WIDTH >> depth) / (LCU_WIDTH >> MAX_DEPTH);
+
+  for (y = y_scu; y < y_scu + block_scu_width; ++y) {
+    int cu_row = y * width_in_scu;
+    for (x = x_scu; x < x_scu + block_scu_width; ++x) {
+      pic->cu_array[MAX_DEPTH][cu_row + x].coeff_y = coeff_y;
     }
   }
 }
@@ -275,6 +298,9 @@ picture *picture_init(int32_t width, int32_t height,
     memset(pic->cu_array[i], 0, sizeof(cu_info) * cu_array_size);
   }
 
+  pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
+  pic->pred_y = NULL; pic->pred_u = NULL; pic->pred_v = NULL;
+
   pic->slice_sao_luma_flag = 1;
   pic->slice_sao_chroma_flag = 1;
 
@@ -309,6 +335,14 @@ int picture_destroy(picture *pic)
   free(pic->cu_array);
   pic->cu_array = NULL;
 
+  FREE_POINTER(pic->coeff_y);
+  FREE_POINTER(pic->coeff_u);
+  FREE_POINTER(pic->coeff_v);
+
+  FREE_POINTER(pic->pred_y);
+  FREE_POINTER(pic->pred_u);
+  FREE_POINTER(pic->pred_v);
+
   return 1;
 }
 
@@ -336,7 +370,7 @@ double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
 /**
  * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
  */
-unsigned satd_16bit_8x8_general(int16_t *piOrg, int32_t iStrideOrg, int16_t *piCur, int32_t iStrideCur)
+unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
@@ -443,14 +477,13 @@ unsigned satd_16bit_8x8_general(int16_t *piOrg, int32_t iStrideOrg, int16_t *piC
       } \
     } \
     return sum; \
-  }
+    }
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, int16_t, 16bit)
-SATD_NXN(16, int16_t, 16bit)
-SATD_NXN(32, int16_t, 16bit)
-SATD_NXN(64, int16_t, 16bit)
-
+SATD_NXN(8, pixel, 16bit)
+SATD_NXN(16, pixel, 16bit)
+SATD_NXN(32, pixel, 16bit)
+SATD_NXN(64, pixel, 16bit)
 
 // Function macro for defining SAD calculating functions 
 // for fixed size blocks.
@@ -472,11 +505,11 @@ SATD_NXN(64, int16_t, 16bit)
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
 // They are used through get_sad_16bit_nxn_func.
-SAD_NXN(4, int16_t, 16bit)
-SAD_NXN(8, int16_t, 16bit)
-SAD_NXN(16, int16_t, 16bit)
-SAD_NXN(32, int16_t, 16bit)
-SAD_NXN(64, int16_t, 16bit)
+SAD_NXN(4, pixel, 16bit)
+SAD_NXN(8, pixel, 16bit)
+SAD_NXN(16, pixel, 16bit)
+SAD_NXN(32, pixel, 16bit)
+SAD_NXN(64, pixel, 16bit)
 
 /**
  * \brief  Get a function that calculates SATD for NxN block.
@@ -498,9 +531,9 @@ cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
     return &satd_16bit_64x64;
   default:
     return NULL;
+    }
   }
-}
-
+  
 /**
  * \brief  Get a function that calculates SAD for NxN block.
  * 
@@ -509,7 +542,7 @@ cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
  * \returns  Pointer to cost_16bit_nxn_func.
  */
 cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
-{
+  {
   switch (n) {
   case 4:
     return &sad_16bit_4x4;
@@ -523,7 +556,7 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
     return &sad_16bit_64x64;
   default:
     return NULL;
-  }
+  }  
 }
 
 /**
@@ -535,11 +568,11 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
  * 
  * \returns       Sum of Absolute Transformed Differences (SATD)
  */
-unsigned satd_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
+unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_satd_16bit_nxn_func(n);
   return sad_func(block1, block2);
-}
+  }
 
 /**
  * \brief Calculate SAD for NxN block of size N.
@@ -550,7 +583,7 @@ unsigned satd_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
  * 
  * \returns       Sum of Absolute Differences
  */
-unsigned sad_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
+unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_sad_16bit_nxn_func(n);
   if (sad_func) {
@@ -561,10 +594,10 @@ unsigned sad_nxn_16bit(int16_t *block1, int16_t *block2, unsigned n)
     for (row = 0; row < n; row += n) {
       for (x = 0; x < n; ++x) {
         sum += abs(block1[row + x] - block2[row + x]);
-      }
-    }
-    return sum;
   }
+    }
+  return sum;
+}
 }
 
 /**

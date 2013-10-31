@@ -123,5 +123,6 @@ typedef int16_t coefficient;
 #endif
 
 #define FREE_POINTER(pointer) { free(pointer); pointer = NULL; }
+#define MOVE_POINTER(dst_pointer,src_pointer) { dst_pointer = src_pointer; src_pointer = NULL; }
 
 #endif

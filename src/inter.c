@@ -227,18 +227,21 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
 }
 
 /**
- * \brief Get MV prediction for current block
+ * \brief Get merge candidates for current block
  * \param encoder encoder control struct to use
  * \param x_cu block x position in SCU
  * \param y_cu block y position in SCU
  * \param depth current block depth
- * \param mv_pred[2][2] 2x motion vector prediction
+ * \param b0 candidate b0
+ * \param b1 candidate b1
+ * \param b2 candidate b2
+ * \param a0 candidate a0
+ * \param a1 candidate a1
  */
-void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2])
+void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, 
+                                        cu_info **b0, cu_info **b1,cu_info **b2,cu_info **a0,cu_info **a1)
 {
   uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS; //!< the width of the current block on SCU
-  uint8_t candidates = 0;
-  
   /*
   Predictor block locations
   ____      _______
@@ -248,37 +251,50 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
    __|         |
   |A1|_________|
   |A0|
-  */
-  cu_info *b0, *b1, *b2, *a0, *a1;
-
-  b0 = b1 = b2 = a0 = a1 = NULL;
+  */ 
 
   // A0 and A1 availability testing
   if (x_cu != 0) {    
-    a1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-    if (!a1->coded) a1 = NULL;
+    *a1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    if (!(*a1)->coded) *a1 = NULL;
 
     if (y_cu + cur_block_in_scu < encoder->in.height_in_lcu<<MAX_DEPTH) {
-      a0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-      if (!a0->coded) a0 = NULL;
+      *a0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      if (!(*a0)->coded) *a0 = NULL;
     }
   }
 
   // B0, B1 and B2 availability testing
   if (y_cu != 0) {
-
     if (x_cu + cur_block_in_scu < encoder->in.width_in_lcu<<MAX_DEPTH) {
-      b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-      if (!b0->coded) b0 = NULL;
+      *b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      if (!(*b0)->coded) *b0 = NULL;
     }
-    b1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-    if (!b1->coded) b1 = NULL;
+    *b1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    if (!(*b1)->coded) *b1 = NULL;
 
     if (x_cu != 0) {
-      b2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-      if(!b2->coded) b2 = NULL;
+      *b2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      if(!(*b2)->coded) *b2 = NULL;
     }
   }
+}
+
+/**
+ * \brief Get MV prediction for current block
+ * \param encoder encoder control struct to use
+ * \param x_cu block x position in SCU
+ * \param y_cu block y position in SCU
+ * \param depth current block depth
+ * \param mv_pred[2][2] 2x motion vector prediction
+ */
+void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2])
+{  
+  uint8_t candidates = 0;
+
+  cu_info *b0, *b1, *b2, *a0, *a1;
+  b0 = b1 = b2 = a0 = a1 = NULL;
+  inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
 
   // Left predictors
   if (a0 && a0->type == CU_INTER) {
@@ -312,15 +328,103 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
   }
 
 #if ENABLE_TEMPORAL_MVP
-  if(candidates < 2) {
+  if(candidates < AMVP_MAX_NUM_CANDS) {
     //TODO: add temporal mv predictor
   }
 #endif
 
   // Fill with (0,0)
-  while (candidates < 2) {
+  while (candidates < AMVP_MAX_NUM_CANDS) {
     mv_cand[candidates][0] = 0;
     mv_cand[candidates][1] = 0;
     candidates++;
   }
 }
+
+/**
+ * \brief Get merge predictions for current block
+ * \param encoder encoder control struct to use
+ * \param x_cu block x position in SCU
+ * \param y_cu block y position in SCU
+ * \param depth current block depth
+ * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
+ */
+uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][2])
+{  
+  uint8_t candidates = 0;
+  uint8_t i = 0;
+  int8_t duplicate = 0;
+
+  cu_info *b0, *b1, *b2, *a0, *a1;
+  b0 = b1 = b2 = a0 = a1 = NULL;
+  inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
+
+#define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
+                                                     (CU1)->inter.mv[0] == (CU2)->inter.mv[0] && \
+                                                     (CU1)->inter.mv[1] == (CU2)->inter.mv[1]) duplicate = 1; }
+
+  if (a1 && a1->type == CU_INTER) {
+      mv_cand[candidates][0] = a1->inter.mv[0];
+      mv_cand[candidates][1] = a1->inter.mv[1];
+      candidates++;
+  }
+
+  if (b1 && b1->type == CU_INTER) {
+    if(candidates) CHECK_DUPLICATE(b1, a1);
+    if(!duplicate) {
+      mv_cand[candidates][0] = b1->inter.mv[0];
+      mv_cand[candidates][1] = b1->inter.mv[1];
+      candidates++;
+    }
+  }
+
+  if (b0 && b0->type == CU_INTER) {
+    if(candidates) CHECK_DUPLICATE(b0,b1);
+    if(!duplicate) {
+      mv_cand[candidates][0] = b0->inter.mv[0];
+      mv_cand[candidates][1] = b0->inter.mv[1];
+      candidates++;
+    }
+  }
+
+  if (a0 && a0->type == CU_INTER) {
+    if(candidates) CHECK_DUPLICATE(a0,a1);
+    if(!duplicate) {
+      mv_cand[candidates][0] = a0->inter.mv[0];
+      mv_cand[candidates][1] = a0->inter.mv[1];
+      candidates++;
+    }
+  }
+
+  if (candidates != 4) {
+    if(b2 && b2->type == CU_INTER) {
+      CHECK_DUPLICATE(b2,a1);
+      if(!duplicate) {
+        CHECK_DUPLICATE(b2,b1);
+        if(!duplicate) {
+          mv_cand[candidates][0] = b2->inter.mv[0];
+          mv_cand[candidates][1] = b2->inter.mv[1];
+          candidates++;
+        }
+      }
+    }
+  }
+
+
+#if ENABLE_TEMPORAL_MVP
+  if(candidates < AMVP_MAX_NUM_CANDS) {
+    //TODO: add temporal mv predictor
+  }
+#endif
+
+  // Fill with (0,0)
+  /*
+  while (candidates < MRG_MAX_NUM_CANDS) {
+    mv_cand[candidates][0] = 0;
+    mv_cand[candidates][1] = 0;
+    candidates++;
+  }
+  */
+  return candidates;
+}
+
