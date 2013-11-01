@@ -792,6 +792,12 @@ typedef struct {
   int offsets[NUM_SAO_EDGE_CATEGORIES];
 } sao_info;
 
+void init_sao_info(sao_info *sao) {
+  sao->type = SAO_TYPE_NONE;
+  sao->merge_left_flag = 0;
+  sao->merge_up_flag = 0;
+}
+
 //#define SIGN3(x) ((x) > 0) ? +1 : ((x) == 0 ? 0 : -1)
 #define SIGN3(x) (((x) > 0) - ((x) < 0))
 #define NUM_SAO_EDGE_DIRS 4;
@@ -807,10 +813,10 @@ typedef struct {
 // | a c b |   c   |   c   |   c   |
 // |       |   b   |     b | b     |
 static const vector2d g_sao_edge_offsets[4][2] = { 
-  { { 0, -1 }, { 0, 1 } },
   { { -1, 0 }, { 1, 0 } },
+  { { 0, -1 }, { 0, 1 } },
   { { -1, -1 }, { 1, 1 } },
-  { { -1, 1 }, { 1, -1 } }
+  { { 1, -1 }, { -1, 1 } }
 };
 // Mapping of edge_idx values to eo-classes.
 static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
@@ -850,7 +856,7 @@ void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
   }
 }
 
-void sao_reconstruct_color(pixel *rec_data, const sao_info *sao, int block_width)
+void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao_info *sao, int block_width)
 {
   int y, x;
   vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
@@ -861,7 +867,8 @@ void sao_reconstruct_color(pixel *rec_data, const sao_info *sao, int block_width
   // their neighbours.
   for (y = 1; y < block_width - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
-      pixel *c_data = &rec_data[y * block_width + x];
+      const pixel *c_data = &rec_data[y * block_width + x];
+      pixel *new_data = &new_rec_data[y * block_width + x];
       pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
       pixel c = c_data[0];
       pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
@@ -869,7 +876,7 @@ void sao_reconstruct_color(pixel *rec_data, const sao_info *sao, int block_width
       int eo_idx = EO_IDX(a, b, c);
       int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
 
-      c_data[0] += sao->offsets[eo_cat];
+      new_data[0] = CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat]);
     }
   }
 }
@@ -878,18 +885,19 @@ void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao_luma, const sao_info *sao_chroma)
 {
   pixel rec_y[LCU_LUMA_SIZE];
+  pixel new_rec_y[LCU_LUMA_SIZE];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   // TODO: sao chroma reconstruct
 
   // Data to tmp buffer.
   picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
-  sao_reconstruct_color(rec_y, sao_luma, LCU_WIDTH);
+  sao_reconstruct_color(rec_y, new_rec_y, sao_luma, LCU_WIDTH);
   //sao_reconstruct_color(rec_u, sao_chroma, COLOR_U);
   //sao_reconstruct_color(rec_v, sao_chroma, COLOR_V);
   
   // Copy reconstructed block from tmp buffer to rec image.
-  picture_blit_pixels(rec_y, y_recdata, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH, pic->width);
+  picture_blit_pixels(new_rec_y, y_recdata, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH, pic->width);
 }
 
 void sao_search_best_mode(const pixel *data, const pixel *recdata, 
@@ -948,16 +956,12 @@ void sao_search_best_mode(const pixel *data, const pixel *recdata,
   }
 }
 
-sao_info sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb)
+ void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao)
 {
-  sao_info sao;
-  sao.merge_left_flag = 0;
-  sao.merge_up_flag = 0;
-  sao.type = SAO_TYPE_NONE;
-  return sao;
+  
 }
 
-sao_info sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb)
+void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao)
 {
   // These buffers are needed only until we switch to a LCU based data
   // structure for pixels. Then we can give pointers directly to that structure
@@ -968,18 +972,20 @@ sao_info sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb)
   pixel *y_data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   
-  sao_info sao;
-  sao.merge_left_flag = 0;
-  sao.merge_up_flag = 0;
-  sao.type = SAO_TYPE_EDGE;
+  sao->offsets[SAO_EO_CAT0] = 0;
+  sao->offsets[SAO_EO_CAT1] = 7;
+  sao->offsets[SAO_EO_CAT2] = 7;
+  sao->offsets[SAO_EO_CAT3] = -7;
+  sao->offsets[SAO_EO_CAT4] = -7;
+  sao->eo_class = SAO_EO0;
+  sao->type = SAO_TYPE_EDGE;
+  return;
 
   // Fill temporary buffers with picture data.
   picture_blit_pixels(y_data, orig_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
   picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
-  sao_search_best_mode(orig_y, rec_y, LCU_WIDTH, LCU_LUMA_SIZE, 1, &sao);
-
-  return sao;
+  sao_search_best_mode(orig_y, rec_y, LCU_WIDTH, LCU_LUMA_SIZE, 1, sao);
 }
 
 void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color_i)
@@ -1087,13 +1093,25 @@ void encode_slice_data(encoder_control* encoder)
       uint8_t depth = 0;
 
       if (encoder->sao_enable) {
-        sao_info sao_luma = sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb);
-        sao_info sao_chroma = sao_search_chroma(encoder->in.cur_pic, x_ctb, y_ctb);
+        sao_info sao_luma;
+        sao_info sao_chroma;
+        init_sao_info(&sao_luma);
+        init_sao_info(&sao_chroma);
         
-        // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
-        // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+        // Temporary guards against non-LCU size coding units at the edges,
+        // because they aren't handled yet.
+        if (encoder->in.width_in_lcu * LCU_WIDTH != encoder->in.cur_pic->width
+            && x_ctb == encoder->in.width_in_lcu - 1) {
 
-        sao_reconstruct(encoder->in.cur_pic, x_ctb, y_ctb, &sao_luma, &sao_chroma);
+        } else if (encoder->in.height_in_lcu * LCU_WIDTH != encoder->in.cur_pic->height
+                   && y_ctb == encoder->in.height_in_lcu - 1) {
+
+        } else {
+          sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, &sao_luma);
+          // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+          // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+          sao_reconstruct(encoder->in.cur_pic, x_ctb, y_ctb, &sao_luma, &sao_chroma);
+        }
 
         encode_sao(encoder, x_ctb, y_ctb, &sao_luma, &sao_chroma);
       }
