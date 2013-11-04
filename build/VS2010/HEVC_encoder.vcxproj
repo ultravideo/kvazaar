@@ -23,9 +23,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>HEVC_encoder</RootNamespace>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
@@ -42,9 +40,7 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-
   <ImportGroup Label="ExtensionSettings">
     <Import Project="..\..\yasm\vsyasm.props" />
   </ImportGroup>
@@ -88,6 +84,7 @@
     <ClCompile Include="..\..\src\intra.c" />
     <ClCompile Include="..\..\src\nal.c" />
     <ClCompile Include="..\..\src\picture.c" />
+    <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\search.c" />
     <ClCompile Include="..\..\src\transform.c" />
   </ItemGroup>
@@ -104,6 +101,7 @@
     <ClInclude Include="..\..\src\intra.h" />
     <ClInclude Include="..\..\src\nal.h" />
     <ClInclude Include="..\..\src\picture.h" />
+    <ClInclude Include="..\..\src\sao.h" />
     <ClInclude Include="..\..\src\search.h" />
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\x64\test64.h" />
