@@ -14,6 +14,9 @@
 
 #include "global.h"
 
+//#include "sao.h"
+struct sao_info_struct;
+
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -105,6 +108,8 @@ typedef struct
   uint8_t slicetype;
   uint8_t slice_sao_luma_flag;
   uint8_t slice_sao_chroma_flag;
+  struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
+  struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
 } picture;
 
 /**

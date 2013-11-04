@@ -35,11 +35,6 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-typedef struct {
-  int x;
-  int y;
-} vector2d;
-
 /** 
  * This is used in the hexagon_search to select 3 points to search.
  * 

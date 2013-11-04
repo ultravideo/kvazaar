@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "sao.h"
+
 
 #define PSNRMAX (255.0 * 255.0)
 
@@ -306,6 +308,8 @@ picture *picture_init(int32_t width, int32_t height,
 
   pic->slice_sao_luma_flag = 1;
   pic->slice_sao_chroma_flag = 1;
+  pic->sao_luma = MALLOC(sao_info, width_in_lcu * height_in_lcu);
+  pic->sao_chroma = MALLOC(sao_info, width_in_lcu * height_in_lcu);
 
   return pic;
 }
@@ -345,6 +349,9 @@ int picture_destroy(picture *pic)
   FREE_POINTER(pic->pred_y);
   FREE_POINTER(pic->pred_u);
   FREE_POINTER(pic->pred_v);
+
+  FREE_POINTER(pic->sao_luma);
+  FREE_POINTER(pic->sao_chroma);
 
   return 1;
 }
