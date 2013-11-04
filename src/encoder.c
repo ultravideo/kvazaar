@@ -856,7 +856,8 @@ void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
   }
 }
 
-void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao_info *sao, int block_width)
+void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao_info *sao, 
+                           int stride, int new_stride, int block_width, int block_height)
 {
   int y, x;
   vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
@@ -865,13 +866,13 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
 
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
-  for (y = 1; y < block_width - 1; ++y) {
+  for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
-      const pixel *c_data = &rec_data[y * block_width + x];
-      pixel *new_data = &new_rec_data[y * block_width + x];
-      pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
+      const pixel *c_data = &rec_data[y * stride + x];
+      pixel *new_data = &new_rec_data[y * new_stride + x];
+      pixel a = c_data[a_ofs.y * stride + a_ofs.x];
       pixel c = c_data[0];
-      pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
+      pixel b = c_data[b_ofs.y * stride + b_ofs.x];
       
       int eo_idx = EO_IDX(a, b, c);
       int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
@@ -881,18 +882,120 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
   }
 }
 
+/**
+ * \brief Calculate dimensions of the buffer used by sao reconstruction.
+ *
+ * This function calculates 4 vectors that can be used to make the temporary
+ * buffers required by sao_reconstruct_color.
+ *
+ * Vector block is the area affected by sao. Vectors tr and br are top-left
+ * margin and bottom-right margin, which contain pixels that are not modified
+ * by the reconstruction of this LCU but are needed by the reconstruction.
+ * Vector rec is the coordinate of the area required by sao reconstruction.
+ *
+ * The margins are always either 0 or 1, depending on the direction of the
+ * edge offset class.
+ *
+ * This also takes into account borders of the picture and non-LCU sized
+ * CU's at the bottom and right of the picture.
+ * 
+ * \ rec
+ *  +------+
+ *  |\ tl  |
+ *  | +--+ |
+ *  | |\ block
+ *  | | \| |
+ *  | +--+ |
+ *  |     \ br
+ *  +------+
+ *
+ * \param pic  Picture.
+ * \param sao  Sao parameters.
+ * \param rec  Top-left corner of the LCU, modified to be top-left corner of 
+ */
+void sao_calc_block_dims(const picture *pic, const sao_info *sao, vector2d *rec, 
+                         vector2d *tl, vector2d *br, vector2d *block)
+{
+  vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
+  vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
+
+  // Handle top and left.
+  if (rec->y == 0) {
+    tl->y = 0;
+    if (a_ofs.y == -1 || b_ofs.y == -1) {
+      block->y -= 1;
+      tl->y += 1;
+    }
+  }
+  if (rec->x == 0) {
+    tl->x = 0;
+    if (a_ofs.x == -1 || b_ofs.x == -1) {
+      block->x -= 1;
+      tl->x += 1;
+    }
+  }
+
+  // Handle right and bottom, taking care of non-LCU sized CUs.
+  if (rec->y + LCU_WIDTH >= pic->height) {
+    br->y = 0;
+    if (rec->y + LCU_WIDTH >= pic->height) {
+      block->y = pic->height - rec->y;
+    }
+    if (a_ofs.y == 1 || b_ofs.y == 1) {
+      block->y -= 1;
+      br->y += 1;
+    }
+  }
+  if (rec->x + LCU_WIDTH >= pic->width) {
+    br->x = 0;
+    if (rec->x + LCU_WIDTH > pic->width) {
+      block->x = pic->width - rec->x;
+    }
+    if (a_ofs.x == 1 || b_ofs.y == 1) {
+      block->x -= 1;
+      br->x += 1;
+    }
+  }
+
+  if (rec->y != 0) {
+    rec->y -= 1;
+  }
+  if (rec->x != 0) {
+    rec->x -= 1;
+  }
+}
+
 void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb, 
                      const sao_info *sao_luma, const sao_info *sao_chroma)
 {
-  pixel rec_y[LCU_LUMA_SIZE];
+  pixel rec_y[(LCU_WIDTH + 2) * (LCU_WIDTH + 2)];
   pixel new_rec_y[LCU_LUMA_SIZE];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
-  // TODO: sao chroma reconstruct
+
+  int x = x_ctb * LCU_WIDTH, y = y_ctb * LCU_WIDTH;
+  
+  vector2d rec;
+  vector2d tl = { 1, 1 };
+  vector2d br = { 1, 1 };
+  vector2d block = { LCU_WIDTH, LCU_WIDTH };
+
+  rec.x = x_ctb * LCU_WIDTH;
+  rec.y = y_ctb * LCU_WIDTH;
+
+  sao_calc_block_dims(pic, sao_luma, &rec, &tl, &br, &block);
 
   // Data to tmp buffer.
-  picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+  picture_blit_pixels(&pic->y_recdata[rec.y * pic->width + rec.x], rec_y,
+                      tl.x + block.x + br.x,
+                      tl.y + block.y + br.y,
+                      pic->width, LCU_WIDTH + 2);
 
-  sao_reconstruct_color(rec_y, new_rec_y, sao_luma, LCU_WIDTH);
+  picture_blit_pixels(y_recdata, new_rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+
+  sao_reconstruct_color(&rec_y[tl.y * (tl.x + block.x + br.x) + tl.x], 
+                        new_rec_y, sao_luma, 
+                        LCU_WIDTH + 2, LCU_WIDTH,
+                        block.x, block.y);
   //sao_reconstruct_color(rec_u, sao_chroma, COLOR_U);
   //sao_reconstruct_color(rec_v, sao_chroma, COLOR_V);
   
