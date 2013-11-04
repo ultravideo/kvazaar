@@ -146,7 +146,7 @@ int main(int argc, char *argv[])
   encoder->QP       = 32;
   encoder->in.video_format = FORMAT_420;
   // deblocking filter
-  encoder->deblock_enable  = 1;
+  encoder->deblock_enable  = 0;
   encoder->beta_offset_div2  = 0;
   encoder->tc_offset_div2    = 0;
   // SAO
