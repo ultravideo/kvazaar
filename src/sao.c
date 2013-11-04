@@ -170,12 +170,13 @@ void sao_calc_block_dims(const picture *pic, const sao_info *sao, vector2d *rec,
   }
 }
 
-void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb, 
+void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y_ctb, 
                      const sao_info *sao_luma, const sao_info *sao_chroma)
 {
   pixel rec_y[(LCU_WIDTH + 2) * (LCU_WIDTH + 2)];
   pixel new_rec_y[LCU_LUMA_SIZE];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  pixel *new_y_recdata = &new_y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
 
   int x = x_ctb * LCU_WIDTH, y = y_ctb * LCU_WIDTH;
   
@@ -205,7 +206,7 @@ void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb,
   //sao_reconstruct_color(rec_v, sao_chroma, COLOR_V);
   
   // Copy reconstructed block from tmp buffer to rec image.
-  picture_blit_pixels(new_rec_y, y_recdata, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH, pic->width);
+  picture_blit_pixels(new_rec_y, new_y_recdata, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH, pic->width);
 }
 
 

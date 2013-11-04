@@ -47,7 +47,7 @@ typedef struct sao_info_struct {
 void init_sao_info(sao_info *sao);
 void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao);
 void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao);
-void sao_reconstruct(picture *pic, unsigned x_ctb, unsigned y_ctb, 
+void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y_ctb, 
                      const sao_info *sao_luma, const sao_info *sao_chroma);
 
 #endif
