@@ -417,14 +417,13 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   }
 #endif
 
-  // Fill with (0,0)
-  /*
-  while (candidates < MRG_MAX_NUM_CANDS) {
+  // Add (0,0) prediction
+  if (candidates != 5) {
     mv_cand[candidates][0] = 0;
     mv_cand[candidates][1] = 0;
     candidates++;
   }
-  */
+
   return candidates;
 }
 
