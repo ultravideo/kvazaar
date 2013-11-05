@@ -870,6 +870,7 @@ void encode_slice_data(encoder_control* encoder)
   uint16_t x_ctb, y_ctb;
   picture *pic = encoder->in.cur_pic;
   pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
+  //memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
   
   if (encoder->sao_enable) {
     for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {

@@ -71,8 +71,8 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
 
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
-  for (y = 1; y < block_height - 1; ++y) {
-    for (x = 1; x < block_width - 1; ++x) {
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
       const pixel *c_data = &rec_data[y * stride + x];
       pixel *new_data = &new_rec_data[y * new_stride + x];
       pixel a = c_data[a_ofs.y * stride + a_ofs.x];
@@ -196,7 +196,7 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
                       tl.y + block.y + br.y,
                       pic->width, LCU_WIDTH + 2);
 
-  picture_blit_pixels(y_recdata, new_rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+  //picture_blit_pixels(y_recdata, new_rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
   sao_reconstruct_color(&rec_y[tl.y * (LCU_WIDTH + 2) + tl.x], 
                         new_rec_y, sao_luma, 
