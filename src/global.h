@@ -57,7 +57,7 @@ typedef int16_t coefficient;
 
 #define ENABLE_PCM 0 /*!< Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
 #define ENABLE_SIGN_HIDING 1
-#define ENABLE_SCALING_LIST 1 /*!< Enable usage of (default) scaling list (BREAKS CHROMA WHEN 0!) */
+#define ENABLE_SCALING_LIST 0 /*!< Enable usage of (default) scaling list */
 
 #define ENABLE_TEMPORAL_MVP 0 /*!< Enable usage of temporal Motion Vector Prediction */
 

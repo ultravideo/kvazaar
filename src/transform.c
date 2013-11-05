@@ -769,7 +769,6 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
 
   int32_t qp_scaled;
   int32_t qp_offset = 0;
-
   if(type == 0) {
     qp_scaled = qp_base + qp_offset;
   } else {
@@ -780,7 +779,7 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
       qp_scaled = g_chroma_scale[qp_scaled] + qp_offset;
     }
   }
-  
+
   //New block for variable definitions
   {
   int32_t n;
@@ -818,7 +817,6 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
     #define SCAN_SET_SIZE 16
     #define LOG2_SCAN_SET_SIZE 4
     int32_t n,last_cg = -1, abssum = 0, subset, subpos;
-    uint32_t *scan_subpos;
     for(subset = (width*height - 1)>>LOG2_SCAN_SET_SIZE; subset >= 0; subset--) {
       int32_t first_nz_pos_in_cg = SCAN_SET_SIZE, last_nz_pos_in_cg=-1;
       subpos = subset<<LOG2_SCAN_SET_SIZE;
@@ -922,7 +920,7 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
     if (qp_scaled < 0) {
       qp_scaled = qp_scaled;
     } else {
-      qp_scaled = g_chroma_scale[ qp_scaled ];
+      qp_scaled = g_chroma_scale[qp_scaled];
     }
   }
   
@@ -950,7 +948,7 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
   }
   #else
   {
-  int32_t scale = g_inv_quant_scales[encoder->QP%6] << (encoder->QP/6);
+  int32_t scale = g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
   add = 1 << (shift-1);
 
   for (n = 0; n < width*height; n++) {
