@@ -876,7 +876,7 @@ void encode_slice_data(encoder_control* encoder)
   if (encoder->sao_enable) {
     for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
       for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
-        unsigned stride = encoder->in.height_in_lcu;
+        unsigned stride = encoder->in.width_in_lcu;
         sao_info *sao_luma = &pic->sao_luma[y_ctb * stride + x_ctb];
         sao_info *sao_chroma = &pic->sao_chroma[y_ctb * stride + x_ctb];
         init_sao_info(sao_luma);
@@ -915,7 +915,7 @@ void encode_slice_data(encoder_control* encoder)
 
       if (encoder->sao_enable) {
         picture *pic = encoder->in.cur_pic;
-        unsigned stride = encoder->in.height_in_lcu;
+        unsigned stride = encoder->in.width_in_lcu;
         sao_info sao_luma = pic->sao_luma[y_ctb * stride + x_ctb];
         sao_info sao_chroma = pic->sao_chroma[y_ctb * stride + x_ctb];
 
