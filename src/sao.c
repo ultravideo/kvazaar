@@ -199,7 +199,7 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   //picture_blit_pixels(y_recdata, new_rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
   sao_reconstruct_color(&rec_y[tl.y * (LCU_WIDTH + 2) + tl.x], 
-                        &new_rec_y[(tl.y + rec.y - y) * (LCU_WIDTH) + (tl.x + rec.x - x)],
+                        &new_rec_y,
                         sao_luma, 
                         LCU_WIDTH + 2, LCU_WIDTH,
                         block.x, block.y);
@@ -207,7 +207,10 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   //sao_reconstruct_color(rec_v, sao_chroma, COLOR_V);
   
   // Copy reconstructed block from tmp buffer to rec image.
-  picture_blit_pixels(new_rec_y, new_y_recdata, LCU_WIDTH, LCU_WIDTH, LCU_WIDTH, pic->width);
+  // 
+  picture_blit_pixels(new_rec_y, 
+                      &new_y_recdata[(tl.y + rec.y - y) * (LCU_WIDTH) + (tl.x + rec.x - x)],
+                      block.x, block.y, LCU_WIDTH, pic->width);
 }
 
 

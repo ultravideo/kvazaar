@@ -882,20 +882,10 @@ void encode_slice_data(encoder_control* encoder)
         init_sao_info(sao_luma);
         init_sao_info(sao_chroma);
 
-        // Temporary guards against non-LCU size coding units at the edges,
-        // because they aren't handled yet.
-        if (encoder->in.width_in_lcu * LCU_WIDTH != encoder->in.cur_pic->width
-            && x_ctb == encoder->in.width_in_lcu - 1) {
-
-        } else if (encoder->in.height_in_lcu * LCU_WIDTH != encoder->in.cur_pic->height
-                   && y_ctb == encoder->in.height_in_lcu - 1) {
-
-        } else {
-          sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, sao_luma);
-          // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
-          // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
-          sao_reconstruct(encoder->in.cur_pic, new_y_data, x_ctb, y_ctb, sao_luma, sao_chroma);
-        }
+        sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, sao_luma);
+        // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+        // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+        sao_reconstruct(encoder->in.cur_pic, new_y_data, x_ctb, y_ctb, sao_luma, sao_chroma);
       }
     }
   }
