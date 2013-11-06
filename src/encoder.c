@@ -321,10 +321,6 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
   }  
   
-  // Filtering
-  if(encoder->deblock_enable) {
-    filter_deblock(encoder);
-  }
   // Calculate checksum
   add_checksum(encoder);
 }
@@ -872,6 +868,11 @@ void encode_slice_data(encoder_control* encoder)
   pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
   //memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
   
+  // Filtering
+  if(encoder->deblock_enable) {
+    filter_deblock(encoder);
+  }
+
   if (encoder->sao_enable) {
     for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
       for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
