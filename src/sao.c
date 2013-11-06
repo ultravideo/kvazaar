@@ -185,8 +185,8 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   vector2d br = { 1, 1 };
   vector2d block = { LCU_WIDTH, LCU_WIDTH };
 
-  rec.x = x_ctb * LCU_WIDTH;
-  rec.y = y_ctb * LCU_WIDTH;
+  rec.x = x;
+  rec.y = y;
 
   sao_calc_block_dims(pic, sao_luma, &rec, &tl, &br, &block);
 
@@ -199,7 +199,8 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   //picture_blit_pixels(y_recdata, new_rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
   sao_reconstruct_color(&rec_y[tl.y * (LCU_WIDTH + 2) + tl.x], 
-                        new_rec_y, sao_luma, 
+                        &new_rec_y[(tl.y + rec.y - y) * (LCU_WIDTH) + (tl.x + rec.x - x)],
+                        sao_luma, 
                         LCU_WIDTH + 2, LCU_WIDTH,
                         block.x, block.y);
   //sao_reconstruct_color(rec_u, sao_chroma, COLOR_U);
