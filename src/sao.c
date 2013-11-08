@@ -181,6 +181,10 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   vector2d br = { 1, 1 };
   vector2d block = { LCU_WIDTH, LCU_WIDTH };
 
+  if (sao_luma->type == SAO_TYPE_NONE) {
+    return;
+  }
+
   rec.x = x;
   rec.y = y;
 
@@ -282,15 +286,22 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   pixel rec_y[LCU_LUMA_SIZE];
   pixel *y_data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+
+  // TODO: Fix searching of SAO in <LCU blocks. (reconstruction works)
+  if (x_ctb == pic->width_in_lcu - 1 || y_ctb == pic->height_in_lcu - 1) {
+    return;
+  }
   
-  sao->offsets[SAO_EO_CAT0] = 0;
+  /*sao->offsets[SAO_EO_CAT0] = 0;
   sao->offsets[SAO_EO_CAT1] = 7;
   sao->offsets[SAO_EO_CAT2] = 7;
   sao->offsets[SAO_EO_CAT3] = -7;
   sao->offsets[SAO_EO_CAT4] = -7;
   sao->eo_class = SAO_EO0;
   sao->type = SAO_TYPE_EDGE;
-  return;
+  return;*/
+
+  sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
   picture_blit_pixels(y_data, orig_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
