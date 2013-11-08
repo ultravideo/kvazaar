@@ -209,7 +209,7 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   // Copy reconstructed block from tmp buffer to rec image.
   // 
   picture_blit_pixels(new_rec_y, 
-                      &new_y_recdata[(tl.y + rec.y - y) * (LCU_WIDTH) + (tl.x + rec.x - x)],
+                      &new_y_recdata[(tl.y + rec.y - y) * (pic->width) + (tl.x + rec.x - x)],
                       block.x, block.y, LCU_WIDTH, pic->width);
 }
 
