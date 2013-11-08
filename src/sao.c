@@ -249,6 +249,15 @@ void sao_search_best_mode(const pixel *data, const pixel *recdata,
         offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
         offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
       }
+
+      // Sharpening edge offsets can't be encoded, so set them to 0 here.
+      if (edge_cat >= SAO_EO_CAT1 && edge_cat <= SAO_EO_CAT2 && offset < 0) {
+        offset = 0;
+      }
+      if (edge_cat >= SAO_EO_CAT3 && edge_cat <= SAO_EO_CAT4 && offset > 0) {
+        offset = 0;
+      }
+
       edge_offset[edge_cat] = offset;
       // The ddistortion is amount by which the SSE of data changes. It should
       // be negative for all categories, if offset was chosen correctly.

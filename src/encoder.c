@@ -799,11 +799,14 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   if (sao->type != SAO_TYPE_NONE) {
     sao_eo_cat i;
   
-    for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-      //CABAC_BIN_EP(&cabac, abs(sao->offsets[i]), "sao_offset_abs");
-      // TR cMax=7 (for 8bit), cRiseParam=0
-      cabac_write_unary_max_symbol_ep(&cabac, abs(sao->offsets[i]), 
-                                      SAO_ABS_OFFSET_MAX);
+    // TR cMax=7 (for 8bit), cRiseParam=0
+    for (i = SAO_EO_CAT1; i <= SAO_EO_CAT2; ++i) {
+      assert(sao->offsets[i] >= 0);
+      cabac_write_unary_max_symbol_ep(&cabac, sao->offsets[i], SAO_ABS_OFFSET_MAX);
+    }
+    for (i = SAO_EO_CAT3; i <= SAO_EO_CAT4; ++i) {
+      assert(sao->offsets[i] <= 0);
+      cabac_write_unary_max_symbol_ep(&cabac, -sao->offsets[i], SAO_ABS_OFFSET_MAX);
     }
 
     if (sao->type == SAO_TYPE_BAND) {
