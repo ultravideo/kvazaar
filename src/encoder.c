@@ -865,8 +865,6 @@ void encode_slice_data(encoder_control* encoder)
 {
   uint16_t x_ctb, y_ctb;
   picture *pic = encoder->in.cur_pic;
-  pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
-  //memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
   
   // Filtering
   if(encoder->deblock_enable) {
@@ -874,6 +872,9 @@ void encode_slice_data(encoder_control* encoder)
   }
 
   if (encoder->sao_enable) {
+    pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
+    memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
+
     for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
       for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
         unsigned stride = encoder->in.width_in_lcu;
@@ -888,10 +889,9 @@ void encode_slice_data(encoder_control* encoder)
         sao_reconstruct(encoder->in.cur_pic, new_y_data, x_ctb, y_ctb, sao_luma, sao_chroma);
       }
     }
-  }
 
-  memcpy(pic->y_recdata, new_y_data, sizeof(pixel) * pic->width * pic->height);
-  free(new_y_data);
+    free(new_y_data);
+  }
 
   init_contexts(encoder,encoder->in.cur_pic->slicetype);
 

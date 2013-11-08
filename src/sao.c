@@ -96,7 +96,7 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
  * Vector block is the area affected by sao. Vectors tr and br are top-left
  * margin and bottom-right margin, which contain pixels that are not modified
  * by the reconstruction of this LCU but are needed by the reconstruction.
- * Vector rec is the coordinate of the area required by sao reconstruction.
+ * Vector rec is the offset from the CU to the required pixel area.
  *
  * The margins are always either 0 or 1, depending on the direction of the
  * edge offset class.
@@ -104,7 +104,7 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
  * This also takes into account borders of the picture and non-LCU sized
  * CU's at the bottom and right of the picture.
  * 
- * \ rec
+ * \ CU + rec
  *  +------+
  *  |\ tl  |
  *  | +--+ |
@@ -162,12 +162,8 @@ void sao_calc_block_dims(const picture *pic, const sao_info *sao, vector2d *rec,
     }
   }
 
-  if (rec->y != 0) {
-    rec->y -= 1;
-  }
-  if (rec->x != 0) {
-    rec->x -= 1;
-  }
+  rec->y = (rec->y == 0 ? 0 : -1);
+  rec->x = (rec->x == 0 ? 0 : -1);
 }
 
 void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y_ctb, 
@@ -191,7 +187,7 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   sao_calc_block_dims(pic, sao_luma, &rec, &tl, &br, &block);
 
   // Data to tmp buffer.
-  picture_blit_pixels(&pic->y_recdata[rec.y * pic->width + rec.x], rec_y,
+  picture_blit_pixels(&new_y_data[(y + rec.y) * pic->width + x + rec.x], rec_y,
                       tl.x + block.x + br.x,
                       tl.y + block.y + br.y,
                       pic->width, LCU_WIDTH + 2);
@@ -199,7 +195,7 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   //picture_blit_pixels(y_recdata, new_rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
 
   sao_reconstruct_color(&rec_y[tl.y * (LCU_WIDTH + 2) + tl.x], 
-                        &new_rec_y,
+                        &new_rec_y[(rec.y + tl.y) * LCU_WIDTH + rec.x + tl.x],
                         sao_luma, 
                         LCU_WIDTH + 2, LCU_WIDTH,
                         block.x, block.y);
@@ -208,8 +204,8 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
   
   // Copy reconstructed block from tmp buffer to rec image.
   // 
-  picture_blit_pixels(new_rec_y, 
-                      &new_y_recdata[(tl.y + rec.y - y) * (pic->width) + (tl.x + rec.x - x)],
+  picture_blit_pixels(&new_rec_y[(tl.y + rec.y) * LCU_WIDTH + (tl.x + rec.x)], 
+                      &y_recdata[(tl.y + rec.y) * (pic->width) + (tl.x + rec.x)],
                       block.x, block.y, LCU_WIDTH, pic->width);
 }
 
