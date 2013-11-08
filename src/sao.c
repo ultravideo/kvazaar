@@ -156,7 +156,7 @@ void sao_calc_block_dims(const picture *pic, const sao_info *sao, vector2d *rec,
     if (rec->x + LCU_WIDTH > pic->width) {
       block->x = pic->width - rec->x;
     }
-    if (a_ofs.x == 1 || b_ofs.y == 1) {
+    if (a_ofs.x == 1 || b_ofs.x == 1) {
       block->x -= 1;
       br->x += 1;
     }
