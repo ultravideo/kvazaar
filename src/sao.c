@@ -35,7 +35,7 @@ static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
  * \param is_chroma  0 for luma, 1 for chroma. Indicates 
  */
 void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
-                       int eo_class, int block_width,
+                       int eo_class, int block_width, int block_height,
                        int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
 {
   int y, x;
@@ -45,7 +45,7 @@ void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
 
   // Don't sample the edge pixels because this function doesn't have access to
   // their neighbours.
-  for (y = 1; y < block_width - 1; ++y) {
+  for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
       const pixel *c_data = &rec_data[y * block_width + x];
       pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
@@ -216,7 +216,8 @@ void sao_reconstruct(picture *pic, pixel *new_y_data, unsigned x_ctb, unsigned y
 
 
 void sao_search_best_mode(const pixel *data, const pixel *recdata, 
-                          unsigned block_width, unsigned buf_size, unsigned buf_cnt,
+                          int block_width, int block_height,
+                          unsigned buf_size, unsigned buf_cnt,
                           sao_info *sao_out)
 {
   sao_eo_class edge_class;
@@ -234,7 +235,8 @@ void sao_search_best_mode(const pixel *data, const pixel *recdata,
 
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
-      calc_sao_edge_dir(data + i * buf_size, recdata + i * buf_size, edge_class, block_width, cat_sum_cnt);
+      calc_sao_edge_dir(data + i * buf_size, recdata + i * buf_size, edge_class,
+                        block_width, block_height, cat_sum_cnt);
     }
     
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
@@ -295,10 +297,14 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   pixel rec_y[LCU_LUMA_SIZE];
   pixel *y_data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  int block_width = LCU_WIDTH;
+  int block_height = LCU_WIDTH;
 
-  // TODO: Fix searching of SAO in <LCU blocks. (reconstruction works)
-  if (x_ctb == pic->width_in_lcu - 1 || y_ctb == pic->height_in_lcu - 1) {
-    return;
+  if (x_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)pic->width) {
+    block_width = pic->width - x_ctb * LCU_WIDTH;
+  }
+  if (y_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)pic->height) {
+    block_height = pic->height - y_ctb * LCU_WIDTH;
   }
   
   /*sao->offsets[SAO_EO_CAT0] = 0;
@@ -313,8 +319,8 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
-  picture_blit_pixels(y_data, orig_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
-  picture_blit_pixels(y_recdata, rec_y, LCU_WIDTH, LCU_WIDTH, pic->width, LCU_WIDTH);
+  picture_blit_pixels(y_data, orig_y, block_width, block_height, pic->width, LCU_WIDTH);
+  picture_blit_pixels(y_recdata, rec_y, block_width, block_height, pic->width, LCU_WIDTH);
 
-  sao_search_best_mode(orig_y, rec_y, LCU_WIDTH, LCU_LUMA_SIZE, 1, sao);
+  sao_search_best_mode(orig_y, rec_y, block_width, block_height, LCU_LUMA_SIZE, 1, sao);
 }
