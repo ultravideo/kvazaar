@@ -24,10 +24,16 @@ struct sao_info_struct;
 enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER };
 enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_index;
 
 
 //////////////////////////////////////////////////////////////////////////
 // TYPES
+
+typedef struct {
+  int x;
+  int y;
+} vector2d;
 
 /**
  * \brief Struct for CU intra info
@@ -80,7 +86,7 @@ typedef struct
 /**
  * \brief Struct which contains all picture data
  */
-typedef struct
+typedef struct picture_struct
 {
   pixel* y_data;        //!< \brief Pointer to luma pixel array.
   pixel* u_data;        //!< \brief Pointer to chroma U pixel array.

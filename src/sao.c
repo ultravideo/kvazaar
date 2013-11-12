@@ -15,6 +15,18 @@
 
 #include "picture.h"
 
+// Offsets of a and b in relation to c.
+// dir_offset[dir][a or b]
+// |       |   a   | a     |     a |
+// | a c b |   c   |   c   |   c   |
+// |       |   b   |     b | b     |
+static const vector2d g_sao_edge_offsets[SAO_NUM_EO][2] = { 
+  { { -1, 0 }, { 1, 0 } },
+  { { 0, -1 }, { 0, 1 } },
+  { { -1, -1 }, { 1, 1 } },
+  { { 1, -1 }, { -1, 1 } }
+};
+
 
 
 void init_sao_info(sao_info *sao) {
