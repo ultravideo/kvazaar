@@ -14,6 +14,9 @@
 
 #include "global.h"
 
+//#include "sao.h"
+struct sao_info_struct;
+
 
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
@@ -103,6 +106,10 @@ typedef struct
   cu_info** cu_array;     //!< \brief Info for each CU at each depth.
   uint8_t type;
   uint8_t slicetype;
+  uint8_t slice_sao_luma_flag;
+  uint8_t slice_sao_chroma_flag;
+  struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
+  struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
 } picture;
 
 /**
@@ -130,6 +137,10 @@ void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
                              uint8_t depth, int8_t split);
 void picture_set_block_skipped(picture *pic, uint32_t x_scu, uint32_t y_scu,
                                 uint8_t depth, int8_t skipped);
+void picture_blit_pixels(const pixel* orig, pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride);
+
 picture_list * picture_list_init(int size);
 int picture_list_resize(picture_list *list, int size);
 int picture_list_destroy(picture_list *list);

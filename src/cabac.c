@@ -11,6 +11,7 @@
 
 #include "cabac.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -281,20 +282,52 @@ void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx, uint32_t sym
 {
   int8_t code_last = max_symbol > symbol;
 
+  assert(symbol <= max_symbol);
+
   if (!max_symbol) return;
   
   data->ctx = &ctx[0];
-  cabac_encode_bin(data, symbol ? 1 : 0);
+  CABAC_BIN(data, symbol ? 1 : 0, "ums");
   
   if (!symbol) return;
   
   while (--symbol) {
     data->ctx = &ctx[offset];
-    cabac_encode_bin(data, 1);
+    CABAC_BIN(data, 1, "ums");
   }
   if (code_last) {
     data->ctx = &ctx[offset];
-    cabac_encode_bin(data, 0);
+    CABAC_BIN(data, 0, "ums");
+  }
+}
+
+/**
+ * This can be used for Truncated Rice binarization with cRiceParam=0.
+ */
+void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned max_symbol)
+{
+  /*if (symbol == 0) {
+    CABAC_BIN_EP(data, 0, "ums_ep");
+  } else {
+    // Make a bit-string of (symbol) times 1 and a single 0, except when
+    // symbol == max_symbol.
+    unsigned bins = ((1 << symbol) - 1) << (symbol < max_symbol);
+    CABAC_BINS_EP(data, bins, symbol + (symbol < max_symbol), "ums_ep");
+  }*/
+  
+  int8_t code_last = max_symbol > symbol;
+
+  assert(symbol <= max_symbol);
+
+  CABAC_BIN_EP(data, symbol ? 1 : 0, "ums_ep");
+  
+  if (!symbol) return;
+  
+  while (--symbol) {
+    CABAC_BIN_EP(data, 1, "ums_ep");
+  }
+  if (code_last) {
+    CABAC_BIN_EP(data, 0, "ums_ep");
   }
 }
 

@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "sao.h"
+
 
 #define PSNRMAX (255.0 * 255.0)
 
@@ -63,6 +65,40 @@ void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
     for (x = x_scu; x < x_scu + block_scu_width; ++x) {
       pic->cu_array[MAX_DEPTH][cu_row + x].coeff_y = coeff_y;
     }
+  }
+}
+
+/**
+ * \brief BLock Image Transfer from one buffer to another.
+ *
+ * It's a stupidly simple loop that copies pixels.
+ *
+ * \param orig  Start of the originating buffer.
+ * \param dst  Start of the destination buffer.
+ * \param width  Width of the copied region.
+ * \param height  Height of the copied region.
+ * \param orig_stride  Width of a row in the originating buffer.
+ * \param dst_stride  Width of a row in the destination buffer.
+ *
+ * This should be inlined, but it's defined here for now to see if Visual
+ * Studios LTCG will inline it.
+ */
+void picture_blit_pixels(const pixel *orig, pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride)
+{
+  unsigned y, x;
+
+  const pixel *borig = orig;
+  const pixel *bdst = dst;
+
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x < width; ++x) {
+      dst[x] = orig[x];
+    }
+    // Move pointers to the next row.
+    orig += orig_stride;
+    dst += dst_stride;
   }
 }
 
@@ -270,6 +306,11 @@ picture *picture_init(int32_t width, int32_t height,
   pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
   pic->pred_y = NULL; pic->pred_u = NULL; pic->pred_v = NULL;
 
+  pic->slice_sao_luma_flag = 1;
+  pic->slice_sao_chroma_flag = 1;
+  pic->sao_luma = MALLOC(sao_info, width_in_lcu * height_in_lcu);
+  pic->sao_chroma = MALLOC(sao_info, width_in_lcu * height_in_lcu);
+
   return pic;
 }
 
@@ -308,6 +349,9 @@ int picture_destroy(picture *pic)
   FREE_POINTER(pic->pred_y);
   FREE_POINTER(pic->pred_u);
   FREE_POINTER(pic->pred_v);
+
+  FREE_POINTER(pic->sao_luma);
+  FREE_POINTER(pic->sao_chroma);
 
   return 1;
 }

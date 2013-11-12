@@ -37,6 +37,8 @@ int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_
                                 int32_t pos_y,int32_t block_type,int32_t width, int8_t texture_type);
 
 // CONTEXTS
+extern cabac_ctx g_sao_merge_flag_model;
+extern cabac_ctx g_sao_type_idx_model;
 extern cabac_ctx g_split_flag_model[3];
 extern cabac_ctx g_intra_mode_model;
 extern cabac_ctx g_chroma_pred_model[2];
@@ -64,6 +66,9 @@ extern cabac_ctx g_cu_ref_pic_model[2];
 extern cabac_ctx g_mvp_idx_model[2];
 extern cabac_ctx g_cu_qt_root_cbf_model;
 #define CNU 154
+
+static const uint8_t INIT_SAO_MERGE_FLAG[3] = { 153, 153, 153 };
+static const uint8_t INIT_SAO_TYPE_IDX[3] = { 160, 185, 200 };
 
 static const uint8_t 
 INIT_QT_ROOT_CBF[3][1] = 

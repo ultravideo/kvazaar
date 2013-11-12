@@ -19,6 +19,8 @@
 
 
 // CONTEXTS
+cabac_ctx g_sao_merge_flag_model;
+cabac_ctx g_sao_type_idx_model;
 cabac_ctx g_split_flag_model[3]; //!< \brief split flag context models
 cabac_ctx g_intra_mode_model;    //!< \brief intra mode context models
 cabac_ctx g_chroma_pred_model[2];
@@ -74,6 +76,9 @@ void init_contexts(encoder_control *encoder, int8_t slice)
   uint16_t i;
 
   // Initialize contexts
+  ctx_init(&g_sao_merge_flag_model, encoder->QP, INIT_SAO_MERGE_FLAG[slice]);
+  ctx_init(&g_sao_type_idx_model, encoder->QP, INIT_SAO_TYPE_IDX[slice]);
+
   ctx_init(&g_cu_merge_flag_ext_model, encoder->QP, INIT_MERGE_FLAG_EXT[slice][0]);
   ctx_init(&g_cu_merge_idx_ext_model, encoder->QP, INIT_MERGE_IDX_EXT[slice][0]);
   ctx_init(&g_cu_pred_mode_model, encoder->QP, INIT_PRED_MODE[slice][0]);
