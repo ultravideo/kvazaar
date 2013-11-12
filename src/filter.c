@@ -163,7 +163,7 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   pixel *src = orig_src;
   int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  cu_info *cu_p = 0;
+  cu_info *cu_p = NULL;
   int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
   int8_t strength = 0;
   
@@ -265,12 +265,12 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   int32_t offset = stride;
   int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  cu_info *cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][((x>>(MIN_SIZE-1))-(dir == EDGE_VER)) +
-                                                            ((y>>(MIN_SIZE-1))-(dir == EDGE_HOR)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  int8_t strength = (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) ? 2 : 0; // Filter strength
+  cu_info *cu_p = NULL;
+  int16_t x_cu = x>>(MIN_SIZE-1),y_cu = y>>(MIN_SIZE-1);
+  int8_t strength = 2;
 
   // We cannot filter edges not on 8x8 grid
-  if(strength != 2 || (depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
+  if((depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
   {
     return;
   }
@@ -291,17 +291,24 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
     uint32_t blk_idx;
 
     for (blk_idx = 0; blk_idx < blocks_in_part; ++blk_idx)
-    {
-      // Chroma U
-      filter_deblock_chroma(src_u + step * (4*blk_idx + 0), offset, Tc, 0, 0);
-      filter_deblock_chroma(src_u + step * (4*blk_idx + 1), offset, Tc, 0, 0);
-      filter_deblock_chroma(src_u + step * (4*blk_idx + 2), offset, Tc, 0, 0);
-      filter_deblock_chroma(src_u + step * (4*blk_idx + 3), offset, Tc, 0, 0);
-      // Chroma V
-      filter_deblock_chroma(src_v + step * (4*blk_idx + 0), offset, Tc, 0, 0);
-      filter_deblock_chroma(src_v + step * (4*blk_idx + 1), offset, Tc, 0, 0);
-      filter_deblock_chroma(src_v + step * (4*blk_idx + 2), offset, Tc, 0, 0);
-      filter_deblock_chroma(src_v + step * (4*blk_idx + 3), offset, Tc, 0, 0);
+    {    
+
+      cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? blk_idx : 0)) +
+                                                         (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? blk_idx : 0))
+                                                          * (encoder->in.width_in_lcu << MAX_DEPTH)];
+      // Only filter when strenght == 2 (one of the blocks is intra coded)
+      if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
+        // Chroma U
+        filter_deblock_chroma(src_u + step * (4*blk_idx + 0), offset, Tc, 0, 0);
+        filter_deblock_chroma(src_u + step * (4*blk_idx + 1), offset, Tc, 0, 0);
+        filter_deblock_chroma(src_u + step * (4*blk_idx + 2), offset, Tc, 0, 0);
+        filter_deblock_chroma(src_u + step * (4*blk_idx + 3), offset, Tc, 0, 0);
+        // Chroma V
+        filter_deblock_chroma(src_v + step * (4*blk_idx + 0), offset, Tc, 0, 0);
+        filter_deblock_chroma(src_v + step * (4*blk_idx + 1), offset, Tc, 0, 0);
+        filter_deblock_chroma(src_v + step * (4*blk_idx + 2), offset, Tc, 0, 0);
+        filter_deblock_chroma(src_v + step * (4*blk_idx + 3), offset, Tc, 0, 0);
+      }
     }
   }
 }
