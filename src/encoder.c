@@ -876,7 +876,11 @@ void encode_slice_data(encoder_control* encoder)
 
   if (encoder->sao_enable) {
     pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
+    pixel *new_u_data = MALLOC(pixel, (pic->width * pic->height) >> 2);
+    pixel *new_v_data = MALLOC(pixel, (pic->width * pic->height) >> 2);
     memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
+    memcpy(new_u_data, pic->u_recdata, sizeof(pixel) * (pic->width * pic->height) >> 2);
+    memcpy(new_v_data, pic->v_recdata, sizeof(pixel) * (pic->width * pic->height) >> 2);
 
     for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
       for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
@@ -887,13 +891,18 @@ void encode_slice_data(encoder_control* encoder)
         init_sao_info(sao_chroma);
 
         sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, sao_luma);
+        sao_search_chroma(encoder->in.cur_pic, x_ctb, y_ctb, sao_chroma);
         // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
         // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
-        sao_reconstruct(encoder->in.cur_pic, new_y_data, x_ctb, y_ctb, sao_luma, sao_chroma);
+        sao_reconstruct(pic, new_y_data, x_ctb, y_ctb, sao_luma, COLOR_Y);
+        sao_reconstruct(pic, new_u_data, x_ctb, y_ctb, sao_chroma, COLOR_U);
+        sao_reconstruct(pic, new_v_data, x_ctb, y_ctb, sao_chroma, COLOR_V);
       }
     }
 
     free(new_y_data);
+    free(new_u_data);
+    free(new_v_data);
   }
 
   init_contexts(encoder,encoder->in.cur_pic->slicetype);
