@@ -20,7 +20,7 @@
 #ifdef _WIN32
 #include <Winsock2.h>
 #else
-#include <net/hton.h>
+//#include <net/hton.h>
 #endif
  
 

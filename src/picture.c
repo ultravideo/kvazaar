@@ -475,7 +475,7 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
 // for fixed size blocks. They calculate hadamart for integer
 // multiples of 8x8 with the 8x8 hadamart function.
 #define SATD_NXN(n, pixel_type, suffix) \
-  unsigned satd_ ## suffix ## _ ## n ## x ## n ## ( \
+  unsigned satd_ ## suffix ## _ ## n ## x ## n( \
                     pixel_type *block1, pixel_type *block2) \
   { \
     unsigned y, x; \
@@ -498,7 +498,7 @@ SATD_NXN(64, pixel, 16bit)
 // Function macro for defining SAD calculating functions 
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type, suffix) \
-  unsigned sad_ ## suffix ## _ ##  n ## x ## n ## ( \
+  unsigned sad_ ## suffix ## _ ##  n ## x ## n( \
                pixel_type *block1, pixel_type *block2) \
   { \
     unsigned x, y, row; \

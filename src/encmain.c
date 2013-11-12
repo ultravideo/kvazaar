@@ -52,8 +52,8 @@ int main(int argc, char *argv[])
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   double psnr[3] = { 0.0, 0.0, 0.0 };
-  fpos_t curpos  = 0;
-  fpos_t lastpos = 0;
+  uint64_t curpos  = 0;
+  uint64_t lastpos = 0;
   #ifdef _DEBUG
   FILE *recout = fopen("encrec.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
   #endif
@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
     #endif
 
     // Calculate the bytes pushed to output for this frame
-    fgetpos(output,&curpos);
+    fgetpos(output,(fpos_t*)&curpos);
     diff = (int32_t)(curpos-lastpos);
     lastpos = curpos;
 
@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
     encoder->frame++;
   }
   // Coding finished
-  fgetpos(output,&curpos);
+  fgetpos(output,(fpos_t*)&curpos);
 
   // Print statistics of the coding
   printf(" Processed %d frames, %10d bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, ((int32_t)curpos)<<3,
