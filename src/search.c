@@ -25,7 +25,7 @@
 
 
 // Temporarily for debugging.
-#define USE_INTRA_IN_P 0
+#define USE_INTRA_IN_P 1
 //#define RENDER_CU encoder->frame==2
 #define RENDER_CU 0
 #define SEARCH_MV_FULL_RADIUS 0
