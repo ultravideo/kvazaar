@@ -91,10 +91,12 @@ typedef struct picture_struct
   pixel* y_data;        //!< \brief Pointer to luma pixel array.
   pixel* u_data;        //!< \brief Pointer to chroma U pixel array.
   pixel* v_data;        //!< \brief Pointer to chroma V pixel array.
+  pixel *data[NUM_COLORS]; // \brief  Alternate access method to same data.
 
   pixel* y_recdata;     //!< \brief Pointer to reconstructed Y-data.
   pixel* u_recdata;     //!< \brief Pointer to reconstructed U-data.
   pixel* v_recdata;     //!< \brief Pointer to reconstructed V-data.
+  pixel *recdata[NUM_COLORS]; // \brief Alternate access method to same data.
 
   pixel* pred_y;        //!< \brief Pointer to predicted Y
   pixel* pred_u;        //!< \brief Pointer to predicted U

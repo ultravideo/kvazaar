@@ -282,11 +282,17 @@ picture *picture_init(int32_t width, int32_t height,
   pic->y_data = MALLOC(pixel, luma_size);
   pic->u_data = MALLOC(pixel, chroma_size);
   pic->v_data = MALLOC(pixel, chroma_size);
+  pic->data[COLOR_Y] = pic->y_data;
+  pic->data[COLOR_U] = pic->u_data;
+  pic->data[COLOR_V] = pic->v_data;
 
   // Reconstruction buffers
   pic->y_recdata = MALLOC(pixel, luma_size);
   pic->u_recdata = MALLOC(pixel, chroma_size);
   pic->v_recdata = MALLOC(pixel, chroma_size);
+  pic->recdata[COLOR_Y] = pic->y_recdata;
+  pic->recdata[COLOR_U] = pic->u_recdata;
+  pic->recdata[COLOR_V] = pic->v_recdata;
 
   memset(pic->u_recdata, 128, (chroma_size));
   memset(pic->v_recdata, 128, (chroma_size));
@@ -327,11 +333,13 @@ int picture_destroy(picture *pic)
   free(pic->v_data);
   free(pic->y_data);
   pic->y_data = pic->u_data = pic->v_data = NULL;
+  pic->data[COLOR_Y] = pic->data[COLOR_U] = pic->data[COLOR_V] = NULL;
 
   free(pic->y_recdata);
   free(pic->u_recdata);
   free(pic->v_recdata);
   pic->y_recdata = pic->u_recdata = pic->v_recdata = NULL;
+  pic->recdata[COLOR_Y] = pic->recdata[COLOR_U] = pic->recdata[COLOR_V] = NULL;
 
   for (i = 0; i <= MAX_DEPTH; ++i)
   {
