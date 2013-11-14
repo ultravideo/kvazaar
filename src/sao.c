@@ -192,8 +192,7 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
   const int lcu_stride = LCU_WIDTH >> is_chroma;
   const int buf_stride = lcu_stride + 2;
 
-  pixel *recdata = (color_i == COLOR_Y ? pic->y_recdata : 
-                    (color_i == COLOR_U ? pic->u_recdata : pic->v_recdata));
+  pixel *recdata = pic->recdata[color_i];
   pixel buf_rec[(LCU_WIDTH + 2) * (LCU_WIDTH + 2)];
   pixel new_rec[LCU_WIDTH * LCU_WIDTH];
   // Calling CU_TO_PIXEL with depth 1 is the same as using block size of 32.
@@ -305,19 +304,15 @@ void sao_search_best_mode(const pixel *data[], const pixel *recdata[],
 
  void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao)
 {
-  pixel orig_u[LCU_CHROMA_SIZE];
-  pixel rec_u[LCU_CHROMA_SIZE];
-  pixel orig_v[LCU_CHROMA_SIZE];
-  pixel rec_v[LCU_CHROMA_SIZE];
-  pixel *orig[2] = { orig_u, orig_v };
-  pixel *rec[2] = { rec_u, rec_v };
-  pixel *u_data = &pic->u_data[CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
-  pixel *u_recdata = &pic->u_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
-  pixel *v_data = &pic->v_data[CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
-  pixel *v_recdata = &pic->v_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
+  pixel *orig_list[2];
+  pixel *rec_list[2];
+  pixel orig[2][LCU_CHROMA_SIZE];
+  pixel rec[2][LCU_CHROMA_SIZE];
+  color_index color_i;
 
+  // Check for right and bottom boundaries.
   if (x_ctb * (LCU_WIDTH / 2) + (LCU_WIDTH / 2) >= (unsigned)pic->width / 2) {
     block_width = (pic->width - x_ctb * LCU_WIDTH) / 2;
   }
@@ -327,33 +322,34 @@ void sao_search_best_mode(const pixel *data[], const pixel *recdata[],
 
   sao->type = SAO_TYPE_EDGE;
 
-  // Fill temporary buffers with picture data.
-  // These buffers are needed only until we switch to a LCU based data
-  // structure for pixels. Then we can give pointers directly to that structure
-  // without making copies.
-  picture_blit_pixels(u_data, orig_u, block_width, block_height,
-                      pic->width / 2, LCU_WIDTH / 2);
-  picture_blit_pixels(v_data, orig_v, block_width, block_height, 
-                      pic->width / 2, LCU_WIDTH / 2);
-  picture_blit_pixels(u_recdata, rec_u, block_width, block_height,
-                      pic->width / 2, LCU_WIDTH / 2);
-  picture_blit_pixels(v_recdata, rec_v, block_width, block_height,
-                      pic->width / 2, LCU_WIDTH / 2);
+  // Copy data to temporary buffers and init orig and rec lists to point to those buffers.
+  for (color_i = COLOR_U; color_i <= COLOR_V; ++color_i) {
+    pixel *data = &pic->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
+    pixel *recdata = &pic->recdata[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
+    picture_blit_pixels(data, orig[color_i - 1], block_width, block_height,
+                        pic->width / 2, LCU_WIDTH / 2);
+    picture_blit_pixels(recdata, rec[color_i - 1], block_width, block_height,
+                        pic->width / 2, LCU_WIDTH / 2);
+    orig_list[color_i - 1] = &orig[color_i - 1][0];
+    rec_list[color_i - 1] = &rec[color_i - 1][0];
+  }
 
-  sao_search_best_mode(orig, rec, block_width, block_height, 2, sao);
+  // Calculate 
+  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 2, sao);
 }
 
 void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao)
 {
-  pixel orig_y[LCU_LUMA_SIZE];
-  pixel rec_y[LCU_LUMA_SIZE];
-  pixel *orig[1] = { orig_y };
-  pixel *rec[1] = { rec_y };
-  pixel *y_data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
-  pixel *y_recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  pixel orig[LCU_LUMA_SIZE];
+  pixel rec[LCU_LUMA_SIZE];
+  pixel *orig_list[1] = { orig };
+  pixel *rec_list[1] = { rec };
+  pixel *data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  pixel *recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   int block_width = LCU_WIDTH;
   int block_height = LCU_WIDTH;
 
+  // Check for right and bottom boundaries.
   if (x_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)pic->width) {
     block_width = pic->width - x_ctb * LCU_WIDTH;
   }
@@ -364,11 +360,8 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
-  // These buffers are needed only until we switch to a LCU based data
-  // structure for pixels. Then we can give pointers directly to that structure
-  // without making copies.
-  picture_blit_pixels(y_data, orig_y, block_width, block_height, pic->width, LCU_WIDTH);
-  picture_blit_pixels(y_recdata, rec_y, block_width, block_height, pic->width, LCU_WIDTH);
+  picture_blit_pixels(data, orig, block_width, block_height, pic->width, LCU_WIDTH);
+  picture_blit_pixels(recdata, rec, block_width, block_height, pic->width, LCU_WIDTH);
 
-  sao_search_best_mode(orig, rec, block_width, block_height, 1, sao);
+  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao);
 }
