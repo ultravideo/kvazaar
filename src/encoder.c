@@ -1209,90 +1209,76 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     for (i = 0; i < 3; i++) {
       if (intra_preds[i] == intra_pred_mode) {
         mpm_preds = i;
-          break;
-        }
+        break;
       }
+    }
 
     // For each part {
     flag = (mpm_preds == -1) ? 0 : 1;
       cabac.ctx = &g_intra_mode_model;
-      CABAC_BIN(&cabac,flag,"IntraPred");
+      CABAC_BIN(&cabac,flag,"prev_intra_luma_pred_flag");
     // } End for each part
 
     // Intrapredmode signaling
     // If found from predictors, we can simplify signaling
     if (flag) {
-      flag = (mpm_preds == 0) ? 0 : 1;
-        CABAC_BIN_EP(&cabac, flag, "intraPredMode");
-
+      CABAC_BIN_EP(&cabac, (mpm_preds == 0 ? 0 : 1), "mpm_idx");
       if (mpm_preds != 0) {
-        flag = (mpm_preds == 1) ? 0 : 1;
-          CABAC_BIN_EP(&cabac, flag, "intraPredMode");
-        }
+        CABAC_BIN_EP(&cabac, (mpm_preds == 1 ? 0 : 1), "mpm_idx");
+      }
     } else { 
       // we signal the "full" predmode
-      int32_t intra_pred_mode_temp = intra_pred_mode;
+      int32_t tmp_pred = intra_pred_mode;
 
-      if (intra_preds[0] > intra_preds[1]) {
-        SWAP(intra_preds[0], intra_preds[1], int8_t);
-      }
-
-      if (intra_preds[0] > intra_preds[2]) {
-        SWAP(intra_preds[0], intra_preds[2], int8_t);
-        }
-
-      if (intra_preds[1] > intra_preds[2]) {
-        SWAP(intra_preds[1], intra_preds[2], int8_t);
-        }
+      if (intra_preds[0] > intra_preds[1]) SWAP(intra_preds[0], intra_preds[1], int8_t);
+      if (intra_preds[0] > intra_preds[2]) SWAP(intra_preds[0], intra_preds[2], int8_t);
+      if (intra_preds[1] > intra_preds[2]) SWAP(intra_preds[1], intra_preds[2], int8_t);
 
       for (i = 2; i >= 0; i--) {
-        intra_pred_mode_temp = intra_pred_mode_temp > intra_preds[i] ?
-                               intra_pred_mode_temp - 1 : intra_pred_mode_temp;
-        }
-
-      CABAC_BINS_EP(&cabac, intra_pred_mode_temp, 5, "intraPredMode");
-        }
-
-    // If we have chroma, signal it
-    if (encoder->in.video_format != FORMAT_400) {
-      // Chroma intra prediction
-      cabac.ctx = &g_chroma_pred_model[0];
-      CABAC_BIN(&cabac, ((intra_pred_mode_chroma != 36) ? 1 : 0), "IntraPredChroma");
-
-      // If not copied from luma, signal it
-      if (intra_pred_mode_chroma != 36) {
-        int8_t intra_pred_mode_chroma_temp = intra_pred_mode_chroma;
-        // Default chroma predictors
-        uint32_t allowed_chroma_dir[5] = { 0, 26, 10, 1, 36 };
-          
-        // If intra is the same as one of the default predictors, replace it
-        for (i = 0; i < 4; i++) {
-          if (intra_pred_mode == allowed_chroma_dir[i]) {
-            allowed_chroma_dir[i] = 34; /* VER+8 mode */
-              break;
-          }
-        }
-
-        for (i = 0; i < 4; i++) {
-          if (intra_pred_mode_chroma_temp == allowed_chroma_dir[i]) {
-            intra_pred_mode_chroma_temp = i;
-            break;
-          }
-        }
-
-        CABAC_BINS_EP(&cabac, intra_pred_mode_chroma_temp, 2, "intraPredModeChroma");
+        tmp_pred = (tmp_pred > intra_preds[i] ? tmp_pred - 1 : tmp_pred);
       }
+
+      CABAC_BINS_EP(&cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
     }
 
-    // END OF PREDINFO CODING
-    
-    // Coeff
-    // Transform tree    
+    // Chroma intra prediction
+    /** Table 9-35 – Binarization for intra_chroma_pred_mode
+     * intra_chroma_pred_mode  bin_string
+     *                      4           0
+     *                      0         100
+     *                      1         101
+     *                      2         110
+     *                      3         111
+     */
+    cabac.ctx = &g_chroma_pred_model[0];
+    CABAC_BIN(&cabac, ((intra_pred_mode_chroma != 36) ? 1 : 0), "intra_chroma_pred_mode");
+
+    // If not copied from luma, signal it
+    if (intra_pred_mode_chroma != 36) {
+      int8_t tmp_pred = intra_pred_mode_chroma;
+      // Default chroma predictors
+      uint32_t allowed_chroma_dir[5] = { 0, 26, 10, 1, 36 };
+          
+      // If intra is the same as one of the default predictors, replace it
+      for (i = 0; i < 4; i++) {
+        if (intra_pred_mode == allowed_chroma_dir[i]) {
+          allowed_chroma_dir[i] = 34;  // VER+8 mode
+          break;
+        }
+      }
+
+      for (i = 0; i < 4; i++) {
+        if (tmp_pred == allowed_chroma_dir[i]) {
+          tmp_pred = i;
+          break;
+        }
+      }
+
+      CABAC_BINS_EP(&cabac, tmp_pred, 2, "intra_chroma_pred_mode");
+    }
+
     encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0, 0, 0);
-    // end Transform tree
-    // end Coeff
-
-    }
+  }
 
     #if ENABLE_PCM == 1
   // Code IPCM block
