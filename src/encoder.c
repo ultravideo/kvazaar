@@ -1241,41 +1241,44 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       CABAC_BINS_EP(&cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
     }
 
-    // Chroma intra prediction
-    /** Table 9-35 – Binarization for intra_chroma_pred_mode
-     * intra_chroma_pred_mode  bin_string
-     *                      4           0
-     *                      0         100
-     *                      1         101
-     *                      2         110
-     *                      3         111
-     */
-    cabac.ctx = &g_chroma_pred_model[0];
-    CABAC_BIN(&cabac, ((intra_pred_mode_chroma != 36) ? 1 : 0), "intra_chroma_pred_mode");
+    {  // start intra chroma pred mode coding
+      unsigned pred_mode = 5;
+      unsigned chroma_pred_modes[4] = {0, 26, 10, 1};
 
-    // If not copied from luma, signal it
-    if (intra_pred_mode_chroma != 36) {
-      int8_t tmp_pred = intra_pred_mode_chroma;
-      // Default chroma predictors
-      uint32_t allowed_chroma_dir[5] = { 0, 26, 10, 1, 36 };
-          
-      // If intra is the same as one of the default predictors, replace it
-      for (i = 0; i < 4; i++) {
-        if (intra_pred_mode == allowed_chroma_dir[i]) {
-          allowed_chroma_dir[i] = 34;  // VER+8 mode
-          break;
+      if (intra_pred_mode_chroma == 36) {
+        pred_mode = 4;
+      } else if (intra_pred_mode_chroma == 34) {
+        // Angular 34 mode is possible only if intra pred mode is one of the
+        // possible chroma pred modes, in which case it is signaled with that
+        // duplicate mode.
+        for (i = 0; i < 4; ++i) {
+          if (intra_pred_mode == chroma_pred_modes[i]) pred_mode = i;
+        }
+      } else {
+        for (i = 0; i < 4; ++i) {
+          if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
         }
       }
 
-      for (i = 0; i < 4; i++) {
-        if (tmp_pred == allowed_chroma_dir[i]) {
-          tmp_pred = i;
-          break;
-        }
+      /**
+       * Table 9-35 – Binarization for intra_chroma_pred_mode
+       *   intra_chroma_pred_mode  bin_string
+       *                        4           0
+       *                        0         100
+       *                        1         101
+       *                        2         110
+       *                        3         111
+       * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
+       *   intra_chroma_pred_mode[][] = 0, bypass, bypass
+       */
+      cabac.ctx = &g_chroma_pred_model[0];
+      if (pred_mode == 4) {
+        CABAC_BIN(&cabac, 0, "intra_chroma_pred_mode");
+      } else {
+        CABAC_BIN(&cabac, 1, "intra_chroma_pred_mode");
+        CABAC_BINS_EP(&cabac, pred_mode, 2, "intra_chroma_pred_mode");
       }
-
-      CABAC_BINS_EP(&cabac, tmp_pred, 2, "intra_chroma_pred_mode");
-    }
+    }  // end intra chroma pred mode coding
 
     encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0, 0, 0);
   }
