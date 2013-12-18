@@ -1186,13 +1186,14 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
     // END for each part
   } else if (cur_cu->type == CU_INTRA) {
-    uint8_t intra_pred_mode = cur_cu->intra.mode;
+    uint8_t intra_pred_mode[4] = { cur_cu->intra.mode, -1, -1, -1 }; // TODO: set modes for NxN
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
     int8_t intra_preds[3] = { -1, -1, -1};
     int8_t mpm_preds = -1;
-    int i;
-    uint32_t flag;
-    uint32_t width = LCU_WIDTH>>depth;    
+    int i, j;
+    uint32_t flag[4];
+    uint32_t width = LCU_WIDTH>>depth;
+    int num_pred_units = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
       
     #if ENABLE_PCM == 1
     // Code must start after variable initialization
@@ -1203,42 +1204,50 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // If intra prediction mode is found from the predictors,
     // it can be signaled with two EP's. Otherwise we can send
     // 5 EP bins with the full predmode
-    intra_get_dir_luma_predictor(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-                                 intra_preds);
-      
-    for (i = 0; i < 3; i++) {
-      if (intra_preds[i] == intra_pred_mode) {
-        mpm_preds = i;
-        break;
+    for (j = 0; j < num_pred_units; ++j) {
+      unsigned x_offset = j % 2;
+      unsigned y_offset = j / 2;
+      intra_get_dir_luma_predictor(encoder->in.cur_pic, 
+                                   x_ctb + x_offset, 
+                                   y_ctb + y_offset, 
+                                   depth,
+                                   intra_preds);
+      for (i = 0; i < 3; i++) {
+        if (intra_preds[i] == intra_pred_mode[j]) {
+          mpm_preds = i;
+          break;
+        }
       }
+      flag[j] = (mpm_preds == -1) ? 0 : 1;
     }
 
-    // For each part {
-    flag = (mpm_preds == -1) ? 0 : 1;
-      cabac.ctx = &g_intra_mode_model;
-      CABAC_BIN(&cabac,flag,"prev_intra_luma_pred_flag");
-    // } End for each part
+    cabac.ctx = &g_intra_mode_model;
+    for (j = 0; j < num_pred_units; ++j) {
+      CABAC_BIN(&cabac, flag[j], "prev_intra_luma_pred_flag");
+    }
+    
+    for (j = 0; j < num_pred_units; ++j) {
+      // Intrapredmode signaling
+      // If found from predictors, we can simplify signaling
+      if (flag[j]) {
+        CABAC_BIN_EP(&cabac, (mpm_preds == 0 ? 0 : 1), "mpm_idx");
+        if (mpm_preds != 0) {
+          CABAC_BIN_EP(&cabac, (mpm_preds == 1 ? 0 : 1), "mpm_idx");
+        }
+      } else { 
+        // we signal the "full" predmode
+        int32_t tmp_pred = intra_pred_mode[j];
 
-    // Intrapredmode signaling
-    // If found from predictors, we can simplify signaling
-    if (flag) {
-      CABAC_BIN_EP(&cabac, (mpm_preds == 0 ? 0 : 1), "mpm_idx");
-      if (mpm_preds != 0) {
-        CABAC_BIN_EP(&cabac, (mpm_preds == 1 ? 0 : 1), "mpm_idx");
+        if (intra_preds[0] > intra_preds[1]) SWAP(intra_preds[0], intra_preds[1], int8_t);
+        if (intra_preds[0] > intra_preds[2]) SWAP(intra_preds[0], intra_preds[2], int8_t);
+        if (intra_preds[1] > intra_preds[2]) SWAP(intra_preds[1], intra_preds[2], int8_t);
+
+        for (i = 2; i >= 0; i--) {
+          tmp_pred = (tmp_pred > intra_preds[i] ? tmp_pred - 1 : tmp_pred);
+        }
+
+        CABAC_BINS_EP(&cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
       }
-    } else { 
-      // we signal the "full" predmode
-      int32_t tmp_pred = intra_pred_mode;
-
-      if (intra_preds[0] > intra_preds[1]) SWAP(intra_preds[0], intra_preds[1], int8_t);
-      if (intra_preds[0] > intra_preds[2]) SWAP(intra_preds[0], intra_preds[2], int8_t);
-      if (intra_preds[1] > intra_preds[2]) SWAP(intra_preds[1], intra_preds[2], int8_t);
-
-      for (i = 2; i >= 0; i--) {
-        tmp_pred = (tmp_pred > intra_preds[i] ? tmp_pred - 1 : tmp_pred);
-      }
-
-      CABAC_BINS_EP(&cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
     }
 
     {  // start intra chroma pred mode coding
@@ -1252,7 +1261,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
         // possible chroma pred modes, in which case it is signaled with that
         // duplicate mode.
         for (i = 0; i < 4; ++i) {
-          if (intra_pred_mode == chroma_pred_modes[i]) pred_mode = i;
+          if (intra_pred_mode[0] == chroma_pred_modes[i]) pred_mode = i;
         }
       } else {
         for (i = 0; i < 4; ++i) {
