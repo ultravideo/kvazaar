@@ -1033,12 +1033,20 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     CABAC_BIN(&cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }
 
-  // Signal PartSize on max depth
-  if (depth == MAX_DEPTH || cur_cu->type != CU_INTRA) {
+  // part_mode
+  if (cur_cu->type == CU_INTRA) {
+    if (depth == MAX_DEPTH) {
+      cabac.ctx = &g_part_size_model[0];
+      if (cur_cu->part_size == SIZE_2Nx2N) {
+        CABAC_BIN(&cabac, 1, "part_mode 2Nx2N");
+      } else {
+        CABAC_BIN(&cabac, 0, "part_mode NxN");
+      }
+    }
+  } else {
     // TODO: Handle inter sizes other than 2Nx2N
     cabac.ctx = &g_part_size_model[0];
-    CABAC_BIN(&cabac, 1, "PartSize");
-    // TODO: add AMP modes
+    CABAC_BIN(&cabac, 1, "part_mode 2Nx2N");
   }
     
   //end partsize
