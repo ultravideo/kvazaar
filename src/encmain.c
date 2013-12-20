@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
   uint64_t curpos  = 0;
   uint64_t lastpos = 0;
   #ifdef _DEBUG
-  FILE *recout = fopen("encrec.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
+  FILE *recout = fopen("encrec_832x480_60.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
   #endif
   encoder_control *encoder = (encoder_control*)malloc(sizeof(encoder_control));
     
