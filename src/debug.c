@@ -103,7 +103,7 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
     depth, rgb[0], rgb[1], rgb[2],
     depth, xCtb, yCtb, (cu->type == CU_INTRA ? 'I' : 'P'),
     cu->inter.cost, cu->inter.mv[0], cu->inter.mv[1],
-    cu->intra.cost, cu->intra.mode);
+    cu->intra[0].cost, cu->intra[0].mode);
 
 
   if(depth != MAX_INTER_SEARCH_DEPTH)

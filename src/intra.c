@@ -45,7 +45,7 @@ void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t dep
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
       pic->cu_array[MAX_DEPTH][cu_pos + x].depth = depth;
       pic->cu_array[MAX_DEPTH][cu_pos + x].type  = CU_INTRA;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].intra.mode = mode;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[0].mode = mode;
     }
   }
 }
@@ -63,7 +63,7 @@ int8_t intra_get_block_mode(picture *pic, uint32_t x_cu, uint32_t y_cu, uint8_t 
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH; //!< width in smallest CU
   int cu_pos = y_cu * width_in_scu + x_cu;
   if (pic->cu_array[MAX_DEPTH][cu_pos].type == CU_INTRA) {
-    return pic->cu_array[MAX_DEPTH][cu_pos].intra.mode;
+    return pic->cu_array[MAX_DEPTH][cu_pos].intra[0].mode;
   }
   return -1;
 }
@@ -111,13 +111,13 @@ int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_cu, uint32_t y_cu, 
   
   // Left PU predictor
   if(x_cu && pic->cu_array[MAX_DEPTH][cu_pos - 1].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - 1].coded) {
-    left_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - 1].intra.mode;
+    left_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - 1].intra[0].mode;
   }
 
   // Top PU predictor
   if(y_cu && ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0
      && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].coded) {
-    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra.mode;
+    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra[0].mode;
   }
 
   // If the predictions are the same, add new predictions

@@ -391,10 +391,10 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   // Build reconstructed block to use in prediction with extrapolated borders
   search_buildReferenceBorder(encoder->in.cur_pic, x_ctb, y_ctb,
       (LCU_WIDTH >> (depth)) * 2 + 8, rec, (LCU_WIDTH >> (depth)) * 2 + 8, 0);
-  cur_cu->intra.mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
+  cur_cu->intra[0].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
       encoder->in.width, recShift, (LCU_WIDTH >> (depth)) * 2 + 8,
       x_ctb * (LCU_WIDTH >> (MAX_DEPTH)), y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
-      width, pred, width, &cur_cu->intra.cost);
+      width, pred, width, &cur_cu->intra[0].cost);
 }
 
 /**
@@ -412,7 +412,7 @@ void search_tree(encoder_control *encoder,
   picture *cur_pic = encoder->in.cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
-  cur_cu->intra.cost = 0xffffffff;
+  cur_cu->intra[0].cost = 0xffffffff;
   cur_cu->inter.cost = 0xffffffff;
 
   // Force split on border
@@ -462,7 +462,7 @@ uint32_t search_best_mode(encoder_control *encoder,
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth]
                      [x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  uint32_t best_intra_cost = cur_cu->intra.cost;
+  uint32_t best_intra_cost = cur_cu->intra[0].cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;
   uint32_t lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
 
@@ -489,7 +489,7 @@ uint32_t search_best_mode(encoder_control *encoder,
     return best_inter_cost;
   } else {
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-        cur_cu->intra.mode);
+        cur_cu->intra[0].mode);
     return best_intra_cost;
   }
 }

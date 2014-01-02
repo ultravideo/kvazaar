@@ -1183,7 +1183,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
     // END for each part
   } else if (cur_cu->type == CU_INTRA) {
-    uint8_t intra_pred_mode[4] = { cur_cu->intra.mode, -1, -1, -1 }; // TODO: set modes for NxN
+    uint8_t intra_pred_mode[4] = { cur_cu->intra[0].mode, -1, -1, -1 }; // TODO: set modes for NxN
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
     int8_t intra_preds[3] = { -1, -1, -1};
     int8_t mpm_preds = -1;
@@ -1426,17 +1426,17 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
     {
       //if multiple scans supported for transform size
       if (ctx_idx > 3 && ctx_idx < 6) {
-        scan_idx_luma = abs((int32_t) cur_cu->intra.mode - 26) < 5 ? 1 : (abs((int32_t)cur_cu->intra.mode - 10) < 5 ? 2 : 0);
+        scan_idx_luma = abs((int32_t) cur_cu->intra[0].mode - 26) < 5 ? 1 : (abs((int32_t)cur_cu->intra[0].mode - 10) < 5 ? 2 : 0);
       }
       // TODO : chroma intra prediction
-      cur_cu->intra.mode_chroma = 36;
+      cur_cu->intra[0].mode_chroma = 36;
       // Chroma scanmode
       ctx_idx++;
-      dir_mode = cur_cu->intra.mode_chroma; 
+      dir_mode = cur_cu->intra[0].mode_chroma; 
 
       if (dir_mode == 36) {
         // TODO: support NxN
-        dir_mode = cur_cu->intra.mode;
+        dir_mode = cur_cu->intra[0].mode;
       }
       if (ctx_idx > 4 && ctx_idx < 7) { // if multiple scans supported for transform size
         scan_idx_chroma = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
@@ -1756,7 +1756,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
         scan_idx = SCAN_DIAG;
       } else {
         // Luma (Intra) scanmode
-        dir_mode = cur_cu->intra.mode;
+        dir_mode = cur_cu->intra[0].mode;
 
         //if multiple scans supported for transform size
         if (ctx_idx > 3 && ctx_idx < 6) {
@@ -1774,11 +1774,11 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
       } else {
         // Chroma scanmode
         ctx_idx++;
-        dir_mode = cur_cu->intra.mode_chroma;
+        dir_mode = cur_cu->intra[0].mode_chroma;
 
         if (dir_mode == 36) {
           // TODO: support NxN
-          dir_mode = cur_cu->intra.mode;
+          dir_mode = cur_cu->intra[0].mode;
         }
 
         scan_idx = SCAN_DIAG;
@@ -2143,39 +2143,39 @@ void encode_block_residual(encoder_control *encoder,
     pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
     pixel *rec_shift_u = &rec[(LCU_WIDTH >> (depth + 1)) * 2 + 8 + 1];
 
-    cur_cu->intra.mode_chroma = 36; // TODO: Chroma intra prediction
+    cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
     
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
                                  (LCU_WIDTH >> (depth)) * 2 + 8, rec,
                                  (LCU_WIDTH >> (depth)) * 2 + 8, 0);
-    cur_cu->intra.mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
+    cur_cu->intra[0].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
                                                   encoder->in.width,
                                                   rec_shift,
                                                   (LCU_WIDTH >> (depth)) * 2 + 8,
                                                   x_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
                                                   y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
                                                   width, pred_y, width,
-                                                  &cur_cu->intra.cost);
+                                                  &cur_cu->intra[0].cost);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-                         cur_cu->intra.mode);
+                         cur_cu->intra[0].mode);
     
     // Build reconstructed block to use in prediction with extrapolated borders
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
                                   (LCU_WIDTH >> (depth)) * 2 + 8, rec, (LCU_WIDTH >> (depth)) * 2 + 8, 0);
     intra_recon(rec_shift, (LCU_WIDTH >> (depth)) * 2 + 8,
                 x_ctb * (LCU_WIDTH >> (MAX_DEPTH)), y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
-                width, recbase_y, rec_stride, cur_cu->intra.mode, 0);
+                width, recbase_y, rec_stride, cur_cu->intra[0].mode, 0);
 
     // Filter DC-prediction
-    if (cur_cu->intra.mode == 1 && width < 32) {
+    if (cur_cu->intra[0].mode == 1 && width < 32) {
       intra_dc_pred_filtering(rec_shift, (LCU_WIDTH >> (depth)) * 2 + 8, recbase_y,
                               rec_stride, LCU_WIDTH >> depth, LCU_WIDTH >> depth);
     }
     
     // TODO : chroma intra prediction
-    if (cur_cu->intra.mode_chroma != 36
-        && cur_cu->intra.mode_chroma == cur_cu->intra.mode) {
-        cur_cu->intra.mode_chroma = 36;
+    if (cur_cu->intra[0].mode_chroma != 36
+        && cur_cu->intra[0].mode_chroma == cur_cu->intra[0].mode) {
+        cur_cu->intra[0].mode_chroma = 36;
     }
     
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
@@ -2190,7 +2190,7 @@ void encode_block_residual(encoder_control *encoder,
                 width >> 1,
                 recbase_u,
                 rec_stride >> 1,
-                cur_cu->intra.mode_chroma != 36 ? cur_cu->intra.mode_chroma : cur_cu->intra.mode,
+                cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
                 1);
     intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
                                   (LCU_WIDTH >> (depth + 1)) * 2 + 8,
@@ -2202,7 +2202,7 @@ void encode_block_residual(encoder_control *encoder,
                 width >> 1,
                 recbase_v,
                 rec_stride >> 1,
-                cur_cu->intra.mode_chroma != 36 ? cur_cu->intra.mode_chroma : cur_cu->intra.mode,
+                cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
                 1);
 
   } else {
