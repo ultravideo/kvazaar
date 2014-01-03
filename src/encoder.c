@@ -1204,11 +1204,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // it can be signaled with two EP's. Otherwise we can send
     // 5 EP bins with the full predmode
     for (j = 0; j < num_pred_units; ++j) {
-      unsigned x_offset = j % 2;
-      unsigned y_offset = j / 2;
       intra_get_dir_luma_predictor(encoder->in.cur_pic, 
-                                   x_ctb + x_offset, 
-                                   y_ctb + y_offset, 
+                                   x_ctb, 
+                                   y_ctb, 
                                    depth,
                                    intra_preds);
       for (i = 0; i < 3; i++) {
@@ -1348,6 +1346,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
   // we have 64>>depth transform size
   int x,y,i;
   int32_t width = LCU_WIDTH>>depth;
+  int32_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   // Split transform and increase depth
@@ -1534,19 +1533,19 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       i = 0;
       ac_sum = 0;
 
-      for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-        for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
+      for (y = 0; y < width_c; y++) {
+        for (x = 0; x < width_c; x++) {
           block[i] = ((int16_t)base_u[x + y * (base_stride >> 1)]) -
                      pred_u[x + y * (pred_stride >> 1)];
           i++;
         }
       }
 
-      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
-      quant(encoder, pre_quant_coeff, coeff_u, width >> 1, width >> 1, &ac_sum, 2,
+      transform2d(block,pre_quant_coeff,width_c,65535);
+      quant(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
             scan_idx_chroma, cur_cu->type);
 
-      for (i = 0; i < width *width >> 2; i++) {
+      for (i = 0; i < width_c * width_c; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
           cur_cu->coeff_top_u[depth] = cur_cu->coeff_u = 1;
@@ -1558,19 +1557,19 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       i = 0;
       ac_sum = 0;
 
-      for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-        for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
+      for (y = 0; y < width_c; y++) {
+        for (x = 0; x < width_c; x++) {
           block[i] = ((int16_t)base_v[x + y * (base_stride >> 1)]) -
                      pred_v[x + y * (pred_stride >> 1)];
           i++;
         }
       }
 
-      transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
-      quant(encoder, pre_quant_coeff, coeff_v, width >> 1, width >> 1, &ac_sum, 3,
+      transform2d(block,pre_quant_coeff,width_c,65535);
+      quant(encoder, pre_quant_coeff, coeff_v, width_c, width_c, &ac_sum, 3,
             scan_idx_chroma, cur_cu->type);
 
-      for (i = 0; i < width *width >> 2; i++) {
+      for (i = 0; i < width_c * width_c; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
           cur_cu->coeff_top_v[depth] = cur_cu->coeff_v = 1;
@@ -1580,8 +1579,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
           
       if (cur_cu->coeff_u || cur_cu->coeff_v) { 
         i = 0;
-        for (y = 0; y < width>>1; y++) {
-          for (x = 0; x < width>>1; x++) {
+        for (y = 0; y < width_c; y++) {
+          for (x = 0; x < width_c; x++) {
             orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
             orig_coeff_v[x + y * (coeff_stride>>1)] = coeff_v[i];
             i++;
@@ -1591,13 +1590,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
 
       if (cur_cu->coeff_u) {        
         // RECONSTRUCT for predictions
-        dequant(encoder, coeff_u, pre_quant_coeff, width >> 1, width >> 1, 2, cur_cu->type);
-        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
+        dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, 2, cur_cu->type);
+        itransform2d(block,pre_quant_coeff,width_c,65535);
 
         i = 0;
 
-        for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-          for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
+        for (y = 0; y < width_c; y++) {
+          for (x = 0; x < width_c; x++) {
             int16_t val = block[i++] + pred_u[x + y * (pred_stride >> 1)];
             //TODO: support 10+bits
             recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
@@ -1607,23 +1606,22 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
         // END RECONTRUCTION
       } else {
         // without coeffs, we only use the prediction
-        for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-          for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
-            recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255,
-                                                                     pred_u[x + y * (pred_stride >> 1)]);
+        for (y = 0; y < width_c; y++) {
+          for (x = 0; x < width_c; x++) {
+            recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, pred_u[x + y * (pred_stride >> 1)]);
           }
         }
       }
       
       if (cur_cu->coeff_v) {
         // RECONSTRUCT for predictions
-        dequant(encoder, coeff_v, pre_quant_coeff, width >> 1, width >> 1, 3, cur_cu->type);
-        itransform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
+        dequant(encoder, coeff_v, pre_quant_coeff, width_c, width_c, 3, cur_cu->type);
+        itransform2d(block,pre_quant_coeff,width_c,65535);
 
         i = 0;
 
-        for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-          for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
+        for (y = 0; y < width_c; y++) {
+          for (x = 0; x < width_c; x++) {
             int16_t val = block[i++] + pred_v[x + y * (pred_stride >> 1)];
             //TODO: support 10+bits
             recbase_v[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
@@ -1633,10 +1631,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
         // END RECONTRUCTION
       } else {
         // without coeffs, we only use the prediction
-        for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-          for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
-            recbase_v[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255,
-                                                                     pred_v[x + y * (pred_stride >> 1)]);
+        for (y = 0; y < width_c; y++) {
+          for (x = 0; x < width_c; x++) {
+            recbase_v[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, pred_v[x + y * (pred_stride >> 1)]);
           }
         }
       }
@@ -1653,24 +1650,23 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
   int8_t width = LCU_WIDTH>>depth;
+  int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
   int8_t split = (cur_cu->tr_depth > depth||!depth);
   int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)))+1;
 
   int8_t cb_flag_u = !split ? cur_cu->coeff_u : cur_cu->coeff_top_u[depth];
   int8_t cb_flag_v = !split ? cur_cu->coeff_v : cur_cu->coeff_top_v[depth];
+  int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
   
-  if (depth != 0 && depth != MAX_DEPTH + 1) {
-    cabac.ctx = &g_trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) -
-                                           depth)];
+  if (depth != 0 && depth != MAX_DEPTH + 1 && !intra_split_flag) {
+    cabac.ctx = &g_trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) - depth)];
     CABAC_BIN(&cabac,split,"TransformSubdivFlag");
   }
 
   // Signal if chroma data is present
   // Chroma data is also signaled BEFORE transform split
   // Chroma data is not signaled if it was set to 0 before split
-  if (encoder->in.video_format != FORMAT_400) {
-    uint8_t offset = 1<<(MAX_DEPTH-1-depth);
-
+  if (tr_depth == 0 || depth < MAX_DEPTH + 1) {
     // Non-zero chroma U Tcoeffs
     cabac.ctx = &g_qt_cbf_model_chroma[tr_depth];
 
@@ -1770,7 +1766,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
     }
 
     if (cur_cu->coeff_u || cur_cu->coeff_v) {
-      int8_t chroma_width = width >> 1;
+      int8_t chroma_width = (depth == MAX_DEPTH + 1 ? width : width >> 1);
       if(cur_cu->type == CU_INTER) {
         scan_idx = SCAN_DIAG;
       } else {
