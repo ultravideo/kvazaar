@@ -399,12 +399,12 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
       width, pred, width, &cur_cu->intra[0].cost);
 
   // Do search for NxN split.
-  if (depth == MAX_DEPTH && 0) { // Disabled because coding NxN doesn't work yet.
+  if (depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
     int nn_mode = cur_cu->intra[0].mode;
     int i;
-    int cost = 0;
+    int cost = g_lambda_cost[encoder->QP] << 6;
     static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
     width = 4;
     recShift = &rec[width * 2 + 8 + 1];
