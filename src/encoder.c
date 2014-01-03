@@ -1183,7 +1183,9 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
     // END for each part
   } else if (cur_cu->type == CU_INTRA) {
-    uint8_t intra_pred_mode[4] = { cur_cu->intra[0].mode, -1, -1, -1 }; // TODO: set modes for NxN
+    uint8_t intra_pred_mode[4] = { 
+      cur_cu->intra[0].mode, cur_cu->intra[1].mode, 
+      cur_cu->intra[2].mode, cur_cu->intra[3].mode };
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
     int8_t intra_preds[3] = { -1, -1, -1};
     int8_t mpm_preds = -1;
@@ -2128,10 +2130,8 @@ void encode_block_residual(encoder_control *encoder,
   }
 
   if (cur_cu->type == CU_INTRA) {
-    uint32_t width = LCU_WIDTH>>depth;
-
     // INTRAPREDICTION VARIABLES
-    pixel pred_y[LCU_WIDTH * LCU_WIDTH];
+    //pixel pred_y[LCU_WIDTH * LCU_WIDTH];
 
     pixel *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
     pixel *recbase_u = &encoder->in.cur_pic->u_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
@@ -2143,9 +2143,20 @@ void encode_block_residual(encoder_control *encoder,
     pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
     pixel *rec_shift_u = &rec[(LCU_WIDTH >> (depth + 1)) * 2 + 8 + 1];
 
+    int width = LCU_WIDTH >> depth;
+    int width_c = LCU_WIDTH >> (depth + 1);
+    static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
+    int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
+    int i;
+
+    if (cur_cu->part_size == SIZE_NxN) {
+      width = width_c;
+    }
+
     cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
     
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
+    // Disable for now because it doesn't implement NxN yet.
+    /*intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
                                  (LCU_WIDTH >> (depth)) * 2 + 8, rec,
                                  (LCU_WIDTH >> (depth)) * 2 + 8, 0);
     cur_cu->intra[0].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
@@ -2157,49 +2168,56 @@ void encode_block_residual(encoder_control *encoder,
                                                   width, pred_y, width,
                                                   &cur_cu->intra[0].cost);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-                         cur_cu->intra[0].mode);
+                         cur_cu->intra[0].mode, cur_cu->part_size);*/
     
-    // Build reconstructed block to use in prediction with extrapolated borders
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
-                                  (LCU_WIDTH >> (depth)) * 2 + 8, rec, (LCU_WIDTH >> (depth)) * 2 + 8, 0);
-    intra_recon(rec_shift, (LCU_WIDTH >> (depth)) * 2 + 8,
-                x_ctb * (LCU_WIDTH >> (MAX_DEPTH)), y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
-                width, recbase_y, rec_stride, cur_cu->intra[0].mode, 0);
 
-    // Filter DC-prediction
-    if (cur_cu->intra[0].mode == 1 && width < 32) {
-      intra_dc_pred_filtering(rec_shift, (LCU_WIDTH >> (depth)) * 2 + 8, recbase_y,
-                              rec_stride, LCU_WIDTH >> depth, LCU_WIDTH >> depth);
+
+    for (i = 0; i < num_pu; ++i) {
+      // Build reconstructed block to use in prediction with extrapolated borders
+      int x_pos = (x_ctb << MIN_SIZE) + offsets[i].x * width;
+      int y_pos = (y_ctb << MIN_SIZE) + offsets[i].y * width;
+
+      intra_build_reference_border(encoder->in.cur_pic, x_pos, y_pos,
+                                    width * 2 + 8, rec, width * 2 + 8, 0);
+      intra_recon(rec_shift, width * 2 + 8,
+                  x_ctb * (LCU_WIDTH >> (MAX_DEPTH)), y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
+                  width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
+
+      // Filter DC-prediction
+      if (cur_cu->intra[i].mode == 1 && width < 32) {
+        intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
+                                rec_stride, width, width);
+      }
     }
-    
+
     // TODO : chroma intra prediction
     if (cur_cu->intra[0].mode_chroma != 36
         && cur_cu->intra[0].mode_chroma == cur_cu->intra[0].mode) {
         cur_cu->intra[0].mode_chroma = 36;
     }
-    
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
-                                  (LCU_WIDTH >> (depth + 1)) * 2 + 8, rec,
-                                  (LCU_WIDTH >> (depth + 1)) * 2 + 8,
+
+    intra_build_reference_border(encoder->in.cur_pic, x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
+                                  width_c * 2 + 8, rec,
+                                  width_c * 2 + 8,
                                   1);
-                                  
     intra_recon(rec_shift_u, 
-                (LCU_WIDTH >> (depth + 1)) * 2 + 8,
-                x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)),
-                y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)),
-                width >> 1,
+                width_c * 2 + 8,
+                x_ctb * width_c,
+                y_ctb * width_c,
+                width_c,
                 recbase_u,
                 rec_stride >> 1,
                 cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
                 1);
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
-                                  (LCU_WIDTH >> (depth + 1)) * 2 + 8,
-                                  rec, (LCU_WIDTH >> (depth + 1)) * 2 + 8,
+
+    intra_build_reference_border(encoder->in.cur_pic, x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
+                                  width_c * 2 + 8,
+                                  rec, width_c * 2 + 8,
                                   2);
-    intra_recon(rec_shift_u, (LCU_WIDTH >> (depth + 1)) * 2 + 8,
-                x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)),
-                y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)),
-                width >> 1,
+    intra_recon(rec_shift_u, width_c * 2 + 8,
+                x_ctb * width_c,
+                y_ctb * width_c,
+                width_c,
                 recbase_v,
                 rec_stride >> 1,
                 cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
