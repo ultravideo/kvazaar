@@ -33,7 +33,7 @@ const uint8_t intra_hor_ver_dist_thres[5] = {0,7,1,0,0};
  * \param mode mode to set
  * \returns Void
  */
-void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode)
+void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
 {
   uint32_t x, y;  
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH; //!< Width in smallest CU
@@ -46,6 +46,7 @@ void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t dep
       pic->cu_array[MAX_DEPTH][cu_pos + x].depth = depth;
       pic->cu_array[MAX_DEPTH][cu_pos + x].type  = CU_INTRA;
       pic->cu_array[MAX_DEPTH][cu_pos + x].intra[0].mode = mode;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].part_size = part_mode;
     }
   }
 }
@@ -362,7 +363,7 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
  * \param chroma signaling if chroma is used, 0 = luma, 1 = U and 2 = V    
  *
  */
-void intra_build_reference_border(picture *pic, int32_t x_cu, int32_t y_cu,int16_t outwidth, pixel *dst, int32_t dststride, int8_t chroma)
+void intra_build_reference_border(picture *pic, int32_t x, int32_t y,int16_t outwidth, pixel *dst, int32_t dststride, int8_t chroma)
 {
   int32_t left_column; //!< left column iterator
   pixel val;         //!< variable to store extrapolated value
@@ -373,6 +374,8 @@ void intra_build_reference_border(picture *pic, int32_t x_cu, int32_t y_cu,int16
   int32_t src_height   = (pic->height>>(chroma?1:0));//!< source picture height
   pixel *src         = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata); //!< input picture pointer
   int16_t scu_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); //!< Smallest Coding Unit width
+  int32_t x_cu = x >> MIN_SIZE;
+  int32_t y_cu = y >> MIN_SIZE;
   pixel *src_shifted = &src[x_cu * scu_width + (y_cu * scu_width) * src_width];  //!< input picture pointer shifted to start from the left-top corner of the current block
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;     //!< picture width in smallest CU
 

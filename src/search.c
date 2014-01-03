@@ -283,9 +283,9 @@ void search_buildReferenceBorder(picture *pic, int32_t x, int32_t y,
   int32_t src_height = (pic->height >> (chroma ? 1 : 0)); // source picture height
   pixel *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
   int16_t scu_width = LCU_WIDTH >> (MAX_DEPTH + (chroma ? 1 : 0)); // Smallest Coding Unit width
-  int x_ctb = x / scu_width;
-  int y_ctb = y / scu_width;
-  pixel *src_shifted = &src_pic[x + y * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
+  int x_ctb = x >> MIN_SIZE;
+  int y_ctb = y >> MIN_SIZE;
+  pixel *src_shifted = &src_pic[x_ctb * scu_width + y_ctb * scu_width * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
   int32_t width_in_scu = pic->width_in_lcu << MAX_DEPTH; // picture width in SCU
 
   // Fill left column
@@ -523,7 +523,7 @@ uint32_t search_best_mode(encoder_control *encoder,
     return best_inter_cost;
   } else {
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-        cur_cu->intra[0].mode);
+        cur_cu->intra[0].mode, cur_cu->part_size);
     return best_intra_cost;
   }
 }
