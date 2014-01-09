@@ -52,6 +52,7 @@ typedef int16_t coefficient;
 
 
 #define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
+#define MAX_PU_DEPTH 4
 #define MIN_SIZE 3   /*!< log2_min_coding_block_size */
 #define CU_MIN_SIZE_PIXELS 8 /*!< pow(2, MIN_SIZE) */
 

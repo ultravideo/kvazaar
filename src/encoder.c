@@ -1177,7 +1177,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // Code (possible) coeffs to bitstream
      
     if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
-      encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0, 0, 0);
+      encode_transform_coeff(encoder, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
     }
 
 
@@ -1286,7 +1286,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       }
     }  // end intra chroma pred mode coding
 
-    encode_transform_coeff(encoder, x_ctb, y_ctb, depth, 0, 0, 0);
+    encode_transform_coeff(encoder, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
   }
 
     #if ENABLE_PCM == 1
@@ -1645,9 +1645,11 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
   // end Residual Coding
 }
 
-void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
+void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
+  int32_t x_cu = x_pu / 2;
+  int32_t y_cu = y_pu / 2;
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
   int8_t width = LCU_WIDTH>>depth;
   int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
@@ -1684,13 +1686,14 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
   
   if (split) {
     uint8_t offset = 1<<(MAX_DEPTH-1-depth);
+    uint8_t pu_offset = 1<<(MAX_PU_DEPTH-1-depth);
     cu_info *cu_a =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
     cu_info *cu_b =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
     cu_info *cu_c =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    encode_transform_coeff(encoder, x_cu, y_cu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder, x_cu + offset, y_cu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder, x_cu, y_cu + offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder, x_cu + offset, y_cu + offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 
@@ -1712,28 +1715,16 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
     uint32_t dir_mode;
 
     if (cur_cu->coeff_y) {
-      int x,y;
-      coefficient *orig_pos = &encoder->in.cur_pic->coeff_y[x_cu * (LCU_WIDTH >> (MAX_DEPTH))     + (y_cu * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
+      int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
+      int y = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
+      coefficient *orig_pos = &encoder->in.cur_pic->coeff_y[x + y * encoder->in.width];
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
           coeff_y[x+y*width] = orig_pos[x];
         }
         orig_pos += coeff_stride;
       }
-    }
-    if (cur_cu->coeff_u || cur_cu->coeff_v) {
-      int x,y;
-      coefficient *orig_pos_u = &encoder->in.cur_pic->coeff_u[x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
-      coefficient *orig_pos_v = &encoder->in.cur_pic->coeff_v[x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
-      for (y = 0; y < (width>>1); y++) {
-        for (x = 0; x < (width>>1); x++) {
-          coeff_u[x+y*(width>>1)] = orig_pos_u[x];
-          coeff_v[x+y*(width>>1)] = orig_pos_v[x];
-        }
-        orig_pos_u += coeff_stride>>1;
-        orig_pos_v += coeff_stride>>1;
-      }
-    }      
+    }    
 
     switch (width) {
       case  2: ctx_idx = 6; break;
@@ -1765,8 +1756,36 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
       encode_coeff_nxn(encoder, coeff_y, width, 0, scan_idx);
     }
 
+    if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
+      // For size 4x4 luma transform the corresponding chroma transforms are
+      // also of size 4x4 covering 8x8 luma pixels. The residual is coded
+      // in the last transform unit so for the other ones, don't do anything.
+      return;
+    }
+
     if (cur_cu->coeff_u || cur_cu->coeff_v) {
-      int8_t chroma_width = (depth == MAX_DEPTH + 1 ? width : width >> 1);
+      int x, y;
+      coefficient *orig_pos_u, *orig_pos_v;
+
+      if (depth <= MAX_DEPTH) {
+        x = x_pu * (LCU_WIDTH >> (MAX_PU_DEPTH + 1));
+        y = y_pu * (LCU_WIDTH >> (MAX_PU_DEPTH + 1));
+      } else {
+        // for 4x4 select top left pixel of the CU.
+        x = x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1));
+        y = y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1));
+      }
+      orig_pos_u = &encoder->in.cur_pic->coeff_u[x + y * (encoder->in.width >> 1)];
+      orig_pos_v = &encoder->in.cur_pic->coeff_v[x + y * (encoder->in.width >> 1)];
+      for (y = 0; y < (width>>1); y++) {
+        for (x = 0; x < (width>>1); x++) {
+          coeff_u[x+y*(width>>1)] = orig_pos_u[x];
+          coeff_v[x+y*(width>>1)] = orig_pos_v[x];
+        }
+        orig_pos_u += coeff_stride>>1;
+        orig_pos_v += coeff_stride>>1;
+      }
+
       if(cur_cu->type == CU_INTER) {
         scan_idx = SCAN_DIAG;
       } else {
@@ -1787,13 +1806,11 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu,int32_t y_cu,
       }
 
       if (cur_cu->coeff_u) {
-        encode_coeff_nxn(encoder, coeff_u,
-                         chroma_width, 2, scan_idx);
+        encode_coeff_nxn(encoder, coeff_u, width_c, 2, scan_idx);
       }
 
       if (cur_cu->coeff_v) {
-        encode_coeff_nxn(encoder, coeff_v,
-                         chroma_width, 2, scan_idx);
+        encode_coeff_nxn(encoder, coeff_v, width_c, 2, scan_idx);
       }
     }
   }
