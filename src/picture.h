@@ -76,9 +76,10 @@ typedef struct
   int8_t coeff_u;    //!< \brief is there coded coeffs U
   int8_t coeff_v;    //!< \brief is there coded coeffs V
 
-  int8_t coeff_top_y[MAX_DEPTH+1];  //!< \brief is there coded coeffs Y in top level
-  int8_t coeff_top_u[MAX_DEPTH+1];  //!< \brief is there coded coeffs U in top level
-  int8_t coeff_top_v[MAX_DEPTH+1];  //!< \brief is there coded coeffs V in top level
+  // MAX_DEPTH+4 for the 4 PUs at the last level.
+  int8_t coeff_top_y[MAX_DEPTH+4];  //!< \brief is there coded coeffs Y in top level
+  int8_t coeff_top_u[MAX_DEPTH+4];  //!< \brief is there coded coeffs U in top level
+  int8_t coeff_top_v[MAX_DEPTH+4];  //!< \brief is there coded coeffs V in top level
   cu_info_intra intra[4];
   cu_info_inter inter;
 } cu_info;
