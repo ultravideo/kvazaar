@@ -582,8 +582,8 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
   WRITE_UE(encoder->stream, 0, "log2_min_transform_block_size_minus2");   // 4x4
   WRITE_UE(encoder->stream, 3, "log2_diff_max_min_transform_block_size"); // 4x4...32x32
-  WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_inter");
-  WRITE_UE(encoder->stream, 2, "max_transform_hierarchy_depth_intra");
+  WRITE_UE(encoder->stream, TR_DEPTH_INTER, "max_transform_hierarchy_depth_inter");
+  WRITE_UE(encoder->stream, TR_DEPTH_INTRA, "max_transform_hierarchy_depth_intra");
   
   // Use default scaling list
   WRITE_U(encoder->stream, ENABLE_SCALING_LIST, 1, "scaling_list_enable_flag");  
@@ -1673,51 +1673,68 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
   // end Residual Coding
 }
 
+/**
+ * \param encoder         
+ * \param x_pu            Prediction units' x coordinate.
+ * \param y_pu            Prediction units' y coordinate.
+ * \param depth           Depth from LCU.
+ * \param tr_depth        Depth from last CU.
+ * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
+ * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
+ */
 void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  int8_t width = LCU_WIDTH>>depth;
-  int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
-  int8_t split = (cur_cu->tr_depth > depth||!depth);
-  int32_t coeff_fourth = ((LCU_WIDTH>>(depth))*(LCU_WIDTH>>(depth)))+1;
+  int8_t width = LCU_WIDTH >> depth;
+  int8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> 1);
+  
+  // NxN signifies implicit transform split at the first transform level.
+  // There is a similar implicit split for inter, but it is only used when
+  // transform hierarchy is not in use.
+  int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
+
+  // The implicit split by intra NxN is not counted towards max_tr_depth.
+  int max_tr_depth = (cur_cu->type == CU_INTRA ? TR_DEPTH_INTRA + intra_split_flag : TR_DEPTH_INTER);
+
+  int8_t split = cur_cu->tr_depth > depth;
 
   int8_t cb_flag_u = !split ? cur_cu->coeff_u : cur_cu->coeff_top_u[depth];
   int8_t cb_flag_v = !split ? cur_cu->coeff_v : cur_cu->coeff_top_v[depth];
-  int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
-  
-  if (depth != 0 && depth != MAX_DEPTH + 1 && !intra_split_flag) {
+
+  // The split_transform_flag is not signaled when:
+  // - transform size is greater than 32 (depth == 0)
+  // - transform size is 4 (depth == MAX_PU_DEPTH)
+  // - transform depth is max
+  // - cu is intra NxN and it's the first split
+  if (depth > 0 &&
+      depth < MAX_PU_DEPTH &&
+      tr_depth < max_tr_depth &&
+      !(intra_split_flag && tr_depth == 0))
+  {
     cabac.ctx = &g_trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) - depth)];
-    CABAC_BIN(&cabac,split,"TransformSubdivFlag");
+    CABAC_BIN(&cabac, split, "split_transform_flag");
   }
 
-  // Signal if chroma data is present
-  // Chroma data is also signaled BEFORE transform split
-  // Chroma data is not signaled if it was set to 0 before split
-  if (tr_depth == 0 || depth < MAX_DEPTH + 1) {
-    // Non-zero chroma U Tcoeffs
+  // Chroma cb flags are not signaled when one of the following:
+  // - transform size is 4 (2x2 chroma transform doesn't exist)
+  // - they have already been signaled to 0 previously
+  // When they are not present they are inferred to be 0, except for size 4
+  // when the flags from previous level are used.
+  if (depth < MAX_PU_DEPTH) {
     cabac.ctx = &g_qt_cbf_model_chroma[tr_depth];
-
-    if (tr_depth == 0  || parent_coeff_u) {
-      CABAC_BIN(&cabac, cb_flag_u, "cbf_chroma_u");
+    if (tr_depth == 0 || parent_coeff_u) {
+      CABAC_BIN(&cabac, cb_flag_u, "cbf_cb");
     }
-
-    // Non-zero chroma V Tcoeffs
-    // NOTE: Using the same ctx as before
-
-    if (tr_depth == 0  || parent_coeff_v) {
-      CABAC_BIN(&cabac, cb_flag_v, "cbf_chroma_v");
+    if (tr_depth == 0 || parent_coeff_v) {
+      CABAC_BIN(&cabac, cb_flag_v, "cbf_cr");
     }
   }
   
   if (split) {
-    uint8_t offset = 1<<(MAX_DEPTH-1-depth);
-    uint8_t pu_offset = 1<<(MAX_PU_DEPTH-1-depth);
-    cu_info *cu_a =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    cu_info *cu_b =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-    cu_info *cu_c =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+    uint8_t pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
     encode_transform_coeff(encoder, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     encode_transform_coeff(encoder, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     encode_transform_coeff(encoder, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
@@ -1725,12 +1742,18 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
     return;
   }
 
-  if(cur_cu->type == CU_INTRA || tr_depth || cur_cu->coeff_u || cur_cu->coeff_v) {
-      // Non-zero luma Tcoeffs
+  // Luma coded block flag is signaled when one of the following:
+  // - prediction mode is intra
+  // - transform depth > 0
+  // - we have chroma coefficients at this level
+  // When it is not present, it is inferred to be 1.
+  if(cur_cu->type == CU_INTRA || tr_depth > 0 || cur_cu->coeff_u || cur_cu->coeff_v) {
       cabac.ctx = &g_qt_cbf_model_luma[!tr_depth];
       CABAC_BIN(&cabac, cur_cu->coeff_y, "cbf_luma");
   }
 
+  // End of transform tree.
+  // Beginning of transform unit.
 
   {
     coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];

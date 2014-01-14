@@ -56,6 +56,9 @@ typedef int16_t coefficient;
 #define MIN_SIZE 3   /*!< log2_min_coding_block_size */
 #define CU_MIN_SIZE_PIXELS 8 /*!< pow(2, MIN_SIZE) */
 
+#define TR_DEPTH_INTRA 2
+#define TR_DEPTH_INTER 2
+
 #define ENABLE_PCM 0 /*!< Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
 #define ENABLE_SIGN_HIDING 1
 #define ENABLE_SCALING_LIST 0 /*!< Enable usage of (default) scaling list */
