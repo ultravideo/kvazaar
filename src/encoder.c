@@ -1341,6 +1341,70 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
   
 }
 
+void transform_chroma(encoder_control *encoder, cu_info *cur_cu, int depth, pixel *base_u, pixel *pred_u,
+                      coefficient *coeff_u, int color_type, unsigned scan_idx_chroma, coefficient *pre_quant_coeff, coefficient *block)
+{
+  int base_stride = encoder->in.width;
+  int pred_stride = encoder->in.width;
+
+  int width_c = LCU_WIDTH >> (depth + 1);
+  
+  int i = 0;
+  unsigned ac_sum = 0;
+
+  int y, x;
+
+  for (y = 0; y < width_c; y++) {
+    for (x = 0; x < width_c; x++) {
+      block[i] = ((int16_t)base_u[x + y * (base_stride >> 1)]) -
+                  pred_u[x + y * (pred_stride >> 1)];
+      i++;
+    }
+  }
+
+  transform2d(block, pre_quant_coeff, width_c,65535);
+  quant(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, color_type,
+        scan_idx_chroma, cur_cu->type);
+}
+
+void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu, 
+                        int depth, int has_coeffs, coefficient *coeff_u,
+                        pixel *recbase_u, pixel *pred_u, int color_type,
+                        coefficient *pre_quant_coeff, coefficient *block)
+{
+  int width_c = LCU_WIDTH >> (depth + 1);
+  int coeff_stride = encoder->in.width;
+  int pred_stride = encoder->in.width;
+  int recbase_stride = encoder->in.width;
+
+  int i, y, x;
+
+  if (has_coeffs) {
+    // RECONSTRUCT for predictions
+    dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, color_type, cur_cu->type);
+    itransform2d(block, pre_quant_coeff, width_c,65535);
+
+    i = 0;
+
+    for (y = 0; y < width_c; y++) {
+      for (x = 0; x < width_c; x++) {
+        int16_t val = block[i++] + pred_u[x + y * (pred_stride >> 1)];
+        //TODO: support 10+bits
+        recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
+      }
+    }
+
+    // END RECONTRUCTION
+  } else {
+    // without coeffs, we only use the prediction
+    for (y = 0; y < width_c; y++) {
+      for (x = 0; x < width_c; x++) {
+        recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, pred_u[x + y * (pred_stride >> 1)]);
+      }
+    }
+  }
+}
+
 void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu, uint8_t depth)
 {
   // we have 64>>depth transform size
@@ -1544,67 +1608,35 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       }
     }
 
-    if (encoder->in.video_format != FORMAT_400) {
-      // Chroma U
-      i = 0;
-      ac_sum = 0;
+    {
+      int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
+      int chroma_size = LCU_CHROMA_SIZE >> (chroma_depth * 2);
+      
+      // These are some weird indices for quant and dequant and should be
+      // replaced later with color_index.
+      int color_type_u = 2;
+      int color_type_v = 3;
 
-      for (y = 0; y < width_c; y++) {
-        for (x = 0; x < width_c; x++) {
-          block[i] = ((int16_t)base_u[x + y * (base_stride >> 1)]) -
-                     pred_u[x + y * (pred_stride >> 1)];
-          i++;
-        }
-      }
-
-      transform2d(block,pre_quant_coeff,width_c,65535);
-      quant(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-            scan_idx_chroma, cur_cu->type);
-
-      for (i = 0; i < width_c * width_c; i++) {
+      transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, color_type_u, scan_idx_chroma, pre_quant_coeff, block);
+      for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
           cur_cu->coeff_u = 1;
-          if (depth <= MAX_DEPTH) {
-            cur_cu->coeff_top_u[depth] = 1;
-          } else {
-            int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-            cur_cu->coeff_top_u[depth + pu_index] = 1;
-          }
+          cur_cu->coeff_top_u[depth] = 1;
           break;
         }
       }
-
-      // Chroma V
-      i = 0;
-      ac_sum = 0;
-
-      for (y = 0; y < width_c; y++) {
-        for (x = 0; x < width_c; x++) {
-          block[i] = ((int16_t)base_v[x + y * (base_stride >> 1)]) -
-                     pred_v[x + y * (pred_stride >> 1)];
-          i++;
-        }
-      }
-
-      transform2d(block,pre_quant_coeff,width_c,65535);
-      quant(encoder, pre_quant_coeff, coeff_v, width_c, width_c, &ac_sum, 3,
-            scan_idx_chroma, cur_cu->type);
-
-      for (i = 0; i < width_c * width_c; i++) {
+      transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, color_type_v, scan_idx_chroma, pre_quant_coeff, block);
+      for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
           cur_cu->coeff_v = 1;
-          if (depth <= MAX_DEPTH) {
-            cur_cu->coeff_top_v[depth] = 1;
-          } else {
-            int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-            cur_cu->coeff_top_v[depth + pu_index] = 1;
-          }
+          cur_cu->coeff_top_v[depth] = 1;
           break;
         }
       }
-          
+
+      // Save coefficients to cu.
       if (cur_cu->coeff_u || cur_cu->coeff_v) { 
         i = 0;
         for (y = 0; y < width_c; y++) {
@@ -1616,55 +1648,14 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
         }
       }
 
-      if (cur_cu->coeff_u) {        
-        // RECONSTRUCT for predictions
-        dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, 2, cur_cu->type);
-        itransform2d(block,pre_quant_coeff,width_c,65535);
-
-        i = 0;
-
-        for (y = 0; y < width_c; y++) {
-          for (x = 0; x < width_c; x++) {
-            int16_t val = block[i++] + pred_u[x + y * (pred_stride >> 1)];
-            //TODO: support 10+bits
-            recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
-          }
-        }
-
-        // END RECONTRUCTION
-      } else {
-        // without coeffs, we only use the prediction
-        for (y = 0; y < width_c; y++) {
-          for (x = 0; x < width_c; x++) {
-            recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, pred_u[x + y * (pred_stride >> 1)]);
-          }
-        }
-      }
-      
-      if (cur_cu->coeff_v) {
-        // RECONSTRUCT for predictions
-        dequant(encoder, coeff_v, pre_quant_coeff, width_c, width_c, 3, cur_cu->type);
-        itransform2d(block,pre_quant_coeff,width_c,65535);
-
-        i = 0;
-
-        for (y = 0; y < width_c; y++) {
-          for (x = 0; x < width_c; x++) {
-            int16_t val = block[i++] + pred_v[x + y * (pred_stride >> 1)];
-            //TODO: support 10+bits
-            recbase_v[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
-          }
-        }
-
-        // END RECONTRUCTION
-      } else {
-        // without coeffs, we only use the prediction
-        for (y = 0; y < width_c; y++) {
-          for (x = 0; x < width_c; x++) {
-            recbase_v[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, pred_v[x + y * (pred_stride >> 1)]);
-          }
-        }
-      }
+      reconstruct_chroma(encoder, cur_cu, chroma_depth, 
+                         cur_cu->coeff_u, 
+                         coeff_u, recbase_u, pred_u, color_type_u,
+                         pre_quant_coeff, block);
+      reconstruct_chroma(encoder, cur_cu, chroma_depth, 
+                         cur_cu->coeff_v, 
+                         coeff_v, recbase_v, pred_v, color_type_v,
+                         pre_quant_coeff, block);
     }
 
     return;
