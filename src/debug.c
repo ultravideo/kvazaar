@@ -72,11 +72,11 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
     return 0;
   }
 
-  if (encoder->ref->used_size > 0) {
-    const picture *ref_pic = encoder->ref->pics[0];
-    yuv[0] = ref_pic->y_recdata[luma];
-    yuv[1] = ref_pic->u_recdata[chroma];
-    yuv[2] = ref_pic->v_recdata[chroma];
+  {
+    const picture *pic = encoder->in.cur_pic;
+    yuv[0] = pic->y_data[luma];
+    yuv[1] = pic->u_data[chroma];
+    yuv[2] = pic->v_data[chroma];
     yuv2rgb(yuv, rgb);
   }
 
@@ -97,11 +97,11 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
 
   fprintf(fp, 
     "\n<table class='d%u' bgcolor='#%02x%02x%02x'><tr><td colspan='2'>"
-    "%u (%u, %u), %c, "
+    "%u (%u, %u), %c, %s, "
     "c=%u, mv=(%d, %d), intra_cost=%d, intra_mode=%d"
     "</td></tr>\n", 
     depth, rgb[0], rgb[1], rgb[2],
-    depth, xCtb, yCtb, (cu->type == CU_INTRA ? 'I' : 'P'),
+    depth, xCtb, yCtb, (cu->type == CU_INTRA ? 'I' : 'P'), (cu->part_size == SIZE_NxN ? "NxN" : "2Nx2N"),
     cu->inter.cost, cu->inter.mv[0], cu->inter.mv[1],
     cu->intra[0].cost, cu->intra[0].mode);
 
