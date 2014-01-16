@@ -633,7 +633,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //TODO: VUI?
   //encode_VUI(encoder);
   
-	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
+  WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
 void encode_vid_parameter_set(encoder_control* encoder)
@@ -668,7 +668,7 @@ void encode_vid_parameter_set(encoder_control* encoder)
   //IF timing info
   //END IF
 
-	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
+  WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
 void encode_VUI(encoder_control* encoder)

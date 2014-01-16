@@ -214,4 +214,6 @@ static const uint8_t INIT_ABS_FLAG[3][6] =
 };
 
 
+const uint32_t entropy_bits[ 128 ];
+
 #endif
