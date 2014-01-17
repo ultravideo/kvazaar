@@ -105,22 +105,56 @@ int16_t intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint32_t xpos, uint32_t
  * \param preds output buffer for 3 predictions 
  * \returns (predictions are found)?1:0
  */
-int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, int8_t* preds)
+int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, uint8_t depth, int8_t* preds)
 {
-  int32_t left_intra_dir  = 1; // reset to DC_IDX
-  int32_t above_intra_dir = 1; // reset to DC_IDX
+  int x_cu = x_pu / 2;
+  int y_cu = y_pu / 2;
+
+  // The default mode if block is not coded yet is INTRA_DC.
+  int32_t left_intra_dir  = 1;
+  int32_t above_intra_dir = 1;
+
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
   int32_t cu_pos = y_cu * width_in_scu + x_cu;
   
+  cu_info* cur_cu = pic->cu_array[MAX_DEPTH][cu_pos];
+  cu_info* left_cu = 0;
+  cu_info* right_cu = 0;
+
+  if (x_cu > 0) {
+    left_cu = pic->cu_array[MAX_DEPTH][cu_pos - 1];
+  }
+  if (y_cu > 0 &&
+      ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0)
+  {
+    right_cu = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu];
+  }
+
+  if (cur_cu->part_size == SIZE_NxN && x_pu % 2 == 1) {
+    // Take mode from the left side of the same CU.
+    int pu_index = 0 + 2 * (y_pu % 2);
+    left_intra_dir = cur_cu->intra[pu_index].mode;
+  } else if (left_cu && left_cu->type == CU_INTRA) {
+    // Take mode from the right side of the CU on the left.
+    int pu_index = 1 + 2 * (y_pu % 2);
+    left_intra_dir = left_cu->intra[pu_index].mode;
+  }
+
   // Left PU predictor
-  if(x_cu && pic->cu_array[MAX_DEPTH][cu_pos - 1].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - 1].coded) {
+  if (x_cu > 0 && 
+      pic->cu_array[MAX_DEPTH][cu_pos - 1].type == CU_INTRA && 
+      pic->cu_array[MAX_DEPTH][cu_pos - 1].coded)
+  {
     left_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - 1].intra[0].mode;
   }
 
   // Top PU predictor
-  if(y_cu && ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0
-     && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].coded) {
-    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra[0].mode;
+  if (y_cu && ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0 && 
+     pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].type == CU_INTRA && 
+     pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].coded)
+  {
+    int pu_index = (depth <= MAX_DEPTH ? 0 : x_pu % 2 + 2 * (y_pu % 2));
+    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra[pu_index].mode;
   }
 
   // If the predictions are the same, add new predictions

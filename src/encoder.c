@@ -621,7 +621,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //TODO: VUI?
   //encode_VUI(encoder);
   
-	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
+  WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
 void encode_vid_parameter_set(encoder_control* encoder)
@@ -656,7 +656,7 @@ void encode_vid_parameter_set(encoder_control* encoder)
   //IF timing info
   //END IF
 
-	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
+  WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
 void encode_VUI(encoder_control* encoder)
@@ -1188,7 +1188,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       cur_cu->intra[2].mode, cur_cu->intra[3].mode };
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
     int8_t intra_preds[3] = { -1, -1, -1};
-    int8_t mpm_preds = -1;
+    int8_t mpm_preds[4] = {-1, -1, -1, -1};
     int i, j;
     uint32_t flag[4];
     uint32_t width = LCU_WIDTH>>depth;
@@ -1205,17 +1205,17 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // 5 EP bins with the full predmode
     for (j = 0; j < num_pred_units; ++j) {
       intra_get_dir_luma_predictor(encoder->in.cur_pic, 
-                                   x_ctb, 
-                                   y_ctb, 
+                                   x_ctb * 2, 
+                                   y_ctb * 2, 
                                    depth,
                                    intra_preds);
       for (i = 0; i < 3; i++) {
         if (intra_preds[i] == intra_pred_mode[j]) {
-          mpm_preds = i;
+          mpm_preds[j] = i;
           break;
         }
       }
-      flag[j] = (mpm_preds == -1) ? 0 : 1;
+      flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
     }
 
     cabac.ctx = &g_intra_mode_model;
@@ -1224,21 +1224,24 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     }
     
     for (j = 0; j < num_pred_units; ++j) {
-      // Intrapredmode signaling
-      // If found from predictors, we can simplify signaling
+      // Signal index of the prediction mode in the prediction list.
       if (flag[j]) {
-        CABAC_BIN_EP(&cabac, (mpm_preds == 0 ? 0 : 1), "mpm_idx");
-        if (mpm_preds != 0) {
-          CABAC_BIN_EP(&cabac, (mpm_preds == 1 ? 0 : 1), "mpm_idx");
+        CABAC_BIN_EP(&cabac, (mpm_preds[j] == 0 ? 0 : 1), "mpm_idx");
+        if (mpm_preds[j] != 0) {
+          CABAC_BIN_EP(&cabac, (mpm_preds[j] == 1 ? 0 : 1), "mpm_idx");
         }
       } else { 
-        // we signal the "full" predmode
+        // Signal the actual prediction mode.
         int32_t tmp_pred = intra_pred_mode[j];
 
+        // Sort prediction list from lowest to highest.
         if (intra_preds[0] > intra_preds[1]) SWAP(intra_preds[0], intra_preds[1], int8_t);
         if (intra_preds[0] > intra_preds[2]) SWAP(intra_preds[0], intra_preds[2], int8_t);
         if (intra_preds[1] > intra_preds[2]) SWAP(intra_preds[1], intra_preds[2], int8_t);
 
+        // Reduce the index of the signaled prediction mode according to the
+        // prediction list, as it has been already signaled that it's not one
+        // of the prediction modes.
         for (i = 2; i >= 0; i--) {
           tmp_pred = (tmp_pred > intra_preds[i] ? tmp_pred - 1 : tmp_pred);
         }
@@ -1427,7 +1430,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     // Derive coded coeff flags from the next depth
     if (depth == MAX_DEPTH) {
-      cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] + cur_cu->coeff_top_y[depth+2] + cur_cu->coeff_top_y[depth+3] + cur_cu->coeff_top_y[depth+4];
+      cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
+      cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
+      cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
     } else {
       cu_info *cu_a =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
       cu_info *cu_b =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
@@ -1568,7 +1573,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
           cur_cu->coeff_top_y[depth] = 1;
         } else {
           int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-          cur_cu->coeff_top_y[depth + pu_index] = 1;
+          cur_cu->coeff_top_y[depth + pu_index] = 0;
         }
         break;
       }
@@ -1608,7 +1613,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       }
     }
 
-    {
+    // If luma is 4x4, do previous depths chroma after the last luma block.
+    if (depth <= MAX_DEPTH || (x_pu % 2 && y_pu % 2)) {
       int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
       int chroma_size = LCU_CHROMA_SIZE >> (chroma_depth * 2);
       
@@ -1621,8 +1627,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
-          cur_cu->coeff_u = 1;
-          cur_cu->coeff_top_u[depth] = 1;
+          if (depth <= MAX_DEPTH) {
+            cur_cu->coeff_u = 1;
+            cur_cu->coeff_top_u[depth] = 1;
+          } else {
+            cur_cu->coeff_u = 0;
+            cur_cu->coeff_top_u[depth] = 0;
+          }
           break;
         }
       }
@@ -1630,9 +1641,14 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
-          cur_cu->coeff_v = 1;
-          cur_cu->coeff_top_v[depth] = 1;
-          break;
+          if (depth <= MAX_DEPTH) {
+            cur_cu->coeff_v = 1;
+            cur_cu->coeff_top_v[depth] = 1;
+            break;
+          } else {
+            cur_cu->coeff_v = 0;
+            cur_cu->coeff_top_v[depth] = 0;
+          }
         }
       }
 
@@ -1682,7 +1698,15 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
   uint32_t scan_idx = SCAN_DIAG;
   uint32_t dir_mode;
 
-  if (cur_cu->coeff_y) {
+  int cbf_y;
+  if (depth <= MAX_DEPTH) {
+    cbf_y = cur_cu->coeff_y;
+  } else {
+    int pu_index = x_pu % 2 + 2 * (y_pu % 2);
+    cbf_y = cur_cu->coeff_top_y[depth + pu_index];
+  }
+
+  if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
     int y = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
     coefficient *orig_pos = &encoder->in.cur_pic->coeff_y[x + y * encoder->in.width];
@@ -1708,12 +1732,18 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
 
   // CoeffNxN
   // Residual Coding
-  if (cur_cu->coeff_y) {
+  if (cbf_y) {
     if (cur_cu->type == CU_INTER) {
       scan_idx = SCAN_DIAG;
     } else {
       // Luma (Intra) scanmode
-      dir_mode = cur_cu->intra[0].mode;
+      if (depth <= MAX_DEPTH) {
+        dir_mode = cur_cu->intra[0].mode;
+      } else {
+        int pu_index = x_pu % 2 + 2 * (y_pu % 2);
+        dir_mode = cur_cu->intra[pu_index].mode;
+      }
+      
 
       //if multiple scans supported for transform size
       if (ctx_idx > 3 && ctx_idx < 6) {
@@ -1809,8 +1839,15 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
 
   int8_t split = cur_cu->tr_depth > depth;
 
-  int8_t cb_flag_u = !split ? cur_cu->coeff_u : cur_cu->coeff_top_u[depth];
-  int8_t cb_flag_v = !split ? cur_cu->coeff_v : cur_cu->coeff_top_v[depth];
+  int8_t cb_flag_u = cur_cu->coeff_top_u[depth];
+  int8_t cb_flag_v = cur_cu->coeff_top_v[depth];
+  int cb_flag_y;
+  if (depth <= MAX_DEPTH) {
+    cb_flag_y = cur_cu->coeff_top_y[depth];
+  } else {
+    int pu_index = x_pu % 2 + 2 * (y_pu % 2);
+    cb_flag_y = cur_cu->coeff_top_y[depth + pu_index];
+  }
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)
@@ -1857,10 +1894,10 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
   // When it is not present, it is inferred to be 1.
   if(cur_cu->type == CU_INTRA || tr_depth > 0 || cur_cu->coeff_u || cur_cu->coeff_v) {
       cabac.ctx = &g_qt_cbf_model_luma[!tr_depth];
-      CABAC_BIN(&cabac, cur_cu->coeff_y, "cbf_luma");
+      CABAC_BIN(&cabac, cb_flag_y, "cbf_luma");
   }
 
-  if (cur_cu->coeff_y | cur_cu->coeff_u | cur_cu->coeff_v) {
+  if (cb_flag_y | cur_cu->coeff_u | cur_cu->coeff_v) {
     encode_transform_unit(encoder, x_pu, y_pu, depth, tr_depth);
   }
 }

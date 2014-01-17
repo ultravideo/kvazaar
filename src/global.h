@@ -41,6 +41,8 @@ typedef uint16_t pixel;
 #endif
 typedef int16_t coefficient;
 
+//#define VERBOSE 1
+
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
 
