@@ -305,7 +305,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
   } else {
     cabac_start(&cabac);
-    encoder->in.cur_pic->slicetype = SLICE_P;
+    encoder->in.cur_pic->slicetype = SLICE_I;
     encoder->in.cur_pic->type = NAL_TRAIL_R;
     scalinglist_process();
     search_slice_data(encoder);
@@ -1488,6 +1488,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
     uint32_t scan_idx_luma   = SCAN_DIAG;
     uint32_t scan_idx_chroma = SCAN_DIAG;
     uint8_t dir_mode;
+
+    int cbf_y = 0;
+
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
     #endif
@@ -1568,20 +1571,22 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
-        cur_cu->coeff_y = 1;
         if (depth <= MAX_DEPTH) {
+          cur_cu->coeff_y = 1;
           cur_cu->coeff_top_y[depth] = 1;
+          cbf_y = 1;
         } else {
           int pu_index = x_pu % 2 + 2 * (y_pu % 2);
           cur_cu->coeff_top_y[depth + pu_index] = 0;
+          cbf_y = 0;
         }
         break;
       }
     }
-        
-    // if non-zero coeffs
-    if (cur_cu->coeff_y) {
-
+    
+    if (cbf_y) {
+      // Combine inverese quantized coefficients with the prediction to get
+      // reconstructed image.
       picture_set_block_residual(encoder->in.cur_pic,x_cu,y_cu,depth,1);
       i = 0;
       for (y = 0; y < width; y++) {
@@ -1590,7 +1595,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
           i++;
         }
       }
-      // RECONSTRUCT for predictions
+
       dequant(encoder, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
       itransform2d(block,pre_quant_coeff,width,0);
 
@@ -1603,9 +1608,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
           recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, val);
         }
       }
-      // END RECONTRUCTION
+
     } else {
-      // without coeffs, we only use the prediction
+      // Without coefficients, just copy the prediction as the reconstructed image.
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
           recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, pred_y[x + y * pred_stride]);
@@ -1644,11 +1649,11 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
           if (depth <= MAX_DEPTH) {
             cur_cu->coeff_v = 1;
             cur_cu->coeff_top_v[depth] = 1;
-            break;
           } else {
             cur_cu->coeff_v = 0;
             cur_cu->coeff_top_v[depth] = 0;
           }
+          break;
         }
       }
 
@@ -2275,11 +2280,13 @@ void encode_block_residual(encoder_control *encoder,
       // Build reconstructed block to use in prediction with extrapolated borders
       int x_pos = (x_ctb << MIN_SIZE) + offsets[i].x * width;
       int y_pos = (y_ctb << MIN_SIZE) + offsets[i].y * width;
+      recbase_y = &encoder->in.cur_pic->y_recdata[x_pos + y_pos * encoder->in.width];
 
+      rec_shift  = &rec[width * 2 + 8 + 1];
       intra_build_reference_border(encoder->in.cur_pic, x_pos, y_pos,
                                     width * 2 + 8, rec, width * 2 + 8, 0);
       intra_recon(rec_shift, width * 2 + 8,
-                  x_ctb * (LCU_WIDTH >> (MAX_DEPTH)), y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
+                  x_pos, y_pos,
                   width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
 
       // Filter DC-prediction
@@ -2295,11 +2302,12 @@ void encode_block_residual(encoder_control *encoder,
         cur_cu->intra[0].mode_chroma = 36;
     }
 
+    rec_shift  = &rec[width_c * 2 + 8 + 1];
     intra_build_reference_border(encoder->in.cur_pic, x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
                                   width_c * 2 + 8, rec,
                                   width_c * 2 + 8,
                                   1);
-    intra_recon(rec_shift_u, 
+    intra_recon(rec_shift, 
                 width_c * 2 + 8,
                 x_ctb * width_c,
                 y_ctb * width_c,
@@ -2313,7 +2321,8 @@ void encode_block_residual(encoder_control *encoder,
                                   width_c * 2 + 8,
                                   rec, width_c * 2 + 8,
                                   2);
-    intra_recon(rec_shift_u, width_c * 2 + 8,
+    intra_recon(rec_shift, 
+                width_c * 2 + 8,
                 x_ctb * width_c,
                 y_ctb * width_c,
                 width_c,

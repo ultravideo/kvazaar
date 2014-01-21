@@ -41,6 +41,7 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
       // Set all SCU's to this blocks values at the bottom most depth.
       pic->cu_array[MAX_DEPTH][cu_pos + x].depth = depth;
       pic->cu_array[MAX_DEPTH][cu_pos + x].type  = CU_INTER;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].part_size = SIZE_2Nx2N;
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mode   = cur_cu->inter.mode;
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[0]  = cur_cu->inter.mv[0];
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[1]  = cur_cu->inter.mv[1];

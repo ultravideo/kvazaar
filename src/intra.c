@@ -38,19 +38,45 @@ void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t dep
   uint32_t x, y;  
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH; //!< Width in smallest CU
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
-  int tr_depth = (part_mode == SIZE_2Nx2N ? depth : depth + 1);
+  
+  if (part_mode == SIZE_NxN) {
+    cu_info *cur_cu = &pic->cu_array[MAX_DEPTH][x_cu + y_cu * width_in_scu];
+    // Modes are already set.
+    cur_cu->depth = depth;
+    cur_cu->type = CU_INTRA;
+    cur_cu->tr_depth = depth + 1;
+    return;
+  }
 
   // Loop through all the blocks in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
+    for (x = x_cu; x < x_cu + block_scu_width; x++) {
+      cu_info *cur_cu = &pic->cu_array[MAX_DEPTH][x + y * width_in_scu];
+      cur_cu->depth = depth;
+      cur_cu->type = CU_INTRA;
+      cur_cu->intra[0].mode = mode;
+      cur_cu->intra[1].mode = mode;
+      cur_cu->intra[2].mode = mode;
+      cur_cu->intra[3].mode = mode;
+      cur_cu->part_size = part_mode;
+      cur_cu->tr_depth = depth;
+    }
+  }
+
+  // Loop through all the blocks in the area of cur_cu
+  /*for (y = y_cu; y < y_cu + block_scu_width; y++) {
     int cu_pos = y * width_in_scu;
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
       pic->cu_array[MAX_DEPTH][cu_pos + x].depth = depth;
       pic->cu_array[MAX_DEPTH][cu_pos + x].type  = CU_INTRA;
       pic->cu_array[MAX_DEPTH][cu_pos + x].intra[0].mode = mode;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[1].mode = mode;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[2].mode = mode;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[3].mode = mode;
       pic->cu_array[MAX_DEPTH][cu_pos + x].part_size = part_mode;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].tr_depth = tr_depth;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].tr_depth = depth;
     }
-  }
+  }*/
 }
 
 /**
@@ -96,6 +122,8 @@ int16_t intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint32_t xpos, uint32_t
   return (sum + width) / (width + width);
 }
 
+#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * (y_pu % 2))
+
 /** 
  * \brief Function for deriving intra luma predictions
  * \param pic picture to use
@@ -117,45 +145,50 @@ int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, 
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
   int32_t cu_pos = y_cu * width_in_scu + x_cu;
   
-  cu_info* cur_cu = pic->cu_array[MAX_DEPTH][cu_pos];
+  cu_info* cur_cu = &pic->cu_array[MAX_DEPTH][cu_pos];
   cu_info* left_cu = 0;
-  cu_info* right_cu = 0;
+  cu_info* above_cu = 0;
 
   if (x_cu > 0) {
-    left_cu = pic->cu_array[MAX_DEPTH][cu_pos - 1];
+    left_cu = &pic->cu_array[MAX_DEPTH][cu_pos - 1];
   }
+  // Don't take the above CU across the LCU boundary.
   if (y_cu > 0 &&
       ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0)
   {
-    right_cu = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu];
+    above_cu = &pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu];
   }
 
   if (cur_cu->part_size == SIZE_NxN && x_pu % 2 == 1) {
-    // Take mode from the left side of the same CU.
-    int pu_index = 0 + 2 * (y_pu % 2);
-    left_intra_dir = cur_cu->intra[pu_index].mode;
+    // If current CU is NxN and PU is on the right half, take mode from the
+    // left half of the same CU.
+    left_intra_dir = cur_cu->intra[PU_INDEX(0, y_pu)].mode;
   } else if (left_cu && left_cu->type == CU_INTRA) {
-    // Take mode from the right side of the CU on the left.
-    int pu_index = 1 + 2 * (y_pu % 2);
-    left_intra_dir = left_cu->intra[pu_index].mode;
+    // Otherwise take the mode from the right side of the CU on the left.
+    left_intra_dir = left_cu->intra[PU_INDEX(1, y_pu)].mode;
+  }
+
+  if (cur_cu->part_size == SIZE_NxN && y_pu % 2 == 1) {
+    // If current CU is NxN and PU is on the bottom half, take mode from the
+    // top half of the same CU.
+    above_intra_dir = cur_cu->intra[PU_INDEX(x_pu, 0)].mode;
+  } else if (above_cu && above_cu->type == CU_INTRA &&
+             (y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH != 0)
+  {
+    // Otherwise take the mode from the bottom half of the CU above.
+    above_intra_dir = above_cu->intra[PU_INDEX(x_pu, 1)].mode;
   }
 
   // Left PU predictor
-  if (x_cu > 0 && 
-      pic->cu_array[MAX_DEPTH][cu_pos - 1].type == CU_INTRA && 
-      pic->cu_array[MAX_DEPTH][cu_pos - 1].coded)
-  {
+  /*if(x_cu && pic->cu_array[MAX_DEPTH][cu_pos - 1].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - 1].coded) {
     left_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - 1].intra[0].mode;
   }
 
   // Top PU predictor
-  if (y_cu && ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0 && 
-     pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].type == CU_INTRA && 
-     pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].coded)
-  {
-    int pu_index = (depth <= MAX_DEPTH ? 0 : x_pu % 2 + 2 * (y_pu % 2));
-    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra[pu_index].mode;
-  }
+  if(y_cu && ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0
+     && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].coded) {
+    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra[0].mode;
+  }*/
 
   // If the predictions are the same, add new predictions
   if (left_intra_dir == above_intra_dir) {  
@@ -360,7 +393,7 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
   int32_t x,y,i;
   pixel pred[LCU_WIDTH * LCU_WIDTH];
   int8_t filter = !chroma&&(width<32);
-  #define COPY_PRED_TO_DST() for(y = 0; y < (int32_t)width; y++)  { for(x = 0; x < (int32_t)width; x++) { dst[x+y*dststride] = pred[x+y*width]; } }
+
 
   // Filtering apply if luma and not DC
   if (!chroma && mode != 1) {
@@ -386,9 +419,12 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
     intra_get_angular_pred(rec, recstride,pred, width, width, width, mode, xpos?1:0, ypos?1:0, filter);
   }
 
-  COPY_PRED_TO_DST();
+  for(y = 0; y < (int32_t)width; y++)  { 
+    for(x = 0; x < (int32_t)width; x++) { 
+      dst[x+y*dststride] = pred[x+y*width]; 
+    } 
+  }
 
-  #undef COPY_PRED_TO_DST
 }
 
 
@@ -398,6 +434,8 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
  * \param outwidth width of the prediction block
  * \param chroma signaling if chroma is used, 0 = luma, 1 = U and 2 = V    
  *
+ * The end result is 2*width+8 x 2*width+8 array, with only the top and left
+ * edge pixels filled with the reconstructed pixels.
  */
 void intra_build_reference_border(picture *pic, int32_t x, int32_t y,int16_t outwidth, pixel *dst, int32_t dststride, int8_t chroma)
 {
@@ -412,27 +450,32 @@ void intra_build_reference_border(picture *pic, int32_t x, int32_t y,int16_t out
   int16_t scu_width    = LCU_WIDTH>>(MAX_DEPTH+(chroma?1:0)); //!< Smallest Coding Unit width
   int32_t x_cu = x >> MIN_SIZE;
   int32_t y_cu = y >> MIN_SIZE;
-  pixel *src_shifted = &src[x_cu * scu_width + (y_cu * scu_width) * src_width];  //!< input picture pointer shifted to start from the left-top corner of the current block
+
+  int xx = chroma ? x / 2 : x;
+  int yy = chroma ? y / 2 : y;
+
+  pixel *src_shifted = &src[xx + yy * src_width];  //!< input picture pointer shifted to start from the left-top corner of the current block
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;     //!< picture width in smallest CU
 
-  // Fill left column when not on the border
-  if (x_cu) {
-    // loop SCU's
-    for (left_column = 1; left_column < outwidth / scu_width; left_column++) {
-      // If over the picture height or block not yet coded, stop
+  // Gather reference pixels from the left.
+  if (x_cu > 0) {
+    int num_ref_scu = outwidth / scu_width;
+    // Check CUs needed for reference until one that isn't coded is found.
+    // Afterwards left_column refers to the first CU that is not coded.
+    for (left_column = 1; left_column < num_ref_scu; left_column++) {
       if ((y_cu + left_column) * scu_width >= src_height || !pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + left_column) * width_in_scu].coded) {
         break;
       }
     }
-    // Copy the pixels to output
+    // Copy pixels from coded CUs.
     for (i = 0; i < left_column*scu_width - 1; i ++) {
       dst[(i + 1) * dststride] = src_shifted[i*src_width - 1];
     }
 
-    // if the loop was not completed, extrapolate the last pixel pushed to output
-    if (left_column != outwidth / scu_width) {
+    // Extrapolate the rest from nearest pixel.
+    if (left_column != num_ref_scu) {
       val = src_shifted[(left_column * scu_width - 1) * src_width - 1];
-      for(i = (left_column * scu_width); i < outwidth; i++) {
+      for (i = (left_column * scu_width); i < outwidth; i++) {
         dst[i * dststride] = val;
       }
     }    
@@ -443,9 +486,10 @@ void intra_build_reference_border(picture *pic, int32_t x, int32_t y,int16_t out
     }
   }
 
+  // Gather reference pixels from the left.
   if(y_cu) {
-    // Loop top SCU's
-    for(top_row = 1; top_row < outwidth / scu_width; top_row++)  {
+    int num_ref_scu = outwidth / scu_width;
+    for(top_row = 1; top_row < num_ref_scu; top_row++)  {
       // If over the picture width or block not yet coded, stop
       if ((x_cu + top_row) * scu_width >= src_width || !pic->cu_array[MAX_DEPTH][x_cu + top_row+(y_cu - 1) * width_in_scu].coded) {
         break;
@@ -457,7 +501,7 @@ void intra_build_reference_border(picture *pic, int32_t x, int32_t y,int16_t out
       dst[i + 1] = src_shifted[i - src_width];
     }
 
-    if(top_row != outwidth/scu_width) {
+    if(top_row != num_ref_scu) {
       val = src_shifted[(top_row * scu_width) - src_width - 1];
       for(i = (top_row * scu_width); i < outwidth; i++) {
         dst[i] = val;

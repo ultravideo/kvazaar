@@ -388,7 +388,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
 
   // INTRAPREDICTION
   pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
-  pixel rec[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8)];
+  pixel rec[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
   pixel *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
 
   // Build reconstructed block to use in prediction with extrapolated borders
@@ -397,14 +397,15 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   cur_cu->intra[0].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
       encoder->in.width, recShift, width * 2 + 8, x, y,
       width, pred, width, &cur_cu->intra[0].cost);
+  cur_cu->part_size = SIZE_2Nx2N;
 
   // Do search for NxN split.
-  if (0 && depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
+  if (1 && depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
     int nn_mode = cur_cu->intra[0].mode;
     int i;
-    int cost = g_lambda_cost[encoder->QP] << 6;
+    int cost = g_lambda_cost[encoder->QP] << 8;
     static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
     width = 4;
     recShift = &rec[width * 2 + 8 + 1];
@@ -424,8 +425,8 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
     if (nn_cost <= cost) {
       cur_cu->intra[0].cost = nn_cost;
       cur_cu->intra[0].mode = nn_mode;
-      cur_cu->part_size = SIZE_2Nx2N;
     } else {
+      cur_cu->intra[0].cost = cost;
       cur_cu->part_size = SIZE_NxN;
     }
   }
@@ -524,6 +525,9 @@ uint32_t search_best_mode(encoder_control *encoder,
   } else {
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
         cur_cu->intra[0].mode, cur_cu->part_size);
+    if (cur_cu->part_size == SIZE_NxN) {
+      printf("coded NxN (%u, %u)\n", x_ctb, y_ctb);
+    }
     return best_intra_cost;
   }
 }
