@@ -114,19 +114,71 @@ uint32_t get_coded_level ( encoder_control* encoder, double *coded_cost, double 
   }
 
   min_abs_level    = ( max_abs_level > 1 ? max_abs_level - 1 : 1 );
-  for (abs_level  = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
-    double err         = (double)(level_double  - ( abs_level << q_bits ) );
-    double cur_cost    = err * err * temp + get_ic_rate( abs_level, ctx_num_one, ctx_num_abs, abs_go_rice, c1_idx, c2_idx, type);
-    cur_cost          += cur_cost_sig;
+  for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
+    double err       = (double)(level_double  - ( abs_level << q_bits ) );
+    double cur_cost  = err * err * temp + get_ic_rate( abs_level, ctx_num_one, ctx_num_abs, abs_go_rice, c1_idx, c2_idx, type);
+    cur_cost        += cur_cost_sig;
 
     if( cur_cost < *coded_cost ) {
-      best_abs_level    = abs_level;
+      best_abs_level  = abs_level;
       *coded_cost     = cur_cost;
-      *coded_cost_sig  = cur_cost_sig;
+      *coded_cost_sig = cur_cost_sig;
     }
   }
 
   return best_abs_level;
+}
+
+
+/** Calculates the cost of signaling the last significant coefficient in the block
+ * \param pos_x X coordinate of the last significant coefficient
+ * \param pos_y Y coordinate of the last significant coefficient
+ * \returns cost of last significant coefficient
+ * \param uiWidth width of the transform unit (TU)
+ *
+ * From HM 12.0
+*/
+double get_rate_last(encoder_control* encoder, const uint32_t  pos_x, const uint32_t pos_y, int32_t* last_x_bits, int32_t* last_y_bits)
+{
+  uint32_t ctx_x   = g_group_idx[pos_x];
+  uint32_t ctx_y   = g_group_idx[pos_y];
+  double uiCost = last_x_bits[ ctx_x ] + last_y_bits[ ctx_y ];
+  if( ctx_x > 3 ) {
+    uiCost += 32768.0 * ((ctx_x-2)>>1);
+  }
+  if( ctx_y > 3 ) {
+    uiCost += 32768.0 * ((ctx_y-2)>>1);
+  }
+  return g_lambda_cost[encoder->QP]*uiCost;
+}
+
+void calc_last_bits(int32_t width, int32_t height, int8_t type, int32_t* last_x_bits, int32_t* last_y_bits)
+{  
+  int32_t bits_x = 0, bits_y = 0;
+  int32_t blk_size_offset_x, blk_size_offset_y, shiftX, shiftY;
+  int32_t ctx;
+  
+  cabac_ctx *base_ctx_x = (type ? g_cu_ctx_last_x_chroma : g_cu_ctx_last_x_luma);
+  cabac_ctx *base_ctx_y = (type ? g_cu_ctx_last_y_chroma : g_cu_ctx_last_y_luma);
+
+  blk_size_offset_x = type ? 0: (g_convert_to_bit[ width ] *3 + ((g_convert_to_bit[ width ] +1)>>2));
+  blk_size_offset_y = type ? 0: (g_convert_to_bit[ height ]*3 + ((g_convert_to_bit[ height ]+1)>>2));
+  shiftX = type ? g_convert_to_bit[ width  ] :((g_convert_to_bit[ width  ]+3)>>2);
+  shiftY = type ? g_convert_to_bit[ height ] :((g_convert_to_bit[ height ]+3)>>2);
+
+
+  for (ctx = 0; ctx < g_group_idx[ width - 1 ]; ctx++) {
+    int32_t ctx_offset = blk_size_offset_x + (ctx >>shiftX);
+    last_x_bits[ ctx ] = bits_x + CTX_ENTROPY_BITS(&base_ctx_x[ ctx_offset ],0);
+    bits_x += CTX_ENTROPY_BITS(&base_ctx_x[ ctx_offset ],1);
+  }
+  last_x_bits[ctx] = bits_x;
+  for (ctx = 0; ctx < g_group_idx[ height - 1 ]; ctx++) {
+    int32_t ctx_offset = blk_size_offset_y + (ctx >>shiftY);
+    last_y_bits[ ctx ] = bits_y + CTX_ENTROPY_BITS(&base_ctx_y[ ctx_offset ],0);
+    bits_y +=  CTX_ENTROPY_BITS(&base_ctx_y[ ctx_offset ],1);
+  }
+  last_y_bits[ctx] = bits_y;
 }
 
 /** RDOQ with CABAC
@@ -167,7 +219,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   int32_t *quant_coeff_org = g_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
   int32_t *quant_coeff     = quant_coeff_org;
 
-  double *err_scale_org = NULL;//getErrScaleCoeff(scalingListType,uiLog2TrSize-2,m_cQP.m_iRem);
+  double *err_scale_org = g_error_scale[scalinglist_type][log2_tr_size-2][qp_scaled%6];
   double *err_scale     = err_scale_org;
 
   double block_uncoded_cost = 0;
@@ -219,6 +271,12 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   int32_t cg_scanpos, scanpos_in_cg;
 
   coeffgroup_rd_stats rd_stats;     
+
+  int32_t last_x_bits[32],last_y_bits[32];
+
+  calc_last_bits(width, height, type,last_x_bits, last_y_bits);
+
+
 
   memset( cost_coeff, 0, sizeof(double) *  max_num_coeff );
   memset( cost_sig,   0, sizeof(double) *  max_num_coeff );
@@ -444,7 +502,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
           uint32_t   pos_y       = blkpos >> log2_block_size;
           uint32_t   pos_x       = blkpos - ( pos_y << log2_block_size );
           
-          double cost_last = 0.0;//scan_idx == SCAN_VER ? xGetRateLast( pos_y, pos_x ) : xGetRateLast( pos_x, pos_y );
+          double cost_last = scan_idx == SCAN_VER ? get_rate_last(encoder, pos_y, pos_x,last_x_bits,last_y_bits) : get_rate_last(encoder, pos_x, pos_y, last_x_bits,last_y_bits );
           double totalCost = base_cost + cost_last - cost_sig[ scanpos ];
           
           if( totalCost < best_cost ) {
