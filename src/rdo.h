@@ -26,12 +26,12 @@ typedef struct
   int32_t nnz_before_pos0;
 } coeffgroup_rd_stats;
 
-const uint32_t g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
-const uint32_t g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
+extern const uint32_t g_go_rice_range[5];
+extern const uint32_t g_go_rice_prefix_len[5];
 
 
 void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff, int32_t width,
-           int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_idx, int8_t block_type, int8_t scan_mode, int8_t tr_depth);
+           int32_t height, uint32_t *abs_sum, int8_t type, int8_t block_type, int8_t scan_mode, int8_t tr_depth);
 
 
 int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
