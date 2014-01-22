@@ -28,8 +28,11 @@
 
 #include "encoder.h"
 
+#include <math.h>
+
 
 extern int32_t* g_quant_coeff[4][6][6];
+extern double* g_error_scale[4][6][6];
 extern const int32_t g_quant_intra_default_8x8[64];
 extern const uint8_t g_chroma_scale[58];
 extern const int16_t g_inv_quant_scales[6];
@@ -47,6 +50,7 @@ void scalinglist_process_enc( int32_t *coeff, int32_t *quant_coeff, int32_t quan
                              uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat);
 void scalinglist_process();
 void scalinglist_set(int32_t *coeff, uint32_t list_id, uint32_t size_id, uint32_t qp);
+void scalinglist_set_err_scale(uint32_t list,uint32_t size, uint32_t qp);
 void scalinglist_destroy();
 
 #endif
