@@ -1187,7 +1187,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       cur_cu->intra[0].mode, cur_cu->intra[1].mode, 
       cur_cu->intra[2].mode, cur_cu->intra[3].mode };
     uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
-    int8_t intra_preds[3] = { -1, -1, -1};
+    int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
     int8_t mpm_preds[4] = {-1, -1, -1, -1};
     int i, j;
     uint32_t flag[4];
@@ -1204,13 +1204,14 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     // it can be signaled with two EP's. Otherwise we can send
     // 5 EP bins with the full predmode
     for (j = 0; j < num_pred_units; ++j) {
+      static const vector2d offset[4] = {{0,0},{1,0},{0,1},{1,1}};
       intra_get_dir_luma_predictor(encoder->in.cur_pic, 
-                                   x_ctb * 2, 
-                                   y_ctb * 2, 
+                                   x_ctb * 2 + offset[j].x, 
+                                   y_ctb * 2 + offset[j].y, 
                                    depth,
-                                   intra_preds);
+                                   intra_preds[j]);
       for (i = 0; i < 3; i++) {
-        if (intra_preds[i] == intra_pred_mode[j]) {
+        if (intra_preds[j][i] == intra_pred_mode[j]) {
           mpm_preds[j] = i;
           break;
         }
@@ -1235,15 +1236,15 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
         int32_t tmp_pred = intra_pred_mode[j];
 
         // Sort prediction list from lowest to highest.
-        if (intra_preds[0] > intra_preds[1]) SWAP(intra_preds[0], intra_preds[1], int8_t);
-        if (intra_preds[0] > intra_preds[2]) SWAP(intra_preds[0], intra_preds[2], int8_t);
-        if (intra_preds[1] > intra_preds[2]) SWAP(intra_preds[1], intra_preds[2], int8_t);
+        if (intra_preds[j][0] > intra_preds[j][1]) SWAP(intra_preds[j][0], intra_preds[j][1], int8_t);
+        if (intra_preds[j][0] > intra_preds[j][2]) SWAP(intra_preds[j][0], intra_preds[j][2], int8_t);
+        if (intra_preds[j][1] > intra_preds[j][2]) SWAP(intra_preds[j][1], intra_preds[j][2], int8_t);
 
         // Reduce the index of the signaled prediction mode according to the
         // prediction list, as it has been already signaled that it's not one
         // of the prediction modes.
         for (i = 2; i >= 0; i--) {
-          tmp_pred = (tmp_pred > intra_preds[i] ? tmp_pred - 1 : tmp_pred);
+          tmp_pred = (tmp_pred > intra_preds[j][i] ? tmp_pred - 1 : tmp_pred);
         }
 
         CABAC_BINS_EP(&cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
