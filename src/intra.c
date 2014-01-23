@@ -392,11 +392,11 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
 {
   int32_t x,y,i;
   pixel pred[LCU_WIDTH * LCU_WIDTH];
-  int8_t filter = !chroma&&(width<32);
+  int8_t filter = !chroma && width < 32;
 
 
   // Filtering apply if luma and not DC
-  if (!chroma && mode != 1) {
+  if (!chroma && mode != 1 && width > 4) {
     uint8_t threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
     if(MIN(abs(mode-26),abs(mode-10)) > threshold) {
       intra_filter(rec,recstride,width,0);
