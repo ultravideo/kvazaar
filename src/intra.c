@@ -496,6 +496,7 @@ void intra_build_reference_border(picture *pic, int32_t x_luma, int32_t y_luma, 
   const pixel dc_val = 1 << (g_bitdepth - 1);
   const int is_chroma = chroma ? 1 : 0;
   const int src_width = pic->width >> is_chroma;
+  const int src_height = pic->height >> is_chroma;
 
   // input picture pointer
   const pixel * const src = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata);
@@ -522,7 +523,9 @@ void intra_build_reference_border(picture *pic, int32_t x_luma, int32_t y_luma, 
     num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
 
     // There are no coded pixels below the bottom of the LCU due to raster scan order.
-    if ((num_ref_pixels << is_chroma) + y_in_lcu > LCU_WIDTH) {
+    if (num_ref_pixels + y > src_height) {
+      num_ref_pixels = src_height - y;
+    } else if ((num_ref_pixels << is_chroma) + y_in_lcu > LCU_WIDTH) {
       num_ref_pixels = (LCU_WIDTH - y_in_lcu) >> is_chroma;
     }
     // Copy pixels from coded CUs.
@@ -538,7 +541,7 @@ void intra_build_reference_border(picture *pic, int32_t x_luma, int32_t y_luma, 
     // If we are on the left edge, extend the first pixel of the top row.
     pixel nearest_pixel = y > 0 ? src_shifted[-src_width] : dc_val;
     int i;
-    for (i = 0; i < outwidth - 1; i++) {
+    for (i = 1; i < outwidth - 1; i++) {
       dst[i * dststride] = nearest_pixel;
     }
   }
@@ -578,9 +581,11 @@ void intra_build_reference_border(picture *pic, int32_t x_luma, int32_t y_luma, 
     }
   }
 
-  // Topleft corner sample
+  // If top-left corner sample doesn't exist, use the sample from below.
+  // Unavailable samples on the left boundary are copied from below if
+  // available. This is the only place they are available because we don't
+  // support constrained intra prediction.
   dst[0] = (x > 0 && y > 0) ? src_shifted[-src_width - 1] : dst[dststride];
-
 }
 
 const int32_t ang_table[9]     = {0,    2,    5,   9,  13,  17,  21,  26,  32};
