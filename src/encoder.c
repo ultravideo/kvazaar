@@ -1534,8 +1534,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
         pred_y[x+y*pred_stride]=recbase_y[x+y*recbase_stride];
       }
     }
-    for(y = 0; y < LCU_WIDTH>>(depth+1); y++) {
-      for(x = 0; x < LCU_WIDTH>>(depth+1); x++) {
+    for(y = 0; y < width_c; y++) {
+      for(x = 0; x < width_c; x++) {
         pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
         pred_v[x+y*(pred_stride>>1)]=recbase_v[x+y*(recbase_stride>>1)];
       }
