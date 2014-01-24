@@ -1,16 +1,28 @@
 #ifndef GLOBAL_H_
 #define GLOBAL_H_
-/**
+/*****************************************************************************
+ * This file is part of Kvazaar HEVC encoder.
+ * 
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ * COPYING file).
+ *
+ * Kvazaar is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as published
+ * by the Free Software Foundation.
+ *
+ * Kvazaar is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
+ ****************************************************************************/
+
+/*
  * \file
  * \brief Header that is included in every other header.
- * 
- * \author Marko Viitanen ( fador@iki.fi ), 
- *         Tampere University of Technology,
- *         Department of Pervasive Computing.
- * \author Ari Koivula ( ari@koivu.la ), 
- *         Tampere University of Technology,
- *         Department of Pervasive Computing.
- * 
+´*
  * This file contains global constants that can be referred to from any header
  * or source file. It also contains some helper macros and includes stdint.h
  * so that any file can refer to integer types with exact widths.

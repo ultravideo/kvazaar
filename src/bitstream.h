@@ -1,15 +1,27 @@
 #ifndef BITSTREAM_H_
 #define BITSTREAM_H_
-/**
+/*****************************************************************************
+ * This file is part of Kvazaar HEVC encoder.
+ * 
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ * COPYING file).
+ *
+ * Kvazaar is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as published
+ * by the Free Software Foundation.
+ *
+ * Kvazaar is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
+ ****************************************************************************/
+
+/*
  * \file
  * \brief Bitstream can be written to one or several bits at a time.
- * 
- * \author Marko Viitanen ( fador@iki.fi ),
- *         Tampere University of Technology,
- *         Department of Pervasive Computing.
- * \author Ari Koivula ( ari@koivu.la ),
- *         Tampere University of Technology,
- *         Department of Pervasive Computing.
  */
  
 #include "global.h"
