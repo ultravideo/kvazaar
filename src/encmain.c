@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
   printf("\r\n");
     
 
-	printf("Input: %s, output: %s\n", cfg->input, cfg->output);
+  printf("Input: %s, output: %s\n", cfg->input, cfg->output);
   printf("  Video size: %dx%d\n", cfg->width, cfg->height);
 
   // Open input file and check that it was opened correctly
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
   // input init (TODO: read from commandline / config)
   encoder->bitdepth = 8;
   encoder->frame    = 0;
-  encoder->QP       = 32;
+  encoder->QP       = encoder->cfg->qp;
   encoder->in.video_format = FORMAT_420;
   // deblocking filter
   encoder->deblock_enable  = 1;

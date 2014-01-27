@@ -52,6 +52,7 @@ int config_init(config *cfg)
   cfg->frames = 0;
   cfg->width  = 320;
   cfg->height = 240;
+  cfg->qp     = 32;
 
   return 1;
 }
@@ -113,6 +114,9 @@ int config_read(config *cfg,int argc, char *argv[])
           break;
         case 'n': // number of frames to encode
           cfg->frames = atoi(argv[arg]);
+          break;
+        case 'q': // QP
+          cfg->qp = atoi(argv[arg]);
           break;
         default:
           // Unknown command, print error message and ignore
