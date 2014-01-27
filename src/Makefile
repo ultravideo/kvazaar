@@ -27,7 +27,6 @@ CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib
 LDFLAGS = -lm
 LD = gcc
 YASM = yasm
-ASMOBJS = test64.o
 OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o debug.o encoder.o filter.o inter.o intra.o nal.o picture.o sao.o search.o transform.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
@@ -39,7 +38,7 @@ test.o: x86/test.asm
 	$(YASM) -f elf x86/test.asm -o test.o
 
 test64.o: x64/test64.asm
-	$(YASM) -f elf64 x64/test64.asm -o test.o
+	$(YASM) -f elf64 x64/test64.asm -o test64.o
 
 %.o: %.c
 	$(CC) $(CCFLAGS) -c $< -o $@
