@@ -32,6 +32,8 @@
   #include "../include/stdint.h"
 #else
   #include <stdint.h>
+  #include <stdio.h>
+  #include <limits.h>
 #endif
 
 #if _MSC_VER && _M_AMD64
