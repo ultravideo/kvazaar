@@ -28,7 +28,7 @@ LDFLAGS = -lm
 LD = gcc
 YASM = yasm
 ASMOBJS = test64.o
-OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o debug.o encoder.o filter.o inter.o intra.o nal.o picture.o sao.o search.o transform.o
+OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o debug.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o search.o transform.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
