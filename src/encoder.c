@@ -1483,7 +1483,6 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     // INTRA PREDICTION
 
-
     uint32_t ac_sum = 0;
     uint32_t ctx_idx;
     uint32_t scan_idx_luma   = SCAN_DIAG;
@@ -1508,10 +1507,21 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     if(cur_cu->type == CU_INTRA)
     {
-      //if multiple scans supported for transform size
-      if (ctx_idx > 3 && ctx_idx < 6) {
-        scan_idx_luma = abs((int32_t) cur_cu->intra[0].mode - 26) < 5 ? 1 : (abs((int32_t)cur_cu->intra[0].mode - 10) < 5 ? 2 : 0);
+      int pu_index = x_pu % 2 + 2 * (y_pu % 2);
+      int luma_mode = cur_cu->intra[pu_index].mode;
+      scan_idx_luma = SCAN_DIAG;
+
+      // Scan mode is diagonal, except for 4x4 and 8x8, where:
+      // - angular 6-14 = vertical
+      // - angular 22-30 = horizontal
+      if (width <= 8) {
+        if (luma_mode >= 6 && luma_mode <= 14) {
+          scan_idx_luma = SCAN_VER;
+        } else if (luma_mode >= 22 && luma_mode <= 30) {
+          scan_idx_luma = SCAN_HOR;
+        }
       }
+
       // TODO : chroma intra prediction
       cur_cu->intra[0].mode_chroma = 36;
       // Chroma scanmode
@@ -1578,8 +1588,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
           cbf_y = 1;
         } else {
           int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-          cur_cu->coeff_top_y[depth + pu_index] = 0;
-          cbf_y = 0;
+          cur_cu->coeff_top_y[depth + pu_index] = 1;
+          cbf_y = 1;
         }
         break;
       }
@@ -1730,9 +1740,8 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
   // CoeffNxN
   // Residual Coding
   if (cbf_y) {
-    if (cur_cu->type == CU_INTER) {
-      scan_idx = SCAN_DIAG;
-    } else {
+    scan_idx = SCAN_DIAG;
+    if (cur_cu->type == CU_INTRA) {
       // Luma (Intra) scanmode
       if (depth <= MAX_DEPTH) {
         dir_mode = cur_cu->intra[0].mode;
@@ -1741,10 +1750,15 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
         dir_mode = cur_cu->intra[pu_index].mode;
       }
       
-
-      //if multiple scans supported for transform size
-      if (ctx_idx > 3 && ctx_idx < 6) {
-        scan_idx = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
+      // Scan mode is diagonal, except for 4x4 and 8x8, where:
+      // - angular 6-14 = vertical
+      // - angular 22-30 = horizontal
+      if (width <= 8) {
+        if (dir_mode >= 6 && dir_mode <= 14) {
+          scan_idx = SCAN_VER;
+        } else if (dir_mode >= 22 && dir_mode <= 30) {
+          scan_idx = SCAN_HOR;
+        }
       }
     }
 
