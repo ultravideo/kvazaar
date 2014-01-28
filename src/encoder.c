@@ -1619,8 +1619,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       }
     }
 
-    // If luma is 4x4, do previous depths chroma after the last luma block.
-    if (depth <= MAX_DEPTH || (x_pu % 2 && y_pu % 2)) {
+    // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
+    // left PU because the coordinates are correct.
+    if (depth <= MAX_DEPTH || (x_pu % 2 == 0 && y_pu % 2 == 0)) {
       int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
       int chroma_size = LCU_CHROMA_SIZE >> (chroma_depth * 2);
       
@@ -1633,13 +1634,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
-          if (depth <= MAX_DEPTH) {
             cur_cu->coeff_u = 1;
             cur_cu->coeff_top_u[depth] = 1;
-          } else {
-            cur_cu->coeff_u = 0;
-            cur_cu->coeff_top_u[depth] = 0;
-          }
           break;
         }
       }
@@ -1647,13 +1643,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
-          if (depth <= MAX_DEPTH) {
             cur_cu->coeff_v = 1;
             cur_cu->coeff_top_v[depth] = 1;
-          } else {
-            cur_cu->coeff_v = 0;
-            cur_cu->coeff_top_v[depth] = 0;
-          }
           break;
         }
       }
@@ -1781,10 +1772,10 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
     }
     orig_pos_u = &encoder->in.cur_pic->coeff_u[x + y * (encoder->in.width >> 1)];
     orig_pos_v = &encoder->in.cur_pic->coeff_v[x + y * (encoder->in.width >> 1)];
-    for (y = 0; y < (width>>1); y++) {
-      for (x = 0; x < (width>>1); x++) {
-        coeff_u[x+y*(width>>1)] = orig_pos_u[x];
-        coeff_v[x+y*(width>>1)] = orig_pos_v[x];
+    for (y = 0; y < (width_c); y++) {
+      for (x = 0; x < (width_c); x++) {
+        coeff_u[x+y*(width_c)] = orig_pos_u[x];
+        coeff_v[x+y*(width_c)] = orig_pos_v[x];
       }
       orig_pos_u += coeff_stride>>1;
       orig_pos_v += coeff_stride>>1;
@@ -1805,6 +1796,9 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
       scan_idx = SCAN_DIAG;
 
       if (ctx_idx > 4 && ctx_idx < 7) { // if multiple scans supported for transform size
+        // mode is diagonal, except for 4x4 and 8x8, where:
+        // - angular 6-14 = vertical
+        // - angular 22-30 = horizontal
         scan_idx = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
       }
     }
