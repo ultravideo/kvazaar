@@ -40,6 +40,7 @@
 #include "filter.h"
 #include "search.h"
 #include "sao.h"
+#include "rdo.h"
 
 int16_t g_lambda_cost[55];
 uint32_t* g_sig_last_scan[3][7];
@@ -200,7 +201,6 @@ void init_tables(void)
 
   // Lambda cost
   // TODO: cleanup
-  //g_lambda_cost = (int16_t*)malloc(sizeof(int16_t)*55);
   for (i = 0; i < 55; i++) {
     if (i < 12) {
       g_lambda_cost[i] = 0;
@@ -208,7 +208,14 @@ void init_tables(void)
       g_lambda_cost[i] = (int16_t)sqrt(0.57 * pow(2.0, (i - 12) / 3));
     }
 
-    //g_lambda_cost[i] = g_lambda_cost[i]*g_lambda_cost[i];
+    /**
+     * While working on RDOQ it was clear that the current lambda cost is wrong (compared to HM)
+     * so the cost is now lambda*lambda to fix some of those issues.
+     * This is not the final solution and this should be fixed by calculating the lambda like HM.
+     * TODO: fix lambda cost calculation
+     * - Marko Viitanen (Fador)
+     **/
+    g_lambda_cost[i] = g_lambda_cost[i]*g_lambda_cost[i];
   }
 
 }
@@ -633,7 +640,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   //TODO: VUI?
   //encode_VUI(encoder);
   
-	WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
+  WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
 void encode_vid_parameter_set(encoder_control* encoder)
@@ -668,7 +675,7 @@ void encode_vid_parameter_set(encoder_control* encoder)
   //IF timing info
   //END IF
 
-	WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
+  WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
 void encode_VUI(encoder_control* encoder)
@@ -1488,7 +1495,11 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
 
     // Transform and quant residual to coeffs
     transform2d(block,pre_quant_coeff,width,0);
+    #if RDOQ == 1
+    rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type,cur_cu->tr_depth-cur_cu->depth);    
+    #else
     quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+    #endif
 
     // Check for non-zero coeffs
     for (i = 0; i < width * width; i++) {
@@ -1547,8 +1558,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       }
 
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
+      #if RDOQ == 1
+      rdoq(encoder, pre_quant_coeff, coeff_u, width >> 1, width >> 1, &ac_sum, 2,
+            scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+      #else      
       quant(encoder, pre_quant_coeff, coeff_u, width >> 1, width >> 1, &ac_sum, 2,
             scan_idx_chroma, cur_cu->type);
+      #endif
 
       for (i = 0; i < width *width >> 2; i++) {
         if (coeff_u[i] != 0) {
@@ -1571,8 +1587,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu,int32_t y_cu, 
       }
 
       transform2d(block,pre_quant_coeff,LCU_WIDTH>>(depth+1),65535);
+      #if RDOQ == 1
+      rdoq(encoder, pre_quant_coeff, coeff_v, width >> 1, width >> 1, &ac_sum, 3,
+           scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+      #else
       quant(encoder, pre_quant_coeff, coeff_v, width >> 1, width >> 1, &ac_sum, 3,
             scan_idx_chroma, cur_cu->type);
+      #endif
 
       for (i = 0; i < width *width >> 2; i++) {
         if (coeff_v[i] != 0) {

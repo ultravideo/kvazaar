@@ -77,6 +77,8 @@ typedef int16_t coefficient;
 
 #define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0 /*!< skip residual coding when it's under _some_ threshold */
 
+#define RDOQ 1 /*!< Rate-Distortion Optimized Quantization */
+
 /* END OF CONFIG VARIABLES */
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
@@ -141,5 +143,15 @@ typedef int16_t coefficient;
 
 #define FREE_POINTER(pointer) { free(pointer); pointer = NULL; }
 #define MOVE_POINTER(dst_pointer,src_pointer) { dst_pointer = src_pointer; src_pointer = NULL; }
+
+#ifndef MAX_INT
+#define MAX_INT 0x7FFFFFFF
+#endif
+#ifndef MAX_INT64
+#define MAX_INT64 0x7FFFFFFFFFFFFFFFLL
+#endif
+#ifndef MAX_DOUBLE
+#define MAX_DOUBLE 1.7e+308
+#endif
 
 #endif

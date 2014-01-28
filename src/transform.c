@@ -151,6 +151,7 @@ const uint8_t g_chroma_scale[58]=
 
 int32_t *g_quant_coeff[4][6][6];
 int32_t *g_de_quant_coeff[4][6][6];
+double *g_error_scale[4][6][6];
 
 const uint8_t g_scaling_list_num[4]    = { 6, 6, 6, 2};
 const uint16_t g_scaling_list_size[4]  = {   16,  64, 256,1024}; 
@@ -177,6 +178,7 @@ void scalinglist_init()
         if (!(sizeId == 3 && listId == 3)) {
           g_quant_coeff[sizeId][listId][qp]    = (int32_t*)calloc(g_scaling_list_size[sizeId], sizeof(int32_t));
           g_de_quant_coeff[sizeId][listId][qp] = (int32_t*)calloc(g_scaling_list_size[sizeId], sizeof(int32_t));
+          g_error_scale[sizeId][listId][qp]    = (double*)calloc(g_scaling_list_size[sizeId], sizeof(double));
         }
       }
     }
@@ -185,6 +187,7 @@ void scalinglist_init()
   for (qp = 0; qp < 6; qp++) {
     g_quant_coeff[3][3][qp]    = g_quant_coeff[3][1][qp];
     g_de_quant_coeff[3][3][qp] = g_de_quant_coeff[3][1][qp];
+    g_error_scale[3][3][qp]    = g_error_scale[3][1][qp];
   }
 }
 
@@ -202,6 +205,7 @@ void scalinglist_destroy()
         if (!(sizeId == 3 && listId == 3)) {
           free(   g_quant_coeff[sizeId][listId][qp]);
           free(g_de_quant_coeff[sizeId][listId][qp]);
+          free(   g_error_scale[sizeId][listId][qp]);
         }
       }
     }
@@ -238,6 +242,7 @@ void scalinglist_process()
 
       for (qp = 0; qp < SCALING_LIST_REM_NUM; qp++) {
         scalinglist_set(list_ptr, list, size, qp);
+        scalinglist_set_err_scale(list, size, qp);
       }
     }
   }
@@ -246,9 +251,32 @@ void scalinglist_process()
 }
 
 
+/** set error scale coefficients
+ * \param list List ID
+ * \param uiSize Size
+ * \param uiQP Quantization parameter
+ */
+#define MAX_TR_DYNAMIC_RANGE 15
+void scalinglist_set_err_scale(uint32_t list,uint32_t size, uint32_t qp)
+{
+  uint32_t log2_tr_size   = g_convert_to_bit[ g_scaling_list_size_x[size] ] + 2;
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;  // Represents scaling through forward transform
+
+  uint32_t i,max_num_coeff = g_scaling_list_size[size];
+  int32_t *quantcoeff      = g_quant_coeff[size][list][qp];
+  double *err_scale        = g_error_scale[size][list][qp];
+
+  // Compensate for scaling of bitcount in Lagrange cost function
+  double scale = (double)(1<<15);
+  // Compensate for scaling through forward transform
+  scale = scale*pow(2.0,-2.0*transform_shift);
+  for(i=0;i<max_num_coeff;i++) {
+    err_scale[i] = scale / quantcoeff[i] / quantcoeff[i] / (1<<(2*(g_bitdepth-8)));
+  }
+}
 
 /**
- * \brief get staling list for encoder
+ * \brief get scaling list for encoder
  * 
  */
 void scalinglist_process_enc( int32_t *coeff, int32_t *quantcoeff, int32_t quant_scales, uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat)
@@ -276,7 +304,7 @@ void scalinglist_process_enc( int32_t *coeff, int32_t *quantcoeff, int32_t quant
 }
 
 /**
- * \brief get staling list for decoder
+ * \brief get scaling list for decoder
  * 
  */
 void scalinglist_process_dec( int32_t *coeff, int32_t *dequantcoeff, int32_t inv_quant_scales, uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat)
@@ -319,6 +347,7 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
   // Decoder list
   scalinglist_process_dec(coeff, dequantcoeff, g_inv_quant_scales[qp], height, width, ratio,
                           MIN(8, g_scaling_list_size_x[sizeId]), SCALING_LIST_DC, ENABLE_SCALING_LIST ? 0 : 1);
+
 
   // TODO: support NSQT
   // if(sizeId == /*SCALING_LIST_32x32*/3 || sizeId == /*SCALING_LIST_16x16*/2) { //for NSQT
