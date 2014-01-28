@@ -13,7 +13,7 @@
 #ifndef _TEST64_H_
 #define _TEST64_H_
 
-void __cdecl cpuId64(int* ecx, int *edx );
+void cpuId64(int* ecx, int *edx );
 
 
 #endif

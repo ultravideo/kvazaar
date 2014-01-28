@@ -13,7 +13,7 @@
 #ifndef _TEST_H_
 #define _TEST_H_
 
-void __cdecl cpuId32(int* ecx, int *edx );
+void cpuId32(int* ecx, int *edx );
 
 
 #endif

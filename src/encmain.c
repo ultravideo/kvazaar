@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "hevc_encoder -i <input> -w <width> -h <height> -o <output>\r\n");
     fprintf(stderr, "Optional parameters:\r\n");
     fprintf(stderr, "      -n <frames> : number of frames to decode\r\n");
-    fprintf(stderr, "      -s <frames> : number of frames to skip from the beginning\r\n");
+    fprintf(stderr, "      -q <QP> : Quantization Parameter, default 32\r\n");
 
     config_destroy(cfg);
     return EXIT_FAILURE;
