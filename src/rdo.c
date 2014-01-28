@@ -40,18 +40,75 @@
 const uint32_t g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
 
+
+#define COEF_REMAIN_BIN_REDUCTION 3
+/** Calculates the cost for specific absolute transform level
+ * \param abs_level scaled quantized level
+ * \param ctx_num_one current ctxInc for coeff_abs_level_greater1 (1st bin of coeff_abs_level_minus1 in AVC)
+ * \param ctx_num_abs current ctxInc for coeff_abs_level_greater2 (remaining bins of coeff_abs_level_minus1 in AVC)
+ * \param abs_go_rice Rice parameter for coeff_abs_level_minus3
+ * \returns cost of given absolute transform level
+ * From HM 12.0
+ */
+double get_ic_rate_cost  (uint32_t abs_level,
+                          uint16_t ctx_num_one,
+                          uint16_t ctx_num_abs,
+                          uint16_t abs_go_rice,
+                          uint32_t c1_idx,
+                          uint32_t c2_idx,
+                          int8_t type
+                          )
+{
+  double rate = 32768.0;
+  uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
+  cabac_ctx *base_one_ctx = (type == 0) ? &g_cu_one_model_luma[0] : &g_cu_one_model_chroma[0];
+  cabac_ctx *base_abs_ctx = (type == 0) ? &g_cu_abs_model_luma[0] : &g_cu_abs_model_chroma[0];
+
+  if ( abs_level >= base_level ) {
+    uint32_t symbol     = abs_level - base_level;
+    uint32_t length;
+    if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
+      length = symbol>>abs_go_rice;
+      rate += (length+1+abs_go_rice)<< 15;
+    } else {
+      length = abs_go_rice;
+      symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
+      while (symbol >= (1<<length)) {
+        symbol -=  (1<<(length++));
+      }
+      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length)<< 15;
+    }
+    if (c1_idx < C1FLAG_NUMBER) {
+      rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
+
+      if (c2_idx < C2FLAG_NUMBER) {
+        rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],1);
+      }
+    }
+  }
+  else if( abs_level == 1 ) {
+    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
+  } else if( abs_level == 2 ) {
+    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
+    rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],0);
+  }
+
+  return rate;
+}
+
+
 int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
                      uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type)
 {
-  int32_t iRate = 0;
-  uint32_t baseLevel  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
+  int32_t rate = 0;
+  uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
   cabac_ctx *base_one_ctx = (type == 0) ? &g_cu_one_model_luma[0] : &g_cu_one_model_chroma[0];
   cabac_ctx *base_abs_ctx = (type == 0) ? &g_cu_abs_model_luma[0] : &g_cu_abs_model_chroma[0];
   
   if(!abs_level) return 0;
 
-  if (abs_level >= baseLevel) {
-    uint32_t symbol     = abs_level - baseLevel;
+  if (abs_level >= base_level) {
+    uint32_t symbol     = abs_level - base_level;
     uint32_t max_vlc     = g_go_rice_range[ abs_go_rice ];
     uint16_t pref_len,num_bins;
 
@@ -60,28 +117,28 @@ int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_a
       uint32_t uiMax = 2;
       abs_level  = symbol - max_vlc;
       for(; abs_level >= uiMax; uiMax <<= 1, iEGS += 2 );
-      iRate      += iEGS << 15;
+      rate      += iEGS << 15;
       symbol    = MIN( symbol, ( max_vlc + 1 ) );
     }
 
     pref_len = (uint16_t)(symbol >> abs_go_rice) + 1;
     num_bins = MIN( pref_len, g_go_rice_prefix_len[ abs_go_rice ] ) + abs_go_rice;
 
-    iRate += num_bins << 15;
+    rate += num_bins << 15;
 
     if (c1_idx < C1FLAG_NUMBER) {      
-      iRate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
+      rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
       if (c2_idx < C2FLAG_NUMBER) {        
-        iRate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],1);
+        rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],1);
       }
     }
   } else if( abs_level == 1 ) {
-    iRate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
+    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
   } else if( abs_level == 2 ) {
-    iRate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
-    iRate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],0);
+    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
+    rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],0);
   }
-  return iRate;
+  return rate;
 }
 
 /** Get the best level in RD sense
@@ -129,7 +186,9 @@ uint32_t get_coded_level ( encoder_control* encoder, double *coded_cost, double 
   min_abs_level    = ( max_abs_level > 1 ? max_abs_level - 1 : 1 );
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
     double err       = (double)(level_double - ( abs_level << q_bits ) );
-    double cur_cost  = err * err * temp + get_ic_rate( abs_level, ctx_num_one, ctx_num_abs, abs_go_rice, c1_idx, c2_idx, type);
+    double cur_cost  = err * err * temp + g_lambda_cost[encoder->QP] *
+                       get_ic_rate_cost( abs_level, ctx_num_one, ctx_num_abs, 
+                                         abs_go_rice, c1_idx, c2_idx, type);
     cur_cost        += cur_cost_sig;
 
     if( cur_cost < *coded_cost ) {
@@ -201,7 +260,7 @@ void calc_last_bits(int32_t width, int32_t height, int8_t type, int32_t* last_x_
  * From HM 12.0
  */
 void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff, int32_t width,
-           int32_t height, uint32_t *abs_sum, int8_t type, int8_t block_type, int8_t scan_mode, int8_t tr_depth)
+           int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;  
   int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;  // Represents scaling through forward transform
