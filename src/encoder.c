@@ -324,7 +324,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
   } else {
     cabac_start(&cabac);
-    encoder->in.cur_pic->slicetype = SLICE_I;
+    encoder->in.cur_pic->slicetype = SLICE_P;
     encoder->in.cur_pic->type = NAL_TRAIL_R;
     scalinglist_process();
     search_slice_data(encoder);
