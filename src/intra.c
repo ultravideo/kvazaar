@@ -62,21 +62,6 @@ void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t dep
       cur_cu->tr_depth = depth;
     }
   }
-
-  // Loop through all the blocks in the area of cur_cu
-  /*for (y = y_cu; y < y_cu + block_scu_width; y++) {
-    int cu_pos = y * width_in_scu;
-    for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      pic->cu_array[MAX_DEPTH][cu_pos + x].depth = depth;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].type  = CU_INTRA;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[0].mode = mode;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[1].mode = mode;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[2].mode = mode;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].intra[3].mode = mode;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].part_size = part_mode;
-      pic->cu_array[MAX_DEPTH][cu_pos + x].tr_depth = depth;
-    }
-  }*/
 }
 
 /**

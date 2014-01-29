@@ -1582,14 +1582,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
+        cur_cu->coeff_y = 1;
+        cbf_y = 1;
         if (depth <= MAX_DEPTH) {
-          cur_cu->coeff_y = 1;
           cur_cu->coeff_top_y[depth] = 1;
-          cbf_y = 1;
         } else {
           int pu_index = x_pu % 2 + 2 * (y_pu % 2);
           cur_cu->coeff_top_y[depth + pu_index] = 1;
-          cbf_y = 1;
         }
         break;
       }
@@ -1644,8 +1643,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
-            cur_cu->coeff_u = 1;
-            cur_cu->coeff_top_u[depth] = 1;
+          cur_cu->coeff_u = 1;
+          cur_cu->coeff_top_u[depth] = 1;
           break;
         }
       }
@@ -1653,8 +1652,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
-            cur_cu->coeff_v = 1;
-            cur_cu->coeff_top_v[depth] = 1;
+          cur_cu->coeff_v = 1;
+          cur_cu->coeff_top_v[depth] = 1;
           break;
         }
       }
@@ -2244,7 +2243,7 @@ void encode_block_residual(encoder_control *encoder,
 
   if (cur_cu->type == CU_INTRA) {
     // INTRAPREDICTION VARIABLES
-    //pixel pred_y[LCU_WIDTH * LCU_WIDTH];
+    pixel pred_y[LCU_WIDTH * LCU_WIDTH];
 
     pixel *recbase_y = &encoder->in.cur_pic->y_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))     + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH)))     * encoder->in.width];
     pixel *recbase_u = &encoder->in.cur_pic->u_recdata[x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * (encoder->in.width >> 1)];
@@ -2268,10 +2267,13 @@ void encode_block_residual(encoder_control *encoder,
 
     cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
     
-    // Disable for now because it doesn't implement NxN yet.
-    /*intra_build_reference_border(encoder->in.cur_pic, x_ctb, y_ctb,
-                                 (LCU_WIDTH >> (depth)) * 2 + 8, rec,
-                                 (LCU_WIDTH >> (depth)) * 2 + 8, 0);
+    // This does not support NxN yet.
+    // A quick test with 10 frames of PeopleOnStreet_3840x2160 showed that
+    // re-doing the search here with actual reconstructed reference lowered
+    // bitrate by 4% and improved luma PSNR by 0.03dB. Doing it here might
+    // not be worth it.
+    intra_build_reference_border(encoder->in.cur_pic, x_ctb * 8, y_ctb * 8,
+                                 width * 2 + 8, rec, width * 2 + 8, 0);
     cur_cu->intra[0].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
                                                   encoder->in.width,
                                                   rec_shift,
@@ -2281,7 +2283,9 @@ void encode_block_residual(encoder_control *encoder,
                                                   width, pred_y, width,
                                                   &cur_cu->intra[0].cost);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-                         cur_cu->intra[0].mode, cur_cu->part_size);*/
+                         cur_cu->intra[0].mode, cur_cu->part_size);
+    intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
+        cur_cu->intra[0].mode, cur_cu->part_size);
     
 
 
