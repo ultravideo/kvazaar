@@ -1,9 +1,13 @@
 #Kvazaar
-An open-source HEVC encoder
+An open-source HEVC encoder licensed under GPLv2
 
-TODO: add description
+Join channel #kvazaar_hevc in Freenode IRC network to contact us.
 
-#Using Kvazaar
+Kvazaar is not yet finished and does not implement all the features of HEVC. Compression performance will increase as we add more coding tools.
+
+http://ultravideo.cs.tut.fi/#encoder for more information.
+
+##Using Kvazaar
 Currently most of the features are turned on/off from the code on compile time, but they are
 meant to be user configurable later.
 
@@ -11,16 +15,27 @@ meant to be user configurable later.
 
 eg. `kvazaar -i BQMall_832x480_60.yuv -w 832 -h 480 -o out.bin -n 600 -q 32`
 
-TODO: add examples
+The only accepted input format so far is 8-bit YUV 4:2:0.
+
 
 ##Compiling Kvazaar
 
-If you have trouble regarding compiling the source code, please make an issue about in Github. Others might encounter the same problem and there is probably much to improve in the build process. We want to make this as simple as possible.
+If you have trouble regarding compiling the source code, please make an [issue](https://github.com/ultravideo/kvazaar/issues) about in Github. Others might encounter the same problem and there is probably much to improve in the build process. We want to make this as simple as possible.
 
-- Visual Studio 2010 project included.
-- Simple linux Makefile included.
-- Yasm used to compile assembly.
-- No external library dependencies.
+No external library dependencies.
+
+###Visual Studio 2010
+- project files included
+- requires external [vsyasm.exe](http://yasm.tortall.net/Download.html) in %PATH%
+  - run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to user variables
+
+###Linux
+- Simple Makefile included in src/
+- Yasm is expected to be in PATH
+
+###Other
+- Contact us for support or write an [issue in Github](https://github.com/ultravideo/kvazaar/issues)
+
 
 ##Contributing to Kvazaar
 
