@@ -32,7 +32,7 @@ PROG  = ./kvazaar
 PROGS = $(PROG)
 
 $(PROG): $(OBJS) $(ASMOBJS)
-	$(LD) $(LDFLAGS) $^ -o $@
+	$(LD) $^ $(LDFLAGS) -o $@
 
 test.o: x86/test.asm
 	$(YASM) -f elf x86/test.asm -o test.o
