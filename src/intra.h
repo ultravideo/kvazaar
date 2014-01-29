@@ -29,7 +29,7 @@
 #include "picture.h"
 
 
-void intra_set_block_mode(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode);
+void intra_set_block_mode(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
 int8_t intra_get_block_mode(picture* pic, uint32_t x_ctb, uint32_t y_ctb, uint8_t depth);
 
 int8_t intra_get_dir_luma_predictor(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, int8_t* preds);

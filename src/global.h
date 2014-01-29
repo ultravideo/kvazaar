@@ -55,6 +55,8 @@ typedef uint16_t pixel;
 #endif
 typedef int16_t coefficient;
 
+//#define VERBOSE 1
+
 /* CONFIG VARIABLES */
 #define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
 
@@ -66,8 +68,12 @@ typedef int16_t coefficient;
 
 
 #define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
+#define MAX_PU_DEPTH 4
 #define MIN_SIZE 3   /*!< log2_min_coding_block_size */
 #define CU_MIN_SIZE_PIXELS 8 /*!< pow(2, MIN_SIZE) */
+
+#define TR_DEPTH_INTRA 2
+#define TR_DEPTH_INTER 2
 
 #define ENABLE_PCM 0 /*!< Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
 #define ENABLE_SIGN_HIDING 1

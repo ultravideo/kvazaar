@@ -282,7 +282,7 @@ unsigned search_mv_full(unsigned depth,
 /**
  * \brief
  */
-void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
+void search_buildReferenceBorder(picture *pic, int32_t x, int32_t y,
                                  int16_t outwidth, pixel *dst, 
                                  int32_t dststride, int8_t chroma)
 {
@@ -295,7 +295,9 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
   int32_t src_height = (pic->height >> (chroma ? 1 : 0)); // source picture height
   pixel *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
   int16_t scu_width = LCU_WIDTH >> (MAX_DEPTH + (chroma ? 1 : 0)); // Smallest Coding Unit width
-  pixel *src_shifted = &src_pic[x_ctb * scu_width + (y_ctb * scu_width) * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
+  int x_ctb = x >> MIN_SIZE;
+  int y_ctb = y >> MIN_SIZE;
+  pixel *src_shifted = &src_pic[x_ctb * scu_width + y_ctb * scu_width * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
   int32_t width_in_scu = pic->width_in_lcu << MAX_DEPTH; // picture width in SCU
 
   // Fill left column
@@ -359,6 +361,90 @@ void search_buildReferenceBorder(picture *pic, int32_t x_ctb, int32_t y_ctb,
 
 }
 
+
+void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth) {
+  picture *cur_pic = encoder->in.cur_pic;
+  picture *ref_pic = encoder->ref->pics[0];
+  unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
+  cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
+  cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+
+  vector2d orig, mv;
+  orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
+  orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
+  mv.x = 0;
+  mv.y = 0;
+  if (ref_cu->type == CU_INTER) {
+    mv.x = ref_cu->inter.mv[0];
+    mv.y = ref_cu->inter.mv[1];
+  }
+
+#if SEARCH_MV_FULL_RADIUS
+  cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
+#else
+  cur_cu->inter.cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
+#endif
+    
+  cur_cu->inter.mv_dir = 1;
+  cur_cu->inter.mv[0] = mv.x;
+  cur_cu->inter.mv[1] = mv.y;
+}
+
+void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
+{
+  int x = x_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  int y = y_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  picture *cur_pic = encoder->in.cur_pic;
+  uint32_t width = LCU_WIDTH >> depth;
+  cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+
+  // INTRAPREDICTION
+  pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
+  pixel rec[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
+  pixel *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
+
+  // Build reconstructed block to use in prediction with extrapolated borders
+  search_buildReferenceBorder(encoder->in.cur_pic, x, y,
+      width * 2 + 8, rec, width * 2 + 8, 0);
+  cur_cu->intra[0].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
+      encoder->in.width, recShift, width * 2 + 8, x, y,
+      width, pred, width, &cur_cu->intra[0].cost);
+  cur_cu->part_size = SIZE_2Nx2N;
+
+  // Do search for NxN split.
+  // This feature doesn't work yet so it is disabled.
+  if (0 && depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
+    // Save 2Nx2N information to compare with NxN.
+    int nn_cost = cur_cu->intra[0].cost;
+    int nn_mode = cur_cu->intra[0].mode;
+    int i;
+    int cost = g_lambda_cost[encoder->QP] << 8;
+    static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
+    width = 4;
+    recShift = &rec[width * 2 + 8 + 1];
+
+    for (i = 0; i < 4; ++i) {
+      int x_pos = x + offsets[i].x * width;
+      int y_pos = y + offsets[i].y * width;
+      search_buildReferenceBorder(encoder->in.cur_pic, x_pos, y_pos,
+        width * 2 + 8, rec, width * 2 + 8, 0);
+      cur_cu->intra[i].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
+          encoder->in.width, recShift, width * 2 + 8, x_pos, y_pos,
+          width, pred, width, &cur_cu->intra[i].cost);
+      cost += cur_cu->intra[i].cost;
+    }
+
+    // Choose between 2Nx2N and NxN.
+    if (nn_cost <= cost) {
+      cur_cu->intra[0].cost = nn_cost;
+      cur_cu->intra[0].mode = nn_mode;
+    } else {
+      cur_cu->intra[0].cost = cost;
+      cur_cu->part_size = SIZE_NxN;
+    }
+  }
+}
+
 /**
  * \brief
  */
@@ -374,7 +460,7 @@ void search_tree(encoder_control *encoder,
   picture *cur_pic = encoder->in.cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
-  cur_cu->intra.cost = 0xffffffff;
+  cur_cu->intra[0].cost = 0xffffffff;
   cur_cu->inter.cost = 0xffffffff;
 
   // Force split on border
@@ -395,56 +481,14 @@ void search_tree(encoder_control *encoder,
     }
   }
 
-  // INTER SEARCH
   if (cur_pic->slicetype != SLICE_I
       && depth >= MIN_INTER_SEARCH_DEPTH && depth <= MAX_INTER_SEARCH_DEPTH) {
-    
-    picture *ref_pic = encoder->ref->pics[0];
-    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
-
-    vector2d orig, mv;
-    orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
-    orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
-    mv.x = 0;
-    mv.y = 0;
-    if (ref_cu->type == CU_INTER) {
-      mv.x = ref_cu->inter.mv[0];
-      mv.y = ref_cu->inter.mv[1];
-    }
-
-#if SEARCH_MV_FULL_RADIUS
-    cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
-#else
-    cur_cu->inter.cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
-#endif
-    
-    cur_cu->inter.mv_dir = 1;
-    cur_cu->inter.mv[0] = mv.x;
-    cur_cu->inter.mv[1] = mv.y;
+    search_inter(encoder, x_ctb, y_ctb, depth);
   }
 
-  // INTRA SEARCH
   if (depth >= MIN_INTRA_SEARCH_DEPTH && depth <= MAX_INTRA_SEARCH_DEPTH
       && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P)) {
-    int x = 0, y = 0;
-    pixel *base = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
-    uint32_t width = LCU_WIDTH >> depth;
-
-    // INTRAPREDICTION
-    pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
-    pixel rec[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8)];
-    pixel *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
-
-    // Build reconstructed block to use in prediction with extrapolated borders
-    search_buildReferenceBorder(encoder->in.cur_pic, x_ctb, y_ctb,
-        (LCU_WIDTH >> (depth)) * 2 + 8, rec, (LCU_WIDTH >> (depth)) * 2 + 8, 0);
-    cur_cu->intra.mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
-        encoder->in.width, recShift, (LCU_WIDTH >> (depth)) * 2 + 8,
-        x_ctb * (LCU_WIDTH >> (MAX_DEPTH)), y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
-        width, pred, width, &cur_cu->intra.cost);
-    //free(pred);
-    //free(rec);
+    search_intra(encoder, x_ctb, y_ctb, depth);
   }
 
   // Split and search to max_depth
@@ -466,7 +510,7 @@ uint32_t search_best_mode(encoder_control *encoder,
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth]
                      [x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  uint32_t best_intra_cost = cur_cu->intra.cost;
+  uint32_t best_intra_cost = cur_cu->intra[0].cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;
   uint32_t lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4; //<<5; //TODO: Correct cost calculation
 
@@ -493,7 +537,7 @@ uint32_t search_best_mode(encoder_control *encoder,
     return best_inter_cost;
   } else {
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-        cur_cu->intra.mode);
+        cur_cu->intra[0].mode, cur_cu->part_size);
     return best_intra_cost;
   }
 }
