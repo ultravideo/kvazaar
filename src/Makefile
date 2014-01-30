@@ -1,25 +1,35 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
-
-BITS = $(shell getconf LONG_BIT)
-
-# Detect 32/64bit system
-ifeq ($(BITS), 64)
-    ASMOBJS = test64.o
-else
-    ASMOBJS = test.o
-endif
-
-
+ARCH = $(shell uname -p)
+SYSTEM = $(shell uname -s)
+ASMFLAGS =
 DFLAGS =
+
+# ARCH related flags
+ifeq ($(ARCH), x86_64)
+    ASMFLAGS += -DARCH_X86_64=1
+else
+    ASMFLAGS += -DARCH_X86_64=0
+endif
+
+
+# Linux specifix flags
+ifeq ($(SYSTEM),Linux)
+  ifeq ($(ARCH), x86_64)    
+      ASMFLAGS += -f elf64
+  else
+      ASMFLAGS += -f elf32
+  endif
+endif
+
+# OS X specific flags
 ifeq ($(SYSTEM),Darwin)
-DFLAGS += -D__APPLE__
-endif
-ifeq ($(SYSTEM),FreeBSD)
-DFLAGS += -D__FREEBSD__
-endif
-ifeq ($(SYSTEM),SunOS)
-DFLAGS += -D__SOLARIS__
+  ifeq ($(ARCH), x86_64)
+  ASMFLAGS += -f macho64
+  else
+  ASMFLAGS += -f macho32
+  endif
+ASMFLAGS += -DPREFIX
 endif
 
 CC = gcc
@@ -27,18 +37,17 @@ CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib
 LDFLAGS = -lm
 LD = gcc
 YASM = yasm
+ASMOBJS = cpu.o
 OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o debug.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o search.o transform.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
+
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
-test.o: x86/test.asm
-	$(YASM) -f elf x86/test.asm -o test.o
-
-test64.o: x64/test64.asm
-	$(YASM) -f elf64 x64/test64.asm -o test64.o
+cpu.o: x86/cpu.asm
+	$(YASM) $(ASMFLAGS) x86/cpu.asm -o cpu.o
 
 %.o: %.c
 	$(CC) $(CCFLAGS) -c $< -o $@

@@ -41,11 +41,7 @@
 #include "transform.h"
  
 // Assembly optimization headers
-#ifdef X86_64
-  #include "x64/test64.h" 
-#else
-  #include "x86/test.h" 
-#endif
+#include "x86/cpu.h" 
  
 /**
  * \brief Program main function.
@@ -91,11 +87,7 @@ int main(int argc, char *argv[])
   }
 
   // Dig CPU features with cpuid
-  #ifdef X86_64
-  cpuId64(&ecx,&edx);
-  #else
-  cpuId32(&ecx,&edx);
-  #endif
+  kvz_cpu_cpuid(&ecx,&edx);
   printf("CPU features enabled: ");
   // EDX
   if (edx & (1<<BIT_MMX))  printf("MMX ");

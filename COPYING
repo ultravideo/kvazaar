@@ -41,7 +41,9 @@ permission notice, all changes are however licensed under GPLv2:
 	CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 	ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 	THE POSSIBILITY OF SUCH DAMAGE.
-
+  
+Kvazaar uses x264asm abstraction layer -library (included in src/x86/x86inc.asm)
+licensed under ISC license.
 
 Copy of GPLv2 (also available at http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt):
                     GNU GENERAL PUBLIC LICENSE

@@ -19,12 +19,6 @@
     <Filter Include="Header Files\x86">
       <UniqueIdentifier>{d1533c70-cb9a-419d-9a38-5161894ec359}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\x64">
-      <UniqueIdentifier>{cbe787b6-15a0-4c72-b658-6f444735fd73}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\x64">
-      <UniqueIdentifier>{39fb72d7-bfcd-4505-9a00-7ed6bf67d9ad}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\encmain.c">
@@ -110,12 +104,6 @@
     <ClInclude Include="..\..\src\filter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\x86\test.h">
-      <Filter>Header Files\x86</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\x64\test64.h">
-      <Filter>Header Files\x64</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\search.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -131,13 +119,13 @@
     <ClInclude Include="..\..\src\rdo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\x86\cpu.h">
+      <Filter>Header Files\x86</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <YASM Include="..\..\src\x86\test.asm">
+    <YASM Include="..\..\src\x86\cpu.asm">
       <Filter>Source Files\x86</Filter>
-    </YASM>
-    <YASM Include="..\..\src\x64\test64.asm">
-      <Filter>Source Files\x64</Filter>
     </YASM>
   </ItemGroup>
 </Project>

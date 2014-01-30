@@ -71,6 +71,30 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <YASM>
+      <Defines>ARCH_X86_64=1</Defines>
+    </YASM>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <YASM>
+      <Defines>ARCH_X86_64=0;PREFIX</Defines>
+    </YASM>
+    <ClCompile>
+      <CallingConvention>Cdecl</CallingConvention>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <YASM>
+      <Defines>ARCH_X86_64=0;PREFIX</Defines>
+    </YASM>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <YASM>
+      <Defines>ARCH_X86_64=1</Defines>
+    </YASM>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
@@ -106,12 +130,10 @@
     <ClInclude Include="..\..\src\sao.h" />
     <ClInclude Include="..\..\src\search.h" />
     <ClInclude Include="..\..\src\transform.h" />
-    <ClInclude Include="..\..\src\x64\test64.h" />
-    <ClInclude Include="..\..\src\x86\test.h" />
+    <ClInclude Include="..\..\src\x86\cpu.h" />
   </ItemGroup>
   <ItemGroup>
-    <YASM Include="..\..\src\x64\test64.asm" />
-    <YASM Include="..\..\src\x86\test.asm" />
+    <YASM Include="..\..\src\x86\cpu.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
