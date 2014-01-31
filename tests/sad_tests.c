@@ -1,14 +1,10 @@
-#include "seatest.h"
+#include "greatest/greatest.h"
 
-#include <stdlib.h>
+#include "src/picture.h"
 
-#include "picture.h"
 
 //////////////////////////////////////////////////////////////////////////
 // EXTERNAL FUNCTIONS
-unsigned calc_sad(picture *pic, picture *ref, 
-                  int pic_x, int pic_y, int ref_x, int ref_y, 
-                  int block_width, int block_height);
 
 //////////////////////////////////////////////////////////////////////////
 // DEFINES
@@ -43,7 +39,7 @@ picture *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
-void sad_setup(void)
+void sad_setup(void *environment)
 {
   unsigned i;
   g_pic = picture_init(8, 8, 1, 1);
@@ -57,7 +53,7 @@ void sad_setup(void)
   }
 }
 
-void sad_teardown(void)
+void sad_teardown(void *environment)
 {
   free(g_pic); g_pic = 0;
   free(g_ref); g_ref = 0;
@@ -65,163 +61,179 @@ void sad_teardown(void)
 
 //////////////////////////////////////////////////////////////////////////
 // OVERLAPPING BOUNDARY TESTS
-void test_topleft(void)
+TEST test_topleft(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     1*(4*4) + (2+4)*(4*4) + 5*(4*4) - 64,
     TEST_SAD(-3, -3));
+  PASS();
 }
 
-void test_top(void)
+TEST test_top(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (1+3)*4 + 2*(6*4) + (4+6)*4 + 5*(6*4) - 64,
     TEST_SAD(0, -3));
+  PASS();
 }
 
-void test_topright(void)
+TEST test_topright(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     3*(4*4) + (2+6)*(4*4) + 5*(4*4) - 64,
     TEST_SAD(3, -3));
+  PASS();
 }
 
-void test_left(void)
+TEST test_left(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (1+7)*4 + 4*(6*4) + (2+8)*4 + 5*(6*4) - 64,
     TEST_SAD(-3, 0));
+  PASS();
 }
 
-void test_no_offset(void)
+TEST test_no_offset(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (1+3+7+9) + (2+4+6+8)*6 + 5*(6*6) - 64,
     TEST_SAD(0, 0));
+  PASS();
 }
 
-void test_right(void)
+TEST test_right(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (3+9)*4 + 6*(4*6) + (2+8)*4 + 5*(6*4) - 64,
     TEST_SAD(3, 0));
+  PASS();
 }
 
-void test_bottomleft(void)
+TEST test_bottomleft(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     7*(4*4) + (4+8)*(4*4) + 5*(4*4) - 64,
     TEST_SAD(-3, 3));
+  PASS();
 }
 
-void test_bottom(void)
+TEST test_bottom(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (7+9)*4 + 8*(6*4) + (4+6)*4 + 5*(6*4) - 64,
     TEST_SAD(0, 3));
+  PASS();
 }
 
-void test_bottomright(void)
+TEST test_bottomright(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     9*(4*4) + (6+8)*(4*4) + 5*(4*4) - 64,
     TEST_SAD(3, 3));
+  PASS();
 }
 
 //////////////////////////////////////////////////////////////////////////
 // OUT OF FRAME TESTS
 
-void test_topleft_out(void)
+TEST test_topleft_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     1*(8*8) - 64,
     TEST_SAD(-8, -8));
+  PASS();
 }
 
-void test_top_out(void)
+TEST test_top_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (1+3)*8 + 2*(6*8) - 64,
     TEST_SAD(0, -8));
+  PASS();
 }
 
-void test_topright_out(void)
+TEST test_topright_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     3*(8*8) - 64,
     TEST_SAD(8, -8));
+  PASS();
 }
 
-void test_left_out(void)
+TEST test_left_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (1+7)*8 + 4*(6*8) - 64,
     TEST_SAD(-8, 0));
+  PASS();
 }
 
-void test_right_out(void)
+TEST test_right_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (3+9)*8 + 6*(6*8) - 64,
     TEST_SAD(8, 0));
+  PASS();
 }
 
-void test_bottomleft_out(void)
+TEST test_bottomleft_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     7*(8*8) - 64,
     TEST_SAD(-8, 8));
+  PASS();
 }
 
-void test_bottom_out(void)
+TEST test_bottom_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     (7+9)*8 + 8*(6*8) - 64,
     TEST_SAD(0, 8));
+  PASS();
 }
 
-void test_bottomright_out(void)
+TEST test_bottomright_out(void)
 {
-  assert_ulong_equal(
+  ASSERT_EQ(
     9*(8*8) - 64,
     TEST_SAD(8, 8));
+  PASS();
 }
 
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
-void sad_tests(void)
+SUITE(sad_tests)
 {
-  test_fixture_start();
-  fixture_setup(sad_setup);
+  //SET_SETUP(sad_setup);
+  //SET_TEARDOWN(sad_teardown);
 
-
+  sad_setup(0);
+  
   // Tests for movement vectors that overlap frame.
-  run_test(test_topleft);
-  run_test(test_top);
-  run_test(test_topright);
+  RUN_TEST(test_topleft);
+  RUN_TEST(test_top);
+  RUN_TEST(test_topright);
 
-  run_test(test_left);
-  run_test(test_no_offset);
-  run_test(test_right);
+  RUN_TEST(test_left);
+  RUN_TEST(test_no_offset);
+  RUN_TEST(test_right);
 
-  run_test(test_bottomleft);
-  run_test(test_bottom);
-  run_test(test_bottomright);
+  RUN_TEST(test_bottomleft);
+  RUN_TEST(test_bottom);
+  RUN_TEST(test_bottomright);
 
   // Tests for movement vectors that are outside the frame.
-  run_test(test_topleft_out);
-  run_test(test_top_out);
-  run_test(test_topright_out);
+  RUN_TEST(test_topleft_out);
+  RUN_TEST(test_top_out);
+  RUN_TEST(test_topright_out);
 
-  run_test(test_left_out);
-  run_test(test_right_out);
+  RUN_TEST(test_left_out);
+  RUN_TEST(test_right_out);
 
-  run_test(test_bottomleft_out);
-  run_test(test_bottom_out);
-  run_test(test_bottomright_out);
+  RUN_TEST(test_bottomleft_out);
+  RUN_TEST(test_bottom_out);
+  RUN_TEST(test_bottomright_out);
 
-
-  fixture_teardown(sad_teardown);
-  test_fixture_end();
+  sad_setup(0);
 }
 

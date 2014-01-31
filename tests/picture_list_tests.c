@@ -1,11 +1,11 @@
-#include "seatest.h"
+#include "greatest/greatest.h"
 
-#include "picture.h"
+#include "src/picture.h"
 
-//////////////////////////////////////////////////////////////////////////
-// GLOBALS
-picture_list *g_pl; // picturelist used by all tests.
 
+typedef struct {
+  picture_list *list; // picturelist used by all tests.
+} picture_list_env;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
@@ -34,29 +34,29 @@ picture * make_pic(unsigned lcu_width, unsigned lcu_height, char init) {
  * meaning that the first picture is filled with 0 values and the second with
  * 1 values.
  */
-void picturelist_setup(void)
+void picture_list_setup(picture_list_env *env)
 {
   unsigned lcu_width = 2;
   unsigned lcu_height = 2;
   unsigned i;
 
-  g_pl = picture_list_init(10);
-  assert_true(g_pl->size == 10);
-  assert_true(g_pl->used_size == 0);
+  env->list = picture_list_init(10);
+  //ASSERT(g_pl->size == 10);
+  //ASSERT(g_pl->used_size == 0);
 
-  for (i = 0; i < g_pl->size; ++i) {
+  for (i = 0; i < env->list->size; ++i) {
     picture *pic = make_pic(lcu_width, lcu_height, i);
-    picture_list_add(g_pl, pic);
+    picture_list_add(env->list, pic);
   }
-  assert_true(g_pl->used_size == 10);
+  //ASSERT(g_pl->used_size == 10);
 }
 
 /**
  * Deallocate all memory allocated by picturelist_setup.
  */
-void picturelist_teardown(void)
+void picture_list_teardown(picture_list_env *env)
 {
-  picture_list_destroy(g_pl);
+  picture_list_destroy(env->list);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -66,32 +66,33 @@ void picturelist_teardown(void)
  * Check that pictures have been added to the list in the correct order and
  * that they can be retrieved.
  */
-void test_add(void)
+TEST test_add(picture_list_env *env)
 {
   unsigned i;
-  for (i = 0; i < g_pl->used_size; ++i) {
-    picture *pic = g_pl->pics[i];
+  for (i = 0; i < env->list->used_size; ++i) {
+    picture *pic = env->list->pics[i];
     unsigned luma_size = pic->width * pic->height;
     unsigned chroma_size = luma_size >> 2;
     
     // Identify that the correct picture is in the correct place by checking
     // that the data values are the same as the index.
-    assert_true(pic->y_data[0] == i);
-    assert_true(pic->u_data[0] == i);
-    assert_true(pic->v_data[0] == i);
-    assert_true(pic->y_data[luma_size - 1] == i);
-    assert_true(pic->u_data[chroma_size - 1] == i);
-    assert_true(pic->v_data[chroma_size - 1] == i);
+    ASSERT(pic->y_data[0] == i);
+    ASSERT(pic->u_data[0] == i);
+    ASSERT(pic->v_data[0] == i);
+    ASSERT(pic->y_data[luma_size - 1] == i);
+    ASSERT(pic->u_data[chroma_size - 1] == i);
+    ASSERT(pic->v_data[chroma_size - 1] == i);
   }
+  PASS();
 }
 
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
-void picture_list_tests(void)
+SUITE(picture_list_tests)
 {
-  test_fixture_start();
-  fixture_setup(picturelist_setup);
-  run_test(test_add);
-  fixture_teardown(picturelist_teardown);
-  test_fixture_end();
+  picture_list_env env;
+  SET_SETUP(picture_list_setup, &env);
+  SET_TEARDOWN(picture_list_teardown, &env);
+
+  RUN_TEST1(test_add, &env);
 }

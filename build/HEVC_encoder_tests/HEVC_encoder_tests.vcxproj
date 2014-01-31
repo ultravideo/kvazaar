@@ -80,7 +80,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\seatest\src\seatest.c" />
     <ClCompile Include="..\..\tests\picture_list_tests.c" />
     <ClCompile Include="..\..\tests\sad_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />
