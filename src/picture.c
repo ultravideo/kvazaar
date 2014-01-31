@@ -204,6 +204,7 @@ int picture_list_destroy(picture_list *list)
   if (list->used_size > 0) {
     for (i = 0; i < list->used_size; ++i) {
       picture_destroy(list->pics[i]);
+      FREE_POINTER(list->pics[i]);
     }
   }
     
@@ -249,7 +250,7 @@ int picture_list_rem(picture_list *list, int n, int8_t destroy)
 
   if (destroy) {
     picture_destroy(list->pics[n]);
-    free(list->pics[n]);
+    FREE_POINTER(list->pics[n]);
   }
 
   // The last item is easy to remove

@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
   // If problem with configuration, print banner and shutdown
   if (!config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr, "/***********************************************/\r\n");
-    fprintf(stderr, " *           HEVC Encoder v. " VERSION_STRING "*\r\n");
+    fprintf(stderr, " *   Kvazaar HEVC Encoder v. " VERSION_STRING "*\r\n");
     fprintf(stderr, " *     Tampere University of Technology 2014   *\r\n");
     fprintf(stderr, "/***********************************************/\r\n\r\n");
       
@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "          2-N: every Nth picture is intra\r\n");
 
     config_destroy(cfg);
+    free(encoder);
     return EXIT_FAILURE;
   }
 
@@ -270,6 +271,7 @@ int main(int argc, char *argv[])
   config_destroy(cfg);
   scalinglist_destroy();
   picture_list_destroy(encoder->ref);
+  free(encoder);
 
   return EXIT_SUCCESS;
 }

@@ -324,7 +324,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t re
     rec_filtered[y*recstride - 1] = rec[y*recstride - 1];
   }
   for (x = 0; x < (int32_t)recstride; x++) {
-    rec_filtered[y - recstride] = rec[y - recstride];
+    rec_filtered[x - recstride] = rec[x - recstride];
   }    
   // Apply filter
   intra_filter(rec_filtered,recstride,width,0);
