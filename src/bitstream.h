@@ -47,10 +47,11 @@ typedef struct
 extern bit_table *g_exp_table;
 
 int floor_log2(unsigned int n);
- 
+
+bitstream *create_bitstream(int32_t width);
 void bitstream_alloc(bitstream* stream, uint32_t alloc);
 void bitstream_clear_buffer(bitstream* stream);
-void bitstream_init(bitstream* stream); 
+void bitstream_reinit(bitstream *stream); 
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits); 
 
 /* Use macros to force inlining */
@@ -61,7 +62,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
 void bitstream_align(bitstream* stream); 
 void bitstream_align_zero(bitstream* stream);
 void bitstream_flush(bitstream* stream);
-void init_exp_golomb(uint32_t len);
+int init_exp_golomb(uint32_t len);
 
 
 /* In debug mode print out some extra info */

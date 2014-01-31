@@ -66,15 +66,13 @@ int main(int argc, char *argv[])
   config *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
+  encoder_control *encoder = NULL; //!< Encoder control struct
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint64_t curpos  = 0;
   uint64_t lastpos = 0;
   #ifdef _DEBUG
   FILE *recout = fopen("encrec_832x480_60.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
   #endif
-  encoder_control *encoder = (encoder_control*)malloc(sizeof(encoder_control));
-  if (!encoder)
-    fprintf(stderr, "Failed to allocate the encoder_control object!\n");
 
   // Windows needs all of the standard in/outputs to be set to _O_BINARY
   #ifdef _WIN32
@@ -87,7 +85,7 @@ int main(int argc, char *argv[])
   cfg = config_alloc();
   
   // If problem with configuration, print banner and shutdown
-  if (!cfg || !encoder || !config_init(cfg) || !config_read(cfg,argc,argv)) {
+  if (!cfg || !config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr, "/***********************************************/\r\n");
     fprintf(stderr, " *   Kvazaar HEVC Encoder v. " VERSION_STRING "*\r\n");
     fprintf(stderr, " *     Tampere University of Technology 2014   *\r\n");
@@ -106,7 +104,6 @@ int main(int argc, char *argv[])
     if (cfg)
       config_destroy(cfg);
 
-    free(encoder);
     return EXIT_FAILURE;
   }
 
@@ -152,27 +149,12 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
-  // Initialization
-  init_tables();
-  init_exp_golomb(4096*8); //Allocate and init exp golomb table
-  scalinglist_init();
-  init_encoder_control(encoder, (bitstream*)malloc(sizeof(bitstream))); 
-  encoder->ref = picture_list_init(MAX_REF_PIC_COUNT);
-    
-  // Init bitstream
-  bitstream_init(encoder->stream);
-  encoder->stream->buffer_pos = 0;
-  encoder->stream->output = 0;
+  encoder = init_encoder_control(cfg);
+  if (!encoder)
+    return EXIT_FAILURE;
 
-  // Alloc 2kB*width for bitstream buffer (for one coded frame)
-  bitstream_alloc(encoder->stream, 1024*2*cfg->width);
-
-  // Config pointer to encoder struct
-  encoder->cfg = cfg;
   // Set output file
   encoder->output = output;
-  // Set CABAC output bitstream
-  cabac.stream = encoder->stream;
 
   // input init (TODO: read from commandline / config)
   encoder->bitdepth = 8;
