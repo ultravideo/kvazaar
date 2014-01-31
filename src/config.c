@@ -35,6 +35,11 @@
 config *config_alloc()
 {
   config *cfg = (config *)malloc(sizeof(config));
+  if (!cfg) {
+    fprintf(stderr, "Failed to allocate a config object!\n");
+    return cfg;
+  }
+
   memset(cfg, 0, sizeof(config));
   return cfg;
 }
