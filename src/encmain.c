@@ -73,6 +73,8 @@ int main(int argc, char *argv[])
   FILE *recout = fopen("encrec_832x480_60.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
   #endif
   encoder_control *encoder = (encoder_control*)malloc(sizeof(encoder_control));
+  if (!encoder)
+    fprintf(stderr, "Failed to allocate the encoder_control object!\n");
 
   // Windows needs all of the standard in/outputs to be set to _O_BINARY
   #ifdef _WIN32
@@ -85,7 +87,7 @@ int main(int argc, char *argv[])
   cfg = config_alloc();
   
   // If problem with configuration, print banner and shutdown
-  if (!config_init(cfg) || !config_read(cfg,argc,argv)) {
+  if (!cfg || !encoder || !config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr, "/***********************************************/\r\n");
     fprintf(stderr, " *   Kvazaar HEVC Encoder v. " VERSION_STRING "*\r\n");
     fprintf(stderr, " *     Tampere University of Technology 2014   *\r\n");
@@ -101,7 +103,9 @@ int main(int argc, char *argv[])
     fprintf(stderr, "          1: all pictures are intra\r\n");
     fprintf(stderr, "          2-N: every Nth picture is intra\r\n");
 
-    config_destroy(cfg);
+    if (cfg)
+      config_destroy(cfg);
+
     free(encoder);
     return EXIT_FAILURE;
   }
