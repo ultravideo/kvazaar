@@ -52,9 +52,16 @@ No external library dependencies.
 - We do not have a proper testing framework yet. We test mainly by decoding the bitstream with HM and checking that the result matches the encoders own reconstruction.
 - You should check that your code encodes at least 600 frames without crashing, that HM can decode the resulting bitstream and produces no hash warnings.
 - We would like to have a suite of automatic tests that also check for BD-rate increase and speed decrease in addition to checking that the bitstream is valid. As of yet there is no such suite.
-- There are some unit tests located in the tests directory. We would like to have more.
 - Compiler should produce no warnings with -W-all. It does now. We are working on fixing that.
 
+
+###Unit tests:
+- There are some unit tests located in the tests directory. We would like to have more.
+- The Visual Studio project links the unit tests against the actual .lib file used by the encoder. There is no Makefile as of yet.
+- The unit tests use "greatest" unit testing framework. It is included as a submodule, but getting it requires the following commands to be run in the root directory of kvazaar:
+
+        git submodule init
+        git submodule update
 
 
 ###Code style:
