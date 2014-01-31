@@ -37,6 +37,7 @@ typedef struct
   char *output;     /*!< \brief Pointer to output filename */
   char *debug;      /*!< \brief Pointer to debug output    */
   int8_t qp;        /*!< \brief Quantization parameter */
+  int16_t intra_period; /*!< \brief the period of intra frames in stream */
   int32_t frames;  /*!< \brief Number of frames to decode */
   int32_t width;   /*!< \brief frame width */
   int32_t height;  /*!< \brief frame height */

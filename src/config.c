@@ -53,6 +53,7 @@ int config_init(config *cfg)
   cfg->width  = 320;
   cfg->height = 240;
   cfg->qp     = 32;
+  cfg->intra_period = 0;
 
   return 1;
 }
@@ -117,6 +118,9 @@ int config_read(config *cfg,int argc, char *argv[])
           break;
         case 'q': // QP
           cfg->qp = atoi(argv[arg]);
+          break;
+        case 'p': // Intra period
+          cfg->intra_period = atoi(argv[arg]);
           break;
         default:
           // Unknown command, print error message and ignore

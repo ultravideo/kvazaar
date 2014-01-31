@@ -61,6 +61,7 @@ typedef struct
 typedef struct
 {
   int32_t frame;
+  int32_t poc; /*!< \brief picture order count */
   config *cfg;
   encoder_input in;
   encoder_me me;

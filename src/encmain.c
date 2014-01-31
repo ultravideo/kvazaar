@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
   if (!config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr, "/***********************************************/\r\n");
     fprintf(stderr, " *           HEVC Encoder v. " VERSION_STRING "*\r\n");
-    fprintf(stderr, " *     Tampere University of Technology  2013  *\r\n");
+    fprintf(stderr, " *     Tampere University of Technology 2014   *\r\n");
     fprintf(stderr, "/***********************************************/\r\n\r\n");
       
     fprintf(stderr, "Usage:\r\n");
@@ -81,6 +81,10 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Optional parameters:\r\n");
     fprintf(stderr, "      -n <frames> : number of frames to decode\r\n");
     fprintf(stderr, "      -q <QP> : Quantization Parameter, default 32\r\n");
+    fprintf(stderr, "      -p <intra period> : Period of intra pictures, default 0\r\n");
+    fprintf(stderr, "          0: only first picture is intra\r\n");
+    fprintf(stderr, "          1: all pictures are intra\r\n");
+    fprintf(stderr, "          2-N: every Nth picture is intra\r\n");
 
     config_destroy(cfg);
     return EXIT_FAILURE;
@@ -225,6 +229,7 @@ int main(int argc, char *argv[])
     MOVE_POINTER(encoder->in.cur_pic->pred_v,encoder->ref->pics[0]->pred_v);
 
     encoder->frame++;
+    encoder->poc++;
   }
   // Coding finished
   fgetpos(output,(fpos_t*)&curpos);

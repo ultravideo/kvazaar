@@ -280,8 +280,15 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
 void encode_one_frame(encoder_control* encoder)
 {
 
-  // output parameters before first frame
-  if (encoder->frame == 0) {
+  /** IDR picture when: period == 0 and frame == 0
+   *                    period == 1 && frame%2 == 0
+   *                    period != 0 && frame%period == 0   
+   **/
+  if ( (encoder->cfg->intra_period == 0 && encoder->frame == 0) ||
+       (encoder->cfg->intra_period && encoder->frame % encoder->cfg->intra_period == 0 &&
+        (encoder->cfg->intra_period != 1 || encoder->frame % 2 == 0 ) ) ) {
+    encoder->poc = 0;
+
     // Video Parameter Set (VPS)
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
@@ -324,7 +331,8 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
   } else {
     cabac_start(&cabac);
-    encoder->in.cur_pic->slicetype = SLICE_P;
+    // When intra period == 1, all pictures are intra
+    encoder->in.cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
     encoder->in.cur_pic->type = NAL_TRAIL_R;
     scalinglist_process();
     search_slice_data(encoder);
@@ -754,7 +762,7 @@ void encode_slice_header(encoder_control* encoder)
       int j;
       int ref_negative = 1;
       int ref_positive = 0;
-      WRITE_U(encoder->stream, encoder->frame&0xf, 4, "pic_order_cnt_lsb");
+      WRITE_U(encoder->stream, encoder->poc&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(encoder->stream, ref_negative, "num_negative_pics");
       WRITE_UE(encoder->stream, ref_positive, "num_positive_pics");
