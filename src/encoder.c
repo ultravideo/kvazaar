@@ -1298,7 +1298,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       }
 
       /**
-       * Table 9-35 – Binarization for intra_chroma_pred_mode
+       * Table 9-35 - Binarization for intra_chroma_pred_mode
        *   intra_chroma_pred_mode  bin_string
        *                        4           0
        *                        0         100
