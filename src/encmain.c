@@ -29,6 +29,14 @@
  *            - -n <n>: encode only n frames
  */
 
+#ifdef _WIN32
+/* The following two defines must be located before the inclusion of any system header files. */
+#define WINVER       0x0500
+#define _WIN32_WINNT 0x0500
+#include <io.h>       /* _setmode() */
+#include <fcntl.h>    /* _O_BINARY */
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,7 +73,14 @@ int main(int argc, char *argv[])
   FILE *recout = fopen("encrec_832x480_60.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
   #endif
   encoder_control *encoder = (encoder_control*)malloc(sizeof(encoder_control));
-    
+
+  // Windows needs all of the standard in/outputs to be set to _O_BINARY
+  #ifdef _WIN32
+      _setmode( _fileno( stdin ),  _O_BINARY );
+      _setmode( _fileno( stdout ), _O_BINARY );
+      _setmode( _fileno( stderr ), _O_BINARY );
+  #endif
+
   // Handle configuration
   cfg = config_alloc();
   
@@ -109,8 +124,15 @@ int main(int argc, char *argv[])
   printf("Input: %s, output: %s\n", cfg->input, cfg->output);
   printf("  Video size: %dx%d\n", cfg->width, cfg->height);
 
-  // Open input file and check that it was opened correctly
-  input = fopen(cfg->input, "rb");
+  // Check if the input file name is a dash, this means stdin
+  if (!strcmp(cfg->input, "-")) {
+    input = stdin;
+  } else {
+    // Otherwise we try to open the input file
+    input = fopen(cfg->input, "rb");
+  }
+
+  // Check that input was opened correctly
   if (input == NULL) {
     fprintf(stderr, "Could not open input file, shutting down!\n");
     config_destroy(cfg);
