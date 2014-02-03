@@ -1,20 +1,40 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
-ARCH = $(shell uname -p)
+ifeq (, $(ARCH))
+  ARCH = $(shell uname -p)
+endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
-DFLAGS =
+DFLAGS = -O2 -g
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
     ASMFLAGS += -DARCH_X86_64=1
+    DFLAGS += -m64
 else
     ASMFLAGS += -DARCH_X86_64=0
+    DFLAGS += -m32
 endif
 
-
-# Linux specifix flags
-ifeq ($(SYSTEM),Linux)
+# Windows (cygwin/mingw) specific flags
+ifneq ( ,$(findstring Windows, $(OS)))
+  ifeq ($(ARCH), x86_64)
+    ASMFLAGS += -f win64
+  else
+    ASMFLAGS += -f win32
+    ASMFLAGS += -DPREFIX  
+  endif
+  LDFLAGS += -lws2_32
+# OS X specific flags
+else ifeq ($(SYSTEM),Darwin)
+  ifeq ($(ARCH), x86_64)
+    ASMFLAGS += -f macho64
+  else
+    ASMFLAGS += -f macho32
+  endif
+ASMFLAGS += -DPREFIX
+# Default to Linux/elf specific flags
+else
   ifeq ($(ARCH), x86_64)    
       ASMFLAGS += -f elf64
   else
@@ -22,19 +42,9 @@ ifeq ($(SYSTEM),Linux)
   endif
 endif
 
-# OS X specific flags
-ifeq ($(SYSTEM),Darwin)
-  ifeq ($(ARCH), x86_64)
-  ASMFLAGS += -f macho64
-  else
-  ASMFLAGS += -f macho32
-  endif
-ASMFLAGS += -DPREFIX
-endif
-
 CC = gcc
 CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib
-LDFLAGS = -lm
+LDFLAGS += -lm
 LD = gcc
 YASM = yasm
 ASMOBJS = cpu.o
@@ -42,6 +52,8 @@ OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o debug.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
+all: $(PROGS)
+.PHONY: all clean
 
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
@@ -52,4 +64,5 @@ cpu.o: x86/cpu.asm
 %.o: %.c
 	$(CC) $(CCFLAGS) -c $< -o $@
 
-all: $(PROGS)
+clean:
+	rm -f $(OBJS) $(PROGS) $(ASMOBJS)
