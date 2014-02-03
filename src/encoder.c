@@ -2395,7 +2395,8 @@ void encode_block_residual(encoder_control *encoder,
     // re-doing the search here with actual reconstructed reference lowered
     // bitrate by 4% and improved luma PSNR by 0.03dB. Doing it here might
     // not be worth it.
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb * 8, y_ctb * 8,
+    intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->y_recdata,
+                                 x_ctb * 8, y_ctb * 8,
                                  width * 2 + 8, rec, width * 2 + 8, 0);
     cur_cu->intra[0].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
                                                   encoder->in.width,
@@ -2419,8 +2420,9 @@ void encode_block_residual(encoder_control *encoder,
       recbase_y = &encoder->in.cur_pic->y_recdata[x_pos + y_pos * encoder->in.width];
 
       rec_shift  = &rec[width * 2 + 8 + 1];
-      intra_build_reference_border(encoder->in.cur_pic, x_pos, y_pos,
-                                    width * 2 + 8, rec, width * 2 + 8, 0);
+      intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->y_recdata,
+                                   x_pos, y_pos,
+                                   width * 2 + 8, rec, width * 2 + 8, 0);
       intra_recon(rec_shift, width * 2 + 8,
                   x_pos, y_pos,
                   width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
@@ -2439,10 +2441,11 @@ void encode_block_residual(encoder_control *encoder,
     }
 
     rec_shift  = &rec[width_c * 2 + 8 + 1];
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
-                                  width_c * 2 + 8, rec,
-                                  width_c * 2 + 8,
-                                  1);
+    intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->u_recdata,
+                                 x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
+                                 width_c * 2 + 8, rec,
+                                 width_c * 2 + 8,
+                                 1);
     intra_recon(rec_shift, 
                 width_c * 2 + 8,
                 x_ctb * width_c,
@@ -2453,10 +2456,11 @@ void encode_block_residual(encoder_control *encoder,
                 cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
                 1);
 
-    intra_build_reference_border(encoder->in.cur_pic, x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
-                                  width_c * 2 + 8,
-                                  rec, width_c * 2 + 8,
-                                  2);
+    intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->v_recdata,
+                                 x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
+                                 width_c * 2 + 8,
+                                 rec, width_c * 2 + 8,
+                                 2);
     intra_recon(rec_shift, 
                 width_c * 2 + 8,
                 x_ctb * width_c,

@@ -279,89 +279,6 @@ unsigned search_mv_full(unsigned depth,
   return best_cost;
 }
 
-/**
- * \brief
- */
-void search_buildReferenceBorder(picture *pic, int32_t x, int32_t y,
-                                 int16_t outwidth, pixel *dst, 
-                                 int32_t dststride, int8_t chroma)
-{
-  int32_t left_col; // left column iterator
-  pixel val;      // variable to store extrapolated value
-  int32_t i;        // index iterator
-  pixel dc_val = 1 << (g_bitdepth - 1); // default predictor value
-  int32_t top_row;  // top row iterator
-  int32_t src_width = (pic->width >> (chroma ? 1 : 0));   // source picture width
-  int32_t src_height = (pic->height >> (chroma ? 1 : 0)); // source picture height
-  pixel *src_pic = (!chroma) ? pic->y_data : ((chroma == 1) ? pic->u_data : pic->v_data); // input picture pointer
-  int16_t scu_width = LCU_WIDTH >> (MAX_DEPTH + (chroma ? 1 : 0)); // Smallest Coding Unit width
-  int x_ctb = x >> MIN_SIZE;
-  int y_ctb = y >> MIN_SIZE;
-  pixel *src_shifted = &src_pic[x_ctb * scu_width + y_ctb * scu_width * src_width]; // input picture pointer shifted to start from the left-top corner of the current block
-  int32_t width_in_scu = pic->width_in_lcu << MAX_DEPTH; // picture width in SCU
-
-  // Fill left column
-  if (x_ctb) {
-    // Loop SCU's
-    for (left_col = 1; left_col < outwidth / scu_width; left_col++) {
-      // If over the picture height or block not yet searched, stop
-      if ((y_ctb + left_col) * scu_width >= src_height
-          || pic->cu_array[MAX_DEPTH][x_ctb - 1 + (y_ctb + left_col) * width_in_scu].type == CU_NOTSET) {
-        break;
-      }
-    }
-
-    // Copy the pixels to output
-    for (i = 0; i < left_col * scu_width - 1; i++) {
-      dst[(i + 1) * dststride] = src_shifted[i * src_width - 1];
-    }
-
-    // if the loop was not completed, extrapolate the last pixel pushed to output
-    if (left_col != outwidth / scu_width) {
-      val = src_shifted[(left_col * scu_width - 1) * src_width - 1];
-      for (i = (left_col * scu_width); i < outwidth; i++) {
-        dst[i * dststride] = val;
-      }
-    }
-  } else { // If left column not available, copy from toprow or use the default predictor
-    val = y_ctb ? src_shifted[-src_width] : dc_val;
-    for (i = 0; i < outwidth; i++) {
-      dst[i * dststride] = val;
-    }
-  }
-
-  if (y_ctb) {
-    // Loop top SCU's
-    for (top_row = 1; top_row < outwidth / scu_width; top_row++) {
-      if ((x_ctb + top_row) * scu_width >= src_width
-          || pic->cu_array[MAX_DEPTH][x_ctb + top_row + (y_ctb - 1) * width_in_scu].type
-              == CU_NOTSET) {
-        break;
-      }
-    }
-
-    for (i = 0; i < top_row * scu_width - 1; i++) {
-      dst[i + 1] = src_shifted[i - src_width];
-    }
-
-    if (top_row != outwidth / scu_width) {
-      val = src_shifted[(top_row * scu_width) - src_width - 1];
-      for (i = (top_row * scu_width); i < outwidth; i++) {
-        dst[i] = val;
-      }
-    }
-  } else {
-    val = x_ctb ? src_shifted[-1] : dc_val;
-    for (i = 1; i < outwidth; i++) {
-      dst[i] = val;
-    }
-  }
-  // Topleft corner
-  dst[0] = (x_ctb && y_ctb) ? src_shifted[-src_width - 1] : dst[dststride];
-
-}
-
-
 void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth) {
   picture *cur_pic = encoder->in.cur_pic;
   picture *ref_pic = encoder->ref->pics[0];
@@ -404,8 +321,9 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   pixel *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
 
   // Build reconstructed block to use in prediction with extrapolated borders
-  search_buildReferenceBorder(encoder->in.cur_pic, x, y,
-      width * 2 + 8, rec, width * 2 + 8, 0);
+  intra_build_reference_border(cur_pic, cur_pic->y_data,
+                               x, y,
+                               width * 2 + 8, rec, width * 2 + 8, 0);
   cur_cu->intra[0].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
       encoder->in.width, recShift, width * 2 + 8, x, y,
       width, pred, width, &cur_cu->intra[0].cost);
@@ -426,8 +344,9 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
     for (i = 0; i < 4; ++i) {
       int x_pos = x + offsets[i].x * width;
       int y_pos = y + offsets[i].y * width;
-      search_buildReferenceBorder(encoder->in.cur_pic, x_pos, y_pos,
-        width * 2 + 8, rec, width * 2 + 8, 0);
+      intra_build_reference_border(cur_pic, cur_pic->y_recdata,
+                                   x_pos, y_pos,
+                                   width * 2 + 8, rec, width * 2 + 8, 0);
       cur_cu->intra[i].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
           encoder->in.width, recShift, width * 2 + 8, x_pos, y_pos,
           width, pred, width, &cur_cu->intra[i].cost);

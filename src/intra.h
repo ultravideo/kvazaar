@@ -35,7 +35,7 @@ int8_t intra_get_block_mode(picture* pic, uint32_t x_ctb, uint32_t y_ctb, uint8_
 int8_t intra_get_dir_luma_predictor(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, int8_t* preds);
 void intra_dc_pred_filtering(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t height );
 
-void intra_build_reference_border(picture* pic, int32_t x_ctb, int32_t y_ctb, int16_t out_width, pixel* dst, int32_t dst_stride, int8_t chroma);
+void intra_build_reference_border(picture* pic, const pixel *src, int32_t x_ctb, int32_t y_ctb, int16_t out_width, pixel* dst, int32_t dst_stride, int8_t chroma);
 void intra_filter(pixel* ref, int32_t stride, int32_t width, int8_t mode);
 
 /* Predictions */

@@ -432,7 +432,7 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
  * The end result is 2*width+8 x 2*width+8 array, with only the top and left
  * edge pixels filled with the reconstructed pixels.
  */
-void intra_build_reference_border(picture *pic, int32_t x_luma, int32_t y_luma, int16_t outwidth, 
+void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma, int32_t y_luma, int16_t outwidth, 
                                   pixel *dst, int32_t dststride, int8_t chroma)
 {
   // Some other function might make use of the arrays num_ref_pixels_top and
@@ -495,7 +495,7 @@ void intra_build_reference_border(picture *pic, int32_t x_luma, int32_t y_luma, 
   const int src_height = pic->height >> is_chroma;
 
   // input picture pointer
-  const pixel * const src = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata);
+  //const pixel * const src = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata);
 
   // Convert luma coordinates to chroma coordinates for chroma.
   const int x = chroma ? x_luma / 2 : x_luma;
