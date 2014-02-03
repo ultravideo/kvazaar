@@ -531,10 +531,16 @@ void encode_PTL(encoder_control *encoder)
   int i;
   // PTL
   // Profile Tier
-  WRITE_U(encoder->stream, 0, 2, "XXX_profile_space[]");
-  WRITE_U(encoder->stream, 0, 1, "XXX_tier_flag[]");
-  WRITE_U(encoder->stream, 0, 5, "XXX_profile_idc[]");
-  WRITE_U(encoder->stream, 0, 32, "XXX_profile_compatibility_flag[][j]");
+  WRITE_U(encoder->stream, 0, 2, "general_profile_space");
+  WRITE_U(encoder->stream, 0, 1, "general_tier_flag");
+  // Main Profile == 1
+  WRITE_U(encoder->stream, 1, 5, "general_profile_idc");
+  /* Compatibility flags should be set at general_profile_idc
+   *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
+   * According to specification, when compatibility_flag[1] is set,
+   *  compatibility_flag[2] should be set too.
+   */
+  WRITE_U(encoder->stream, 6, 32, "general_profile_compatibility_flag[]");
 
   WRITE_U(encoder->stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(encoder->stream, 0, 1, "general_interlaced_source_flag");
@@ -546,7 +552,8 @@ void encode_PTL(encoder_control *encoder)
   
   // end Profile Tier
   
-  WRITE_U(encoder->stream, 0, 8, "general_level_idc");
+  // Level 6.2 (general_level_idc is 30 * 6.2)
+  WRITE_U(encoder->stream, 186, 8, "general_level_idc");
   
   WRITE_U(encoder->stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(encoder->stream, 0, 1, "sub_layer_level_present_flag");
