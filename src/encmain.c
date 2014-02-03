@@ -94,12 +94,12 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Usage:\r\n");
     fprintf(stderr, "hevc_encoder -i <input> -w <width> -h <height> -o <output>\r\n");
     fprintf(stderr, "Optional parameters:\r\n");
-    fprintf(stderr, "      -n <frames> : number of frames to decode\r\n");
-    fprintf(stderr, "      -q <QP> : Quantization Parameter, default 32\r\n");
-    fprintf(stderr, "      -p <intra period> : Period of intra pictures, default 0\r\n");
-    fprintf(stderr, "          0: only first picture is intra\r\n");
-    fprintf(stderr, "          1: all pictures are intra\r\n");
-    fprintf(stderr, "          2-N: every Nth picture is intra\r\n");
+    fprintf(stderr, "      -n, --frames <integer> : number of frames to decode\r\n");
+    fprintf(stderr, "      -q, --qp <integer>     : Quantization Parameter, default 32\r\n");
+    fprintf(stderr, "      -p, --period <integer> : Period of intra pictures, default 0\r\n");
+    fprintf(stderr, "                                 0: only first picture is intra\r\n");
+    fprintf(stderr, "                                 1: all pictures are intra\r\n");
+    fprintf(stderr, "                                 2-N: every Nth picture is intra\r\n");
 
     if (cfg)
       config_destroy(cfg);
