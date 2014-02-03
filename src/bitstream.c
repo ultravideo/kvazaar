@@ -263,4 +263,3 @@ void bitstream_flush(bitstream *stream)
   //Stream flushed, zero out the values
   bitstream_reinit(stream);
 }
-

@@ -441,4 +441,3 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
 
   return candidates;
 }
-
