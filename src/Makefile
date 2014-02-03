@@ -1,7 +1,7 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
 ifeq (, $(ARCH))
-  ARCH = $(shell uname -p)
+  ARCH = $(shell uname -m)
 endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
@@ -11,9 +11,11 @@ DFLAGS = -O2 -g
 ifeq ($(ARCH), x86_64)
     ASMFLAGS += -DARCH_X86_64=1
     DFLAGS += -m64
+    LDFLAGS += -m64
 else
     ASMFLAGS += -DARCH_X86_64=0
     DFLAGS += -m32
+    LDFLAGS += -m32
 endif
 
 # Windows (cygwin/mingw) specific flags
