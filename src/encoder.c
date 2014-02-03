@@ -304,7 +304,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_VPS_NUT, 0);
+              encoder->stream->buffer_pos, 0, NAL_VPS_NUT, 0, 1);
     bitstream_clear_buffer(encoder->stream);
 
     // Sequence Parameter Set (SPS)
@@ -312,7 +312,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_SPS_NUT, 0);
+              encoder->stream->buffer_pos, 0, NAL_SPS_NUT, 0, 1);
     bitstream_clear_buffer(encoder->stream);
         
     // Picture Parameter Set (PPS)
@@ -320,7 +320,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_PPS_NUT, 0);
+              encoder->stream->buffer_pos, 0, NAL_PPS_NUT, 0, 1);
     bitstream_clear_buffer(encoder->stream);
 
     // First slice is IDR
@@ -337,7 +337,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_IDR_W_RADL, 0);
+              encoder->stream->buffer_pos, 0, NAL_IDR_W_RADL, 0, 0);
     bitstream_clear_buffer(encoder->stream);
   } else {
     cabac_start(&cabac);
@@ -354,7 +354,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_TRAIL_R, 0);
+              encoder->stream->buffer_pos, 0, NAL_TRAIL_R, 0, 1);
     bitstream_clear_buffer(encoder->stream);
   }  
   
@@ -462,7 +462,7 @@ static void add_checksum(encoder_control* encoder)
   bitstream_align(encoder->stream);
   bitstream_flush(encoder->stream);
   nal_write(encoder->output, encoder->stream->buffer,
-            encoder->stream->buffer_pos, 0, NAL_SUFFIT_SEI_NUT, 0);
+            encoder->stream->buffer_pos, 0, NAL_SUFFIT_SEI_NUT, 0, 0);
   bitstream_clear_buffer(encoder->stream);
 }
 

@@ -35,7 +35,9 @@
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
  */
-void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len, uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id)
+void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
+               uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id,
+               int long_start_code)
 {
   uint8_t byte;
   uint32_t i;
@@ -45,6 +47,11 @@ void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len, uint8_t nal_r
   const uint8_t emulation_prevention_three_byte = 0x03;
   const uint8_t start_code_prefix_one_3bytes = 0x01;
   const uint8_t zero = 0x00;
+
+  // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
+  // and PPS, or the first NALU of an access unit
+  if(long_start_code)
+    fwrite(&zero, 1, 1, output);
 
   // start_code_prefix_one_3bytes
   fwrite(&zero, 1, 1, output);

@@ -93,7 +93,8 @@ enum {
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
-               uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id);
+               uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id,
+               int long_start_code);
 void picture_checksum(const picture *pic,
                       unsigned char checksum_out[][SEI_HASH_MAX_LENGTH]);
 
