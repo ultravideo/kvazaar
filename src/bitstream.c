@@ -67,15 +67,18 @@ int floor_log2(unsigned int n) {
 /**
  * \brief Initialize the Exp Golomb code table with desired number of values
  * \param len table length to init
- * 
+ * \return 1 on success, 0 on failure
+ *
  * Allocates g_exp_table with len*sizeof(bit_table) and fills it with exponential golomb codes
  */
-void init_exp_golomb(uint32_t len)
+int init_exp_golomb(uint32_t len)
 {
   uint32_t code_num;
   uint32_t M;
   uint32_t info;
   g_exp_table = (bit_table*)malloc(len*sizeof(bit_table));
+  if(!g_exp_table)
+    return 0;
 
   for (code_num = 0; code_num < len; code_num++) {
     M = (uint32_t)floor_log2(code_num + 1);
@@ -83,12 +86,55 @@ void init_exp_golomb(uint32_t len)
     g_exp_table[code_num].len = M * 2 + 1;
     g_exp_table[code_num].value = (1<<M) | info;
   }
+
+  return 1;
 }
 
 /**
- * \brief Clear bitstream
+ * \brief Create and initialize a new bitstream
  */
-void bitstream_init(bitstream *stream)
+bitstream *create_bitstream(int32_t width)
+{
+  bitstream *stream = malloc(sizeof(bitstream));
+  if (!stream) {
+    fprintf(stderr, "Failed to allocate the bitstream object!\n");
+    return stream;
+  }
+
+  // Initialize the bitstream
+  bitstream_reinit(stream);
+
+  // Initialize buffer-related values
+  stream->output     = NULL;
+  stream->buffer     = NULL;
+  stream->buffer_pos = 0;
+  stream->bufferlen  = 0;
+
+  // Alloc 2kB*width for bitstream buffer (for one coded frame)
+  bitstream_alloc(stream, 1024*2*width);
+  if (!stream->buffer) {
+    fprintf(stderr, "Failed to allocate the bitstream buffer!\n");
+    goto creation_failure;
+  }
+
+  //Clear buffer just to be sure
+  bitstream_clear_buffer(stream);
+
+  // Return the created bitstream
+  return stream;
+
+creation_failure:
+  // In case of failure, free whatever was allocated
+  free(stream->buffer);
+  free(stream);
+
+  return NULL;
+}
+
+/**
+ * \brief Reinitialize bitstream
+ */
+void bitstream_reinit(bitstream *stream)
 {
   stream->cur_byte = 0;
   stream->cur_bit = 0;
@@ -103,9 +149,8 @@ void bitstream_init(bitstream *stream)
 void bitstream_alloc(bitstream *stream, uint32_t alloc)
 {
   stream->buffer = (uint8_t*)malloc(alloc);
-  stream->bufferlen = alloc;
-  //Clear just to be sure
-  bitstream_clear_buffer(stream);
+  if (stream->buffer)
+    stream->bufferlen = alloc;
 }
 
 /**
@@ -225,6 +270,5 @@ void bitstream_flush(bitstream *stream)
     }
   }
   //Stream flushed, zero out the values
-  bitstream_init(stream);
+  bitstream_reinit(stream);
 }
-

@@ -236,4 +236,3 @@ SUITE(sad_tests)
 
   sad_setup(0);
 }
-

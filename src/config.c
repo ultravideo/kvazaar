@@ -35,6 +35,11 @@
 config *config_alloc()
 {
   config *cfg = (config *)malloc(sizeof(config));
+  if (!cfg) {
+    fprintf(stderr, "Failed to allocate a config object!\n");
+    return cfg;
+  }
+
   memset(cfg, 0, sizeof(config));
   return cfg;
 }
@@ -73,6 +78,26 @@ int config_destroy(config *cfg)
 }
 
 /**
+ * \brief Allocates memory space for a string, and copies it
+ * \param char * string to copy
+ * \return a pointer to the copied string on success, null on failure
+ */
+char *copy_string(char *string)
+{
+  // Allocate +1 for \0
+  char *allocated_string = (char *)malloc(strlen(string) + 1);
+  if (!allocated_string) {
+    fprintf(stderr, "Failed to allocate a string!\n");
+    return allocated_string;
+  }
+
+  // Copy the string to the new buffer
+  memcpy(allocated_string, string, strlen(string) + 1);
+
+  return allocated_string;
+}
+
+/**
  * \brief Read configuration options from argv to the config struct
  * \param cfg config object
  * \param argc argument count
@@ -95,17 +120,13 @@ int config_read(config *cfg,int argc, char *argv[])
       arg++;
       switch(option) {
         case 'i': // Input
-          // Allocate +1 for \0
-          cfg->input = (char *)malloc(strlen(argv[arg]) + 1);
-          memcpy(cfg->input, argv[arg], strlen(argv[arg]) + 1);
+          cfg->input = copy_string(argv[arg]);
           break;
         case 'o': // Output
-          cfg->output = (char *)malloc(strlen(argv[arg]) + 1);
-          memcpy(cfg->output, argv[arg], strlen(argv[arg]) + 1);
+          cfg->output = copy_string(argv[arg]);
           break;
         case 'd': // Debug
-          cfg->debug = (char *)malloc(strlen(argv[arg]) + 1);
-          memcpy(cfg->debug, argv[arg], strlen(argv[arg]) + 1);
+          cfg->debug = copy_string(argv[arg]);
           break;
         case 'w': // width
           cfg->width = atoi(argv[arg]);
