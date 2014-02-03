@@ -220,6 +220,16 @@ void init_tables(void)
 
 }
 
+void free_tables(void)
+{
+  int i;
+  for (i = 0; i < 7; i++) {
+    free(g_sig_last_scan[0][i]);
+    free(g_sig_last_scan[1][i]);
+    free(g_sig_last_scan[2][i]);
+  }
+}
+
 void init_encoder_control(encoder_control* control,bitstream* output)
 {
   control->stream = output;  

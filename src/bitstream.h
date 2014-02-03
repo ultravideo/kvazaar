@@ -49,6 +49,7 @@ extern bit_table *g_exp_table;
 int floor_log2(unsigned int n);
  
 void bitstream_alloc(bitstream* stream, uint32_t alloc);
+void bitstream_free(bitstream *stream);
 void bitstream_clear_buffer(bitstream* stream);
 void bitstream_init(bitstream* stream); 
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits); 

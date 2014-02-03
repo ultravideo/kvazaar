@@ -109,6 +109,15 @@ void bitstream_alloc(bitstream *stream, uint32_t alloc)
 }
 
 /**
+ *  \brief Free bitstream buffer
+ */
+void bitstream_free(bitstream *stream)
+{
+  free(stream->buffer);
+  stream->bufferlen = 0;
+}
+
+/**
  *  \brief clear output buffer
  */
 void bitstream_clear_buffer(bitstream *stream)

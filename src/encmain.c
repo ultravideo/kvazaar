@@ -271,7 +271,13 @@ int main(int argc, char *argv[])
   config_destroy(cfg);
   scalinglist_destroy();
   picture_list_destroy(encoder->ref);
+  picture_destroy(encoder->in.cur_pic);
+  FREE_POINTER(encoder->in.cur_pic);
+  bitstream_free(encoder->stream);
+  FREE_POINTER(encoder->stream);
   free(encoder);
+  free_tables();
+  FREE_POINTER(g_exp_table);
 
   return EXIT_SUCCESS;
 }

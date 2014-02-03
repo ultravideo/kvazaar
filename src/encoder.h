@@ -81,6 +81,7 @@ typedef struct
 } encoder_control;
 
 void init_tables(void);
+void free_tables(void);
 void init_encoder_control(encoder_control *control, bitstream *output);
 void init_encoder_input(encoder_input *input, FILE* inputfile,
                         int32_t width, int32_t height);
