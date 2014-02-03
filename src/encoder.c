@@ -229,10 +229,80 @@ void free_tables(void)
     free(g_sig_last_scan[2][i]);
   }
 }
-
-void init_encoder_control(encoder_control* control,bitstream* output)
+encoder_control *init_encoder_control(config *cfg)
 {
-  control->stream = output;  
+  encoder_control *enc_c    = NULL;
+  bitstream       *stream   = NULL;
+  picture_list    *pic_list = NULL;
+
+  if (!cfg) {
+    fprintf(stderr, "Config object must not be null!\n");
+    goto init_failure;
+  }
+
+  // Allocate the main struct
+  enc_c = malloc(sizeof(encoder_control));
+  if(!enc_c){
+    fprintf(stderr, "Failed to allocate encoder_control!\n");
+    goto init_failure;
+  }
+
+  // Config pointer to encoder struct
+  enc_c->cfg = cfg;
+
+  // input init (TODO: read from commandline / config)
+  enc_c->bitdepth = 8;
+  enc_c->frame    = 0;
+  enc_c->QP       = enc_c->cfg->qp;
+  enc_c->in.video_format = FORMAT_420;
+  // deblocking filter
+  enc_c->deblock_enable    = 1;
+  enc_c->beta_offset_div2  = 0;
+  enc_c->tc_offset_div2    = 0;
+  // SAO
+  enc_c->sao_enable = 1;
+
+  // Allocate the bitstream struct
+  stream = create_bitstream(enc_c->cfg->width);
+  if (!stream) {
+    fprintf(stderr, "Failed to allocate the bitstream object!\n");
+    goto init_failure;
+  }
+
+  enc_c->stream = stream;
+
+  // Set CABAC output bitstream
+  cabac.stream = enc_c->stream;
+
+  // Initialize tables
+  init_tables();
+
+  //Allocate and init exp golomb table
+  if (!init_exp_golomb(4096*8)) {
+    fprintf(stderr, "Failed to allocate the exp golomb code table, shutting down!\n");
+    goto init_failure;
+  }
+
+  // Initialize the scaling list
+  scalinglist_init();
+
+  pic_list = picture_list_init(MAX_REF_PIC_COUNT);
+  if(!pic_list) {
+    fprintf(stderr, "Failed to allocate the picture list!\n");
+    goto init_failure;
+  }
+
+  enc_c->ref = pic_list;
+
+  return enc_c;
+
+init_failure:
+  // Free everything allocated in this function
+  free(pic_list);
+  free(stream);
+  free(enc_c);
+
+  return NULL;
 }
 
 void init_encoder_input(encoder_input *input, FILE *inputfile,
@@ -1315,7 +1385,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       }
 
       /**
-       * Table 9-35 – Binarization for intra_chroma_pred_mode
+       * Table 9-35 - Binarization for intra_chroma_pred_mode
        *   intra_chroma_pred_mode  bin_string
        *                        4           0
        *                        0         100

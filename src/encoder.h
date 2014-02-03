@@ -82,7 +82,7 @@ typedef struct
 
 void init_tables(void);
 void free_tables(void);
-void init_encoder_control(encoder_control *control, bitstream *output);
+encoder_control *init_encoder_control(config *cfg);
 void init_encoder_input(encoder_input *input, FILE* inputfile,
                         int32_t width, int32_t height);
 void encode_one_frame(encoder_control *encoder);
