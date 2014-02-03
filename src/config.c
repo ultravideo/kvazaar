@@ -60,6 +60,7 @@ int config_init(config *cfg)
   cfg->height = 240;
   cfg->qp     = 32;
   cfg->intra_period = 0;
+  cfg->deblock_enable = 1;
 
   return 1;
 }
@@ -98,10 +99,32 @@ char *copy_string(const char *string)
   return allocated_string;
 }
 
+static int atobool(const char *str)
+{
+  if (!strcmp(str, "1")    ||
+      !strcmp(str, "true") ||
+      !strcmp(str, "yes"))
+    return 1;
+  if (!strcmp(str, "0")     ||
+      !strcmp(str, "false") ||
+      !strcmp(str, "no"))
+    return 0;
+  return 0;
+}
+
 static int config_parse(config *cfg, const char *name, const char *value)
 {
+  int i;
+
   if (!name)
     return 0;
+  if (!value)
+    value = "true";
+
+  if ((!strncmp(name, "no-", 3) && (i = 3))) {
+    name += i;
+    value = atobool(value) ? "false" : "true";
+  }
 
 #define OPT(STR) else if (!strcmp(name, STR))
   if (0);
@@ -121,6 +144,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->qp = atoi(value);
   OPT("period")
     cfg->intra_period = atoi(value);
+  OPT("deblock")
+    cfg->deblock_enable = atobool(value);
   else
     return 0;
 #undef OPT
@@ -152,6 +177,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "frames",             required_argument, NULL, 'n' },
     { "qp",                 required_argument, NULL, 'q' },
     { "period",             required_argument, NULL, 'p' },
+    { "no-deblock",               no_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

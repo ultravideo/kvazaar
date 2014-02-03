@@ -100,6 +100,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "                                 0: only first picture is intra\r\n");
     fprintf(stderr, "                                 1: all pictures are intra\r\n");
     fprintf(stderr, "                                 2-N: every Nth picture is intra\r\n");
+    fprintf(stderr, "          --no-deblock       : Disable deblocking filter\r\n");
 
     if (cfg)
       config_destroy(cfg);
@@ -162,9 +163,9 @@ int main(int argc, char *argv[])
   encoder->QP       = encoder->cfg->qp;
   encoder->in.video_format = FORMAT_420;
   // deblocking filter
-  encoder->deblock_enable  = 1;
-  encoder->beta_offset_div2  = 0;
-  encoder->tc_offset_div2    = 0;
+  encoder->deblock_enable   = encoder->cfg->deblock_enable;
+  encoder->beta_offset_div2 = 0;
+  encoder->tc_offset_div2   = 0;
   // SAO
   encoder->sao_enable = 1;
 

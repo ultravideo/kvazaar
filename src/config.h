@@ -41,6 +41,7 @@ typedef struct
   int32_t frames;  /*!< \brief Number of frames to decode */
   int32_t width;   /*!< \brief frame width */
   int32_t height;  /*!< \brief frame height */
+  int8_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
 } config;
 
 /* Function definitions */
