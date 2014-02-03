@@ -102,6 +102,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "                                 2-N: every Nth picture is intra\r\n");
     fprintf(stderr, "          --no-deblock       : Disable deblocking filter\r\n");
     fprintf(stderr, "          --deblock <beta:tc> : Deblocking filter parameters\r\n");
+    fprintf(stderr, "          --no-sao           : Disable sample adaptive offset\r\n");
 
     if (cfg)
       config_destroy(cfg);
@@ -168,7 +169,7 @@ int main(int argc, char *argv[])
   encoder->beta_offset_div2 = encoder->cfg->deblock_beta;
   encoder->tc_offset_div2   = encoder->cfg->deblock_tc;
   // SAO
-  encoder->sao_enable = 1;
+  encoder->sao_enable = encoder->cfg->sao_enable;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 

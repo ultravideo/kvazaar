@@ -63,6 +63,7 @@ int config_init(config *cfg)
   cfg->deblock_enable = 1;
   cfg->deblock_beta   = 0;
   cfg->deblock_tc     = 0;
+  cfg->sao_enable = 1;
 
   return 1;
 }
@@ -159,6 +160,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     } else
       cfg->deblock_enable = atobool(value);
   }
+  OPT("sao")
+    cfg->sao_enable = atobool(value);
   else
     return 0;
 #undef OPT
@@ -192,6 +195,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "period",             required_argument, NULL, 'p' },
     { "no-deblock",               no_argument, NULL, 0 },
     { "deblock",            required_argument, NULL, 0 },
+    { "no-sao",                   no_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 
