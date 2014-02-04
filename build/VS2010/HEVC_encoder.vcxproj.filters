@@ -69,6 +69,9 @@
     <ClCompile Include="..\..\src\rdo.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\extras\getopt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -121,6 +124,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\x86\cpu.h">
       <Filter>Header Files\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\extras\getopt.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
