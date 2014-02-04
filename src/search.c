@@ -365,59 +365,65 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
 }
 
 /**
- * \brief
+ * \brief Search best modes at each depth for the whole picture.
+ *
+ * This function fills the cur_pic->cu_array of the current picture
+ * with the best mode and it's cost for each CU at each depth for the whole
+ * frame.
  */
 void search_tree(encoder_control *encoder, 
                  uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  uint8_t border_x = ((encoder->in.width) < (x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_y = ((encoder->in.height) < (y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_split_x = ((encoder->in.width) < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border = border_x | border_y; // are we in any border CU
+  int cu_width = LCU_WIDTH >> depth;
+  int x = x_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  int y = y_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  
+  // Stop recursion if the CU is completely outside the frame.
+  if (x >= encoder->in.width || y >= encoder->in.height) {
+    return;
+  }
 
-  picture *cur_pic = encoder->in.cur_pic;
-  cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  // If the CU is partially outside the frame, split.
+  if (x + cu_width > encoder->in.width ||
+      y + cu_width > encoder->in.height)
+  {
+    int half_cu = 1 << (MAX_DEPTH - (depth + 1));
 
-  cur_cu->intra[0].cost = 0xffffffff;
-  cur_cu->inter.cost = 0xffffffff;
+    search_tree(encoder, x_ctb, y_ctb, depth + 1);
+    search_tree(encoder, x_ctb + half_cu, y_ctb, depth + 1);
+    search_tree(encoder, x_ctb, y_ctb + half_cu, depth + 1);
+    search_tree(encoder, x_ctb + half_cu, y_ctb + half_cu, depth + 1);
 
-  // Force split on border
-  if (depth != MAX_DEPTH) {
-    if (border) {
-      uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-      search_tree(encoder, x_ctb, y_ctb, depth + 1);
-      if (!border_x || border_split_x) {
-        search_tree(encoder, x_ctb + change, y_ctb, depth + 1);
-      }
-      if (!border_y || border_split_y) {
-        search_tree(encoder, x_ctb, y_ctb + change, depth + 1);
-      }
-      if (!border || (border_split_x && border_split_y)) {
-        search_tree(encoder, x_ctb + change, y_ctb + change, depth + 1);
-      }
-      return;
+    return;
+  }
+
+  // CU is completely inside the frame, so search for best prediction mode at
+  // this depth.
+  {
+    picture *cur_pic = encoder->in.cur_pic;
+
+    if (cur_pic->slicetype != SLICE_I &&
+        depth >= MIN_INTER_SEARCH_DEPTH &&
+        depth <= MAX_INTER_SEARCH_DEPTH)
+    {
+      search_inter(encoder, x_ctb, y_ctb, depth);
+    }
+
+    if ((encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P) &&
+        depth >= MIN_INTRA_SEARCH_DEPTH &&
+        depth <= MAX_INTRA_SEARCH_DEPTH)
+    {
+      search_intra(encoder, x_ctb, y_ctb, depth);
     }
   }
 
-  if (cur_pic->slicetype != SLICE_I
-      && depth >= MIN_INTER_SEARCH_DEPTH && depth <= MAX_INTER_SEARCH_DEPTH) {
-    search_inter(encoder, x_ctb, y_ctb, depth);
-  }
-
-  if (depth >= MIN_INTRA_SEARCH_DEPTH && depth <= MAX_INTRA_SEARCH_DEPTH
-      && (encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P)) {
-    search_intra(encoder, x_ctb, y_ctb, depth);
-  }
-
-  // Split and search to max_depth
+  // Recurse to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
-    // Split blocks and remember to change x and y block positions
-    uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-    search_tree(encoder, x_ctb,          y_ctb,          depth + 1);
-    search_tree(encoder, x_ctb + change, y_ctb,          depth + 1);
-    search_tree(encoder, x_ctb,          y_ctb + change, depth + 1);
-    search_tree(encoder, x_ctb + change, y_ctb + change, depth + 1);
+    int half_cu = 1 << (MAX_DEPTH - (depth + 1));
+    search_tree(encoder, x_ctb,           y_ctb,           depth + 1);
+    search_tree(encoder, x_ctb + half_cu, y_ctb,           depth + 1);
+    search_tree(encoder, x_ctb,           y_ctb + half_cu, depth + 1);
+    search_tree(encoder, x_ctb + half_cu, y_ctb + half_cu, depth + 1);
   }
 }
 
@@ -462,7 +468,6 @@ uint32_t search_best_mode(encoder_control *encoder,
 }
 
 
-
 /**
  * \brief
  */
@@ -470,6 +475,22 @@ void search_slice_data(encoder_control *encoder)
 {
   int16_t x_lcu, y_lcu;
   FILE *fp = 0, *fp2 = 0;
+
+  // Initialize the costs in the cu-array used for searching.
+  {
+    int d, x_cu, y_cu;
+
+    for (y_cu = 0; y_cu < encoder->in.height / CU_MIN_SIZE_PIXELS; ++y_cu) {
+      for (x_cu = 0; x_cu < encoder->in.width / CU_MIN_SIZE_PIXELS; ++x_cu) {
+        for (d = 0; d <= MAX_DEPTH; ++d) {
+          picture *cur_pic = encoder->in.cur_pic;
+          cu_info *cur_cu = &cur_pic->cu_array[d][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+          cur_cu->intra[0].cost = -1;
+          cur_cu->inter.cost = -1;
+        }
+      }
+    }
+  }
 
   if (RENDER_CU) {
     fp = open_cu_file("cu_search.html");
@@ -480,6 +501,7 @@ void search_slice_data(encoder_control *encoder)
   for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
     for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
       uint8_t depth = 0;
+
       // Recursive function for looping through all the sub-blocks
       search_tree(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
       if (RENDER_CU) {
