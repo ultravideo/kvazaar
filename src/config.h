@@ -41,6 +41,10 @@ typedef struct
   int32_t frames;  /*!< \brief Number of frames to decode */
   int32_t width;   /*!< \brief frame width */
   int32_t height;  /*!< \brief frame height */
+  int8_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
+  int8_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
+  int8_t deblock_beta;   /*!< \brief (deblocking) beta offset (div 2), range -6...6 */
+  int8_t deblock_tc;     /*!< \brief (deblocking) tc offset (div 2), range -6...6 */
 } config;
 
 /* Function definitions */

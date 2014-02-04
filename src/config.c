@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "extras/getopt.h"
 
 /**
  * \brief Allocate memory for config object
@@ -59,6 +60,10 @@ int config_init(config *cfg)
   cfg->height = 240;
   cfg->qp     = 32;
   cfg->intra_period = 0;
+  cfg->deblock_enable = 1;
+  cfg->deblock_beta   = 0;
+  cfg->deblock_tc     = 0;
+  cfg->sao_enable = 1;
 
   return 1;
 }
@@ -82,7 +87,7 @@ int config_destroy(config *cfg)
  * \param char * string to copy
  * \return a pointer to the copied string on success, null on failure
  */
-char *copy_string(char *string)
+char *copy_string(const char *string)
 {
   // Allocate +1 for \0
   char *allocated_string = (char *)malloc(strlen(string) + 1);
@@ -95,6 +100,73 @@ char *copy_string(char *string)
   memcpy(allocated_string, string, strlen(string) + 1);
 
   return allocated_string;
+}
+
+static int atobool(const char *str)
+{
+  if (!strcmp(str, "1")    ||
+      !strcmp(str, "true") ||
+      !strcmp(str, "yes"))
+    return 1;
+  if (!strcmp(str, "0")     ||
+      !strcmp(str, "false") ||
+      !strcmp(str, "no"))
+    return 0;
+  return 0;
+}
+
+static int config_parse(config *cfg, const char *name, const char *value)
+{
+  int i;
+
+  if (!name)
+    return 0;
+  if (!value)
+    value = "true";
+
+  if ((!strncmp(name, "no-", 3) && (i = 3))) {
+    name += i;
+    value = atobool(value) ? "false" : "true";
+  }
+
+#define OPT(STR) else if (!strcmp(name, STR))
+  if (0);
+  OPT("input")
+    cfg->input = copy_string(value);
+  OPT("output")
+    cfg->output = copy_string(value);
+  OPT("debug")
+    cfg->debug = copy_string(value);
+  OPT("width")
+    cfg->width = atoi(value);
+  OPT("height")
+    cfg->height = atoi(value);
+  OPT("frames")
+    cfg->frames = atoi(value);
+  OPT("qp")
+    cfg->qp = atoi(value);
+  OPT("period")
+    cfg->intra_period = atoi(value);
+  OPT("deblock") {
+    int beta, tc;
+    if (2 == sscanf(value, "%d:%d", &beta, &tc)) {
+      cfg->deblock_enable = 1;
+      cfg->deblock_beta   = beta;
+      cfg->deblock_tc     = tc;
+    } else if (sscanf(value, "%d", &beta)) {
+      cfg->deblock_enable = 1;
+      cfg->deblock_beta   = beta;
+      cfg->deblock_tc     = cfg->deblock_beta;
+    } else
+      cfg->deblock_enable = atobool(value);
+  }
+  OPT("sao")
+    cfg->sao_enable = atobool(value);
+  else
+    return 0;
+#undef OPT
+
+  return 1;
 }
 
 /**
@@ -110,47 +182,49 @@ int config_read(config *cfg,int argc, char *argv[])
   int arg = 1;
   char option = 0;
   
-  while(arg < argc && pos < strlen(argv[arg])) {
-    // Check for an option
-    if(argv[arg][0] == '-' && strlen(argv[arg]) > 1) {
-      // Second letter of the argument is the option we want to use
-      option = argv[arg][1];
-      
-      // Point to the next argument
-      arg++;
-      switch(option) {
-        case 'i': // Input
-          cfg->input = copy_string(argv[arg]);
-          break;
-        case 'o': // Output
-          cfg->output = copy_string(argv[arg]);
-          break;
-        case 'd': // Debug
-          cfg->debug = copy_string(argv[arg]);
-          break;
-        case 'w': // width
-          cfg->width = atoi(argv[arg]);
-          break;
-        case 'h': // height
-          cfg->height = atoi(argv[arg]);
-          break;
-        case 'n': // number of frames to encode
-          cfg->frames = atoi(argv[arg]);
-          break;
-        case 'q': // QP
-          cfg->qp = atoi(argv[arg]);
-          break;
-        case 'p': // Intra period
-          cfg->intra_period = atoi(argv[arg]);
-          break;
-        default:
-          // Unknown command, print error message and ignore
-          fprintf(stderr, "%c is not a known option\r\n", option);
-          break;
+  static char short_options[] = "i:o:d:w:h:n:q:p:";
+  static struct option long_options[] =
+  {
+    { "input",              required_argument, NULL, 'i' },
+    { "output",             required_argument, NULL, 'o' },
+    { "debug",              required_argument, NULL, 'd' },
+    { "width",              required_argument, NULL, 'w' },
+    { "height",             required_argument, NULL, 'h' },
+    { "frames",             required_argument, NULL, 'n' },
+    { "qp",                 required_argument, NULL, 'q' },
+    { "period",             required_argument, NULL, 'p' },
+    { "no-deblock",               no_argument, NULL, 0 },
+    { "deblock",            required_argument, NULL, 0 },
+    { "no-sao",                   no_argument, NULL, 0 },
+    {0, 0, 0, 0}
+  };
+
+  // Parse command line options
+  for (optind = 0;;) {
+    int long_options_index = -1;
+
+    int c = getopt_long(argc, argv, short_options, long_options, &long_options_index);
+    if (c == -1)
+      break;
+
+    if (long_options_index < 0) {
+      int i;
+      for (i = 0; long_options[i].name; i++)
+        if (long_options[i].val == c) {
+            long_options_index = i;
+            break;
+        }
+      if (long_options_index < 0) {
+        // getopt_long already printed an error message
+        return 0;
       }
     }
-    // Next argument
-    arg++;
+
+    if (!config_parse(cfg, long_options[long_options_index].name, optarg)) {
+      const char *name = long_options_index > 0 ? long_options[long_options_index].name : argv[optind-2];
+      fprintf(stderr, "invalid argument: %s = %s\r\n", name, optarg );
+      return 0;
+    }
   }
   
   // Check that the required files were defined
