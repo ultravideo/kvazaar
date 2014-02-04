@@ -447,7 +447,7 @@ void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
   }
 }
 
-void read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
+int read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
                               unsigned array_width, pixel *data)
 {
   pixel* p = data;
@@ -457,7 +457,8 @@ void read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
 
   while (p < end) {
     // Read the beginning of the line from input.
-    fread(p, sizeof(unsigned char), width, file);
+    if (width != fread(p, sizeof(unsigned char), width, file))
+      return 0;
 
     // Fill the rest with the last pixel value.
     fill_char = p[width - 1];
@@ -468,9 +469,10 @@ void read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
 
     p += array_width;
   }
+  return 1;
 }
 
-void read_one_frame(FILE* file, encoder_control* encoder)
+int read_one_frame(FILE* file, encoder_control* encoder)
 {
   encoder_input* in = &encoder->in;
   unsigned width = in->real_width;
@@ -480,20 +482,24 @@ void read_one_frame(FILE* file, encoder_control* encoder)
 
   if (width != array_width) {
     // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-    read_and_fill_frame_data(file, width, height, array_width,
-                             in->cur_pic->y_data);
-    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                             in->cur_pic->u_data);
-    read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                             in->cur_pic->v_data);
+    if (!read_and_fill_frame_data(file, width, height, array_width,
+                                  in->cur_pic->y_data) ||
+        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
+                                  in->cur_pic->u_data) ||
+        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
+                                  in->cur_pic->v_data))
+      return 0;
   } else {
     // Otherwise the data can be read directly to the array.
-    fread(in->cur_pic->y_data, sizeof(unsigned char),
-          width * height, file);
-    fread(in->cur_pic->u_data, sizeof(unsigned char), 
-          (width >> 1) * (height >> 1), file);
-    fread(in->cur_pic->v_data, sizeof(unsigned char),
-          (width >> 1) * (height >> 1), file);
+    unsigned y_size = width * height;
+    unsigned uv_size = (width >> 1) * (height >> 1);
+    if (y_size  != fread(in->cur_pic->y_data, sizeof(unsigned char),
+                         y_size, file) ||
+        uv_size != fread(in->cur_pic->u_data, sizeof(unsigned char), 
+                         uv_size, file) ||
+        uv_size != fread(in->cur_pic->v_data, sizeof(unsigned char),
+                         uv_size, file))
+      return 0;
   }
 
   if (height != array_height) {
@@ -504,6 +510,7 @@ void read_one_frame(FILE* file, encoder_control* encoder)
     fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1,
                      in->cur_pic->v_data);
   }
+  return 1;
 }
 
 /**
