@@ -28,13 +28,9 @@
  * so that any file can refer to integer types with exact widths.
  */
 
-#ifdef _MSC_VER
-  #include "../include/stdint.h"
-#else
-  #include <stdint.h>
-  #include <stdio.h>
-  #include <limits.h>
-#endif
+#include <stdint.h>
+#include <stdio.h>
+#include <limits.h>
 
 #if _MSC_VER && _M_AMD64
   #define X86_64
