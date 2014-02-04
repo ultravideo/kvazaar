@@ -181,12 +181,16 @@ int main(int argc, char *argv[])
   encoder->in.cur_pic->pred_v = MALLOC(pixel, (cfg->width * cfg->height) >> 2);
 
   // Start coding cycle while data on input and not on the last frame
-  while(!feof(input) && (!cfg->frames || encoder->frame < cfg->frames)) {
+  while(!cfg->frames || encoder->frame < cfg->frames) {
     int32_t diff;
     double temp_psnr[3];
 
     // Read one frame from the input
-    read_one_frame(input, encoder);
+    if (!read_one_frame(input, encoder)) {
+      if (!feof(input))
+        printf("Failed to read a frame %d\n", encoder->frame);
+      break;
+    }
 
     // The actual coding happens here, after this function we have a coded frame
     encode_one_frame(encoder);    
