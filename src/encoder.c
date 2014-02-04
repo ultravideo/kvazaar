@@ -202,8 +202,10 @@ void init_tables(void)
   // Lambda cost
   // TODO: cleanup
   for (i = 0; i < 55; i++) {
-    if (i < 12) {
-      g_lambda_cost[i] = 0;
+
+    // Force minimum lambda cost of 1
+    if (i < 15) {
+      g_lambda_cost[i] = 1;
     } else {
       g_lambda_cost[i] = (int16_t)sqrt(0.57 * pow(2.0, (i - 12) / 3));
     }
