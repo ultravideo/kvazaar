@@ -81,6 +81,7 @@ typedef struct
 } encoder_control;
 
 void init_tables(void);
+void init_lambda(encoder_control* encoder);
 void free_tables(void);
 encoder_control *init_encoder_control(config *cfg);
 void init_encoder_input(encoder_input *input, FILE* inputfile,
@@ -107,7 +108,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_cu, int32_t y_cu
 void encode_block_residual(encoder_control *encoder, 
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
-extern int16_t g_lambda_cost[55];
+extern double g_lambda_cost[55];
 extern uint32_t* g_sig_last_scan[3][7];
 int8_t g_convert_to_bit[LCU_WIDTH + 1];
 static int8_t g_bitdepth     = 8;

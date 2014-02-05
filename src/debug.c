@@ -68,7 +68,7 @@ unsigned render_cu_file(encoder_control *encoder, picture *pic,
 {
   cu_info *cu = &pic->cu_array[depth][xCtb + yCtb * (pic->width_in_lcu<<MAX_DEPTH)];
   cu_info *final_cu = &pic->cu_array[MAX_DEPTH][xCtb + yCtb * (pic->width_in_lcu<<MAX_DEPTH)];
-  unsigned lambda_cost = (4 * g_lambda_cost[encoder->QP]) << 4;
+  unsigned lambda_cost = (4 * g_lambda_cost[encoder->QP]);
   unsigned sum = 0;
   unsigned best_cost = -1;
   char type = cu->type == CU_INTRA ? 'I' : 'P';

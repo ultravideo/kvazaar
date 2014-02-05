@@ -42,7 +42,7 @@
 #include "sao.h"
 #include "rdo.h"
 
-int16_t g_lambda_cost[55];
+double g_lambda_cost[55];
 uint32_t* g_sig_last_scan[3][7];
 
 /* Local functions. */
@@ -179,6 +179,7 @@ void init_tables(void)
 {
   int i;
   int c = 0;
+
   memset( g_convert_to_bit,-1, sizeof( g_convert_to_bit ) );  
 
   for (i = 4; i < (1 << 7); i *= 2) {
@@ -199,27 +200,35 @@ void init_tables(void)
     c <<= 1;
   }
 
-  // Lambda cost
-  // TODO: cleanup
-  for (i = 0; i < 55; i++) {
+}
 
-    // Force minimum lambda cost of 1
-    if (i < 15) {
-      g_lambda_cost[i] = 1;
-    } else {
-      g_lambda_cost[i] = (int16_t)sqrt(0.57 * pow(2.0, (i - 12) / 3));
-    }
+/*!
+  \brief Initializes lambda-value for current QP
+ 
+  Implementation closer to HM (Used HM12 as reference)
+   - Still missing functionality when GOP and B-pictures are used 
+ */
+void init_lambda(encoder_control *encoder)
+{
+  double qp = encoder->QP;  
+  double lambda_scale = 1.0;
+  double qp_temp      = qp - 12;
+  double lambda;
 
-    /**
-     * While working on RDOQ it was clear that the current lambda cost is wrong (compared to HM)
-     * so the cost is now lambda*lambda to fix some of those issues.
-     * This is not the final solution and this should be fixed by calculating the lambda like HM.
-     * TODO: fix lambda cost calculation
-     * - Marko Viitanen (Fador)
-     **/
-    g_lambda_cost[i] = g_lambda_cost[i]*g_lambda_cost[i];
+  // Default QP-factor from HM config
+  double qp_factor = 0.4624;
+
+  if (encoder->in.cur_pic->slicetype == SLICE_I) {
+    qp_factor=0.57*lambda_scale;
   }
 
+  lambda = qp_factor*pow( 2.0, qp_temp/3.0 );
+
+  if (encoder->in.cur_pic->slicetype != SLICE_I ) {
+    lambda *= 0.95;
+  }
+  
+  g_lambda_cost[encoder->QP] = lambda;
 }
 
 void free_tables(void)
@@ -361,6 +370,9 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
 
 void encode_one_frame(encoder_control* encoder)
 {
+
+  // Initialize lambda value(s) to use in search
+  init_lambda(encoder);
 
   /** IDR picture when: period == 0 and frame == 0
    *                    period == 1 && frame%2 == 0
