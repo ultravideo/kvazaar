@@ -372,11 +372,11 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
  * frame.
  */
 void search_tree(encoder_control *encoder, 
-                 uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
+                 uint16_t x, uint16_t y, uint8_t depth)
 {
   int cu_width = LCU_WIDTH >> depth;
-  int x = x_ctb * (LCU_WIDTH >> MAX_DEPTH);
-  int y = y_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  int x_ctb = x / (LCU_WIDTH >> MAX_DEPTH);
+  int y_ctb = y / (LCU_WIDTH >> MAX_DEPTH);
   
   // Stop recursion if the CU is completely outside the frame.
   if (x >= encoder->in.width || y >= encoder->in.height) {
@@ -387,12 +387,12 @@ void search_tree(encoder_control *encoder,
   if (x + cu_width > encoder->in.width ||
       y + cu_width > encoder->in.height)
   {
-    int half_cu = 1 << (MAX_DEPTH - (depth + 1));
+    int half_cu = cu_width / 2;
 
-    search_tree(encoder, x_ctb, y_ctb, depth + 1);
-    search_tree(encoder, x_ctb + half_cu, y_ctb, depth + 1);
-    search_tree(encoder, x_ctb, y_ctb + half_cu, depth + 1);
-    search_tree(encoder, x_ctb + half_cu, y_ctb + half_cu, depth + 1);
+    search_tree(encoder, x,           y,           depth + 1);
+    search_tree(encoder, x + half_cu, y,           depth + 1);
+    search_tree(encoder, x,           y + half_cu, depth + 1);
+    search_tree(encoder, x + half_cu, y + half_cu, depth + 1);
 
     return;
   }
@@ -419,11 +419,12 @@ void search_tree(encoder_control *encoder,
 
   // Recurse to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
-    int half_cu = 1 << (MAX_DEPTH - (depth + 1));
-    search_tree(encoder, x_ctb,           y_ctb,           depth + 1);
-    search_tree(encoder, x_ctb + half_cu, y_ctb,           depth + 1);
-    search_tree(encoder, x_ctb,           y_ctb + half_cu, depth + 1);
-    search_tree(encoder, x_ctb + half_cu, y_ctb + half_cu, depth + 1);
+    int half_cu = cu_width / 2;;
+
+    search_tree(encoder, x,           y,           depth + 1);
+    search_tree(encoder, x + half_cu, y,           depth + 1);
+    search_tree(encoder, x,           y + half_cu, depth + 1);
+    search_tree(encoder, x + half_cu, y + half_cu, depth + 1);
   }
 }
 
@@ -503,7 +504,7 @@ void search_slice_data(encoder_control *encoder)
       uint8_t depth = 0;
 
       // Recursive function for looping through all the sub-blocks
-      search_tree(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
+      search_tree(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH, depth);
       if (RENDER_CU) {
         render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp);
       }
