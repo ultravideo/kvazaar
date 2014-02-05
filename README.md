@@ -11,6 +11,21 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
 Currently most of the features are turned on/off from the code on compile time, but they are
 meant to be user configurable later.
 
+		Usage:
+		hevc_encoder -i <input> -w <width> -h <height> -o <output>
+		Optional parameters:
+			  -n, --frames <integer> : number of frames to decode
+			  -q, --qp <integer>     : Quantization Parameter, default 32
+			  -p, --period <integer> : Period of intra pictures, default 0
+										 0: only first picture is intra
+										 1: all pictures are intra
+										 2-N: every Nth picture is intra
+				  --no-deblock       : Disable deblocking filter
+				  --deblock <beta:tc> : Deblocking filter parameters
+				  --no-sao           : Disable sample adaptive offset
+
+Example:
+
     kvazaar -i <INPUT_YUV> -w <WIDTH> -h <HEIGHT> -o <OUTPUT.BIN> -n <NUMBER_OF_FRAMES> -q <QP>
 
 eg. `kvazaar -i BQMall_832x480_60.yuv -w 832 -h 480 -o out.bin -n 600 -q 32`

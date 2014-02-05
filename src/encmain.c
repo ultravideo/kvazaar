@@ -20,13 +20,6 @@
 /*
  * \file
  *
- * TODO: Check that these usage instructions are correct.
- * \subsection options_subsec All program options:
- *            - -i <filename>: input
- *            - -o <filename>: output
- *            - -w <width>: frame width
- *            - -h <height>: frame height
- *            - -n <n>: encode only n frames
  */
 
 #ifdef _WIN32
@@ -74,11 +67,12 @@ int main(int argc, char *argv[])
   FILE *recout = fopen("encrec_832x480_60.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
   #endif
 
-  // Windows needs all of the standard in/outputs to be set to _O_BINARY
+  // Stdin and stdout need to be binary for input and output to work.
+  // Stderr needs to be text mode to convert \n to \r\n in Windows.
   #ifdef _WIN32
       _setmode( _fileno( stdin ),  _O_BINARY );
       _setmode( _fileno( stdout ), _O_BINARY );
-      _setmode( _fileno( stderr ), _O_BINARY );
+      _setmode( _fileno( stderr ), _O_TEXT );
   #endif
 
   // Handle configuration
@@ -86,23 +80,25 @@ int main(int argc, char *argv[])
   
   // If problem with configuration, print banner and shutdown
   if (!cfg || !config_init(cfg) || !config_read(cfg,argc,argv)) {
-    fprintf(stderr, "/***********************************************/\r\n");
-    fprintf(stderr, " *   Kvazaar HEVC Encoder v. " VERSION_STRING "*\r\n");
-    fprintf(stderr, " *     Tampere University of Technology 2014   *\r\n");
-    fprintf(stderr, "/***********************************************/\r\n\r\n");
+    fprintf(stderr,
+            "/***********************************************/\n"
+            " *   Kvazaar HEVC Encoder v. " VERSION_STRING "*\n"
+            " *     Tampere University of Technology 2014   *\n"
+            "/***********************************************/\n\n");
       
-    fprintf(stderr, "Usage:\r\n");
-    fprintf(stderr, "hevc_encoder -i <input> -w <width> -h <height> -o <output>\r\n");
-    fprintf(stderr, "Optional parameters:\r\n");
-    fprintf(stderr, "      -n, --frames <integer> : number of frames to decode\r\n");
-    fprintf(stderr, "      -q, --qp <integer>     : Quantization Parameter, default 32\r\n");
-    fprintf(stderr, "      -p, --period <integer> : Period of intra pictures, default 0\r\n");
-    fprintf(stderr, "                                 0: only first picture is intra\r\n");
-    fprintf(stderr, "                                 1: all pictures are intra\r\n");
-    fprintf(stderr, "                                 2-N: every Nth picture is intra\r\n");
-    fprintf(stderr, "          --no-deblock       : Disable deblocking filter\r\n");
-    fprintf(stderr, "          --deblock <beta:tc> : Deblocking filter parameters\r\n");
-    fprintf(stderr, "          --no-sao           : Disable sample adaptive offset\r\n");
+    fprintf(stderr, 
+            "Usage:\n"
+            "hevc_encoder -i <input> -w <width> -h <height> -o <output>\n"
+            "Optional parameters:\n"
+            "      -n, --frames <integer> : number of frames to decode\n"
+            "      -q, --qp <integer>     : Quantization Parameter, default 32\n"
+            "      -p, --period <integer> : Period of intra pictures, default 0\n"
+            "                                 0: only first picture is intra\n"
+            "                                 1: all pictures are intra\n"
+            "                                 2-N: every Nth picture is intra\n"
+            "          --no-deblock       : Disable deblocking filter\n"
+            "          --deblock <beta:tc> : Deblocking filter parameters\n"
+            "          --no-sao           : Disable sample adaptive offset\n");
 
     if (cfg)
       config_destroy(cfg);
