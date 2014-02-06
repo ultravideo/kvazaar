@@ -106,7 +106,7 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
       int eo_idx = EO_IDX(a, b, c);
       int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
 
-      new_data[0] = CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat]);
+      new_data[0] = (pixel)CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat]);
     }
   }
 }
@@ -246,8 +246,15 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
 }
 
 
-
-void sao_search_best_mode(const pixel *data[], const pixel *recdata[], 
+/**
+ * \param data     Array of pointers to reference pixels.
+ * \param recdata  Array of pointers to reconstructed pixels.
+ * \param block_width   Width of the area to be examined.
+ * \param block_height  Height of the area to be examined.
+ * \param buf_cnt  Number of pointers data and recdata have.
+ * \param sao_out  Output parameter for the best sao parameters.
+ */
+void sao_search_best_mode(const pixel * data[], const pixel * recdata[], 
                           int block_width, int block_height,
                           unsigned buf_cnt,
                           sao_info *sao_out)
@@ -354,8 +361,8 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
-  pixel *orig_list[1] = { orig };
-  pixel *rec_list[1] = { rec };
+  pixel * orig_list[1] = { NULL };
+  pixel * rec_list[1] = { NULL };
   pixel *data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   pixel *recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   int block_width = LCU_WIDTH;
@@ -375,5 +382,7 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   picture_blit_pixels(data, orig, block_width, block_height, pic->width, LCU_WIDTH);
   picture_blit_pixels(recdata, rec, block_width, block_height, pic->width, LCU_WIDTH);
 
+  orig_list[0] = orig;
+  rec_list[0] = rec;
   sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao);
 }
