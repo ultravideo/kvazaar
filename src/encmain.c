@@ -90,14 +90,15 @@ int main(int argc, char *argv[])
             "Usage:\n"
             "hevc_encoder -i <input> -w <width> -h <height> -o <output>\n"
             "Optional parameters:\n"
-            "      -n, --frames <integer> : number of frames to decode\n"
-            "      -q, --qp <integer>     : Quantization Parameter, default 32\n"
-            "      -p, --period <integer> : Period of intra pictures, default 0\n"
+            "      -n, --frames <integer> : number of frames to code [all]\n"
+            "      -q, --qp <integer>     : Quantization Parameter [32]\n"
+            "      -p, --period <integer> : Period of intra pictures [0]\n"
             "                                 0: only first picture is intra\n"
             "                                 1: all pictures are intra\n"
             "                                 2-N: every Nth picture is intra\n"
             "          --no-deblock       : Disable deblocking filter\n"
             "          --deblock <beta:tc> : Deblocking filter parameters\n"
+            "                                beta and tc range is -6..6 [0:0]\n"
             "          --no-sao           : Disable sample adaptive offset\n");
 
     if (cfg)

@@ -14,14 +14,15 @@ meant to be user configurable later.
 		Usage:
 		hevc_encoder -i <input> -w <width> -h <height> -o <output>
 		Optional parameters:
-			  -n, --frames <integer> : number of frames to decode
-			  -q, --qp <integer>     : Quantization Parameter, default 32
-			  -p, --period <integer> : Period of intra pictures, default 0
+			  -n, --frames <integer> : number of frames to code [all]
+			  -q, --qp <integer>     : Quantization Parameter [32]
+			  -p, --period <integer> : Period of intra pictures [0]
 										 0: only first picture is intra
 										 1: all pictures are intra
 										 2-N: every Nth picture is intra
 				  --no-deblock       : Disable deblocking filter
 				  --deblock <beta:tc> : Deblocking filter parameters
+										beta and tc range is -6..6 [0:0]
 				  --no-sao           : Disable sample adaptive offset
 
 Example:

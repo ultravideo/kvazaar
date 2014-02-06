@@ -159,6 +159,15 @@ static int config_parse(config *cfg, const char *name, const char *value)
       cfg->deblock_tc     = cfg->deblock_beta;
     } else
       cfg->deblock_enable = atobool(value);
+
+    if (cfg->deblock_beta  < -6 || cfg->deblock_beta  > 6) {
+      fprintf(stderr, "--deblock beta parameter out of range [-6..6], set to 0\n");
+      cfg->deblock_beta = 0;
+    }
+    if (cfg->deblock_tc < -6 || cfg->deblock_tc > 6) {
+      fprintf(stderr, "--deblock tc parameter out of range [-6..6], set to 0\n");
+      cfg->deblock_tc = 0;
+    }
   }
   OPT("sao")
     cfg->sao_enable = atobool(value);
