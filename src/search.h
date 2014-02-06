@@ -30,7 +30,7 @@
 
 
 void search_slice_data(encoder_control *encoder);
-void search_tree(encoder_control *encoder,uint16_t x_cu,uint16_t y_cu, uint8_t depth);
+void search_tree(encoder_control *encoder, int x, int y, uint8_t depth);
 uint32_t search_best_mode(encoder_control* encoder,uint16_t x_cu,uint16_t y_cu, uint8_t depth);
 
 #endif

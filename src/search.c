@@ -122,7 +122,7 @@ unsigned hexagon_search(unsigned depth,
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
-  unsigned best_cost = -1;
+  unsigned best_cost = UINT32_MAX;
   unsigned i;
   unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
 
@@ -241,7 +241,7 @@ unsigned search_mv_full(unsigned depth,
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
-  unsigned best_cost = -1;
+  unsigned best_cost = UINT32_MAX;
   int x, y;
   vector2d min_mv, max_mv;
 
@@ -303,8 +303,8 @@ void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
 #endif
     
   cur_cu->inter.mv_dir = 1;
-  cur_cu->inter.mv[0] = mv.x;
-  cur_cu->inter.mv[1] = mv.y;
+  cur_cu->inter.mv[0] = (int16_t)mv.x;
+  cur_cu->inter.mv[1] = (int16_t)mv.y;
 }
 
 void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
@@ -323,8 +323,8 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   // Build reconstructed block to use in prediction with extrapolated borders
   intra_build_reference_border(cur_pic, cur_pic->y_data,
                                x, y,
-                               width * 2 + 8, rec, width * 2 + 8, 0);
-  cur_cu->intra[0].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
+                               (int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0);
+  cur_cu->intra[0].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
       encoder->in.width, recShift, width * 2 + 8, x, y,
       width, pred, width, &cur_cu->intra[0].cost);
   cur_cu->part_size = SIZE_2Nx2N;
@@ -334,7 +334,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   if (0 && depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
-    int nn_mode = cur_cu->intra[0].mode;
+    int8_t nn_mode = cur_cu->intra[0].mode;
     int i;
     int cost = (int)(g_lambda_cost[encoder->QP] * 4.5);  // round to nearest
     static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
@@ -346,8 +346,8 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
       int y_pos = y + offsets[i].y * width;
       intra_build_reference_border(cur_pic, cur_pic->y_recdata,
                                    x_pos, y_pos,
-                                   width * 2 + 8, rec, width * 2 + 8, 0);
-      cur_cu->intra[i].mode = (uint8_t) intra_prediction(encoder->in.cur_pic->y_data,
+                                   (int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0);
+      cur_cu->intra[i].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
           encoder->in.width, recShift, width * 2 + 8, x_pos, y_pos,
           width, pred, width, &cur_cu->intra[i].cost);
       cost += cur_cu->intra[i].cost;
@@ -372,11 +372,11 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
  * frame.
  */
 void search_tree(encoder_control *encoder, 
-                 uint16_t x, uint16_t y, uint8_t depth)
+                 int x, int y, uint8_t depth)
 {
   int cu_width = LCU_WIDTH >> depth;
-  int x_ctb = x / (LCU_WIDTH >> MAX_DEPTH);
-  int y_ctb = y / (LCU_WIDTH >> MAX_DEPTH);
+  uint16_t x_ctb = (uint16_t)x / (LCU_WIDTH >> MAX_DEPTH);
+  uint16_t y_ctb = (uint16_t)y / (LCU_WIDTH >> MAX_DEPTH);
   
   // Stop recursion if the CU is completely outside the frame.
   if (x >= encoder->in.width || y >= encoder->in.height) {
@@ -486,8 +486,8 @@ void search_slice_data(encoder_control *encoder)
         for (d = 0; d <= MAX_DEPTH; ++d) {
           picture *cur_pic = encoder->in.cur_pic;
           cu_info *cur_cu = &cur_pic->cu_array[d][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
-          cur_cu->intra[0].cost = -1;
-          cur_cu->inter.cost = -1;
+          cur_cu->intra[0].cost = UINT32_MAX;
+          cur_cu->inter.cost = UINT32_MAX;
         }
       }
     }
