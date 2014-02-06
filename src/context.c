@@ -30,6 +30,143 @@
 #include "config.h"
 
 
+// stuff
+
+const uint8_t INIT_SAO_MERGE_FLAG[3] = { 153, 153, 153 };
+const uint8_t INIT_SAO_TYPE_IDX[3] = { 160, 185, 200 };
+
+const uint8_t INIT_QT_ROOT_CBF[3][1] = {
+  {  79, }, 
+  {  79, }, 
+  { CNU, }, 
+};
+
+const uint8_t INIT_MVP_IDX[3][2] = {
+  { 168,  CNU, }, 
+  { 168,  CNU, }, 
+  { CNU,  CNU, }, 
+};
+
+const uint8_t INIT_REF_PIC[3][2] = {
+  { 153,  153 }, 
+  { 153,  153 }, 
+  { CNU,  CNU }, 
+};
+
+const uint8_t INIT_MVD[3][2] = {
+  { 169,  198, }, 
+  { 140,  198, }, 
+  { CNU,  CNU, }, 
+};
+
+const uint8_t INIT_MERGE_FLAG_EXT[3][1] = {
+  { 154, }, 
+  { 110, }, 
+  { CNU, },
+};
+
+const uint8_t INIT_MERGE_IDX_EXT[3][1] = {
+  { 137, }, 
+  { 122, }, 
+  { CNU, },
+};
+
+const uint8_t INIT_SKIP_FLAG[3][3] =  {
+  { 197,  185,  201, }, 
+  { 197,  185,  201, }, 
+  { CNU,  CNU,  CNU, },
+};
+
+const uint8_t INIT_PRED_MODE[3][1] = {
+  { 134, }, 
+  { 149, }, 
+  { CNU, },
+};
+
+
+const uint8_t INIT_PART_SIZE[3][4] = {
+  { 154,  139,  CNU,  CNU, }, 
+  { 154,  139,  CNU,  CNU, }, 
+  { 184,  CNU,  CNU,  CNU, }, 
+};
+
+const uint8_t  INIT_SPLIT_FLAG[3][3] = {
+  { 107,  139,  126 },
+  { 107,  139,  126 },
+  { 139,  141,  157 },
+};
+
+const uint8_t INIT_INTRA_PRED_MODE[3] = { 
+  183, 154, 184 
+};
+
+const uint8_t INIT_CHROMA_PRED_MODE[3][2] = { 
+  { 152,  139 }, 
+  { 152,  139 }, 
+  {  63,  139 },
+};
+
+
+const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
+  { 224,  167,  122 }, 
+  { 124,  138,   94 }, 
+  { 153,  138,  138 },
+};
+
+const uint8_t INIT_QT_CBF[3][6] = {
+  { 153,  111,  CNU,  149,   92,  167 },
+  { 153,  111,  CNU,  149,  107,  167 },
+  { 111,  141,  CNU,   94,  138,  182 },
+};
+
+const uint8_t INIT_SIG_CG_FLAG[3][4] = {  
+  { 121,  140,  61,  154  },
+  { 121,  140,  61,  154 },
+  {  91,  171,  134,  141  },
+};
+
+const uint8_t INIT_SIG_FLAG[3][42] = {
+   {170,154,139,153,139,123,123, 63,124,166,
+    183,140,136,153,154,166,183,140,136,153,
+    154,166,183,140,136,153,154,170,153,138,
+    138,122,121,122,121,167,151,183,140,151,
+    183,140},
+   {155,154,139,153,139,123,123,63,153,166,
+   183,140,136,153,154,166,183,140,136,153,
+   154,166,183,140,136,153,154,170,153,123,
+   123,107,121,107,121,167,151,183,140,151,
+   183,140},
+   {111,111,125,110,110,94,124,108,124,107,
+   125,141,179,153,125,107,125,141,179,153,
+   125,107,125,141,179,153,125,140,139,182,
+   182,152,136,152,136,153,136,139,111,136,
+   139,111},
+};
+
+const uint8_t INIT_LAST[3][30] = {
+  { 125,  110,  124,  110,   95,   94,  125,  111,  111,   79,  125,  126,  111,  111,   79,
+    108,  123,   93,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
+  { 125,  110,   94,  110,   95,   79,  125,  111,  110,   78,  110,  111,  111,   95,   94,
+    108,  123,  108,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
+  { 110,  110,  124,  125,  140,  153,  125,  127,  140,  109,  111,  143,  127,  111,   79,
+    108,  123,   63,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
+};
+
+const uint8_t INIT_ONE_FLAG[3][24] = 
+{
+  {154,196,167,167,154,152,167,182,182,134,149,136,153,121,136,122,169,208,166,167,154,152,167,182},
+  {154,196,196,167,154,152,167,182,182,134,149,136,153,121,136,137,169,194,166,167,154,167,137,182},
+  {140, 92,137,138,140,152,138,139,153, 74,149, 92,139,107,122,152,140,179,166,182,140,227,122,197},
+};
+
+const uint8_t INIT_ABS_FLAG[3][6] =  
+{
+  { 107,167, 91,107,107,167}, 
+  { 107,167, 91,122,107,167}, 
+  { 138,153,136,167,152,152},
+};
+
+
 // CONTEXTS
 cabac_ctx g_sao_merge_flag_model;
 cabac_ctx g_sao_type_idx_model;
@@ -59,6 +196,8 @@ cabac_ctx g_cu_mvd_model[2];
 cabac_ctx g_cu_ref_pic_model[2];
 cabac_ctx g_mvp_idx_model[2];
 cabac_ctx g_cu_qt_root_cbf_model;
+
+
 
 
 /**
@@ -239,18 +378,3 @@ int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int3
   }
   return (( texture_type == 0 && ((pos_x>>2) + (pos_y>>2)) > 0 ) ? 3 : 0) + offset + cnt;
 }
-
-/*
- * Entropy bits to estimate coded bits in RDO / RDOQ (From HM 12.0)
- */
-const uint32_t entropy_bits[128] =
-{
-  0x08000, 0x08000, 0x076da, 0x089a0, 0x06e92, 0x09340, 0x0670a, 0x09cdf, 0x06029, 0x0a67f, 0x059dd, 0x0b01f, 0x05413, 0x0b9bf, 0x04ebf, 0x0c35f,
-  0x049d3, 0x0ccff, 0x04546, 0x0d69e, 0x0410d, 0x0e03e, 0x03d22, 0x0e9de, 0x0397d, 0x0f37e, 0x03619, 0x0fd1e, 0x032ee, 0x106be, 0x02ffa, 0x1105d,
-  0x02d37, 0x119fd, 0x02aa2, 0x1239d, 0x02836, 0x12d3d, 0x025f2, 0x136dd, 0x023d1, 0x1407c, 0x021d2, 0x14a1c, 0x01ff2, 0x153bc, 0x01e2f, 0x15d5c,
-  0x01c87, 0x166fc, 0x01af7, 0x1709b, 0x0197f, 0x17a3b, 0x0181d, 0x183db, 0x016d0, 0x18d7b, 0x01595, 0x1971b, 0x0146c, 0x1a0bb, 0x01354, 0x1aa5a,
-  0x0124c, 0x1b3fa, 0x01153, 0x1bd9a, 0x01067, 0x1c73a, 0x00f89, 0x1d0da, 0x00eb7, 0x1da79, 0x00df0, 0x1e419, 0x00d34, 0x1edb9, 0x00c82, 0x1f759,
-  0x00bda, 0x200f9, 0x00b3c, 0x20a99, 0x00aa5, 0x21438, 0x00a17, 0x21dd8, 0x00990, 0x22778, 0x00911, 0x23118, 0x00898, 0x23ab8, 0x00826, 0x24458,
-  0x007ba, 0x24df7, 0x00753, 0x25797, 0x006f2, 0x26137, 0x00696, 0x26ad7, 0x0063f, 0x27477, 0x005ed, 0x27e17, 0x0059f, 0x287b6, 0x00554, 0x29156,
-  0x0050e, 0x29af6, 0x004cc, 0x2a497, 0x0048d, 0x2ae35, 0x00451, 0x2b7d6, 0x00418, 0x2c176, 0x003e2, 0x2cb15, 0x003af, 0x2d4b5, 0x0037f, 0x2de55
-};

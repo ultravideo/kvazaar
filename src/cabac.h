@@ -75,7 +75,6 @@ void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned
 #define CTX_MPS(ctx) (ctx->uc_state & 1)
 #define CTX_UPDATE_LPS(ctx) { (ctx)->uc_state = g_auc_next_state_lps[ (ctx)->uc_state ]; }
 #define CTX_UPDATE_MPS(ctx) { (ctx)->uc_state = g_auc_next_state_mps[ (ctx)->uc_state ]; }
-#define CTX_ENTROPY_BITS(ctx,val) entropy_bits[(ctx)->uc_state ^ val]
 
 #ifdef VERBOSE
   #define CABAC_BIN(data, value, name) { \

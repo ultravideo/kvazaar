@@ -36,9 +36,25 @@
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
 
-
 const uint32_t g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
+
+
+#define CTX_ENTROPY_BITS(ctx,val) entropy_bits[(ctx)->uc_state ^ val]
+/**
+ * Entropy bits to estimate coded bits in RDO / RDOQ (From HM 12.0)
+ */
+const uint32_t entropy_bits[128] =
+{
+  0x08000, 0x08000, 0x076da, 0x089a0, 0x06e92, 0x09340, 0x0670a, 0x09cdf, 0x06029, 0x0a67f, 0x059dd, 0x0b01f, 0x05413, 0x0b9bf, 0x04ebf, 0x0c35f,
+  0x049d3, 0x0ccff, 0x04546, 0x0d69e, 0x0410d, 0x0e03e, 0x03d22, 0x0e9de, 0x0397d, 0x0f37e, 0x03619, 0x0fd1e, 0x032ee, 0x106be, 0x02ffa, 0x1105d,
+  0x02d37, 0x119fd, 0x02aa2, 0x1239d, 0x02836, 0x12d3d, 0x025f2, 0x136dd, 0x023d1, 0x1407c, 0x021d2, 0x14a1c, 0x01ff2, 0x153bc, 0x01e2f, 0x15d5c,
+  0x01c87, 0x166fc, 0x01af7, 0x1709b, 0x0197f, 0x17a3b, 0x0181d, 0x183db, 0x016d0, 0x18d7b, 0x01595, 0x1971b, 0x0146c, 0x1a0bb, 0x01354, 0x1aa5a,
+  0x0124c, 0x1b3fa, 0x01153, 0x1bd9a, 0x01067, 0x1c73a, 0x00f89, 0x1d0da, 0x00eb7, 0x1da79, 0x00df0, 0x1e419, 0x00d34, 0x1edb9, 0x00c82, 0x1f759,
+  0x00bda, 0x200f9, 0x00b3c, 0x20a99, 0x00aa5, 0x21438, 0x00a17, 0x21dd8, 0x00990, 0x22778, 0x00911, 0x23118, 0x00898, 0x23ab8, 0x00826, 0x24458,
+  0x007ba, 0x24df7, 0x00753, 0x25797, 0x006f2, 0x26137, 0x00696, 0x26ad7, 0x0063f, 0x27477, 0x005ed, 0x27e17, 0x0059f, 0x287b6, 0x00554, 0x29156,
+  0x0050e, 0x29af6, 0x004cc, 0x2a497, 0x0048d, 0x2ae35, 0x00451, 0x2b7d6, 0x00418, 0x2c176, 0x003e2, 0x2cb15, 0x003af, 0x2d4b5, 0x0037f, 0x2de55
+};
 
 
 #define COEF_REMAIN_BIN_REDUCTION 3
@@ -122,7 +138,7 @@ int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_a
     }
 
     pref_len = (uint16_t)(symbol >> abs_go_rice) + 1;
-    num_bins = MIN( pref_len, g_go_rice_prefix_len[ abs_go_rice ] ) + abs_go_rice;
+    num_bins = (uint16_t)MIN( pref_len, g_go_rice_prefix_len[ abs_go_rice ] ) + abs_go_rice;
 
     rate += num_bins << 15;
 
@@ -264,7 +280,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
 {
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;  
   int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;  // Represents scaling through forward transform
-  uint32_t go_rice_param   = 0;  
+  uint16_t go_rice_param   = 0;  
   uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   uint32_t max_num_coeff   = width * height;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);  
@@ -311,9 +327,9 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   
   int32_t  cg_last_scanpos = -1;
   
-  uint32_t    ctx_set        = 0;
-  int32_t     c1             = 1;
-  int32_t     c2             = 0;
+  uint16_t    ctx_set        = 0;
+  int16_t     c1             = 1;
+  int16_t     c2             = 0;
   double      base_cost      = 0;
   int32_t     last_scanpos   = -1;
   
@@ -388,7 +404,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
       err               = (double)level_double;
       cost_coeff0[ scanpos ]  = err * err * temp;
       block_uncoded_cost      += cost_coeff0[ scanpos ];
-      dest_coeff[ blkpos ]    = max_abs_level;
+      dest_coeff[ blkpos ] = (coefficient)max_abs_level;
       
       if ( max_abs_level > 0 && last_scanpos < 0 ) {
         last_scanpos             = scanpos;
@@ -399,8 +415,8 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
       if ( last_scanpos >= 0 ) {
         //===== coefficient level estimation =====
         int32_t  level;
-        uint32_t  one_ctx = 4 * ctx_set + c1;
-        uint32_t  abs_ctx = ctx_set + c2;
+        uint16_t  one_ctx = 4 * ctx_set + c1;
+        uint16_t  abs_ctx = ctx_set + c2;
         
         if( scanpos == last_scanpos ) {
           level            = get_coded_level(encoder, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ], 
@@ -409,7 +425,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
         } else {
           uint32_t  pos_y    = blkpos >> log2_block_size;
           uint32_t  pos_x    = blkpos - ( pos_y << log2_block_size );
-          uint16_t  ctx_sig  = context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
+          uint16_t  ctx_sig  = (uint16_t)context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                                        log2_block_size, width, type);
           level              = get_coded_level(encoder, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
@@ -424,7 +440,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
         } else { // level == 0
           rate_inc_up[blkpos] = CTX_ENTROPY_BITS(&base_one_ctx[one_ctx],0);
         }
-        dest_coeff[blkpos] = level;
+        dest_coeff[blkpos] = (coefficient)level;
         base_cost         += cost_coeff[scanpos];
         
         base_level = (c1_idx < C1FLAG_NUMBER) ? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
@@ -590,7 +606,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
     int32_t blkPos = scan[ scanpos ];
     int32_t level  = dest_coeff[ blkPos ];
     *abs_sum += level;
-    dest_coeff[ blkPos ] = ( coef[ blkPos ] < 0 ) ? -level : level;
+    dest_coeff[ blkPos ] = (coefficient)(( coef[ blkPos ] < 0 ) ? -level : level);
   }
   
   //===== clean uncoded coefficients =====
@@ -633,7 +649,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
       if(lastNZPosInCG>=0 && lastCG==-1) lastCG = 1;
       
       if (lastNZPosInCG-firstNZPosInCG >= SBH_THRESHOLD ) {
-        uint32_t signbit = (dest_coeff[scan[subPos+firstNZPosInCG]]>0?0:1);
+        int32_t signbit = (dest_coeff[scan[subPos+firstNZPosInCG]]>0?0:1);
         if( signbit!=(absSum&0x1) ) {  // hide but need tune        
           // calculate the cost 
           int64_t minCostInc = MAX_INT64, curCost=MAX_INT64;
@@ -682,9 +698,9 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
           }
           
           if(coef[minPos]>=0) {
-            dest_coeff[minPos] += finalChange;
+            dest_coeff[minPos] += (coefficient)finalChange;
           } else {
-            dest_coeff[minPos] -= finalChange;
+            dest_coeff[minPos] -= (coefficient)finalChange;
           }
         }
       }
