@@ -65,8 +65,8 @@ double get_ic_rate_cost  (uint32_t abs_level,
   cabac_ctx *base_abs_ctx = (type == 0) ? &g_cu_abs_model_luma[0] : &g_cu_abs_model_chroma[0];
 
   if ( abs_level >= base_level ) {
-    uint32_t symbol     = abs_level - base_level;
-    uint32_t length;
+    int32_t symbol     = abs_level - base_level;
+    int32_t length;
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
       rate += (length+1+abs_go_rice)<< 15;

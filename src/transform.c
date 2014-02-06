@@ -952,7 +952,6 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
   int32_t qp_scaled;
   int32_t qp_base = encoder->QP;
   int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  int32_t *dequant_coef;
 
   if (type == 0) {
     qp_scaled = qp_base;

@@ -336,7 +336,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
     int nn_cost = cur_cu->intra[0].cost;
     int nn_mode = cur_cu->intra[0].mode;
     int i;
-    int cost = g_lambda_cost[encoder->QP] * 256.0;
+    int cost = (int)(g_lambda_cost[encoder->QP] * 4.5);  // round to nearest
     static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
     width = 4;
     recShift = &rec[width * 2 + 8 + 1];
@@ -438,7 +438,7 @@ uint32_t search_best_mode(encoder_control *encoder,
                      [x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint32_t best_intra_cost = cur_cu->intra[0].cost;
   uint32_t best_inter_cost = cur_cu->inter.cost;
-  uint32_t lambda_cost = (4 * g_lambda_cost[encoder->QP]); //TODO: Correct cost calculation
+  uint32_t lambda_cost = (int)(4.5 * g_lambda_cost[encoder->QP]); //TODO: Correct cost calculation
 
   if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
     uint32_t cost = lambda_cost;
