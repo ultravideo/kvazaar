@@ -52,18 +52,27 @@ config *config_alloc()
  */
 int config_init(config *cfg)
 {  
-  cfg->input  = NULL;
-  cfg->output = NULL;
-  cfg->debug  = NULL;
-  cfg->frames = 0;
-  cfg->width  = 320;
-  cfg->height = 240;
-  cfg->qp     = 32;
-  cfg->intra_period = 0;
-  cfg->deblock_enable = 1;
-  cfg->deblock_beta   = 0;
-  cfg->deblock_tc     = 0;
-  cfg->sao_enable = 1;
+  cfg->input           = NULL;
+  cfg->output          = NULL;
+  cfg->debug           = NULL;
+  cfg->frames          = 0;
+  cfg->width           = 320;
+  cfg->height          = 240;
+  cfg->qp              = 32;
+  cfg->intra_period    = 0;
+  cfg->deblock_enable  = 1;
+  cfg->deblock_beta    = 0;
+  cfg->deblock_tc      = 0;
+  cfg->sao_enable      = 1;
+  cfg->vui.sar_width   = 0;
+  cfg->vui.sar_height  = 0;
+  cfg->vui.overscan    = 0; /* undef */
+  cfg->vui.videoformat = 5; /* undef */
+  cfg->vui.fullrange   = 0; /* limited range */
+  cfg->vui.colorprim   = 2; /* undef */
+  cfg->vui.transfer    = 2; /* undef */
+  cfg->vui.colormatrix = 2; /* undef */
+  cfg->vui.chroma_loc  = 0; /* left center */
 
   return 1;
 }
@@ -115,9 +124,33 @@ static int atobool(const char *str)
   return 0;
 }
 
-static int config_parse(config *cfg, const char *name, const char *value)
+static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
 {
   int i;
+  for (i = 0; names[i]; i++)
+    if (!strcmp(arg, names[i])) {
+      *dst = i;
+      return 1;
+    }
+
+  return 0;
+}
+
+static int config_parse(config *cfg, const char *name, const char *value)
+{
+  static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
+  static const char * const videoformat_names[] = { "component", "pal", "ntsc", "secam", "mac", "undef", NULL };
+  static const char * const fullrange_names[]   = { "off", "on", NULL };
+  static const char * const colorprim_names[]   = { "", "bt709", "undef", "", "bt470m", "bt470bg", "smpte170m",
+                                                    "smpte240m", "film", "bt2020", NULL };
+  static const char * const transfer_names[]    = { "", "bt709", "undef", "", "bt470m", "bt470bg", "smpte170m",
+                                                    "smpte240m", "linear", "log100", "log316", "iec61966-2-4",
+                                                    "bt1361e", "iec61966-2-1", "bt2020-10", "bt2020-12", NULL };
+  static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
+                                                    "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
+
+  int i;
+  int error = 0;
 
   if (!name)
     return 0;
@@ -171,11 +204,38 @@ static int config_parse(config *cfg, const char *name, const char *value)
   }
   OPT("sao")
     cfg->sao_enable = atobool(value);
+  OPT("sar") {
+      int sar_width, sar_height;
+      if (2 == sscanf(value, "%d:%d", &sar_width, &sar_height)) {
+        cfg->vui.sar_width  = sar_width;
+        cfg->vui.sar_height = sar_height;
+      } else
+        error = 1;
+  }
+  OPT("overscan")
+    error = !parse_enum(value, overscan_names, &cfg->vui.overscan);
+  OPT("videoformat")
+    error = !parse_enum(value, videoformat_names, &cfg->vui.videoformat);
+  OPT("fullrange")
+    error = !parse_enum(value, fullrange_names, &cfg->vui.fullrange);
+  OPT("colorprim")
+    error = !parse_enum(value, colorprim_names, &cfg->vui.colorprim);
+  OPT("transfer")
+    error = !parse_enum(value, transfer_names, &cfg->vui.transfer);
+  OPT("colormatrix")
+    error = !parse_enum(value, colormatrix_names, &cfg->vui.colormatrix);
+  OPT("chromaloc") {
+      cfg->vui.chroma_loc = atoi(value);
+      if (cfg->vui.chroma_loc < 0 || cfg->vui.chroma_loc > 5) {
+        fprintf(stderr, "--chromaloc parameter out of range [0..5], set to 0\n");
+        cfg->vui.chroma_loc = 0;
+      }
+  }
   else
     return 0;
 #undef OPT
 
-  return 1;
+  return error ? 0 : 1;
 }
 
 /**
@@ -205,6 +265,14 @@ int config_read(config *cfg,int argc, char *argv[])
     { "no-deblock",               no_argument, NULL, 0 },
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
+    { "sar",                required_argument, NULL, 0 },
+    { "overscan",           required_argument, NULL, 0 },
+    { "videoformat",        required_argument, NULL, 0 },
+    { "range",              required_argument, NULL, 0 },
+    { "colorprim",          required_argument, NULL, 0 },
+    { "transfer",           required_argument, NULL, 0 },
+    { "colormatrix",        required_argument, NULL, 0 },
+    { "chromaloc",          required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

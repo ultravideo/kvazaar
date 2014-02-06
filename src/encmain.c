@@ -89,17 +89,39 @@ int main(int argc, char *argv[])
     fprintf(stderr, 
             "Usage:\n"
             "hevc_encoder -i <input> -w <width> -h <height> -o <output>\n"
+            "\n"
             "Optional parameters:\n"
-            "      -n, --frames <integer> : number of frames to code [all]\n"
-            "      -q, --qp <integer>     : Quantization Parameter [32]\n"
-            "      -p, --period <integer> : Period of intra pictures [0]\n"
-            "                                 0: only first picture is intra\n"
-            "                                 1: all pictures are intra\n"
-            "                                 2-N: every Nth picture is intra\n"
-            "          --no-deblock       : Disable deblocking filter\n"
-            "          --deblock <beta:tc> : Deblocking filter parameters\n"
-            "                                beta and tc range is -6..6 [0:0]\n"
-            "          --no-sao           : Disable sample adaptive offset\n");
+            "      -n, --frames <integer>     : number of frames to code [all]\n"
+            "      -q, --qp <integer>         : Quantization Parameter [32]\n"
+            "      -p, --period <integer>     : Period of intra pictures [0]\n"
+            "                                     0: only first picture is intra\n"
+            "                                     1: all pictures are intra\n"
+            "                                     2-N: every Nth picture is intra\n"
+            "          --no-deblock           : Disable deblocking filter\n"
+            "          --deblock <beta:tc>    : Deblocking filter parameters\n"
+            "                                   beta and tc range is -6..6 [0:0]\n"
+            "          --no-sao               : Disable sample adaptive offset\n"
+            "\n"
+            "  Video Usability Information:\n"
+            "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
+            "          --overscan <string>    : Specify crop overscan setting [\"undef\"]\n"
+            "                                     - undef, show, crop\n"
+            "          --videoformat <string> : Specify video format [\"undef\"]\n"
+            "                                     - component, pal, ntsc, secam, mac, undef\n"
+            "          --range <string>       : Specify color range [\"off\"]\n"
+            "                                     - off, on\n"
+            "          --colorprim <string>   : Specify color primaries [\"undef\"]\n"
+            "                                     - undef, bt709, bt470m, bt470bg,\n"
+            "                                       smpte170m, smpte240m, film, bt2020\n"
+            "          --transfer <string>    : Specify transfer characteristics [\"undef\"]\n"
+            "                                     - undef, bt709, bt470m, bt470bg,\n"
+            "                                       smpte170m, smpte240m, linear, log100,\n"
+            "                                       log316, iec61966-2-4, bt1361e,\n"
+            "                                       iec61966-2-1, bt2020-10, bt2020-12\n"
+            "          --colormatrix <string> : Specify color matrix setting [\"undef\"]\n"
+            "                                     - undef, bt709, fcc, bt470bg, smpte170m,\n"
+            "                                       smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
+            "          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n");
 
     if (cfg)
       config_destroy(cfg);
@@ -167,6 +189,16 @@ int main(int argc, char *argv[])
   encoder->tc_offset_div2   = encoder->cfg->deblock_tc;
   // SAO
   encoder->sao_enable = encoder->cfg->sao_enable;
+  // VUI
+  encoder->vui.sar_width   = encoder->cfg->vui.sar_width;
+  encoder->vui.sar_height  = encoder->cfg->vui.sar_height;
+  encoder->vui.overscan    = encoder->cfg->vui.overscan;
+  encoder->vui.videoformat = encoder->cfg->vui.videoformat;
+  encoder->vui.fullrange   = encoder->cfg->vui.fullrange;
+  encoder->vui.colorprim   = encoder->cfg->vui.colorprim;
+  encoder->vui.transfer    = encoder->cfg->vui.transfer;
+  encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
+  encoder->vui.chroma_loc  = encoder->cfg->vui.chroma_loc;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 

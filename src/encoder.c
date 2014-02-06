@@ -47,6 +47,7 @@ uint32_t* g_sig_last_scan[3][7];
 
 /* Local functions. */
 static void add_checksum(encoder_control* encoder);
+static void encode_VUI(encoder_control* encoder);
 
 void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h, uint32_t *buff_v,
                         int32_t width, int32_t height)
@@ -751,10 +752,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, ENABLE_TEMPORAL_MVP, 1,
           "sps_temporal_mvp_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
-  WRITE_U(encoder->stream, 0, 1, "vui_parameters_present_flag");
+  WRITE_U(encoder->stream, 1, 1, "vui_parameters_present_flag");
 
-  //TODO: VUI?
-  //encode_VUI(encoder);
+  encode_VUI(encoder);
   
   WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
@@ -794,27 +794,82 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
-void encode_VUI(encoder_control* encoder)
+static void encode_VUI(encoder_control* encoder)
 {
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
-  WRITE_U(encoder->stream, 0, 1, "aspect_ratio_info_present_flag");
+  if (encoder->vui.sar_width > 0 && encoder->vui.sar_height > 0) {
+    int i;
+    static const struct
+    {
+      uint8_t width;
+      uint8_t height;
+      uint8_t idc;
+    } sar[] = {
+      // aspect_ratio_idc = 0 -> unspecified
+      {  1,  1, 1 }, { 12, 11, 2 }, { 10, 11, 3 }, { 16, 11, 4 },
+      { 40, 33, 5 }, { 24, 11, 6 }, { 20, 11, 7 }, { 32, 11, 8 },
+      { 80, 33, 9 }, { 18, 11, 10}, { 15, 11, 11}, { 64, 33, 12},
+      {160, 99, 13}, {  4,  3, 14}, {  3,  2, 15}, {  2,  1, 16},
+      // aspect_ratio_idc = [17..254] -> reserved
+      { 0, 0, 255 }
+    };
+
+    for (i = 0; sar[i].idc != 255; i++)
+      if (sar[i].width  == encoder->vui.sar_width &&
+          sar[i].height == encoder->vui.sar_height)
+        break;
+
+    WRITE_U(encoder->stream, 1, 1, "aspect_ratio_info_present_flag");
+    WRITE_U(encoder->stream, sar[i].idc, 8, "aspect_ratio_idc");
+    if (sar[i].idc == 255) {
+      // EXTENDED_SAR
+      WRITE_U(encoder->stream, encoder->vui.sar_width, 16, "sar_width");
+      WRITE_U(encoder->stream, encoder->vui.sar_height, 16, "sar_height");
+    }
+  } else
+    WRITE_U(encoder->stream, 0, 1, "aspect_ratio_info_present_flag");
 
   //IF aspect ratio info
   //ENDIF
 
-  WRITE_U(encoder->stream, 0, 1, "overscan_info_present_flag");
+  if (encoder->vui.overscan > 0) {
+    WRITE_U(encoder->stream, 1, 1, "overscan_info_present_flag");
+    WRITE_U(encoder->stream, encoder->vui.overscan - 1, 1, "overscan_appropriate_flag");
+  } else
+    WRITE_U(encoder->stream, 0, 1, "overscan_info_present_flag");
 
   //IF overscan info
   //ENDIF
 
-  WRITE_U(encoder->stream, 0, 1, "video_signal_type_present_flag");
+  if (encoder->vui.videoformat != 5 || encoder->vui.fullrange ||
+      encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
+      encoder->vui.colormatrix != 2) {
+    WRITE_U(encoder->stream, 1, 1, "video_signal_type_present_flag");
+    WRITE_U(encoder->stream, encoder->vui.videoformat, 3, "video_format");
+    WRITE_U(encoder->stream, encoder->vui.fullrange, 1, "video_full_range_flag");
+
+    if (encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
+        encoder->vui.colormatrix != 2) {
+      WRITE_U(encoder->stream, 1, 1, "colour_description_present_flag");
+      WRITE_U(encoder->stream, encoder->vui.colorprim, 8, "colour_primaries");
+      WRITE_U(encoder->stream, encoder->vui.transfer, 8, "transfer_characteristics");
+      WRITE_U(encoder->stream, encoder->vui.colormatrix, 8, "matrix_coeffs");
+    } else
+      WRITE_U(encoder->stream, 0, 1, "colour_description_present_flag");
+  } else
+    WRITE_U(encoder->stream, 0, 1, "video_signal_type_present_flag");
 
   //IF video type
   //ENDIF
 
-  WRITE_U(encoder->stream, 0, 1, "chroma_loc_info_present_flag");
+  if (encoder->vui.chroma_loc > 0) {
+    WRITE_U(encoder->stream, 1, 1, "chroma_loc_info_present_flag");
+    WRITE_UE(encoder->stream, encoder->vui.chroma_loc, "chroma_sample_loc_type_top_field");
+    WRITE_UE(encoder->stream, encoder->vui.chroma_loc, "chroma_sample_loc_type_bottom_field");
+  } else
+    WRITE_U(encoder->stream, 0, 1, "chroma_loc_info_present_flag");
 
   //IF chroma loc info
   //ENDIF

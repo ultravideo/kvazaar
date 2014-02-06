@@ -78,6 +78,20 @@ typedef struct
   int8_t sao_enable;     // \brief Flag to enable sample adaptive offset filter
   int8_t beta_offset_div2; // \brief (deblocking) beta offset (div 2), range -6...6
   int8_t tc_offset_div2;   // \brief (deblocking)tc offset (div 2), range -6...6
+
+  /* VUI */
+  struct
+  {
+    int16_t sar_width;
+    int16_t sar_height;
+    int8_t overscan;
+    int8_t videoformat;
+    int8_t fullrange;
+    int8_t colorprim;
+    int8_t transfer;
+    int8_t colormatrix;
+    int8_t chroma_loc;
+  } vui;
 } encoder_control;
 
 void init_tables(void);
