@@ -100,6 +100,7 @@ typedef int16_t coefficient;
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define NO_SCU_IN_LCU(no_lcu) ((no_lcu) << MAX_DEPTH)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
+#define UNREFERENCED_PARAMETER(p) (p)
 
 #define LOG2_LCU_WIDTH 6
 // CU_TO_PIXEL = y * lcu_width * pic_width + x * lcu_width
