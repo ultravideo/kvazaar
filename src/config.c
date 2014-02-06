@@ -73,6 +73,7 @@ int config_init(config *cfg)
   cfg->vui.transfer    = 2; /* undef */
   cfg->vui.colormatrix = 2; /* undef */
   cfg->vui.chroma_loc  = 0; /* left center */
+  cfg->aud_enable      = 0;
 
   return 1;
 }
@@ -231,6 +232,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
         cfg->vui.chroma_loc = 0;
       }
   }
+  OPT("aud")
+    cfg->aud_enable = atobool(value);
   else
     return 0;
 #undef OPT
@@ -273,6 +276,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "transfer",           required_argument, NULL, 0 },
     { "colormatrix",        required_argument, NULL, 0 },
     { "chromaloc",          required_argument, NULL, 0 },
+    { "aud",                      no_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

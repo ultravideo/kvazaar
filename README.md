@@ -24,6 +24,7 @@ meant to be user configurable later.
 				  --deblock <beta:tc>    : Deblocking filter parameters
 										   beta and tc range is -6..6 [0:0]
 				  --no-sao               : Disable sample adaptive offset
+				  --aud                  : Use access unit delimiters
 
 		  Video Usability Information:
 				  --sar <width:height>   : Specify Sample Aspect Ratio

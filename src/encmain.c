@@ -101,6 +101,7 @@ int main(int argc, char *argv[])
             "          --deblock <beta:tc>    : Deblocking filter parameters\n"
             "                                   beta and tc range is -6..6 [0:0]\n"
             "          --no-sao               : Disable sample adaptive offset\n"
+            "          --aud                  : Use access unit delimiters\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
@@ -199,6 +200,8 @@ int main(int argc, char *argv[])
   encoder->vui.transfer    = encoder->cfg->vui.transfer;
   encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
   encoder->vui.chroma_loc  = encoder->cfg->vui.chroma_loc;
+  // AUD
+  encoder->aud_enable = encoder->cfg->aud_enable;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 

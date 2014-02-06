@@ -57,6 +57,7 @@ typedef struct
     int8_t colormatrix;  /*!< \brief Color matrix coefficients */
     int8_t chroma_loc;   /*!< \brief Chroma sample location */
   } vui;
+  int8_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
 } config;
 
 /* Function definitions */
