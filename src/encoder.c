@@ -1822,12 +1822,6 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
         pred_y[x+y*pred_stride]=recbase_y[x+y*recbase_stride];
       }
     }
-    for(y = 0; y < width_c; y++) {
-      for(x = 0; x < width_c; x++) {
-        pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
-        pred_v[x+y*(pred_stride>>1)]=recbase_v[x+y*(recbase_stride>>1)];
-      }
-    }
     
     // INTRA PREDICTION ENDS HERE
 
@@ -1920,6 +1914,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       // replaced later with color_index.
       int color_type_u = 2;
       int color_type_v = 3;
+
+      for(y = 0; y < width_c; y++) {
+        for(x = 0; x < width_c; x++) {
+          pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
+          pred_v[x+y*(pred_stride>>1)]=recbase_v[x+y*(recbase_stride>>1)];
+        }
+      }
 
       transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, color_type_u, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
