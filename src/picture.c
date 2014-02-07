@@ -760,15 +760,23 @@ unsigned interpolated_sad(const picture *pic, const picture *ref,
   int width = pic->width;
   int height = pic->height;
 
+  int left, right, top, bottom;
+  int result = 0;
+  
+  // Change the movement vector to point right next to the frame. This doesn't
+  // affect the result but removes some special cases.
+  if (ref_x > width)            ref_x = width;
+  if (ref_y > height)           ref_y = height;
+  if (ref_x + block_width < 0)  ref_x = -block_width;
+  if (ref_y + block_height < 0) ref_y = -block_height;
+
   // These are the number of pixels by how far the movement vector points
   // outside the frame. They are always >= 0. If all of them are 0, the
   // movement vector doesn't point outside the frame.
-  int left   = (ref_x < 0) ? -ref_x : 0;
-  int top    = (ref_y < 0) ? -ref_y : 0;
-  int right  = (ref_x + block_width  > width)  ? ref_x + block_width  - width  : 0;
-  int bottom = (ref_y + block_height > height) ? ref_y + block_height - height : 0;
-
-  unsigned result = 0;
+  left   = (ref_x < 0) ? -ref_x : 0;
+  top    = (ref_y < 0) ? -ref_y : 0;
+  right  = (ref_x + block_width  > width)  ? ref_x + block_width  - width  : 0;
+  bottom = (ref_y + block_height > height) ? ref_y + block_height - height : 0;
 
   // Center picture to the current block and reference to the point where
   // movement vector is pointing to. That point might be outside the buffer,
