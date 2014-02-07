@@ -216,18 +216,23 @@ int picture_list_destroy(picture_list *list)
 }
 
 /**
- * \brief Add picture to picturelist
+ * \brief Add picture to the front of the picturelist
  * \param pic picture pointer to add
  * \param picture_list list to use
  * \return 1 on success
  */
 int picture_list_add(picture_list *list,picture* pic)
 {
+  int i = 0;
   if (list->size == list->used_size) {
     if (!picture_list_resize(list, list->size*2)) return 0;
   }
 
-  list->pics[list->used_size] = pic;
+  for (i = list->used_size; i > 0; i--) {
+    list->pics[i] = list->pics[i - 1];
+  }
+
+  list->pics[0] = pic;
   list->used_size++;
   return 1;
 }

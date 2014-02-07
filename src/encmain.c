@@ -260,7 +260,9 @@ int main(int argc, char *argv[])
     // TODO: add more than one reference
 
     // Remove the ref pic (if present)
-    picture_list_rem(encoder->ref, 0, 1);
+    if (encoder->ref->used_size == MAX_REF_PIC_COUNT) {
+	    picture_list_rem(encoder->ref, encoder->ref->used_size-1, 1);
+    }
     // Add current picture as reference
     picture_list_add(encoder->ref, encoder->in.cur_pic);
     // Allocate new memory to current picture

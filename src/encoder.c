@@ -392,6 +392,12 @@ void encode_one_frame(encoder_control* encoder)
   if ( (encoder->cfg->intra_period == 0 && encoder->frame == 0) ||
        (encoder->cfg->intra_period && encoder->frame % encoder->cfg->intra_period == 0 &&
         (encoder->cfg->intra_period != 1 || encoder->frame % 2 == 0 ) ) ) {
+    // Clear the reference list
+    while (encoder->ref->used_size) {
+      picture_list_rem(encoder->ref, encoder->ref->used_size - 1, 1);
+    }
+    
+
     encoder->poc = 0;
 
     encoder->in.cur_pic->slicetype = SLICE_I;
@@ -470,10 +476,12 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output, encoder->stream->buffer,
               encoder->stream->buffer_pos, 0, NAL_TRAIL_R, 0, encoder->aud_enable ? 0 : 1);
     bitstream_clear_buffer(encoder->stream);
-  }  
+  }
   
   // Calculate checksum
   add_checksum(encoder);
+
+  encoder->in.cur_pic->poc = encoder->poc;
 }
 
 void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
@@ -1006,7 +1014,7 @@ void encode_slice_header(encoder_control* encoder)
   if (encoder->in.cur_pic->type != NAL_IDR_W_RADL
       && encoder->in.cur_pic->type != NAL_IDR_N_LP) {
       int j;
-      int ref_negative = 1;
+      int ref_negative = encoder->ref->used_size;
       int ref_positive = 0;
       WRITE_U(encoder->stream, encoder->poc&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(encoder->stream, 0, 1, "short_term_ref_pic_set_sps_flag");
@@ -1014,8 +1022,9 @@ void encode_slice_header(encoder_control* encoder)
       WRITE_UE(encoder->stream, ref_positive, "num_positive_pics");
 
     for (j = 0; j < ref_negative; j++) {
-        WRITE_UE(encoder->stream, 0, "delta_poc_s0_minus1");
-        WRITE_U(encoder->stream,1,1, "used_by_curr_pic_s0_flag");
+      int32_t delta_poc_minus1 = 0;
+      WRITE_UE(encoder->stream, delta_poc_minus1, "delta_poc_s0_minus1");
+      WRITE_U(encoder->stream,1,1, "used_by_curr_pic_s0_flag");
     }
 
     //WRITE_UE(encoder->stream, 0, "short_term_ref_pic_set_idx");
@@ -1029,7 +1038,8 @@ void encode_slice_header(encoder_control* encoder)
   }
     
   if (encoder->in.cur_pic->slicetype != SLICE_I) {
-      WRITE_U(encoder->stream, 0, 1, "num_ref_idx_active_override_flag");
+      WRITE_U(encoder->stream, 1, 1, "num_ref_idx_active_override_flag");
+        WRITE_UE(encoder->stream, encoder->ref->used_size-1, "num_ref_idx_l0_active_minus1");
       WRITE_UE(encoder->stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
@@ -1366,16 +1376,16 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             //if(encoder->ref_idx_num[uiRefListIdx] > 0)
             {
           if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-            if (0) { //encoder->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
+            if (encoder->ref->used_size != 1) { //encoder->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
               // parseRefFrmIdx
               int32_t ref_frame = cur_cu->inter.mv_ref;
-                  
+              
               cabac.ctx = &g_cu_ref_pic_model[0];
               CABAC_BIN(&cabac, (ref_frame == 0) ? 0 : 1, "ref_frame_flag");
     
               if (ref_frame > 0) {
                 uint32_t i;
-                uint32_t ref_num = encoder->ref_idx_num[ref_list_idx] - 2;
+                uint32_t ref_num = encoder->ref->used_size - 2;
 
                 cabac.ctx = &g_cu_ref_pic_model[1];
                 ref_frame--;
@@ -1433,7 +1443,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
             }
 
             // Signal which candidate MV to use
-            cabac_write_unary_max_symbol(&cabac, g_mvp_idx_model, cur_cu->inter.mv_ref, 1,
+            cabac_write_unary_max_symbol(&cabac, g_mvp_idx_model, cur_cu->inter.mv_cand, 1,
                                         AMVP_MAX_NUM_CANDS - 1);
           }
           }
@@ -2648,7 +2658,7 @@ void encode_block_residual(encoder_control *encoder,
     inter_get_mv_cand(encoder, x_ctb, y_ctb, depth, mv_cand);
 
     // Select better candidate
-    cur_cu->inter.mv_ref = 0; // Default to candidate 0
+    cur_cu->inter.mv_cand = 0; // Default to candidate 0
 
     // Only check when candidates are different
     if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
@@ -2659,14 +2669,14 @@ void encode_block_residual(encoder_control *encoder,
 
       // Select candidate 1 if it's closer
       if (cand_2_diff < cand_1_diff) {
-        cur_cu->inter.mv_ref = 1;
+        cur_cu->inter.mv_cand = 1;
       }
     }
-    cur_cu->inter.mvd[0] = cur_cu->inter.mv[0] - mv_cand[cur_cu->inter.mv_ref][0];
-    cur_cu->inter.mvd[1] = cur_cu->inter.mv[1] - mv_cand[cur_cu->inter.mv_ref][1];
+    cur_cu->inter.mvd[0] = cur_cu->inter.mv[0] - mv_cand[cur_cu->inter.mv_cand][0];
+    cur_cu->inter.mvd[1] = cur_cu->inter.mv[1] - mv_cand[cur_cu->inter.mv_cand][1];
 
     // Inter reconstruction
-    inter_recon(encoder->ref->pics[0], x_ctb * CU_MIN_SIZE_PIXELS,
+    inter_recon(encoder->ref->pics[cur_cu->inter.mv_ref], x_ctb * CU_MIN_SIZE_PIXELS,
                 y_ctb * CU_MIN_SIZE_PIXELS, LCU_WIDTH >> depth, cur_cu->inter.mv,
                 encoder->in.cur_pic);
   }

@@ -67,6 +67,7 @@ typedef struct
 
   int16_t mv[2];
   int16_t mvd[2];
+  uint8_t mv_cand; // \brief selected MV candidate
   uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
   uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
 } cu_info_inter;
@@ -131,6 +132,7 @@ typedef struct picture_struct
   uint8_t slice_sao_chroma_flag;
   struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
+  int32_t poc;           //!< \brief Picture order count
 } picture;
 
 /**
