@@ -425,6 +425,15 @@ void encode_one_frame(encoder_control* encoder)
               encoder->stream->buffer_pos, 0, NAL_PPS_NUT, 0, 1);
     bitstream_clear_buffer(encoder->stream);
 
+    if (encoder->frame == 0) {
+      encode_prefix_sei_version(encoder);
+      bitstream_align(encoder->stream);
+      bitstream_flush(encoder->stream);
+      nal_write(encoder->output, encoder->stream->buffer,
+                encoder->stream->buffer_pos, 0, PREFIX_SEI_NUT, 0, 0);
+      bitstream_clear_buffer(encoder->stream);
+    }
+
     // First slice is IDR
     cabac_start(&cabac);
     scalinglist_process();
@@ -584,6 +593,45 @@ void encode_access_unit_delimiter(encoder_control* encoder)
                    : encoder->in.cur_pic->slicetype == SLICE_P ? 1
                    :                                             2;
   WRITE_U(encoder->stream, pic_type, 3, "pic_type");
+}
+
+void encode_prefix_sei_version(encoder_control* encoder)
+{
+  int i, length;
+  char buf[1000] = { 0 };
+  char *s = buf;
+  config *cfg = encoder->cfg;
+
+  // uuid_iso_iec_11578
+  static const uint8_t uuid[16] = {
+    0x32, 0xfe, 0x46, 0x6c, 0x98, 0x41, 0x42, 0x69,
+    0xae, 0x35, 0x6a, 0x91, 0x54, 0x9e, 0xf3, 0xf1
+  };
+  memcpy(buf, uuid, 16);
+
+  // user_data_payload_byte
+  s += sprintf(s + 16, "Kvazaar HEVC Encoder v. " VERSION_STRING " - "
+                       "Copyleft 2012-2014 - http://ultravideo.cs.tut.fi/ - options:");
+
+  s += sprintf(s, " %dx%d", cfg->width, cfg->height);
+  s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,
+               cfg->deblock_beta, cfg->deblock_tc);
+  s += sprintf(s, " sao=%d", cfg->sao_enable);
+  s += sprintf(s, " intra_period=%d", cfg->intra_period);
+  s += sprintf(s, " qp=%d", cfg->qp);
+
+  length = strlen(buf) + 1;
+
+  // payloadType = 5 -> user_data_unregistered
+  WRITE_U(encoder->stream, 5, 8, "last_payload_type_byte");
+
+  // payloadSize
+  for (i = 0; i <= length - 255; i += 255)
+    WRITE_U(encoder->stream, 255, 8, "ff_byte");
+  WRITE_U(encoder->stream, length - i, 8, "last_payload_size_byte");
+
+  for (i = 0; i < length; i++)
+    WRITE_U(encoder->stream, ((uint8_t *)buf)[i], 8, "sei_payload");
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)

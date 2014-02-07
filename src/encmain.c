@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
   if (!cfg || !config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr,
             "/***********************************************/\n"
-            " *   Kvazaar HEVC Encoder v. " VERSION_STRING "*\n"
+            " *   Kvazaar HEVC Encoder v. " VERSION_STRING "             *\n"
             " *     Tampere University of Technology 2014   *\n"
             "/***********************************************/\n\n");
       

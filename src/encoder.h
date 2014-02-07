@@ -111,6 +111,7 @@ void encode_vid_parameter_set(encoder_control *encoder);
 void encode_slice_data(encoder_control *encoder);
 void encode_slice_header(encoder_control *encoder);
 void encode_access_unit_delimiter(encoder_control* encoder);
+void encode_prefix_sei_version(encoder_control* encoder);
 void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 void encode_last_significant_xy(encoder_control *encoder, uint8_t lastpos_x,
