@@ -2567,10 +2567,6 @@ void encode_block_residual(encoder_control *encoder,
                                                   &cur_cu->intra[0].cost);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
                          cur_cu->intra[0].mode, cur_cu->part_size);
-    intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-        cur_cu->intra[0].mode, cur_cu->part_size);
-    
-
 
     for (i = 0; i < num_pu; ++i) {
       // Build reconstructed block to use in prediction with extrapolated borders
