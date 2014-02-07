@@ -136,11 +136,12 @@ TEST test_bottomright(void)
 //////////////////////////////////////////////////////////////////////////
 // OUT OF FRAME TESTS
 
+#define DIST 10
 TEST test_topleft_out(void)
 {
   ASSERT_EQ(
     1*(8*8) - 64,
-    TEST_SAD(-8, -8));
+    TEST_SAD(-DIST, -DIST));
   PASS();
 }
 
@@ -148,7 +149,7 @@ TEST test_top_out(void)
 {
   ASSERT_EQ(
     (1+3)*8 + 2*(6*8) - 64,
-    TEST_SAD(0, -8));
+    TEST_SAD(0, -DIST));
   PASS();
 }
 
@@ -156,7 +157,7 @@ TEST test_topright_out(void)
 {
   ASSERT_EQ(
     3*(8*8) - 64,
-    TEST_SAD(8, -8));
+    TEST_SAD(DIST, -DIST));
   PASS();
 }
 
@@ -164,7 +165,7 @@ TEST test_left_out(void)
 {
   ASSERT_EQ(
     (1+7)*8 + 4*(6*8) - 64,
-    TEST_SAD(-8, 0));
+    TEST_SAD(-DIST, 0));
   PASS();
 }
 
@@ -172,7 +173,7 @@ TEST test_right_out(void)
 {
   ASSERT_EQ(
     (3+9)*8 + 6*(6*8) - 64,
-    TEST_SAD(8, 0));
+    TEST_SAD(DIST, 0));
   PASS();
 }
 
@@ -180,7 +181,7 @@ TEST test_bottomleft_out(void)
 {
   ASSERT_EQ(
     7*(8*8) - 64,
-    TEST_SAD(-8, 8));
+    TEST_SAD(-DIST, DIST));
   PASS();
 }
 
@@ -188,7 +189,7 @@ TEST test_bottom_out(void)
 {
   ASSERT_EQ(
     (7+9)*8 + 8*(6*8) - 64,
-    TEST_SAD(0, 8));
+    TEST_SAD(0, DIST));
   PASS();
 }
 
@@ -196,7 +197,7 @@ TEST test_bottomright_out(void)
 {
   ASSERT_EQ(
     9*(8*8) - 64,
-    TEST_SAD(8, 8));
+    TEST_SAD(DIST, DIST));
   PASS();
 }
 
