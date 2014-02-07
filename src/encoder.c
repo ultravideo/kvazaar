@@ -47,6 +47,7 @@ uint32_t* g_sig_last_scan[3][7];
 
 /* Local functions. */
 static void add_checksum(encoder_control* encoder);
+static void encode_VUI(encoder_control* encoder);
 
 void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h, uint32_t *buff_v,
                         int32_t width, int32_t height)
@@ -366,7 +367,17 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
            input->height);
   }
   #endif
-  }  
+}
+
+static void write_aud(encoder_control* encoder)
+{
+  encode_access_unit_delimiter(encoder);
+  bitstream_align(encoder->stream);
+  bitstream_flush(encoder->stream);
+  nal_write(encoder->output, encoder->stream->buffer,
+            encoder->stream->buffer_pos, 0, AUD_NUT, 0, 1);
+  bitstream_clear_buffer(encoder->stream);
+}
 
 void encode_one_frame(encoder_control* encoder)
 {
@@ -382,6 +393,13 @@ void encode_one_frame(encoder_control* encoder)
        (encoder->cfg->intra_period && encoder->frame % encoder->cfg->intra_period == 0 &&
         (encoder->cfg->intra_period != 1 || encoder->frame % 2 == 0 ) ) ) {
     encoder->poc = 0;
+
+    encoder->in.cur_pic->slicetype = SLICE_I;
+    encoder->in.cur_pic->type = NAL_IDR_W_RADL;
+
+    // Access Unit Delimiter (AUD)
+    if (encoder->aud_enable)
+      write_aud(encoder);
 
     // Video Parameter Set (VPS)
     encode_vid_parameter_set(encoder);
@@ -407,10 +425,17 @@ void encode_one_frame(encoder_control* encoder)
               encoder->stream->buffer_pos, 0, NAL_PPS_NUT, 0, 1);
     bitstream_clear_buffer(encoder->stream);
 
+    if (encoder->frame == 0) {
+      encode_prefix_sei_version(encoder);
+      bitstream_align(encoder->stream);
+      bitstream_flush(encoder->stream);
+      nal_write(encoder->output, encoder->stream->buffer,
+                encoder->stream->buffer_pos, 0, PREFIX_SEI_NUT, 0, 0);
+      bitstream_clear_buffer(encoder->stream);
+    }
+
     // First slice is IDR
     cabac_start(&cabac);
-    encoder->in.cur_pic->slicetype = SLICE_I;
-    encoder->in.cur_pic->type = NAL_IDR_W_RADL;
     scalinglist_process();
     search_slice_data(encoder);    
     
@@ -424,10 +449,15 @@ void encode_one_frame(encoder_control* encoder)
               encoder->stream->buffer_pos, 0, NAL_IDR_W_RADL, 0, 0);
     bitstream_clear_buffer(encoder->stream);
   } else {
-    cabac_start(&cabac);
     // When intra period == 1, all pictures are intra
     encoder->in.cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
     encoder->in.cur_pic->type = NAL_TRAIL_R;
+
+    // Access Unit Delimiter (AUD)
+    if (encoder->aud_enable)
+      write_aud(encoder);
+
+    cabac_start(&cabac);
     scalinglist_process();
     search_slice_data(encoder);
     
@@ -438,7 +468,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_align(encoder->stream);
     bitstream_flush(encoder->stream);
     nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_TRAIL_R, 0, 1);
+              encoder->stream->buffer_pos, 0, NAL_TRAIL_R, 0, encoder->aud_enable ? 0 : 1);
     bitstream_clear_buffer(encoder->stream);
   }  
   
@@ -555,6 +585,60 @@ static void add_checksum(encoder_control* encoder)
   nal_write(encoder->output, encoder->stream->buffer,
             encoder->stream->buffer_pos, 0, NAL_SUFFIT_SEI_NUT, 0, 0);
   bitstream_clear_buffer(encoder->stream);
+}
+
+void encode_access_unit_delimiter(encoder_control* encoder)
+{
+  uint8_t pic_type = encoder->in.cur_pic->slicetype == SLICE_I ? 0
+                   : encoder->in.cur_pic->slicetype == SLICE_P ? 1
+                   :                                             2;
+  WRITE_U(encoder->stream, pic_type, 3, "pic_type");
+}
+
+void encode_prefix_sei_version(encoder_control* encoder)
+{
+#define STR_BUF_LEN 1000
+
+  int i, length;
+  char buf[STR_BUF_LEN] = { 0 };
+  char *s = buf + 16;
+  config *cfg = encoder->cfg;
+
+  // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
+  static const uint8_t uuid[16] = {
+    0x32, 0xfe, 0x46, 0x6c, 0x98, 0x41, 0x42, 0x69,
+    0xae, 0x35, 0x6a, 0x91, 0x54, 0x9e, 0xf3, 0xf1
+  };
+  memcpy(buf, uuid, 16);
+
+  // user_data_payload_byte
+  s += sprintf(s, "Kvazaar HEVC Encoder v. " VERSION_STRING " - "
+                  "Copyleft 2012-2014 - http://ultravideo.cs.tut.fi/ - options:");
+  s += sprintf(s, " %dx%d", cfg->width, cfg->height);
+  s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,
+               cfg->deblock_beta, cfg->deblock_tc);
+  s += sprintf(s, " sao=%d", cfg->sao_enable);
+  s += sprintf(s, " intra_period=%d", cfg->intra_period);
+  s += sprintf(s, " qp=%d", cfg->qp);
+  
+  length = (int)(s - buf + 1);  // length, +1 for \0
+  
+  // Assert this so that in the future if the message gets longer, we remember
+  // to increase the buf len. Divide by 2 for margin.
+  assert(length < STR_BUF_LEN / 2);
+
+  // payloadType = 5 -> user_data_unregistered
+  WRITE_U(encoder->stream, 5, 8, "last_payload_type_byte");
+
+  // payloadSize
+  for (i = 0; i <= length - 255; i += 255)
+    WRITE_U(encoder->stream, 255, 8, "ff_byte");
+  WRITE_U(encoder->stream, length - i, 8, "last_payload_size_byte");
+
+  for (i = 0; i < length; i++)
+    WRITE_U(encoder->stream, ((uint8_t *)buf)[i], 8, "sei_payload");
+
+#undef STR_BUF_LEN
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)
@@ -751,10 +835,9 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, ENABLE_TEMPORAL_MVP, 1,
           "sps_temporal_mvp_enable_flag");
   WRITE_U(encoder->stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
-  WRITE_U(encoder->stream, 0, 1, "vui_parameters_present_flag");
+  WRITE_U(encoder->stream, 1, 1, "vui_parameters_present_flag");
 
-  //TODO: VUI?
-  //encode_VUI(encoder);
+  encode_VUI(encoder);
   
   WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
@@ -794,27 +877,82 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
-void encode_VUI(encoder_control* encoder)
+static void encode_VUI(encoder_control* encoder)
 {
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
-  WRITE_U(encoder->stream, 0, 1, "aspect_ratio_info_present_flag");
+  if (encoder->vui.sar_width > 0 && encoder->vui.sar_height > 0) {
+    int i;
+    static const struct
+    {
+      uint8_t width;
+      uint8_t height;
+      uint8_t idc;
+    } sar[] = {
+      // aspect_ratio_idc = 0 -> unspecified
+      {  1,  1, 1 }, { 12, 11, 2 }, { 10, 11, 3 }, { 16, 11, 4 },
+      { 40, 33, 5 }, { 24, 11, 6 }, { 20, 11, 7 }, { 32, 11, 8 },
+      { 80, 33, 9 }, { 18, 11, 10}, { 15, 11, 11}, { 64, 33, 12},
+      {160, 99, 13}, {  4,  3, 14}, {  3,  2, 15}, {  2,  1, 16},
+      // aspect_ratio_idc = [17..254] -> reserved
+      { 0, 0, 255 }
+    };
+
+    for (i = 0; sar[i].idc != 255; i++)
+      if (sar[i].width  == encoder->vui.sar_width &&
+          sar[i].height == encoder->vui.sar_height)
+        break;
+
+    WRITE_U(encoder->stream, 1, 1, "aspect_ratio_info_present_flag");
+    WRITE_U(encoder->stream, sar[i].idc, 8, "aspect_ratio_idc");
+    if (sar[i].idc == 255) {
+      // EXTENDED_SAR
+      WRITE_U(encoder->stream, encoder->vui.sar_width, 16, "sar_width");
+      WRITE_U(encoder->stream, encoder->vui.sar_height, 16, "sar_height");
+    }
+  } else
+    WRITE_U(encoder->stream, 0, 1, "aspect_ratio_info_present_flag");
 
   //IF aspect ratio info
   //ENDIF
 
-  WRITE_U(encoder->stream, 0, 1, "overscan_info_present_flag");
+  if (encoder->vui.overscan > 0) {
+    WRITE_U(encoder->stream, 1, 1, "overscan_info_present_flag");
+    WRITE_U(encoder->stream, encoder->vui.overscan - 1, 1, "overscan_appropriate_flag");
+  } else
+    WRITE_U(encoder->stream, 0, 1, "overscan_info_present_flag");
 
   //IF overscan info
   //ENDIF
 
-  WRITE_U(encoder->stream, 0, 1, "video_signal_type_present_flag");
+  if (encoder->vui.videoformat != 5 || encoder->vui.fullrange ||
+      encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
+      encoder->vui.colormatrix != 2) {
+    WRITE_U(encoder->stream, 1, 1, "video_signal_type_present_flag");
+    WRITE_U(encoder->stream, encoder->vui.videoformat, 3, "video_format");
+    WRITE_U(encoder->stream, encoder->vui.fullrange, 1, "video_full_range_flag");
+
+    if (encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
+        encoder->vui.colormatrix != 2) {
+      WRITE_U(encoder->stream, 1, 1, "colour_description_present_flag");
+      WRITE_U(encoder->stream, encoder->vui.colorprim, 8, "colour_primaries");
+      WRITE_U(encoder->stream, encoder->vui.transfer, 8, "transfer_characteristics");
+      WRITE_U(encoder->stream, encoder->vui.colormatrix, 8, "matrix_coeffs");
+    } else
+      WRITE_U(encoder->stream, 0, 1, "colour_description_present_flag");
+  } else
+    WRITE_U(encoder->stream, 0, 1, "video_signal_type_present_flag");
 
   //IF video type
   //ENDIF
 
-  WRITE_U(encoder->stream, 0, 1, "chroma_loc_info_present_flag");
+  if (encoder->vui.chroma_loc > 0) {
+    WRITE_U(encoder->stream, 1, 1, "chroma_loc_info_present_flag");
+    WRITE_UE(encoder->stream, encoder->vui.chroma_loc, "chroma_sample_loc_type_top_field");
+    WRITE_UE(encoder->stream, encoder->vui.chroma_loc, "chroma_sample_loc_type_bottom_field");
+  } else
+    WRITE_U(encoder->stream, 0, 1, "chroma_loc_info_present_flag");
 
   //IF chroma loc info
   //ENDIF
