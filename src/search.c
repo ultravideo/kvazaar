@@ -344,7 +344,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
     for (i = 0; i < 4; ++i) {
       int x_pos = x + offsets[i].x * width;
       int y_pos = y + offsets[i].y * width;
-      intra_build_reference_border(cur_pic, cur_pic->y_recdata,
+      intra_build_reference_border(cur_pic, cur_pic->y_data,
                                    x_pos, y_pos,
                                    (int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0);
       cur_cu->intra[i].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
