@@ -597,12 +597,14 @@ void encode_access_unit_delimiter(encoder_control* encoder)
 
 void encode_prefix_sei_version(encoder_control* encoder)
 {
+#define STR_BUF_LEN 1000
+
   int i, length;
-  char buf[1000] = { 0 };
-  char *s = buf;
+  char buf[STR_BUF_LEN] = { 0 };
+  char *s = buf + 16;
   config *cfg = encoder->cfg;
 
-  // uuid_iso_iec_11578
+  // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
     0x32, 0xfe, 0x46, 0x6c, 0x98, 0x41, 0x42, 0x69,
     0xae, 0x35, 0x6a, 0x91, 0x54, 0x9e, 0xf3, 0xf1
@@ -610,17 +612,20 @@ void encode_prefix_sei_version(encoder_control* encoder)
   memcpy(buf, uuid, 16);
 
   // user_data_payload_byte
-  s += sprintf(s + 16, "Kvazaar HEVC Encoder v. " VERSION_STRING " - "
-                       "Copyleft 2012-2014 - http://ultravideo.cs.tut.fi/ - options:");
-
+  s += sprintf(s, "Kvazaar HEVC Encoder v. " VERSION_STRING " - "
+                  "Copyleft 2012-2014 - http://ultravideo.cs.tut.fi/ - options:");
   s += sprintf(s, " %dx%d", cfg->width, cfg->height);
   s += sprintf(s, " deblock=%d:%d:%d", cfg->deblock_enable,
                cfg->deblock_beta, cfg->deblock_tc);
   s += sprintf(s, " sao=%d", cfg->sao_enable);
   s += sprintf(s, " intra_period=%d", cfg->intra_period);
   s += sprintf(s, " qp=%d", cfg->qp);
-
-  length = strlen(buf) + 1;
+  
+  length = (int)(s - buf + 1);  // length, +1 for \0
+  
+  // Assert this so that in the future if the message gets longer, we remember
+  // to increase the buf len. Divide by 2 for margin.
+  assert(length < STR_BUF_LEN / 2);
 
   // payloadType = 5 -> user_data_unregistered
   WRITE_U(encoder->stream, 5, 8, "last_payload_type_byte");
@@ -632,6 +637,8 @@ void encode_prefix_sei_version(encoder_control* encoder)
 
   for (i = 0; i < length; i++)
     WRITE_U(encoder->stream, ((uint8_t *)buf)[i], 8, "sei_payload");
+
+#undef STR_BUF_LEN
 }
 
 void encode_pic_parameter_set(encoder_control* encoder)
