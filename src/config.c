@@ -141,7 +141,7 @@ static int config_parse(config *cfg, const char *name, const char *value)
 {
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
   static const char * const videoformat_names[] = { "component", "pal", "ntsc", "secam", "mac", "undef", NULL };
-  static const char * const fullrange_names[]   = { "off", "on", NULL };
+  static const char * const range_names[]       = { "tv", "pc", NULL };
   static const char * const colorprim_names[]   = { "", "bt709", "undef", "", "bt470m", "bt470bg", "smpte170m",
                                                     "smpte240m", "film", "bt2020", NULL };
   static const char * const transfer_names[]    = { "", "bt709", "undef", "", "bt470m", "bt470bg", "smpte170m",
@@ -217,8 +217,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     error = !parse_enum(value, overscan_names, &cfg->vui.overscan);
   OPT("videoformat")
     error = !parse_enum(value, videoformat_names, &cfg->vui.videoformat);
-  OPT("fullrange")
-    error = !parse_enum(value, fullrange_names, &cfg->vui.fullrange);
+  OPT("range")
+    error = !parse_enum(value, range_names, &cfg->vui.fullrange);
   OPT("colorprim")
     error = !parse_enum(value, colorprim_names, &cfg->vui.colorprim);
   OPT("transfer")

@@ -32,8 +32,8 @@ meant to be user configurable later.
 										     - undef, show, crop
 				  --videoformat <string> : Specify video format ["undef"]
 										     - component, pal, ntsc, secam, mac, undef
-				  --range <string>       : Specify color range ["off"]
-										     - off, on
+				  --range <string>       : Specify color range ["tv"]
+										     - tv, pc
 				  --colorprim <string>   : Specify color primaries ["undef"]
 										     - undef, bt709, bt470m, bt470bg,
 										       smpte170m, smpte240m, film, bt2020
