@@ -131,7 +131,7 @@ unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + pattern->x, orig->y + mv.y + pattern->y, mv_in_out);
+    cost += calc_mvd_cost(mv.x + pattern->x, mv.y + pattern->y, mv_in_out);
 
     if (cost < best_cost) {
       best_cost = cost;
