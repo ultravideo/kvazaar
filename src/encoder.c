@@ -188,7 +188,7 @@ void init_tables(void)
     c++;
   }
 
-  g_convert_to_bit[i] = c;
+  g_convert_to_bit[i] = (int8_t)c;
 
   c = 2;
   for (i = 0; i < 7; i++) {
@@ -1655,8 +1655,7 @@ void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
                         pixel *recbase_u, pixel *pred_u, int color_type,
                         coefficient *pre_quant_coeff, coefficient *block)
 {
-  int width_c = LCU_WIDTH >> (depth + 1);
-  int coeff_stride = encoder->in.width;
+  int8_t width_c = LCU_WIDTH >> (depth + 1);
   int pred_stride = encoder->in.width;
   int recbase_stride = encoder->in.width;
 
@@ -1664,8 +1663,8 @@ void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
 
   if (has_coeffs) {
     // RECONSTRUCT for predictions
-    dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, color_type, cur_cu->type);
-    itransform2d(block, pre_quant_coeff, width_c,65535);
+    dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
+    itransform2d(block, pre_quant_coeff, width_c, 65535);
 
     i = 0;
 
@@ -1694,8 +1693,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   int i;
-  int32_t width = LCU_WIDTH>>depth;
-  int32_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
+  int8_t width = LCU_WIDTH>>depth;
+  int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   // Split transform and increase depth
@@ -1764,8 +1763,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     uint32_t ac_sum = 0;
     uint32_t ctx_idx;
-    uint32_t scan_idx_luma   = SCAN_DIAG;
-    uint32_t scan_idx_chroma = SCAN_DIAG;
+    uint8_t scan_idx_luma   = SCAN_DIAG;
+    uint8_t scan_idx_chroma = SCAN_DIAG;
     uint8_t dir_mode;
 
     int cbf_y = 0;
@@ -1849,11 +1848,12 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     // Transform and quant residual to coeffs
     transform2d(block,pre_quant_coeff,width,0);
-    #if RDOQ == 1
-    rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type,cur_cu->tr_depth-cur_cu->depth);    
-    #else
+#if RDOQ == 1
+    rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, 
+         scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);    
+#else
     quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
-    #endif
+#endif
 
     // Check for non-zero coeffs
     for (i = 0; i < width * width; i++) {
@@ -1972,8 +1972,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
 void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int depth, int tr_depth)
 {
-  int width = LCU_WIDTH >> depth;
-  int width_c = (depth == MAX_PU_DEPTH ? width : width >> 1);
+  uint8_t width = LCU_WIDTH >> depth;
+  uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> 1);
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
@@ -1985,7 +1985,7 @@ void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int dep
   int32_t coeff_stride = encoder->in.width;
 
   uint32_t ctx_idx;
-  uint32_t scan_idx = SCAN_DIAG;
+  int8_t scan_idx = SCAN_DIAG;
   uint32_t dir_mode;
 
   int cbf_y;
@@ -2264,7 +2264,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
   }
   
   last_coeff_x = pos_last & (width - 1);
-  last_coeff_y = pos_last >> log2_block_size;
+  last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
   encode_last_significant_xy(encoder, last_coeff_x, last_coeff_y, width, width,
@@ -2437,6 +2437,8 @@ void encode_last_significant_xy(encoder_control *encoder,
   cabac_ctx *base_ctx_x = (type ? g_cu_ctx_last_x_chroma : g_cu_ctx_last_x_luma);
   cabac_ctx *base_ctx_y = (type ? g_cu_ctx_last_y_chroma : g_cu_ctx_last_y_luma);
 
+  UNREFERENCED_PARAMETER(encoder);
+
   if (scan == SCAN_VER) {
     SWAP( lastpos_x, lastpos_y,uint8_t );
   }
@@ -2496,7 +2498,6 @@ void encode_block_residual(encoder_control *encoder,
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
-  uint8_t split_model = 0;
 
   // Check for slice border
   uint8_t border_x = ((encoder->in.width) < (x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
@@ -2537,10 +2538,9 @@ void encode_block_residual(encoder_control *encoder,
     // SEARCH BEST INTRA MODE (AGAIN)
     pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
     pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
-    pixel *rec_shift_u = &rec[(LCU_WIDTH >> (depth + 1)) * 2 + 8 + 1];
 
-    int width = LCU_WIDTH >> depth;
-    int width_c = LCU_WIDTH >> (depth + 1);
+    int8_t width = LCU_WIDTH >> depth;
+    int8_t width_c = LCU_WIDTH >> (depth + 1);
     static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
     int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
     int i;
@@ -2653,10 +2653,10 @@ void encode_block_residual(encoder_control *encoder,
 
     // Only check when candidates are different
     if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
-      uint16_t cand_1_diff = abs(cur_cu->inter.mv[0] - mv_cand[0][0]) + abs(
-                                cur_cu->inter.mv[1] - mv_cand[0][1]);
-      uint16_t cand_2_diff = abs(cur_cu->inter.mv[0] - mv_cand[1][0]) + abs(
-                                cur_cu->inter.mv[1] - mv_cand[1][1]);
+      int cand_1_diff = abs(cur_cu->inter.mv[0] - mv_cand[0][0]) + abs(
+                                 cur_cu->inter.mv[1] - mv_cand[0][1]);
+      int cand_2_diff = abs(cur_cu->inter.mv[0] - mv_cand[1][0]) + abs(
+                                 cur_cu->inter.mv[1] - mv_cand[1][1]);
 
       // Select candidate 1 if it's closer
       if (cand_2_diff < cand_1_diff) {
