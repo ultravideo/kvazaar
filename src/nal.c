@@ -48,6 +48,10 @@ void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
   const uint8_t start_code_prefix_one_3bytes = 0x01;
   const uint8_t zero = 0x00;
 
+  // This parameter might not be needed, but I'm not going to remove it
+  // right away.
+  UNREFERENCED_PARAMETER(nal_ref);
+
   // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
   // and PPS, or the first NALU of an access unit
   if(long_start_code)
@@ -104,17 +108,16 @@ static void array_checksum(const pixel* data,
                            const int stride, 
                            unsigned char checksum_out[SEI_HASH_MAX_LENGTH])
 {
-	unsigned char mask;
-	unsigned int checksum = 0;
+	uint8_t mask;
+	uint32_t checksum = 0;
 	int y, x;
 
   assert(SEI_HASH_MAX_LENGTH >= 4);
 
 	for (y = 0; y < height; ++y) {
 		for (x = 0; x < width; ++x) {
-			mask = (x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8);
+			mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
 			checksum += (data[(y * stride) + x] & 0xff) ^ mask;
-			checksum &= 0xffffffff;
 		}
 	}
 
@@ -134,7 +137,6 @@ static void array_checksum(const pixel* data,
 */
 void picture_checksum(const picture* pic, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
 {
-	int stride = pic->width; /* TODO: != width, if there is a luma margin. */
 	array_checksum(pic->y_recdata, pic->height, pic->width, pic->width, checksum_out[0]);
 
   /* The number of chroma pixels is half that of luma. */
