@@ -100,7 +100,6 @@
     <ClCompile Include="..\..\src\cabac.c" />
     <ClCompile Include="..\..\src\config.c" />
     <ClCompile Include="..\..\src\context.c" />
-    <ClCompile Include="..\..\src\debug.c" />
     <ClCompile Include="..\..\src\encmain.c" />
     <ClCompile Include="..\..\src\encoder.c" />
     <ClCompile Include="..\..\src\extras\getopt.c" />
@@ -119,7 +118,6 @@
     <ClInclude Include="..\..\src\cabac.h" />
     <ClInclude Include="..\..\src\config.h" />
     <ClInclude Include="..\..\src\context.h" />
-    <ClInclude Include="..\..\src\debug.h" />
     <ClInclude Include="..\..\src\encoder.h" />
     <ClInclude Include="..\..\src\extras\getopt.h" />
     <ClInclude Include="..\..\src\filter.h" />

@@ -50,7 +50,7 @@ LDFLAGS += -lm
 LD = gcc
 YASM = yasm
 ASMOBJS = cpu.o
-OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o debug.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o search.o transform.o extras/getopt.o
+OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o search.o transform.o extras/getopt.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
