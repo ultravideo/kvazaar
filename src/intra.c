@@ -521,7 +521,8 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
     // There are no coded pixels below the bottom of the LCU due to raster scan order.
     if (num_ref_pixels + y > src_height) {
       num_ref_pixels = src_height - y;
-    } else if ((num_ref_pixels << is_chroma) + y_in_lcu > LCU_WIDTH) {
+    }
+    if ((num_ref_pixels << is_chroma) + y_in_lcu > LCU_WIDTH) {
       num_ref_pixels = (LCU_WIDTH - y_in_lcu) >> is_chroma;
     }
     // Copy pixels from coded CUs.
