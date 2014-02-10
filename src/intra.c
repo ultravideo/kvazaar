@@ -517,14 +517,12 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
     num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
+    // There are no coded pixels below the frame.
+    num_ref_pixels = MIN(num_ref_pixels, src_height - y);
+    // There are no coded pixels below the bottom of the LCU due to raster
+    // scan order.
+    num_ref_pixels = MIN(num_ref_pixels, (LCU_WIDTH - y_in_lcu) >> is_chroma);
 
-    // There are no coded pixels below the bottom of the LCU due to raster scan order.
-    if (num_ref_pixels + y > src_height) {
-      num_ref_pixels = src_height - y;
-    }
-    if ((num_ref_pixels << is_chroma) + y_in_lcu > LCU_WIDTH) {
-      num_ref_pixels = (LCU_WIDTH - y_in_lcu) >> is_chroma;
-    }
     // Copy pixels from coded CUs.
     for (i = 0; i < num_ref_pixels; ++i) {
       dst[(i + 1) * dststride] = src_shifted[i*src_width - 1];
@@ -553,13 +551,10 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
     num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
-
     // All LCUs in the row above have been coded.
-    if (x + num_ref_pixels > src_width) {
-      num_ref_pixels = src_width - x;
-    }
+    num_ref_pixels = MIN(num_ref_pixels, src_width - x);
+    
     // Copy pixels from coded CUs.
-    // For some reason copying the all the refe
     for (i = 0; i < num_ref_pixels; ++i) {
       dst[i + 1] = src_shifted[i - src_width];
     }
