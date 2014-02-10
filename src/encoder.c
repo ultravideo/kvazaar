@@ -184,13 +184,13 @@ void init_tables(void)
   memset( g_convert_to_bit,-1, sizeof( g_convert_to_bit ) );  
 
   for (i = 4; i < (1 << 7); i *= 2) {
-    g_convert_to_bit[i] = c;
+    g_convert_to_bit[i] = (int8_t)c;
     c++;
   }
 
   g_convert_to_bit[i] = c;
-  c = 2;
 
+  c = 2;
   for (i = 0; i < 7; i++) {
     g_sig_last_scan[0][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
     g_sig_last_scan[1][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
@@ -484,7 +484,7 @@ void encode_one_frame(encoder_control* encoder)
   encoder->in.cur_pic->poc = encoder->poc;
 }
 
-void fill_after_frame(FILE *file, unsigned height, unsigned array_width,
+void fill_after_frame(unsigned height, unsigned array_width,
                       unsigned array_height, pixel *data)
 {
   pixel* p = data + height * array_width;
@@ -553,11 +553,11 @@ int read_one_frame(FILE* file, encoder_control* encoder)
   }
 
   if (height != array_height) {
-    fill_after_frame(file, height, array_width, array_height,
+    fill_after_frame(height, array_width, array_height,
                      in->cur_pic->y_data);
-    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1,
+    fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
                      in->cur_pic->u_data);
-    fill_after_frame(file, height >> 1, array_width >> 1, array_height >> 1,
+    fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
                      in->cur_pic->v_data);
   }
   return 1;
@@ -1106,13 +1106,8 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   }
 }
 
-void encode_sao_merge_flags(encoder_control *encoder, sao_info *sao,
-                            unsigned x_ctb, unsigned y_ctb)
+void encode_sao_merge_flags(sao_info *sao, unsigned x_ctb, unsigned y_ctb)
 {
-  // SAO merge flags are not present if merge candidate is not in the same
-  // slice AND tile, but there isn't any such segmentation right now.
-  assert(!USE_SLICES && !USE_TILES);
-
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
     cabac.ctx = &g_sao_merge_flag_model;
@@ -1130,11 +1125,8 @@ void encode_sao_merge_flags(encoder_control *encoder, sao_info *sao,
 void encode_sao(encoder_control *encoder, unsigned x_lcu, uint16_t y_lcu,
                 sao_info *sao_luma, sao_info *sao_chroma)
 {
-  unsigned sao_type[3] = {SAO_TYPE_NONE, SAO_TYPE_NONE, SAO_TYPE_NONE};
-  picture *pic = encoder->in.cur_pic;
-  
   // TODO: transmit merge flags outside sao_info
-  encode_sao_merge_flags(encoder, sao_luma, x_lcu, y_lcu);
+  encode_sao_merge_flags(sao_luma, x_lcu, y_lcu);
 
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
@@ -1384,8 +1376,8 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
               CABAC_BIN(&cabac, (ref_frame == 0) ? 0 : 1, "ref_frame_flag");
     
               if (ref_frame > 0) {
-                uint32_t i;
-                uint32_t ref_num = encoder->ref->used_size - 2;
+                int32_t i;
+                int32_t ref_num = encoder->ref->used_size - 2;
 
                 cabac.ctx = &g_cu_ref_pic_model[1];
                 ref_frame--;
@@ -1474,7 +1466,6 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     int8_t mpm_preds[4] = {-1, -1, -1, -1};
     int i, j;
     uint32_t flag[4];
-    uint32_t width = LCU_WIDTH>>depth;
     int num_pred_units = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
       
     #if ENABLE_PCM == 1
@@ -1495,7 +1486,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
                                    intra_preds[j]);
       for (i = 0; i < 3; i++) {
         if (intra_preds[j][i] == intra_pred_mode[j]) {
-          mpm_preds[j] = i;
+          mpm_preds[j] = (int8_t)i;
           break;
         }
       }
@@ -1629,12 +1620,12 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 }
 
 void transform_chroma(encoder_control *encoder, cu_info *cur_cu, int depth, pixel *base_u, pixel *pred_u,
-                      coefficient *coeff_u, int color_type, unsigned scan_idx_chroma, coefficient *pre_quant_coeff, coefficient *block)
+                      coefficient *coeff_u, int8_t scan_idx_chroma, coefficient *pre_quant_coeff, coefficient *block)
 {
   int base_stride = encoder->in.width;
   int pred_stride = encoder->in.width;
 
-  int width_c = LCU_WIDTH >> (depth + 1);
+  int8_t width_c = LCU_WIDTH >> (depth + 1);
   
   int i = 0;
   unsigned ac_sum = 0;
@@ -1649,7 +1640,7 @@ void transform_chroma(encoder_control *encoder, cu_info *cur_cu, int depth, pixe
     }
   }
 
-  transform2d(block, pre_quant_coeff, width_c,65535);
+  transform2d(block, pre_quant_coeff, width_c, 65535);
   #if RDOQ == 1
   rdoq(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
        scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
@@ -1932,7 +1923,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
         }
       }
 
-      transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, color_type_u, scan_idx_chroma, pre_quant_coeff, block);
+      transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           // Found one, we can break here
@@ -1941,7 +1932,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
           break;
         }
       }
-      transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, color_type_v, scan_idx_chroma, pre_quant_coeff, block);
+      transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           // Found one, we can break here
