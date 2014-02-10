@@ -183,7 +183,7 @@ void init_tables(void)
 
   memset( g_convert_to_bit,-1, sizeof( g_convert_to_bit ) );  
 
-  for (i = 4; i < (1 << 7); i *= 2) {
+  for (i = 4; i < LCU_WIDTH; i *= 2) {
     g_convert_to_bit[i] = (int8_t)c;
     c++;
   }
