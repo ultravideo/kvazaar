@@ -305,6 +305,7 @@ encoder_control *init_encoder_control(config *cfg)
   }
 
   enc_c->ref = pic_list;
+  enc_c->ref_list = REF_PIC_LIST_0;
 
   return enc_c;
 
