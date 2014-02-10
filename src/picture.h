@@ -165,10 +165,10 @@ void picture_blit_pixels(const pixel* orig, pixel *dst,
                          unsigned orig_stride, unsigned dst_stride);
 
 picture_list * picture_list_init(int size);
-int picture_list_resize(picture_list *list, int size);
+int picture_list_resize(picture_list *list, unsigned size);
 int picture_list_destroy(picture_list *list);
 int picture_list_add(picture_list *list, picture *pic);
-int picture_list_rem(picture_list *list, int n, int8_t destroy);
+int picture_list_rem(picture_list *list, unsigned n, int8_t destroy);
 
 typedef unsigned (*cost_16bit_nxn_func)(pixel *block1, pixel *block2);
 

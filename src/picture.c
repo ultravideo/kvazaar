@@ -101,9 +101,6 @@ void picture_blit_pixels(const pixel *orig, pixel *dst,
 {
   unsigned y, x;
 
-  const pixel *borig = orig;
-  const pixel *bdst = dst;
-
   for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
       dst[x] = orig[x];
@@ -163,7 +160,7 @@ picture_list * picture_list_init(int size)
  * \param size  new array size
  * \return 1 on success, 0 on failure
  */
-int picture_list_resize(picture_list *list, int size)
+int picture_list_resize(picture_list *list, unsigned size)
 {
   unsigned int i;
   picture** old_pics = NULL;
@@ -243,12 +240,12 @@ int picture_list_add(picture_list *list,picture* pic)
  * \param picture_list list to use
  * \return 1 on success
  */
-int picture_list_rem(picture_list *list, int n, int8_t destroy)
+int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
 {
   int i;
 
   // Must be within list boundaries
-  if ((unsigned)n >= list->used_size)
+  if (n >= list->used_size)
   {
     return 0;
   }
@@ -264,7 +261,7 @@ int picture_list_rem(picture_list *list, int n, int8_t destroy)
     list->used_size--;
   } else {
     // Shift all following pics one backward in the list
-    for (i = n; (unsigned)n < list->used_size - 1; ++n) {
+    for (i = n; n < list->used_size - 1; ++n) {
       list->pics[n] = list->pics[n + 1];
     }
     list->pics[list->used_size - 1] = NULL;
