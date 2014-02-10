@@ -33,7 +33,6 @@
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"
-#include "debug.h"
 
 
 // Temporarily for debugging.
@@ -331,7 +330,8 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
 
   // Do search for NxN split.
   // This feature doesn't work yet so it is disabled.
-  if (0 && depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
+#ifdef ENABLE_INTRA_NXN
+  if (depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
     int8_t nn_mode = cur_cu->intra[0].mode;
@@ -362,6 +362,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
       cur_cu->part_size = SIZE_NxN;
     }
   }
+#endif
 }
 
 /**
@@ -409,7 +410,7 @@ void search_tree(encoder_control *encoder,
       search_inter(encoder, x_ctb, y_ctb, depth);
     }
 
-    if ((encoder->in.cur_pic->slicetype == SLICE_I || USE_INTRA_IN_P) &&
+    if ((encoder->in.cur_pic->slicetype == SLICE_I) &&
         depth >= MIN_INTRA_SEARCH_DEPTH &&
         depth <= MAX_INTRA_SEARCH_DEPTH)
     {
@@ -475,7 +476,6 @@ uint32_t search_best_mode(encoder_control *encoder,
 void search_slice_data(encoder_control *encoder)
 {
   int16_t x_lcu, y_lcu;
-  FILE *fp = 0, *fp2 = 0;
 
   // Initialize the costs in the cu-array used for searching.
   {
@@ -493,11 +493,6 @@ void search_slice_data(encoder_control *encoder)
     }
   }
 
-  if (RENDER_CU) {
-    fp = open_cu_file("cu_search.html");
-    fp2 = open_cu_file("cu_best.html");
-  }
-
   // Loop through every LCU in the slice
   for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
     for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
@@ -505,29 +500,12 @@ void search_slice_data(encoder_control *encoder)
 
       // Recursive function for looping through all the sub-blocks
       search_tree(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH, depth);
-      if (RENDER_CU) {
-        render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp);
-      }
 
       // Decide actual coding modes
       search_best_mode(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
-      if (RENDER_CU) {
-        render_cu_file(encoder, encoder->in.cur_pic, depth, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, fp2);
-      }
 
       encode_block_residual(encoder, x_lcu << MAX_DEPTH, y_lcu << MAX_DEPTH, depth);
 
     }
-  }
-
-
-
-  if (RENDER_CU && fp) {
-    close_cu_file(fp);
-    fp = 0;
-  }
-  if (RENDER_CU && fp2) {
-    close_cu_file(fp2);
-    fp2 = 0;
   }
 }
