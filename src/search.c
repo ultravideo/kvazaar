@@ -329,9 +329,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   cur_cu->part_size = SIZE_2Nx2N;
 
   // Do search for NxN split.
-  // This feature doesn't work yet so it is disabled.
-#ifdef ENABLE_INTRA_NXN
-  if (depth == MAX_DEPTH) { // Disabled because coding NxN doesn't work yet.
+  if (depth == MAX_DEPTH) {
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
     int8_t nn_mode = cur_cu->intra[0].mode;
@@ -362,7 +360,6 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
       cur_cu->part_size = SIZE_NxN;
     }
   }
-#endif
 }
 
 /**

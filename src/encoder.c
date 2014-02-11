@@ -2571,33 +2571,14 @@ void encode_block_residual(encoder_control *encoder,
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
                          cur_cu->intra[0].mode, cur_cu->part_size);
 
-    for (i = 0; i < num_pu; ++i) {
-      // Build reconstructed block to use in prediction with extrapolated borders
-      int x_pos = (x_ctb << MIN_SIZE) + offsets[i].x * width;
-      int y_pos = (y_ctb << MIN_SIZE) + offsets[i].y * width;
-      recbase_y = &encoder->in.cur_pic->y_recdata[x_pos + y_pos * encoder->in.width];
-
-      rec_shift  = &rec[width * 2 + 8 + 1];
-      intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->y_recdata,
-                                   x_pos, y_pos,
-                                   width * 2 + 8, rec, width * 2 + 8, 0);
-      intra_recon(rec_shift, width * 2 + 8,
-                  x_pos, y_pos,
-                  width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
-
-      // Filter DC-prediction
-      if (cur_cu->intra[i].mode == 1 && width < 32) {
-        intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
-                                rec_stride, width, width);
-      }
-    }
-
+    
     // TODO : chroma intra prediction
     if (cur_cu->intra[0].mode_chroma != 36
         && cur_cu->intra[0].mode_chroma == cur_cu->intra[0].mode) {
         cur_cu->intra[0].mode_chroma = 36;
     }
 
+    // Reconstruct chroma
     rec_shift  = &rec[width_c * 2 + 8 + 1];
     intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->u_recdata,
                                  x_ctb << MIN_SIZE, y_ctb << MIN_SIZE,
@@ -2628,6 +2609,43 @@ void encode_block_residual(encoder_control *encoder,
                 rec_stride >> 1,
                 cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
                 1);
+
+
+    picture_set_block_coded(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);
+
+    for (i = 0; i < num_pu; ++i) {
+      // Build reconstructed block to use in prediction with extrapolated borders
+      int x_pos = (x_ctb << MIN_SIZE) + offsets[i].x * width;
+      int y_pos = (y_ctb << MIN_SIZE) + offsets[i].y * width;
+      recbase_y = &encoder->in.cur_pic->y_recdata[x_pos + y_pos * encoder->in.width];
+
+      rec_shift  = &rec[width * 2 + 8 + 1];
+      intra_build_reference_border(encoder->in.cur_pic, encoder->in.cur_pic->y_recdata,
+                                   x_pos, y_pos,
+                                   width * 2 + 8, rec, width * 2 + 8, 0);
+      intra_recon(rec_shift, width * 2 + 8,
+                  x_pos, y_pos,
+                  width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
+
+      // Filter DC-prediction
+      if (cur_cu->intra[i].mode == 1 && width < 32) {
+        intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
+                                rec_stride, width, width);
+      }
+
+      // Handle NxN mode by doing quant/transform and inverses for the next NxN block       
+      if (cur_cu->part_size == SIZE_NxN) { 
+        encode_transform_tree(encoder, x_pos>>2, y_pos>>2, depth+1);
+      }
+    }
+    
+    // If we coded NxN block, fetch the coded block flags to this level
+    if (cur_cu->part_size == SIZE_NxN) {
+      cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
+      cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
+      cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
+      return;
+    }
 
   } else {
     int16_t mv_cand[2][2];
