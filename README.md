@@ -11,41 +11,42 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
 Currently most of the features are turned on/off from the code on compile time, but they are
 meant to be user configurable later.
 
-		Usage:
-		hevc_encoder -i <input> -w <width> -h <height> -o <output>
-		Optional parameters:
-			  -n, --frames <integer>     : number of frames to code [all]
-			  -q, --qp <integer>         : Quantization Parameter [32]
-			  -p, --period <integer>     : Period of intra pictures [0]
-										     0: only first picture is intra
-										     1: all pictures are intra
-										     2-N: every Nth picture is intra
-				  --no-deblock           : Disable deblocking filter
-				  --deblock <beta:tc>    : Deblocking filter parameters
-										   beta and tc range is -6..6 [0:0]
-				  --no-sao               : Disable sample adaptive offset
-				  --aud                  : Use access unit delimiters
+    Usage:
+    kvazaar -i <input> -w <width> -h <height> -o <output>
 
-		  Video Usability Information:
-				  --sar <width:height>   : Specify Sample Aspect Ratio
-				  --overscan <string>    : Specify crop overscan setting ["undef"]
-										     - undef, show, crop
-				  --videoformat <string> : Specify video format ["undef"]
-										     - component, pal, ntsc, secam, mac, undef
-				  --range <string>       : Specify color range ["tv"]
-										     - tv, pc
-				  --colorprim <string>   : Specify color primaries ["undef"]
-										     - undef, bt709, bt470m, bt470bg,
-										       smpte170m, smpte240m, film, bt2020
-				  --transfer <string>    : Specify transfer characteristics ["undef"]
-										     - undef, bt709, bt470m, bt470bg,
-										       smpte170m, smpte240m, linear, log100,
-										       log316, iec61966-2-4, bt1361e,
-										       iec61966-2-1, bt2020-10, bt2020-12
-				  --colormatrix <string> : Specify color matrix setting ["undef"]
-										     - undef, bt709, fcc, bt470bg, smpte170m,
-										       smpte240m, GBR, YCgCo, bt2020nc, bt2020c
-				  --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
+    Optional parameters:
+          -n, --frames <integer>     : number of frames to code [all]
+          -q, --qp <integer>         : Quantization Parameter [32]
+          -p, --period <integer>     : Period of intra pictures [0]
+                                         0: only first picture is intra
+                                         1: all pictures are intra
+                                         2-N: every Nth picture is intra
+              --no-deblock           : Disable deblocking filter
+              --deblock <beta:tc>    : Deblocking filter parameters
+                                       beta and tc range is -6..6 [0:0]
+              --no-sao               : Disable sample adaptive offset
+              --aud                  : Use access unit delimiters
+
+      Video Usability Information:
+              --sar <width:height>   : Specify Sample Aspect Ratio
+              --overscan <string>    : Specify crop overscan setting ["undef"]
+                                         - undef, show, crop
+              --videoformat <string> : Specify video format ["undef"]
+                                         - component, pal, ntsc, secam, mac, undef
+              --range <string>       : Specify color range ["tv"]
+                                         - tv, pc
+              --colorprim <string>   : Specify color primaries ["undef"]
+                                         - undef, bt709, bt470m, bt470bg,
+                                           smpte170m, smpte240m, film, bt2020
+              --transfer <string>    : Specify transfer characteristics ["undef"]
+                                         - undef, bt709, bt470m, bt470bg,
+                                           smpte170m, smpte240m, linear, log100,
+                                           log316, iec61966-2-4, bt1361e,
+                                           iec61966-2-1, bt2020-10, bt2020-12
+              --colormatrix <string> : Specify color matrix setting ["undef"]
+                                         - undef, bt709, fcc, bt470bg, smpte170m,
+                                           smpte240m, GBR, YCgCo, bt2020nc, bt2020c
+              --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
 
 Example:
 

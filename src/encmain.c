@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
       
     fprintf(stderr, 
             "Usage:\n"
-            "hevc_encoder -i <input> -w <width> -h <height> -o <output>\n"
+            "kvazaar -i <input> -w <width> -h <height> -o <output>\n"
             "\n"
             "Optional parameters:\n"
             "      -n, --frames <integer>     : number of frames to code [all]\n"
