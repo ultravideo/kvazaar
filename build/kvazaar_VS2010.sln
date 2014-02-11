@@ -1,26 +1,26 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HEVC_encoder", "VS2010\HEVC_encoder.vcxproj", "{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kvazaar_lib", "kvazaar_lib\kvazaar_lib.vcxproj", "{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{50AB7A17-4885-4D20-BF01-376DE4417FCD}"
 	ProjectSection(SolutionItems) = preProject
-		HEVC_encoder_VS2010.vsd = HEVC_encoder_VS2010.vsd
-		HEVC_encoder_VS2010.vsmdi = HEVC_encoder_VS2010.vsmdi
+		kvazaar_VS2010.vsd = kvazaar_VS2010.vsd
+		kvazaar_VS2010.vsmdi = kvazaar_VS2010.vsmdi
 		Local.testsettings = Local.testsettings
 		TraceAndTestImpact.testsettings = TraceAndTestImpact.testsettings
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HEVC_encoder_tests", "HEVC_encoder_tests\HEVC_encoder_tests.vcxproj", "{3CD1C68B-542C-46D8-9B8A-6C91C5A3F312}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kvazaar_tests", "kvazaar_tests\kvazaar_tests.vcxproj", "{3CD1C68B-542C-46D8-9B8A-6C91C5A3F312}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "HEVC_interface", "HEVC_interface\HEVC_interface.vcxproj", "{C755308D-9B3E-4712-99AB-7F6F4E2DA567}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kvazaar_cli", "kvazaar_cli\kvazaar_cli.vcxproj", "{C755308D-9B3E-4712-99AB-7F6F4E2DA567}"
 	ProjectSection(ProjectDependencies) = postProject
 		{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF} = {EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}
 	EndProjectSection
 EndProject
 Global
 	GlobalSection(TestCaseManagementSettings) = postSolution
-		CategoryFile = HEVC_encoder_VS2010.vsmdi
+		CategoryFile = kvazaar_VS2010.vsmdi
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32

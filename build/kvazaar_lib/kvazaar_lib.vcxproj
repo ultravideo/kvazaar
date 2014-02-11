@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>HEVC_encoder</RootNamespace>
+    <RootNamespace>kvazaar_lib</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
