@@ -410,8 +410,7 @@ void search_tree(encoder_control *encoder,
       search_inter(encoder, x_ctb, y_ctb, depth);
     }
 
-    if ((encoder->in.cur_pic->slicetype == SLICE_I) &&
-        depth >= MIN_INTRA_SEARCH_DEPTH &&
+    if (depth >= MIN_INTRA_SEARCH_DEPTH &&
         depth <= MAX_INTRA_SEARCH_DEPTH)
     {
       search_intra(encoder, x_ctb, y_ctb, depth);
