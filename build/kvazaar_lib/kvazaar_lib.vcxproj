@@ -80,10 +80,6 @@
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
     </YASM>
-    <ClCompile>
-      <CallingConvention>Cdecl</CallingConvention>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <YASM>
