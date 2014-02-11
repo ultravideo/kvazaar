@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
   config *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
+  FILE *cqmfile = NULL; //!< HM-compatible CQM file
   encoder_control *encoder = NULL; //!< Encoder control struct
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint64_t curpos  = 0;
@@ -102,6 +103,7 @@ int main(int argc, char *argv[])
             "                                   beta and tc range is -6..6 [0:0]\n"
             "          --no-sao               : Disable sample adaptive offset\n"
             "          --aud                  : Use access unit delimiters\n"
+            "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
@@ -202,6 +204,9 @@ int main(int argc, char *argv[])
   encoder->vui.chroma_loc  = encoder->cfg->vui.chroma_loc;
   // AUD
   encoder->aud_enable = encoder->cfg->aud_enable;
+  // CQM
+  cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
+  encoder->cqmfile = cqmfile;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
@@ -290,6 +295,7 @@ int main(int argc, char *argv[])
 
   fclose(input);
   fclose(output);
+  fclose(cqmfile);
   #ifdef _DEBUG
   fclose(recout);
   #endif

@@ -94,6 +94,7 @@ typedef struct
   } vui;
 
   int8_t aud_enable;
+  FILE *cqmfile; // \brief Costum Quantization Matrices
 } encoder_control;
 
 void init_tables(void);

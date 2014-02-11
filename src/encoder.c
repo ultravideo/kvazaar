@@ -398,6 +398,8 @@ void encode_one_frame(encoder_control* encoder)
       picture_list_rem(encoder->ref, encoder->ref->used_size - 1, 1);
     }
     
+    if (encoder->frame == 0 && encoder->cqmfile)
+      scalinglist_parse(encoder->cqmfile);
 
     encoder->poc = 0;
 
@@ -433,6 +435,7 @@ void encode_one_frame(encoder_control* encoder)
     bitstream_clear_buffer(encoder->stream);
 
     if (encoder->frame == 0) {
+      // Prefix SEI
       encode_prefix_sei_version(encoder);
       bitstream_align(encoder->stream);
       bitstream_flush(encoder->stream);
@@ -749,6 +752,61 @@ void encode_PTL(encoder_control *encoder)
   // end PTL
 }
 
+static void encode_scaling_list(encoder_control* encoder)
+{
+  uint32_t size_id;
+  for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
+    uint32_t list_id;
+    for (list_id = 0; list_id < g_scaling_list_num[size_id]; list_id++) {
+      uint8_t scaling_list_pred_mode_flag = 1;
+      int32_t pred_list_idx;
+      int32_t i;
+      uint32_t ref_matrix_id;
+
+      for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
+        int32_t *pred_list = (list_id == pred_list_idx) ?
+                             scalinglist_get_default(size_id, pred_list_idx) :
+                             g_scaling_list_coeff[size_id][pred_list_idx];
+
+        if (!memcmp(g_scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, g_scaling_list_size[size_id])) &&
+            ((size_id < SCALING_LIST_16x16) ||
+             (g_scaling_list_dc[size_id][list_id] == g_scaling_list_dc[size_id][pred_list_idx]))) {
+          ref_matrix_id = pred_list_idx;
+          scaling_list_pred_mode_flag = 0;
+          break;
+        }
+      }
+      WRITE_U(encoder->stream, scaling_list_pred_mode_flag, 1, "scaling_list_pred_mode_flag" );
+
+      if (!scaling_list_pred_mode_flag) {
+        WRITE_UE(encoder->stream, list_id - ref_matrix_id, "scaling_list_pred_matrix_id_delta");
+      } else {
+        int32_t delta;
+        int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, g_scaling_list_size[size_id]);
+        uint32_t *scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
+        int32_t next_coef = 8;
+        int32_t *coef_list = g_scaling_list_coeff[size_id][list_id];
+
+        if (size_id >= SCALING_LIST_16x16) {
+          WRITE_SE(encoder->stream, g_scaling_list_dc[size_id][list_id] - 8, "scaling_list_dc_coef_minus8");
+          next_coef = g_scaling_list_dc[size_id][list_id];
+        }
+
+        for (i = 0; i < coef_num; i++) {
+          delta     = coef_list[scan[i]] - next_coef;
+          next_coef = coef_list[scan[i]];
+          if (delta > 127)
+            delta -= 256;
+          if (delta < -128)
+            delta += 256;
+
+          WRITE_SE(encoder->stream, delta, "scaling_list_delta_coef");
+        }
+      }
+    }
+  }
+}
+
 void encode_seq_parameter_set(encoder_control* encoder)
 {
   encoder_input* const in = &encoder->in;
@@ -813,11 +871,12 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, TR_DEPTH_INTER, "max_transform_hierarchy_depth_inter");
   WRITE_UE(encoder->stream, TR_DEPTH_INTRA, "max_transform_hierarchy_depth_intra");
   
-  // Use default scaling list
-  WRITE_U(encoder->stream, ENABLE_SCALING_LIST, 1, "scaling_list_enable_flag");  
-  #if ENABLE_SCALING_LIST == 1
-    WRITE_U(encoder->stream, 0, 1, "sps_scaling_list_data_present_flag");
-  #endif
+  // scaling list
+  WRITE_U(encoder->stream, g_scaling_list_enable, 1, "scaling_list_enable_flag");  
+  if (g_scaling_list_enable) {
+    WRITE_U(encoder->stream, 1, 1, "sps_scaling_list_data_present_flag");
+    encode_scaling_list(encoder);
+  }
   
   WRITE_U(encoder->stream, 0, 1, "amp_enabled_flag");
   WRITE_U(encoder->stream, encoder->sao_enable ? 1 : 0, 1,

@@ -58,6 +58,7 @@ typedef struct
     int8_t chroma_loc;   /*!< \brief Chroma sample location */
   } vui;
   int8_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
+  char * cqmfile;        /*!< \brief Pointer to custom quantization matrices filename */
 } config;
 
 /* Function definitions */

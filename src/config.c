@@ -74,6 +74,7 @@ int config_init(config *cfg)
   cfg->vui.colormatrix = 2; /* undef */
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
+  cfg->cqmfile         = NULL;
 
   return 1;
 }
@@ -87,6 +88,7 @@ int config_destroy(config *cfg)
 {
   FREE_POINTER(cfg->input);
   FREE_POINTER(cfg->output);
+  FREE_POINTER(cfg->cqmfile);
   free(cfg);
 
   return 1;
@@ -234,6 +236,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
   }
   OPT("aud")
     cfg->aud_enable = atobool(value);
+  OPT("cqmfile")
+    cfg->cqmfile = copy_string(value);
   else
     return 0;
 #undef OPT
@@ -277,6 +281,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "colormatrix",        required_argument, NULL, 0 },
     { "chromaloc",          required_argument, NULL, 0 },
     { "aud",                      no_argument, NULL, 0 },
+    { "cqmfile",            required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

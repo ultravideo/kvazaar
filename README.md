@@ -26,6 +26,7 @@ meant to be user configurable later.
                                        beta and tc range is -6..6 [0:0]
               --no-sao               : Disable sample adaptive offset
               --aud                  : Use access unit delimiters
+              --cqmfile <string>     : Custom Quantization Matrices from a file
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio

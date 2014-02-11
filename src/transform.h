@@ -30,9 +30,21 @@
 
 #include <math.h>
 
+#define SCALING_LIST_4x4      0
+#define SCALING_LIST_8x8      1
+#define SCALING_LIST_16x16    2
+#define SCALING_LIST_32x32    3
+#define SCALING_LIST_SIZE_NUM 4
+#define SCALING_LIST_NUM      6
+#define MAX_MATRIX_COEF_NUM   64
 
+extern uint8_t  g_scaling_list_enable;
+extern int32_t  g_scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
+extern int32_t* g_scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
 extern int32_t* g_quant_coeff[4][6][6];
 extern double* g_error_scale[4][6][6];
+extern const uint8_t g_scaling_list_num[4];
+extern const uint16_t g_scaling_list_size[4];
 extern const int32_t g_quant_intra_default_8x8[64];
 extern const uint8_t g_chroma_scale[58];
 extern const int16_t g_inv_quant_scales[6];
@@ -52,5 +64,8 @@ void scalinglist_process();
 void scalinglist_set(int32_t *coeff, uint32_t list_id, uint32_t size_id, uint32_t qp);
 void scalinglist_set_err_scale(uint32_t list,uint32_t size, uint32_t qp);
 void scalinglist_destroy();
+
+int32_t *scalinglist_get_default(uint32_t size_id, uint32_t list_id);
+int scalinglist_parse(FILE *fp);
 
 #endif

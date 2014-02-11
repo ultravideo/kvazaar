@@ -33,6 +33,9 @@
 //////////////////////////////////////////////////////////////////////////
 // INITIALIZATIONS
 // 
+
+#define SCALING_LIST_REM_NUM  6
+
 const int16_t g_t4[4][4] =
 {
   { 64, 64, 64, 64},
@@ -149,9 +152,12 @@ const uint8_t g_chroma_scale[58]=
   45,46,47,48,49,50,51
 };
 
-int32_t *g_quant_coeff[4][6][6];
-int32_t *g_de_quant_coeff[4][6][6];
-double *g_error_scale[4][6][6];
+uint8_t  g_scaling_list_enable = 0;
+int32_t  g_scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM] = { { 0 } };
+int32_t *g_scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM] = { { NULL } };
+int32_t *g_quant_coeff       [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
+int32_t *g_de_quant_coeff    [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
+double  *g_error_scale       [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
 
 const uint8_t g_scaling_list_num[4]    = { 6, 6, 6, 2};
 const uint16_t g_scaling_list_size[4]  = {   16,  64, 256,1024}; 
@@ -181,6 +187,7 @@ void scalinglist_init()
           g_error_scale[sizeId][listId][qp]    = (double*)calloc(g_scaling_list_size[sizeId], sizeof(double));
         }
       }
+      g_scaling_list_coeff[sizeId][listId] = (int32_t*)calloc(MIN(MAX_MATRIX_COEF_NUM, g_scaling_list_size[sizeId]), sizeof(int32_t));
     }
   }
   // alias, assign pointer to an existing array
@@ -208,6 +215,7 @@ void scalinglist_destroy()
           free(   g_error_scale[sizeId][listId][qp]);
         }
       }
+      free(g_scaling_list_coeff[sizeId][listId]);
     }
   }
 }
@@ -219,26 +227,13 @@ void scalinglist_destroy()
  */
 void scalinglist_process()
 {
-  #define SCALING_LIST_SIZE_NUM 4
-  #define SCALING_LIST_REM_NUM 6
   uint32_t size,list,qp;
 
   for (size = 0; size < SCALING_LIST_SIZE_NUM; size++) {
-    int32_t* list_ptr = (int32_t *)g_quant_intra_default_8x8; // Default to "8x8" intra
-
     for (list = 0; list < g_scaling_list_num[size]; list++) {
-      switch(size) {
-        case 0: // 4x4
-          list_ptr = (int32_t *)g_quant_default_4x4;
-          break;
-        case 1: // 8x8
-        case 2: // 16x16
-          if (list > 2) list_ptr = (int32_t*)g_quant_inter_default_8x8;
-          break;
-        case 3: // 32x32
-          if (list > 0) list_ptr = (int32_t*)g_quant_inter_default_8x8;
-          break;
-      }
+      int32_t *list_ptr = g_scaling_list_enable ?
+                          g_scaling_list_coeff[size][list] :
+                          scalinglist_get_default(size, list);
 
       for (qp = 0; qp < SCALING_LIST_REM_NUM; qp++) {
         scalinglist_set(list_ptr, list, size, qp);
@@ -246,8 +241,6 @@ void scalinglist_process()
       }
     }
   }
-  #undef SCALING_LIST_SIZE_NUM
-  #undef SCALING_LIST_REM_NUM
 }
 
 
@@ -334,19 +327,19 @@ void scalinglist_process_dec( int32_t *coeff, int32_t *dequantcoeff, int32_t inv
  */
 void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
 {
-  #define SCALING_LIST_DC 16
   uint32_t width  = g_scaling_list_size_x[sizeId];
   uint32_t height = g_scaling_list_size_x[sizeId];
   uint32_t ratio  = g_scaling_list_size_x[sizeId] / MIN(8, g_scaling_list_size_x[sizeId]);
   int32_t *quantcoeff   = g_quant_coeff[sizeId][listId][qp];
   int32_t *dequantcoeff = g_de_quant_coeff[sizeId][listId][qp];
+  uint32_t dc = g_scaling_list_dc[sizeId][listId] != 0 ? g_scaling_list_dc[sizeId][listId] : 16;
 
   // Encoder list
   scalinglist_process_enc(coeff, quantcoeff, g_quant_scales[qp]<<4, height, width, ratio,
-                          MIN(8, g_scaling_list_size_x[sizeId]), SCALING_LIST_DC, ENABLE_SCALING_LIST ? 0 : 1);
+                          MIN(8, g_scaling_list_size_x[sizeId]), dc, !g_scaling_list_enable);
   // Decoder list
   scalinglist_process_dec(coeff, dequantcoeff, g_inv_quant_scales[qp], height, width, ratio,
-                          MIN(8, g_scaling_list_size_x[sizeId]), SCALING_LIST_DC, ENABLE_SCALING_LIST ? 0 : 1);
+                          MIN(8, g_scaling_list_size_x[sizeId]), dc, !g_scaling_list_enable);
 
 
   // TODO: support NSQT
@@ -357,7 +350,6 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
   //   quantcoeff   = g_quant_coeff[listId][qp][sizeId-1][/*SCALING_LIST_HOR*/2];
   //   scalinglist_process_enc(coeff,quantcoeff,g_quantScales[qp]<<4,height>>2,width,ratio,MIN(8,g_scalingListSizeX[sizeId]),/*scalingList->getScalingListDC(sizeId,listId)*/0);
   // }
-  #undef SCALING_LIST_DC
 }
 
 
@@ -962,12 +954,12 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
   shift = 20 - QUANT_SHIFT - transform_shift;
 
   UNREFERENCED_PARAMETER(block_type);
-  #if ENABLE_SCALING_LIST == 1
+  if (g_scaling_list_enable)
   {
     uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
     int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-    dequant_coef = g_de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+    int32_t *dequant_coef = g_de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
     shift += 4;
 
     if (shift >qp_scaled / 6) {
@@ -986,9 +978,7 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
         coef[n] = (int16_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
       }
     }
-  }
-  #else
-  {
+  } else {
     int32_t scale = g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
     add = 1 << (shift-1);
 
@@ -998,5 +988,145 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
       coef[n] = (int16_t)CLIP(-32768, 32767, coeff_q);
     }
   }
-  #endif
+}
+
+int32_t *scalinglist_get_default(uint32_t size_id, uint32_t list_id)
+{
+  int32_t *list_ptr = (int32_t *)g_quant_intra_default_8x8; // Default to "8x8" intra
+  switch(size_id) {
+    case SCALING_LIST_4x4:
+      list_ptr = (int32_t *)g_quant_default_4x4;
+      break;
+    case SCALING_LIST_8x8:
+    case SCALING_LIST_16x16:
+      if (list_id > 2) list_ptr = (int32_t *)g_quant_inter_default_8x8;
+      break;
+    case SCALING_LIST_32x32:
+      if (list_id > 0) list_ptr = (int32_t *)g_quant_inter_default_8x8;
+      break;
+  }
+  return list_ptr;
+}
+
+int scalinglist_parse(FILE *fp)
+{
+  #define LINE_BUFSIZE 1024
+  static const char matrix_type[4][6][20] =
+  {
+    {
+      "INTRA4X4_LUMA",
+      "INTRA4X4_CHROMAU",
+      "INTRA4X4_CHROMAV",
+      "INTER4X4_LUMA",
+      "INTER4X4_CHROMAU",
+      "INTER4X4_CHROMAV"
+    },
+    {
+      "INTRA8X8_LUMA",
+      "INTRA8X8_CHROMAU",
+      "INTRA8X8_CHROMAV",
+      "INTER8X8_LUMA",
+      "INTER8X8_CHROMAU",
+      "INTER8X8_CHROMAV"
+    },
+    {
+      "INTRA16X16_LUMA",
+      "INTRA16X16_CHROMAU",
+      "INTRA16X16_CHROMAV",
+      "INTER16X16_LUMA",
+      "INTER16X16_CHROMAU",
+      "INTER16X16_CHROMAV"
+    },
+    {
+      "INTRA32X32_LUMA",
+      "INTER32X32_LUMA",
+    },
+  };
+  static const char matrix_type_dc[2][6][22] =
+  {
+    {
+      "INTRA16X16_LUMA_DC",
+      "INTRA16X16_CHROMAU_DC",
+      "INTRA16X16_CHROMAV_DC",
+      "INTER16X16_LUMA_DC",
+      "INTER16X16_CHROMAU_DC",
+      "INTER16X16_CHROMAV_DC" 
+    },
+    {
+      "INTRA32X32_LUMA_DC",
+      "INTER32X32_LUMA_DC",
+    },
+  };
+
+  uint32_t size_id;
+  for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
+    uint32_t list_id;
+    uint32_t size = MIN(MAX_MATRIX_COEF_NUM, (int32_t)g_scaling_list_size[size_id]);
+    uint32_t *scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
+
+    for (list_id = 0; list_id < g_scaling_list_num[size_id]; list_id++) {
+      int found;
+      uint32_t i;
+      int32_t data;
+      int32_t *coeff = g_scaling_list_coeff[size_id][list_id];
+      char line[LINE_BUFSIZE + 1] = { 0 }; // +1 for null-terminator
+
+      // Go back for each matrix.
+      fseek(fp, 0, SEEK_SET);
+
+      do {
+        if (!fgets(line, LINE_BUFSIZE, fp) ||
+            ((found = !!strstr(line, matrix_type[size_id][list_id])) == 0 && feof(fp)))
+          return 0;
+      } while (!found);
+
+      for (i = 0; i < size;) {
+        char *p;
+        if (!fgets(line, LINE_BUFSIZE, fp))
+          return 0;
+        p = line;
+
+        // Read coefficients per line.
+        // The comma (,) character is used as a separator.
+        // The coefficients are stored in up-right diagonal order.
+        do {
+          int ret = sscanf(p, "%d", &data);
+          if (ret != 1)
+            break;
+          else if (data < 1 || data > 255)
+            return 0;
+
+          coeff[i++] = data;
+          if (i == size)
+            break;
+
+          // Seek to the next newline, null-terminator or comma.
+          while (*p != '\n' && *p != '\0' && *p != ',')
+            ++p;
+          if (*p == ',')
+            ++p;
+        } while (*p != '\n' && *p != '\0');
+      }
+
+      // Set DC value.
+      if (size_id >= SCALING_LIST_16x16) {
+        fseek(fp, 0, SEEK_SET);
+
+        do {
+          if (!fgets(line, LINE_BUFSIZE, fp) ||
+              ((found = !!strstr(line, matrix_type_dc[size_id - SCALING_LIST_16x16][list_id])) == 0 && feof(fp)))
+            return 0;
+        } while (!found);
+        if (1 != fscanf(fp, "%d", &data) || data < 1 || data > 255)
+          return 0;
+
+        g_scaling_list_dc[size_id][list_id] = data;
+      } else
+        g_scaling_list_dc[size_id][list_id] = coeff[0];
+    }
+  }
+
+  g_scaling_list_enable = 1;
+  return 1;
+  #undef LINE_BUFSIZE
 }
