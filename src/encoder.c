@@ -724,7 +724,7 @@ void encode_PTL(encoder_control *encoder)
    * According to specification, when compatibility_flag[1] is set,
    *  compatibility_flag[2] should be set too.
    */
-  WRITE_U(encoder->stream, 6, 32, "general_profile_compatibility_flag[]");
+  WRITE_U(encoder->stream, 3<<29, 32, "general_profile_compatibility_flag[]");
 
   WRITE_U(encoder->stream, 1, 1, "general_progressive_source_flag");
   WRITE_U(encoder->stream, 0, 1, "general_interlaced_source_flag");
