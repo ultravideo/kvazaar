@@ -295,7 +295,7 @@ int main(int argc, char *argv[])
 
   fclose(input);
   fclose(output);
-  fclose(cqmfile);
+  if(cqmfile != NULL) fclose(cqmfile);
   #ifdef _DEBUG
   fclose(recout);
   #endif
