@@ -312,11 +312,13 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
 
- #define CALCULATE_SCALE(cu) (((encoder->poc - encoder->ref->pics[0]->poc) * ((0x4000 + abs((encoder->poc - encoder->poc-encoder->ref->pics[cu->inter.mv_ref]->poc)/2))/(encoder->poc - encoder->ref->pics[cu->inter.mv_ref]->poc)) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand) if ((encoder->ref->pics[(cu)->inter.mv_ref]->poc) != (encoder->ref->pics[0]->poc)) { \
-                                      int scale = CALCULATE_SCALE(cu); \
+ #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
+#define APPLY_MV_SCALING(cu, cand) {int td = encoder->poc - encoder->ref->pics[(cu)->inter.mv_ref]->poc;\
+                                   int tb = encoder->poc - encoder->ref->pics[cur_cu->inter.mv_ref]->poc;\
+                                   if (td != tb) { \
+                                      int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[0] + 127 + (scale * (cu)->inter.mv[0] < 0)) >> 8 ); \
-                                       mv_cand[cand][1] = ((scale * (cu)->inter.mv[1] + 127 + (scale * (cu)->inter.mv[1] < 0)) >> 8 ); }
+                                       mv_cand[cand][1] = ((scale * (cu)->inter.mv[1] + 127 + (scale * (cu)->inter.mv[1] < 0)) >> 8 ); }}
 
   // Left predictors
   if (a0 && a0->type == CU_INTER && a0->inter.mv_ref == cur_cu->inter.mv_ref) {
@@ -448,7 +450,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   }
 
   if (b1 && b1->type == CU_INTER) {
-    APPLY_MV_SCALING(b1);
+    APPLY_MV_SCALING(b1,candidates);
     if(candidates) CHECK_DUPLICATE(&temp_cu, a1);
     if(!duplicate) {
       mv_cand[candidates][0] = temp_cu.inter.mv[0];
