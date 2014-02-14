@@ -1542,7 +1542,6 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       intra_get_dir_luma_predictor(encoder->in.cur_pic, 
                                    x_ctb * 2 + offset[j].x, 
                                    y_ctb * 2 + offset[j].y, 
-                                   depth,
                                    intra_preds[j]);
       for (i = 0; i < 3; i++) {
         if (intra_preds[j][i] == intra_pred_mode[j]) {
@@ -2646,8 +2645,6 @@ void encode_block_residual(encoder_control *encoder,
                                  1);
     intra_recon(rec_shift, 
                 width_c * 2 + 8,
-                x_ctb * width_c,
-                y_ctb * width_c,
                 width_c,
                 recbase_u,
                 rec_stride >> 1,
@@ -2661,8 +2658,6 @@ void encode_block_residual(encoder_control *encoder,
                                  2);
     intra_recon(rec_shift, 
                 width_c * 2 + 8,
-                x_ctb * width_c,
-                y_ctb * width_c,
                 width_c,
                 recbase_v,
                 rec_stride >> 1,
@@ -2683,7 +2678,6 @@ void encode_block_residual(encoder_control *encoder,
                                    x_pos, y_pos,
                                    width * 2 + 8, rec, width * 2 + 8, 0);
       intra_recon(rec_shift, width * 2 + 8,
-                  x_pos, y_pos,
                   width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
 
       // Filter DC-prediction

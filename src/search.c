@@ -308,10 +308,10 @@ void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
 
 void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  int x = x_ctb * (LCU_WIDTH >> MAX_DEPTH);
-  int y = y_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  int16_t x = x_ctb * (LCU_WIDTH >> MAX_DEPTH);
+  int16_t y = y_ctb * (LCU_WIDTH >> MAX_DEPTH);
   picture *cur_pic = encoder->in.cur_pic;
-  uint32_t width = LCU_WIDTH >> depth;
+  uint8_t width = LCU_WIDTH >> depth;
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   // INTRAPREDICTION
@@ -346,7 +346,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
                                    x_pos, y_pos,
                                    (int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0);
       cur_cu->intra[i].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
-          encoder->in.width, recShift, width * 2 + 8, x_pos, y_pos,
+          encoder->in.width, recShift, width * 2 + 8, (int16_t)x_pos, (int16_t)y_pos,
           width, pred, width, &cur_cu->intra[i].cost);
       cost += cur_cu->intra[i].cost;
     }

@@ -1062,7 +1062,7 @@ int scalinglist_parse(FILE *fp)
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     uint32_t list_id;
     uint32_t size = MIN(MAX_MATRIX_COEF_NUM, (int32_t)g_scaling_list_size[size_id]);
-    uint32_t *scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
+    //uint32_t *scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
 
     for (list_id = 0; list_id < g_scaling_list_num[size_id]; list_id++) {
       int found;

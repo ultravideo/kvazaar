@@ -77,24 +77,6 @@ void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t dep
 
 /**
  * \brief get intrablock mode
- * \param pic picture to use
- * \param xCtb x CU position (smallest CU)
- * \param yCtb y CU position (smallest CU)
- * \param depth current CU depth
- * \returns mode if it's present, otherwise -1
-*/
-int8_t intra_get_block_mode(picture *pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth)
-{ 
-  int width_in_scu = pic->width_in_lcu<<MAX_DEPTH; //!< width in smallest CU
-  int cu_pos = y_cu * width_in_scu + x_cu;
-  if (pic->cu_array[MAX_DEPTH][cu_pos].type == CU_INTRA) {
-    return pic->cu_array[MAX_DEPTH][cu_pos].intra[0].mode;
-  }
-  return -1;
-}
-
-/**
- * \brief get intrablock mode
  * \param pic picture data to use
  * \param picwidth width of the picture data
  * \param xpos x-position
@@ -102,7 +84,7 @@ int8_t intra_get_block_mode(picture *pic, uint32_t x_cu, uint32_t y_cu, uint8_t 
  * \param width block width
  * \returns DC prediction
 */
-int16_t intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint32_t xpos, uint32_t ypos, uint8_t width)
+pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
 {
   int32_t i, sum = 0;
 
@@ -115,7 +97,7 @@ int16_t intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint32_t xpos, uint32_t
   }
 
   // return the average
-  return (sum + width) / (width + width);
+  return (pixel)((sum + width) / (width + width));
 }
 
 #define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * (y_pu % 2))
@@ -125,18 +107,17 @@ int16_t intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint32_t xpos, uint32_t
  * \param pic picture to use
  * \param x_cu x CU position (smallest CU)
  * \param y_cu y CU position (smallest CU)
- * \param depth current CU depth
  * \param preds output buffer for 3 predictions 
  * \returns (predictions are found)?1:0
  */
-int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, uint8_t depth, int8_t* preds)
+int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, int8_t* preds)
 {
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
 
   // The default mode if block is not coded yet is INTRA_DC.
-  int32_t left_intra_dir  = 1;
-  int32_t above_intra_dir = 1;
+  int8_t left_intra_dir  = 1;
+  int8_t above_intra_dir = 1;
 
   int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
   int32_t cu_pos = y_cu * width_in_scu + x_cu;
@@ -174,17 +155,6 @@ int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, 
     // Otherwise take the mode from the bottom half of the CU above.
     above_intra_dir = above_cu->intra[PU_INDEX(x_pu, 1)].mode;
   }
-
-  // Left PU predictor
-  /*if(x_cu && pic->cu_array[MAX_DEPTH][cu_pos - 1].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - 1].coded) {
-    left_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - 1].intra[0].mode;
-  }
-
-  // Top PU predictor
-  if(y_cu && ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0
-     && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].type == CU_INTRA && pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].coded) {
-    above_intra_dir = pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu].intra[0].mode;
-  }*/
 
   // If the predictions are the same, add new predictions
   if (left_intra_dir == above_intra_dir) {  
@@ -279,13 +249,14 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t recstride, uint32_t xpos,
-                         uint32_t ypos, uint32_t width, pixel *dst, int32_t dststride, uint32_t *sad_out)
+int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride, uint16_t xpos,
+                         uint16_t ypos, uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
   int16_t best_mode = 1;
-  int32_t x,y,i;
+  int32_t x,y;
+  int16_t i;
 
   cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
 
@@ -329,19 +300,20 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t re
   // Apply filter
   intra_filter(rec_filtered,recstride,width,0);
   
-
   // Test DC mode (never filtered)
-  x = intra_get_dc_pred(rec, recstride, xpos, ypos, width);
-  for (i = 0; i < (int32_t)(width*width); i++) {
-    pred[i] = x;
+  {
+    pixel val = intra_get_dc_pred(rec, recstride, width);
+    for (i = 0; i < (int32_t)(width*width); i++) {
+      pred[i] = val;
+    }
+    CHECK_FOR_BEST(1,0);
   }
-  CHECK_FOR_BEST(1,0);
   
   // Check angular not requiring filtering
   for (i = 2; i < 35; i++) {
     int distance = MIN(abs(i - 26),abs(i - 10)); //!< Distance from top and left predictions
     if(distance <= threshold) {
-      intra_get_angular_pred(rec, recstride, pred, width, width, width, i, xpos?1:0, ypos?1:0, filter);
+      intra_get_angular_pred(rec, recstride, pred, width, width, i, filter);
       CHECK_FOR_BEST(i,0);
     }
   }
@@ -349,7 +321,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t re
   // FROM THIS POINT FORWARD, USING FILTERED PREDICTION
 
   // Test planar mode (always filtered)
-  intra_get_planar_pred(rec_filtered, recstride, xpos, ypos, width, pred, width);
+  intra_get_planar_pred(rec_filtered, recstride, width, pred, width);
   CHECK_FOR_BEST(0,0);  
   
   // Check angular predictions which require filtered samples
@@ -358,7 +330,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t re
   for (i = 2; i < 35; i++) {
     int distance = MIN(abs(i-26),abs(i-10)); //!< Distance from top and left predictions
     if(distance > threshold) {
-      intra_get_angular_pred(rec_filtered, recstride, pred, width, width, width, i, xpos?1:0, ypos?1:0, filter);
+      intra_get_angular_pred(rec_filtered, recstride, pred, width, width, i, filter);
       CHECK_FOR_BEST(i,0);
     }
   }
@@ -375,8 +347,6 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t re
  * \brief Reconstruct intra block according to prediction
  * \param rec reconstructed picture data
  * \param recstride reconstructed picture stride
- * \param xpos source x-position
- * \param ypos source y-position
  * \param width block size to predict
  * \param dst destination buffer for best prediction
  * \param dststride destination width
@@ -384,9 +354,9 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int32_t re
  * \param chroma chroma-block flag
 
 */
-void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uint32_t width, pixel* dst,int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(pixel* rec, uint32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
 {
-  int32_t x,y,i;
+  int32_t x,y;
   pixel pred[LCU_WIDTH * LCU_WIDTH];
   int8_t filter = !chroma && width < 32;
 
@@ -401,18 +371,18 @@ void intra_recon(pixel* rec,uint32_t recstride, uint32_t xpos, uint32_t ypos,uin
 
   // planar
   if (mode == 0)  {
-    intra_get_planar_pred(rec, recstride, xpos, ypos, width, pred, width); 
+    intra_get_planar_pred(rec, recstride, width, pred, width); 
   } else if (mode == 1) { // DC
-    i = intra_get_dc_pred(rec, recstride, xpos, ypos, width);
+    pixel val = intra_get_dc_pred(rec, (uint16_t)recstride, (uint8_t)width);
     for (y = 0; y < (int32_t)width; y++) {
       for (x = 0; x < (int32_t)width; x++) {
-        dst[x + y*dststride] = i;
+        dst[x + y*dststride] = val;
       }
     }
     // Assigned value directly to output, no need to stay here
     return;
   } else {  // directional predictions
-    intra_get_angular_pred(rec, recstride,pred, width, width, width, mode, xpos?1:0, ypos?1:0, filter);
+    intra_get_angular_pred(rec, recstride,pred, width, width, mode, filter);
   }
 
   for(y = 0; y < (int32_t)width; y++)  { 
@@ -587,8 +557,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width,
-                           int32_t height, int32_t dir_mode, int8_t left_avail,int8_t top_avail, int8_t filter)
+void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
 {
   int32_t k,l;
   int32_t blk_size        = width;
@@ -716,15 +685,13 @@ void intra_dc_pred_filtering(pixel *src, int32_t src_stride, pixel *dst, int32_t
  * \brief Function for deriving planar intra prediction.
  * \param src source pixel array
  * \param srcstride source width
- * \param xpos source x-position
- * \param ypos source y-position
  * \param width block size to predict
  * \param dst destination buffer for prediction
  * \param dststride destination width
  
   This function derives the prediction samples for planar mode (intra coding).
 */
-void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t xpos, uint32_t ypos,uint32_t width, pixel* dst,int32_t dststride)
+void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride)
 {
   int32_t k, l, bottom_left, top_right;
   int32_t hor_pred;
@@ -756,7 +723,7 @@ void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t xpos, uint32_t
     for (l = 0; l < (int32_t)blk_size; l++) {
       hor_pred += right_column[k];
       top_row[l] += bottom_row[l];
-      dst[k * dststride + l] = ( (hor_pred + top_row[l]) >> shift_2d );
+      dst[k * dststride + l] = (pixel)((hor_pred + top_row[l]) >> shift_2d);
     }
   }
 }
