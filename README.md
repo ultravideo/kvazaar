@@ -7,6 +7,8 @@ Kvazaar is not yet finished and does not implement all the features of HEVC. Com
 
 http://ultravideo.cs.tut.fi/#encoder for more information.
 
+http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of topics you might want to examine if you would like to do something bigger than a bug fix but don't know what yet.
+
 ##Using Kvazaar
 Currently most of the features are turned on/off from the code on compile time, but they are
 meant to be user configurable later.
