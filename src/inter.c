@@ -58,6 +58,7 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[0]  = cur_cu->inter.mv[0];
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[1]  = cur_cu->inter.mv[1];
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv_dir = cur_cu->inter.mv_dir;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv_ref = cur_cu->inter.mv_ref;
       pic->cu_array[MAX_DEPTH][cu_pos + x].tr_depth = tr_depth;
     }
   }
@@ -358,7 +359,7 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
   } else if(b2 && b2->type == CU_INTER && b2->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = b2->inter.mv[0];
     mv_cand[candidates][1] = b2->inter.mv[1];
-     b_candidates++;    
+    b_candidates++;
   }
   candidates += b_candidates;
 
@@ -372,14 +373,13 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
     } else if (b1 && b1->type == CU_INTER) {
       mv_cand[candidates][0] = b1->inter.mv[0];
       mv_cand[candidates][1] = b1->inter.mv[1];
-       APPLY_MV_SCALING(b1, candidates);
+      APPLY_MV_SCALING(b1, candidates);
       candidates++;
-    
     } else if(b2 && b2->type == CU_INTER) {
       mv_cand[candidates][0] = b2->inter.mv[0];
       mv_cand[candidates][1] = b2->inter.mv[1];
-       APPLY_MV_SCALING(b2, candidates);
-       candidates++;
+      APPLY_MV_SCALING(b2, candidates);
+      candidates++;
     }
   }
 
