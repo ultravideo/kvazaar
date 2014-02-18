@@ -364,7 +364,11 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
   candidates += b_candidates;
 
   // When a1 or a0 is available, we dont check for secondary B candidates
-  if((a1 && a1->type == CU_INTER) || (a0 && a0->type == CU_INTER)) b_candidates = 1;
+  if((a1 && a1->type == CU_INTER) || (a0 && a0->type == CU_INTER)) {
+    b_candidates = 1;
+  } else if(candidates != 2) {
+    b_candidates = 0;
+  }
 
   if(!b_candidates) {
     // Top predictors
