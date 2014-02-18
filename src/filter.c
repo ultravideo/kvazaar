@@ -216,6 +216,8 @@ void filter_deblock_edge_luma(encoder_control *encoder,
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
         } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {
           strength = 1;         
+        } else if(cu_q->inter.mv_ref != cu_p->inter.mv_ref) {
+          strength = 1; 
         }
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;

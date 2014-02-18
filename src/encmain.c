@@ -98,6 +98,7 @@ int main(int argc, char *argv[])
             "                                     0: only first picture is intra\n"
             "                                     1: all pictures are intra\n"
             "                                     2-N: every Nth picture is intra\n"
+            "      -r, --ref <integer>        : Reference frames, range 1..5 [5]\n"
             "          --no-deblock           : Disable deblocking filter\n"
             "          --deblock <beta:tc>    : Deblocking filter parameters\n"
             "                                   beta and tc range is -6..6 [0:0]\n"
@@ -265,7 +266,7 @@ int main(int argc, char *argv[])
     // TODO: add more than one reference
 
     // Remove the ref pic (if present)
-    if (encoder->ref->used_size == MAX_REF_PIC_COUNT) {
+    if (encoder->ref->used_size == encoder->cfg->ref_frames) {
 	    picture_list_rem(encoder->ref, encoder->ref->used_size-1, 1);
     }
     // Add current picture as reference

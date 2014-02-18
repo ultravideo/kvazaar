@@ -280,30 +280,39 @@ unsigned search_mv_full(unsigned depth,
 
 void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth) {
   picture *cur_pic = encoder->in.cur_pic;
-  picture *ref_pic = encoder->ref->pics[0];
-  unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-  cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
+  int ref_idx = 0;  
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cur_cu->inter.cost = UINT_MAX;
 
-  vector2d orig, mv;
-  orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
-  orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
-  mv.x = 0;
-  mv.y = 0;
-  if (ref_cu->type == CU_INTER) {
-    mv.x = ref_cu->inter.mv[0];
-    mv.y = ref_cu->inter.mv[1];
+  for (ref_idx = 0; ref_idx < encoder->ref->used_size; ref_idx++) {
+    picture *ref_pic = encoder->ref->pics[ref_idx];
+    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);  
+    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];    
+    uint32_t temp_cost;
+    vector2d orig, mv;
+    orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
+    orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
+    mv.x = 0;
+    mv.y = 0;
+    if (ref_cu->type == CU_INTER) {
+      mv.x = ref_cu->inter.mv[0];
+      mv.y = ref_cu->inter.mv[1];
+    }
+
+  #if SEARCH_MV_FULL_RADIUS
+    cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
+  #else
+    temp_cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
+  #endif
+    if(temp_cost < cur_cu->inter.cost) {
+      cur_cu->inter.mv_ref = ref_idx;
+      cur_cu->inter.mv_dir = 1;
+      cur_cu->inter.mv[0] = (int16_t)mv.x;
+      cur_cu->inter.mv[1] = (int16_t)mv.y;
+      cur_cu->inter.cost = temp_cost;
+    }    
   }
 
-#if SEARCH_MV_FULL_RADIUS
-  cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
-#else
-  cur_cu->inter.cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
-#endif
-    
-  cur_cu->inter.mv_dir = 1;
-  cur_cu->inter.mv[0] = (int16_t)mv.x;
-  cur_cu->inter.mv[1] = (int16_t)mv.y;
 }
 
 void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)

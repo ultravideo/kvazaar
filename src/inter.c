@@ -58,6 +58,7 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[0]  = cur_cu->inter.mv[0];
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv[1]  = cur_cu->inter.mv[1];
       pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv_dir = cur_cu->inter.mv_dir;
+      pic->cu_array[MAX_DEPTH][cu_pos + x].inter.mv_ref = cur_cu->inter.mv_ref;
       pic->cu_array[MAX_DEPTH][cu_pos + x].tr_depth = tr_depth;
     }
   }
@@ -303,38 +304,90 @@ void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, 
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2])
+void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu)
 {  
   uint8_t candidates = 0;
+  uint8_t b_candidates = 0;
 
   cu_info *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
 
+ #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
+#define APPLY_MV_SCALING(cu, cand) {int td = encoder->poc - encoder->ref->pics[(cu)->inter.mv_ref]->poc;\
+                                   int tb = encoder->poc - encoder->ref->pics[cur_cu->inter.mv_ref]->poc;\
+                                   if (td != tb) { \
+                                      int scale = CALCULATE_SCALE(cu,tb,td); \
+                                       mv_cand[cand][0] = ((scale * (cu)->inter.mv[0] + 127 + (scale * (cu)->inter.mv[0] < 0)) >> 8 ); \
+                                       mv_cand[cand][1] = ((scale * (cu)->inter.mv[1] + 127 + (scale * (cu)->inter.mv[1] < 0)) >> 8 ); }}
+
   // Left predictors
-  if (a0 && a0->type == CU_INTER) {
+  if (a0 && a0->type == CU_INTER && a0->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = a0->inter.mv[0];
     mv_cand[candidates][1] = a0->inter.mv[1];
     candidates++;
-  } else if (a1 && a1->type == CU_INTER) {
+  } else if (a1 && a1->type == CU_INTER && a1->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = a1->inter.mv[0];
     mv_cand[candidates][1] = a1->inter.mv[1];
     candidates++;
   }
 
+  if(!candidates) {
+      // Left predictors
+    if (a0 && a0->type == CU_INTER) {
+      mv_cand[candidates][0] = a0->inter.mv[0];
+      mv_cand[candidates][1] = a0->inter.mv[1];
+      APPLY_MV_SCALING(a0, candidates);
+      candidates++;
+    } else if (a1 && a1->type == CU_INTER) {
+      mv_cand[candidates][0] = a1->inter.mv[0];
+      mv_cand[candidates][1] = a1->inter.mv[1];
+      APPLY_MV_SCALING(a1, candidates);
+      candidates++;
+    }
+  }
+
   // Top predictors
-  if (b0 && b0->type == CU_INTER) {
+  if (b0 && b0->type == CU_INTER && b0->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = b0->inter.mv[0];
     mv_cand[candidates][1] = b0->inter.mv[1];
-    candidates++;
-  } else if (b1 && b1->type == CU_INTER) {
+    b_candidates++;
+  } else if (b1 && b1->type == CU_INTER && b1->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = b1->inter.mv[0];
     mv_cand[candidates][1] = b1->inter.mv[1];
-    candidates++;
-  } else if(b2 && b2->type == CU_INTER) {
+    b_candidates++;    
+  } else if(b2 && b2->type == CU_INTER && b2->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = b2->inter.mv[0];
     mv_cand[candidates][1] = b2->inter.mv[1];
-    candidates++;
+    b_candidates++;
+  }
+  candidates += b_candidates;
+
+  // When a1 or a0 is available, we dont check for secondary B candidates
+  if((a1 && a1->type == CU_INTER) || (a0 && a0->type == CU_INTER)) {
+    b_candidates = 1;
+  } else if(candidates != 2) {
+    b_candidates = 0;
+  }
+
+  if(!b_candidates) {
+    // Top predictors
+    if (b0 && b0->type == CU_INTER) {
+      mv_cand[candidates][0] = b0->inter.mv[0];
+      mv_cand[candidates][1] = b0->inter.mv[1];
+      APPLY_MV_SCALING(b0, candidates);
+      candidates++;
+    } else if (b1 && b1->type == CU_INTER) {
+      mv_cand[candidates][0] = b1->inter.mv[0];
+      mv_cand[candidates][1] = b1->inter.mv[1];
+      APPLY_MV_SCALING(b1, candidates);
+      candidates++;
+    } else if(b2 && b2->type == CU_INTER) {
+      mv_cand[candidates][0] = b2->inter.mv[0];
+      mv_cand[candidates][1] = b2->inter.mv[1];
+      APPLY_MV_SCALING(b2, candidates);
+      candidates++;
+    }
   }
 
   // Remove identical candidate
@@ -354,6 +407,8 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
     mv_cand[candidates][1] = 0;
     candidates++;
   }
+#undef CALCULATE_SCALE
+#undef APPLY_MV_SCALING
 }
 
 /**
@@ -364,23 +419,27 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
  * \param depth current block depth
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
-uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][2])
+uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu)
 {  
   uint8_t candidates = 0;
   uint8_t i = 0;
   int8_t duplicate = 0;
 
   cu_info *b0, *b1, *b2, *a0, *a1;
+  int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
+  
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
                                                      (CU1)->inter.mv[0] == (CU2)->inter.mv[0] && \
-                                                     (CU1)->inter.mv[1] == (CU2)->inter.mv[1]) duplicate = 1; }
+                                                     (CU1)->inter.mv[1] == (CU2)->inter.mv[1] && \
+                                                     (CU1)->inter.mv_ref == (CU2)->inter.mv_ref) duplicate = 1; }
 
   if (a1 && a1->type == CU_INTER) {
       mv_cand[candidates][0] = a1->inter.mv[0];
       mv_cand[candidates][1] = a1->inter.mv[1];
+      mv_cand[candidates][2] = a1->inter.mv_ref;
       candidates++;
   }
 
@@ -389,6 +448,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
     if(!duplicate) {
       mv_cand[candidates][0] = b1->inter.mv[0];
       mv_cand[candidates][1] = b1->inter.mv[1];
+      mv_cand[candidates][2] = b1->inter.mv_ref;
       candidates++;
     }
   }
@@ -398,6 +458,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
     if(!duplicate) {
       mv_cand[candidates][0] = b0->inter.mv[0];
       mv_cand[candidates][1] = b0->inter.mv[1];
+      mv_cand[candidates][2] = b0->inter.mv_ref;
       candidates++;
     }
   }
@@ -406,7 +467,8 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
     if(candidates) CHECK_DUPLICATE(a0,a1);
     if(!duplicate) {
       mv_cand[candidates][0] = a0->inter.mv[0];
-      mv_cand[candidates][1] = a0->inter.mv[1];
+      mv_cand[candidates][1] = a0->inter.mv[1]; 
+      mv_cand[candidates][2] = a0->inter.mv_ref;
       candidates++;
     }
   }
@@ -419,6 +481,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
         if(!duplicate) {
           mv_cand[candidates][0] = b2->inter.mv[0];
           mv_cand[candidates][1] = b2->inter.mv[1];
+          mv_cand[candidates][2] = b2->inter.mv_ref;
           candidates++;
         }
       }
@@ -436,6 +499,8 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   if (candidates != 5) {
     mv_cand[candidates][0] = 0;
     mv_cand[candidates][1] = 0;
+    mv_cand[candidates][2] = zero_idx;
+    zero_idx++;
     candidates++;
   }
 

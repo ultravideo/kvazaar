@@ -2702,23 +2702,23 @@ void encode_block_residual(encoder_control *encoder,
 
   } else {
     int16_t mv_cand[2][2];
-    
+
     // Search for merge mode candidate
-    int16_t merge_cand[MRG_MAX_NUM_CANDS][2];
+    int16_t merge_cand[MRG_MAX_NUM_CANDS][3];
     // Get list of candidates
-    int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand);
+    int16_t num_cand = inter_get_merge_cand(encoder, x_ctb, y_ctb, depth, merge_cand, cur_cu);
     // Check every candidate to find a match
     for(cur_cu->merge_idx = 0; cur_cu->merge_idx < num_cand; cur_cu->merge_idx++) {
       if(merge_cand[cur_cu->merge_idx][0] == cur_cu->inter.mv[0] &&
-          merge_cand[cur_cu->merge_idx][1] == cur_cu->inter.mv[1]) {
+          merge_cand[cur_cu->merge_idx][1] == cur_cu->inter.mv[1] &&
+          merge_cand[cur_cu->merge_idx][2] == cur_cu->inter.mv_ref) {
         cur_cu->merged = 1;
         break;
       }
     }
-    
-    
+
     // Get MV candidates
-    inter_get_mv_cand(encoder, x_ctb, y_ctb, depth, mv_cand);
+    inter_get_mv_cand(encoder, x_ctb, y_ctb, depth, mv_cand, cur_cu);
 
     // Select better candidate
     cur_cu->inter.mv_cand = 0; // Default to candidate 0
