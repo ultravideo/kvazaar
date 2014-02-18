@@ -2711,7 +2711,7 @@ void encode_block_residual(encoder_control *encoder,
     for(cur_cu->merge_idx = 0; cur_cu->merge_idx < num_cand; cur_cu->merge_idx++) {
       if(merge_cand[cur_cu->merge_idx][0] == cur_cu->inter.mv[0] &&
           merge_cand[cur_cu->merge_idx][1] == cur_cu->inter.mv[1] &&
-          merge_cand[cur_cu->merge_idx][3] == cur_cu->inter.mv_ref) {
+          merge_cand[cur_cu->merge_idx][2] == cur_cu->inter.mv_ref) {
         cur_cu->merged = 1;
         break;
       }
