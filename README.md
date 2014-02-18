@@ -21,6 +21,7 @@ meant to be user configurable later.
                                          0: only first picture is intra
                                          1: all pictures are intra
                                          2-N: every Nth picture is intra
+          -r, --ref <integer>        : Reference frames, range 1..5 [5]
               --no-deblock           : Disable deblocking filter
               --deblock <beta:tc>    : Deblocking filter parameters
                                        beta and tc range is -6..6 [0:0]

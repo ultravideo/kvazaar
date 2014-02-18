@@ -75,6 +75,7 @@ int config_init(config *cfg)
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
+  cfg->ref_frames      = 5;
 
   return 1;
 }
@@ -183,6 +184,13 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->qp = atoi(value);
   OPT("period")
     cfg->intra_period = atoi(value);
+  OPT("ref") {
+    cfg->ref_frames = atoi(value);
+    if (cfg->ref_frames  < 1 || cfg->ref_frames > MAX_REF_PIC_COUNT) {
+      fprintf(stderr, "--ref out of range [1..5], set to 5\n");
+      cfg->ref_frames = 5;
+    }
+  }
   OPT("deblock") {
     int beta, tc;
     if (2 == sscanf(value, "%d:%d", &beta, &tc)) {
@@ -258,7 +266,7 @@ int config_read(config *cfg,int argc, char *argv[])
   int arg = 1;
   char option = 0;
   
-  static char short_options[] = "i:o:d:w:h:n:q:p:";
+  static char short_options[] = "i:o:d:w:h:n:q:p:r:";
   static struct option long_options[] =
   {
     { "input",              required_argument, NULL, 'i' },
@@ -269,6 +277,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "frames",             required_argument, NULL, 'n' },
     { "qp",                 required_argument, NULL, 'q' },
     { "period",             required_argument, NULL, 'p' },
+    { "ref",                required_argument, NULL, 'r' },
     { "no-deblock",               no_argument, NULL, 0 },
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
