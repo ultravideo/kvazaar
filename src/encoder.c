@@ -632,6 +632,7 @@ void encode_prefix_sei_version(encoder_control* encoder)
   s += sprintf(s, " sao=%d", cfg->sao_enable);
   s += sprintf(s, " intra_period=%d", cfg->intra_period);
   s += sprintf(s, " qp=%d", cfg->qp);
+  s += sprintf(s, " ref=%d", cfg->ref_frames);
   
   length = (int)(s - buf + 1);  // length, +1 for \0
   
