@@ -338,7 +338,7 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   cur_cu->part_size = SIZE_2Nx2N;
 
   // Do search for NxN split.
-  if (depth == MAX_DEPTH) {
+  if (0 && depth == MAX_DEPTH) { //TODO: reactivate NxN when _something_ is done to make it better
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
     int8_t nn_mode = cur_cu->intra[0].mode;
