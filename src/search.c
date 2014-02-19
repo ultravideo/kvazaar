@@ -280,7 +280,7 @@ unsigned search_mv_full(unsigned depth,
 
 void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth) {
   picture *cur_pic = encoder->in.cur_pic;
-  int ref_idx = 0;  
+  uint32_t ref_idx = 0;  
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   cur_cu->inter.cost = UINT_MAX;
 
@@ -288,7 +288,7 @@ void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
     picture *ref_pic = encoder->ref->pics[ref_idx];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);  
     cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];    
-    uint32_t temp_cost;
+    uint32_t temp_cost = (int)(g_lambda_cost[encoder->QP] * ref_idx);
     vector2d orig, mv;
     orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
     orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
@@ -302,7 +302,7 @@ void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
   #if SEARCH_MV_FULL_RADIUS
     cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
   #else
-    temp_cost = hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
+    temp_cost += hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
   #endif
     if(temp_cost < cur_cu->inter.cost) {
       cur_cu->inter.mv_ref = ref_idx;
