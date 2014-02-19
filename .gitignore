@@ -1,6 +1,7 @@
 # Build files
 /bin
 /build
+/scons_build_*
 
 # Generated documentation
 /doxygen_html

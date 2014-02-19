@@ -1,0 +1,18 @@
+""" Build Kvazaa
+"""
+
+import os
+
+Import('env')
+
+sources = []
+sources += env.Glob('*.c')
+sources += env.Glob('extras/*.c')
+sources += env.Glob('x86/*.asm')
+env.Depends('x86/cpu.asm', 'x86/x86inc.asm')
+
+prog = env.Program('kvazaar', sources)
+
+env.Clean(prog, '.')  # Remove variant_dir with 'scons -c'.
+
+Return('prog')
