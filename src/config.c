@@ -75,7 +75,7 @@ int config_init(config *cfg)
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
-  cfg->ref_frames      = 5;
+  cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
 
   return 1;
 }
@@ -187,8 +187,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
   OPT("ref") {
     cfg->ref_frames = atoi(value);
     if (cfg->ref_frames  < 1 || cfg->ref_frames > MAX_REF_PIC_COUNT) {
-      fprintf(stderr, "--ref out of range [1..5], set to 5\n");
-      cfg->ref_frames = 5;
+      fprintf(stderr, "--ref out of range [1..16], set to 3\n");
+      cfg->ref_frames = 3;
     }
   }
   OPT("deblock") {

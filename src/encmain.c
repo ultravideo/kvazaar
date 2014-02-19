@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
             "                                     0: only first picture is intra\n"
             "                                     1: all pictures are intra\n"
             "                                     2-N: every Nth picture is intra\n"
-            "      -r, --ref <integer>        : Reference frames, range 1..5 [5]\n"
+            "      -r, --ref <integer>        : Reference frames, range 1..16 [3]\n"
             "          --no-deblock           : Disable deblocking filter\n"
             "          --deblock <beta:tc>    : Deblocking filter parameters\n"
             "                                   beta and tc range is -6..6 [0:0]\n"

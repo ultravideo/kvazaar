@@ -85,7 +85,8 @@ typedef int16_t coefficient;
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
-#define MAX_REF_PIC_COUNT 5
+#define MAX_REF_PIC_COUNT 16
+#define DEFAULT_REF_PIC_COUNT 3
 
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
