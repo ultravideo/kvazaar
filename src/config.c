@@ -186,8 +186,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->intra_period = atoi(value);
   OPT("ref") {
     cfg->ref_frames = atoi(value);
-    if (cfg->ref_frames  < 1 || cfg->ref_frames > MAX_REF_PIC_COUNT) {
-      fprintf(stderr, "--ref out of range [1..16], set to 3\n");
+    if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
+      fprintf(stderr, "--ref out of range [1..15], set to 3\n");
       cfg->ref_frames = 3;
     }
   }
