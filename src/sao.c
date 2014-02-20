@@ -55,6 +55,79 @@ static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
 /**
  * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
+ * \param sao_bands an array of bands for original and reconstructed block 
+ */
+int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_position)
+{
+  int band;
+  int offset;
+  int shift = g_bitdepth-5;
+  int best_dist;
+  int temp_dist;
+  int dist[32];
+  int temp_offsets[32];
+  int best_dist_pos = 0;
+
+  memset(dist, 0, 32*sizeof(int));
+
+  // Calculate distortion for each band using N*h^2 - 2*h*E
+  for (band = 0; band < 32; band++) {
+    best_dist = INT_MAX;
+    offset = sao_bands[1][band];
+    while(offset != 0) {
+      temp_dist = sao_bands[0][band]*offset*offset - 2*offset*sao_bands[0][band];
+
+      // Store best distortion and offset
+      if(temp_dist < best_dist) {
+        dist[band] = temp_dist;
+        temp_offsets[band] = offset;
+      }
+      offset += (offset > 0) ? -1:1;
+    }
+  }
+
+  best_dist = INT_MAX;
+  //Find starting pos for best 4 band distortions
+  for (band = 0; band < 28; band++) {
+    temp_dist = dist[band] + dist[band+1] + dist[band+2] + dist[band+3];
+    if(temp_dist < best_dist) {
+      best_dist = temp_dist;
+      best_dist_pos = band;
+    }
+  }
+  // Copy best offsets to output
+  memcpy(offsets, &temp_offsets[best_dist_pos], 4*sizeof(int));
+  
+  *band_position = best_dist_pos;
+
+  return best_dist;
+}
+
+/**
+ * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
+ * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
+ * \param sao_bands an array of bands for original and reconstructed block 
+ */
+void calc_sao_bands(const pixel *orig_data, const pixel *rec_data,
+                   int block_width, int block_height,
+                   int sao_bands[2][32])
+{
+  int y, x;
+  int shift = g_bitdepth-5;
+
+  //Loop pixels and take top 5 bits to classify different bands
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {      
+      sao_bands[0][rec_data[y * block_width + x]>>shift] += orig_data[y * block_width + x] - rec_data[y * block_width + x];
+      sao_bands[1][rec_data[y * block_width + x]>>shift]++;
+    }
+  }
+}
+
+
+/**
+ * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
+ * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
  * \param dir_offsets
  * \param is_chroma  0 for luma, 1 for chroma. Indicates 
  */
@@ -262,6 +335,7 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   sao_eo_class edge_class;
   // This array is used to calculate the mean offset used to minimize distortion.
   int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES];
+  unsigned i = 0;
   memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
 
   sao_out->ddistortion = INT_MAX;
@@ -270,7 +344,6 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     int edge_offset[NUM_SAO_EDGE_CATEGORIES];
     int sum_ddistortion = 0;
     sao_eo_cat edge_cat;
-    unsigned i = 0;
 
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
@@ -317,6 +390,28 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       sao_out->eo_class = edge_class;
       sao_out->ddistortion = sum_ddistortion;
       memcpy(sao_out->offsets, edge_offset, sizeof(int) * NUM_SAO_EDGE_CATEGORIES);
+    }
+  }
+
+  // Band offset
+  {
+    int sao_bands[2][32];
+    int temp_offsets[4];
+    int ddistortion;
+
+    memset(sao_bands, 0, 2*32*sizeof(int));
+    for (i = 0; i < buf_cnt; ++i) {
+      calc_sao_bands(data[i], recdata[i],block_width,
+                     block_height,sao_bands);
+    }
+
+    ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position);
+    
+    // Select band sao over edge sao when distortion is lower
+    if (ddistortion < sao_out->ddistortion) {
+      sao_out->type = SAO_TYPE_BAND;
+      sao_out->ddistortion = ddistortion;
+      memcpy(&sao_out->offsets[1], temp_offsets, sizeof(int) * 4);
     }
   }
 }

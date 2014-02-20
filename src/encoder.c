@@ -1155,13 +1155,13 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   /// sao_eo_class_luma:       FL, cMax = 3, bins = {bypass x 3}
   /// sao_eo_class_chroma:     FL, cMax = 3, bins = {bypass x 3}
   if (sao->type == SAO_TYPE_BAND) {
-    for (i = SAO_EO_CAT1; i < SAO_EO_CAT4; ++i) {
+    for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
       // Positive sign is coded as 0.
       CABAC_BIN_EP(&cabac, sao->offsets[i] >= 0 ? 0 : 1, "sao_offset_sign");
     }
     // TODO: sao_band_position
     // FL cMax=31 (6 bits)
-    //CABAC_BINS_EP(&cavac, sao->band_position, 6, "sao_band_position");
+    CABAC_BINS_EP(&cabac, sao->band_position, 6, "sao_band_position");
   } else if (color_i != COLOR_V) {
     CABAC_BINS_EP(&cabac, sao->eo_class, 2, "sao_eo_class");
   }
