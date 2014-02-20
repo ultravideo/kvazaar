@@ -73,9 +73,11 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
   // Calculate distortion for each band using N*h^2 - 2*h*E
   for (band = 0; band < 32; band++) {
     best_dist = INT_MAX;
-    offset = sao_bands[1][band];
+    offset = sao_bands[1][band]?sao_bands[0][band]/sao_bands[1][band]:0;
+    dist[band] = offset==0?0:INT_MAX;
+    temp_offsets[band] = 0;    
     while(offset != 0) {
-      temp_dist = sao_bands[0][band]*offset*offset - 2*offset*sao_bands[0][band];
+      temp_dist = sao_bands[1][band]*offset*offset - 2*offset*sao_bands[0][band];
 
       // Store best distortion and offset
       if(temp_dist < best_dist) {

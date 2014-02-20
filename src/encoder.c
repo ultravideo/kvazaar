@@ -1141,13 +1141,8 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
-  for (i = SAO_EO_CAT1; i <= SAO_EO_CAT2; ++i) {
-    assert(sao->offsets[i] >= 0);
-    cabac_write_unary_max_symbol_ep(&cabac, sao->offsets[i], SAO_ABS_OFFSET_MAX);
-  }
-  for (i = SAO_EO_CAT3; i <= SAO_EO_CAT4; ++i) {
-    assert(sao->offsets[i] <= 0);
-    cabac_write_unary_max_symbol_ep(&cabac, -sao->offsets[i], SAO_ABS_OFFSET_MAX);
+  for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
+    cabac_write_unary_max_symbol_ep(&cabac, abs(sao->offsets[i]), SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
@@ -1157,11 +1152,13 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   if (sao->type == SAO_TYPE_BAND) {
     for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
       // Positive sign is coded as 0.
-      CABAC_BIN_EP(&cabac, sao->offsets[i] >= 0 ? 0 : 1, "sao_offset_sign");
+      if(sao->offsets[i] != 0) {
+        CABAC_BIN_EP(&cabac, sao->offsets[i] < 0 ? 1 : 0, "sao_offset_sign");
+      }
     }
     // TODO: sao_band_position
-    // FL cMax=31 (6 bits)
-    CABAC_BINS_EP(&cabac, sao->band_position, 6, "sao_band_position");
+    // FL cMax=31 (5 bits)
+    CABAC_BINS_EP(&cabac, sao->band_position, 5, "sao_band_position");
   } else if (color_i != COLOR_V) {
     CABAC_BINS_EP(&cabac, sao->eo_class, 2, "sao_eo_class");
   }
