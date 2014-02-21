@@ -403,7 +403,8 @@ double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
 /**
  * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
  */
-unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, int32_t iStrideCur)
+static unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg,
+                                       pixel *piCur, int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
@@ -498,8 +499,8 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
 // for fixed size blocks. They calculate hadamart for integer
 // multiples of 8x8 with the 8x8 hadamart function.
 #define SATD_NXN(n, pixel_type, suffix) \
-  unsigned satd_ ## suffix ## _ ## n ## x ## n( \
-                    pixel_type *block1, pixel_type *block2) \
+  static unsigned satd_ ## suffix ## _ ## n ## x ## n( \
+                  pixel_type *block1, pixel_type *block2) \
   { \
     unsigned y, x; \
     unsigned sum = 0; \
@@ -521,8 +522,8 @@ SATD_NXN(64, pixel, 16bit)
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type, suffix) \
-  unsigned sad_ ## suffix ## _ ##  n ## x ## n( \
-               pixel_type *block1, pixel_type *block2) \
+  static unsigned sad_ ## suffix ## _ ##  n ## x ## n( \
+                  pixel_type *block1, pixel_type *block2) \
   { \
     unsigned x, y, row; \
     unsigned sum = 0; \
@@ -601,7 +602,7 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
  *
  * \returns       Sum of Absolute Transformed Differences (SATD)
  */
-unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
+static unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_satd_16bit_nxn_func(n);
   return sad_func(block1, block2);
@@ -616,7 +617,7 @@ unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
  *
  * \returns       Sum of Absolute Differences
  */
-unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
+static unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 {
   cost_16bit_nxn_func sad_func = get_sad_16bit_nxn_func(n);
   if (sad_func) {
@@ -644,8 +645,8 @@ unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
  *
  * \returns Sum of Absolute Differences
  */
-unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
-                 int block_width, int block_height, unsigned width)
+static unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
+                        int block_width, int block_height, unsigned width)
 {
   pixel ref = *ref_data;
   int x, y;
@@ -671,8 +672,8 @@ unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
-                 int block_width, int block_height, unsigned width)
+static unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
+                        int block_width, int block_height, unsigned width)
 {
   int x, y;
   unsigned sad = 0;
@@ -697,8 +698,8 @@ unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
-                 int block_width, int block_height, unsigned width)
+static unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
+                        int block_width, int block_height, unsigned width)
 {
   int x, y;
   unsigned sad = 0;
@@ -726,8 +727,8 @@ unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-unsigned reg_sad(const pixel *data1, const pixel *data2,
-                 int width, int height, unsigned stride)
+static unsigned reg_sad(const pixel *data1, const pixel *data2,
+                        int width, int height, unsigned stride)
 {
   int y, x;
   unsigned sad = 0;
@@ -754,9 +755,9 @@ unsigned reg_sad(const pixel *data1, const pixel *data2,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-unsigned interpolated_sad(const picture *pic, const picture *ref,
-                          int pic_x, int pic_y, int ref_x, int ref_y,
-                          int block_width, int block_height)
+static unsigned interpolated_sad(const picture *pic, const picture *ref,
+                                 int pic_x, int pic_y, int ref_x, int ref_y,
+                                 int block_width, int block_height)
 {
   pixel *pic_data, *ref_data;
   int width = pic->width;
