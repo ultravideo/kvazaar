@@ -828,7 +828,6 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
   #if ENABLE_SIGN_HIDING == 1
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
   #endif
-  int32_t qp_base = encoder->QP;
 
   int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
 
@@ -957,7 +956,6 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
   int32_t shift,add,coeff_q,clip_q_coef;
   int32_t n;
   int32_t transform_shift = 15 - g_bitdepth - (g_convert_to_bit[ width ] + 2);
-  int32_t qp_base = encoder->QP;
 
   int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
 
