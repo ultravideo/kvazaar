@@ -169,6 +169,25 @@ const int16_t g_inv_quant_scales[6]    = { 40,45,51,57,64,72 };
 // FUNCTIONS
 // 
 
+/**
+ * \brief Get scaled QP used in quantization
+ * 
+ */
+int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
+{
+  int32_t qp_scaled = 0;
+  if(type == 0) {
+    qp_scaled = qp + qp_offset;
+  } else {
+    qp_scaled = CLIP(-qp_offset, 57, qp);
+    if(qp_scaled < 0) {
+      qp_scaled = qp_scaled + qp_offset;
+    } else {
+      qp_scaled = g_chroma_scale[qp_scaled] + qp_offset;
+    }
+  }
+  return qp_scaled;
+}
 
 /**
  * \brief Initialize scaling lists
@@ -798,19 +817,8 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
   #endif
   int32_t qp_base = encoder->QP;
-
-  int32_t qp_scaled;
-  int32_t qp_offset = 0;
-  if(type == 0) {
-    qp_scaled = qp_base + qp_offset;
-  } else {
-    qp_scaled = CLIP(-qp_offset, 57, qp_base);
-    if(qp_scaled < 0) {
-      qp_scaled = qp_scaled + qp_offset;
-    } else {
-      qp_scaled = g_chroma_scale[qp_scaled] + qp_offset;
-    }
-  }
+  
+  int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
 
   //New block for variable definitions
   {
@@ -937,19 +945,9 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
   int32_t shift,add,coeff_q,clip_q_coef;
   int32_t n;
   int32_t transform_shift = 15 - g_bitdepth - (g_convert_to_bit[ width ] + 2);
-  int32_t qp_scaled;
   int32_t qp_base = encoder->QP;
 
-  if (type == 0) {
-    qp_scaled = qp_base;
-  } else {
-    qp_scaled = CLIP( 0, 57, qp_base);
-    if (qp_scaled < 0) {
-      qp_scaled = qp_scaled;
-    } else {
-      qp_scaled = g_chroma_scale[qp_scaled];
-    }
-  }
+  int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
   
   shift = 20 - QUANT_SHIFT - transform_shift;
 

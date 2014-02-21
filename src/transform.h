@@ -68,4 +68,6 @@ void scalinglist_destroy();
 int32_t *scalinglist_get_default(uint32_t size_id, uint32_t list_id);
 int scalinglist_parse(FILE *fp);
 
+int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
+
 #endif

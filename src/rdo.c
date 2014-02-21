@@ -286,19 +286,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);  
   int32_t  qp_base         = encoder->QP;
 
-  int32_t  qp_scaled;
-  int32_t  qp_offset = 0;
-
-  if(type == 0) {
-    qp_scaled = qp_base + qp_offset;
-  } else {
-    qp_scaled = CLIP(-qp_offset, 57, qp_base);
-    if(qp_scaled < 0) {
-      qp_scaled = qp_scaled + qp_offset;
-    } else {
-      qp_scaled = g_chroma_scale[qp_scaled] + qp_offset;
-    }
-  }
+  int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
 
   {
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
