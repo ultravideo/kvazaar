@@ -32,11 +32,11 @@
 #include <stdio.h>
 #include <limits.h>
 
-#if _MSC_VER && _M_AMD64
+#if defined(_MSC_VER) && defined(_M_AMD64)
   #define X86_64
 #endif
 
-#if __GNUC__ && __x86_64__
+#if defined(__GNUC__) && defined(__x86_64__)
   #define X86_64
 #endif
 
