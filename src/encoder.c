@@ -43,6 +43,7 @@
 #include "rdo.h"
 
 double g_lambda_cost[55];
+double g_cur_lambda_cost;
 uint32_t* g_sig_last_scan[3][7];
 
 /* Local functions. */
@@ -230,6 +231,7 @@ void init_lambda(encoder_control *encoder)
   }
   
   g_lambda_cost[encoder->QP] = lambda;
+  g_cur_lambda_cost = lambda;
 }
 
 void free_tables(void)

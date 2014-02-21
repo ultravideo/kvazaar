@@ -128,6 +128,7 @@ void encode_block_residual(encoder_control *encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
 extern double g_lambda_cost[55];
+extern double g_cur_lambda_cost;
 extern uint32_t* g_sig_last_scan[3][7];
 int8_t g_convert_to_bit[LCU_WIDTH + 1];
 static int8_t g_bitdepth     = 8;

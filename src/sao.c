@@ -52,6 +52,26 @@ static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
 // Mapping relationships between a, b and c to eo_idx.
 #define EO_IDX(a, b, c) (2 + SIGN3((c) - (a)) + SIGN3((c) - (b)))
 
+/**
+ * \brief Check merge conditions
+ */
+int sao_check_merge(const sao_info *sao_candidate, int type, int offsets[NUM_SAO_EDGE_CATEGORIES],
+                         int band_position, int eo_class)
+{
+  if (sao_candidate->type == type) {
+    if (offsets[1] == sao_candidate->offsets[1] &&
+        offsets[2] == sao_candidate->offsets[2] &&
+        offsets[3] == sao_candidate->offsets[3] &&
+        offsets[4] == sao_candidate->offsets[4]) {
+      // Type must be BAND or EDGE
+      if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position) ||
+        (type == SAO_TYPE_EDGE && eo_class == sao_candidate->eo_class)) {
+          return 1;
+      }
+    }
+  }
+  return 0;
+}
 
 /**
  * \brief calculate an array of intensity correlations for each intensity value
@@ -79,7 +99,7 @@ void calc_sao_offset_array(const sao_info *sao, int *offset)
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
  * \param sao_bands an array of bands for original and reconstructed block 
  */
-int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_position)
+int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_position, int *rate)
 {
   int band;
   int offset;
@@ -88,9 +108,11 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
   int temp_dist;
   int dist[32];
   int temp_offsets[32];
+  int temp_rate[32];
   int best_dist_pos = 0;
 
   memset(dist, 0, 32*sizeof(int));
+  memset(temp_rate, 0, 32*sizeof(int));
 
   // Calculate distortion for each band using N*h^2 - 2*h*E
   for (band = 0; band < 32; band++) {
@@ -105,6 +127,12 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
     while(offset != 0) {
       temp_dist = sao_bands[1][band]*offset*offset - 2*offset*sao_bands[0][band];
 
+      // Calculate used rate to code this
+      temp_rate[band] = abs(offset+2);
+      // When max offset, no need to signal final bit
+      if (abs(offset)==SAO_ABS_OFFSET_MAX) {
+        temp_rate[band] --;
+      }
       // Store best distortion and offset
       if(temp_dist < best_dist) {
         dist[band] = temp_dist;
@@ -123,6 +151,8 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
       best_dist_pos = band;
     }
   }
+  *rate = temp_rate[best_dist_pos]+temp_rate[best_dist_pos+1]+
+          temp_rate[best_dist_pos+2]+temp_rate[best_dist_pos+3];
   // Copy best offsets to output
   memcpy(offsets, &temp_offsets[best_dist_pos], 4*sizeof(int));
   
@@ -414,6 +444,7 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   // This array is used to calculate the mean offset used to minimize distortion.
   int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES];
   unsigned i = 0;
+  int temp_rate = 0;
   memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
 
   sao_out->ddistortion = INT_MAX;
@@ -459,7 +490,20 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       // increase increase SSE by h^2 and all pixels that are improved by
       // offset decrease SSE by h*E.
       sum_ddistortion += cat_cnt * offset * offset - 2 * offset * cat_sum;
+
+      // Calculate used rate to code this
+      temp_rate += abs(offset+2);
+      // When max offset, no need to signal final bit
+      if (abs(offset)==SAO_ABS_OFFSET_MAX) {
+        temp_rate --;
+      }      
     }
+    // If can merge, use lower cost
+    if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, edge_offset,0, edge_class)) ||
+       (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, edge_offset,0, edge_class))) {
+          temp_rate = 1;
+    }
+    sum_ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
 
@@ -476,15 +520,21 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     int sao_bands[2][32];
     int temp_offsets[4];
     int ddistortion;
+    int temp_rate = 0;
 
-    memset(sao_bands, 0, 2*32*sizeof(int));
+    memset(sao_bands, 0, 2 * 32 * sizeof(int));
     for (i = 0; i < buf_cnt; ++i) {
       calc_sao_bands(data[i], recdata[i],block_width,
                      block_height,sao_bands);
     }
 
-    ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position);
+    ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position, &temp_rate);
     
+    if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, temp_offsets,sao_out->band_position, 0)) ||
+       (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, temp_offsets,sao_out->band_position, 0))) {
+          temp_rate = 1;
+    }
+    ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
       sao_out->type = SAO_TYPE_BAND;
@@ -493,36 +543,22 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     }
   }
 
-  // Check for merge modes
-  if(sao_top != NULL) {
-    if(sao_top->type == sao_out->type) {
-      if(sao_out->offsets[1] == sao_top->offsets[1] &&
-          sao_out->offsets[2] == sao_top->offsets[2] &&
-          sao_out->offsets[3] == sao_top->offsets[3] &&
-          sao_out->offsets[4] == sao_top->offsets[4]) {
-        // Type must be BAND or EDGE
-        if((sao_out->type == SAO_TYPE_BAND && sao_out->band_position == sao_top->band_position) ||
-          (sao_out->type == SAO_TYPE_EDGE && sao_out->eo_class == sao_top->eo_class)) {
-            sao_out->merge_up_flag = 1;
-        }
-      }
-    }
+  // When BD-rate would increase because of SAO, disable it
+  if(sao_out->ddistortion > 0) {
+    sao_out->type = SAO_TYPE_NONE;
+    return;
   }
 
   // Check for merge modes
-  if(sao_left != NULL) {
-    if(sao_left->type == sao_out->type) {
-      if(sao_out->offsets[1] == sao_left->offsets[1] &&
-          sao_out->offsets[2] == sao_left->offsets[2] &&
-          sao_out->offsets[3] == sao_left->offsets[3] &&
-          sao_out->offsets[4] == sao_left->offsets[4]) {
-        // Type must be BAND or EDGE
-        if((sao_out->type == SAO_TYPE_BAND && sao_out->band_position == sao_left->band_position) ||
-          (sao_out->type == SAO_TYPE_EDGE && sao_out->eo_class == sao_left->eo_class)) {
-            sao_out->merge_left_flag = 1;
-        }
-      }
-    }
+  if (sao_top != NULL) {
+    sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
+                                             sao_out->band_position, sao_out->eo_class);
+  }
+
+  // Check for merge modes
+  if (sao_left != NULL) {
+    sao_out->merge_left_flag = sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
+                                               sao_out->band_position, sao_out->eo_class);
   }
 }
 
