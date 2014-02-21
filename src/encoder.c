@@ -1215,14 +1215,26 @@ void encode_slice_data(encoder_control* encoder)
     for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
       for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
         unsigned stride = encoder->in.width_in_lcu;
+
+        //Fetch luma top and left merge candidate
+        sao_info *sao_top = y_ctb!=0?&pic->sao_luma[(y_ctb-1) * stride + x_ctb]:NULL;
+        sao_info *sao_left = x_ctb!=0?&pic->sao_luma[y_ctb * stride + x_ctb -1]:NULL;
+
         sao_info *sao_luma = &pic->sao_luma[y_ctb * stride + x_ctb];
         sao_info *sao_chroma = &pic->sao_chroma[y_ctb * stride + x_ctb];
         init_sao_info(sao_luma);
         init_sao_info(sao_chroma);
 
-        sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, sao_luma);
-        sao_search_chroma(encoder->in.cur_pic, x_ctb, y_ctb, sao_chroma);
-        // sao_do_merge(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
+        sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, sao_luma, sao_top, sao_left);
+        // Chroma top and left merge candidate
+        sao_top = y_ctb!=0?&pic->sao_chroma[(y_ctb-1) * stride + x_ctb]:NULL;
+        sao_left = x_ctb!=0?&pic->sao_chroma[y_ctb * stride + x_ctb -1]:NULL;
+        sao_search_chroma(encoder->in.cur_pic, x_ctb, y_ctb, sao_chroma, sao_top, sao_left);
+
+        // Merge only if both luma and chroma can be merged
+        sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
+        sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+
         // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
         sao_reconstruct(pic, new_y_data, x_ctb, y_ctb, sao_luma, COLOR_Y);
         sao_reconstruct(pic, new_u_data, x_ctb, y_ctb, sao_chroma, COLOR_U);

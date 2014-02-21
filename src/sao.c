@@ -408,7 +408,7 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
 void sao_search_best_mode(const pixel * data[], const pixel * recdata[], 
                           int block_width, int block_height,
                           unsigned buf_cnt,
-                          sao_info *sao_out)
+                          sao_info *sao_out, sao_info *sao_top, sao_info *sao_left)
 {
   sao_eo_class edge_class;
   // This array is used to calculate the mean offset used to minimize distortion.
@@ -492,9 +492,41 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       memcpy(&sao_out->offsets[1], temp_offsets, sizeof(int) * 4);
     }
   }
+
+  // Check for merge modes
+  if(sao_top != NULL) {
+    if(sao_top->type == sao_out->type) {
+      if(sao_out->offsets[1] == sao_top->offsets[1] &&
+          sao_out->offsets[2] == sao_top->offsets[2] &&
+          sao_out->offsets[3] == sao_top->offsets[3] &&
+          sao_out->offsets[4] == sao_top->offsets[4]) {
+        // Type must be BAND or EDGE
+        if((sao_out->type == SAO_TYPE_BAND && sao_out->band_position == sao_top->band_position) ||
+          (sao_out->type == SAO_TYPE_EDGE && sao_out->eo_class == sao_top->eo_class)) {
+            sao_out->merge_up_flag = 1;
+        }
+      }
+    }
+  }
+
+  // Check for merge modes
+  if(sao_left != NULL) {
+    if(sao_left->type == sao_out->type) {
+      if(sao_out->offsets[1] == sao_left->offsets[1] &&
+          sao_out->offsets[2] == sao_left->offsets[2] &&
+          sao_out->offsets[3] == sao_left->offsets[3] &&
+          sao_out->offsets[4] == sao_left->offsets[4]) {
+        // Type must be BAND or EDGE
+        if((sao_out->type == SAO_TYPE_BAND && sao_out->band_position == sao_left->band_position) ||
+          (sao_out->type == SAO_TYPE_EDGE && sao_out->eo_class == sao_left->eo_class)) {
+            sao_out->merge_left_flag = 1;
+        }
+      }
+    }
+  }
 }
 
- void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao)
+ void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -527,10 +559,10 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   }
 
   // Calculate 
-  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 2, sao);
+  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left);
 }
 
-void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao)
+void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
@@ -557,5 +589,5 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
 
   orig_list[0] = orig;
   rec_list[0] = rec;
-  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao);
+  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left);
 }
