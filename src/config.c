@@ -33,7 +33,7 @@
  * \brief Allocate memory for config object
  * \return pointer to allocated memory
  */
-config *config_alloc()
+config *config_alloc(void)
 {
   config *cfg = (config *)malloc(sizeof(config));
   if (!cfg) {

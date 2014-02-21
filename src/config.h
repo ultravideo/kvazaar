@@ -63,7 +63,7 @@ typedef struct
 } config;
 
 /* Function definitions */
-config *config_alloc();
+config *config_alloc(void);
 int config_init(config *cfg);
 int config_destroy(config *cfg);
 int config_read(config *cfg,int argc, char *argv[]);
