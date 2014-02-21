@@ -262,10 +262,6 @@ static int config_parse(config *cfg, const char *name, const char *value)
  */
 int config_read(config *cfg,int argc, char *argv[])
 {
-  uint32_t pos = 0;
-  int arg = 1;
-  char option = 0;
-
   static char short_options[] = "i:o:d:w:h:n:q:p:r:";
   static struct option long_options[] =
   {

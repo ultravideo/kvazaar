@@ -422,7 +422,6 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
 uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu)
 {
   uint8_t candidates = 0;
-  uint8_t i = 0;
   int8_t duplicate = 0;
 
   cu_info *b0, *b1, *b2, *a0, *a1;

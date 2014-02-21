@@ -271,7 +271,6 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
 {
   int32_t stride = encoder->in.cur_pic->width >> 1;
   int32_t tc_offset_div2 = encoder->tc_offset_div2;
-  int8_t num_parts = 1;
   // TODO: support 10+bits
   pixel *src_u = &encoder->in.cur_pic->u_recdata[x + y*stride];
   pixel *src_v = &encoder->in.cur_pic->v_recdata[x + y*stride];
@@ -433,7 +432,6 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
   int32_t shift1 = g_bitdepth-8;
   int32_t shift2 = 6;
   int32_t shift3 = 14-g_bitdepth;
-  int32_t offset = 1 << (shift2 - 1); //!< offset for rounding purposes
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
