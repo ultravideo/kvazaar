@@ -74,14 +74,14 @@ int floor_log2(unsigned int n) {
 int init_exp_golomb(uint32_t len)
 {
   uint32_t code_num;
-  uint32_t M;
+  uint8_t M;
   uint32_t info;
   g_exp_table = (bit_table*)malloc(len*sizeof(bit_table));
   if(!g_exp_table)
     return 0;
 
   for (code_num = 0; code_num < len; code_num++) {
-    M = (uint32_t)floor_log2(code_num + 1);
+    M = (uint8_t)floor_log2(code_num + 1);
     info = code_num + 1 - (uint32_t)pow(2, M);
     g_exp_table[code_num].len = M * 2 + 1;
     g_exp_table[code_num].value = (1<<M) | info;
@@ -179,7 +179,7 @@ void bitstream_clear_buffer(bitstream *stream)
  */
 void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
 {
-  uint32_t bitsleft = 32 - stream->cur_bit;
+  uint8_t bitsleft = 32 - stream->cur_bit;
   #ifdef VERBOSE
   uint8_t i=0;
   printf_bitstream("put: ");

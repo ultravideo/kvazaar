@@ -105,7 +105,7 @@ void cabac_encode_bin(cabac_data *data, uint32_t bin_value)
   data->range -= lps;
 
   // Not the Most Probable Symbol?
-  if (bin_value != CTX_MPS(data->ctx)) {
+  if (bin_value != (uint32_t)CTX_MPS(data->ctx)) {
     int num_bits = g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
@@ -162,6 +162,8 @@ void cabac_write(cabac_data *data)
  */
 void cabac_finish(cabac_data *data)
 {
+  assert(data->bits_left <= 32);
+
   if (data->low >> (32 - data->bits_left)) {
     bitstream_put(data->stream,data->buffered_byte + 1, 8);
     while (data->num_buffered_bytes > 1) {
@@ -178,7 +180,11 @@ void cabac_finish(cabac_data *data)
       data->num_buffered_bytes--;
     }
   }
-  bitstream_put(data->stream, data->low >> 8, 24 - data->bits_left);
+
+  {
+    uint8_t bits = (uint8_t)(24 - data->bits_left);
+    bitstream_put(data->stream, data->low >> 8, bits);
+  }
 }
 
 /*!
