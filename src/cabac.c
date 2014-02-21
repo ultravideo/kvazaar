@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 
 /*
  * \file
- * 
+ *
  */
 
 #include "cabac.h"
@@ -98,30 +98,30 @@ void cabac_start(cabac_data *data)
 void cabac_encode_bin(cabac_data *data, uint32_t bin_value)
 {
   uint32_t lps;
-  
+
   data->ctx->bins_coded = 1;
-  
+
   lps = g_auc_lpst_table[CTX_STATE(data->ctx)][(data->range >> 6) & 3];
   data->range -= lps;
-  
+
   // Not the Most Probable Symbol?
   if (bin_value != CTX_MPS(data->ctx)) {
     int num_bits = g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
-    
+
     CTX_UPDATE_LPS(data->ctx);
-    
+
     data->bits_left -= num_bits;
   } else {
     CTX_UPDATE_MPS(data->ctx);
     if (data->range >= 256) return;
-    
+
     data->low <<= 1;
     data->range <<= 1;
     data->bits_left--;
   }
-  
+
   if (data->bits_left < 12) {
     cabac_write(data);
   }
@@ -135,7 +135,7 @@ void cabac_write(cabac_data *data)
   uint32_t lead_byte = data->low >> (24 - data->bits_left);
   data->bits_left += 8;
   data->low &= 0xffffffffu >> data->bits_left;
-  
+
   if (lead_byte == 0xff) {
     data->num_buffered_bytes++;
   } else {
@@ -200,7 +200,7 @@ void cabac_encode_bin_trm(cabac_data *data, uint8_t bin_value)
     data->range <<= 1;
     data->bits_left--;
   }
-  
+
   if (data->bits_left < 12) {
     cabac_write(data);
   }
@@ -248,16 +248,16 @@ void cabac_encode_bins_ep(cabac_data *data, uint32_t bin_values, int num_bins)
     data->low += data->range * pattern;
     bin_values -= pattern << num_bins;
     data->bits_left -= 8;
-    
+
     if(data->bits_left < 12) {
       cabac_write(data);
     }
   }
-  
+
   data->low <<= num_bins;
   data->low += data->range * bin_values;
   data->bits_left -= num_bins;
-  
+
   if (data->bits_left < 12) {
     cabac_write(data);
   }
@@ -298,12 +298,12 @@ void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx, uint32_t sym
   assert(symbol <= max_symbol);
 
   if (!max_symbol) return;
-  
+
   data->ctx = &ctx[0];
   CABAC_BIN(data, symbol ? 1 : 0, "ums");
-  
+
   if (!symbol) return;
-  
+
   while (--symbol) {
     data->ctx = &ctx[offset];
     CABAC_BIN(data, 1, "ums");
@@ -327,15 +327,15 @@ void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned
     unsigned bins = ((1 << symbol) - 1) << (symbol < max_symbol);
     CABAC_BINS_EP(data, bins, symbol + (symbol < max_symbol), "ums_ep");
   }*/
-  
+
   int8_t code_last = max_symbol > symbol;
 
   assert(symbol <= max_symbol);
 
   CABAC_BIN_EP(data, symbol ? 1 : 0, "ums_ep");
-  
+
   if (!symbol) return;
-  
+
   while (--symbol) {
     CABAC_BIN_EP(data, 1, "ums_ep");
   }
@@ -351,7 +351,7 @@ void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol, uint32_t count)
 {
   uint32_t bins = 0;
   int32_t num_bins = 0;
-  
+
   while (symbol >= (uint32_t)(1 << count)) {
     bins = 2 * bins + 1;
     ++num_bins;
@@ -360,9 +360,9 @@ void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol, uint32_t count)
   }
   bins = 2 * bins;
   ++num_bins;
-  
+
   bins = (bins << count) | symbol;
   num_bins += count;
-  
+
   cabac_encode_bins_ep(data, bins, num_bins);
 }

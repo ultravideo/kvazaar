@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -36,58 +36,58 @@ const uint8_t INIT_SAO_MERGE_FLAG[3] = { 153, 153, 153 };
 const uint8_t INIT_SAO_TYPE_IDX[3] = { 160, 185, 200 };
 
 const uint8_t INIT_QT_ROOT_CBF[3][1] = {
-  {  79, }, 
-  {  79, }, 
-  { CNU, }, 
+  {  79, },
+  {  79, },
+  { CNU, },
 };
 
 const uint8_t INIT_MVP_IDX[3][2] = {
-  { 168,  CNU, }, 
-  { 168,  CNU, }, 
-  { CNU,  CNU, }, 
+  { 168,  CNU, },
+  { 168,  CNU, },
+  { CNU,  CNU, },
 };
 
 const uint8_t INIT_REF_PIC[3][2] = {
-  { 153,  153 }, 
-  { 153,  153 }, 
-  { CNU,  CNU }, 
+  { 153,  153 },
+  { 153,  153 },
+  { CNU,  CNU },
 };
 
 const uint8_t INIT_MVD[3][2] = {
-  { 169,  198, }, 
-  { 140,  198, }, 
-  { CNU,  CNU, }, 
+  { 169,  198, },
+  { 140,  198, },
+  { CNU,  CNU, },
 };
 
 const uint8_t INIT_MERGE_FLAG_EXT[3][1] = {
-  { 154, }, 
-  { 110, }, 
+  { 154, },
+  { 110, },
   { CNU, },
 };
 
 const uint8_t INIT_MERGE_IDX_EXT[3][1] = {
-  { 137, }, 
-  { 122, }, 
+  { 137, },
+  { 122, },
   { CNU, },
 };
 
 const uint8_t INIT_SKIP_FLAG[3][3] =  {
-  { 197,  185,  201, }, 
-  { 197,  185,  201, }, 
+  { 197,  185,  201, },
+  { 197,  185,  201, },
   { CNU,  CNU,  CNU, },
 };
 
 const uint8_t INIT_PRED_MODE[3][1] = {
-  { 134, }, 
-  { 149, }, 
+  { 134, },
+  { 149, },
   { CNU, },
 };
 
 
 const uint8_t INIT_PART_SIZE[3][4] = {
-  { 154,  139,  CNU,  CNU, }, 
-  { 154,  139,  CNU,  CNU, }, 
-  { 184,  CNU,  CNU,  CNU, }, 
+  { 154,  139,  CNU,  CNU, },
+  { 154,  139,  CNU,  CNU, },
+  { 184,  CNU,  CNU,  CNU, },
 };
 
 const uint8_t  INIT_SPLIT_FLAG[3][3] = {
@@ -96,20 +96,20 @@ const uint8_t  INIT_SPLIT_FLAG[3][3] = {
   { 139,  141,  157 },
 };
 
-const uint8_t INIT_INTRA_PRED_MODE[3] = { 
-  183, 154, 184 
+const uint8_t INIT_INTRA_PRED_MODE[3] = {
+  183, 154, 184
 };
 
-const uint8_t INIT_CHROMA_PRED_MODE[3][2] = { 
-  { 152,  139 }, 
-  { 152,  139 }, 
+const uint8_t INIT_CHROMA_PRED_MODE[3][2] = {
+  { 152,  139 },
+  { 152,  139 },
   {  63,  139 },
 };
 
 
 const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
-  { 224,  167,  122 }, 
-  { 124,  138,   94 }, 
+  { 224,  167,  122 },
+  { 124,  138,   94 },
   { 153,  138,  138 },
 };
 
@@ -119,7 +119,7 @@ const uint8_t INIT_QT_CBF[3][6] = {
   { 111,  141,  CNU,   94,  138,  182 },
 };
 
-const uint8_t INIT_SIG_CG_FLAG[3][4] = {  
+const uint8_t INIT_SIG_CG_FLAG[3][4] = {
   { 121,  140,  61,  154  },
   { 121,  140,  61,  154 },
   {  91,  171,  134,  141  },
@@ -152,17 +152,17 @@ const uint8_t INIT_LAST[3][30] = {
     108,  123,   63,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
 };
 
-const uint8_t INIT_ONE_FLAG[3][24] = 
+const uint8_t INIT_ONE_FLAG[3][24] =
 {
   {154,196,167,167,154,152,167,182,182,134,149,136,153,121,136,122,169,208,166,167,154,152,167,182},
   {154,196,196,167,154,152,167,182,182,134,149,136,153,121,136,137,169,194,166,167,154,167,137,182},
   {140, 92,137,138,140,152,138,139,153, 74,149, 92,139,107,122,152,140,179,166,182,140,227,122,197},
 };
 
-const uint8_t INIT_ABS_FLAG[3][6] =  
+const uint8_t INIT_ABS_FLAG[3][6] =
 {
-  { 107,167, 91,107,107,167}, 
-  { 107,167, 91,122,107,167}, 
+  { 107,167, 91,107,107,167},
+  { 107,167, 91,122,107,167},
   { 138,153,136,167,152,152},
 };
 
@@ -242,11 +242,11 @@ void init_contexts(encoder_control *encoder, int8_t slice)
   ctx_init(&g_split_flag_model[1], encoder->QP, INIT_SPLIT_FLAG[slice][1]);
   ctx_init(&g_split_flag_model[2], encoder->QP, INIT_SPLIT_FLAG[slice][2]);
 
-  ctx_init(&g_intra_mode_model, encoder->QP, INIT_INTRA_PRED_MODE[slice]);  
+  ctx_init(&g_intra_mode_model, encoder->QP, INIT_INTRA_PRED_MODE[slice]);
 
   ctx_init(&g_chroma_pred_model[0], encoder->QP, INIT_CHROMA_PRED_MODE[slice][0]);
   ctx_init(&g_chroma_pred_model[1], encoder->QP, INIT_CHROMA_PRED_MODE[slice][1]);
-  
+
   ctx_init(&g_cu_abs_model_chroma[0], encoder->QP, INIT_ABS_FLAG[slice][4]);
   ctx_init(&g_cu_abs_model_chroma[1], encoder->QP, INIT_ABS_FLAG[slice][5]);
 
@@ -259,8 +259,8 @@ void init_contexts(encoder_control *encoder, int8_t slice)
   ctx_init(&g_cu_ref_pic_model[1], encoder->QP, INIT_REF_PIC[slice][1]);
   ctx_init(&g_mvp_idx_model[0], encoder->QP, INIT_MVP_IDX[slice][0]);
   ctx_init(&g_mvp_idx_model[1], encoder->QP, INIT_MVP_IDX[slice][1]);
-  
-  for (i = 0; i < 4; i++) {    
+
+  for (i = 0; i < 4; i++) {
     ctx_init(&g_cu_sig_coeff_group_model[i], encoder->QP, INIT_SIG_CG_FLAG[slice][i]);
     ctx_init(&g_cu_abs_model_luma[i], encoder->QP, INIT_ABS_FLAG[slice][i]);
     ctx_init(&g_part_size_model[i], encoder->QP, INIT_PART_SIZE[slice][i]);
@@ -285,7 +285,7 @@ void init_contexts(encoder_control *encoder, int8_t slice)
     ctx_init(&g_cu_one_model_luma[i], encoder->QP, INIT_ONE_FLAG[slice][i]);
   }
   ctx_init(&g_cu_one_model_luma[15], encoder->QP, INIT_ONE_FLAG[slice][15]);
-  
+
   for (i = 0; i < 27; i++) {
     ctx_init(&g_cu_sig_model_luma[i], encoder->QP, INIT_SIG_FLAG[slice][i]);
     if(i < 15) ctx_init(&g_cu_sig_model_chroma[i], encoder->QP, INIT_SIG_FLAG[slice][i+27]);
@@ -309,7 +309,7 @@ uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
 }
 
 
-/** 
+/**
  * \brief Pattern decision for context derivation process of significant_coeff_flag
  * \param sig_coeff_group_flag pointer to prior coded significant coeff group
  * \param pos_x column of current coefficient group
@@ -317,7 +317,7 @@ uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
  * \param width width of the block
  * \returns pattern for current coefficient group
  */
- 
+
 int32_t context_calc_pattern_sig_ctx(const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width)
 {
   uint32_t sigRight = 0;
@@ -328,7 +328,7 @@ int32_t context_calc_pattern_sig_ctx(const uint32_t *sig_coeff_group_flag, uint3
   width >>= 2;
   if (pos_x < (uint32_t)width - 1) sigRight = (sig_coeff_group_flag[pos_y * width + pos_x + 1] != 0);
   if (pos_y < (uint32_t)width - 1) sigLower = (sig_coeff_group_flag[(pos_y  + 1 ) * width + pos_x] != 0);
-  
+
   return sigRight + (sigLower<<1);
 }
 
@@ -366,9 +366,9 @@ int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int3
   offset = (block_type == 3) ? ((scan_idx == SCAN_DIAG) ? 9 : 15) : ((texture_type == 0) ? 21 : 12);
   pos_x_in_subset = pos_x - ((pos_x>>2)<<2);
   pos_y_in_subset = pos_y - ((pos_y>>2)<<2);
-  
+
   if (pattern_sig_ctx == 0) {
-    cnt = (pos_x_in_subset + pos_y_in_subset <= 2) ? ((pos_x_in_subset + pos_y_in_subset==0) ? 2 : 1) : 0;  
+    cnt = (pos_x_in_subset + pos_y_in_subset <= 2) ? ((pos_x_in_subset + pos_y_in_subset==0) ? 2 : 1) : 0;
   } else if (pattern_sig_ctx==1) {
     cnt = (pos_y_in_subset <= 1) ? ((pos_y_in_subset == 0) ? 2 : 1) : 0;
   } else if (pattern_sig_ctx==2) {

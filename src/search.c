@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -46,13 +46,13 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-/** 
+/**
  * This is used in the hexagon_search to select 3 points to search.
- * 
+ *
  * The start of the hexagonal pattern has been repeated at the end so that
  * the indices between 1-6 can be used as the start of a 3-point list of new
  * points to search.
- * 
+ *
  *   6 o-o 1 / 7
  *    /   \
  * 5 o  0  o 2 / 8
@@ -115,7 +115,7 @@ int calc_mvd_cost(int x, int y, const vector2d *pred)
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-unsigned hexagon_search(unsigned depth, 
+unsigned hexagon_search(unsigned depth,
                         const picture *pic, const picture *ref,
                         const vector2d *orig, vector2d *mv_in_out)
 {
@@ -145,7 +145,7 @@ unsigned hexagon_search(unsigned depth,
                              orig->x, orig->y,
                              block_width, block_width);
     cost += calc_mvd_cost(0, 0, mv_in_out);
-    
+
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
       best_cost = cost;
@@ -156,7 +156,7 @@ unsigned hexagon_search(unsigned depth,
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = &large_hexbs[i];
         unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                                 orig->x + pattern->x, 
+                                 orig->x + pattern->x,
                                  orig->y + pattern->y,
                                  block_width, block_width);
         cost += calc_mvd_cost(pattern->x, pattern->y, mv_in_out);
@@ -168,7 +168,7 @@ unsigned hexagon_search(unsigned depth,
       }
     }
   }
-  
+
   // Iteratively search the 3 new points around the best match, until the best
   // match is in the center.
   while (best_index != 0) {
@@ -190,7 +190,7 @@ unsigned hexagon_search(unsigned depth,
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = &large_hexbs[start + i];
       unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                               orig->x + mv.x + offset->x, 
+                               orig->x + mv.x + offset->x,
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
       cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out);
@@ -234,7 +234,7 @@ unsigned hexagon_search(unsigned depth,
   return best_cost;
 }
 
-unsigned search_mv_full(unsigned depth, 
+unsigned search_mv_full(unsigned depth,
                         const picture *pic, const picture *ref,
                         const vector2d *orig, vector2d *mv_in_out)
 {
@@ -245,7 +245,7 @@ unsigned search_mv_full(unsigned depth,
   vector2d min_mv, max_mv;
 
   /*if (abs(mv.x) > SEARCH_MV_FULL_RADIUS || abs(mv.y) > SEARCH_MV_FULL_RADIUS) {
-    best_cost = calc_sad(pic, ref, orig->x, orig->y, 
+    best_cost = calc_sad(pic, ref, orig->x, orig->y,
                          orig->x, orig->y,
                          block_width, block_width);
     mv.x = 0;
@@ -280,14 +280,14 @@ unsigned search_mv_full(unsigned depth,
 
 void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth) {
   picture *cur_pic = encoder->in.cur_pic;
-  uint32_t ref_idx = 0;  
+  uint32_t ref_idx = 0;
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   cur_cu->inter.cost = UINT_MAX;
 
   for (ref_idx = 0; ref_idx < encoder->ref->used_size; ref_idx++) {
     picture *ref_pic = encoder->ref->pics[ref_idx];
-    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);  
-    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];    
+    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
+    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
     uint32_t temp_cost = (int)(g_lambda_cost[encoder->QP] * ref_idx);
     vector2d orig, mv;
     orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
@@ -310,7 +310,7 @@ void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
       cur_cu->inter.mv[0] = (int16_t)mv.x;
       cur_cu->inter.mv[1] = (int16_t)mv.y;
       cur_cu->inter.cost = temp_cost;
-    }    
+    }
   }
 
 }
@@ -378,13 +378,13 @@ void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
  * with the best mode and it's cost for each CU at each depth for the whole
  * frame.
  */
-void search_tree(encoder_control *encoder, 
+void search_tree(encoder_control *encoder,
                  int x, int y, uint8_t depth)
 {
   int cu_width = LCU_WIDTH >> depth;
   uint16_t x_ctb = (uint16_t)x / (LCU_WIDTH >> MAX_DEPTH);
   uint16_t y_ctb = (uint16_t)y / (LCU_WIDTH >> MAX_DEPTH);
-  
+
   // Stop recursion if the CU is completely outside the frame.
   if (x >= encoder->in.width || y >= encoder->in.height) {
     return;
@@ -437,7 +437,7 @@ void search_tree(encoder_control *encoder,
 /**
  * \brief
  */
-uint32_t search_best_mode(encoder_control *encoder, 
+uint32_t search_best_mode(encoder_control *encoder,
                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth]
@@ -459,7 +459,7 @@ uint32_t search_best_mode(encoder_control *encoder,
       // Better value was found at a lower level.
       return cost;
     }
-  } 
+  }
 
   // If search hasn't been peformed at all for this block, the cost will be
   // max value, so it is safe to just compare costs. It just has to be made

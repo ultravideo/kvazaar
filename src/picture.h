@@ -2,8 +2,8 @@
 #define PICTURE_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -76,7 +76,7 @@ typedef struct
  * \brief Struct for CU info
  */
 typedef struct
-{  
+{
   int8_t type;       //!< \brief block type, CU_INTER / CU_INTRA
   int8_t depth;      //!< \brief depth / size of this block
   int8_t part_size;  //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
@@ -149,7 +149,7 @@ typedef struct
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 
-picture * picture_init(int32_t width, int32_t height, 
+picture * picture_init(int32_t width, int32_t height,
                        int32_t width_in_lcu, int32_t height_in_lcu);
 int picture_destroy(picture *pic);
 void picture_set_block_coded(picture *pic, uint32_t x_scu, uint32_t y_scu,
@@ -179,8 +179,8 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n);
 unsigned satd_16bit_nxn(pixel *block1, pixel *block2, unsigned n);
 unsigned sad_16bit_nxn(pixel *block1, pixel *block2, unsigned n);
 
-unsigned calc_sad(const picture *pic, const picture *ref, 
-                  int pic_x, int pic_y, int ref_x, int ref_y, 
+unsigned calc_sad(const picture *pic, const picture *ref,
+                  int pic_x, int pic_y, int ref_x, int ref_y,
                   int block_width, int block_height);
 
 double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y);

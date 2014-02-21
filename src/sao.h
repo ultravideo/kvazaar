@@ -2,8 +2,8 @@
 #define SAO_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -48,8 +48,8 @@ typedef struct sao_info_struct {
 void init_sao_info(sao_info *sao);
 void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left);
 void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left);
-void sao_reconstruct(picture *pic, const pixel *old_rec, 
-                     unsigned x_ctb, unsigned y_ctb, 
+void sao_reconstruct(picture *pic, const pixel *old_rec,
+                     unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i);
 
 #endif

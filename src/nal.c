@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -103,9 +103,9 @@ void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
  * \param width Width of the picture.
  * \param stride Width of one row in the pixel array.
  */
-static void array_checksum(const pixel* data, 
+static void array_checksum(const pixel* data,
                            const int height, const int width,
-                           const int stride, 
+                           const int stride,
                            unsigned char checksum_out[SEI_HASH_MAX_LENGTH])
 {
 	uint8_t mask;

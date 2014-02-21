@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -40,10 +40,10 @@
 #include "cabac.h"
 #include "picture.h"
 #include "transform.h"
- 
+
 // Assembly optimization headers
-#include "x86/cpu.h" 
- 
+#include "x86/cpu.h"
+
 /**
  * \brief Program main function.
  * \param argc Argument count from commandline
@@ -51,7 +51,7 @@
  * \return Program exit state
  */
 int main(int argc, char *argv[])
-{    
+{
   int ecx = 0,edx =0;
   /* CPU feature bits */
   enum { BIT_SSE3 = 0,BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26, BIT_AVX = 28};
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
 
   // Handle configuration
   cfg = config_alloc();
-  
+
   // If problem with configuration, print banner and shutdown
   if (!cfg || !config_init(cfg) || !config_read(cfg,argc,argv)) {
     fprintf(stderr,
@@ -86,8 +86,8 @@ int main(int argc, char *argv[])
             " *   Kvazaar HEVC Encoder v. " VERSION_STRING "             *\n"
             " *     Tampere University of Technology 2014   *\n"
             "/***********************************************/\n\n");
-      
-    fprintf(stderr, 
+
+    fprintf(stderr,
             "Usage:\n"
             "kvazaar -i <input> -w <width> -h <height> -o <output>\n"
             "\n"
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
     config_destroy(cfg);
     return EXIT_FAILURE;
   }
-    
+
   // Open output file and check that it was opened correctly
   output = fopen(cfg->output, "wb");
   if (output == NULL) {
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
     }
 
     // The actual coding happens here, after this function we have a coded frame
-    encode_one_frame(encoder);    
+    encode_one_frame(encoder);
 
     #ifdef _DEBUG
     // Write reconstructed frame out (for debugging purposes)
@@ -287,7 +287,7 @@ int main(int argc, char *argv[])
     MOVE_POINTER(encoder->in.cur_pic->coeff_y,encoder->ref->pics[0]->coeff_y);
     MOVE_POINTER(encoder->in.cur_pic->coeff_u,encoder->ref->pics[0]->coeff_u);
     MOVE_POINTER(encoder->in.cur_pic->coeff_v,encoder->ref->pics[0]->coeff_v);
-    
+
     MOVE_POINTER(encoder->in.cur_pic->pred_y,encoder->ref->pics[0]->pred_y);
     MOVE_POINTER(encoder->in.cur_pic->pred_u,encoder->ref->pics[0]->pred_u);
     MOVE_POINTER(encoder->in.cur_pic->pred_v,encoder->ref->pics[0]->pred_v);

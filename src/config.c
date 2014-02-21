@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -51,7 +51,7 @@ config *config_alloc(void)
  * \return 1 on success, 0 on failure
  */
 int config_init(config *cfg)
-{  
+{
   cfg->input           = NULL;
   cfg->output          = NULL;
   cfg->debug           = NULL;
@@ -265,7 +265,7 @@ int config_read(config *cfg,int argc, char *argv[])
   uint32_t pos = 0;
   int arg = 1;
   char option = 0;
-  
+
   static char short_options[] = "i:o:d:w:h:n:q:p:r:";
   static struct option long_options[] =
   {
@@ -321,9 +321,9 @@ int config_read(config *cfg,int argc, char *argv[])
       return 0;
     }
   }
-  
+
   // Check that the required files were defined
-  if(cfg->input == NULL || cfg->output == NULL) return 0;  
-  
+  if(cfg->input == NULL || cfg->output == NULL) return 0;
+
   return 1;
 }

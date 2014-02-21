@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -204,7 +204,7 @@ int picture_list_destroy(picture_list *list)
       FREE_POINTER(list->pics[i]);
     }
   }
-    
+
   if (list->size > 0) {
     free(list->pics);
   }
@@ -270,7 +270,7 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
 
   return 1;
 }
-  
+
 /**
  * \brief Allocate new picture
  * \param pic picture pointer
@@ -279,7 +279,7 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
 picture *picture_init(int32_t width, int32_t height,
                       int32_t width_in_lcu, int32_t height_in_lcu)
 {
-  picture *pic = (picture *)malloc(sizeof(picture));    
+  picture *pic = (picture *)malloc(sizeof(picture));
   unsigned int luma_size = width * height;
   unsigned int chroma_size = luma_size / 4;
   int i = 0;
@@ -343,7 +343,7 @@ picture *picture_init(int32_t width, int32_t height,
 int picture_destroy(picture *pic)
 {
   int i;
-        
+
   free(pic->u_data);
   free(pic->v_data);
   free(pic->y_data);
@@ -417,11 +417,11 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     diff[k+5] = piOrg[5] - piCur[5];
     diff[k+6] = piOrg[6] - piCur[6];
     diff[k+7] = piOrg[7] - piCur[7];
-    
+
     piCur += iStrideCur;
     piOrg += iStrideOrg;
   }
-  
+
   // horizontal
   for (j = 0; j < 8; ++j) {
     jj = j << 3;
@@ -433,7 +433,7 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     m2[j][5] = diff[jj+1] - diff[jj+5];
     m2[j][6] = diff[jj+2] - diff[jj+6];
     m2[j][7] = diff[jj+3] - diff[jj+7];
-    
+
     m1[j][0] = m2[j][0] + m2[j][2];
     m1[j][1] = m2[j][1] + m2[j][3];
     m1[j][2] = m2[j][0] - m2[j][2];
@@ -442,7 +442,7 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     m1[j][5] = m2[j][5] + m2[j][7];
     m1[j][6] = m2[j][4] - m2[j][6];
     m1[j][7] = m2[j][5] - m2[j][7];
-    
+
     m2[j][0] = m1[j][0] + m1[j][1];
     m2[j][1] = m1[j][0] - m1[j][1];
     m2[j][2] = m1[j][2] + m1[j][3];
@@ -452,7 +452,7 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     m2[j][6] = m1[j][6] + m1[j][7];
     m2[j][7] = m1[j][6] - m1[j][7];
   }
-  
+
   // vertical
   for (i = 0; i < 8; ++i) {
     m3[0][i] = m2[0][i] + m2[4][i];
@@ -463,7 +463,7 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     m3[5][i] = m2[1][i] - m2[5][i];
     m3[6][i] = m2[2][i] - m2[6][i];
     m3[7][i] = m2[3][i] - m2[7][i];
-    
+
     m1[0][i] = m3[0][i] + m3[2][i];
     m1[1][i] = m3[1][i] + m3[3][i];
     m1[2][i] = m3[0][i] - m3[2][i];
@@ -472,7 +472,7 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     m1[5][i] = m3[5][i] + m3[7][i];
     m1[6][i] = m3[4][i] - m3[6][i];
     m1[7][i] = m3[5][i] - m3[7][i];
-    
+
     m2[0][i] = m1[0][i] + m1[1][i];
     m2[1][i] = m1[0][i] - m1[1][i];
     m2[2][i] = m1[2][i] + m1[3][i];
@@ -482,19 +482,19 @@ unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg, pixel *piCur, 
     m2[6][i] = m1[6][i] + m1[7][i];
     m2[7][i] = m1[6][i] - m1[7][i];
   }
-  
+
   for (i = 0; i < 8; ++i) {
     for (j = 0; j < 8; ++j) {
       sad += abs(m2[i][j]);
     }
   }
-  
+
   sad = (sad + 2) >> 2;
-  
+
   return sad;
 }
 
-// Function macro for defining hadamart calculating functions 
+// Function macro for defining hadamart calculating functions
 // for fixed size blocks. They calculate hadamart for integer
 // multiples of 8x8 with the 8x8 hadamart function.
 #define SATD_NXN(n, pixel_type, suffix) \
@@ -518,7 +518,7 @@ SATD_NXN(16, pixel, 16bit)
 SATD_NXN(32, pixel, 16bit)
 SATD_NXN(64, pixel, 16bit)
 
-// Function macro for defining SAD calculating functions 
+// Function macro for defining SAD calculating functions
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type, suffix) \
   unsigned sad_ ## suffix ## _ ##  n ## x ## n( \
@@ -546,9 +546,9 @@ SAD_NXN(64, pixel, 16bit)
 
 /**
  * \brief  Get a function that calculates SATD for NxN block.
- * 
+ *
  * \param n  Width of the region for which SATD is calculated.
- * 
+ *
  * \returns  Pointer to cost_16bit_nxn_func.
  */
 cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
@@ -566,12 +566,12 @@ cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
     return NULL;
     }
   }
-  
+
 /**
  * \brief  Get a function that calculates SAD for NxN block.
- * 
+ *
  * \param n  Width of the region for which SAD is calculated.
- * 
+ *
  * \returns  Pointer to cost_16bit_nxn_func.
  */
 cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
@@ -589,16 +589,16 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
     return &sad_16bit_64x64;
   default:
     return NULL;
-  }  
+  }
 }
 
 /**
  * \brief  Calculate SATD for NxN block of size N.
- * 
+ *
  * \param block1  Start of the first block.
  * \param block2  Start of the second block.
  * \param n       Width of the region for which SAD is calculated.
- * 
+ *
  * \returns       Sum of Absolute Transformed Differences (SATD)
  */
 unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
@@ -609,11 +609,11 @@ unsigned satd_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 
 /**
  * \brief Calculate SAD for NxN block of size N.
- * 
+ *
  * \param block1  Start of the first block.
  * \param block2  Start of the second block.
  * \param n       Width of the region for which SAD is calculated.
- * 
+ *
  * \returns       Sum of Absolute Differences
  */
 unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
@@ -635,16 +635,16 @@ unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
 
 /**
  * \brief Diagonally interpolate SAD outside the frame.
- * 
+ *
  * \param data1   Starting point of the first picture.
  * \param data2   Starting point of the second picture.
  * \param width   Width of the region for which SAD is calculated.
  * \param height  Height of the region for which SAD is calculated.
  * \param width  Width of the pixel array.
- * 
+ *
  * \returns Sum of Absolute Differences
  */
-unsigned cor_sad(const pixel *pic_data, const pixel *ref_data, 
+unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
                  int block_width, int block_height, unsigned width)
 {
   pixel ref = *ref_data;
@@ -662,16 +662,16 @@ unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
 
 /**
  * \brief Vertically interpolate SAD outside the frame.
- * 
+ *
  * \param data1   Starting point of the first picture.
  * \param data2   Starting point of the second picture.
  * \param width   Width of the region for which SAD is calculated.
  * \param height  Height of the region for which SAD is calculated.
  * \param width  Width of the pixel array.
- * 
+ *
  * \returns Sum of Absolute Differences
  */
-unsigned ver_sad(const pixel *pic_data, const pixel *ref_data, 
+unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
                  int block_width, int block_height, unsigned width)
 {
   int x, y;
@@ -688,16 +688,16 @@ unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
 
 /**
  * \brief Horizontally interpolate SAD outside the frame.
- * 
+ *
  * \param data1   Starting point of the first picture.
  * \param data2   Starting point of the second picture.
  * \param width   Width of the region for which SAD is calculated.
  * \param height  Height of the region for which SAD is calculated.
  * \param width   Width of the pixel array.
- * 
+ *
  * \returns Sum of Absolute Differences
  */
-unsigned hor_sad(const pixel *pic_data, const pixel *ref_data, 
+unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
                  int block_width, int block_height, unsigned width)
 {
   int x, y;
@@ -714,19 +714,19 @@ unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
 
 /**
  * \brief Calculate Sum of Absolute Differences (SAD)
- * 
+ *
  * Calculate Sum of Absolute Differences (SAD) between two rectangular regions
  * located in arbitrary points in the picture.
- * 
+ *
  * \param data1   Starting point of the first picture.
  * \param data2   Starting point of the second picture.
  * \param width   Width of the region for which SAD is calculated.
  * \param height  Height of the region for which SAD is calculated.
  * \param stride  Width of the pixel array.
- * 
+ *
  * \returns Sum of Absolute Differences
  */
-unsigned reg_sad(const pixel *data1, const pixel *data2, 
+unsigned reg_sad(const pixel *data1, const pixel *data2,
                  int width, int height, unsigned stride)
 {
   int y, x;
@@ -744,7 +744,7 @@ unsigned reg_sad(const pixel *data1, const pixel *data2,
 /**
  * \brief  Handle special cases of comparing blocks that are not completely
  *         inside the frame.
- * 
+ *
  * \param pic  First frame.
  * \param ref  Second frame.
  * \param pic_x  X coordinate of the first block.
@@ -754,8 +754,8 @@ unsigned reg_sad(const pixel *data1, const pixel *data2,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-unsigned interpolated_sad(const picture *pic, const picture *ref, 
-                          int pic_x, int pic_y, int ref_x, int ref_y, 
+unsigned interpolated_sad(const picture *pic, const picture *ref,
+                          int pic_x, int pic_y, int ref_x, int ref_y,
                           int block_width, int block_height)
 {
   pixel *pic_data, *ref_data;
@@ -764,7 +764,7 @@ unsigned interpolated_sad(const picture *pic, const picture *ref,
 
   int left, right, top, bottom;
   int result = 0;
-  
+
   // Change the movement vector to point right next to the frame. This doesn't
   // affect the result but removes some special cases.
   if (ref_x > width)            ref_x = width;
@@ -854,7 +854,7 @@ unsigned interpolated_sad(const picture *pic, const picture *ref,
     result += reg_sad(&pic_data[top * width],
                       &ref_data[top * width],
                       block_width, block_height - top, width);
-  } else if (bottom) { 
+  } else if (bottom) {
     result += reg_sad(pic_data,
                       ref_data,
                       block_width, block_height - bottom, width);
@@ -878,7 +878,7 @@ unsigned interpolated_sad(const picture *pic, const picture *ref,
   } else {
     result += reg_sad(pic_data, ref_data, block_width, block_height, width);
   }
-  
+
   return result;
 }
 
@@ -895,8 +895,8 @@ unsigned interpolated_sad(const picture *pic, const picture *ref,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-unsigned calc_sad(const picture *pic, const picture *ref, 
-                  int pic_x, int pic_y, int ref_x, int ref_y, 
+unsigned calc_sad(const picture *pic, const picture *ref,
+                  int pic_x, int pic_y, int ref_x, int ref_y,
                   int block_width, int block_height)
 {
   if (ref_x >= 0 && ref_x <= pic->width  - block_width &&

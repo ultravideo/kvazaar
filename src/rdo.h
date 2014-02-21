@@ -2,8 +2,8 @@
 #define RDO_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -30,7 +30,7 @@
 
 
 typedef struct
-{  
+{
   double coded_level_and_dist;
   double uncoded_dist;
   double sig_cost;
@@ -49,7 +49,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
 int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
                      uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
 double get_ic_rate_cost  (uint32_t abs_level, uint16_t ctx_num_one, uint16_t ctx_num_abs,
-                          uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);                          
+                          uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
 uint32_t get_coded_level ( encoder_control* encoder, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,

@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -119,7 +119,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
 
       // On y-overflow set coord_y accordingly
       overflow_neg_y_temp = (coord_y < 0) ? 1 : 0;
-      overflow_pos_y_temp = (coord_y >= ref->height>>1) ? 1 : 0;     
+      overflow_pos_y_temp = (coord_y >= ref->height>>1) ? 1 : 0;
       if (overflow_neg_y_temp)      coord_y = 0;
       else if (overflow_pos_y_temp) coord_y = (ref->height>>1) - 1;
       coord_y *= ref_width_c;
@@ -144,7 +144,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
     filter_inter_halfpel_chroma(halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
 
     // Assign filtered pixels to output, take every second half-pel sample with offset of abs_mv_y/x
-    for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {      
+    for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {
       for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
         dst->u_recdata[y*dst_width_c + x] = (uint8_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
         dst->v_recdata[y*dst_width_c + x] = (uint8_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
@@ -235,7 +235,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
         coord_y = (y + (mv[1]>>1)) * ref_width_c; // pre-calculate
         for (x = xpos>>1; x < (xpos + width)>>1; x++) {
           dst->u_recdata[y*dst_width_c + x] = ref->u_recdata[coord_y + x + (mv[0]>>1)];
-          dst->v_recdata[y*dst_width_c + x] = ref->v_recdata[coord_y + x + (mv[0]>>1)]; 
+          dst->v_recdata[y*dst_width_c + x] = ref->v_recdata[coord_y + x + (mv[0]>>1)];
         }
       }
     }
@@ -254,7 +254,7 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
  * \param a0 candidate a0
  * \param a1 candidate a1
  */
-void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, 
+void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth,
                                         cu_info **b0, cu_info **b1,cu_info **b2,cu_info **a0,cu_info **a1)
 {
   uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS; //!< the width of the current block on SCU
@@ -267,10 +267,10 @@ void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, 
    __|         |
   |A1|_________|
   |A0|
-  */ 
+  */
 
   // A0 and A1 availability testing
-  if (x_cu != 0) {    
+  if (x_cu != 0) {
     *a1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
     if (!(*a1)->coded) *a1 = NULL;
 
@@ -305,7 +305,7 @@ void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, 
  * \param mv_pred[2][2] 2x motion vector prediction
  */
 void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu)
-{  
+{
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
 
@@ -355,7 +355,7 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
   } else if (b1 && b1->type == CU_INTER && b1->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = b1->inter.mv[0];
     mv_cand[candidates][1] = b1->inter.mv[1];
-    b_candidates++;    
+    b_candidates++;
   } else if(b2 && b2->type == CU_INTER && b2->inter.mv_ref == cur_cu->inter.mv_ref) {
     mv_cand[candidates][0] = b2->inter.mv[0];
     mv_cand[candidates][1] = b2->inter.mv[1];
@@ -420,7 +420,7 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
 uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu)
-{  
+{
   uint8_t candidates = 0;
   uint8_t i = 0;
   int8_t duplicate = 0;
@@ -429,7 +429,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
-  
+
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
                                                      (CU1)->inter.mv[0] == (CU2)->inter.mv[0] && \
@@ -467,7 +467,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
     if(candidates) CHECK_DUPLICATE(a0,a1);
     if(!duplicate) {
       mv_cand[candidates][0] = a0->inter.mv[0];
-      mv_cand[candidates][1] = a0->inter.mv[1]; 
+      mv_cand[candidates][1] = a0->inter.mv[1];
       mv_cand[candidates][2] = a0->inter.mv_ref;
       candidates++;
     }

@@ -1,10 +1,10 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 /**
-/*****************************************************************************
+ *****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify

@@ -2,8 +2,8 @@
 #define NAL_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -36,17 +36,17 @@
 
 /**
  * \brief NAL unit type codes.
- * 
+ *
  * These are the nal_unit_type codes from Table 7-1 ITU-T H.265 v1.0.
  * The type codes have been prefixed with "NAL_".
  */
 enum {
   NAL_TRAIL_N = 0,
   NAL_TRAIL_R = 1,
-  
+
   NAL_TSA_N = 2,
   NAL_TSA_R = 3,
-  
+
   NAL_STSA_N = 4,
   NAL_STSA_R = 5,
 
@@ -71,7 +71,7 @@ enum {
   NAL_RSV_IRAP_VCL23 = 23,
 
   // Reserved RSV_VCL 24-31
-  
+
   NAL_VPS_NUT = 32,
   NAL_SPS_NUT = 33,
   NAL_PPS_NUT = 34,

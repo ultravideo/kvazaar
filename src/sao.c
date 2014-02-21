@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@
 // |       |   a   | a     |     a |
 // | a c b |   c   |   c   |   c   |
 // |       |   b   |     b | b     |
-static const vector2d g_sao_edge_offsets[SAO_NUM_EO][2] = { 
+static const vector2d g_sao_edge_offsets[SAO_NUM_EO][2] = {
   { { -1, 0 }, { 1, 0 } },
   { { 0, -1 }, { 0, 1 } },
   { { -1, -1 }, { 1, 1 } },
@@ -97,7 +97,7 @@ void calc_sao_offset_array(const sao_info *sao, int *offset)
 /**
  * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
- * \param sao_bands an array of bands for original and reconstructed block 
+ * \param sao_bands an array of bands for original and reconstructed block
  */
 int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_position, int *rate)
 {
@@ -123,7 +123,7 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
       offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
     }
     dist[band] = offset==0?0:INT_MAX;
-    temp_offsets[band] = 0;    
+    temp_offsets[band] = 0;
     while(offset != 0) {
       temp_dist = sao_bands[1][band]*offset*offset - 2*offset*sao_bands[0][band];
 
@@ -155,7 +155,7 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
           temp_rate[best_dist_pos+2]+temp_rate[best_dist_pos+3];
   // Copy best offsets to output
   memcpy(offsets, &temp_offsets[best_dist_pos], 4*sizeof(int));
-  
+
   *band_position = best_dist_pos;
 
   return best_dist;
@@ -164,7 +164,7 @@ int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4], int *band_positi
 /**
  * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
- * \param sao_bands an array of bands for original and reconstructed block 
+ * \param sao_bands an array of bands for original and reconstructed block
  */
 void calc_sao_bands(const pixel *orig_data, const pixel *rec_data,
                    int block_width, int block_height,
@@ -175,7 +175,7 @@ void calc_sao_bands(const pixel *orig_data, const pixel *rec_data,
 
   //Loop pixels and take top 5 bits to classify different bands
   for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {      
+    for (x = 0; x < block_width; ++x) {
       sao_bands[0][rec_data[y * block_width + x]>>shift] += orig_data[y * block_width + x] - rec_data[y * block_width + x];
       sao_bands[1][rec_data[y * block_width + x]>>shift]++;
     }
@@ -187,7 +187,7 @@ void calc_sao_bands(const pixel *orig_data, const pixel *rec_data,
  * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
  * \param dir_offsets
- * \param is_chroma  0 for luma, 1 for chroma. Indicates 
+ * \param is_chroma  0 for luma, 1 for chroma. Indicates
  */
 void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
                        int eo_class, int block_width, int block_height,
@@ -206,7 +206,7 @@ void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
       pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
       pixel c = c_data[0];
       pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
-      
+
       int eo_idx = EO_IDX(a, b, c);
       int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
 
@@ -216,7 +216,7 @@ void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
   }
 }
 
-void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao_info *sao, 
+void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao_info *sao,
                            int stride, int new_stride, int block_width, int block_height)
 {
   int y, x;
@@ -230,7 +230,7 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
     calc_sao_offset_array(sao, offsets);
     for (y = 0; y < block_height; ++y) {
       for (x = 0; x < block_width; ++x) {
-        new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];        
+        new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
       }
     }
   } else {
@@ -243,7 +243,7 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
         pixel a = c_data[a_ofs.y * stride + a_ofs.x];
         pixel c = c_data[0];
         pixel b = c_data[b_ofs.y * stride + b_ofs.x];
-      
+
         int eo_idx = EO_IDX(a, b, c);
         int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
 
@@ -260,8 +260,8 @@ void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data, const sao
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU
  */
-void sao_calc_band_block_dims(const picture *pic, color_index color_i, 
-                         const sao_info *sao, vector2d *rec, 
+void sao_calc_band_block_dims(const picture *pic, color_index color_i,
+                         const sao_info *sao, vector2d *rec,
                          vector2d *block)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
@@ -301,7 +301,7 @@ void sao_calc_band_block_dims(const picture *pic, color_index color_i,
  *
  * This also takes into account borders of the picture and non-LCU sized
  * CU's at the bottom and right of the picture.
- * 
+ *
  * \ CU + rec
  *  +------+
  *  |\ tl  |
@@ -314,10 +314,10 @@ void sao_calc_band_block_dims(const picture *pic, color_index color_i,
  *
  * \param pic  Picture.
  * \param sao  Sao parameters.
- * \param rec  Top-left corner of the LCU, modified to be top-left corner of 
+ * \param rec  Top-left corner of the LCU, modified to be top-left corner of
  */
-void sao_calc_edge_block_dims(const picture *pic, color_index color_i, 
-                         const sao_info *sao, vector2d *rec, 
+void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
+                         const sao_info *sao, vector2d *rec,
                          vector2d *tl, vector2d *br, vector2d *block)
 {
   vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
@@ -369,8 +369,8 @@ void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
   rec->x = (rec->x == 0 ? 0 : -1);
 }
 
-void sao_reconstruct(picture *pic, const pixel *old_rec, 
-                     unsigned x_ctb, unsigned y_ctb, 
+void sao_reconstruct(picture *pic, const pixel *old_rec,
+                     unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
@@ -398,7 +398,7 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
   ofs.y = y_ctb * lcu_stride;
   block.x = lcu_stride;
   block.y = lcu_stride;
-  if (sao->type == SAO_TYPE_BAND) {    
+  if (sao->type == SAO_TYPE_BAND) {
     tl.x = 0; tl.y = 0;
     br.x = 0; br.y = 0;
     sao_calc_band_block_dims(pic, color_i, sao,&ofs, &block);
@@ -408,20 +408,20 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
   }
 
   // Data to tmp buffer.
-  picture_blit_pixels(&old_lcu_rec[ofs.y * pic_stride + ofs.x], 
+  picture_blit_pixels(&old_lcu_rec[ofs.y * pic_stride + ofs.x],
                       buf_rec,
                       tl.x + block.x + br.x,
                       tl.y + block.y + br.y,
                       pic_stride, buf_stride);
 
-  sao_reconstruct_color(&buf_rec[tl.y * buf_stride + tl.x], 
+  sao_reconstruct_color(&buf_rec[tl.y * buf_stride + tl.x],
                         &new_rec[(ofs.y + tl.y) * lcu_stride + ofs.x + tl.x],
-                        sao, 
+                        sao,
                         buf_stride, lcu_stride,
                         block.x, block.y);
 
   // Copy reconstructed block from tmp buffer to rec image.
-  picture_blit_pixels(&new_rec[(tl.y + ofs.y) * lcu_stride + (tl.x + ofs.x)], 
+  picture_blit_pixels(&new_rec[(tl.y + ofs.y) * lcu_stride + (tl.x + ofs.x)],
                       &lcu_rec[(tl.y + ofs.y) * pic_stride + (tl.x + ofs.x)],
                       block.x, block.y, lcu_stride, pic_stride);
 }
@@ -435,7 +435,7 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
  * \param buf_cnt  Number of pointers data and recdata have.
  * \param sao_out  Output parameter for the best sao parameters.
  */
-void sao_search_best_mode(const pixel * data[], const pixel * recdata[], 
+void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
                           int block_width, int block_height,
                           unsigned buf_cnt,
                           sao_info *sao_out, sao_info *sao_top, sao_info *sao_left)
@@ -459,11 +459,11 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       calc_sao_edge_dir(data[i], recdata[i], edge_class,
                         block_width, block_height, cat_sum_cnt);
     }
-    
+
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int cat_sum = cat_sum_cnt[0][edge_cat];
       int cat_cnt = cat_sum_cnt[1][edge_cat];
-      
+
       // The optimum offset can be calculated by getting the minima of the
       // fast ddistortion estimation formula. The minima is the mean error
       // and we round that to the nearest integer.
@@ -484,7 +484,7 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       edge_offset[edge_cat] = offset;
       // The ddistortion is amount by which the SSE of data changes. It should
       // be negative for all categories, if offset was chosen correctly.
-      // ddistortion = N * h^2 - 2 * h * E, where N is the number of samples 
+      // ddistortion = N * h^2 - 2 * h * E, where N is the number of samples
       // and E is the sum of errors.
       // It basically says that all pixels that are not improved by offset
       // increase increase SSE by h^2 and all pixels that are improved by
@@ -496,7 +496,7 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       // When max offset, no need to signal final bit
       if (abs(offset)==SAO_ABS_OFFSET_MAX) {
         temp_rate --;
-      }      
+      }
     }
     // If can merge, use lower cost
     if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, edge_offset,0, edge_class)) ||
@@ -529,12 +529,13 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     }
 
     ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position, &temp_rate);
-    
+
     if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, temp_offsets,sao_out->band_position, 0)) ||
        (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, temp_offsets,sao_out->band_position, 0))) {
           temp_rate = 1;
     }
     ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
+
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
       sao_out->type = SAO_TYPE_BAND;
@@ -594,7 +595,7 @@ void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     rec_list[color_i - 1] = &rec[color_i - 1][0];
   }
 
-  // Calculate 
+  // Calculate
   sao_search_best_mode(orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left);
 }
 

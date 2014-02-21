@@ -2,8 +2,8 @@
 #define ENCODER_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -37,7 +37,7 @@ typedef struct
   void (*IME)();
   void (*FME)();
   int range;
- 
+
 } encoder_me;
 
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
@@ -124,7 +124,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
                            uint8_t depth);
 void encode_transform_coeff(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
-void encode_block_residual(encoder_control *encoder, 
+void encode_block_residual(encoder_control *encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
 extern double g_lambda_cost[55];
@@ -166,7 +166,7 @@ static const uint32_t g_sig_last_scan_8x8[3][4] =
 //4 8 16 32 64 128
 //0 1  2  3  4   5
 static const uint8_t g_to_bits[129] =
-{  
+{
   0,
   0,0,0,0,
   0,0,0,1,
