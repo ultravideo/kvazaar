@@ -1,7 +1,7 @@
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -32,22 +32,22 @@
 #ifdef _WIN32
 #include <Winsock2.h>
 #else
-//#include <net/hton.h>
+#include <arpa/inet.h>
 #endif
- 
+
 
 //#define VERBOSE
 
 #ifdef VERBOSE
 void printf_bitstream(char *msg, ...)
-{ 
+{
   va_list fmtargs;
-  char buffer[1024]; 
+  char buffer[1024];
   va_start(fmtargs,msg);
   vsnprintf(buffer,sizeof(buffer)-1,msg,fmtargs);
   va_end(fmtargs);
   printf("%s",buffer);
-} 
+}
 #endif
 
 bit_table *g_exp_table;
@@ -61,7 +61,7 @@ int floor_log2(unsigned int n) {
   if (n >= 1<< 4) { n >>=  4; pos +=  4; }
   if (n >= 1<< 2) { n >>=  2; pos +=  2; }
   if (n >= 1<< 1) {           pos +=  1; }
-  return ((n == 0) ? (-1) : pos);  
+  return ((n == 0) ? (-1) : pos);
 }
 
 /**
@@ -138,7 +138,7 @@ void bitstream_reinit(bitstream *stream)
 {
   stream->cur_byte = 0;
   stream->cur_bit = 0;
-  memset(stream->data, 0, sizeof(uint32_t)*32); 
+  memset(stream->data, 0, sizeof(uint32_t)*32);
 }
 
 /**
@@ -169,14 +169,14 @@ void bitstream_clear_buffer(bitstream *stream)
 {
   memset(stream->buffer, 0, stream->bufferlen);
   stream->buffer_pos = 0;
-} 
- 
+}
+
 /**
- * \brief Put bits to bitstream 
+ * \brief Put bits to bitstream
  * \param stream pointer bitstream to put the data
  * \param data input data
  * \param bits number of bits to write from data to stream
- */ 
+ */
 void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
 {
   uint32_t bitsleft = 32 - stream->cur_bit;
@@ -189,7 +189,7 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
   printf_bitstream("\n");
   //printf_bitstream(" count: %i\n",bits);
   #endif
- 
+
   //There's space for all the bits
   if (bits <= bitsleft) {
     stream->data[stream->cur_byte] |= (data<<((bitsleft-bits)));
@@ -200,7 +200,7 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
     stream->cur_bit = 32;
     bits -= bitsleft;
   }
- 
+
   //Check if the buffer is full, and flush to output if it is
   if (stream->cur_bit == 32) {
     bitsleft = 32;
@@ -211,19 +211,19 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
       bitstream_flush(stream);
     }
   }
- 
+
   //Write the last of the bits (if buffer was full and flushed before)
   if (bits != 0) {
     stream->data[stream->cur_byte] |= (data<<(bitsleft-bits));
     stream->cur_bit += bits;
-  } 
+  }
 }
- 
+
 /**
  * \brief Align the bitstream with one-bit padding
  */
 void bitstream_align(bitstream *stream)
-{  
+{
   bitstream_put(stream, 1, 1);
   if ((stream->cur_bit & 7) != 0) {
     bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
@@ -231,7 +231,7 @@ void bitstream_align(bitstream *stream)
 }
 
 /**
- * \brief Align the bitstream with zero 
+ * \brief Align the bitstream with zero
  */
 void bitstream_align_zero(bitstream *stream)
 {
@@ -239,7 +239,7 @@ void bitstream_align_zero(bitstream *stream)
     bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
   }
 }
-  
+
 /**
  * \brief Flush bitstream to output
  */
@@ -262,7 +262,7 @@ void bitstream_flush(bitstream *stream)
         stream->buffer_pos += 4;
       }
     }
-   
+
     if (stream->cur_bit>>3) {
       correct_endian = htonl(stream->data[stream->cur_byte]);
       memcpy((uint8_t*)&stream->buffer[stream->buffer_pos], &correct_endian, stream->cur_bit>>3);
