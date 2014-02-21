@@ -319,7 +319,11 @@ void scalinglist_process_enc( int32_t *coeff, int32_t *quantcoeff, int32_t quant
  * \brief get scaling list for decoder
  *
  */
-void scalinglist_process_dec( int32_t *coeff, int32_t *dequantcoeff, int32_t inv_quant_scales, uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat)
+static void scalinglist_process_dec(int32_t *coeff, int32_t *dequantcoeff,
+                                    int32_t inv_quant_scales, uint32_t height,
+                                    uint32_t width, uint32_t ratio,
+                                    int32_t size_num, uint32_t dc,
+                                    uint8_t flat)
 {
   uint32_t j,i;
 
@@ -372,7 +376,8 @@ void scalinglist_set(int32_t *coeff, uint32_t listId, uint32_t sizeId, uint32_t 
 }
 
 
-void partial_butterfly_4(short *src, short *dst,int32_t shift, int32_t line)
+static void partial_butterfly_4(short *src, short *dst,
+                                int32_t shift, int32_t line)
 {
   int32_t j;
   int32_t e[2],o[2];
@@ -395,7 +400,8 @@ void partial_butterfly_4(short *src, short *dst,int32_t shift, int32_t line)
   }
 }
 
-void partial_butterfly_inverse_4(short *src,short *dst,int shift, int line)
+static void partial_butterfly_inverse_4(short *src,short *dst,
+                                        int shift, int line)
 {
   int j;
   int e[2],o[2];
@@ -421,7 +427,7 @@ void partial_butterfly_inverse_4(short *src,short *dst,int shift, int line)
 
 // Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
 // gives identical results
-void fast_forward_dst(short *block, short *coeff, int32_t shift)  // input block, output coeff
+static void fast_forward_dst(short *block, short *coeff, int32_t shift)  // input block, output coeff
 {
   int32_t i, c[4];
   int32_t rnd_factor = 1<<(shift - 1);
@@ -439,7 +445,7 @@ void fast_forward_dst(short *block, short *coeff, int32_t shift)  // input block
   }
 }
 
-void fast_inverse_dst(short *tmp,short *block,int shift)  // input tmp, output block
+static void fast_inverse_dst(short *tmp,short *block,int shift)  // input tmp, output block
 {
   int i, c[4];
   int rnd_factor = 1<<(shift-1);
@@ -458,7 +464,8 @@ void fast_inverse_dst(short *tmp,short *block,int shift)  // input tmp, output b
 }
 
 
-void partial_butterfly_8(short *src, short *dst,int32_t shift, int32_t line)
+static void partial_butterfly_8(short *src, short *dst,
+                                int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t e[4],o[4];
@@ -492,7 +499,8 @@ void partial_butterfly_8(short *src, short *dst,int32_t shift, int32_t line)
   }
 }
 
-void partial_butterfly_inverse_8(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
+static void partial_butterfly_inverse_8(int16_t *src,int16_t *dst,
+                                        int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t e[4],o[4];
@@ -526,7 +534,8 @@ void partial_butterfly_inverse_8(int16_t *src,int16_t *dst,int32_t shift, int32_
 }
 
 
-void partial_butterfly_16(short *src,short *dst,int32_t shift, int32_t line)
+static void partial_butterfly_16(short *src,short *dst,
+                                 int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t e[8],o[8];
@@ -571,7 +580,8 @@ void partial_butterfly_16(short *src,short *dst,int32_t shift, int32_t line)
 }
 
 
-void partial_butterfly_inverse_16(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
+static void partial_butterfly_inverse_16(int16_t *src, int16_t *dst,
+                                         int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t e[8],o[8];
@@ -613,7 +623,8 @@ void partial_butterfly_inverse_16(int16_t *src,int16_t *dst,int32_t shift, int32
 
 
 
-void partial_butterfly_32(short *src,short *dst,int32_t shift, int32_t line)
+static void partial_butterfly_32(short *src, short *dst,
+                                 int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t e[16],o[16];
@@ -667,7 +678,8 @@ void partial_butterfly_32(short *src,short *dst,int32_t shift, int32_t line)
 }
 
 
-void partial_butterfly_inverse_32(int16_t *src,int16_t *dst,int32_t shift, int32_t line)
+static void partial_butterfly_inverse_32(int16_t *src, int16_t *dst,
+                                         int32_t shift, int32_t line)
 {
   int32_t j,k;
   int32_t e[16],o[16];
