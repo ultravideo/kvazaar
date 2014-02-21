@@ -287,7 +287,6 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   uint32_t max_num_coeff   = width * height;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-  int32_t  qp_base         = encoder->QP;
 
   int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
 
