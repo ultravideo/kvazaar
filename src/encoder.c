@@ -50,8 +50,9 @@ uint32_t* g_sig_last_scan[3][7];
 static void add_checksum(encoder_control* encoder);
 static void encode_VUI(encoder_control* encoder);
 
-void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h, uint32_t *buff_v,
-                        int32_t width, int32_t height)
+static void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h,
+                               uint32_t *buff_v,
+                               int32_t width, int32_t height)
 {
   uint32_t num_scan_pos  = width * width;
   uint32_t next_scan_pos = 0;
@@ -490,8 +491,8 @@ void encode_one_frame(encoder_control* encoder)
   encoder->in.cur_pic->poc = encoder->poc;
 }
 
-void fill_after_frame(unsigned height, unsigned array_width,
-                      unsigned array_height, pixel *data)
+static void fill_after_frame(unsigned height, unsigned array_width,
+                             unsigned array_height, pixel *data)
 {
   pixel* p = data + height * array_width;
   pixel* end = data + array_width * array_height;
@@ -503,8 +504,9 @@ void fill_after_frame(unsigned height, unsigned array_width,
   }
 }
 
-int read_and_fill_frame_data(FILE *file, unsigned width, unsigned height,
-                              unsigned array_width, pixel *data)
+static int read_and_fill_frame_data(FILE *file,
+                                    unsigned width, unsigned height,
+                                    unsigned array_width, pixel *data)
 {
   pixel* p = data;
   pixel* end = data + array_width * height;
@@ -716,7 +718,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");
 }
 
-void encode_PTL(encoder_control *encoder)
+static void encode_PTL(encoder_control *encoder)
 {
   int i;
   // PTL
@@ -1117,7 +1119,8 @@ void encode_slice_header(encoder_control* encoder)
 }
 
 
-void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color_i)
+static void encode_sao_color(encoder_control *encoder, sao_info *sao,
+                             color_index color_i)
 {
   picture *pic = encoder->in.cur_pic;
   sao_eo_cat i;
@@ -1166,7 +1169,8 @@ void encode_sao_color(encoder_control *encoder, sao_info *sao, color_index color
   }
 }
 
-void encode_sao_merge_flags(sao_info *sao, unsigned x_ctb, unsigned y_ctb)
+static void encode_sao_merge_flags(sao_info *sao,
+                                   unsigned x_ctb, unsigned y_ctb)
 {
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
@@ -1182,8 +1186,9 @@ void encode_sao_merge_flags(sao_info *sao, unsigned x_ctb, unsigned y_ctb)
 /**
  * \brief Stub that encodes all LCU's as none type.
  */
-void encode_sao(encoder_control *encoder, unsigned x_lcu, uint16_t y_lcu,
-                sao_info *sao_luma, sao_info *sao_chroma)
+static void encode_sao(encoder_control *encoder,
+                       unsigned x_lcu, uint16_t y_lcu,
+                       sao_info *sao_luma, sao_info *sao_chroma)
 {
   // TODO: transmit merge flags outside sao_info
   encode_sao_merge_flags(sao_luma, x_lcu, y_lcu);
@@ -1690,8 +1695,10 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
 
 }
 
-void transform_chroma(encoder_control *encoder, cu_info *cur_cu, int depth, pixel *base_u, pixel *pred_u,
-                      coefficient *coeff_u, int8_t scan_idx_chroma, coefficient *pre_quant_coeff, coefficient *block)
+static void transform_chroma(encoder_control *encoder, cu_info *cur_cu,
+                             int depth, pixel *base_u, pixel *pred_u,
+                             coefficient *coeff_u, int8_t scan_idx_chroma,
+                             coefficient *pre_quant_coeff, coefficient *block)
 {
   int base_stride = encoder->in.width;
   int pred_stride = encoder->in.width;
@@ -1721,10 +1728,10 @@ void transform_chroma(encoder_control *encoder, cu_info *cur_cu, int depth, pixe
   #endif
 }
 
-void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
-                        int depth, int has_coeffs, coefficient *coeff_u,
-                        pixel *recbase_u, pixel *pred_u, int color_type,
-                        coefficient *pre_quant_coeff, coefficient *block)
+static void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
+                               int depth, int has_coeffs, coefficient *coeff_u,
+                               pixel *recbase_u, pixel *pred_u, int color_type,
+                               coefficient *pre_quant_coeff, coefficient *block)
 {
   int8_t width_c = LCU_WIDTH >> (depth + 1);
   int pred_stride = encoder->in.width;
@@ -2041,7 +2048,8 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
   // end Residual Coding
 }
 
-void encode_transform_unit(encoder_control *encoder, int x_pu, int y_pu, int depth, int tr_depth)
+static void encode_transform_unit(encoder_control *encoder,
+                                  int x_pu, int y_pu, int depth, int tr_depth)
 {
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> 1);
