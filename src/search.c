@@ -234,6 +234,7 @@ static unsigned hexagon_search(unsigned depth,
   return best_cost;
 }
 
+#if SEARCH_MV_FULL_RADIUS
 static unsigned search_mv_full(unsigned depth,
                                const picture *pic, const picture *ref,
                                const vector2d *orig, vector2d *mv_in_out)
@@ -277,6 +278,7 @@ static unsigned search_mv_full(unsigned depth,
 
   return best_cost;
 }
+#endif
 
 static void search_inter(encoder_control *encoder, uint16_t x_ctb,
                          uint16_t y_ctb, uint8_t depth)
