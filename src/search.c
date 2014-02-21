@@ -73,7 +73,7 @@ const vector2d small_hexbs[5] = {
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
 
-int calc_mvd_cost(int x, int y, const vector2d *pred)
+static int calc_mvd_cost(int x, int y, const vector2d *pred)
 {
   int cost = 0;
 
@@ -115,9 +115,9 @@ int calc_mvd_cost(int x, int y, const vector2d *pred)
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-unsigned hexagon_search(unsigned depth,
-                        const picture *pic, const picture *ref,
-                        const vector2d *orig, vector2d *mv_in_out)
+static unsigned hexagon_search(unsigned depth,
+                               const picture *pic, const picture *ref,
+                               const vector2d *orig, vector2d *mv_in_out)
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
@@ -234,9 +234,9 @@ unsigned hexagon_search(unsigned depth,
   return best_cost;
 }
 
-unsigned search_mv_full(unsigned depth,
-                        const picture *pic, const picture *ref,
-                        const vector2d *orig, vector2d *mv_in_out)
+static unsigned search_mv_full(unsigned depth,
+                               const picture *pic, const picture *ref,
+                               const vector2d *orig, vector2d *mv_in_out)
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
@@ -278,7 +278,9 @@ unsigned search_mv_full(unsigned depth,
   return best_cost;
 }
 
-void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth) {
+static void search_inter(encoder_control *encoder, uint16_t x_ctb,
+                         uint16_t y_ctb, uint8_t depth)
+{
   picture *cur_pic = encoder->in.cur_pic;
   uint32_t ref_idx = 0;
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
@@ -315,7 +317,8 @@ void search_inter(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint
 
 }
 
-void search_intra(encoder_control *encoder, uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
+static void search_intra(encoder_control *encoder, uint16_t x_ctb,
+                         uint16_t y_ctb, uint8_t depth)
 {
   int16_t x = x_ctb * (LCU_WIDTH >> MAX_DEPTH);
   int16_t y = y_ctb * (LCU_WIDTH >> MAX_DEPTH);
