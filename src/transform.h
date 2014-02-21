@@ -57,13 +57,13 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
 void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
 void itransform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
 
-void scalinglist_init();
+void scalinglist_init(void);
 void scalinglist_process_enc( int32_t *coeff, int32_t *quant_coeff, int32_t quant_scales,
                              uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat);
-void scalinglist_process();
+void scalinglist_process(void);
 void scalinglist_set(int32_t *coeff, uint32_t list_id, uint32_t size_id, uint32_t qp);
 void scalinglist_set_err_scale(uint32_t list,uint32_t size, uint32_t qp);
-void scalinglist_destroy();
+void scalinglist_destroy(void);
 
 int32_t *scalinglist_get_default(uint32_t size_id, uint32_t list_id);
 int scalinglist_parse(FILE *fp);

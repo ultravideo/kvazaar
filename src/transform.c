@@ -193,7 +193,7 @@ int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
  * \brief Initialize scaling lists
  *
  */
-void scalinglist_init()
+void scalinglist_init(void)
 {
   uint32_t sizeId,listId,qp;
 
@@ -221,7 +221,7 @@ void scalinglist_init()
  * \brief Destroy scaling list allocated memory
  *
  */
-void scalinglist_destroy()
+void scalinglist_destroy(void)
 {
   uint32_t sizeId,listId,qp;
 
@@ -244,7 +244,7 @@ void scalinglist_destroy()
  * \brief
  *
  */
-void scalinglist_process()
+void scalinglist_process(void)
 {
   uint32_t size,list,qp;
 
