@@ -105,7 +105,6 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
 {
   int band;
   int offset;
-  int shift = g_bitdepth-5;
   int best_dist;
   int temp_dist;
   int dist[32];
