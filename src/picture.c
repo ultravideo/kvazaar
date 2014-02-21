@@ -593,6 +593,7 @@ cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
   }
 }
 
+#if 0
 /**
  * \brief  Calculate SATD for NxN block of size N.
  *
@@ -633,6 +634,7 @@ static unsigned sad_nxn_16bit(pixel *block1, pixel *block2, unsigned n)
   return sum;
 }
 }
+#endif
 
 /**
  * \brief Diagonally interpolate SAD outside the frame.
