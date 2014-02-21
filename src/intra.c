@@ -593,7 +593,7 @@ void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t 
     ref_side = (mode_ver ? ref_left : ref_above) + (blk_size - 1);
 
     // Extend the Main reference to the left.
-    for (k =- 1; k > blk_size * intra_pred_angle>>5; k--) {
+    for (k = -1; k > blk_size * intra_pred_angle>>5; k--) {
       invAngleSum += inv_angle;
       ref_main[k] = ref_side[invAngleSum>>8];
     }
