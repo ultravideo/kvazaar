@@ -572,8 +572,8 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
-  pixel *orig_list[2];
-  pixel *rec_list[2];
+  const pixel *orig_list[2];
+  const pixel *rec_list[2];
   pixel orig[2][LCU_CHROMA_SIZE];
   pixel rec[2][LCU_CHROMA_SIZE];
   color_index color_i;
@@ -608,8 +608,8 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
-  pixel * orig_list[1] = { NULL };
-  pixel * rec_list[1] = { NULL };
+  const pixel * orig_list[1] = { NULL };
+  const pixel * rec_list[1] = { NULL };
   pixel *data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   pixel *recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
   int block_width = LCU_WIDTH;
