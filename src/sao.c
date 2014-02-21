@@ -551,7 +551,7 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   }
 
   // When BD-rate would increase because of SAO, disable it
-  if(sao_out->ddistortion > 0) {
+  if(sao_out->ddistortion >= 0) {
     sao_out->type = SAO_TYPE_NONE;
     return;
   }
