@@ -24,7 +24,7 @@ ifneq ( ,$(findstring Windows, $(OS)))
     ASMFLAGS += -f win64
   else
     ASMFLAGS += -f win32
-    ASMFLAGS += -DPREFIX  
+    ASMFLAGS += -DPREFIX
   endif
   LDFLAGS += -lws2_32
 # OS X specific flags
@@ -37,7 +37,7 @@ else ifeq ($(SYSTEM),Darwin)
 ASMFLAGS += -DPREFIX
 # Default to Linux/elf specific flags
 else
-  ifeq ($(ARCH), x86_64)    
+  ifeq ($(ARCH), x86_64)
       ASMFLAGS += -f elf64
   else
       ASMFLAGS += -f elf32
@@ -45,7 +45,7 @@ else
 endif
 
 CC = gcc
-CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib
+CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib -Wdeclaration-after-statement -Wall -Wdisabled-optimization -Wpointer-arith -Wredundant-decls -Wcast-qual -Wwrite-strings -Wtype-limits -Wundef -Wmissing-prototypes -Wstrict-prototypes -Wno-parentheses -Wno-switch -Wno-format-zero-length -Wno-pointer-sign -O3 -fno-math-errno -fno-signed-zeros -fno-tree-vectorize -Werror=implicit-function-declaration -Werror=missing-prototypes -Werror=return-type -Werror=declaration-after-statement -Werror=vla -Wno-maybe-uninitialized
 LDFLAGS += -lm
 LD = gcc
 YASM = yasm
