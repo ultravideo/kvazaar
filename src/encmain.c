@@ -147,10 +147,6 @@ int main(int argc, char *argv[])
   if (ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
   if (ecx & (1<<BIT_AVX))   printf("AVX ");
   printf("\r\n");
-    
-
-  printf("Input: %s, output: %s\n", cfg->input, cfg->output);
-  printf("  Video size: %dx%d\n", cfg->width, cfg->height);
 
   // Check if the input file name is a dash, this means stdin
   if (!strcmp(cfg->input, "-")) {
@@ -210,6 +206,18 @@ int main(int argc, char *argv[])
   encoder->cqmfile = cqmfile;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
+
+  printf("Input: %s, output: %s\n", cfg->input, cfg->output);
+  printf("  Video size: %dx%d\n (%dx%d)",
+         encoder->in.width, encoder->in.height,
+         encoder->in.real_width, encoder->in.real_height);
+
+  // Only the code that handles conformance window coding needs to know
+  // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
+  // change the input values here to be the real values. For a real fix
+  // encoder.in probably needs to be merged into cfg.
+  cfg->width = encoder->in.width;
+  cfg->height = encoder->in.height;
 
   // Init coeff data table
   encoder->in.cur_pic->coeff_y = MALLOC(coefficient, cfg->width * cfg->height);
