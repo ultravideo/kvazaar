@@ -100,7 +100,7 @@ int config_destroy(config *cfg)
  * \param char * string to copy
  * \return a pointer to the copied string on success, null on failure
  */
-char *copy_string(const char *string)
+static char *copy_string(const char *string)
 {
   // Allocate +1 for \0
   char *allocated_string = (char *)malloc(strlen(string) + 1);
