@@ -268,7 +268,7 @@ encoder_control *init_encoder_control(config *cfg)
   // input init (TODO: read from commandline / config)
   enc_c->bitdepth = 8;
   enc_c->frame    = 0;
-  enc_c->QP       = enc_c->cfg->qp;
+  enc_c->QP       = (int8_t)enc_c->cfg->qp;
   enc_c->in.video_format = FORMAT_420;
   // deblocking filter
   enc_c->deblock_enable    = 1;

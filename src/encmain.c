@@ -180,26 +180,26 @@ int main(int argc, char *argv[])
   // input init (TODO: read from commandline / config)
   encoder->bitdepth = 8;
   encoder->frame    = 0;
-  encoder->QP       = encoder->cfg->qp;
+  encoder->QP       = (int8_t)encoder->cfg->qp;
   encoder->in.video_format = FORMAT_420;
   // deblocking filter
-  encoder->deblock_enable   = encoder->cfg->deblock_enable;
-  encoder->beta_offset_div2 = encoder->cfg->deblock_beta;
-  encoder->tc_offset_div2   = encoder->cfg->deblock_tc;
+  encoder->deblock_enable   = (int8_t)encoder->cfg->deblock_enable;
+  encoder->beta_offset_div2 = (int8_t)encoder->cfg->deblock_beta;
+  encoder->tc_offset_div2   = (int8_t)encoder->cfg->deblock_tc;
   // SAO
-  encoder->sao_enable = encoder->cfg->sao_enable;
+  encoder->sao_enable = (int8_t)encoder->cfg->sao_enable;
   // VUI
-  encoder->vui.sar_width   = encoder->cfg->vui.sar_width;
-  encoder->vui.sar_height  = encoder->cfg->vui.sar_height;
+  encoder->vui.sar_width   = (int16_t)encoder->cfg->vui.sar_width;
+  encoder->vui.sar_height  = (int16_t)encoder->cfg->vui.sar_height;
   encoder->vui.overscan    = encoder->cfg->vui.overscan;
   encoder->vui.videoformat = encoder->cfg->vui.videoformat;
   encoder->vui.fullrange   = encoder->cfg->vui.fullrange;
   encoder->vui.colorprim   = encoder->cfg->vui.colorprim;
   encoder->vui.transfer    = encoder->cfg->vui.transfer;
   encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
-  encoder->vui.chroma_loc  = encoder->cfg->vui.chroma_loc;
+  encoder->vui.chroma_loc  = (int8_t)encoder->cfg->vui.chroma_loc;
   // AUD
-  encoder->aud_enable = encoder->cfg->aud_enable;
+  encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
   // CQM
   cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
   encoder->cqmfile = cqmfile;

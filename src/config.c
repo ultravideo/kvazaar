@@ -130,12 +130,13 @@ static int atobool(const char *str)
 
 static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
 {
-  int i;
-  for (i = 0; names[i]; i++)
+  int8_t i;
+  for (i = 0; names[i]; i++) {
     if (!strcmp(arg, names[i])) {
       *dst = i;
       return 1;
     }
+  }
 
   return 0;
 }

@@ -141,8 +141,8 @@ typedef struct picture_struct
 typedef struct
 {
   picture** pics;          //!< \brief Pointer to array of picture pointers.
-  unsigned int size;       //!< \brief Array size.
-  unsigned int used_size;
+  int32_t size;       //!< \brief Array size.
+  int32_t used_size;
 } picture_list;
 
 
