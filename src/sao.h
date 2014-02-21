@@ -26,7 +26,8 @@
 
 #include "global.h"
 #include "picture.h"
-
+#include "encoder.h"
+#include "math.h"
 
 typedef enum { SAO_TYPE_NONE = 0, SAO_TYPE_BAND, SAO_TYPE_EDGE } sao_type;
 typedef enum { SAO_EO0 = 0, SAO_EO1, SAO_EO2, SAO_EO3, SAO_NUM_EO } sao_eo_class;
@@ -39,6 +40,7 @@ typedef struct sao_info_struct {
   int ddistortion;
   int merge_left_flag;
   int merge_up_flag;
+  int band_position;
   int offsets[NUM_SAO_EDGE_CATEGORIES];
 } sao_info;
 
