@@ -82,7 +82,7 @@ No external library dependencies.
 
 ##Contributing to Kvazaar
 
-###For version control we try to follow these convetions:
+###For version control we try to follow these conventions:
 
 - Master branch always produces a working bitstream (can be decoded with HM).
 - Commits for new features and major changes/fixes put to a sensibly named feature branch first and later merged to the master branch.
@@ -126,4 +126,4 @@ We try to follow the following conventions:
 
 - A good first resource is JCTVC-N1002 High Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder Description
 - Many good articles regarding specific parts of HEVC can be found on IEEE Transactions on Circuits and Systems for Video Technology, Combined issue on High Efficiency Video Coding (HEVC) Standards and Research
-- A definitive ansver to a question regarding the bitstream can often be found faster from the HM reference encoder than by reading the specification. 
+- A definitive answer to a question regarding the bitstream can often be found faster from the HM reference encoder than by reading the specification. 
