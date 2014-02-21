@@ -226,7 +226,9 @@ uint32_t get_coded_level ( encoder_control* encoder, double *coded_cost, double 
  *
  * From HM 12.0
 */
-double get_rate_last(encoder_control* encoder, const uint32_t  pos_x, const uint32_t pos_y, int32_t* last_x_bits, int32_t* last_y_bits)
+static double get_rate_last(encoder_control* encoder,
+                            const uint32_t  pos_x, const uint32_t pos_y,
+                            int32_t* last_x_bits, int32_t* last_y_bits)
 {
   uint32_t ctx_x   = g_group_idx[pos_x];
   uint32_t ctx_y   = g_group_idx[pos_y];
@@ -240,7 +242,8 @@ double get_rate_last(encoder_control* encoder, const uint32_t  pos_x, const uint
   return g_lambda_cost[encoder->QP]*uiCost;
 }
 
-void calc_last_bits(int32_t width, int32_t height, int8_t type, int32_t* last_x_bits, int32_t* last_y_bits)
+static void calc_last_bits(int32_t width, int32_t height, int8_t type,
+                           int32_t* last_x_bits, int32_t* last_y_bits)
 {
   int32_t bits_x = 0, bits_y = 0;
   int32_t blk_size_offset_x, blk_size_offset_y, shiftX, shiftY;
