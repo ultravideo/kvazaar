@@ -536,8 +536,8 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
 
     ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position, &temp_rate);
 
-    if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, temp_offsets,sao_out->band_position, 0)) ||
-       (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, temp_offsets,sao_out->band_position, 0))) {
+    if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_BAND, temp_offsets,sao_out->band_position, 0)) ||
+       (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_BAND, temp_offsets,sao_out->band_position, 0))) {
           temp_rate = 1;
     }
     ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
