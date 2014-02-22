@@ -45,6 +45,7 @@
 double g_lambda_cost[55];
 double g_cur_lambda_cost;
 uint32_t* g_sig_last_scan[3][7];
+int8_t g_convert_to_bit[LCU_WIDTH + 1];
 
 /* Local functions. */
 static void add_checksum(encoder_control* encoder);
