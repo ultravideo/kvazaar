@@ -333,13 +333,15 @@ static void search_intra(encoder_control *encoder, uint16_t x_ctb,
   pixel rec[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
   pixel *recShift = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
 
+  int8_t merge[3] = {-1,-1,-1};
+
   // Build reconstructed block to use in prediction with extrapolated borders
   intra_build_reference_border(cur_pic, cur_pic->y_data,
                                x, y,
                                (int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0);
   cur_cu->intra[0].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
       encoder->in.width, recShift, width * 2 + 8, x, y,
-      width, pred, width, &cur_cu->intra[0].cost);
+      width, pred, width, &cur_cu->intra[0].cost,merge);
   cur_cu->part_size = SIZE_2Nx2N;
 
   // Do search for NxN split.
@@ -361,7 +363,7 @@ static void search_intra(encoder_control *encoder, uint16_t x_ctb,
                                    (int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0);
       cur_cu->intra[i].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
           encoder->in.width, recShift, width * 2 + 8, (int16_t)x_pos, (int16_t)y_pos,
-          width, pred, width, &cur_cu->intra[i].cost);
+          width, pred, width, &cur_cu->intra[i].cost,merge);
       cost += cur_cu->intra[i].cost;
     }
 
