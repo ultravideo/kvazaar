@@ -2623,6 +2623,12 @@ void encode_block_residual(encoder_control *encoder,
     static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
     int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
     int i;
+    int8_t merge[3];
+
+    intra_get_dir_luma_predictor(encoder->in.cur_pic,
+                                   x_ctb * 2,
+                                   y_ctb * 2,
+                                   merge);
 
     if (cur_cu->part_size == SIZE_NxN) {
       width = width_c;
@@ -2645,7 +2651,7 @@ void encode_block_residual(encoder_control *encoder,
                                                   x_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
                                                   y_ctb * (LCU_WIDTH >> (MAX_DEPTH)),
                                                   width, pred_y, width,
-                                                  &cur_cu->intra[0].cost);
+                                                  &cur_cu->intra[0].cost,merge);
     intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
                          cur_cu->intra[0].mode, cur_cu->part_size);
 
