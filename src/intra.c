@@ -237,15 +237,15 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
  * \brief Helper function to find intra merge costs
  * \returns intra mode coding cost in bits
  */
-static uint32_t intra_merge_cost(int8_t mode, int8_t *merge_modes)
+static uint32_t intra_pred_ratecost(int16_t mode, int16_t *intra_preds)
 {
    // merge mode -1 means they are not used -> cost 0
-   if(merge_modes[0] == -1) return 0;
+   if(intra_preds[0] == -1) return 0;
 
    // First candidate needs only one bit and two other need two
-   if(merge_modes[0] == mode) {
+   if(intra_preds[0] == mode) {
      return 1; 
-   } else if(merge_modes[1] == mode || merge_modes[2] == mode) {
+   } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
      return 2;
    }
    // Without merging the cost is 5 bits
@@ -269,7 +269,7 @@ static uint32_t intra_merge_cost(int8_t mode, int8_t *merge_modes)
  This function derives the prediction samples for planar mode (intra coding).
 */
 int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride, uint16_t xpos,
-                         uint16_t ypos, uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *merge)
+                         uint16_t ypos, uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *intra_preds)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
@@ -287,7 +287,6 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
 
   pixel* rec_filtered = &rec_filtered_temp[recstride + 1]; //!< pointer to rec_filtered_temp with offset of (1,1)
-  pixel *orig_shift = &orig[xpos + ypos*origstride];  //!< pointer to orig with offset of (1,1)
   int8_t filter = (width<32); // TODO: chroma support
 
   uint8_t threshold = intra_hor_ver_dist_thres[g_to_bits[width]]; //!< Intra filtering threshold
@@ -306,7 +305,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
   i = 0;
   for(y = 0; y < (int32_t)width; y++) {
     for(x = 0; x < (int32_t)width; x++) {
-      orig_block[i++] = orig_shift[x + y*origstride];
+      orig_block[i++] = orig[x + y*origstride];
     }
   }
 
@@ -326,7 +325,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     for (i = 0; i < (int32_t)(width*width); i++) {
       pred[i] = val;
     }
-    ratecost = intra_merge_cost(1,merge)*(int)(g_cur_lambda_cost+0.5);
+    ratecost = intra_pred_ratecost(1,intra_preds)*(int)(g_cur_lambda_cost+0.5);
     CHECK_FOR_BEST(1,ratecost);
   }
 
@@ -335,7 +334,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     int distance = MIN(abs(i - 26),abs(i - 10)); //!< Distance from top and left predictions
     if(distance <= threshold) {
       intra_get_angular_pred(rec, recstride, pred, width, width, i, filter);
-      ratecost = intra_merge_cost(i,merge)*(int)(g_cur_lambda_cost+0.5);
+      ratecost = intra_pred_ratecost(i,intra_preds)*(int)(g_cur_lambda_cost+0.5);
       CHECK_FOR_BEST(i,ratecost);
     }
   }
@@ -344,7 +343,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
 
   // Test planar mode (always filtered)
   intra_get_planar_pred(rec_filtered, recstride, width, pred, width);
-  ratecost = intra_merge_cost(0,merge)*(int)(g_cur_lambda_cost+0.5);
+  ratecost = intra_pred_ratecost(0,intra_preds)*(int)(g_cur_lambda_cost+0.5);
   CHECK_FOR_BEST(0,ratecost);
 
   // Check angular predictions which require filtered samples
@@ -354,7 +353,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     int distance = MIN(abs(i-26),abs(i-10)); //!< Distance from top and left predictions
     if(distance > threshold) {
       intra_get_angular_pred(rec_filtered, recstride, pred, width, width, i, filter);
-      ratecost = intra_merge_cost(i,merge)*(int)(g_cur_lambda_cost+0.5);
+      ratecost = intra_pred_ratecost(i,intra_preds)*(int)(g_cur_lambda_cost+0.5);
       CHECK_FOR_BEST(i,ratecost);
     }
   }
