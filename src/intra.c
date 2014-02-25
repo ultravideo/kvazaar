@@ -751,3 +751,78 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
     }
   }
 }
+
+void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
+{
+  int x_local = (x&0x3f), y_local = (y&0x3f);
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + x_local>>3 + (y_local>>3)*LCU_CU_STRUCT_WIDTH];
+  
+  // Pointers to reconstruction arrays
+  pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
+  pixel *recbase_u = &lcu->rec.u[(x_local + y_local * LCU_WIDTH)>>2];
+  pixel *recbase_v = &lcu->rec.v[(x_local + y_local * LCU_WIDTH)>>2];
+  int32_t rec_stride = LCU_WIDTH;
+
+
+  pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+  pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
+
+  int8_t width = LCU_WIDTH >> depth;
+  int8_t width_c = LCU_WIDTH >> (depth + 1);
+  static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
+  int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
+  int i;
+
+  if (cur_cu->part_size == SIZE_NxN) {
+    width = width_c;
+  }
+
+  cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
+
+  // Reconstruct chroma
+  rec_shift  = &rec[width_c * 2 + 8 + 1];
+  intra_build_reference_border_lcu(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
+                                   pic_width, pic_height, lcu);
+  intra_recon(rec_shift,
+              width_c * 2 + 8,
+              width_c,
+              recbase_u,
+              rec_stride >> 1,
+              cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+              1);
+
+  intra_build_reference_border_lcu(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
+                                   pic_width, pic_height, lcu);
+  intra_recon(rec_shift,
+              width_c * 2 + 8,
+              width_c,
+              recbase_v,
+              rec_stride >> 1,
+              cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+              2);
+
+  for (i = 0; i < num_pu; ++i) {
+    // Build reconstructed block to use in prediction with extrapolated borders
+    int x_off = offsets[i].x * width;
+    int y_off = offsets[i].y * width;
+    recbase_y = &lcu->rec.y[x_local + x_off + (y_local+y_off) * LCU_WIDTH];
+
+    rec_shift  = &rec[width * 2 + 8 + 1];
+    intra_build_reference_border_lcu(x+x_off, y+y_off,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+                                   pic_width, pic_height, lcu);
+    intra_recon(rec_shift, width * 2 + 8,
+                width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
+
+    // Filter DC-prediction
+    if (cur_cu->intra[i].mode == 1 && width < 32) {
+      intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
+                              rec_stride, width, width);
+    }
+
+    // Handle NxN mode by doing quant/transform and inverses for the next NxN block
+    if (cur_cu->part_size == SIZE_NxN) {
+      //encode_transform_tree_lcu(encoder, x + x_off, y + y_off, depth+1, lcu);
+    }
+  }
+
+}
