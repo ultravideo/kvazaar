@@ -319,7 +319,7 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
 
 }
 
-
+// Width from top left of the LCU, so +1 for ref buffer size.
 #define LCU_REF_PX_WIDTH (LCU_WIDTH + LCU_WIDTH / 2)
 
 /**
@@ -474,6 +474,10 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
   return cost;
 }
 
+#define SUB_SCU_BIT_MASK (64 - 1);
+#define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
+#define LCU_CU_WIDTH 8
+#define LCU_T_CU_WIDTH 9
 
 /**
  * Initialize lcu_t for search.
@@ -481,9 +485,124 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  */
-static void init_lcu_t(encoder_control *encoder, int x, int y, lcu_t *lcu)
+static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t *lcu)
 {
-  // TODO: 
+  // Copy reference cu_info structs from neighbouring LCUs.
+  {
+    const int x_cu = x >> MAX_DEPTH;
+    const int y_cu = y >> MAX_DEPTH;
+    const int cu_array_width = encoder->in.width_in_lcu << MAX_DEPTH;
+    cu_info *const cu_array = encoder->in.cur_pic->cu_array[MAX_DEPTH];
+
+    // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
+    // simpler.
+    cu_info *lcu_cu = &lcu->cu[1 + LCU_T_CU_WIDTH];
+
+    // Copy top CU row.
+    if (y_cu > 0) {
+      int i;
+      for (i = 0; i < LCU_CU_WIDTH; ++i) {
+        const cu_info *from_cu = &cu_array[(x_cu + i) + (y_cu - 1) * cu_array_width];
+        cu_info *to_cu = &lcu_cu[i - LCU_T_CU_WIDTH];
+        memcpy(to_cu, from_cu, sizeof(*to_cu));
+      }
+    }
+    // Copy left CU column.
+    if (x_cu > 0) {
+      int i;
+      for (i = 0; i < LCU_CU_WIDTH; ++i) {
+        const cu_info *from_cu = &cu_array[(x_cu - 1) + (y_cu + i) * cu_array_width];
+        cu_info *to_cu = &lcu_cu[-1 + i * LCU_T_CU_WIDTH];
+        memcpy(to_cu, from_cu, sizeof(*to_cu));
+      }
+    }
+    // Copy top-left CU.
+    if (x_cu > 0 && y_cu > 0) {
+      const cu_info *from_cu = &cu_array[(x_cu - 1) + (y_cu - 1) * cu_array_width];
+      cu_info *to_cu = &lcu_cu[-1 - LCU_T_CU_WIDTH];
+      memcpy(to_cu, from_cu, sizeof(*to_cu));
+    }
+  }
+
+  // Copy reference pixels.
+  {
+    const picture *pic = encoder->in.cur_pic;
+
+    const int pic_width = encoder->in.width;
+    const int pic_height = encoder->in.height;
+    const int ref_size = LCU_REF_PX_WIDTH;
+
+    const int pic_width_c = encoder->in.width / 2;
+    const int pic_height_c = encoder->in.height / 2;
+    const int ref_size_c = LCU_REF_PX_WIDTH / 2;
+    const int x_c = x / 2;
+    const int y_c = y / 2;
+
+    // Copy top reference pixels.
+    if (y > 0) {
+      int x_max = MIN(ref_size, pic_width - x);
+      int x_max_c = x_max / 2;
+      picture_blit_pixels(&pic->y_recdata[x + (y - 1) * pic_width],
+                          &lcu->top_ref.y[1],
+                          x_max, 1, pic_width, ref_size);
+      
+      picture_blit_pixels(&pic->u_recdata[x_c + (x_c - 1) * pic_width_c],
+                          &lcu->top_ref.u[1],
+                          x_max, 1, pic_width_c, ref_size_c);
+      picture_blit_pixels(&pic->v_recdata[x_c + (x_c - 1) * pic_width_c],
+                          &lcu->top_ref.v[1],
+                          x_max, 1, pic_width_c, ref_size_c);
+    }
+    // Copy left reference pixels.
+    if (x > 0) {
+      int y_max = MIN(LCU_REF_PX_WIDTH, pic_height - y);
+      int y_max_c = y_max / 2;
+      picture_blit_pixels(&pic->y_recdata[(x - 1) + y * pic_width],
+                          &lcu->left_ref.y[1],
+                          1, y_max, pic_width, 1);
+
+      picture_blit_pixels(&pic->u_recdata[(x_c - 1) + (y_c) * pic_width_c],
+                          &lcu->left_ref.u[1],
+                          1, y_max_c, pic_width_c, 1);
+      picture_blit_pixels(&pic->v_recdata[(x_c - 1) + (y_c) * pic_width_c],
+                          &lcu->left_ref.v[1],
+                          1, y_max_c, pic_width_c, 1);
+    }
+    // Copy top-left reference pixel.
+    if (x > 0 && y > 0) {
+      lcu->top_ref.y[0] = pic->y_recdata[(x - 1) + (y - 1) * pic_width];
+      lcu->left_ref.y[0] = pic->y_recdata[(x - 1) + (y - 1) * pic_width];
+    }
+  }
+
+  // Copy LCU pixels.
+  {
+    const picture *pic = encoder->in.cur_pic;
+    int pic_width = encoder->in.width;
+    int x_max = MIN(x + LCU_WIDTH, pic_width) - x;
+    int y_max = MIN(y + LCU_WIDTH, encoder->in.height) - y;
+
+    int x_c = x / 2;
+    int y_c = y / 2;
+    int pic_width_c = pic_width / 2;
+    int x_max_c = x_max / 2;
+    int y_max_c = y_max / 2;
+
+    picture_blit_pixels(&pic->y_recdata[x + y * pic_width], lcu->rec.y,
+                        x_max, y_max, pic_width, LCU_WIDTH);
+    picture_blit_pixels(&pic->y_data[x + y * pic_width], lcu->ref.y,
+                        x_max, y_max, pic_width, LCU_WIDTH);
+
+    picture_blit_pixels(&pic->u_recdata[x_c + y_c * pic_width_c], lcu->rec.u,
+                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
+    picture_blit_pixels(&pic->u_data[x_c + y_c * pic_width_c], lcu->ref.u,
+                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
+
+    picture_blit_pixels(&pic->v_recdata[x_c + y_c * pic_width_c], lcu->rec.v,
+                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
+    picture_blit_pixels(&pic->v_data[x_c + y_c * pic_width_c], lcu->ref.v,
+                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
+  }
 }
 
 
