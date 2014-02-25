@@ -284,7 +284,7 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
                          uint16_t y_ctb, uint8_t depth)
 {
   picture *cur_pic = encoder->in.cur_pic;
-  uint32_t ref_idx = 0;
+  int32_t ref_idx = 0;
   cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   cur_cu->inter.cost = UINT_MAX;
 
@@ -318,6 +318,218 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
   }
 
 }
+
+
+#define LCU_REF_PX_WIDTH (LCU_WIDTH + LCU_WIDTH / 2)
+
+/**
+ * Top and left intra reference pixels for LCU.
+ * - Intra needs maximum of 32 to the right and down from LCU border.
+ * - First pixel is the top-left pixel.
+ */
+typedef struct {
+  pixel y[LCU_REF_PX_WIDTH + 1];
+  pixel u[LCU_REF_PX_WIDTH / 2 + 1];
+  pixel v[LCU_REF_PX_WIDTH / 2 + 1];
+} lcu_ref_px_t;
+
+typedef struct {
+  pixel y[LCU_LUMA_SIZE];
+  pixel u[LCU_CHROMA_SIZE];
+  pixel v[LCU_CHROMA_SIZE];
+} lcu_yuv_t;
+
+typedef struct {
+  lcu_ref_px_t top_ref;  //!< Reference pixels from adjacent LCUs.
+  lcu_ref_px_t left_ref; //!< Reference pixels from adjacent LCUs.
+  lcu_yuv_t ref; //!< LCU reference pixels
+  lcu_yuv_t rec; //!< LCU reconstructed pixels
+
+  /**
+   * A 9x9 CU array for the LCU, +1 CU.
+   * - Top reference CUs on row 0.
+   * - Left reference CUs on column 0.
+   * - All of LCUs CUs on 1:9, 1:9.
+   * - Top right reference CU on the last slot.
+   */
+  cu_info cu[9*9+1];
+} lcu_t;
+
+
+/**
+ * Copy all non-reference CU data from depth+1 to depth.
+ */
+static void work_tree_copy_up(int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+{
+
+}
+
+
+/**
+ * Copy all non-reference CU data from depth to depth+1..MAX_PU_DEPTH.
+ */
+static void work_tree_copy_down(int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+{
+
+}
+
+
+/**
+ * Update lcu to have best modes at this depth.
+ * \return Cost of best mode.
+ */
+static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lcu_t lcu)
+{
+  int cost = MAX_INT;
+  return cost;
+}
+
+
+/**
+ * Update lcu to have best modes at this depth.
+ * \return Cost of best mode.
+ */
+static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lcu_t lcu)
+{
+  int cost = MAX_INT;
+
+  // reconstruct border
+
+  // find best intra mode
+
+  // reconstruct
+
+  return cost;
+}
+
+
+/**
+ * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
+ * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
+ * - Data structure work_tree is maintained such that the neighbouring SCUs
+ *   and pixels to the left and up of current CU are the final CUs decided
+ *   via the search. This is done by copying the relevant data to all
+ *   relevant levels whenever a decision is made whether to split or not.
+ * - All the final data for the LCU gets eventually copied to depth 0, which
+ *   will be the final output of the recursion.
+ */
+static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+{
+  int cu_width = LCU_WIDTH >> depth;
+  int cost = MAX_INT;
+
+  // Stop recursion if the CU is completely outside the frame.
+  if (x >= encoder->in.width || y >= encoder->in.height) {
+    // Return zero cost because this CU does not have to be coded.
+    return 0;
+  }
+
+  // If the CU is completely inside the frame at this depth, search for
+  // prediction modes at this depth.
+  if (x + cu_width <= encoder->in.width &&
+      y + cu_width <= encoder->in.height)
+  {
+    picture *cur_pic = encoder->in.cur_pic;
+
+    if (cur_pic->slicetype != SLICE_I &&
+        depth >= MIN_INTER_SEARCH_DEPTH &&
+        depth <= MAX_INTER_SEARCH_DEPTH)
+    {
+      int mode_cost = search_cu_inter(encoder, x, y, depth, work_tree[depth]);
+      if (mode_cost < cost) {
+        cost = mode_cost;
+      }
+    }
+
+    if (depth >= MIN_INTRA_SEARCH_DEPTH &&
+        depth <= MAX_INTRA_SEARCH_DEPTH)
+    {
+      int mode_cost = search_cu_intra(encoder, x, y, depth, work_tree[depth]);
+      if (mode_cost < cost) {
+        cost = mode_cost;
+      }
+    }
+  }
+
+  // Recursively split all the way to max search depth.
+  if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
+    int half_cu = cu_width / 2;
+    int split_cost = (int)(4.5 * g_lambda_cost[encoder->QP]);
+    split_cost += search_cu(encoder, x,           y,           depth + 1, work_tree);
+    split_cost += search_cu(encoder, x + half_cu, y,           depth + 1, work_tree);
+    split_cost += search_cu(encoder, x,           y + half_cu, depth + 1, work_tree);
+    split_cost += search_cu(encoder, x + half_cu, y + half_cu, depth + 1, work_tree);
+
+    if (split_cost < cost) {
+      // Copy split modes to this depth.
+      cost = split_cost;
+      work_tree_copy_up(x, y, depth, work_tree);
+    } else {
+      // Copy this CU's mode all the way down for use in adjacent CUs mode
+      // search.
+      work_tree_copy_down(x, y, depth, work_tree);
+    }
+  }
+
+  return cost;
+}
+
+
+/**
+ * Initialize lcu_t for search.
+ * - Copy reference CUs.
+ * - Copy reference pixels from neighbouring LCUs.
+ * - Copy reference pixels from this LCU.
+ */
+static void init_lcu_t(encoder_control *encoder, int x, int y, lcu_t *lcu)
+{
+  // TODO: 
+}
+
+
+/**
+ * Copy CU and pixel data to it's place in picture datastructure.
+ */
+static void copy_lcu_to_cu_data(encoder_control *encoder, int x, int y, lcu_t *lcu)
+{
+  // TODO: 
+}
+
+
+/**
+ * Search LCU for modes.
+ * - Best mode gets copied to current picture.
+ */
+static void search_lcu(encoder_control *encoder, int x, int y)
+{
+  lcu_t work_tree[MAX_PU_DEPTH];
+  int depth;
+
+  // Initialize work tree.
+  for (depth = 0; depth < MAX_PU_DEPTH; ++depth) {
+    init_lcu_t(encoder, x, y, &work_tree[depth]);
+  }
+
+  // Start search from depth 0.
+  search_cu(encoder, x, y, 0, work_tree);
+
+  copy_lcu_to_cu_data(encoder, x, y, &work_tree[0]);
+}
+
+
+/**
+ * Perform mode search for every LCU in the current picture.
+ */
+static void search_frame(encoder_control *encoder)
+{
+  int y_lcu, x_lcu;
+  for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
+    for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
+      search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
+    }
+  }
+}
+
 
 static void search_intra(encoder_control *encoder, uint16_t x_ctb,
                          uint16_t y_ctb, uint8_t depth)
@@ -485,6 +697,9 @@ uint32_t search_best_mode(encoder_control *encoder,
  */
 void search_slice_data(encoder_control *encoder)
 {
+#ifdef USE_NEW_SEARCH
+  search_frame(encoder);
+#else
   int16_t x_lcu, y_lcu;
 
   // Initialize the costs in the cu-array used for searching.
@@ -518,4 +733,5 @@ void search_slice_data(encoder_control *encoder)
 
     }
   }
+#endif
 }
