@@ -426,8 +426,10 @@ void intra_recon(pixel* rec, uint32_t recstride, uint32_t width, pixel* dst, int
  * The end result is 2*width+8 x 2*width+8 array, with only the top and left
  * edge pixels filled with the reconstructed pixels.
  */
-void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma, int32_t y_luma, int16_t outwidth,
-                                  pixel *dst, int32_t dststride, int8_t chroma)
+void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_width,
+                                      pixel *dst, int32_t dst_stride, int8_t chroma,
+                                      int32_t pic_width, int32_t pic_height,
+                                      lcu_t *lcu)
 {
   // Some other function might make use of the arrays num_ref_pixels_top and
   // num_ref_pixels_left in the future, but until that happens lets leave
@@ -485,8 +487,6 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
 
   const pixel dc_val = 1 << (g_bitdepth - 1);
   const int is_chroma = chroma ? 1 : 0;
-  const int src_width = pic->width >> is_chroma;
-  const int src_height = pic->height >> is_chroma;
 
   // input picture pointer
   //const pixel * const src = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata);
@@ -495,11 +495,27 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
   const int x = chroma ? x_luma / 2 : x_luma;
   const int y = chroma ? y_luma / 2 : y_luma;
 
-  // input picture pointer shifted to start from the left-top corner of the current block
-  const pixel *const src_shifted = &src[x + y * src_width];
-
   const int y_in_lcu = y_luma % LCU_WIDTH;
   const int x_in_lcu = x_luma % LCU_WIDTH;
+
+  int x_local = (x&0x3f), y_local = (y&0x3f);
+
+  pixel *left_ref = !chroma?lcu->left_ref.y : (chroma==1)? lcu->left_ref.u : lcu->left_ref.v;
+  pixel *top_ref  = !chroma?lcu->top_ref.y  : (chroma==1)? lcu->top_ref.u  : lcu->top_ref.v;
+  pixel *rec_ref  = !chroma?lcu->rec.y      : (chroma==1)? lcu->rec.u      : lcu->rec.v;
+
+  pixel *left_border = &left_ref[x_local];
+  pixel *top_border = &top_ref[y_local];  
+  uint32_t left_stride = 1;
+
+  if(x_local) {
+    left_border = &rec_ref[x_local - 1 + (y_local - 1) * LCU_WIDTH];
+    left_stride = LCU_WIDTH;
+  }
+
+  if(y_local) {
+    top_border = &rec_ref[x_local - 1 + (y_local-1) * LCU_WIDTH];    
+  }
 
   // Copy pixels for left edge.
   if (x > 0) {
@@ -510,28 +526,28 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
-    num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
+    num_ref_pixels = MIN(num_ref_pixels, out_width - 1);
     // There are no coded pixels below the frame.
-    num_ref_pixels = MIN(num_ref_pixels, src_height - y);
+    num_ref_pixels = MIN(num_ref_pixels, pic_height - y);
     // There are no coded pixels below the bottom of the LCU due to raster
     // scan order.
     num_ref_pixels = MIN(num_ref_pixels, (LCU_WIDTH - y_in_lcu) >> is_chroma);
 
     // Copy pixels from coded CUs.
     for (i = 0; i < num_ref_pixels; ++i) {
-      dst[(i + 1) * dststride] = src_shifted[i*src_width - 1];
+      dst[(i + 1) * dst_stride] = left_border[i*left_stride];
     }
     // Extend the last pixel for the rest of the reference values.
-    nearest_pixel = dst[i * dststride];
-    for (i = num_ref_pixels; i < outwidth - 1; ++i) {
-      dst[i * dststride] = nearest_pixel;
+    nearest_pixel = dst[i * dst_stride];
+    for (i = num_ref_pixels; i < out_width - 1; ++i) {
+      dst[i * dst_stride] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
-    pixel nearest_pixel = y > 0 ? src_shifted[-src_width] : dc_val;
+    pixel nearest_pixel = y > 0 ? left_border[0] : dc_val;
     int i;
-    for (i = 1; i < outwidth - 1; i++) {
-      dst[i * dststride] = nearest_pixel;
+    for (i = 1; i < out_width - 1; i++) {
+      dst[i * dst_stride] = nearest_pixel;
     }
   }
 
@@ -544,24 +560,24 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
-    num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
+    num_ref_pixels = MIN(num_ref_pixels, out_width - 1);
     // All LCUs in the row above have been coded.
-    num_ref_pixels = MIN(num_ref_pixels, src_width - x);
+    num_ref_pixels = MIN(num_ref_pixels, pic_width - x);
 
     // Copy pixels from coded CUs.
     for (i = 0; i < num_ref_pixels; ++i) {
-      dst[i + 1] = src_shifted[i - src_width];
+      dst[i + 1] = top_border[i];
     }
     // Extend the last pixel for the rest of the reference values.
-    nearest_pixel = src_shifted[num_ref_pixels - src_width - 1];
-    for (; i < outwidth - 1; ++i) {
+    nearest_pixel = top_border[num_ref_pixels - 1];
+    for (; i < out_width - 1; ++i) {
       dst[i + 1] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
-    pixel nearest_pixel = x > 0 ? src_shifted[-1] : dc_val;
+    pixel nearest_pixel = x > 0 ? top_border[0] : dc_val;
     int i;
-    for(i = 1; i < outwidth; i++)
+    for(i = 1; i < out_width; i++)
     {
       dst[i] = nearest_pixel;
     }
@@ -571,7 +587,7 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
   // Unavailable samples on the left boundary are copied from below if
   // available. This is the only place they are available because we don't
   // support constrained intra prediction.
-  dst[0] = (x > 0 && y > 0) ? src_shifted[-src_width - 1] : dst[dststride];
+  dst[0] = (x > 0 && y > 0) ? top_border[0] : dst[dst_stride];
 }
 
 const int32_t ang_table[9]     = {0,    2,    5,   9,  13,  17,  21,  26,  32};
@@ -808,8 +824,8 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
     recbase_y = &lcu->rec.y[x_local + x_off + (y_local+y_off) * LCU_WIDTH];
 
     rec_shift  = &rec[width * 2 + 8 + 1];
-    intra_build_reference_border_lcu(x+x_off, y+y_off,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
-                                   pic_width, pic_height, lcu);
+    intra_build_reference_border(x+x_off, y+y_off,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+                                 pic_width, pic_height, lcu);
     intra_recon(rec_shift, width * 2 + 8,
                 width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
 
