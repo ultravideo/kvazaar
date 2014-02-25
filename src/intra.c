@@ -110,50 +110,49 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
  * \param preds output buffer for 3 predictions
  * \returns (predictions are found)?1:0
  */
-int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, int8_t* preds)
+int8_t intra_get_dir_luma_predictor(lcu_t* lcu, uint32_t x, uint32_t y, int8_t* preds)
 {
-  int x_cu = x_pu / 2;
-  int y_cu = y_pu / 2;
+  int x_cu = x>>3;
+  int y_cu = y>>3;
 
   // The default mode if block is not coded yet is INTRA_DC.
   int8_t left_intra_dir  = 1;
   int8_t above_intra_dir = 1;
+    
+  int32_t cu_pos = ((x&0x3f)>>3) + ((y&0x3f)>>3) * LCU_CU_STRUCT_WIDTH;
 
-  int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
-  int32_t cu_pos = y_cu * width_in_scu + x_cu;
-
-  cu_info* cur_cu = &pic->cu_array[MAX_DEPTH][cu_pos];
+  cu_info* cur_cu = &lcu->cu[LCU_CU_OFFSET+cu_pos];
   cu_info* left_cu = 0;
   cu_info* above_cu = 0;
 
   if (x_cu > 0) {
-    left_cu = &pic->cu_array[MAX_DEPTH][cu_pos - 1];
+    left_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - 1];
   }
   // Don't take the above CU across the LCU boundary.
   if (y_cu > 0 &&
       ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0)
   {
-    above_cu = &pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu];
+    above_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - LCU_CU_STRUCT_WIDTH];
   }
 
-  if (cur_cu->part_size == SIZE_NxN && x_pu % 2 == 1) {
+  if (cur_cu->part_size == SIZE_NxN && (x & 7) == 1) {
     // If current CU is NxN and PU is on the right half, take mode from the
     // left half of the same CU.
-    left_intra_dir = cur_cu->intra[PU_INDEX(0, y_pu)].mode;
+    left_intra_dir = cur_cu->intra[PU_INDEX(0, y_cu<<1)].mode;
   } else if (left_cu && left_cu->type == CU_INTRA) {
     // Otherwise take the mode from the right side of the CU on the left.
-    left_intra_dir = left_cu->intra[PU_INDEX(1, y_pu)].mode;
+    left_intra_dir = left_cu->intra[PU_INDEX(1, y_cu<<1)].mode;
   }
 
-  if (cur_cu->part_size == SIZE_NxN && y_pu % 2 == 1) {
+  if (cur_cu->part_size == SIZE_NxN && (y & 7) == 1) {
     // If current CU is NxN and PU is on the bottom half, take mode from the
     // top half of the same CU.
-    above_intra_dir = cur_cu->intra[PU_INDEX(x_pu, 0)].mode;
+    above_intra_dir = cur_cu->intra[PU_INDEX(x_cu<<1, 0)].mode;
   } else if (above_cu && above_cu->type == CU_INTRA &&
              (y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH != 0)
   {
     // Otherwise take the mode from the bottom half of the CU above.
-    above_intra_dir = above_cu->intra[PU_INDEX(x_pu, 1)].mode;
+    above_intra_dir = above_cu->intra[PU_INDEX(x_cu<<1, 1)].mode;
   }
 
   // If the predictions are the same, add new predictions
@@ -237,7 +236,7 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
  * \brief Helper function to find intra merge costs
  * \returns intra mode coding cost in bits
  */
-static uint32_t intra_pred_ratecost(int16_t mode, int16_t *intra_preds)
+static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 {
    // merge mode -1 means they are not used -> cost 0
    if(intra_preds[0] == -1) return 0;
@@ -796,7 +795,7 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
 
   // Reconstruct chroma
   rec_shift  = &rec[width_c * 2 + 8 + 1];
-  intra_build_reference_border_lcu(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
+  intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
                                    pic_width, pic_height, lcu);
   intra_recon(rec_shift,
               width_c * 2 + 8,
@@ -806,7 +805,7 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
               cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
               1);
 
-  intra_build_reference_border_lcu(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
+  intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
                                    pic_width, pic_height, lcu);
   intra_recon(rec_shift,
               width_c * 2 + 8,
