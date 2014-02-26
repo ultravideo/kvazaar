@@ -824,4 +824,10 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
     }
   }
 
+  // If we coded NxN block, fetch the coded block flags to this level
+  if (cur_cu->part_size == SIZE_NxN) {
+    cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
+    cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
+    cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
+  }
 }
