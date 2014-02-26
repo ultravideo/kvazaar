@@ -545,6 +545,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       int mode_cost = search_cu_inter(encoder, x, y, depth, work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
+        cur_cu->type = CU_INTER;
       }
     }
 
@@ -554,15 +555,17 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       int mode_cost = search_cu_intra(encoder, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
+        cur_cu->type = CU_INTRA;
       }
     }
+    // Reconstruct best mode
+    if (cur_cu->type == CU_INTRA) {
+      intra_recon_lcu(encoder, x, y, depth,&work_tree[depth],encoder->in.cur_pic->width,encoder->in.cur_pic->height);
+    } else if (cur_cu->type == CU_INTER) {
+      // TODO
+    }
   }
-  // Reconstruct best mode
-  if(cur_cu->type == CU_INTRA) {
-    intra_recon_lcu(encoder, x, y, depth,&work_tree[depth],encoder->in.cur_pic->width,encoder->in.cur_pic->height);
-  } else {
-    // TODO
-  }
+
 
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
