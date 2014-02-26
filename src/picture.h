@@ -147,7 +147,7 @@ typedef struct
 
 
 
-#define SUB_SCU_BIT_MASK (64 - 1);
+#define SUB_SCU_BIT_MASK (64 - 1)
 #define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
 #define LCU_CU_WIDTH 8
 #define LCU_T_CU_WIDTH 9

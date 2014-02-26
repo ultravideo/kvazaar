@@ -319,7 +319,6 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
 }
 
 
-
 /**
  * Copy all non-reference CU data from depth+1 to depth.
  */
@@ -858,9 +857,8 @@ uint32_t search_best_mode(encoder_control *encoder,
  */
 void search_slice_data(encoder_control *encoder)
 {
-#ifdef USE_NEW_SEARCH
   search_frame(encoder);
-#else
+  /*
   int16_t x_lcu, y_lcu;
 
   // Initialize the costs in the cu-array used for searching.
@@ -878,7 +876,7 @@ void search_slice_data(encoder_control *encoder)
       }
     }
   }
-  /*
+  
   // Loop through every LCU in the slice
   for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
     for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
@@ -895,5 +893,4 @@ void search_slice_data(encoder_control *encoder)
     }
   }
   */
-#endif
 }
