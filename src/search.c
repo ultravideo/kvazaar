@@ -417,7 +417,7 @@ static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lc
                                    lcu);
 
   // find best intra mode
-  cur_cu->intra[0].mode = (int8_t)intra_prediction_lcu(&lcu->ref.y[x_local + y_local*LCU_WIDTH],
+  cur_cu->intra[0].mode = (int8_t)intra_prediction(&lcu->ref.y[x_local + y_local*LCU_WIDTH],
                                                        LCU_WIDTH, rec_shift, width * 2 + 8, x, y,
                                                        width, pred, width, &cur_cu->intra[0].cost, intra_preds);
   cur_cu->part_size = SIZE_2Nx2N;

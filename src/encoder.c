@@ -1765,25 +1765,23 @@ static void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
   }
 }
 
-void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu, uint8_t depth)
+void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8_t depth, lcu_t *lcu)
 {
   // we have 64>>depth transform size
-  int32_t x_cu = x_pu / 2;
-  int32_t y_cu = y_pu / 2;
+  int x_local = (x&0x3f), y_local = (y&0x3f);
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_CU_STRUCT_WIDTH];
+  
   int i;
   int8_t width = LCU_WIDTH>>depth;
   int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = 1 << (MAX_DEPTH - (depth + 1));
-    int pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
-
-    encode_transform_tree(encoder, x_pu, y_pu, depth+1);
-    encode_transform_tree(encoder, x_pu + pu_offset, y_pu, depth+1);
-    encode_transform_tree(encoder, x_pu, y_pu + pu_offset, depth+1);
-    encode_transform_tree(encoder, x_pu + pu_offset, y_pu + pu_offset, depth+1);
+    encode_transform_tree_lcu(encoder, x,          y,          depth+1, lcu);
+    encode_transform_tree_lcu(encoder, x + offset, y,          depth+1, lcu);
+    encode_transform_tree_lcu(encoder, x,          y + offset, depth+1, lcu);
+    encode_transform_tree_lcu(encoder, x + offset, y + offset, depth+1, lcu);
 
     // Derive coded coeff flags from the next depth
     if (depth == MAX_DEPTH) {
@@ -1791,9 +1789,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
       cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
       cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
     } else {
-      cu_info *cu_a =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
-      cu_info *cu_b =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-      cu_info *cu_c =  &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + offset + (y_cu + offset) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + (x_local + offset)>>3 + (y_local>>3)         *LCU_CU_STRUCT_WIDTH];
+      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET + x_local>>3            + ((y_local+offset)>>3)*LCU_CU_STRUCT_WIDTH];
+      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + (x_local + offset)>>3 + ((y_local+offset)>>3)*LCU_CU_STRUCT_WIDTH];
       cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cu_a->coeff_top_y[depth+1] | cu_b->coeff_top_y[depth+1]
                                     | cu_c->coeff_top_y[depth+1];
       cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1] | cu_a->coeff_top_u[depth+1] | cu_b->coeff_top_u[depth+1]
@@ -1808,30 +1806,30 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
   {
     // INTRAPREDICTION VARIABLES
-    int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
-    int y = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
-    pixel *recbase_y = &encoder->in.cur_pic->y_recdata[x + y * encoder->in.width];
-    pixel *recbase_u = &encoder->in.cur_pic->u_recdata[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    pixel *recbase_v = &encoder->in.cur_pic->v_recdata[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    int32_t recbase_stride = encoder->in.width;
+      // Pointers to reconstruction arrays
+    pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
+    pixel *recbase_u = &lcu->rec.u[(x_local + y_local * LCU_WIDTH)>>2];
+    pixel *recbase_v = &lcu->rec.v[(x_local + y_local * LCU_WIDTH)>>2];
+    int32_t recbase_stride = LCU_WIDTH;
 
-    pixel *base_y    = &encoder->in.cur_pic->y_data[x + y * encoder->in.width];
-    pixel *base_u    = &encoder->in.cur_pic->u_data[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    pixel *base_v    = &encoder->in.cur_pic->v_data[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    int32_t base_stride = encoder->in.width;
 
-    pixel *pred_y    = &encoder->in.cur_pic->pred_y[x + y * encoder->in.width];
-    pixel *pred_u    = &encoder->in.cur_pic->pred_u[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    pixel *pred_v    = &encoder->in.cur_pic->pred_v[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    int32_t pred_stride = encoder->in.width;
+    pixel *base_y = &lcu->ref.y[x_local + y_local * LCU_WIDTH];
+    pixel *base_u = &lcu->ref.u[(x_local + y_local * LCU_WIDTH)>>2];
+    pixel *base_v = &lcu->ref.v[(x_local + y_local * LCU_WIDTH)>>2];
+    int32_t base_stride = LCU_WIDTH;
+
+    pixel pred_y[LCU_WIDTH*LCU_WIDTH];
+    pixel pred_u[LCU_WIDTH*LCU_WIDTH>>2];
+    pixel pred_v[LCU_WIDTH*LCU_WIDTH>>2];
+    int32_t pred_stride = LCU_WIDTH;
 
     coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
     coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
-    coefficient *orig_coeff_y   = &encoder->in.cur_pic->coeff_y[x + y * encoder->in.width];
-    coefficient *orig_coeff_u   = &encoder->in.cur_pic->coeff_u[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    coefficient *orig_coeff_v   = &encoder->in.cur_pic->coeff_v[(x >> 1) + (y >> 1) * (encoder->in.width >> 1)];
-    int32_t coeff_stride = encoder->in.width;
+    coefficient *orig_coeff_y = &lcu->coeff.y[x_local + y_local * LCU_WIDTH];
+    coefficient *orig_coeff_u = &lcu->coeff.u[(x_local + y_local * LCU_WIDTH)>>2];
+    coefficient *orig_coeff_v = &lcu->coeff.v[(x_local + y_local * LCU_WIDTH)>>2];
+    int32_t coeff_stride = LCU_WIDTH;
 
     // Quant and transform here...
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
@@ -1844,6 +1842,9 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
     uint8_t scan_idx_luma   = SCAN_DIAG;
     uint8_t scan_idx_chroma = SCAN_DIAG;
     uint8_t dir_mode;
+
+    int32_t x_pu = x_local >> 2;
+    int32_t y_pu = y_local >> 2;
 
     int cbf_y = 0;
 
@@ -1863,7 +1864,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     if(cur_cu->type == CU_INTRA)
     {
-      int pu_index = x_pu % 2 + 2 * (y_pu % 2);
+      int pu_index = x_pu + 2 * (y_pu);
       int luma_mode = cur_cu->intra[pu_index].mode;
       scan_idx_luma = SCAN_DIAG;
 
@@ -1942,7 +1943,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
         if (depth <= MAX_DEPTH) {
           cur_cu->coeff_top_y[depth] = 1;
         } else {
-          int pu_index = x_pu % 2 + 2 * (y_pu % 2);
+          int pu_index = x_pu + 2 * y_pu;
           cur_cu->coeff_top_y[depth + pu_index] = 1;
         }
         break;
@@ -1952,7 +1953,7 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
     if (cbf_y) {
       // Combine inverese quantized coefficients with the prediction to get
       // reconstructed image.
-      picture_set_block_residual(encoder->in.cur_pic,x_cu,y_cu,depth,1);
+      //picture_set_block_residual(encoder->in.cur_pic,x_cu,y_cu,depth,1);
       i = 0;
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
