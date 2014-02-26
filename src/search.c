@@ -367,9 +367,46 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
 /**
  * Copy all non-reference CU data from depth to depth+1..MAX_PU_DEPTH.
  */
-static void work_tree_copy_down(int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
+  // TODO: clean up to remove the copy pasta
+  const int width_px = LCU_WIDTH >> depth;
+  
+  int d;
 
+  for (d = depth + 1; d < MAX_PU_DEPTH; ++d) {
+    const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
+    const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
+    const int width_cu = width_px >> MAX_DEPTH;
+    
+    int x, y;
+    for (y = y_cu; y < y_cu + width_cu; ++y) {
+      for (x = x_cu; x < x_cu + width_cu; ++x) {
+        const cu_info *from_cu = &work_tree[depth].cu[x + y * LCU_T_CU_WIDTH];
+        cu_info *to_cu = &work_tree[d].cu[x + y * LCU_T_CU_WIDTH];
+        memcpy(to_cu, from_cu, sizeof(*to_cu));
+      }
+    }
+  }
+
+  // Copy reconstructed pixels.
+  for (d = depth + 1; d < MAX_PU_DEPTH; ++d) {
+    const int x = SUB_SCU(x_px);
+    const int y = SUB_SCU(y_px);
+      
+    const int luma_index = x + y * LCU_WIDTH;
+    const int chroma_index = (x / 2) + (y / 2) * (LCU_WIDTH / 2);
+
+    lcu_yuv_t *from = &work_tree[depth].rec;
+    lcu_yuv_t *to = &work_tree[d].rec;
+
+    picture_blit_pixels(&from->y[luma_index], &to->y[luma_index],
+                        width_px, width_px, LCU_WIDTH, LCU_WIDTH);
+    picture_blit_pixels(&from->u[chroma_index], &to->u[chroma_index],
+                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+    picture_blit_pixels(&from->v[chroma_index], &to->v[chroma_index],
+                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+  }
 }
 
 
