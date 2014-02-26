@@ -645,9 +645,53 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
 /**
  * Copy CU and pixel data to it's place in picture datastructure.
  */
-static void copy_lcu_to_cu_data(encoder_control *encoder, int x, int y, lcu_t *lcu)
+static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, const lcu_t *lcu)
 {
-  // TODO: 
+  // Copy non-reference CUs to picture.
+  {
+    const int x_cu = x_px >> MAX_DEPTH;
+    const int y_cu = y_px >> MAX_DEPTH;
+    const int cu_array_width = encoder->in.width_in_lcu << MAX_DEPTH;
+    cu_info *const cu_array = encoder->in.cur_pic->cu_array[MAX_DEPTH];
+
+    // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
+    // simpler.
+    const cu_info *const lcu_cu = &lcu->cu[1 + LCU_T_CU_WIDTH];
+
+    int x, y;
+    for (y = 0; y < LCU_CU_WIDTH; ++y) {
+      for (x = 0; x < LCU_CU_WIDTH; ++x) {
+        const cu_info *from_cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
+        cu_info *to_cu = &cu_array[(x_cu + x) + (y_cu + y) * cu_array_width];
+        memcpy(to_cu, from_cu, sizeof(*to_cu));
+      }
+    }
+  }
+
+  // Copy pixels to picture.
+  {
+    picture *const pic = encoder->in.cur_pic;
+
+    const int pic_width = encoder->in.width;
+    const int pic_height = encoder->in.height;
+
+    const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
+    const int y_max = MIN(y_px + LCU_WIDTH, encoder->in.height) - y_px;
+
+    const int x_c = x_px / 2;
+    const int y_c = y_px / 2;
+    const int pic_width_c = pic_width / 2;
+    const int x_max_c = x_max / 2;
+    const int y_max_c = y_max / 2;
+
+    picture_blit_pixels(lcu->rec.y, &pic->y_recdata[x_px + y_px * pic_width],
+                        x_max, y_max, LCU_WIDTH, pic_width);
+
+    picture_blit_pixels(lcu->rec.u, &pic->u_recdata[x_c + y_c * pic_width_c],
+                        x_max_c, y_max_c, LCU_WIDTH / 2, pic_width_c);
+    picture_blit_pixels(lcu->rec.v, &pic->v_recdata[x_c + y_c * pic_width_c],
+                        x_max_c, y_max_c, LCU_WIDTH / 2, pic_width_c);
+  }
 }
 
 
