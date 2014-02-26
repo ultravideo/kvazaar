@@ -110,7 +110,8 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
  * \param preds output buffer for 3 predictions
  * \returns (predictions are found)?1:0
  */
-int8_t intra_get_dir_luma_predictor(lcu_t* lcu, uint32_t x, uint32_t y, int8_t* preds)
+int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
+                                    cu_info* cur_cu, cu_info* left_cu, cu_info* above_cu)
 {
   int x_cu = x>>3;
   int y_cu = y>>3;
@@ -119,22 +120,6 @@ int8_t intra_get_dir_luma_predictor(lcu_t* lcu, uint32_t x, uint32_t y, int8_t* 
   int8_t left_intra_dir  = 1;
   int8_t above_intra_dir = 1;
     
-  int32_t cu_pos = ((x&0x3f)>>3) + ((y&0x3f)>>3) * LCU_CU_STRUCT_WIDTH;
-
-  cu_info* cur_cu = &lcu->cu[LCU_CU_OFFSET+cu_pos];
-  cu_info* left_cu = 0;
-  cu_info* above_cu = 0;
-
-  if (x_cu > 0) {
-    left_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - 1];
-  }
-  // Don't take the above CU across the LCU boundary.
-  if (y_cu > 0 &&
-      ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0)
-  {
-    above_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - LCU_CU_STRUCT_WIDTH];
-  }
-
   if (cur_cu->part_size == SIZE_NxN && (x & 7) == 1) {
     // If current CU is NxN and PU is on the right half, take mode from the
     // left half of the same CU.
@@ -769,7 +754,7 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
 void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
 {
   int x_local = (x&0x3f), y_local = (y&0x3f);
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + x_local>>3 + (y_local>>3)*LCU_CU_STRUCT_WIDTH];
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
   
   // Pointers to reconstruction arrays
   pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
@@ -835,7 +820,7 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
 
     // Handle NxN mode by doing quant/transform and inverses for the next NxN block
     if (cur_cu->part_size == SIZE_NxN) {
-      //encode_transform_tree_lcu(encoder, x + x_off, y + y_off, depth+1, lcu);
+      encode_transform_tree(encoder, x + x_off, y + y_off, depth+1, lcu);
     }
   }
 

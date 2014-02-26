@@ -120,8 +120,7 @@ void encode_last_significant_xy(encoder_control *encoder, uint8_t lastpos_x,
                                 uint8_t type, uint8_t scan);
 void encode_coeff_nxn(encoder_control *encoder, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode);
-void encode_transform_tree(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
-                           uint8_t depth);
+void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8_t depth, lcu_t *lcu);
 void encode_transform_coeff(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(encoder_control *encoder,

@@ -34,12 +34,6 @@
 #include "inter.h"
 #include "filter.h"
 
-#define SUB_SCU_BIT_MASK (64 - 1);
-#define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
-#define LCU_CU_WIDTH 8
-#define LCU_T_CU_WIDTH 9
-#define LCU_CU_OFFSET 10
-
 // Temporarily for debugging.
 #define USE_INTRA_IN_P 1
 //#define RENDER_CU encoder->frame==2
@@ -324,41 +318,6 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
 
 }
 
-// Width from top left of the LCU, so +1 for ref buffer size.
-#define LCU_REF_PX_WIDTH (LCU_WIDTH + LCU_WIDTH / 2)
-
-/**
- * Top and left intra reference pixels for LCU.
- * - Intra needs maximum of 32 to the right and down from LCU border.
- * - First pixel is the top-left pixel.
- */
-typedef struct {
-  pixel y[LCU_REF_PX_WIDTH + 1];
-  pixel u[LCU_REF_PX_WIDTH / 2 + 1];
-  pixel v[LCU_REF_PX_WIDTH / 2 + 1];
-} lcu_ref_px_t;
-
-typedef struct {
-  pixel y[LCU_LUMA_SIZE];
-  pixel u[LCU_CHROMA_SIZE];
-  pixel v[LCU_CHROMA_SIZE];
-} lcu_yuv_t;
-
-typedef struct {
-  lcu_ref_px_t top_ref;  //!< Reference pixels from adjacent LCUs.
-  lcu_ref_px_t left_ref; //!< Reference pixels from adjacent LCUs.
-  lcu_yuv_t ref; //!< LCU reference pixels
-  lcu_yuv_t rec; //!< LCU reconstructed pixels
-
-  /**
-   * A 9x9 CU array for the LCU, +1 CU.
-   * - Top reference CUs on row 0.
-   * - Left reference CUs on column 0.
-   * - All of LCUs CUs on 1:9, 1:9.
-   * - Top right reference CU on the last slot.
-   */
-  cu_info cu[9*9+1];
-} lcu_t;
 
 
 /**
@@ -398,8 +357,11 @@ static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lc
 {
   int width = (LCU_WIDTH >> (depth));
   int x_local = (x&0x3f), y_local = (y&0x3f);
+  int x_cu = x>>3;
+  int y_cu = y>>3;
+  int cu_pos = LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH;
 
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+  cu_info *cur_cu = &lcu->cu[cu_pos];
 
   // INTRAPREDICTION
   pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
@@ -408,8 +370,20 @@ static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lc
 
   int8_t intra_preds[3];
 
+  cu_info* left_cu = 0;
+  cu_info* above_cu = 0;
+
+  if (x_cu > 0) {
+    left_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - 1];
+  }
+  // Don't take the above CU across the LCU boundary.
+  if (y_cu > 0 &&
+      ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0) {
+    above_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - LCU_T_CU_WIDTH];
+  }
+
   // Get intra predictors
-  intra_get_dir_luma_predictor(lcu, x, y, intra_preds);
+  intra_get_dir_luma_predictor(x, y, intra_preds, cur_cu, left_cu, above_cu);
 
   // Build reconstructed block to use in prediction with extrapolated borders
   intra_build_reference_border(x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
@@ -436,8 +410,7 @@ static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lc
     for (i = 0; i < 4; ++i) {
       int x_pos = x + offsets[i].x * width;
       int y_pos = y + offsets[i].y * width;
-      intra_get_dir_luma_predictor(lcu,x_pos,y_pos,
-                                   intra_preds);
+      intra_get_dir_luma_predictor(x_pos,y_pos, intra_preds, cur_cu, left_cu, above_cu);
       intra_build_reference_border(x_pos, y_pos,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
                                    encoder->in.cur_pic->width, encoder->in.cur_pic->height,
                                    lcu);
@@ -484,7 +457,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
     return 0;
   }
 
-  cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_CU_STRUCT_WIDTH];
+  cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
@@ -713,7 +686,7 @@ static void search_frame(encoder_control *encoder)
   }
 }
 
-
+/*
 static void search_intra(encoder_control *encoder, uint16_t x_ctb,
                          uint16_t y_ctb, uint8_t depth)
 {
@@ -772,6 +745,7 @@ static void search_intra(encoder_control *encoder, uint16_t x_ctb,
     }
   }
 }
+*/
 
 /**
  * \brief Search best modes at each depth for the whole picture.
@@ -780,6 +754,7 @@ static void search_intra(encoder_control *encoder, uint16_t x_ctb,
  * with the best mode and it's cost for each CU at each depth for the whole
  * frame.
  */
+/*
 void search_tree(encoder_control *encoder,
                  int x, int y, uint8_t depth)
 {
@@ -835,6 +810,7 @@ void search_tree(encoder_control *encoder,
     search_tree(encoder, x + half_cu, y + half_cu, depth + 1);
   }
 }
+*/
 
 /**
  * \brief
@@ -902,7 +878,7 @@ void search_slice_data(encoder_control *encoder)
       }
     }
   }
-
+  /*
   // Loop through every LCU in the slice
   for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
     for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
@@ -918,5 +894,6 @@ void search_slice_data(encoder_control *encoder)
 
     }
   }
+  */
 #endif
 }

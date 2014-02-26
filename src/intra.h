@@ -27,11 +27,12 @@
 #include "global.h"
 
 #include "picture.h"
-
+#include "encoder.h"
 
 void intra_set_block_mode(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
 
-int8_t intra_get_dir_luma_predictor(lcu_t* lcu, uint32_t x, uint32_t y, int8_t* preds);
+int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
+                                    cu_info* cur_cu, cu_info* left_cu, cu_info* above_cu);
 void intra_dc_pred_filtering(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t height );
 
 void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_width, pixel *dst, int32_t dst_stride, int8_t chroma, int32_t pic_width, int32_t pic_height, lcu_t *lcu);
@@ -46,6 +47,7 @@ void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t width, pixel* 
 void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* p_dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter);
 
 void intra_recon(pixel* rec, uint32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
-void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
+
+void intra_recon_lcu(encoder_control *encoder, int32_t x, int32_t y, int32_t depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
 
 #endif
