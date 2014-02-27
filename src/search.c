@@ -714,17 +714,9 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
     int x_max_c = x_max / 2;
     int y_max_c = y_max / 2;
 
-    picture_blit_pixels(&pic->y_recdata[x + y * pic_width], lcu->rec.y,
-                        x_max, y_max, pic_width, LCU_WIDTH);
     picture_blit_pixels(&pic->y_data[x + y * pic_width], lcu->ref.y,
                         x_max, y_max, pic_width, LCU_WIDTH);
-
-    picture_blit_pixels(&pic->u_recdata[x_c + y_c * pic_width_c], lcu->rec.u,
-                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
     picture_blit_pixels(&pic->u_data[x_c + y_c * pic_width_c], lcu->ref.u,
-                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
-
-    picture_blit_pixels(&pic->v_recdata[x_c + y_c * pic_width_c], lcu->rec.v,
                         x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
     picture_blit_pixels(&pic->v_data[x_c + y_c * pic_width_c], lcu->ref.v,
                         x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
