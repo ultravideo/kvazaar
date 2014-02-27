@@ -425,8 +425,8 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
 static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pred_mode, int part_mode)
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
-  const int x_cu = SUB_SCU(x_px);
-  const int y_cu = SUB_SCU(y_px);
+  const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
+  const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
   cu_info *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
   int x, y;
   
