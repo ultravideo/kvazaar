@@ -1952,7 +1952,14 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
         cur_cu->coeff_y = 1;
         cbf_y = 1;
         if (depth <= MAX_DEPTH) {
-          cur_cu->coeff_top_y[depth] = 1;
+          int d;
+          for (d = 0; d <= depth; ++d) {
+            cur_cu->coeff_top_y[d] = 1;
+          }
+          while (d < MAX_PU_DEPTH + 4) {
+            cur_cu->coeff_top_y[d] = 0;
+            ++d;
+          }
         } else {
           int pu_index = x_pu + 2 * y_pu;
           cur_cu->coeff_top_y[depth + pu_index] = 1;
@@ -2016,18 +2023,30 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
-          // Found one, we can break here
+          int d;
+          for (d = 0; d <= depth; ++d) {
+            cur_cu->coeff_top_u[d] = 1;
+          }
+          while (d < MAX_PU_DEPTH + 4) {
+            cur_cu->coeff_top_u[d] = 0;
+            ++d;
+          }
           cur_cu->coeff_u = 1;
-          cur_cu->coeff_top_u[depth] = 1;
           break;
         }
       }
       transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
-          // Found one, we can break here
+          int d;
+          for (d = 0; d <= depth; ++d) {
+            cur_cu->coeff_top_v[d] = 1;
+          }
+          while (d < MAX_PU_DEPTH + 4) {
+            cur_cu->coeff_top_v[d] = 0;
+            ++d;
+          }
           cur_cu->coeff_v = 1;
-          cur_cu->coeff_top_v[depth] = 1;
           break;
         }
       }
