@@ -318,10 +318,6 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
 
 }
 
-#define SUB_SCU_BIT_MASK (64 - 1)
-#define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
-#define LCU_CU_WIDTH 8
-#define LCU_T_CU_WIDTH 9
 
 /**
  * Copy all non-reference CU data from depth+1 to depth.
