@@ -1711,8 +1711,8 @@ static void transform_chroma(encoder_control *encoder, cu_info *cur_cu,
                              coefficient *coeff_u, int8_t scan_idx_chroma,
                              coefficient *pre_quant_coeff, coefficient *block)
 {
-  int base_stride = encoder->in.width;
-  int pred_stride = encoder->in.width;
+  int base_stride = LCU_WIDTH;
+  int pred_stride = LCU_WIDTH;
 
   int8_t width_c = LCU_WIDTH >> (depth + 1);
 
