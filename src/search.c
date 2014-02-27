@@ -332,8 +332,8 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
     int x, y;
     for (y = y_cu; y < y_cu + width_cu; ++y) {
       for (x = x_cu; x < x_cu + width_cu; ++x) {
-        const cu_info *from_cu = &work_tree[depth + 1].cu[x + y * LCU_T_CU_WIDTH];
-        cu_info *to_cu = &work_tree[depth].cu[x + y * LCU_T_CU_WIDTH];
+        const cu_info *from_cu = &work_tree[depth + 1].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
+        cu_info *to_cu = &work_tree[depth].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -390,8 +390,8 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
     int x, y;
     for (y = y_cu; y < y_cu + width_cu; ++y) {
       for (x = x_cu; x < x_cu + width_cu; ++x) {
-        const cu_info *from_cu = &work_tree[depth].cu[x + y * LCU_T_CU_WIDTH];
-        cu_info *to_cu = &work_tree[d].cu[x + y * LCU_T_CU_WIDTH];
+        const cu_info *from_cu = &work_tree[depth].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
+        cu_info *to_cu = &work_tree[d].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -657,7 +657,7 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
-    cu_info *lcu_cu = &lcu->cu[1 + LCU_T_CU_WIDTH];
+    cu_info *lcu_cu = &lcu->cu[LCU_CU_OFFSET];
 
     // Copy top CU row.
     if (y_cu > 0) {
@@ -773,7 +773,7 @@ static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, co
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
-    const cu_info *const lcu_cu = &lcu->cu[1 + LCU_T_CU_WIDTH];
+    const cu_info *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
 
     int x, y;
     for (y = 0; y < LCU_CU_WIDTH; ++y) {
