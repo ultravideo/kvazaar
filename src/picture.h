@@ -184,6 +184,11 @@ typedef struct {
   lcu_ref_px_t left_ref; //!< Reference pixels from adjacent LCUs.
   lcu_yuv_t ref; //!< LCU reference pixels
   lcu_yuv_t rec; //!< LCU reconstructed pixels
+  /**
+   * We get the coefficients as a byproduct of doing reconstruction during the
+   * search. It might be more efficient to recalculate the final coefficients
+   * once we know the final modes rather than copying them.
+   */
   lcu_coeff_t coeff; //!< LCU coefficients
 
   /**
@@ -211,6 +216,9 @@ void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
 void picture_set_block_skipped(picture *pic, uint32_t x_scu, uint32_t y_scu,
                                 uint8_t depth, int8_t skipped);
 void picture_blit_pixels(const pixel* orig, pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride);
+void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 

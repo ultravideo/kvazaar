@@ -351,14 +351,26 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
     const int luma_index = x + y * LCU_WIDTH;
     const int chroma_index = (x / 2) + (y / 2) * (LCU_WIDTH / 2);
 
-    lcu_yuv_t *from = &work_tree[depth + 1].rec;
+    const lcu_yuv_t *from = &work_tree[depth + 1].rec;
     lcu_yuv_t *to = &work_tree[depth].rec;
+
+    const lcu_coeff_t *from_coeff = &work_tree[depth + 1].coeff;
+    lcu_coeff_t *to_coeff = &work_tree[depth + 1].coeff;
 
     picture_blit_pixels(&from->y[luma_index], &to->y[luma_index],
                         width_px, width_px, LCU_WIDTH, LCU_WIDTH);
     picture_blit_pixels(&from->u[chroma_index], &to->u[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
     picture_blit_pixels(&from->v[chroma_index], &to->v[chroma_index],
+                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+
+    // Copy coefficients up. They do not have to be copied down because they
+    // are not used for the search.
+    picture_blit_coeffs(&from_coeff->y[luma_index], &to_coeff->y[luma_index],
+                        width_px, width_px, LCU_WIDTH, LCU_WIDTH);
+    picture_blit_coeffs(&from_coeff->u[chroma_index], &to_coeff->u[chroma_index],
+                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+    picture_blit_coeffs(&from_coeff->v[chroma_index], &to_coeff->v[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
   }
 }
@@ -749,26 +761,26 @@ static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, co
   // Copy pixels to picture.
   {
     picture *const pic = encoder->in.cur_pic;
-
     const int pic_width = encoder->in.width;
     const int pic_height = encoder->in.height;
-
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, encoder->in.height) - y_px;
+    const int luma_index = x_px + y_px * pic_width;
+    const int chroma_index = (x_px / 2) + (y_px / 2) * (pic_width / 2);
 
-    const int x_c = x_px / 2;
-    const int y_c = y_px / 2;
-    const int pic_width_c = pic_width / 2;
-    const int x_max_c = x_max / 2;
-    const int y_max_c = y_max / 2;
-
-    picture_blit_pixels(lcu->rec.y, &pic->y_recdata[x_px + y_px * pic_width],
+    picture_blit_pixels(lcu->rec.y, &pic->y_recdata[luma_index],
+                        x_max, y_max, LCU_WIDTH, pic_width);
+    picture_blit_coeffs(lcu->coeff.y, &pic->coeff_y[luma_index],
                         x_max, y_max, LCU_WIDTH, pic_width);
 
-    picture_blit_pixels(lcu->rec.u, &pic->u_recdata[x_c + y_c * pic_width_c],
-                        x_max_c, y_max_c, LCU_WIDTH / 2, pic_width_c);
-    picture_blit_pixels(lcu->rec.v, &pic->v_recdata[x_c + y_c * pic_width_c],
-                        x_max_c, y_max_c, LCU_WIDTH / 2, pic_width_c);
+    picture_blit_pixels(lcu->rec.u, &pic->u_recdata[chroma_index],
+                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    picture_blit_pixels(lcu->rec.v, &pic->v_recdata[chroma_index],
+                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    picture_blit_coeffs(lcu->coeff.u, &pic->coeff_u[chroma_index],
+                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    picture_blit_coeffs(lcu->coeff.v, &pic->coeff_v[chroma_index],
+                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
   }
 }
 

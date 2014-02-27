@@ -111,6 +111,22 @@ void picture_blit_pixels(const pixel *orig, pixel *dst,
   }
 }
 
+void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride)
+{
+  unsigned y, x;
+
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x < width; ++x) {
+      dst[x] = orig[x];
+    }
+    // Move pointers to the next row.
+    orig += orig_stride;
+    dst += dst_stride;
+  }
+}
+
 /**
  * \brief Set block coded status
  * \param pic    picture to use
