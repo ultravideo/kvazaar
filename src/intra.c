@@ -829,5 +829,8 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
     cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
     cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
     cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
+    return;
   }
+
+  encode_transform_tree(encoder, x, y, depth, lcu);
 }

@@ -530,6 +530,8 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
   }
 
   cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+  // Assign correct depth
+  cur_cu->depth = depth; cur_cu->tr_depth = depth;
 
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
