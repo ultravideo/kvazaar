@@ -758,8 +758,8 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
   
   // Pointers to reconstruction arrays
   pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
-  pixel *recbase_u = &lcu->rec.u[(x_local + y_local * LCU_WIDTH)>>2];
-  pixel *recbase_v = &lcu->rec.v[(x_local + y_local * LCU_WIDTH)>>2];
+  pixel *recbase_u = &lcu->rec.u[x_local/2 + (y_local * LCU_WIDTH)/4];
+  pixel *recbase_v = &lcu->rec.v[x_local/2 + (y_local * LCU_WIDTH)/4];
   int32_t rec_stride = LCU_WIDTH;
 
 

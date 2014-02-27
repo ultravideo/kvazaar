@@ -1819,14 +1819,14 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
     // INTRAPREDICTION VARIABLES
       // Pointers to reconstruction arrays
     pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
-    pixel *recbase_u = &lcu->rec.u[(x_local + y_local * LCU_WIDTH)>>2];
-    pixel *recbase_v = &lcu->rec.v[(x_local + y_local * LCU_WIDTH)>>2];
+    pixel *recbase_u = &lcu->rec.u[x_local/2 + (y_local * LCU_WIDTH)/4];
+    pixel *recbase_v = &lcu->rec.v[x_local/2 + (y_local * LCU_WIDTH)/4];
     int32_t recbase_stride = LCU_WIDTH;
 
 
     pixel *base_y = &lcu->ref.y[x_local + y_local * LCU_WIDTH];
-    pixel *base_u = &lcu->ref.u[(x_local + y_local * LCU_WIDTH)>>2];
-    pixel *base_v = &lcu->ref.v[(x_local + y_local * LCU_WIDTH)>>2];
+    pixel *base_u = &lcu->ref.u[x_local/2 + (y_local * LCU_WIDTH)/4];
+    pixel *base_v = &lcu->ref.v[x_local/2 + (y_local * LCU_WIDTH)/4];
     int32_t base_stride = LCU_WIDTH;
 
     pixel pred_y[LCU_WIDTH*LCU_WIDTH];
@@ -1838,8 +1838,8 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
     coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient *orig_coeff_y = &lcu->coeff.y[x_local + y_local * LCU_WIDTH];
-    coefficient *orig_coeff_u = &lcu->coeff.u[(x_local + y_local * LCU_WIDTH)>>2];
-    coefficient *orig_coeff_v = &lcu->coeff.v[(x_local + y_local * LCU_WIDTH)>>2];
+    coefficient *orig_coeff_u = &lcu->coeff.u[x_local/2 + (y_local * LCU_WIDTH)/4];
+    coefficient *orig_coeff_v = &lcu->coeff.v[x_local/2 + (y_local * LCU_WIDTH)/4];
     int32_t coeff_stride = LCU_WIDTH;
 
     // Quant and transform here...
