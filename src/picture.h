@@ -168,9 +168,9 @@ typedef struct {
 } lcu_ref_px_t;
 
 typedef struct {
-  coefficient y[LCU_REF_PX_WIDTH];
-  coefficient u[LCU_REF_PX_WIDTH / 2];
-  coefficient v[LCU_REF_PX_WIDTH / 2];
+  coefficient y[LCU_LUMA_SIZE];
+  coefficient u[LCU_CHROMA_SIZE];
+  coefficient v[LCU_CHROMA_SIZE];
 } lcu_coeff_t;
 
 typedef struct {
