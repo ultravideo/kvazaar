@@ -1857,7 +1857,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
     int32_t x_pu = x_local >> 2;
     int32_t y_pu = y_local >> 2;
 
-    int cbf_y = 0;
+    int cbf_y;
 
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
@@ -1946,6 +1946,9 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 #endif
 
     // Check for non-zero coeffs
+    cbf_y = 0;
+    cur_cu->coeff_y = 0;
+    memset(cur_cu->coeff_top_y, 0, MAX_PU_DEPTH + 4);
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
@@ -1955,10 +1958,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
           int d;
           for (d = 0; d <= depth; ++d) {
             cur_cu->coeff_top_y[d] = 1;
-          }
-          while (d < MAX_PU_DEPTH + 4) {
-            cur_cu->coeff_top_y[d] = 0;
-            ++d;
           }
         } else {
           int pu_index = x_pu + 2 * y_pu;
@@ -2021,30 +2020,26 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       }
 
       transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
+      cur_cu->coeff_u = 0;
+      memset(cur_cu->coeff_top_u, 0, MAX_PU_DEPTH + 4);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           int d;
           for (d = 0; d <= depth; ++d) {
             cur_cu->coeff_top_u[d] = 1;
           }
-          while (d < MAX_PU_DEPTH + 4) {
-            cur_cu->coeff_top_u[d] = 0;
-            ++d;
-          }
           cur_cu->coeff_u = 1;
           break;
         }
       }
       transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
+      cur_cu->coeff_v = 0;
+      memset(cur_cu->coeff_top_v, 0, MAX_PU_DEPTH + 4);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           int d;
           for (d = 0; d <= depth; ++d) {
             cur_cu->coeff_top_v[d] = 1;
-          }
-          while (d < MAX_PU_DEPTH + 4) {
-            cur_cu->coeff_top_v[d] = 0;
-            ++d;
           }
           cur_cu->coeff_v = 1;
           break;
