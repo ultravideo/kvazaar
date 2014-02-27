@@ -707,10 +707,10 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
                           &lcu->top_ref.y[1],
                           x_max, 1, pic_width, ref_size);
       
-      picture_blit_pixels(&pic->u_recdata[x_c + (x_c - 1) * pic_width_c],
+      picture_blit_pixels(&pic->u_recdata[x_c + (y_c - 1) * pic_width_c],
                           &lcu->top_ref.u[1],
                           x_max, 1, pic_width_c, ref_size_c);
-      picture_blit_pixels(&pic->v_recdata[x_c + (x_c - 1) * pic_width_c],
+      picture_blit_pixels(&pic->v_recdata[x_c + (y_c - 1) * pic_width_c],
                           &lcu->top_ref.v[1],
                           x_max, 1, pic_width_c, ref_size_c);
     }
