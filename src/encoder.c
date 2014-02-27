@@ -1745,8 +1745,8 @@ static void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
                                coefficient *pre_quant_coeff, coefficient *block)
 {
   int8_t width_c = LCU_WIDTH >> (depth + 1);
-  int pred_stride = encoder->in.width;
-  int recbase_stride = encoder->in.width;
+  const int pred_stride = LCU_WIDTH;
+  const int recbase_stride = LCU_WIDTH;
 
   int i, y, x;
 
