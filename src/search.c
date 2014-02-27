@@ -351,7 +351,7 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
     lcu_yuv_t *to = &work_tree[depth].rec;
 
     const lcu_coeff_t *from_coeff = &work_tree[depth + 1].coeff;
-    lcu_coeff_t *to_coeff = &work_tree[depth + 1].coeff;
+    lcu_coeff_t *to_coeff = &work_tree[depth].coeff;
 
     picture_blit_pixels(&from->y[luma_index], &to->y[luma_index],
                         width_px, width_px, LCU_WIDTH, LCU_WIDTH);
