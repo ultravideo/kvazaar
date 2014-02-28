@@ -483,21 +483,21 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
 
   int x_local = (x&0x3f), y_local = (y&0x3f);
 
-  pixel *left_ref = !chroma?lcu->left_ref.y : (chroma==1)? lcu->left_ref.u : lcu->left_ref.v;
-  pixel *top_ref  = !chroma?lcu->top_ref.y  : (chroma==1)? lcu->top_ref.u  : lcu->top_ref.v;
-  pixel *rec_ref  = !chroma?lcu->rec.y      : (chroma==1)? lcu->rec.u      : lcu->rec.v;
+  pixel *left_ref = !chroma ? &lcu->left_ref.y[1] : is_chroma ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  pixel *top_ref  = !chroma ? &lcu->top_ref.y[1]  : is_chroma ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
+  pixel *rec_ref  = !chroma ? lcu->rec.y : is_chroma ? lcu->rec.u : lcu->rec.v;
 
   pixel *left_border = &left_ref[x_local];
   pixel *top_border = &top_ref[y_local];  
   uint32_t left_stride = 1;
 
   if(x_local) {
-    left_border = &rec_ref[x_local - 1 + (y_local - 1) * LCU_WIDTH];
+    left_border = &rec_ref[x_local - 1 + y_local * LCU_WIDTH];
     left_stride = LCU_WIDTH;
   }
 
   if(y_local) {
-    top_border = &rec_ref[x_local - 1 + (y_local-1) * LCU_WIDTH];    
+    top_border = &rec_ref[x_local + (y_local - 1) * LCU_WIDTH];
   }
 
   // Copy pixels for left edge.
@@ -527,7 +527,7 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
-    pixel nearest_pixel = y > 0 ? left_border[0] : dc_val;
+    pixel nearest_pixel = y > 0 ? top_border[0] : dc_val;
     int i;
     for (i = 1; i < out_width - 1; i++) {
       dst[i * dst_stride] = nearest_pixel;
@@ -558,7 +558,7 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
     }
   } else {
     // Extend nearest pixel.
-    pixel nearest_pixel = x > 0 ? top_border[0] : dc_val;
+    pixel nearest_pixel = x > 0 ? left_border[0] : dc_val;
     int i;
     for(i = 1; i < out_width; i++)
     {
@@ -570,7 +570,7 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
   // Unavailable samples on the left boundary are copied from below if
   // available. This is the only place they are available because we don't
   // support constrained intra prediction.
-  dst[0] = (x > 0 && y > 0) ? top_border[0] : dst[dst_stride];
+  dst[0] = (x > 0 && y > 0) ? top_border[-1] : dst[dst_stride];
 }
 
 const int32_t ang_table[9]     = {0,    2,    5,   9,  13,  17,  21,  26,  32};
