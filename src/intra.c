@@ -481,23 +481,23 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
   const int y_in_lcu = y_luma % LCU_WIDTH;
   const int x_in_lcu = x_luma % LCU_WIDTH;
 
-  int x_local = (x&0x3f), y_local = (y&0x3f);
+  int x_local = (x_luma&0x3f)>>is_chroma, y_local = (y_luma&0x3f)>>is_chroma;
 
-  pixel *left_ref = !chroma ? &lcu->left_ref.y[1] : is_chroma ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
-  pixel *top_ref  = !chroma ? &lcu->top_ref.y[1]  : is_chroma ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
-  pixel *rec_ref  = !chroma ? lcu->rec.y : is_chroma ? lcu->rec.u : lcu->rec.v;
+  pixel *left_ref = !chroma ? &lcu->left_ref.y[1] : (chroma == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  pixel *top_ref  = !chroma ? &lcu->top_ref.y[1]  : (chroma == 1) ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
+  pixel *rec_ref  = !chroma ? lcu->rec.y : (chroma == 1) ? lcu->rec.u : lcu->rec.v;
 
-  pixel *left_border = &left_ref[x_local];
-  pixel *top_border = &top_ref[y_local];  
+  pixel *left_border = &left_ref[y_local];
+  pixel *top_border = &top_ref[x_local];
   uint32_t left_stride = 1;
 
   if(x_local) {
-    left_border = &rec_ref[x_local - 1 + y_local * LCU_WIDTH];
-    left_stride = LCU_WIDTH;
+    left_border = &rec_ref[x_local - 1 + y_local * (LCU_WIDTH>>is_chroma)];
+    left_stride = LCU_WIDTH>>is_chroma;
   }
 
   if(y_local) {
-    top_border = &rec_ref[x_local + (y_local - 1) * LCU_WIDTH];
+    top_border = &rec_ref[x_local + (y_local - 1) * (LCU_WIDTH>>is_chroma)];
   }
 
   // Copy pixels for left edge.
