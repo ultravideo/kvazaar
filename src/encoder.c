@@ -1875,7 +1875,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
     if(cur_cu->type == CU_INTRA)
     {
-      int pu_index = x_pu + 2 * (y_pu);
+      int pu_index = x_pu&1 + 2 * (y_pu&1);
       int luma_mode = cur_cu->intra[pu_index].mode;
       scan_idx_luma = SCAN_DIAG;
 
@@ -1960,7 +1960,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
             cur_cu->coeff_top_y[d] = 1;
           }
         } else {
-          int pu_index = x_pu + 2 * y_pu;
+          int pu_index = x_pu&1 + 2 * (y_pu&1);
           cur_cu->coeff_top_y[depth + pu_index] = 1;
         }
         break;

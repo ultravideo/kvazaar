@@ -100,7 +100,7 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
   return (pixel)((sum + width) / (width + width));
 }
 
-#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * (y_pu % 2))
+#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
 
 /**
  * \brief Function for deriving intra luma predictions

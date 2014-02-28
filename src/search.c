@@ -566,7 +566,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
   int cost = MAX_INT;
   cu_info *cur_cu;
   int x_local = (x&0x3f), y_local = (y&0x3f);
-
+   
   // Stop recursion if the CU is completely outside the frame.
   if (x >= encoder->in.width || y >= encoder->in.height) {
     // Return zero cost because this CU does not have to be coded.
@@ -576,7 +576,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
   cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
   // Assign correct depth
   cur_cu->depth = depth; cur_cu->tr_depth = depth;
-
+  cur_cu->type = CU_NOTSET; cur_cu->part_size = SIZE_2Nx2N;
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
   if (x + cu_width <= encoder->in.width &&
