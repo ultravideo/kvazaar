@@ -490,12 +490,12 @@ static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lc
   cu_info* above_cu = 0;
 
   if (x_cu > 0) {
-    left_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - 1];
+    left_cu = &lcu->cu[cu_pos - 1];
   }
   // Don't take the above CU across the LCU boundary.
   if (y_cu > 0 &&
       ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0) {
-    above_cu = &lcu->cu[LCU_CU_OFFSET + cu_pos - LCU_T_CU_WIDTH];
+    above_cu = &lcu->cu[cu_pos - LCU_T_CU_WIDTH];
   }
 
   // Get intra predictors
