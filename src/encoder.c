@@ -1559,7 +1559,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
       cu_info *left_cu = 0;
       cu_info *above_cu = 0;
 
-      if (y_ctb > 0) {
+      if (x_ctb > 0) {
         left_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
       }
       // Don't take the above CU across the LCU boundary.
