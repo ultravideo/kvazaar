@@ -570,7 +570,17 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
   // Unavailable samples on the left boundary are copied from below if
   // available. This is the only place they are available because we don't
   // support constrained intra prediction.
-  dst[0] = (x > 0 && y > 0) ? top_border[-1] : dst[dst_stride];
+  if (x > 0 && y > 0) {
+    // Make sure we always take the top-left pixel from the LCU reference
+    // pixel arrays if they are available.
+    if (x_local == 0) {
+      dst[0] = left_border[-1];
+    } else {
+      dst[0] = top_border[-1];
+    }
+  } else {
+    dst[0] = dst[dst_stride];
+  }
 }
 
 const int32_t ang_table[9]     = {0,    2,    5,   9,  13,  17,  21,  26,  32};
