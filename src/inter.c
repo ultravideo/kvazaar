@@ -283,14 +283,14 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
   */
   int32_t x_cu = (x & LCU_WIDTH-1) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
   int32_t y_cu = (y & LCU_WIDTH-1) >> MAX_DEPTH;
-
+  cu_info* cu = &lcu->cu[LCU_CU_OFFSET];
   // A0 and A1 availability testing
   if (x != 0) {
-    *a1 = &lcu->cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
+    *a1 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
     if (!(*a1)->coded) *a1 = NULL;
 
     if (y_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *a0 = &lcu->cu[x_cu - 1 + (y_cu + cur_block_in_scu) * LCU_T_CU_WIDTH];
+      *a0 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu) * LCU_T_CU_WIDTH];
       if (!(*a0)->coded) *a0 = NULL;
     }
   }
@@ -298,16 +298,17 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *b0 = &lcu->cu[x_cu + cur_block_in_scu + (y_cu - 1) * LCU_T_CU_WIDTH];      
+      *b0 = &cu[x_cu + cur_block_in_scu + (y_cu - 1) * LCU_T_CU_WIDTH];      
     } else {
+      // Special case, top-right cu from LCU is the last in lcu->cu array
       *b0 = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
     }
     if (!(*b0)->coded) *b0 = NULL;
-    *b1 = &lcu->cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
+    *b1 = &cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
     if (!(*b1)->coded) *b1 = NULL;
 
     if (x_cu != 0) {
-      *b2 = &lcu->cu[x_cu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
+      *b2 = &cu[x_cu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
       if(!(*b2)->coded) *b2 = NULL;
     }
   }
