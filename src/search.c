@@ -460,6 +460,7 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
       cu->intra[3].mode = pred_mode;
       cu->part_size = part_mode;
       cu->tr_depth = depth;
+      cu->coded = 1;
     }
   }
 }
@@ -606,7 +607,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
         depth <= MAX_INTER_SEARCH_DEPTH)
     {
       int mode_cost = search_cu_inter(encoder, x, y, depth, &work_tree[depth]);
-      if (0&&mode_cost < cost) {
+      if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTER;
       }
@@ -634,6 +635,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       int16_t merge_cand[MRG_MAX_NUM_CANDS][3];
       // Get list of candidates
       int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, cur_cu, &work_tree[depth]);
+
       // Check every candidate to find a match
       for(cur_cu->merge_idx = 0; cur_cu->merge_idx < num_cand; cur_cu->merge_idx++) {
         if(merge_cand[cur_cu->merge_idx][0] == cur_cu->inter.mv[0] &&
@@ -652,6 +654,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
 
       // Only check when candidates are different
       if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
+        // TODO: calculate bit costs
         int cand_1_diff = abs(cur_cu->inter.mv[0] - mv_cand[0][0]) + abs(
                                    cur_cu->inter.mv[1] - mv_cand[0][1]);
         int cand_2_diff = abs(cur_cu->inter.mv[0] - mv_cand[1][0]) + abs(
@@ -666,9 +669,10 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       cur_cu->inter.mvd[1] = cur_cu->inter.mv[1] - mv_cand[cur_cu->inter.mv_cand][1];
 
       cur_cu->coded = 1;
-
-      lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);            
+      
       inter_recon_lcu(encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      encode_transform_tree(encoder, x, y, depth, &work_tree[depth]);
+      lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
     }
   }
 

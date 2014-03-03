@@ -2239,7 +2239,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
   // The implicit split by intra NxN is not counted towards max_tr_depth.
   int max_tr_depth = (cur_cu->type == CU_INTRA ? TR_DEPTH_INTRA + intra_split_flag : TR_DEPTH_INTER);
 
-  int8_t split = cur_cu->tr_depth > depth;
+  int8_t split = (cur_cu->tr_depth > depth) | depth == 0;
 
   int8_t cb_flag_u = cur_cu->coeff_top_u[depth];
   int8_t cb_flag_v = cur_cu->coeff_top_v[depth];
