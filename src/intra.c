@@ -791,7 +791,7 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
   // Reconstruct chroma
   rec_shift  = &rec[width_c * 2 + 8 + 1];
   intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
-                                   pic_width, pic_height, lcu);
+                                   pic_width/2, pic_height/2, lcu);
   intra_recon(rec_shift,
               width_c * 2 + 8,
               width_c,
@@ -801,7 +801,7 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
               1);
 
   intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
-                                   pic_width, pic_height, lcu);
+                                   pic_width/2, pic_height/2, lcu);
   intra_recon(rec_shift,
               width_c * 2 + 8,
               width_c,

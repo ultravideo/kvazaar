@@ -733,6 +733,12 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
     if (x > 0 && y > 0) {
       lcu->top_ref.y[0] = pic->y_recdata[(x - 1) + (y - 1) * pic_width];
       lcu->left_ref.y[0] = pic->y_recdata[(x - 1) + (y - 1) * pic_width];
+
+      lcu->top_ref.u[0] = pic->u_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
+      lcu->left_ref.u[0] = pic->u_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
+
+      lcu->top_ref.v[0] = pic->v_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
+      lcu->left_ref.v[0] = pic->v_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
     }
   }
 
