@@ -267,8 +267,8 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
  * \param a0 candidate a0
  * \param a1 candidate a1
  */
-void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth,
-                                        cu_info **b0, cu_info **b1,cu_info **b2,cu_info **a0,cu_info **a1)
+void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info **b0, cu_info **b1,
+                                        cu_info **b2,cu_info **a0,cu_info **a1, lcu_t *lcu)
 {
   uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS; //!< the width of the current block on SCU
   /*
@@ -281,29 +281,33 @@ void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, 
   |A1|_________|
   |A0|
   */
+  int32_t x_cu = (x & LCU_WIDTH-1) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
+  int32_t y_cu = (y & LCU_WIDTH-1) >> MAX_DEPTH;
 
   // A0 and A1 availability testing
-  if (x_cu != 0) {
-    *a1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+  if (x != 0) {
+    *a1 = &lcu->cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
     if (!(*a1)->coded) *a1 = NULL;
 
-    if (y_cu + cur_block_in_scu < encoder->in.height_in_lcu<<MAX_DEPTH) {
-      *a0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu + cur_block_in_scu) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    if (y_cu + cur_block_in_scu < LCU_WIDTH>>3) {
+      *a0 = &lcu->cu[x_cu - 1 + (y_cu + cur_block_in_scu) * LCU_T_CU_WIDTH];
       if (!(*a0)->coded) *a0 = NULL;
     }
   }
 
   // B0, B1 and B2 availability testing
-  if (y_cu != 0) {
-    if (x_cu + cur_block_in_scu < encoder->in.width_in_lcu<<MAX_DEPTH) {
-      *b0 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
-      if (!(*b0)->coded) *b0 = NULL;
+  if (y != 0) {
+    if (x_cu + cur_block_in_scu < LCU_WIDTH>>3) {
+      *b0 = &lcu->cu[x_cu + cur_block_in_scu + (y_cu - 1) * LCU_T_CU_WIDTH];      
+    } else {
+      *b0 = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
     }
-    *b1 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + cur_block_in_scu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+    if (!(*b0)->coded) *b0 = NULL;
+    *b1 = &lcu->cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
     if (!(*b1)->coded) *b1 = NULL;
 
     if (x_cu != 0) {
-      *b2 = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu - 1 + (y_cu - 1) * (encoder->in.width_in_lcu<<MAX_DEPTH)];
+      *b2 = &lcu->cu[x_cu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
       if(!(*b2)->coded) *b2 = NULL;
     }
   }
@@ -317,14 +321,14 @@ void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, 
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu)
+void inter_get_mv_cand(encoder_control *encoder, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
 
   cu_info *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
+  inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand) {int td = encoder->poc - encoder->ref->pics[(cu)->inter.mv_ref]->poc;\
@@ -432,7 +436,7 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int
  * \param depth current block depth
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
-uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu)
+uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -440,7 +444,7 @@ uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_c
   cu_info *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  inter_get_spatial_merge_candidates(encoder, x_cu, y_cu, depth, &b0, &b1, &b2, &a0, &a1);
+  inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \

@@ -476,11 +476,7 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
   for (y = y_cu; y < y_cu + width_cu; ++y) {
     for (x = x_cu; x < x_cu + width_cu; ++x) {
       cu_info *cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
-      cu->depth = depth;
-      cu->type = CU_INTER;
-      cu->merged = cur_cu->merged;
-      cu->skipped = cur_cu->skipped;
-      memcpy(&cu->inter, &cur_cu->inter, sizeof(cu_info_inter));
+      memcpy(cu, cur_cu, sizeof(cu_info));      
     }
   }
 }
@@ -596,7 +592,6 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
 
   cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
   // Assign correct depth
-  cur_cu->skipped = 0; cur_cu->merged = 0;
   cur_cu->depth = depth; cur_cu->tr_depth = depth;
   cur_cu->type = CU_NOTSET; cur_cu->part_size = SIZE_2Nx2N;
   // If the CU is completely inside the frame at this depth, search for
@@ -633,6 +628,45 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[0].mode, cur_cu->part_size);
       intra_recon_lcu(encoder, x, y, depth,&work_tree[depth],encoder->in.cur_pic->width,encoder->in.cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
+
+      int16_t mv_cand[2][2];
+      // Search for merge mode candidate
+      int16_t merge_cand[MRG_MAX_NUM_CANDS][3];
+      // Get list of candidates
+      int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, cur_cu, &work_tree[depth]);
+      // Check every candidate to find a match
+      for(cur_cu->merge_idx = 0; cur_cu->merge_idx < num_cand; cur_cu->merge_idx++) {
+        if(merge_cand[cur_cu->merge_idx][0] == cur_cu->inter.mv[0] &&
+            merge_cand[cur_cu->merge_idx][1] == cur_cu->inter.mv[1] &&
+            merge_cand[cur_cu->merge_idx][2] == cur_cu->inter.mv_ref) {
+          cur_cu->merged = 1;
+          break;
+        }
+      }
+
+      // Get MV candidates
+      inter_get_mv_cand(encoder, x, y, depth, mv_cand, cur_cu, &work_tree[depth]);
+
+      // Select better candidate
+      cur_cu->inter.mv_cand = 0; // Default to candidate 0
+
+      // Only check when candidates are different
+      if (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1]) {
+        int cand_1_diff = abs(cur_cu->inter.mv[0] - mv_cand[0][0]) + abs(
+                                   cur_cu->inter.mv[1] - mv_cand[0][1]);
+        int cand_2_diff = abs(cur_cu->inter.mv[0] - mv_cand[1][0]) + abs(
+                                   cur_cu->inter.mv[1] - mv_cand[1][1]);
+
+        // Select candidate 1 if it's closer
+        if (cand_2_diff < cand_1_diff) {
+          cur_cu->inter.mv_cand = 1;
+        }
+      }
+      cur_cu->inter.mvd[0] = cur_cu->inter.mv[0] - mv_cand[cur_cu->inter.mv_cand][0];
+      cur_cu->inter.mvd[1] = cur_cu->inter.mv[1] - mv_cand[cur_cu->inter.mv_cand][1];
+
+      cur_cu->coded = 1;
+
       lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);            
       inter_recon_lcu(encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
     }
@@ -704,6 +738,13 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
     if (x_cu > 0 && y_cu > 0) {
       const cu_info *from_cu = &cu_array[(x_cu - 1) + (y_cu - 1) * cu_array_width];
       cu_info *to_cu = &lcu_cu[-1 - LCU_T_CU_WIDTH];
+      memcpy(to_cu, from_cu, sizeof(*to_cu));
+    }
+
+    // Copy top-right CU.
+    if (y_cu > 0 && x < encoder->in.cur_pic->width) {
+      const cu_info *from_cu = &cu_array[(x_cu + LCU_CU_WIDTH) + (y_cu - 1) * cu_array_width];
+      cu_info *to_cu = &lcu_cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
   }
@@ -849,7 +890,7 @@ static void search_lcu(encoder_control *encoder, int x, int y)
 {
   lcu_t work_tree[MAX_PU_DEPTH];
   int depth;
-
+  memset(work_tree, 0, sizeof(lcu_t)*MAX_PU_DEPTH);
   // Initialize work tree.
   for (depth = 0; depth < MAX_PU_DEPTH; ++depth) {
     init_lcu_t(encoder, x, y, &work_tree[depth]);
