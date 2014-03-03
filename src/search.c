@@ -279,22 +279,33 @@ static unsigned search_mv_full(unsigned depth,
 }
 #endif
 
-static void search_inter(encoder_control *encoder, uint16_t x_ctb,
-                         uint16_t y_ctb, uint8_t depth)
+
+
+/**
+ * Update lcu to have best modes at this depth.
+ * \return Cost of best mode.
+ */
+static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lcu_t *lcu)
 {
   picture *cur_pic = encoder->in.cur_pic;
   int32_t ref_idx = 0;
-  cu_info *cur_cu = &cur_pic->cu_array[depth][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  int x_local = (x&0x3f), y_local = (y&0x3f);
+  int x_cu = x>>3;
+  int y_cu = y>>3;
+  int cu_pos = LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH;
+
+  cu_info *cur_cu = &lcu->cu[cu_pos];
+
   cur_cu->inter.cost = UINT_MAX;
 
   for (ref_idx = 0; ref_idx < encoder->ref->used_size; ref_idx++) {
     picture *ref_pic = encoder->ref->pics[ref_idx];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_ctb * width_in_scu + x_ctb];
+    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_cu * width_in_scu + x_cu];
     uint32_t temp_cost = (int)(g_lambda_cost[encoder->QP] * ref_idx);
     vector2d orig, mv;
-    orig.x = x_ctb * CU_MIN_SIZE_PIXELS;
-    orig.y = y_ctb * CU_MIN_SIZE_PIXELS;
+    orig.x = x_cu * CU_MIN_SIZE_PIXELS;
+    orig.y = y_cu * CU_MIN_SIZE_PIXELS;
     mv.x = 0;
     mv.y = 0;
     if (ref_cu->type == CU_INTER) {
@@ -303,7 +314,7 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
     }
 
   #if SEARCH_MV_FULL_RADIUS
-    cur_cu->inter.cost = search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
+    temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
   #else
     temp_cost += hexagon_search(depth, cur_pic, ref_pic, &orig, &mv);
   #endif
@@ -316,8 +327,8 @@ static void search_inter(encoder_control *encoder, uint16_t x_ctb,
     }
   }
 
+  return cur_cu->inter.cost;
 }
-
 
 /**
  * Copy all non-reference CU data from depth+1 to depth.
@@ -453,15 +464,25 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
   }
 }
 
-
-/**
- * Update lcu to have best modes at this depth.
- * \return Cost of best mode.
- */
-static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lcu_t lcu)
+static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cur_cu)
 {
-  int cost = MAX_INT;
-  return cost;
+  const int width_cu = LCU_CU_WIDTH >> depth;
+  const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
+  const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
+  cu_info *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
+  int x, y;
+
+  // Set mode in every CU covered by part_mode in this depth.
+  for (y = y_cu; y < y_cu + width_cu; ++y) {
+    for (x = x_cu; x < x_cu + width_cu; ++x) {
+      cu_info *cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
+      cu->depth = depth;
+      cu->type = CU_INTER;
+      cu->merged = cur_cu->merged;
+      cu->skipped = cur_cu->skipped;
+      memcpy(&cu->inter, &cur_cu->inter, sizeof(cu_info_inter));
+    }
+  }
 }
 
 
@@ -575,6 +596,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
 
   cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
   // Assign correct depth
+  cur_cu->skipped = 0; cur_cu->merged = 0;
   cur_cu->depth = depth; cur_cu->tr_depth = depth;
   cur_cu->type = CU_NOTSET; cur_cu->part_size = SIZE_2Nx2N;
   // If the CU is completely inside the frame at this depth, search for
@@ -588,8 +610,8 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
         depth >= MIN_INTER_SEARCH_DEPTH &&
         depth <= MAX_INTER_SEARCH_DEPTH)
     {
-      int mode_cost = search_cu_inter(encoder, x, y, depth, work_tree[depth]);
-      if (mode_cost < cost) {
+      int mode_cost = search_cu_inter(encoder, x, y, depth, &work_tree[depth]);
+      if (0&&mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTER;
       }
@@ -611,7 +633,8 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[0].mode, cur_cu->part_size);
       intra_recon_lcu(encoder, x, y, depth,&work_tree[depth],encoder->in.cur_pic->width,encoder->in.cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
-      // TODO
+      lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);            
+      inter_recon_lcu(encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
     }
   }
 

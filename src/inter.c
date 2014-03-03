@@ -71,15 +71,15 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
  * \param ypos block y position
  * \param width block width
  * \param mv[2] motion vector
- * \param dst destination picture
+ * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], picture *dst)
+void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
 
-  int32_t dst_width_c = dst->width>>1; //!< Destination picture width in chroma pixels
+  int32_t dst_width_c = LCU_WIDTH>>1; //!< Destination picture width in chroma pixels
   int32_t ref_width_c = ref->width>>1; //!< Reference picture width in chroma pixels
 
   // negative overflow flag
@@ -146,8 +146,10 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
     // Assign filtered pixels to output, take every second half-pel sample with offset of abs_mv_y/x
     for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {
       for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
-        dst->u_recdata[y*dst_width_c + x] = (uint8_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
-        dst->v_recdata[y*dst_width_c + x] = (uint8_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
+        int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
+        int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
+        lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (uint8_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
+        lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (uint8_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
       }
     }
   }
@@ -157,6 +159,9 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
     // Copy Luma with boundary checking
     for (y = ypos; y < ypos + width; y++) {
       for (x = xpos; x < xpos + width; x++) {
+        int x_in_lcu = (x & ((LCU_WIDTH)-1));
+        int y_in_lcu = (y & ((LCU_WIDTH)-1));
+
         coord_x = x + mv[0];
         coord_y = y + mv[1];
         overflow_neg_x = (coord_x < 0)?1:0;
@@ -178,9 +183,9 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
         } else if (overflow_pos_y) {
           coord_y = ref->height - 1;
         }
-
+        
         // set destination to (corrected) pixel value from the reference
-        dst->y_recdata[y * dst->width + x] = ref->y_recdata[coord_y*ref->width + coord_x];
+        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y_recdata[coord_y*ref->width + coord_x];
       }
     }
 
@@ -189,6 +194,9 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
       // TODO: chroma fractional pixel interpolation
       for (y = ypos>>1; y < (ypos + width)>>1; y++) {
         for (x = xpos>>1; x < (xpos + width)>>1; x++) {
+          int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
+          int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
+
           coord_x = x + (mv[0]>>1);
           coord_y = y + (mv[1]>>1);
 
@@ -213,8 +221,8 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
           }
 
           // set destinations to (corrected) pixel value from the reference
-          dst->u_recdata[y*dst_width_c + x] = ref->u_recdata[coord_y*ref_width_c + coord_x];
-          dst->v_recdata[y*dst_width_c + x] = ref->v_recdata[coord_y*ref_width_c + coord_x];
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u_recdata[coord_y*ref_width_c + coord_x];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v_recdata[coord_y*ref_width_c + coord_x];
 
         }
       }
@@ -222,9 +230,12 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
   } else { //If no overflow, we can copy without checking boundaries
     // Copy Luma
     for (y = ypos; y < ypos + width; y++) {
+      int y_in_lcu = (y & ((LCU_WIDTH)-1));
       coord_y = (y + mv[1]) * ref->width; // pre-calculate
       for (x = xpos; x < xpos + width; x++) {
-        dst->y_recdata[y * dst->width + x] = ref->y_recdata[coord_y + x + mv[0]];
+        int x_in_lcu = (x & ((LCU_WIDTH)-1));
+        
+        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y_recdata[coord_y + x + mv[0]];
       }
     }
 
@@ -232,10 +243,12 @@ void inter_recon(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const in
       // Copy Chroma
       // TODO: chroma fractional pixel interpolation
       for (y = ypos>>1; y < (ypos + width)>>1; y++) {
+        int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
         coord_y = (y + (mv[1]>>1)) * ref_width_c; // pre-calculate
         for (x = xpos>>1; x < (xpos + width)>>1; x++) {
-          dst->u_recdata[y*dst_width_c + x] = ref->u_recdata[coord_y + x + (mv[0]>>1)];
-          dst->v_recdata[y*dst_width_c + x] = ref->v_recdata[coord_y + x + (mv[0]>>1)];
+          int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u_recdata[coord_y + x + (mv[0]>>1)];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v_recdata[coord_y + x + (mv[0]>>1)];
         }
       }
     }
