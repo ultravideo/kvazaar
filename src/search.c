@@ -672,6 +672,11 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       
       inter_recon_lcu(encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
       encode_transform_tree(encoder, x, y, depth, &work_tree[depth]);
+      
+      if(cur_cu->merged && !cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
+        cur_cu->merged = 0;        
+        cur_cu->skipped = 1;
+      }
       lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
     }
   }
