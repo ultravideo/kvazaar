@@ -307,7 +307,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
     *b1 = &cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
     if (!(*b1)->coded) *b1 = NULL;
 
-    if (x_cu != 0) {
+    if (x != 0) {
       *b2 = &cu[x_cu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
       if(!(*b2)->coded) *b2 = NULL;
     }
