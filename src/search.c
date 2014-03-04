@@ -751,9 +751,9 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
     }
 
     // Copy top-right CU.
-    if (y_cu > 0 && x < encoder->in.cur_pic->width) {
+    if (y_cu > 0 && x + LCU_WIDTH < encoder->in.cur_pic->width) {
       const cu_info *from_cu = &cu_array[(x_cu + LCU_CU_WIDTH) + (y_cu - 1) * cu_array_width];
-      cu_info *to_cu = &lcu_cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
+      cu_info *to_cu = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
   }
