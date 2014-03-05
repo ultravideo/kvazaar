@@ -85,9 +85,6 @@ typedef struct
   int8_t skipped;    //!< \brief flag to indicate this block is skipped
   int8_t merged;     //!< \brief flag to indicate this block is merged
   int8_t merge_idx;  //!< \brief merge index
-  int8_t coeff_y;    //!< \brief is there coded coeffs Y
-  int8_t coeff_u;    //!< \brief is there coded coeffs U
-  int8_t coeff_v;    //!< \brief is there coded coeffs V
 
   // MAX_DEPTH+4 for the 4 PUs at the last level.
   int8_t coeff_top_y[MAX_DEPTH+5];  //!< \brief is there coded coeffs Y in top level

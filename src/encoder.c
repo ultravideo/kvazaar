@@ -1810,6 +1810,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
                                     | cu_c->coeff_top_u[depth+1];
       cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1] | cu_a->coeff_top_v[depth+1] | cu_b->coeff_top_v[depth+1]
                                     | cu_c->coeff_top_v[depth+1];
+
     }
 
 
@@ -1949,12 +1950,10 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
     // Check for non-zero coeffs
     cbf_y = 0;
-    cur_cu->coeff_y = 0;
     memset(cur_cu->coeff_top_y, 0, MAX_PU_DEPTH + 4);
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
-        cur_cu->coeff_y = 1;
         cbf_y = 1;
         if (depth <= MAX_DEPTH) {
           int d;
@@ -2022,7 +2021,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       }
 
       transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
-      cur_cu->coeff_u = 0;
       memset(cur_cu->coeff_top_u, 0, MAX_PU_DEPTH + 4);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
@@ -2030,12 +2028,10 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
           for (d = 0; d <= depth; ++d) {
             cur_cu->coeff_top_u[d] = 1;
           }
-          cur_cu->coeff_u = 1;
           break;
         }
       }
       transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
-      cur_cu->coeff_v = 0;
       memset(cur_cu->coeff_top_v, 0, MAX_PU_DEPTH + 4);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
@@ -2043,13 +2039,12 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
           for (d = 0; d <= depth; ++d) {
             cur_cu->coeff_top_v[d] = 1;
           }
-          cur_cu->coeff_v = 1;
           break;
         }
       }
 
       // Save coefficients to cu.
-      if (cur_cu->coeff_u || cur_cu->coeff_v) {
+      if (cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
         i = 0;
         for (y = 0; y < width_c; y++) {
           for (x = 0; x < width_c; x++) {
@@ -2061,11 +2056,11 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       }
 
       reconstruct_chroma(encoder, cur_cu, chroma_depth,
-                         cur_cu->coeff_u,
+                         cur_cu->coeff_top_u[depth],
                          coeff_u, recbase_u, pred_u, color_type_u,
                          pre_quant_coeff, block);
       reconstruct_chroma(encoder, cur_cu, chroma_depth,
-                         cur_cu->coeff_v,
+                         cur_cu->coeff_top_v[depth],
                          coeff_v, recbase_v, pred_v, color_type_v,
                          pre_quant_coeff, block);
     }
@@ -2097,7 +2092,7 @@ static void encode_transform_unit(encoder_control *encoder,
 
   int cbf_y;
   if (depth <= MAX_DEPTH) {
-    cbf_y = cur_cu->coeff_y;
+    cbf_y = cur_cu->coeff_top_y[depth];
   } else {
     int pu_index = x_pu % 2 + 2 * (y_pu % 2);
     cbf_y = cur_cu->coeff_top_y[depth + pu_index];
@@ -2162,7 +2157,7 @@ static void encode_transform_unit(encoder_control *encoder,
     return;
   }
 
-  if (cur_cu->coeff_u || cur_cu->coeff_v) {
+  if (cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
     int x, y;
     coefficient *orig_pos_u, *orig_pos_v;
 
@@ -2207,11 +2202,11 @@ static void encode_transform_unit(encoder_control *encoder,
       }
     }
 
-    if (cur_cu->coeff_u) {
+    if (cur_cu->coeff_top_u[depth]) {
       encode_coeff_nxn(encoder, coeff_u, width_c, 2, scan_idx);
     }
 
-    if (cur_cu->coeff_v) {
+    if (cur_cu->coeff_top_v[depth]) {
       encode_coeff_nxn(encoder, coeff_v, width_c, 2, scan_idx);
     }
   }
@@ -2296,12 +2291,12 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
   // - transform depth > 0
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
-  if(cur_cu->type == CU_INTRA || tr_depth > 0 || cur_cu->coeff_u || cur_cu->coeff_v) {
+  if(cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) {
       cabac.ctx = &g_qt_cbf_model_luma[!tr_depth];
       CABAC_BIN(&cabac, cb_flag_y, "cbf_luma");
   }
 
-  if (cb_flag_y | cur_cu->coeff_u | cur_cu->coeff_v) {
+  if (cb_flag_y | cb_flag_u | cb_flag_v) {
     encode_transform_unit(encoder, x_pu, y_pu, depth, tr_depth);
   }
 }
