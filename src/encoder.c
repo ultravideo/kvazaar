@@ -1789,7 +1789,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
-    int offset = 1 << (MAX_DEPTH - (depth + 1));
+    int offset = LCU_WIDTH>>(depth+1);
     encode_transform_tree(encoder, x,          y,          depth+1, lcu);
     encode_transform_tree(encoder, x + offset, y,          depth+1, lcu);
     encode_transform_tree(encoder, x,          y + offset, depth+1, lcu);
@@ -1801,8 +1801,8 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
       cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
     } else {
-      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) + (y_local>>3)         *LCU_T_CU_WIDTH];
-      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET + (x_local>>3)            + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) +  (y_local>>3)        *LCU_T_CU_WIDTH];
+      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (x_local>>3)           + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
       cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
       cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cu_a->coeff_top_y[depth+1] | cu_b->coeff_top_y[depth+1]
                                     | cu_c->coeff_top_y[depth+1];
@@ -2241,7 +2241,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
   // The implicit split by intra NxN is not counted towards max_tr_depth.
   int max_tr_depth = (cur_cu->type == CU_INTRA ? TR_DEPTH_INTRA + intra_split_flag : TR_DEPTH_INTER);
 
-  int8_t split = (cur_cu->tr_depth > depth) | depth == 0;
+  int8_t split = (cur_cu->tr_depth > depth);
 
   int8_t cb_flag_u = cur_cu->coeff_top_u[depth];
   int8_t cb_flag_v = cur_cu->coeff_top_v[depth];
