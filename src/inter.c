@@ -298,12 +298,14 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *b0 = &cu[x_cu + cur_block_in_scu + (y_cu - 1) * LCU_T_CU_WIDTH];      
-    } else {
+      *b0 = &cu[x_cu + cur_block_in_scu + (y_cu - 1) * LCU_T_CU_WIDTH];
+      if (!(*b0)->coded) *b0 = NULL;
+    } else if(y_cu == 0) {
       // Special case, top-right cu from LCU is the last in lcu->cu array
       *b0 = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
+      if (!(*b0)->coded) *b0 = NULL;
     }
-    if (!(*b0)->coded) *b0 = NULL;
+    
     *b1 = &cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
     if (!(*b1)->coded) *b1 = NULL;
 
