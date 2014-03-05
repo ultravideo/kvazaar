@@ -450,6 +450,8 @@ void encode_one_frame(encoder_control* encoder)
 
     // First slice is IDR
     cabac_start(&cabac);
+    init_contexts(encoder, encoder->in.cur_pic->slicetype);
+
     scalinglist_process();
     search_slice_data(encoder);
 
@@ -472,6 +474,7 @@ void encode_one_frame(encoder_control* encoder)
       write_aud(encoder);
 
     cabac_start(&cabac);
+    init_contexts(encoder, encoder->in.cur_pic->slicetype);
     scalinglist_process();
     search_slice_data(encoder);
 
@@ -1254,8 +1257,6 @@ void encode_slice_data(encoder_control* encoder)
     free(new_u_data);
     free(new_v_data);
   }
-
-  init_contexts(encoder,encoder->in.cur_pic->slicetype);
 
   // Loop through every LCU in the slice
   for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
