@@ -1721,13 +1721,13 @@ static void transform_chroma(encoder_control *encoder, cu_info *cur_cu,
   }
 
   transform2d(block, pre_quant_coeff, width_c, 65535);
-  #if RDOQ == 1
-  rdoq(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-       scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
-  #else
-  quant(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-        scan_idx_chroma, cur_cu->type);
-  #endif
+  if (encoder->rdoq_enable) {
+    rdoq(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+         scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+  } else {
+    quant(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+          scan_idx_chroma, cur_cu->type);
+  }
 }
 
 static void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
@@ -1928,12 +1928,13 @@ void encode_transform_tree(encoder_control *encoder, int32_t x_pu, int32_t y_pu,
 
     // Transform and quant residual to coeffs
     transform2d(block,pre_quant_coeff,width,0);
-#if RDOQ == 1
-    rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
-         scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
-#else
-    quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
-#endif
+    
+    if (encoder->rdoq_enable) {
+      rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
+           scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+    } else {
+      quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+    }
 
     // Check for non-zero coeffs
     for (i = 0; i < width * width; i++) {
