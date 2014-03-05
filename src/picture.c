@@ -33,30 +33,6 @@
 
 #define PSNRMAX (255.0 * 255.0)
 
-
-/**
- * \brief Set block skipped
- * \param pic    picture to use
- * \param x_scu  x SCU position (smallest CU)
- * \param y_scu  y SCU position (smallest CU)
- * \param depth  current CU depth
- * \param skipped skipped flag
- */
-void picture_set_block_skipped(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                                uint8_t depth, int8_t skipped)
-{
-  uint32_t x, y;
-  int width_in_scu = pic->width_in_lcu << MAX_DEPTH;
-  int block_scu_width = (LCU_WIDTH >> depth) / (LCU_WIDTH >> MAX_DEPTH);
-
-  for (y = y_scu; y < y_scu + block_scu_width; ++y) {
-    int cu_row = y * width_in_scu;
-    for (x = x_scu; x < x_scu + block_scu_width; ++x) {
-      pic->cu_array[MAX_DEPTH][cu_row + x].skipped = skipped;
-    }
-  }
-}
-
 /**
  * \brief BLock Image Transfer from one buffer to another.
  *
@@ -104,30 +80,6 @@ void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
   }
 }
 
-/**
- * \brief Set block coded status
- * \param pic    picture to use
- * \param x_scu  x SCU position (smallest CU)
- * \param y_scu  y SCU position (smallest CU)
- * \param depth  current CU depth
- * \param coded  coded status
- */
-void picture_set_block_coded(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                             uint8_t depth, int8_t coded)
-{
-  uint32_t x, y, d;
-  int width_in_scu = pic->width_in_lcu << MAX_DEPTH;
-  int block_scu_width = (LCU_WIDTH >> depth) / (LCU_WIDTH >> MAX_DEPTH);
-
-  for (y = y_scu; y < y_scu + block_scu_width; ++y) {
-    int cu_row = y * width_in_scu;
-    for (x = x_scu; x < x_scu + block_scu_width; ++x) {
-      for (d = 0; d < MAX_DEPTH + 1; ++d) {
-        pic->cu_array[d][cu_row + x].coded = coded;
-      }
-    }
-  }
-}
 
 /**
  * \brief Allocate memory for picture_list
