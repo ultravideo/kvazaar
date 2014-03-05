@@ -76,6 +76,7 @@ typedef struct
   /* Filtering */
   int8_t deblock_enable; // \brief Flag to enable deblocking filter
   int8_t sao_enable;     // \brief Flag to enable sample adaptive offset filter
+  int8_t rdoq_enable;    // \brief Whether RDOQ is enabled or not.
   int8_t beta_offset_div2; // \brief (deblocking) beta offset (div 2), range -6...6
   int8_t tc_offset_div2;   // \brief (deblocking)tc offset (div 2), range -6...6
 

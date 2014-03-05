@@ -78,8 +78,6 @@ typedef int16_t coefficient;
 
 #define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0 /*!< skip residual coding when it's under _some_ threshold */
 
-#define RDOQ 1 /*!< Rate-Distortion Optimized Quantization */
-
 /* END OF CONFIG VARIABLES */
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
