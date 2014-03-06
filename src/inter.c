@@ -107,7 +107,6 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
   // Chroma half-pel
   // get half-pel interpolated block and push it to output
   if(chroma_halfpel) {
-
     int halfpel_y, halfpel_x;
     int abs_mv_x = mv[0]&1;
     int abs_mv_y = mv[1]&1;
@@ -183,7 +182,7 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
         } else if (overflow_pos_y) {
           coord_y = ref->height - 1;
         }
-        
+
         // set destination to (corrected) pixel value from the reference
         lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y_recdata[coord_y*ref->width + coord_x];
       }
@@ -223,7 +222,6 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
           // set destinations to (corrected) pixel value from the reference
           lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u_recdata[coord_y*ref_width_c + coord_x];
           lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v_recdata[coord_y*ref_width_c + coord_x];
-
         }
       }
     }
@@ -234,7 +232,7 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
       coord_y = (y + mv[1]) * ref->width; // pre-calculate
       for (x = xpos; x < xpos + width; x++) {
         int x_in_lcu = (x & ((LCU_WIDTH)-1));
-        
+
         lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y_recdata[coord_y + x + mv[0]];
       }
     }
@@ -305,7 +303,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
       *b0 = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
       if (!(*b0)->coded) *b0 = NULL;
     }
-    
+
     *b1 = &cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
     if (!(*b1)->coded) *b1 = NULL;
 

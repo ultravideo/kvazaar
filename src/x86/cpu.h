@@ -2,8 +2,8 @@
 #define _CPU_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -20,7 +20,7 @@
  ****************************************************************************/
 
  /*! \file cpu.h
-    \brief cpu functions header    
+    \brief cpu functions header
 */
 
 void kvz_cpu_cpuid(int *ecx, int *edx);

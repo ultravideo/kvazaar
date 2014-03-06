@@ -508,7 +508,6 @@ static void partial_butterfly_inverse_8(int16_t *src,int16_t *dst,
   int32_t add = 1<<(shift-1);
 
   for (j = 0; j < line; j++) {
-
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
     for (k = 0; k < 4; k++) {
       o[k] = g_t8[ 1][k]*src[line] + g_t8[ 3][k]*src[3*line] + g_t8[ 5][k]*src[5*line] + g_t8[ 7][k]*src[7*line];
@@ -739,7 +738,6 @@ static void partial_butterfly_inverse_32(int16_t *src, int16_t *dst,
  */
 void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
 {
-
   int32_t shift_1st = g_convert_to_bit[block_size]  + 1 + g_bit_increment;
   int32_t shift_2nd = g_convert_to_bit[block_size]  + 8;
 
@@ -934,7 +932,6 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
 
           if(coef[min_pos] >= 0) q_coef[min_pos] += final_change;
           else q_coef[min_pos] -= final_change;
-
         } // Hide
       }
       if (last_cg == 1) last_cg=0;

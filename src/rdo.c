@@ -487,7 +487,6 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
                                                           cg_pos_y, width);
           cost_coeffgroup_sig[ cg_scanpos ] = g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],0);
           base_cost += cost_coeffgroup_sig[ cg_scanpos ]  - rd_stats.sig_cost;
-
         } else {
           if (cg_scanpos < cg_last_scanpos) {//skip the last coefficient group, which will be handled together with last position below.
             double cost_zero_cg;

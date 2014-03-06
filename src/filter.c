@@ -305,7 +305,6 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
 
     for (blk_idx = 0; blk_idx < blocks_in_part; ++blk_idx)
     {
-
       cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? blk_idx : 0)) +
                                                          (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? blk_idx : 0))
                                                           * (encoder->in.width_in_lcu << MAX_DEPTH)];
@@ -440,7 +439,6 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
     int dst_pos_y = (y<<1)*dst_stride;
     int src_pos_y = y*src_stride;
     for (x = 0; x < width; x++) {
-
       // Calculate current dst and src pixel positions
       int dst_pos = dst_pos_y+(x<<1);
       int src_pos = src_pos_y+x;

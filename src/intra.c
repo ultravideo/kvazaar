@@ -119,7 +119,7 @@ int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
   // The default mode if block is not coded yet is INTRA_DC.
   int8_t left_intra_dir  = 1;
   int8_t above_intra_dir = 1;
-    
+
   if (cur_cu->part_size == SIZE_NxN && (x & 7) == 1) {
     // If current CU is NxN and PU is on the right half, take mode from the
     // left half of the same CU.
@@ -209,7 +209,6 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
     for(y = 0; y < (int32_t)width * 2; y++)  {
       ref[y * stride - 1] = filtered[(y + 1) * FWIDTH];
     }
-
   } else  {
     printf("UNHANDLED: %s: %d\r\n", __FILE__, __LINE__);
     exit(1);
@@ -217,7 +216,7 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
   #undef FWIDTH
 }
 
-/** 
+/**
  * \brief Helper function to find intra merge costs
  * \returns intra mode coding cost in bits
  */
@@ -228,7 +227,7 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 
    // First candidate needs only one bit and two other need two
    if(intra_preds[0] == mode) {
-     return 1; 
+     return 1;
    } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
      return 2;
    }
@@ -397,7 +396,6 @@ void intra_recon(pixel* rec, uint32_t recstride, uint32_t width, pixel* dst, int
       dst[x+y*dststride] = pred[x+y*width];
     }
   }
-
 }
 
 /**
@@ -691,7 +689,6 @@ void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t 
       }
     }
   }
-
 }
 
 
@@ -765,7 +762,7 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
 {
   int x_local = (x&0x3f), y_local = (y&0x3f);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
-  
+
   // Pointers to reconstruction arrays
   pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
   pixel *recbase_u = &lcu->rec.u[x_local/2 + (y_local * LCU_WIDTH)/4];

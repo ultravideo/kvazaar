@@ -2,8 +2,8 @@
 #define CABAC_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -60,12 +60,12 @@ void cabac_encode_bin_trm(cabac_data *data, uint8_t bin_value);
 void cabac_write(cabac_data *data);
 void cabac_finish(cabac_data *data);
 void cabac_flush(cabac_data *data);
-void cabac_write_coeff_remain(cabac_data *cabac, uint32_t symbol, 
+void cabac_write_coeff_remain(cabac_data *cabac, uint32_t symbol,
                               uint32_t r_param);
-void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol, 
+void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol,
                               uint32_t count);
-void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx, 
-                                  uint32_t symbol, int32_t offset, 
+void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx,
+                                  uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
 void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned max_symbol);
 

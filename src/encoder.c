@@ -202,7 +202,6 @@ void init_tables(void)
                        g_sig_last_scan[2][i], c, c);
     c <<= 1;
   }
-
 }
 
 /*!
@@ -385,7 +384,6 @@ static void write_aud(encoder_control* encoder)
 
 void encode_one_frame(encoder_control* encoder)
 {
-
   // Initialize lambda value(s) to use in search
   init_lambda(encoder);
 
@@ -1682,8 +1680,7 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
           for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
             bitstream_put(cabac.stream, base_u[x + y * (encoder->in.width >> 1)], 8);
           }
-
-            }
+        }
         for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
           for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
             bitstream_put(cabac.stream, base_v[x + y * (encoder->in.width >> 1)], 8);
@@ -1693,18 +1690,15 @@ void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
     }
     // end PCM sample
       cabac_start(&cabac);
-
   } // end Code IPCM block
-
-    #endif /* END ENABLE_PCM */
+#endif /* END ENABLE_PCM */
   else { /* Should not happend */
-      printf("UNHANDLED TYPE!\r\n");
-      exit(1);
-    }
+    printf("UNHANDLED TYPE!\r\n");
+    exit(1);
+  }
 
    /* end prediction unit */
   /* end coding_unit */
-
 }
 
 static void transform_chroma(encoder_control *encoder, cu_info *cur_cu,
@@ -1782,7 +1776,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
   // we have 64>>depth transform size
   int x_local = (x&0x3f), y_local = (y&0x3f);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
-  
+
   int i;
   int8_t width = LCU_WIDTH>>depth;
   int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
@@ -1810,7 +1804,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
                                     | cu_c->coeff_top_u[depth+1];
       cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1] | cu_a->coeff_top_v[depth+1] | cu_b->coeff_top_v[depth+1]
                                     | cu_c->coeff_top_v[depth+1];
-
     }
 
 
@@ -1940,7 +1933,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
     // Transform and quant residual to coeffs
     transform2d(block,pre_quant_coeff,width,0);
-    
+
     if (encoder->rdoq_enable) {
       rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
            scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
@@ -1992,7 +1985,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
           recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, val);
         }
       }
-
     } else {
       // Without coefficients, just copy the prediction as the reconstructed image.
       for (y = 0; y < width; y++) {
@@ -2749,7 +2741,6 @@ void encode_block_residual(encoder_control *encoder,
       cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
       return;
     }
-
   } else {
     int16_t mv_cand[2][2];
 
@@ -2804,6 +2795,5 @@ void encode_block_residual(encoder_control *encoder,
     picture_set_block_skipped(encoder->in.cur_pic, x_ctb, y_ctb, depth, 1);
     cur_cu->skipped = 1;
   }
-
 }
 */

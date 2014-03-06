@@ -251,7 +251,6 @@ void bitstream_flush(bitstream *stream)
   if (stream->output) {
     if (stream->cur_byte) fwrite(&stream->data[0], stream->cur_byte * 4, 1, stream->output);
     if (stream->cur_bit>>3) fwrite(&stream->data[stream->cur_byte], stream->cur_bit>>3, 1, stream->output);
-
   } else { //No file open, write to buffer
     if (stream->cur_byte) {
       //Handle endianness issue

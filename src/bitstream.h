@@ -2,8 +2,8 @@
 #define BITSTREAM_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
- * 
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see 
+ *
+ * Copyright (C) 2013-2014 Tampere University of Technology and others (see
  * COPYING file).
  *
  * Kvazaar is free software: you can redistribute it and/or modify
@@ -23,10 +23,10 @@
  * \file
  * \brief Bitstream can be written to one or several bits at a time.
  */
- 
+
 #include "global.h"
 
- 
+
 typedef struct
 {
     uint32_t data[32];
@@ -52,15 +52,15 @@ bitstream *create_bitstream(int32_t width);
 void bitstream_alloc(bitstream* stream, uint32_t alloc);
 void bitstream_free(bitstream *stream);
 void bitstream_clear_buffer(bitstream* stream);
-void bitstream_reinit(bitstream *stream); 
-void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits); 
+void bitstream_reinit(bitstream *stream);
+void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
 
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
                                          bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
 
-void bitstream_align(bitstream* stream); 
+void bitstream_align(bitstream* stream);
 void bitstream_align_zero(bitstream* stream);
 void bitstream_flush(bitstream* stream);
 int init_exp_golomb(uint32_t len);
@@ -79,5 +79,5 @@ static int WRITE_VALUE = 0;
 #define WRITE_SE(stream, data, name) { bitstream_put_se(stream,data); }
 #endif
 
- 
+
 #endif

@@ -37,7 +37,6 @@ typedef struct
   void (*IME)();
   void (*FME)();
   int range;
-
 } encoder_me;
 
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
