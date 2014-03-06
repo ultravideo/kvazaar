@@ -85,9 +85,6 @@ typedef struct
   int8_t skipped;    //!< \brief flag to indicate this block is skipped
   int8_t merged;     //!< \brief flag to indicate this block is merged
   int8_t merge_idx;  //!< \brief merge index
-  int8_t coeff_y;    //!< \brief is there coded coeffs Y
-  int8_t coeff_u;    //!< \brief is there coded coeffs U
-  int8_t coeff_v;    //!< \brief is there coded coeffs V
 
   // MAX_DEPTH+4 for the 4 PUs at the last level.
   int8_t coeff_top_y[MAX_DEPTH+5];  //!< \brief is there coded coeffs Y in top level
@@ -146,21 +143,72 @@ typedef struct
 } picture_list;
 
 
+
+#define SUB_SCU_BIT_MASK (64 - 1)
+#define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
+#define LCU_CU_WIDTH 8
+#define LCU_T_CU_WIDTH 9
+#define LCU_CU_OFFSET 10
+
+// Width from top left of the LCU, so +1 for ref buffer size.
+#define LCU_REF_PX_WIDTH (LCU_WIDTH + LCU_WIDTH / 2)
+
+/**
+ * Top and left intra reference pixels for LCU.
+ * - Intra needs maximum of 32 to the right and down from LCU border.
+ * - First pixel is the top-left pixel.
+ */
+typedef struct {
+  pixel y[LCU_REF_PX_WIDTH + 1];
+  pixel u[LCU_REF_PX_WIDTH / 2 + 1];
+  pixel v[LCU_REF_PX_WIDTH / 2 + 1];
+} lcu_ref_px_t;
+
+typedef struct {
+  coefficient y[LCU_LUMA_SIZE];
+  coefficient u[LCU_CHROMA_SIZE];
+  coefficient v[LCU_CHROMA_SIZE];
+} lcu_coeff_t;
+
+typedef struct {
+  pixel y[LCU_LUMA_SIZE];
+  pixel u[LCU_CHROMA_SIZE];
+  pixel v[LCU_CHROMA_SIZE];
+} lcu_yuv_t;
+
+typedef struct {
+  lcu_ref_px_t top_ref;  //!< Reference pixels from adjacent LCUs.
+  lcu_ref_px_t left_ref; //!< Reference pixels from adjacent LCUs.
+  lcu_yuv_t ref; //!< LCU reference pixels
+  lcu_yuv_t rec; //!< LCU reconstructed pixels
+  /**
+   * We get the coefficients as a byproduct of doing reconstruction during the
+   * search. It might be more efficient to recalculate the final coefficients
+   * once we know the final modes rather than copying them.
+   */
+  lcu_coeff_t coeff; //!< LCU coefficients
+
+  /**
+   * A 9x9 CU array for the LCU, +1 CU.
+   * - Top reference CUs on row 0.
+   * - Left reference CUs on column 0.
+   * - All of LCUs CUs on 1:9, 1:9.
+   * - Top right reference CU on the last slot.
+   */
+  cu_info cu[9*9+1];
+} lcu_t;
+
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 
 picture * picture_init(int32_t width, int32_t height,
                        int32_t width_in_lcu, int32_t height_in_lcu);
 int picture_destroy(picture *pic);
-void picture_set_block_coded(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                             uint8_t depth, int8_t coded);
-void picture_set_block_residual(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                                uint8_t depth, int8_t residual);
-void picture_set_block_split(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                             uint8_t depth, int8_t split);
-void picture_set_block_skipped(picture *pic, uint32_t x_scu, uint32_t y_scu,
-                                uint8_t depth, int8_t skipped);
+
 void picture_blit_pixels(const pixel* orig, pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride);
+void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 

@@ -31,11 +31,10 @@
 
 
 void inter_set_block(picture* pic,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
-void inter_recon(picture *ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv[2], picture* dst);
+void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu);
 
-void inter_get_spatial_merge_candidates(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth,
-                                        cu_info **b0, cu_info **b1,cu_info **b2,cu_info **a0,cu_info **a1);
-void inter_get_mv_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu);
-uint8_t inter_get_merge_cand(encoder_control *encoder, int32_t x_cu, int32_t y_cu, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu);
-
+void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info **b0, cu_info **b1,
+                                        cu_info **b2,cu_info **a0,cu_info **a1, lcu_t *lcu);
+void inter_get_mv_cand(encoder_control *encoder, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu);
+uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu, lcu_t *lcu);
 #endif

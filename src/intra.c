@@ -100,7 +100,7 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
   return (pixel)((sum + width) / (width + width));
 }
 
-#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * (y_pu % 2))
+#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
 
 /**
  * \brief Function for deriving intra luma predictions
@@ -110,50 +110,34 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
  * \param preds output buffer for 3 predictions
  * \returns (predictions are found)?1:0
  */
-int8_t intra_get_dir_luma_predictor(picture* pic, uint32_t x_pu, uint32_t y_pu, int8_t* preds)
+int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
+                                    cu_info* cur_cu, cu_info* left_cu, cu_info* above_cu)
 {
-  int x_cu = x_pu / 2;
-  int y_cu = y_pu / 2;
+  int x_cu = x>>3;
+  int y_cu = y>>3;
 
   // The default mode if block is not coded yet is INTRA_DC.
   int8_t left_intra_dir  = 1;
   int8_t above_intra_dir = 1;
 
-  int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
-  int32_t cu_pos = y_cu * width_in_scu + x_cu;
-
-  cu_info* cur_cu = &pic->cu_array[MAX_DEPTH][cu_pos];
-  cu_info* left_cu = 0;
-  cu_info* above_cu = 0;
-
-  if (x_cu > 0) {
-    left_cu = &pic->cu_array[MAX_DEPTH][cu_pos - 1];
-  }
-  // Don't take the above CU across the LCU boundary.
-  if (y_cu > 0 &&
-      ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0)
-  {
-    above_cu = &pic->cu_array[MAX_DEPTH][cu_pos - width_in_scu];
-  }
-
-  if (cur_cu->part_size == SIZE_NxN && x_pu % 2 == 1) {
+  if (cur_cu->part_size == SIZE_NxN && (x & 7) == 1) {
     // If current CU is NxN and PU is on the right half, take mode from the
     // left half of the same CU.
-    left_intra_dir = cur_cu->intra[PU_INDEX(0, y_pu)].mode;
+    left_intra_dir = cur_cu->intra[PU_INDEX(0, y_cu<<1)].mode;
   } else if (left_cu && left_cu->type == CU_INTRA) {
     // Otherwise take the mode from the right side of the CU on the left.
-    left_intra_dir = left_cu->intra[PU_INDEX(1, y_pu)].mode;
+    left_intra_dir = left_cu->intra[PU_INDEX(1, y_cu<<1)].mode;
   }
 
-  if (cur_cu->part_size == SIZE_NxN && y_pu % 2 == 1) {
+  if (cur_cu->part_size == SIZE_NxN && (y & 7) == 1) {
     // If current CU is NxN and PU is on the bottom half, take mode from the
     // top half of the same CU.
-    above_intra_dir = cur_cu->intra[PU_INDEX(x_pu, 0)].mode;
+    above_intra_dir = cur_cu->intra[PU_INDEX(x_cu<<1, 0)].mode;
   } else if (above_cu && above_cu->type == CU_INTRA &&
              (y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH != 0)
   {
     // Otherwise take the mode from the bottom half of the CU above.
-    above_intra_dir = above_cu->intra[PU_INDEX(x_pu, 1)].mode;
+    above_intra_dir = above_cu->intra[PU_INDEX(x_cu<<1, 1)].mode;
   }
 
   // If the predictions are the same, add new predictions
@@ -225,7 +209,6 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
     for(y = 0; y < (int32_t)width * 2; y++)  {
       ref[y * stride - 1] = filtered[(y + 1) * FWIDTH];
     }
-
   } else  {
     printf("UNHANDLED: %s: %d\r\n", __FILE__, __LINE__);
     exit(1);
@@ -233,19 +216,19 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
   #undef FWIDTH
 }
 
-/** 
+/**
  * \brief Helper function to find intra merge costs
  * \returns intra mode coding cost in bits
  */
-static uint32_t intra_merge_cost(int8_t mode, int8_t *merge_modes)
+static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 {
    // merge mode -1 means they are not used -> cost 0
-   if(merge_modes[0] == -1) return 0;
+   if(intra_preds[0] == -1) return 0;
 
    // First candidate needs only one bit and two other need two
-   if(merge_modes[0] == mode) {
-     return 1; 
-   } else if(merge_modes[1] == mode || merge_modes[2] == mode) {
+   if(intra_preds[0] == mode) {
+     return 1;
+   } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
      return 2;
    }
    // Without merging the cost is 5 bits
@@ -269,7 +252,7 @@ static uint32_t intra_merge_cost(int8_t mode, int8_t *merge_modes)
  This function derives the prediction samples for planar mode (intra coding).
 */
 int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride, uint16_t xpos,
-                         uint16_t ypos, uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *merge)
+                         uint16_t ypos, uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *intra_preds)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
@@ -287,7 +270,6 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
 
   pixel* rec_filtered = &rec_filtered_temp[recstride + 1]; //!< pointer to rec_filtered_temp with offset of (1,1)
-  pixel *orig_shift = &orig[xpos + ypos*origstride];  //!< pointer to orig with offset of (1,1)
   int8_t filter = (width<32); // TODO: chroma support
 
   uint8_t threshold = intra_hor_ver_dist_thres[g_to_bits[width]]; //!< Intra filtering threshold
@@ -306,7 +288,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
   i = 0;
   for(y = 0; y < (int32_t)width; y++) {
     for(x = 0; x < (int32_t)width; x++) {
-      orig_block[i++] = orig_shift[x + y*origstride];
+      orig_block[i++] = orig[x + y*origstride];
     }
   }
 
@@ -326,7 +308,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     for (i = 0; i < (int32_t)(width*width); i++) {
       pred[i] = val;
     }
-    ratecost = intra_merge_cost(1,merge)*(int)(g_cur_lambda_cost+0.5);
+    ratecost = intra_pred_ratecost(1,intra_preds)*(int)(g_cur_lambda_cost+0.5);
     CHECK_FOR_BEST(1,ratecost);
   }
 
@@ -335,7 +317,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     int distance = MIN(abs(i - 26),abs(i - 10)); //!< Distance from top and left predictions
     if(distance <= threshold) {
       intra_get_angular_pred(rec, recstride, pred, width, width, i, filter);
-      ratecost = intra_merge_cost(i,merge)*(int)(g_cur_lambda_cost+0.5);
+      ratecost = intra_pred_ratecost(i,intra_preds)*(int)(g_cur_lambda_cost+0.5);
       CHECK_FOR_BEST(i,ratecost);
     }
   }
@@ -344,7 +326,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
 
   // Test planar mode (always filtered)
   intra_get_planar_pred(rec_filtered, recstride, width, pred, width);
-  ratecost = intra_merge_cost(0,merge)*(int)(g_cur_lambda_cost+0.5);
+  ratecost = intra_pred_ratecost(0,intra_preds)*(int)(g_cur_lambda_cost+0.5);
   CHECK_FOR_BEST(0,ratecost);
 
   // Check angular predictions which require filtered samples
@@ -354,7 +336,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     int distance = MIN(abs(i-26),abs(i-10)); //!< Distance from top and left predictions
     if(distance > threshold) {
       intra_get_angular_pred(rec_filtered, recstride, pred, width, width, i, filter);
-      ratecost = intra_merge_cost(i,merge)*(int)(g_cur_lambda_cost+0.5);
+      ratecost = intra_pred_ratecost(i,intra_preds)*(int)(g_cur_lambda_cost+0.5);
       CHECK_FOR_BEST(i,ratecost);
     }
   }
@@ -414,7 +396,6 @@ void intra_recon(pixel* rec, uint32_t recstride, uint32_t width, pixel* dst, int
       dst[x+y*dststride] = pred[x+y*width];
     }
   }
-
 }
 
 /**
@@ -426,8 +407,10 @@ void intra_recon(pixel* rec, uint32_t recstride, uint32_t width, pixel* dst, int
  * The end result is 2*width+8 x 2*width+8 array, with only the top and left
  * edge pixels filled with the reconstructed pixels.
  */
-void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma, int32_t y_luma, int16_t outwidth,
-                                  pixel *dst, int32_t dststride, int8_t chroma)
+void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_width,
+                                      pixel *dst, int32_t dst_stride, int8_t chroma,
+                                      int32_t pic_width, int32_t pic_height,
+                                      lcu_t *lcu)
 {
   // Some other function might make use of the arrays num_ref_pixels_top and
   // num_ref_pixels_left in the future, but until that happens lets leave
@@ -485,8 +468,6 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
 
   const pixel dc_val = 1 << (g_bitdepth - 1);
   const int is_chroma = chroma ? 1 : 0;
-  const int src_width = pic->width >> is_chroma;
-  const int src_height = pic->height >> is_chroma;
 
   // input picture pointer
   //const pixel * const src = (!chroma) ? pic->y_recdata : ((chroma == 1) ? pic->u_recdata : pic->v_recdata);
@@ -495,11 +476,27 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
   const int x = chroma ? x_luma / 2 : x_luma;
   const int y = chroma ? y_luma / 2 : y_luma;
 
-  // input picture pointer shifted to start from the left-top corner of the current block
-  const pixel *const src_shifted = &src[x + y * src_width];
-
   const int y_in_lcu = y_luma % LCU_WIDTH;
   const int x_in_lcu = x_luma % LCU_WIDTH;
+
+  int x_local = (x_luma&0x3f)>>is_chroma, y_local = (y_luma&0x3f)>>is_chroma;
+
+  pixel *left_ref = !chroma ? &lcu->left_ref.y[1] : (chroma == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  pixel *top_ref  = !chroma ? &lcu->top_ref.y[1]  : (chroma == 1) ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
+  pixel *rec_ref  = !chroma ? lcu->rec.y : (chroma == 1) ? lcu->rec.u : lcu->rec.v;
+
+  pixel *left_border = &left_ref[y_local];
+  pixel *top_border = &top_ref[x_local];
+  uint32_t left_stride = 1;
+
+  if(x_local) {
+    left_border = &rec_ref[x_local - 1 + y_local * (LCU_WIDTH>>is_chroma)];
+    left_stride = LCU_WIDTH>>is_chroma;
+  }
+
+  if(y_local) {
+    top_border = &rec_ref[x_local + (y_local - 1) * (LCU_WIDTH>>is_chroma)];
+  }
 
   // Copy pixels for left edge.
   if (x > 0) {
@@ -510,28 +507,28 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
-    num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
+    num_ref_pixels = MIN(num_ref_pixels, out_width - 1);
     // There are no coded pixels below the frame.
-    num_ref_pixels = MIN(num_ref_pixels, src_height - y);
+    num_ref_pixels = MIN(num_ref_pixels, pic_height - y);
     // There are no coded pixels below the bottom of the LCU due to raster
     // scan order.
     num_ref_pixels = MIN(num_ref_pixels, (LCU_WIDTH - y_in_lcu) >> is_chroma);
 
     // Copy pixels from coded CUs.
     for (i = 0; i < num_ref_pixels; ++i) {
-      dst[(i + 1) * dststride] = src_shifted[i*src_width - 1];
+      dst[(i + 1) * dst_stride] = left_border[i*left_stride];
     }
     // Extend the last pixel for the rest of the reference values.
-    nearest_pixel = dst[i * dststride];
-    for (i = num_ref_pixels; i < outwidth - 1; ++i) {
-      dst[i * dststride] = nearest_pixel;
+    nearest_pixel = dst[i * dst_stride];
+    for (i = num_ref_pixels; i < out_width - 1; ++i) {
+      dst[i * dst_stride] = nearest_pixel;
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
-    pixel nearest_pixel = y > 0 ? src_shifted[-src_width] : dc_val;
+    pixel nearest_pixel = y > 0 ? top_border[0] : dc_val;
     int i;
-    for (i = 1; i < outwidth - 1; i++) {
-      dst[i * dststride] = nearest_pixel;
+    for (i = 1; i < out_width - 1; i++) {
+      dst[i * dst_stride] = nearest_pixel;
     }
   }
 
@@ -544,24 +541,24 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
-    num_ref_pixels = MIN(num_ref_pixels, outwidth - 1);
+    num_ref_pixels = MIN(num_ref_pixels, out_width - 1);
     // All LCUs in the row above have been coded.
-    num_ref_pixels = MIN(num_ref_pixels, src_width - x);
+    num_ref_pixels = MIN(num_ref_pixels, pic_width - x);
 
     // Copy pixels from coded CUs.
     for (i = 0; i < num_ref_pixels; ++i) {
-      dst[i + 1] = src_shifted[i - src_width];
+      dst[i + 1] = top_border[i];
     }
     // Extend the last pixel for the rest of the reference values.
-    nearest_pixel = src_shifted[num_ref_pixels - src_width - 1];
-    for (; i < outwidth - 1; ++i) {
+    nearest_pixel = top_border[num_ref_pixels - 1];
+    for (; i < out_width - 1; ++i) {
       dst[i + 1] = nearest_pixel;
     }
   } else {
     // Extend nearest pixel.
-    pixel nearest_pixel = x > 0 ? src_shifted[-1] : dc_val;
+    pixel nearest_pixel = x > 0 ? left_border[0] : dc_val;
     int i;
-    for(i = 1; i < outwidth; i++)
+    for(i = 1; i < out_width; i++)
     {
       dst[i] = nearest_pixel;
     }
@@ -571,7 +568,17 @@ void intra_build_reference_border(picture *pic, const pixel *src, int32_t x_luma
   // Unavailable samples on the left boundary are copied from below if
   // available. This is the only place they are available because we don't
   // support constrained intra prediction.
-  dst[0] = (x > 0 && y > 0) ? src_shifted[-src_width - 1] : dst[dststride];
+  if (x > 0 && y > 0) {
+    // Make sure we always take the top-left pixel from the LCU reference
+    // pixel arrays if they are available.
+    if (x_local == 0) {
+      dst[0] = left_border[-1];
+    } else {
+      dst[0] = top_border[-1];
+    }
+  } else {
+    dst[0] = dst[dst_stride];
+  }
 }
 
 const int32_t ang_table[9]     = {0,    2,    5,   9,  13,  17,  21,  26,  32};
@@ -682,7 +689,6 @@ void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t 
       }
     }
   }
-
 }
 
 
@@ -750,4 +756,88 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
       dst[k * dststride + l] = (pixel)((hor_pred + top_row[l]) >> shift_2d);
     }
   }
+}
+
+void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
+{
+  int x_local = (x&0x3f), y_local = (y&0x3f);
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+
+  // Pointers to reconstruction arrays
+  pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
+  pixel *recbase_u = &lcu->rec.u[x_local/2 + (y_local * LCU_WIDTH)/4];
+  pixel *recbase_v = &lcu->rec.v[x_local/2 + (y_local * LCU_WIDTH)/4];
+  int32_t rec_stride = LCU_WIDTH;
+
+
+  pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+  pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
+
+  int8_t width = LCU_WIDTH >> depth;
+  int8_t width_c = LCU_WIDTH >> (depth + 1);
+  static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
+  int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
+  int i;
+
+  if (cur_cu->part_size == SIZE_NxN) {
+    width = width_c;
+  }
+
+  cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
+
+  // Reconstruct chroma
+  rec_shift  = &rec[width_c * 2 + 8 + 1];
+  intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
+                                   pic_width/2, pic_height/2, lcu);
+  intra_recon(rec_shift,
+              width_c * 2 + 8,
+              width_c,
+              recbase_u,
+              rec_stride >> 1,
+              cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+              1);
+
+  intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
+                                   pic_width/2, pic_height/2, lcu);
+  intra_recon(rec_shift,
+              width_c * 2 + 8,
+              width_c,
+              recbase_v,
+              rec_stride >> 1,
+              cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+              2);
+
+  for (i = 0; i < num_pu; ++i) {
+    // Build reconstructed block to use in prediction with extrapolated borders
+    int x_off = offsets[i].x * width;
+    int y_off = offsets[i].y * width;
+    recbase_y = &lcu->rec.y[x_local + x_off + (y_local+y_off) * LCU_WIDTH];
+
+    rec_shift  = &rec[width * 2 + 8 + 1];
+    intra_build_reference_border(x+x_off, y+y_off,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+                                 pic_width, pic_height, lcu);
+    intra_recon(rec_shift, width * 2 + 8,
+                width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
+
+    // Filter DC-prediction
+    if (cur_cu->intra[i].mode == 1 && width < 32) {
+      intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
+                              rec_stride, width, width);
+    }
+
+    // Handle NxN mode by doing quant/transform and inverses for the next NxN block
+    if (cur_cu->part_size == SIZE_NxN) {
+      encode_transform_tree(encoder, x + x_off, y + y_off, depth+1, lcu);
+    }
+  }
+
+  // If we coded NxN block, fetch the coded block flags to this level
+  if (cur_cu->part_size == SIZE_NxN) {
+    cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
+    cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
+    cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
+    return;
+  }
+
+  encode_transform_tree(encoder, x, y, depth, lcu);
 }

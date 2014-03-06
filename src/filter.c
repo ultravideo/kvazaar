@@ -211,7 +211,7 @@ void filter_deblock_edge_luma(encoder_control *encoder,
         if(cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
           strength = 2;
           // Non-zero residual/coeffs and transform boundary
-        } else if(cu_q->coeff_y || cu_p->coeff_y) {
+        } else if(cu_q->coeff_top_y[cu_q->tr_depth] || cu_p->coeff_top_y[cu_p->tr_depth]) {
           strength = 1;
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
         } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {
@@ -305,7 +305,6 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
 
     for (blk_idx = 0; blk_idx < blocks_in_part; ++blk_idx)
     {
-
       cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? blk_idx : 0)) +
                                                          (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? blk_idx : 0))
                                                           * (encoder->in.width_in_lcu << MAX_DEPTH)];
@@ -440,7 +439,6 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
     int dst_pos_y = (y<<1)*dst_stride;
     int src_pos_y = y*src_stride;
     for (x = 0; x < width; x++) {
-
       // Calculate current dst and src pixel positions
       int dst_pos = dst_pos_y+(x<<1);
       int src_pos = src_pos_y+x;

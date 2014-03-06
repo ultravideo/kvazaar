@@ -290,7 +290,6 @@ void init_contexts(encoder_control *encoder, int8_t slice)
     ctx_init(&g_cu_sig_model_luma[i], encoder->QP, INIT_SIG_FLAG[slice][i]);
     if(i < 15) ctx_init(&g_cu_sig_model_chroma[i], encoder->QP, INIT_SIG_FLAG[slice][i+27]);
   }
-
 }
 
 
