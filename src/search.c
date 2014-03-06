@@ -472,16 +472,42 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
   const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
   cu_info *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
   int x, y;
-
   // Set mode in every CU covered by part_mode in this depth.
   for (y = y_cu; y < y_cu + width_cu; ++y) {
     for (x = x_cu; x < x_cu + width_cu; ++x) {
       cu_info *cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
-      memcpy(cu, cur_cu, sizeof(cu_info));      
+      cu->coded    = 1;
+      cu->depth    = cur_cu->depth;
+      cu->type     = CU_INTER;
+      cu->tr_depth = cur_cu->tr_depth;
+      cu->merged   = cur_cu->merged;
+      cu->skipped  = cur_cu->skipped;
+      memcpy(&cu->inter, &cur_cu->inter, sizeof(cu_info_inter));
     }
   }
 }
 
+static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cur_cu)
+{
+  const int width_cu = LCU_CU_WIDTH >> depth;
+  const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
+  const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
+  cu_info *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
+  int x, y;
+  int tr_split = cur_cu->tr_depth-cur_cu->depth;
+
+  // Set coeff flags in every CU covered by part_mode in this depth.
+  for (y = y_cu; y < y_cu + width_cu; ++y) {
+    for (x = x_cu; x < x_cu + width_cu; ++x) {
+      cu_info *cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
+      // Use TU top-left CU to propagate coeff flags
+      uint32_t mask = ~((width_cu>>tr_split)-1);
+      cu_info *cu_from = &lcu_cu[(x & mask) + (y & mask) * LCU_T_CU_WIDTH];
+      // Chroma coeff data is not used, luma is needed for deblocking
+      memcpy(cu->coeff_top_y, cu_from->coeff_top_y, 8);
+    }
+  }
+}
 
 /**
  * Update lcu to have best modes at this depth.
@@ -678,6 +704,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
         cur_cu->skipped = 1;
       }
       lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
+      lcu_set_coeff(&work_tree[depth], x, y, depth, cur_cu);
     }
   }
 
