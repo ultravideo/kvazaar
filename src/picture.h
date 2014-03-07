@@ -52,9 +52,10 @@ typedef struct {
  */
 typedef struct
 {
+  uint32_t cost;
+  uint32_t bitcost;
   int8_t mode;
   int8_t mode_chroma;
-  uint32_t cost;
 } cu_info_intra;
 
 /**
@@ -62,14 +63,14 @@ typedef struct
  */
 typedef struct
 {
-  int8_t mode;
   uint32_t cost;
-
+  uint32_t bitcost;
   int16_t mv[2];
   int16_t mvd[2];
   uint8_t mv_cand; // \brief selected MV candidate
   uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
   uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
+  int8_t mode;
 } cu_info_inter;
 
 /**
