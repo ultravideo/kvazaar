@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
   printf("Input: %s, output: %s\n", cfg->input, cfg->output);
-  printf("  Video size: %dx%d\n (%dx%d)",
+  printf("  Video size: %dx%d\n (%dx%d)\n",
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
