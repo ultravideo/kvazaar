@@ -517,71 +517,92 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_intra(encoder_control *encoder, int x, int y, int depth, lcu_t *lcu)
+static int search_cu_intra(encoder_control *encoder,
+		           const int x_px, const int y_px,
+		           const int depth, lcu_t *lcu)
 {
-  int width = (LCU_WIDTH >> (depth));
-  int x_local = (x&0x3f), y_local = (y&0x3f);
-  int x_cu = x>>3;
-  int y_cu = y>>3;
-  int cu_pos = LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH;
+  const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
+  const int8_t cu_width = (LCU_WIDTH >> (depth));
+  const int cu_index = LCU_CU_OFFSET + lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH;
 
-  cu_info *cur_cu = &lcu->cu[cu_pos];
+  cu_info *cur_cu = &lcu->cu[cu_index];
 
-  // INTRAPREDICTION
-  pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
-  pixel rec[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
-  pixel *rec_shift = &rec[width * 2 + 8 + 1];
+  pixel pred_buffer[LCU_WIDTH * LCU_WIDTH + 1];
+  pixel rec_buffer[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
+  pixel *cu_in_rec_buffer = &rec_buffer[cu_width * 2 + 8 + 1];
 
-  int8_t intra_preds[3];
+  int8_t candidate_modes[3];
 
-  cu_info* left_cu = 0;
-  cu_info* above_cu = 0;
+  cu_info *left_cu = 0;
+  cu_info *above_cu = 0;
 
-  if (x_cu > 0) {
-    left_cu = &lcu->cu[cu_pos - 1];
+  if ((x_px >> 3) > 0) {
+    left_cu = &lcu->cu[cu_index - 1];
   }
   // Don't take the above CU across the LCU boundary.
-  if (y_cu > 0 &&
-      ((y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH) != 0) {
-    above_cu = &lcu->cu[cu_pos - LCU_T_CU_WIDTH];
+  if ((y_px >> 3) > 0 && lcu_cu.y != 0) {
+    above_cu = &lcu->cu[cu_index - LCU_T_CU_WIDTH];
   }
 
   // Get intra predictors
-  intra_get_dir_luma_predictor(x, y, intra_preds, cur_cu, left_cu, above_cu);
+  intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   // Build reconstructed block to use in prediction with extrapolated borders
-  intra_build_reference_border(x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
-                                   encoder->in.cur_pic->width, encoder->in.cur_pic->height,
-                                   lcu);
+  intra_build_reference_border(x_px, y_px, cu_width * 2 + 8,
+                               rec_buffer, cu_width * 2 + 8, 0,
+                               encoder->in.cur_pic->width,
+                               encoder->in.cur_pic->height,
+                               lcu);
 
-  // find best intra mode
-  cur_cu->intra[0].mode = (int8_t)intra_prediction(&lcu->ref.y[x_local + y_local*LCU_WIDTH],
-                                                       LCU_WIDTH, rec_shift, width * 2 + 8, x, y,
-                                                       width, pred, width, &cur_cu->intra[0].cost, intra_preds);
-  cur_cu->part_size = SIZE_2Nx2N;
+  // Find best intra mode for 2Nx2N.
+  {
+    uint32_t cost = -1;
+    int16_t mode = -1;
+    pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+    mode = intra_prediction(ref_pixels, LCU_WIDTH,
+                            cu_in_rec_buffer, cu_width * 2 + 8, cu_width,
+                            pred_buffer, cu_width,
+                            &cost, candidate_modes);
+    cur_cu->intra[0].mode = (int8_t)mode;
+    cur_cu->intra[0].cost = cost;
+    cur_cu->part_size = SIZE_2Nx2N;
+  }
 
   // Do search for NxN split.
   if (0 && depth == MAX_DEPTH) { //TODO: reactivate NxN when _something_ is done to make it better
+    static const vector2d offsets[4] = {{0,0},{4,0},{0,4},{4,4}};
+    const int nxn_width = 4;
+
     // Save 2Nx2N information to compare with NxN.
     int nn_cost = cur_cu->intra[0].cost;
     int8_t nn_mode = cur_cu->intra[0].mode;
-    int i;
-    int cost = (int)(g_cur_lambda_cost * 4.5);  // round to nearest
-    static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
-    width = 4;
-    rec_shift = &rec[width * 2 + 8 + 1];
+    int cost = (int)(g_cur_lambda_cost * 4.5);  // +0.5 to round to nearest
 
-    for (i = 0; i < 4; ++i) {
-      int x_pos = x + offsets[i].x * width;
-      int y_pos = y + offsets[i].y * width;
-      intra_get_dir_luma_predictor(x_pos,y_pos, intra_preds, cur_cu, left_cu, above_cu);
-      intra_build_reference_border(x_pos, y_pos,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+    int nxn_i;
+
+    cu_in_rec_buffer = &rec_buffer[nxn_width * 2 + 8 + 1];
+
+    for (nxn_i = 0; nxn_i < 4; ++nxn_i) {
+      const vector2d nxn_px = { x_px + offsets[nxn_i].x,
+                                y_px + offsets[nxn_i].y };
+      intra_get_dir_luma_predictor(nxn_px.x, nxn_px.y, candidate_modes,
+                                   cur_cu, left_cu, above_cu);
+      intra_build_reference_border(nxn_px.x, nxn_px.y, nxn_width * 2 + 8,
+                                   rec_buffer, nxn_width * 2 + 8, 0,
                                    encoder->in.cur_pic->width, encoder->in.cur_pic->height,
                                    lcu);
-      cur_cu->intra[i].mode = (int8_t)intra_prediction(encoder->in.cur_pic->y_data,
-          encoder->in.width, rec_shift, width * 2 + 8, (int16_t)x_pos, (int16_t)y_pos,
-          width, pred, width, &cur_cu->intra[i].cost,intra_preds);
-      cost += cur_cu->intra[i].cost;
+      {
+        uint32_t nxn_cost = -1;
+        int16_t nxn_mode = -1;
+        pixel *ref_pixels = &lcu->ref.y[nxn_px.x + nxn_px.y * LCU_WIDTH];
+        nxn_mode = intra_prediction(ref_pixels, encoder->in.width,
+                                    cu_in_rec_buffer, nxn_width * 2 + 8, nxn_width,
+                                    pred_buffer, nxn_width,
+                                    &nxn_cost, candidate_modes);
+        cur_cu->intra[nxn_i].mode = (int8_t)nxn_mode;
+        cost += nxn_cost;
+      }
     }
 
     // Choose between 2Nx2N and NxN.

@@ -251,8 +251,8 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride, uint16_t xpos,
-                         uint16_t ypos, uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *intra_preds)
+int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
+                         uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *intra_preds)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
