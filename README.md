@@ -17,7 +17,8 @@ meant to be user configurable later.
     kvazaar -i <input> -w <width> -h <height> -o <output>
 
     Optional parameters:
-          -n, --frames <integer>     : number of frames to code [all]
+          -n, --frames <integer>     : Number of frames to code [all]
+          --seek                     : First frame to code [0]
           -q, --qp <integer>         : Quantization Parameter [32]
           -p, --period <integer>     : Period of intra pictures [0]
                                          0: only first picture is intra

@@ -91,7 +91,8 @@ int main(int argc, char *argv[])
             "kvazaar -i <input> -w <width> -h <height> -o <output>\n"
             "\n"
             "Optional parameters:\n"
-            "      -n, --frames <integer>     : number of frames to code [all]\n"
+            "      -n, --frames <integer>     : Number of frames to code [all]\n"
+            "      --seek <integer>           : First frame to code [0]\n"
             "      -q, --qp <integer>         : Quantization Parameter [32]\n"
             "      -p, --period <integer>     : Period of intra pictures [0]\n"
             "                                     0: only first picture is intra\n"
@@ -235,6 +236,29 @@ int main(int argc, char *argv[])
   while(!cfg->frames || encoder->frame < cfg->frames) {
     int32_t diff;
     double temp_psnr[3];
+
+    // Skip '--seek' frames before input.
+    // This block can be moved outside this while loop when there is a
+    // mechanism to skip the while loop on error.
+    if (encoder->frame == 0 && cfg->seek > 0) {
+      int frame_bytes = cfg->width * cfg->height * 3 / 2;
+      int error = 0;
+
+      if (!strcmp(cfg->input, "-")) {
+        // Input is stdin.
+        int i;
+        for (i = 0; !error && i < cfg->seek; ++i) {
+          error = !read_one_frame(input, encoder);
+        }
+      } else {
+        // input is a file. We hope. Proper detection is OS dependent.
+        error = fseek(input, cfg->seek * frame_bytes, SEEK_CUR);
+      }
+      if (error && !feof(input)) {
+        fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
+        break;
+      }
+    }
 
     // Read one frame from the input
     if (!read_one_frame(input, encoder)) {

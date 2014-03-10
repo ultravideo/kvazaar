@@ -61,6 +61,7 @@ typedef struct
   int32_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
   int32_t ref_frames;     /*!< \brief number of reference frames to use */
   char * cqmfile;        /*!< \brief Pointer to custom quantization matrices filename */
+  int32_t seek;           /*!< \brief Number of frames to skip in the beginning of input. */
 } config;
 
 /* Function definitions */

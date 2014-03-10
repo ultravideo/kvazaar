@@ -77,6 +77,7 @@ int config_init(config *cfg)
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
+  cfg->seek            = 0;
 
   return 1;
 }
@@ -250,6 +251,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->aud_enable = atobool(value);
   OPT("cqmfile")
     cfg->cqmfile = copy_string(value);
+  OPT("seek")
+    cfg->seek = atoi(value);
   else
     return 0;
 #undef OPT
@@ -292,6 +295,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "chromaloc",          required_argument, NULL, 0 },
     { "aud",                      no_argument, NULL, 0 },
     { "cqmfile",            required_argument, NULL, 0 },
+    { "seek",               required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 
