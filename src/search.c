@@ -79,7 +79,7 @@ static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
     symbol -= 1 << count;
     ++count;
   }
-  num_bins += count+1;
+  num_bins ++;
 
   return num_bins;
 }
@@ -99,15 +99,17 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
 
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs-2, 1);
+      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs-2, 1) - 2; // TODO: tune the costs
     }
+    // Greater than 1 + sign
     bitcost += 2;
   }
 
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs-2, 1);
+      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs-2, 1) - 2; // TODO: tune the costs
     }
+    // Greater than 1 + sign
     bitcost += 2;
   }
 
@@ -135,7 +137,7 @@ static int calc_mvd_cost(int x, int y, const vector2d *pred,
     if (merge_cand[merge_idx][0] == x &&
         merge_cand[merge_idx][1] == y &&
         merge_cand[merge_idx][2] == ref_idx) {
-      temp_bitcost += merge_idx < MRG_MAX_NUM_CANDS ? merge_idx+1:merge_idx;
+      temp_bitcost += merge_idx;
       merged = 1;
       break;
     }
@@ -647,8 +649,8 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  * \return Cost of best mode.
  */
 static int search_cu_intra(encoder_control *encoder,
-		           const int x_px, const int y_px,
-		           const int depth, lcu_t *lcu)
+                           const int x_px, const int y_px,
+                           const int depth, lcu_t *lcu)
 {
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
