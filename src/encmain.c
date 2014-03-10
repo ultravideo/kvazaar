@@ -63,9 +63,7 @@ int main(int argc, char *argv[])
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint64_t curpos  = 0;
   uint64_t lastpos = 0;
-  #ifdef _DEBUG
-  FILE *recout = fopen("encrec_832x480_60.yuv","wb"); //!< reconstructed YUV output (only on debug mode)
-  #endif
+  FILE *recout = NULL; //!< reconstructed YUV output, --debug
 
   // Stdin and stdout need to be binary for input and output to work.
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -184,6 +182,15 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  if (cfg->debug != NULL) {
+    recout = fopen(cfg->debug, "wb");
+    if (recout == NULL) {
+      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", cfg->debug);
+      config_destroy(cfg);
+      return EXIT_FAILURE;
+    }
+  }
+
   encoder = init_encoder_control(cfg);
   if (!encoder)
     return EXIT_FAILURE;
@@ -282,12 +289,12 @@ int main(int argc, char *argv[])
     // The actual coding happens here, after this function we have a coded frame
     encode_one_frame(encoder);
 
-    #ifdef _DEBUG
-    // Write reconstructed frame out (for debugging purposes)
-    fwrite(encoder->in.cur_pic->y_recdata, cfg->width * cfg->height, 1, recout);
-    fwrite(encoder->in.cur_pic->u_recdata, (cfg->width * cfg->height)>>2, 1, recout);
-    fwrite(encoder->in.cur_pic->v_recdata, (cfg->width * cfg->height)>>2, 1, recout);
-    #endif
+    if (cfg->debug != NULL) {
+      // Write reconstructed frame out (for debugging purposes)
+      fwrite(encoder->in.cur_pic->y_recdata, cfg->width * cfg->height, 1, recout);
+      fwrite(encoder->in.cur_pic->u_recdata, (cfg->width * cfg->height)>>2, 1, recout);
+      fwrite(encoder->in.cur_pic->v_recdata, (cfg->width * cfg->height)>>2, 1, recout);
+    }
 
     // Calculate the bytes pushed to output for this frame
     fgetpos(output,(fpos_t*)&curpos);
@@ -343,9 +350,7 @@ int main(int argc, char *argv[])
   fclose(input);
   fclose(output);
   if(cqmfile != NULL) fclose(cqmfile);
-  #ifdef _DEBUG
   fclose(recout);
-  #endif
 
   // Deallocating
   config_destroy(cfg);
