@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
 
     // Remove the ref pic (if present)
     if (encoder->ref->used_size == encoder->cfg->ref_frames) {
-	    picture_list_rem(encoder->ref, encoder->ref->used_size-1, 1);
+      picture_list_rem(encoder->ref, encoder->ref->used_size-1, 1);
     }
     // Add current picture as reference
     picture_list_add(encoder->ref, encoder->in.cur_pic);

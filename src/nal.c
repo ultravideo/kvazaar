@@ -108,24 +108,24 @@ static void array_checksum(const pixel* data,
                            const int stride,
                            unsigned char checksum_out[SEI_HASH_MAX_LENGTH])
 {
-	uint8_t mask;
-	uint32_t checksum = 0;
-	int y, x;
+  uint8_t mask;
+  uint32_t checksum = 0;
+  int y, x;
 
   assert(SEI_HASH_MAX_LENGTH >= 4);
 
-	for (y = 0; y < height; ++y) {
-		for (x = 0; x < width; ++x) {
-			mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
-			checksum += (data[(y * stride) + x] & 0xff) ^ mask;
-		}
-	}
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x < width; ++x) {
+      mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
+      checksum += (data[(y * stride) + x] & 0xff) ^ mask;
+    }
+  }
 
   // Unpack uint into byte-array.
-	checksum_out[0] = (checksum >> 24) & 0xff;
-	checksum_out[1] = (checksum >> 16) & 0xff;
-	checksum_out[2] = (checksum >> 8) & 0xff;
-	checksum_out[3] = (checksum) & 0xff;
+  checksum_out[0] = (checksum >> 24) & 0xff;
+  checksum_out[1] = (checksum >> 16) & 0xff;
+  checksum_out[2] = (checksum >> 8) & 0xff;
+  checksum_out[3] = (checksum) & 0xff;
 }
 
 
@@ -137,9 +137,9 @@ static void array_checksum(const pixel* data,
 */
 void picture_checksum(const picture* pic, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
 {
-	array_checksum(pic->y_recdata, pic->height, pic->width, pic->width, checksum_out[0]);
+  array_checksum(pic->y_recdata, pic->height, pic->width, pic->width, checksum_out[0]);
 
   /* The number of chroma pixels is half that of luma. */
-	array_checksum(pic->u_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[1]);
-	array_checksum(pic->v_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[2]);
+  array_checksum(pic->u_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[1]);
+  array_checksum(pic->v_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[2]);
 }
