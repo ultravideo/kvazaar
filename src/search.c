@@ -374,9 +374,6 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
   // Get list of candidates
   int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, cur_cu, lcu);
 
-  // Get MV candidates
-  inter_get_mv_cand(encoder, x, y, depth, mv_cand, cur_cu, lcu);
-
   // Select better candidate
   cur_cu->inter.mv_cand = 0; // Default to candidate 0
 
@@ -390,16 +387,21 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;
     int32_t merged = 0;
+    uint8_t cu_mv_cand = 0;
+    int8_t merge_idx = 0;
+    int8_t temp_ref_idx = cur_cu->inter.mv_ref;
     orig.x = x_cu * CU_MIN_SIZE_PIXELS;
     orig.y = y_cu * CU_MIN_SIZE_PIXELS;
     mv.x = 0;
     mv.y = 0;
-    mvd.x = 0;
-    mvd.y = 0;
     if (ref_cu->type == CU_INTER) {
       mv.x = ref_cu->inter.mv[0];
       mv.y = ref_cu->inter.mv[1];
     }
+    // Get MV candidates
+    cur_cu->inter.mv_ref = ref_idx;
+    inter_get_mv_cand(encoder, x, y, depth, mv_cand, cur_cu, lcu);
+    cur_cu->inter.mv_ref = temp_ref_idx;
 
 #if SEARCH_MV_FULL_RADIUS
     temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
@@ -409,16 +411,14 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
 
     merged = 0;
     // Check every candidate to find a match
-    for(cur_cu->merge_idx = 0; cur_cu->merge_idx < num_cand; cur_cu->merge_idx++) {
-      if (merge_cand[cur_cu->merge_idx][0] == mv.x &&
-          merge_cand[cur_cu->merge_idx][1] == mv.y &&
-          merge_cand[cur_cu->merge_idx][2] == ref_idx) {
+    for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+      if (merge_cand[merge_idx][0] == mv.x &&
+          merge_cand[merge_idx][1] == mv.y &&
+          merge_cand[merge_idx][2] == ref_idx) {
         merged = 1;
-        //temp_bitcost += cur_cu->merge_idx < MRG_MAX_NUM_CANDS ? cur_cu->merge_idx+1:cur_cu->merge_idx;
         break;
       }
     }
-
 
     // Only check when candidates are different
     if (!merged && (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
@@ -435,18 +435,15 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
 
       // Select candidate 1 if it has lower cost
       if (cand2_cost < cand1_cost) {
-        cur_cu->inter.mv_cand = 1;
+        cu_mv_cand = 1;
       }
     }
-    mvd.x = mv.x - mv_cand[cur_cu->inter.mv_cand][0];
-    mvd.y = mv.y - mv_cand[cur_cu->inter.mv_cand][1];
-    //temp_bitcost += merged ? 0  : get_mvd_coding_cost(&mvd);
-
-
-    //temp_cost += temp_bitcost*g_cur_lambda_cost;
+    mvd.x = mv.x - mv_cand[cu_mv_cand][0];
+    mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
     if(temp_cost < cur_cu->inter.cost) {
       cur_cu->merged        = merged;
+      cur_cu->merge_idx     = merge_idx;
       cur_cu->inter.mv_ref  = ref_idx;
       cur_cu->inter.mv_dir  = 1;
       cur_cu->inter.mv[0]   = (int16_t)mv.x;
@@ -455,6 +452,7 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
       cur_cu->inter.mvd[1]  = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
       cur_cu->inter.bitcost = temp_bitcost;
+      cur_cu->inter.mv_cand = cu_mv_cand;
     }
   }
 
