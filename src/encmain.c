@@ -88,11 +88,12 @@ int main(int argc, char *argv[])
 
     fprintf(stderr,
             "Usage:\n"
-            "kvazaar -i <input> -w <width> -h <height> -o <output>\n"
+            "kvazaar -i <input> -w <width> --input-res <width>:<height> -o <output>\n"
             "\n"
             "Optional parameters:\n"
             "      -n, --frames <integer>     : Number of frames to code [all]\n"
             "      --seek <integer>           : First frame to code [0]\n"
+            "      --input-res <int>x<int>    : Input resolution (width x height)\n"
             "      -q, --qp <integer>         : Quantization Parameter [32]\n"
             "      -p, --period <integer>     : Period of intra pictures [0]\n"
             "                                     0: only first picture is intra\n"
@@ -126,11 +127,22 @@ int main(int argc, char *argv[])
             "          --colormatrix <string> : Specify color matrix setting [\"undef\"]\n"
             "                                     - undef, bt709, fcc, bt470bg, smpte170m,\n"
             "                                       smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
-            "          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n");
+            "          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
+            "\n"
+            "  Deprecated parameters: (might be removed at some point)\n"
+            "     Use --input-res:\n"
+            "       -w, --width               : Width of input in pixels\n"
+            "       -h, --height              : Height of input in pixels\n");
 
     if (cfg)
       config_destroy(cfg);
 
+    return EXIT_FAILURE;
+  }
+
+  // Do more validation to make sure the parameters we have make sense.
+  if (!config_validate(cfg)) {
+    config_destroy(cfg);
     return EXIT_FAILURE;
   }
 

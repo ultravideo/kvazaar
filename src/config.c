@@ -56,8 +56,8 @@ int config_init(config *cfg)
   cfg->output          = NULL;
   cfg->debug           = NULL;
   cfg->frames          = 0;
-  cfg->width           = 320;
-  cfg->height          = 240;
+  cfg->width           = 0;
+  cfg->height          = 0;
   cfg->qp              = 32;
   cfg->intra_period    = 0;
   cfg->deblock_enable  = 1;
@@ -181,6 +181,11 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->width = atoi(value);
   OPT("height")
     cfg->height = atoi(value);
+  OPT("input-res") {
+    if (2 != sscanf(value, "%dx%d", &cfg->width, &cfg->height)) {
+      cfg->width = cfg->height = 0;
+    }
+  }
   OPT("frames")
     cfg->frames = atoi(value);
   OPT("qp")
@@ -276,11 +281,12 @@ int config_read(config *cfg,int argc, char *argv[])
     { "output",             required_argument, NULL, 'o' },
     { "debug",              required_argument, NULL, 'd' },
     { "width",              required_argument, NULL, 'w' },
-    { "height",             required_argument, NULL, 'h' },
-    { "frames",             required_argument, NULL, 'n' },
+    { "height",             required_argument, NULL, 'h' }, // deprecated
+    { "frames",             required_argument, NULL, 'n' }, // deprecated
     { "qp",                 required_argument, NULL, 'q' },
     { "period",             required_argument, NULL, 'p' },
     { "ref",                required_argument, NULL, 'r' },
+    { "input-res",          required_argument, NULL, 0 },
     { "no-deblock",               no_argument, NULL, 0 },
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
@@ -330,5 +336,22 @@ int config_read(config *cfg,int argc, char *argv[])
   // Check that the required files were defined
   if(cfg->input == NULL || cfg->output == NULL) return 0;
 
+  return 1;
+}
+
+/**
+ * \brief A function that does additional checks after config_init.
+ *
+ * Add checks that don't make sense to have in config_init here.
+ * This should be called when cfg is in it's final state.
+ *
+ * \return 0 if config fails, otherwise 1.
+ */
+int config_validate(config *cfg)
+{
+  if (cfg->width == 0 || cfg->height == 0) {
+    fprintf(stderr, "Input error: one of the dimensions is 0: dims=%dx%d", cfg->width, cfg->height);
+    return 0;
+  }
   return 1;
 }

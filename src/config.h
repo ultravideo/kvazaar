@@ -69,5 +69,6 @@ config *config_alloc(void);
 int config_init(config *cfg);
 int config_destroy(config *cfg);
 int config_read(config *cfg,int argc, char *argv[]);
+int config_validate(config *cfg);
 
 #endif
