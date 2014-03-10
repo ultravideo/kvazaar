@@ -138,6 +138,17 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
 
+  // Add dimensions to the reconstructions file name.
+  if (cfg->debug != NULL) {
+    char dim_str[50]; // log10(2^64) < 20, so this should suffice. I hate C.
+    size_t left_len, right_len;
+    sprintf(dim_str, "_%dx%d.yuv", cfg->width, cfg->height);
+    left_len = strlen(cfg->debug);
+    right_len = strlen(dim_str);
+    realloc(cfg->debug, left_len + right_len + 1);
+    strcpy(cfg->debug + left_len, dim_str);
+  }
+
   // Do more validation to make sure the parameters we have make sense.
   if (!config_validate(cfg)) {
     config_destroy(cfg);
