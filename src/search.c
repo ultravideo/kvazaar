@@ -878,7 +878,9 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       lcu_set_coeff(&work_tree[depth], x, y, depth, cur_cu);
     }
   }
-  cost = lcu_get_final_cost(encoder, x, y, depth, &work_tree[depth]);
+  if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
+    cost = lcu_get_final_cost(encoder, x, y, depth, &work_tree[depth]);
+  }
 
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
