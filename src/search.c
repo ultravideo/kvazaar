@@ -118,7 +118,7 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
 
 static int calc_mvd_cost(int x, int y, const vector2d *pred,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
-                         int16_t num_cand,int32_t ref_idx)
+                         int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
   int cost = 0;
 
@@ -159,7 +159,7 @@ static int calc_mvd_cost(int x, int y, const vector2d *pred,
     }
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
-
+  *bitcost = temp_bitcost;
   return temp_bitcost*(int32_t)(g_cur_lambda_cost+0.5);
 }
 
@@ -188,11 +188,12 @@ static unsigned hexagon_search(unsigned depth,
                                const picture *pic, const picture *ref,
                                const vector2d *orig, vector2d *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
-                               int16_t num_cand, int32_t ref_idx)
+                               int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
+  uint32_t best_bitcost = 0, bitcost;
   unsigned i;
   unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
 
@@ -203,11 +204,12 @@ static unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + pattern->x, mv.y + pattern->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx);
+    cost += calc_mvd_cost(mv.x + pattern->x, mv.y + pattern->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost < best_cost) {
-      best_cost = cost;
-      best_index = i;
+      best_cost    = cost;
+      best_index   = i;
+      best_bitcost = bitcost;
     }
   }
 
@@ -216,12 +218,13 @@ static unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x, orig->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(0, 0, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx);
+    cost += calc_mvd_cost(0, 0, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
-      best_cost = cost;
-      best_index = 0;
+      best_cost    = cost;
+      best_bitcost = bitcost;
+      best_index   = 0;
       mv.x = 0;
       mv.y = 0;
 
@@ -231,11 +234,12 @@ static unsigned hexagon_search(unsigned depth,
                                  orig->x + pattern->x,
                                  orig->y + pattern->y,
                                  block_width, block_width);
-        cost += calc_mvd_cost(pattern->x, pattern->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx);
+        cost += calc_mvd_cost(pattern->x, pattern->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
         if (cost < best_cost) {
-          best_cost = cost;
-          best_index = i;
+          best_cost    = cost;
+          best_index   = i;
+          best_bitcost = bitcost;
         }
       }
     }
@@ -265,11 +269,12 @@ static unsigned hexagon_search(unsigned depth,
                                orig->x + mv.x + offset->x,
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
-      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx);
+      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
       if (cost < best_cost) {
-        best_cost = cost;
-        best_index = start + i;
+        best_cost    = cost;
+        best_index   = start + i;
+        best_bitcost = bitcost;
       }
       ++offset;
     }
@@ -287,11 +292,12 @@ static unsigned hexagon_search(unsigned depth,
                              orig->x + mv.x + offset->x,
                              orig->y + mv.y + offset->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx);
+    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
-      best_cost = cost;
-      best_index = i;
+      best_cost    = cost;
+      best_index   = i;
+      best_bitcost = bitcost;
     }
   }
 
@@ -303,6 +309,8 @@ static unsigned hexagon_search(unsigned depth,
   mv_in_out->x = mv.x << 2;
   mv_in_out->y = mv.y << 2;
 
+  *bitcost_out = best_bitcost;
+
   return best_cost;
 }
 
@@ -312,12 +320,13 @@ static unsigned search_mv_full(unsigned depth,
                                const picture *pic, const picture *ref,
                                const vector2d *orig, vector2d *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
-                               int16_t num_cand, int32_t ref_idx)
+                               int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
   vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
   int x, y;
+  uint32_t best_bitcost = 0, bitcost;
   vector2d min_mv, max_mv;
 
   /*if (abs(mv.x) > SEARCH_MV_FULL_RADIUS || abs(mv.y) > SEARCH_MV_FULL_RADIUS) {
@@ -339,9 +348,10 @@ static unsigned search_mv_full(unsigned depth,
                                orig->x + x,
                                orig->y + y,
                                block_width, block_width);
-      cost += calc_mvd_cost(x, y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx);
+      cost += calc_mvd_cost(x, y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
       if (cost < best_cost) {
-        best_cost = cost;
+        best_cost    = cost;
+        best_bitcost = bitcost;
         mv.x = x;
         mv.y = y;
       }
@@ -350,6 +360,8 @@ static unsigned search_mv_full(unsigned depth,
 
   mv_in_out->x = mv.x << 2;
   mv_in_out->y = mv.y << 2;
+
+  *bitcost_out = best_bitcost;
 
   return best_cost;
 }
@@ -385,7 +397,7 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
     picture *ref_pic = encoder->ref->pics[ref_idx];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
     cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_cu * width_in_scu + x_cu];
-    uint32_t temp_bitcost = ref_idx;
+    uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;
     int32_t merged = 0;
@@ -406,9 +418,9 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
     cur_cu->inter.mv_ref = temp_ref_idx;
 
 #if SEARCH_MV_FULL_RADIUS
-    temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv);
+    temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
-    temp_cost += hexagon_search(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx);
+    temp_cost += hexagon_search(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
 
     merged = 0;
@@ -453,7 +465,7 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
       cur_cu->inter.mvd[0]  = (int16_t)mvd.x;
       cur_cu->inter.mvd[1]  = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
-      cur_cu->inter.bitcost = temp_bitcost;
+      cur_cu->inter.bitcost = temp_bitcost + ref_idx;
       cur_cu->inter.mv_cand = cu_mv_cand;
     }
   }
