@@ -59,7 +59,7 @@ typedef int16_t coefficient;
 #define MAX_INTER_SEARCH_DEPTH 3
 #define MIN_INTER_SEARCH_DEPTH 0
 
-#define MAX_INTRA_SEARCH_DEPTH 3 /*!< Max search depth -> min block size (3 == 8x8) */
+#define MAX_INTRA_SEARCH_DEPTH 4 /*!< Max search depth -> min block size (3 == 8x8) */
 #define MIN_INTRA_SEARCH_DEPTH 1 /*!< Min search depth -> max block size (0 == 64x64) */
 
 
@@ -99,6 +99,7 @@ typedef int16_t coefficient;
 #define NO_SCU_IN_LCU(no_lcu) ((no_lcu) << MAX_DEPTH)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
 #define UNREFERENCED_PARAMETER(p) (p)
+#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
 
 #define LOG2_LCU_WIDTH 6
 // CU_TO_PIXEL = y * lcu_width * pic_width + x * lcu_width
