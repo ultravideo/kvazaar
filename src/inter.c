@@ -437,7 +437,7 @@ void inter_get_mv_cand(encoder_control *encoder, int32_t x, int32_t y, int8_t de
  * \param depth current block depth
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
-uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu, lcu_t *lcu)
+uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;

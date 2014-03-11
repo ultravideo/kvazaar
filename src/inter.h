@@ -36,5 +36,5 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
 void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info **b0, cu_info **b1,
                                         cu_info **b2,cu_info **a0,cu_info **a1, lcu_t *lcu);
 void inter_get_mv_cand(encoder_control *encoder, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu);
-uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], cu_info* cur_cu, lcu_t *lcu);
+uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], lcu_t *lcu);
 #endif

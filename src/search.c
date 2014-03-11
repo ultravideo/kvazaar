@@ -374,7 +374,7 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
   // Search for merge mode candidate
   int16_t merge_cand[MRG_MAX_NUM_CANDS][3];
   // Get list of candidates
-  int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, cur_cu, lcu);
+  int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, lcu);
 
   // Select better candidate
   cur_cu->inter.mv_cand = 0; // Default to candidate 0
