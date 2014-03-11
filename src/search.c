@@ -769,6 +769,42 @@ static int search_cu_intra(encoder_control *encoder,
   return cur_cu->intra[0].cost;
 }
 
+/**
+ * Calculate "final cost" for the block
+ * \return Cost of block
+ *
+ * Take SAD between reconstruction and original and add cost from
+ * coding (bitcost * lambda) and cost for coding coefficients (estimated
+ * here as (coefficient_sum / 2) * lambda
+ */
+static int lcu_get_final_cost(encoder_control *encoder,
+                              const int x_px, const int y_px,
+                              const int depth, lcu_t *lcu)
+{
+  cu_info *cur_cu;
+  int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
+  int cost = 0;
+  int coeff_cost = 0;
+  int width = LCU_WIDTH>>depth;
+  int x,y;
+  cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+
+  // SAD between reconstruction and original
+  for (y = y_local; y < y_local+width; ++y) {
+    for (x = x_local; x < x_local+width; ++x) {
+      cost += abs((int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x]);
+      coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
+    }
+  }
+
+  // Bitcost
+  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[0].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
+
+  // Coefficient costs (TODO: check cost)
+  cost += (coeff_cost>>1) * (int32_t)(g_cur_lambda_cost+0.5);
+
+  return cost;
+}
 
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
@@ -842,7 +878,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       lcu_set_coeff(&work_tree[depth], x, y, depth, cur_cu);
     }
   }
-  //cost = lcu_get_final_cost(encoder, x, y, depth, cur_cu);
+  cost = lcu_get_final_cost(encoder, x, y, depth, &work_tree[depth]);
 
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
