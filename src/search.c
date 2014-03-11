@@ -828,11 +828,18 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
     int split_cost = (int)(4.5 * g_lambda_cost[encoder->QP]);
-    split_cost += search_cu(encoder, x,           y,           depth + 1, work_tree);
-    split_cost += search_cu(encoder, x + half_cu, y,           depth + 1, work_tree);
-    split_cost += search_cu(encoder, x,           y + half_cu, depth + 1, work_tree);
-    split_cost += search_cu(encoder, x + half_cu, y + half_cu, depth + 1, work_tree);
 
+    // If skip mode was selected for the block, skip further search.
+    // Skip mode means there's no coefficients in the block, so splitting
+    // might not give any better results but takes more time to do.
+    if(cur_cu->type == CU_INTER && cur_cu->skipped) {
+      split_cost = INT_MAX;
+    } else {
+      split_cost += search_cu(encoder, x,           y,           depth + 1, work_tree);
+      split_cost += search_cu(encoder, x + half_cu, y,           depth + 1, work_tree);
+      split_cost += search_cu(encoder, x,           y + half_cu, depth + 1, work_tree);
+      split_cost += search_cu(encoder, x + half_cu, y + half_cu, depth + 1, work_tree);
+    }
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
