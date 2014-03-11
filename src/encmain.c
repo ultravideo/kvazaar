@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
   fclose(input);
   fclose(output);
   if(cqmfile != NULL) fclose(cqmfile);
-  fclose(recout);
+  if(recout != NULL) fclose(recout);
 
   // Deallocating
   config_destroy(cfg);
