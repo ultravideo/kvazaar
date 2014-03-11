@@ -40,7 +40,8 @@ void intra_filter(pixel* ref, int32_t stride, int32_t width, int8_t mode);
 
 /* Predictions */
 int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
-                         uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *intra_preds);
+                         uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out,
+                         int8_t *intra_preds, uint32_t *bitcost_out);
 
 pixel intra_get_dc_pred(pixel* pic, uint16_t pic_width, uint8_t width);
 void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride);

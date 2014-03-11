@@ -252,14 +252,16 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
  This function derives the prediction samples for planar mode (intra coding).
 */
 int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
-                         uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out, int8_t *intra_preds)
+                         uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out,
+                         int8_t *intra_preds, uint32_t *bitcost_out)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
   int16_t best_mode = 1;
+  uint32_t best_bitcost = 0;
   int32_t x,y;
   int16_t i;
-  uint32_t ratecost = 0;
+  uint32_t bitcost = 0;
 
   cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
 
@@ -279,6 +281,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
                                                 sad += additional_sad;\
                                                 if(sad < best_sad)\
                                                 {\
+                                                  best_bitcost = bitcost;\
                                                   best_sad = sad;\
                                                   best_mode = mode;\
                                                   COPY_PRED_TO_DST();\
@@ -308,8 +311,8 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     for (i = 0; i < (int32_t)(width*width); i++) {
       pred[i] = val;
     }
-    ratecost = intra_pred_ratecost(1,intra_preds)*(int)(g_cur_lambda_cost+0.5);
-    CHECK_FOR_BEST(1,ratecost);
+    bitcost = intra_pred_ratecost(1,intra_preds);
+    CHECK_FOR_BEST(1,bitcost*(int)(g_cur_lambda_cost+0.5));
   }
 
   // Check angular not requiring filtering
@@ -317,8 +320,8 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     int distance = MIN(abs(i - 26),abs(i - 10)); //!< Distance from top and left predictions
     if(distance <= threshold) {
       intra_get_angular_pred(rec, recstride, pred, width, width, i, filter);
-      ratecost = intra_pred_ratecost(i,intra_preds)*(int)(g_cur_lambda_cost+0.5);
-      CHECK_FOR_BEST(i,ratecost);
+      bitcost = intra_pred_ratecost(i,intra_preds);
+      CHECK_FOR_BEST(i,bitcost*(int)(g_cur_lambda_cost+0.5));
     }
   }
 
@@ -326,8 +329,8 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
 
   // Test planar mode (always filtered)
   intra_get_planar_pred(rec_filtered, recstride, width, pred, width);
-  ratecost = intra_pred_ratecost(0,intra_preds)*(int)(g_cur_lambda_cost+0.5);
-  CHECK_FOR_BEST(0,ratecost);
+  bitcost = intra_pred_ratecost(0,intra_preds);
+  CHECK_FOR_BEST(0,bitcost*(int)(g_cur_lambda_cost+0.5));
 
   // Check angular predictions which require filtered samples
   // TODO: add conditions to skip some modes on borders
@@ -336,13 +339,14 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
     int distance = MIN(abs(i-26),abs(i-10)); //!< Distance from top and left predictions
     if(distance > threshold) {
       intra_get_angular_pred(rec_filtered, recstride, pred, width, width, i, filter);
-      ratecost = intra_pred_ratecost(i,intra_preds)*(int)(g_cur_lambda_cost+0.5);
-      CHECK_FOR_BEST(i,ratecost);
+      bitcost = intra_pred_ratecost(i,intra_preds);
+      CHECK_FOR_BEST(i,bitcost*(int)(g_cur_lambda_cost+0.5));
     }
   }
 
   // assign final sad to output
-  *sad_out = best_sad;
+  *sad_out     = best_sad;
+  *bitcost_out = best_bitcost;
   #undef COPY_PRED_TO_DST
   #undef CHECK_FOR_BEST
 

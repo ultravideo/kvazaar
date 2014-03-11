@@ -679,6 +679,7 @@ static int search_cu_intra(encoder_control *encoder,
 
   cu_info *left_cu = 0;
   cu_info *above_cu = 0;
+  uint32_t bitcost = 0, bitcost_nxn;
 
   if ((x_px >> 3) > 0) {
     left_cu = &lcu->cu[cu_index - 1];
@@ -706,7 +707,7 @@ static int search_cu_intra(encoder_control *encoder,
     mode = intra_prediction(ref_pixels, LCU_WIDTH,
                             cu_in_rec_buffer, cu_width * 2 + 8, cu_width,
                             pred_buffer, cu_width,
-                            &cost, candidate_modes);
+                            &cost, candidate_modes, &bitcost);
     cur_cu->intra[0].mode = (int8_t)mode;
     cur_cu->intra[0].cost = cost;
     cur_cu->part_size = SIZE_2Nx2N;
@@ -726,6 +727,8 @@ static int search_cu_intra(encoder_control *encoder,
 
     cu_in_rec_buffer = &rec_buffer[nxn_width * 2 + 8 + 1];
 
+    bitcost_nxn = 0;
+
     for (nxn_i = 0; nxn_i < 4; ++nxn_i) {
       const vector2d nxn_px = { x_px + offsets[nxn_i].x,
                                 y_px + offsets[nxn_i].y };
@@ -738,13 +741,15 @@ static int search_cu_intra(encoder_control *encoder,
       {
         uint32_t nxn_cost = -1;
         int16_t nxn_mode = -1;
+        uint32_t bitcost_temp = 0;
         pixel *ref_pixels = &lcu->ref.y[nxn_px.x + nxn_px.y * LCU_WIDTH];
         nxn_mode = intra_prediction(ref_pixels, encoder->in.width,
                                     cu_in_rec_buffer, nxn_width * 2 + 8, nxn_width,
                                     pred_buffer, nxn_width,
-                                    &nxn_cost, candidate_modes);
+                                    &nxn_cost, candidate_modes, &bitcost_temp);
         cur_cu->intra[nxn_i].mode = (int8_t)nxn_mode;
         cost += nxn_cost;
+        bitcost_nxn += bitcost_temp;
       }
     }
 
@@ -755,8 +760,11 @@ static int search_cu_intra(encoder_control *encoder,
     } else {
       cur_cu->intra[0].cost = cost;
       cur_cu->part_size = SIZE_NxN;
+      bitcost = bitcost_nxn;
     }
   }
+
+  cur_cu->intra[0].bitcost = bitcost;
 
   return cur_cu->intra[0].cost;
 }
