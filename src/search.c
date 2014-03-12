@@ -775,7 +775,7 @@ static int search_cu_intra(encoder_control *encoder,
  *
  * Take SAD between reconstruction and original and add cost from
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
- * here as (coefficient_sum / 2) * lambda
+ * here as (coefficient_sum * 1.5) * lambda)
  */
 static int lcu_get_final_cost(encoder_control *encoder,
                               const int x_px, const int y_px,
@@ -789,19 +789,29 @@ static int lcu_get_final_cost(encoder_control *encoder,
   int x,y;
   cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
 
-  // SAD between reconstruction and original
+  // SAD between reconstruction and original + sum of coeffs
   for (y = y_local; y < y_local+width; ++y) {
     for (x = x_local; x < x_local+width; ++x) {
       cost += abs((int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x]);
       coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
     }
   }
+  // Chroma SAD + sum of coeffs
+  for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
+    for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
+      cost += abs((int)lcu->rec.u[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.u[y * (LCU_WIDTH>>1) + x]);
+      cost += abs((int)lcu->rec.v[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.v[y * (LCU_WIDTH>>1) + x]);
+
+      coeff_cost += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
+      coeff_cost += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
+    }
+  }
 
   // Bitcost
   cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[0].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
 
-  // Coefficient costs (TODO: check cost)
-  cost += (coeff_cost>>1) * (int32_t)(g_cur_lambda_cost+0.5);
+  // Coefficient costs (TODO: more tuning of the cost)
+  cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
 
   return cost;
 }
