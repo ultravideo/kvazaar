@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
             "          --no-rdoq              : Disable RDO quantiztion\n"
             "          --aud                  : Use access unit delimiters\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
+            "          --debug <string>       : Output encoders reconstruction.\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

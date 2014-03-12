@@ -108,7 +108,7 @@ typedef int16_t coefficient;
 //#define SIGN3(x) ((x) > 0) ? +1 : ((x) == 0 ? 0 : -1)
 #define SIGN3(x) (((x) > 0) - ((x) < 0))
 
-#define VERSION_STRING "0.2.4"
+#define VERSION_STRING "0.3.0"
 
 //#define VERBOSE 1
 

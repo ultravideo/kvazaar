@@ -33,6 +33,7 @@ meant to be user configurable later.
               --no-rdoq              : Disable RDO quantiztion
               --aud                  : Use access unit delimiters
               --cqmfile <string>     : Custom Quantization Matrices from a file
+              --debug <string>       : Output encoders reconstruction.
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio
