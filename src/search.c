@@ -902,13 +902,14 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
-    if(cur_cu->type == CU_INTER && cur_cu->skipped) {
-      split_cost = INT_MAX;
-    } else {
+    if(cur_cu->type == CU_NOTSET || cur_cu->coeff_top_y[depth] ||
+       cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
       split_cost += search_cu(encoder, x,           y,           depth + 1, work_tree);
       split_cost += search_cu(encoder, x + half_cu, y,           depth + 1, work_tree);
       split_cost += search_cu(encoder, x,           y + half_cu, depth + 1, work_tree);
       split_cost += search_cu(encoder, x + half_cu, y + half_cu, depth + 1, work_tree);
+    } else {
+      split_cost = INT_MAX;
     }
     if (split_cost < cost) {
       // Copy split modes to this depth.
