@@ -679,7 +679,6 @@ static int search_cu_intra(encoder_control *encoder,
 
   cu_info *left_cu = 0;
   cu_info *above_cu = 0;
-  uint32_t bitcost = 0, bitcost_nxn;
 
   if ((x_px >> 3) > 0) {
     left_cu = &lcu->cu[cu_index - 1];
@@ -703,6 +702,7 @@ static int search_cu_intra(encoder_control *encoder,
   {
     uint32_t cost = -1;
     int16_t mode = -1;
+    uint32_t bitcost = -1;
     pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
     mode = intra_prediction(ref_pixels, LCU_WIDTH,
@@ -711,11 +711,10 @@ static int search_cu_intra(encoder_control *encoder,
                             &cost, candidate_modes, &bitcost);
     cur_cu->intra[pu_index].mode = (int8_t)mode;
     cur_cu->intra[pu_index].cost = cost;
+    cur_cu->intra[pu_index].bitcost = bitcost;
   }
 
-  cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost = bitcost;
   return cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].cost;
-
 }
 
 /**
@@ -757,7 +756,7 @@ static int lcu_get_final_cost(encoder_control *encoder,
   }
 
   // Bitcost
-  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[0].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
+  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
 
   // Coefficient costs (TODO: more tuning of the cost)
   cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
