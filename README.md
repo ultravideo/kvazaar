@@ -14,11 +14,12 @@ Currently most of the features are turned on/off from the code on compile time, 
 meant to be user configurable later.
 
     Usage:
-    kvazaar -i <input> -w <width> -h <height> -o <output>
+    kvazaar -i <input> --input-res <width>x<height> -o <output>
 
     Optional parameters:
           -n, --frames <integer>     : Number of frames to code [all]
           --seek                     : First frame to code [0]
+		  --input-res <int>x<int>    : Input resolution (width x height)
           -q, --qp <integer>         : Quantization Parameter [32]
           -p, --period <integer>     : Period of intra pictures [0]
                                          0: only first picture is intra
@@ -56,9 +57,9 @@ meant to be user configurable later.
 
 Example:
 
-    kvazaar -i <INPUT_YUV> -w <WIDTH> -h <HEIGHT> -o <OUTPUT.BIN> -n <NUMBER_OF_FRAMES> -q <QP>
+    kvazaar -i <INPUT_YUV> --input-res <WIDTH>x<HEIGHT> -o <OUTPUT.BIN> -n <NUMBER_OF_FRAMES> -q <QP>
 
-eg. `kvazaar -i BQMall_832x480_60.yuv -w 832 -h 480 -o out.bin -n 600 -q 32`
+eg. `kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.bin -n 600 -q 32`
 
 The only accepted input format so far is 8-bit YUV 4:2:0.
 

@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 
     fprintf(stderr,
             "Usage:\n"
-            "kvazaar -i <input> -w <width> --input-res <width>:<height> -o <output>\n"
+            "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"
             "\n"
             "Optional parameters:\n"
             "      -n, --frames <integer>     : Number of frames to code [all]\n"
