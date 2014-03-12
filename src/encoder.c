@@ -1871,7 +1871,7 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
     if(cur_cu->type == CU_INTRA)
     {
-      int pu_index = x_pu&1 + 2 * (y_pu&1);
+      int pu_index = PU_INDEX(x_pu, y_pu);
       int luma_mode = cur_cu->intra[pu_index].mode;
       scan_idx_luma = SCAN_DIAG;
 
@@ -1944,7 +1944,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
     // Check for non-zero coeffs
     cbf_y = 0;
-    memset(cur_cu->coeff_top_y, 0, MAX_PU_DEPTH + 4);
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
@@ -1955,8 +1954,12 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
             cur_cu->coeff_top_y[d] = 1;
           }
         } else {
-          int pu_index = x_pu&1 + 2 * (y_pu&1);
+          int pu_index = (x_pu & 1) + 2 * (y_pu & 1);
+          int d;
           cur_cu->coeff_top_y[depth + pu_index] = 1;
+          for (d = 0; d < depth; ++d) {
+            cur_cu->coeff_top_y[d] = 1;
+          }
         }
         break;
       }
@@ -2014,7 +2017,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       }
 
       transform_chroma(encoder, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
-      memset(cur_cu->coeff_top_u, 0, MAX_PU_DEPTH + 4);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           int d;
@@ -2025,7 +2027,6 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
         }
       }
       transform_chroma(encoder, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
-      memset(cur_cu->coeff_top_v, 0, MAX_PU_DEPTH + 4);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           int d;

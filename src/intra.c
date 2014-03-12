@@ -100,8 +100,6 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
   return (pixel)((sum + width) / (width + width));
 }
 
-#define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
-
 /**
  * \brief Function for deriving intra luma predictions
  * \param pic picture to use
@@ -120,24 +118,24 @@ int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
   int8_t left_intra_dir  = 1;
   int8_t above_intra_dir = 1;
 
-  if (cur_cu->part_size == SIZE_NxN && (x & 7) == 1) {
+  if (x & 4) {
     // If current CU is NxN and PU is on the right half, take mode from the
     // left half of the same CU.
-    left_intra_dir = cur_cu->intra[PU_INDEX(0, y_cu<<1)].mode;
+    left_intra_dir = cur_cu->intra[PU_INDEX(0, y >> 2)].mode;
   } else if (left_cu && left_cu->type == CU_INTRA) {
     // Otherwise take the mode from the right side of the CU on the left.
-    left_intra_dir = left_cu->intra[PU_INDEX(1, y_cu<<1)].mode;
+    left_intra_dir = left_cu->intra[PU_INDEX(1, y >> 2)].mode;
   }
 
-  if (cur_cu->part_size == SIZE_NxN && (y & 7) == 1) {
+  if (y & 4) {
     // If current CU is NxN and PU is on the bottom half, take mode from the
     // top half of the same CU.
-    above_intra_dir = cur_cu->intra[PU_INDEX(x_cu<<1, 0)].mode;
+    above_intra_dir = cur_cu->intra[PU_INDEX(x >> 2, 0)].mode;
   } else if (above_cu && above_cu->type == CU_INTRA &&
              (y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH != 0)
   {
     // Otherwise take the mode from the bottom half of the CU above.
-    above_intra_dir = above_cu->intra[PU_INDEX(x_cu<<1, 1)].mode;
+    above_intra_dir = above_cu->intra[PU_INDEX(x >> 2, 1)].mode;
   }
 
   // If the predictions are the same, add new predictions
@@ -158,7 +156,7 @@ int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
     // add planar mode if it's not yet present
     if (left_intra_dir && above_intra_dir ) {
       preds[2] = 0; // PLANAR_IDX;
-    } else { // else we add 26 or 1
+    } else {  // Add DC mode if it's not present, otherwise 26.
       preds[2] =  (left_intra_dir+above_intra_dir)<2? 26 : 1;
     }
   }
@@ -778,69 +776,50 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
   pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
 
   int8_t width = LCU_WIDTH >> depth;
-  int8_t width_c = LCU_WIDTH >> (depth + 1);
+  int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
   static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
   int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
-  int i;
-
-  if (cur_cu->part_size == SIZE_NxN) {
-    width = width_c;
-  }
+  int i = PU_INDEX(x >> 2, y >> 2);
 
   cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
 
-  // Reconstruct chroma
-  rec_shift  = &rec[width_c * 2 + 8 + 1];
-  intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
-                                   pic_width/2, pic_height/2, lcu);
-  intra_recon(rec_shift,
-              width_c * 2 + 8,
-              width_c,
-              recbase_u,
-              rec_stride >> 1,
-              cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
-              1);
+  // Reconstruct chroma.
+  if (!(x & 4 || y & 4)) {
+    rec_shift  = &rec[width_c * 2 + 8 + 1];
+    intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
+                                     pic_width/2, pic_height/2, lcu);
+    intra_recon(rec_shift,
+                width_c * 2 + 8,
+                width_c,
+                recbase_u,
+                rec_stride >> 1,
+                cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+                1);
 
-  intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
-                                   pic_width/2, pic_height/2, lcu);
-  intra_recon(rec_shift,
-              width_c * 2 + 8,
-              width_c,
-              recbase_v,
-              rec_stride >> 1,
-              cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
-              2);
-
-  for (i = 0; i < num_pu; ++i) {
-    // Build reconstructed block to use in prediction with extrapolated borders
-    int x_off = offsets[i].x * width;
-    int y_off = offsets[i].y * width;
-    recbase_y = &lcu->rec.y[x_local + x_off + (y_local+y_off) * LCU_WIDTH];
-
-    rec_shift  = &rec[width * 2 + 8 + 1];
-    intra_build_reference_border(x+x_off, y+y_off,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
-                                 pic_width, pic_height, lcu);
-    intra_recon(rec_shift, width * 2 + 8,
-                width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
-
-    // Filter DC-prediction
-    if (cur_cu->intra[i].mode == 1 && width < 32) {
-      intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
-                              rec_stride, width, width);
-    }
-
-    // Handle NxN mode by doing quant/transform and inverses for the next NxN block
-    if (cur_cu->part_size == SIZE_NxN) {
-      encode_transform_tree(encoder, x + x_off, y + y_off, depth+1, lcu);
-    }
+    intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
+                                     pic_width/2, pic_height/2, lcu);
+    intra_recon(rec_shift,
+                width_c * 2 + 8,
+                width_c,
+                recbase_v,
+                rec_stride >> 1,
+                cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+                2);
   }
 
-  // If we coded NxN block, fetch the coded block flags to this level
-  if (cur_cu->part_size == SIZE_NxN) {
-    cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
-    cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
-    cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
-    return;
+  // Build reconstructed block to use in prediction with extrapolated borders
+  recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
+
+  rec_shift  = &rec[width * 2 + 8 + 1];
+  intra_build_reference_border(x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+                                pic_width, pic_height, lcu);
+  intra_recon(rec_shift, width * 2 + 8,
+              width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
+
+  // Filter DC-prediction
+  if (cur_cu->intra[i].mode == 1 && width < 32) {
+    intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
+                            rec_stride, width, width);
   }
 
   encode_transform_tree(encoder, x, y, depth, lcu);
