@@ -465,7 +465,7 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
 /**
  * Copy all non-reference CU data from depth+1 to depth.
  */
-static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
   // Copy non-reference CUs.
   {
@@ -518,14 +518,14 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
 /**
  * Copy all non-reference CU data from depth to depth+1..MAX_PU_DEPTH.
  */
-static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
   // TODO: clean up to remove the copy pasta
   const int width_px = LCU_WIDTH >> depth;
 
   int d;
 
-  for (d = depth + 1; d < MAX_PU_DEPTH; ++d) {
+  for (d = depth + 1; d < MAX_PU_DEPTH + 1; ++d) {
     const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
     const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
     const int width_cu = width_px >> MAX_DEPTH;
@@ -541,7 +541,7 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
   }
 
   // Copy reconstructed pixels.
-  for (d = depth + 1; d < MAX_PU_DEPTH; ++d) {
+  for (d = depth + 1; d < MAX_PU_DEPTH + 1; ++d) {
     const int x = SUB_SCU(x_px);
     const int y = SUB_SCU(y_px);
 
