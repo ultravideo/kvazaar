@@ -883,6 +883,8 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
       if(cur_cu->merged && !cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
+        // Selecting skip reduces bits needed to code the CU
+        cur_cu->inter.bitcost--;
       }
       lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
       lcu_set_coeff(&work_tree[depth], x, y, depth, cur_cu);
