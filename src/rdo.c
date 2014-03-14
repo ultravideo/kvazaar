@@ -308,7 +308,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   int32_t delta_u       [ 32 * 32 ];
 
 
-  const uint32_t *scan_cg = NULL;
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
   const int32_t  shift   = 4>>1;
   const uint32_t cg_size = 16;
   const uint32_t num_blk_side    = width >> shift;
@@ -357,14 +357,6 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
 
   memset( cost_coeffgroup_sig,   0, sizeof(double)   * 64 );
   memset( sig_coeffgroup_flag,   0, sizeof(uint32_t) * 64 );
-
-  scan_cg = g_sig_last_scan[scan_mode][log2_block_size > 3 ? log2_block_size - 3 : 0];
-
-  if (log2_block_size == 3) {
-    scan_cg = g_sig_last_scan_8x8[scan_mode];
-  } else if (log2_block_size == 5) {
-    scan_cg = g_sig_last_scan_32x32;
-  }
 
   for (cg_scanpos = cg_num-1; cg_scanpos >= 0; cg_scanpos--) {
     uint32_t cg_blkpos = scan_cg[ cg_scanpos ];

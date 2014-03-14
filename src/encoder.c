@@ -44,13 +44,17 @@
 
 double g_lambda_cost[55];
 double g_cur_lambda_cost;
-uint32_t* g_sig_last_scan[3][7];
+uint32_t* g_sig_last_scan[3][5];
 int8_t g_convert_to_bit[LCU_WIDTH + 1];
 
 /* Local functions. */
 static void add_checksum(encoder_control* encoder);
 static void encode_VUI(encoder_control* encoder);
 
+/**
+ * Initialize g_sig_last_scan with scan positions for a transform block of
+ * size width x height.
+ */
 static void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h,
                                uint32_t *buff_v,
                                int32_t width, int32_t height)
@@ -63,12 +67,10 @@ static void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h,
   uint32_t blk;
   uint32_t cnt = 0;
 
-  if (width < 16) {
-    uint32_t *buff_tmp = buff_d;
+  assert(width == height && width <= 32);
 
-    if (width == 8) {
-      buff_tmp = (uint32_t *)g_sig_last_scan_32x32;
-    }
+  if (width <= 4) {
+    uint32_t *buff_tmp = buff_d;
 
     for (scan_line = 0; next_scan_pos < num_scan_pos; scan_line++) {
       int    primary_dim  = scan_line;
@@ -88,18 +90,14 @@ static void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h,
     }
   }
 
-  if (width > 4) {
+  if (width > 4 && width <= 32) {
     uint32_t num_blk_side = width >> 2;
-    uint32_t num_blks    = num_blk_side * num_blk_side;
-    uint32_t log2_blk      = g_convert_to_bit[num_blk_side] + 1;
+    uint32_t num_blks   = num_blk_side * num_blk_side;
+    uint32_t log2_width = g_to_bits[width];
 
     for (blk = 0; blk < num_blks; blk++) {
-      uint32_t init_blk_pos = g_sig_last_scan[SCAN_DIAG][log2_blk][blk];
+      uint32_t init_blk_pos = g_sig_last_scan_cg[log2_width][SCAN_DIAG][blk];
       next_scan_pos   = 0;
-
-      if (width == 32) {
-        init_blk_pos = g_sig_last_scan_32x32[blk];
-      }
 
       {
         uint32_t offset_y    = init_blk_pos / num_blk_side;
@@ -194,7 +192,7 @@ void init_tables(void)
   g_convert_to_bit[i] = (int8_t)c;
 
   c = 2;
-  for (i = 0; i < 7; i++) {
+  for (i = 0; i < 5; i++) {
     g_sig_last_scan[0][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
     g_sig_last_scan[1][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
     g_sig_last_scan[2][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
@@ -238,7 +236,7 @@ void init_lambda(encoder_control *encoder)
 void free_tables(void)
 {
   int i;
-  for (i = 0; i < 7; i++) {
+  for (i = 0; i < 5; i++) {
     free(g_sig_last_scan[0][i]);
     free(g_sig_last_scan[1][i]);
     free(g_sig_last_scan[2][i]);
@@ -790,7 +788,7 @@ static void encode_scaling_list(encoder_control* encoder)
       } else {
         int32_t delta;
         int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, g_scaling_list_size[size_id]);
-        uint32_t *scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
+        const uint32_t *scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
         int32_t next_coef = 8;
         int32_t *coef_list = g_scaling_list_coeff[size_id][list_id];
 
@@ -800,8 +798,8 @@ static void encode_scaling_list(encoder_control* encoder)
         }
 
         for (i = 0; i < coef_num; i++) {
-          delta     = coef_list[scan[i]] - next_coef;
-          next_coef = coef_list[scan[i]];
+          delta     = coef_list[scan_cg[i]] - next_coef;
+          next_coef = coef_list[scan_cg[i]];
           if (delta > 127)
             delta -= 256;
           if (delta < -128)
@@ -2319,7 +2317,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
   const uint32_t log2_block_size = g_convert_to_bit[width] + 2;
   const uint32_t *scan           =
     g_sig_last_scan[scan_mode][log2_block_size - 1];
-  const uint32_t *scan_cg         = NULL;
+  const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
 
   // Init base contexts according to block type
   cabac_ctx *base_coeff_group_ctx = &g_cu_sig_coeff_group_model[type];
@@ -2332,14 +2330,6 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
     if (coeff[i] != 0) {
       num_nonzero++;
     }
-  }
-
-  scan_cg = g_sig_last_scan[scan_mode][log2_block_size > 3 ? log2_block_size - 3 : 0];
-
-  if (log2_block_size == 3) {
-    scan_cg = g_sig_last_scan_8x8[scan_mode];
-  } else if (log2_block_size == 5) {
-    scan_cg = g_sig_last_scan_32x32;
   }
 
   scan_pos_last = -1;
