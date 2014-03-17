@@ -217,7 +217,6 @@ void cabac_encode_bin_trm(cabac_data *data, uint8_t bin_value)
  */
 void cabac_flush(cabac_data *data)
 {
-  cabac_encode_bin_trm(data, 1);
   cabac_finish(data);
   bitstream_put(data->stream, 1, 1);
   bitstream_align_zero(data->stream);

@@ -1222,6 +1222,7 @@ void encode_slice_data(encoder_control* encoder)
 {
   uint16_t x_ctb, y_ctb;
   picture *pic = encoder->in.cur_pic;
+  const vector2d size_lcu = { encoder->in.width_in_lcu, encoder->in.height_in_lcu };
 
   // Filtering
   if(encoder->deblock_enable) {
@@ -1273,11 +1274,9 @@ void encode_slice_data(encoder_control* encoder)
 
   // Loop through every LCU in the slice
   for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
-    uint8_t last_cu_y = (y_ctb == (encoder->in.height_in_lcu - 1)) ? 1 : 0;
-
     for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
-      uint8_t last_cu_x = (x_ctb == (encoder->in.width_in_lcu - 1)) ? 1 : 0;
       uint8_t depth = 0;
+      const int last_lcu = (x_ctb == size_lcu.x - 1 && y_ctb == size_lcu.y - 1);
 
       if (encoder->sao_enable) {
         picture *pic = encoder->in.cur_pic;
@@ -1291,10 +1290,7 @@ void encode_slice_data(encoder_control* encoder)
       // Recursive function for looping through all the sub-blocks
       encode_coding_tree(encoder, x_ctb << MAX_DEPTH, y_ctb << MAX_DEPTH, depth);
 
-      // signal Terminating bit
-      if (!last_cu_x || !last_cu_y) {
-        cabac_encode_bin_trm(&cabac, 0);
-      }
+      cabac_encode_bin_trm(&cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
     }
   }
 }
