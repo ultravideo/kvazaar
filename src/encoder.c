@@ -449,10 +449,19 @@ void encode_one_frame(encoder_control* encoder)
     init_contexts(encoder, encoder->in.cur_pic->slicetype);
 
     scalinglist_process();
-    search_slice_data(encoder);
 
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
+
+    {
+      int x_lcu, y_lcu;
+      for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
+        for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
+          search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
+        }
+      }
+    }
+
     encode_slice_data(encoder);
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);
@@ -472,10 +481,18 @@ void encode_one_frame(encoder_control* encoder)
     cabac_start(&cabac);
     init_contexts(encoder, encoder->in.cur_pic->slicetype);
     scalinglist_process();
-    search_slice_data(encoder);
-
     encode_slice_header(encoder);
     bitstream_align(encoder->stream);
+
+    {
+      int x_lcu, y_lcu;
+      for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
+        for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
+          search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
+        }
+      }
+    }
+
     encode_slice_data(encoder);
     cabac_flush(&cabac);
     bitstream_align(encoder->stream);

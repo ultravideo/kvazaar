@@ -29,7 +29,6 @@
 #include "encoder.h"
 
 
-void search_slice_data(encoder_control *encoder);
-void search_tree(encoder_control *encoder, int x, int y, uint8_t depth);
+void search_lcu(encoder_control *encoder, int x, int y);
 
 #endif

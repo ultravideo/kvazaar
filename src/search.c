@@ -1065,7 +1065,7 @@ static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, co
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-static void search_lcu(encoder_control *encoder, int x, int y)
+void search_lcu(encoder_control *encoder, int x, int y)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;
@@ -1093,13 +1093,4 @@ static void search_frame(encoder_control *encoder)
       search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
     }
   }
-}
-
-
-/**
- * \brief
- */
-void search_slice_data(encoder_control *encoder)
-{
-  search_frame(encoder);
 }
