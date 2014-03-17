@@ -1099,47 +1099,6 @@ static void search_frame(encoder_control *encoder)
 /**
  * \brief
  */
-uint32_t search_best_mode(encoder_control *encoder,
-                          uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
-{
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[depth]
-                     [x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  uint32_t best_intra_cost = cur_cu->intra[0].cost;
-  uint32_t best_inter_cost = cur_cu->inter.cost;
-  uint32_t lambda_cost = (int)(4.5 * g_lambda_cost[encoder->QP]); //TODO: Correct cost calculation
-
-  if (depth < MAX_INTRA_SEARCH_DEPTH && depth < MAX_INTER_SEARCH_DEPTH) {
-    uint32_t cost = lambda_cost;
-    uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
-    cost += search_best_mode(encoder, x_ctb,          y_ctb,          depth + 1);
-    cost += search_best_mode(encoder, x_ctb + change, y_ctb,          depth + 1);
-    cost += search_best_mode(encoder, x_ctb,          y_ctb + change, depth + 1);
-    cost += search_best_mode(encoder, x_ctb + change, y_ctb + change, depth + 1);
-
-    if (cost < best_intra_cost && cost < best_inter_cost)
-    {
-      // Better value was found at a lower level.
-      return cost;
-    }
-  }
-
-  // If search hasn't been peformed at all for this block, the cost will be
-  // max value, so it is safe to just compare costs. It just has to be made
-  // sure that no value overflows.
-  if (best_inter_cost <= best_intra_cost) {
-    inter_set_block(encoder->in.cur_pic, x_ctb, y_ctb, depth, cur_cu);
-    return best_inter_cost;
-  } else {
-    intra_set_block_mode(encoder->in.cur_pic, x_ctb, y_ctb, depth,
-        cur_cu->intra[0].mode, cur_cu->part_size);
-    return best_intra_cost;
-  }
-}
-
-
-/**
- * \brief
- */
 void search_slice_data(encoder_control *encoder)
 {
   search_frame(encoder);
