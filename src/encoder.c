@@ -383,6 +383,11 @@ static void write_aud(encoder_control* encoder)
 
 void encode_one_frame(encoder_control* encoder)
 {
+  const int is_first_frame = (encoder->frame == 0);
+  const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder->frame % 2 == 0);
+  const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder->frame % encoder->cfg->intra_period) == 0);
+  const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+
   // Initialize lambda value(s) to use in search
   init_lambda(encoder);
 
@@ -390,9 +395,7 @@ void encode_one_frame(encoder_control* encoder)
    *                    period == 1 && frame%2 == 0
    *                    period != 0 && frame%period == 0
    **/
-  if ( (encoder->cfg->intra_period == 0 && encoder->frame == 0) ||
-       (encoder->cfg->intra_period && encoder->frame % encoder->cfg->intra_period == 0 &&
-        (encoder->cfg->intra_period != 1 || encoder->frame % 2 == 0 ) ) ) {
+  if (is_radl_frame) {
     // Clear the reference list
     while (encoder->ref->used_size) {
       picture_list_rem(encoder->ref, encoder->ref->used_size - 1, 1);
@@ -443,32 +446,6 @@ void encode_one_frame(encoder_control* encoder)
                 encoder->stream->buffer_pos, 0, PREFIX_SEI_NUT, 0, 0);
       bitstream_clear_buffer(encoder->stream);
     }
-
-    // First slice is IDR
-    cabac_start(&cabac);
-    init_contexts(encoder, encoder->in.cur_pic->slicetype);
-
-    scalinglist_process();
-
-    encode_slice_header(encoder);
-    bitstream_align(encoder->stream);
-
-    {
-      int x_lcu, y_lcu;
-      for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
-        for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
-          search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
-        }
-      }
-    }
-
-    encode_slice_data(encoder);
-    cabac_flush(&cabac);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_IDR_W_RADL, 0, 0);
-    bitstream_clear_buffer(encoder->stream);
   } else {
     // When intra period == 1, all pictures are intra
     encoder->in.cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
@@ -477,30 +454,42 @@ void encode_one_frame(encoder_control* encoder)
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
       write_aud(encoder);
+  }
 
-    cabac_start(&cabac);
-    init_contexts(encoder, encoder->in.cur_pic->slicetype);
-    scalinglist_process();
-    encode_slice_header(encoder);
-    bitstream_align(encoder->stream);
+  cabac_start(&cabac);
+  init_contexts(encoder, encoder->in.cur_pic->slicetype);
+  scalinglist_process();
+  encode_slice_header(encoder);
+  bitstream_align(encoder->stream);
 
-    {
-      int x_lcu, y_lcu;
-      for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
-        for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
-          search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
-        }
+  {
+    vector2d lcu;
+
+    for (lcu.y = 0; lcu.y < encoder->in.height_in_lcu; lcu.y++) {
+      for (lcu.x = 0; lcu.x < encoder->in.width_in_lcu; lcu.x++) {
+        const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
+
+        search_lcu(encoder, px.x, px.y);
       }
     }
-
-    encode_slice_data(encoder);
-    cabac_flush(&cabac);
-    bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_TRAIL_R, 0, encoder->aud_enable ? 0 : 1);
-    bitstream_clear_buffer(encoder->stream);
   }
+
+  encode_slice_data(encoder);
+  cabac_flush(&cabac);
+  bitstream_align(encoder->stream);
+  bitstream_flush(encoder->stream);
+
+  {
+    // Not quite sure if this is correct, but it seems to have worked so far
+    // so I tried to not change it's behavior.
+    int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
+
+    nal_write(encoder->output, encoder->stream->buffer,
+              encoder->stream->buffer_pos, 0,
+              is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
+  }
+
+  bitstream_clear_buffer(encoder->stream);
 
   // Calculate checksum
   add_checksum(encoder);
