@@ -383,6 +383,9 @@ static void write_aud(encoder_control* encoder)
 
 void encode_one_frame(encoder_control* encoder)
 {
+  yuv_t *hor_buf = alloc_yuv_t(encoder->in.width);
+  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH);
+
   const int is_first_frame = (encoder->frame == 0);
   const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder->frame % 2 == 0);
   const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder->frame % encoder->cfg->intra_period) == 0);
@@ -464,17 +467,50 @@ void encode_one_frame(encoder_control* encoder)
 
   {
     vector2d lcu;
+    picture *pic = encoder->in.cur_pic;
 
     for (lcu.y = 0; lcu.y < encoder->in.height_in_lcu; lcu.y++) {
       for (lcu.x = 0; lcu.x < encoder->in.width_in_lcu; lcu.x++) {
         const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
+        const vector2d size = { encoder->in.width, encoder->in.height };
 
-        search_lcu(encoder, px.x, px.y);
+        // Handle partial LCUs on the right and bottom.
+        const vector2d lcu_dim = {
+          MIN(LCU_WIDTH, size.x - px.x), MIN(LCU_WIDTH, size.y - px.y)
+        };
+        const int right = px.x + lcu_dim.x;
+        const int bottom = px.y + lcu_dim.y;
+
+        search_lcu(encoder, px.x, px.y, hor_buf, ver_buf);
+
+        // Take bottom and right pixels from this LCU to be used on the search of next LCU.
+        picture_blit_pixels(&pic->y_recdata[(bottom - 1) * size.x + px.x],
+                            &hor_buf->y[px.x],
+                            lcu_dim.x, 1, size.x, size.x);
+        picture_blit_pixels(&pic->u_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
+                            &hor_buf->u[px.x / 2],
+                            lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
+        picture_blit_pixels(&pic->v_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
+                            &hor_buf->v[px.x / 2],
+                            lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
+
+        picture_blit_pixels(&pic->y_recdata[px.y * size.x + right - 1],
+                            ver_buf->y,
+                            1, lcu_dim.y, size.x, 1);
+        picture_blit_pixels(&pic->u_recdata[px.y * size.x / 4 + (right / 2) - 1],
+                            ver_buf->u,
+                            1, lcu_dim.y / 2, size.x / 2, 1);
+        picture_blit_pixels(&pic->v_recdata[px.y * size.x / 4 + (right / 2) - 1],
+                            ver_buf->v,
+                            1, lcu_dim.y / 2, size.x / 2, 1);
+
+        //encode_lcu(encoder, x.px, y.px, hor_buf, ver_buf);
       }
     }
   }
 
   encode_slice_data(encoder);
+
   cabac_flush(&cabac);
   bitstream_align(encoder->stream);
   bitstream_flush(encoder->stream);
@@ -495,6 +531,9 @@ void encode_one_frame(encoder_control* encoder)
   add_checksum(encoder);
 
   encoder->in.cur_pic->poc = encoder->poc;
+
+  dealloc_yuv_t(hor_buf);
+  dealloc_yuv_t(ver_buf);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,

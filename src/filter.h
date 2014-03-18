@@ -32,7 +32,7 @@
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 // Deblocking
-void filter_deblock_cu(encoder_control *encoder, int32_t x_cu, int32_t y_cu,
+void filter_deblock_cu(encoder_control *encoder, int32_t x_px, int32_t y_px,
                        int8_t depth, int32_t edge);
 void filter_deblock_edge_luma(encoder_control *encoder,
                               int32_t x_pos, int32_t y_pos,

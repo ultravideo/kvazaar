@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "config.h"
 #include "bitstream.h"
@@ -882,7 +883,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  */
-static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t *lcu)
+static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t *lcu, yuv_t *hor_buf, yuv_t *ver_buf)
 {
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -952,14 +953,18 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
 
       picture_blit_pixels(&pic->u_recdata[x_c + (y_c - 1) * pic_width_c],
                           &lcu->top_ref.u[1],
-                          x_max, 1, pic_width_c, ref_size_c);
+                          x_max_c, 1, pic_width_c, ref_size_c);
       picture_blit_pixels(&pic->v_recdata[x_c + (y_c - 1) * pic_width_c],
                           &lcu->top_ref.v[1],
-                          x_max, 1, pic_width_c, ref_size_c);
+                          x_max_c, 1, pic_width_c, ref_size_c);
+
+      assert(!memcmp(&hor_buf->y[x], &lcu->top_ref.y[1], x_max));
+      assert(!memcmp(&hor_buf->u[x / 2], &lcu->top_ref.u[1], x_max_c));
+      assert(!memcmp(&hor_buf->v[x / 2], &lcu->top_ref.v[1], x_max_c));
     }
     // Copy left reference pixels.
     if (x > 0) {
-      int y_max = MIN(LCU_REF_PX_WIDTH, pic_height - y);
+      int y_max = MIN(LCU_WIDTH, pic_height - y);
       int y_max_c = y_max / 2;
       picture_blit_pixels(&pic->y_recdata[(x - 1) + y * pic_width],
                           &lcu->left_ref.y[1],
@@ -971,6 +976,10 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
       picture_blit_pixels(&pic->v_recdata[(x_c - 1) + (y_c) * pic_width_c],
                           &lcu->left_ref.v[1],
                           1, y_max_c, pic_width_c, 1);
+
+      assert(!memcmp(ver_buf->y, &lcu->left_ref.y[1], y_max));
+      assert(!memcmp(ver_buf->u, &lcu->left_ref.u[1], y_max_c));
+      assert(!memcmp(ver_buf->v, &lcu->left_ref.v[1], y_max_c));
     }
     // Copy top-left reference pixel.
     if (x > 0 && y > 0) {
@@ -1065,32 +1074,18 @@ static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, co
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void search_lcu(encoder_control *encoder, int x, int y)
+void search_lcu(encoder_control *encoder, int x, int y, yuv_t *hor_buf, yuv_t *ver_buf)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;
   // Initialize work tree.
   for (depth = 0; depth <= MAX_PU_DEPTH; ++depth) {
     memset(&work_tree[depth], 0, sizeof(work_tree[depth]));
-    init_lcu_t(encoder, x, y, &work_tree[depth]);
+    init_lcu_t(encoder, x, y, &work_tree[depth], hor_buf, ver_buf);
   }
 
   // Start search from depth 0.
   search_cu(encoder, x, y, 0, work_tree);
 
   copy_lcu_to_cu_data(encoder, x, y, &work_tree[0]);
-}
-
-
-/**
- * Perform mode search for every LCU in the current picture.
- */
-static void search_frame(encoder_control *encoder)
-{
-  int y_lcu, x_lcu;
-  for (y_lcu = 0; y_lcu < encoder->in.height_in_lcu; y_lcu++) {
-    for (x_lcu = 0; x_lcu < encoder->in.width_in_lcu; x_lcu++) {
-      search_lcu(encoder, x_lcu * LCU_WIDTH, y_lcu * LCU_WIDTH);
-    }
-  }
 }

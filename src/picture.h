@@ -178,6 +178,13 @@ typedef struct {
 } lcu_yuv_t;
 
 typedef struct {
+  int size;
+  pixel *y;
+  pixel *u;
+  pixel *v;
+} yuv_t;
+
+typedef struct {
   lcu_ref_px_t top_ref;  //!< Reference pixels from adjacent LCUs.
   lcu_ref_px_t left_ref; //!< Reference pixels from adjacent LCUs.
   lcu_yuv_t ref; //!< LCU reference pixels
@@ -201,6 +208,9 @@ typedef struct {
 
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
+
+yuv_t * alloc_yuv_t(int luma_size);
+void dealloc_yuv_t(yuv_t * yuv);
 
 picture * picture_init(int32_t width, int32_t height,
                        int32_t width_in_lcu, int32_t height_in_lcu);
