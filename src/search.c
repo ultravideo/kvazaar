@@ -883,7 +883,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  */
-static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t *lcu, yuv_t *hor_buf, yuv_t *ver_buf)
+static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -931,70 +931,33 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
 
   // Copy reference pixels.
   {
-    const picture *pic = encoder->in.cur_pic;
-
     const int pic_width = encoder->in.width;
-    const int pic_height = encoder->in.height;
-    const int ref_size = LCU_REF_PX_WIDTH;
-
-    const int pic_width_c = encoder->in.width / 2;
-    const int pic_height_c = encoder->in.height / 2;
-    const int ref_size_c = LCU_REF_PX_WIDTH / 2;
-    const int x_c = x / 2;
-    const int y_c = y / 2;
 
     // Copy top reference pixels.
     if (y > 0) {
-      int x_max = MIN(ref_size, pic_width - x);
-      int x_max_c = x_max / 2;
-      picture_blit_pixels(&pic->y_recdata[x + (y - 1) * pic_width],
-                          &lcu->top_ref.y[1],
-                          x_max, 1, pic_width, ref_size);
-
-      picture_blit_pixels(&pic->u_recdata[x_c + (y_c - 1) * pic_width_c],
-                          &lcu->top_ref.u[1],
-                          x_max_c, 1, pic_width_c, ref_size_c);
-      picture_blit_pixels(&pic->v_recdata[x_c + (y_c - 1) * pic_width_c],
-                          &lcu->top_ref.v[1],
-                          x_max_c, 1, pic_width_c, ref_size_c);
-
-      assert(!memcmp(&hor_buf->y[x], &lcu->top_ref.y[1], x_max));
-      assert(!memcmp(&hor_buf->u[x / 2], &lcu->top_ref.u[1], x_max_c));
-      assert(!memcmp(&hor_buf->v[x / 2], &lcu->top_ref.v[1], x_max_c));
+      // hor_buf is of size pic_width so there might not be LCU_REF_PX_WIDTH
+      // number of allocated pixels left.
+      int x_max = MIN(LCU_REF_PX_WIDTH, pic_width - x);
+      memcpy(&lcu->top_ref.y[1], &hor_buf->y[x], x_max);
+      memcpy(&lcu->top_ref.u[1], &hor_buf->u[x / 2], x_max / 2);
+      memcpy(&lcu->top_ref.v[1], &hor_buf->v[x / 2], x_max / 2);
     }
     // Copy left reference pixels.
     if (x > 0) {
-      int y_max = MIN(LCU_WIDTH, pic_height - y);
-      int y_max_c = y_max / 2;
-      picture_blit_pixels(&pic->y_recdata[(x - 1) + y * pic_width],
-                          &lcu->left_ref.y[1],
-                          1, y_max, pic_width, 1);
-
-      picture_blit_pixels(&pic->u_recdata[(x_c - 1) + (y_c) * pic_width_c],
-                          &lcu->left_ref.u[1],
-                          1, y_max_c, pic_width_c, 1);
-      picture_blit_pixels(&pic->v_recdata[(x_c - 1) + (y_c) * pic_width_c],
-                          &lcu->left_ref.v[1],
-                          1, y_max_c, pic_width_c, 1);
-
-      assert(!memcmp(&ver_buf->y[1], &lcu->left_ref.y[1], y_max));
-      assert(!memcmp(&ver_buf->u[1], &lcu->left_ref.u[1], y_max_c));
-      assert(!memcmp(&ver_buf->v[1], &lcu->left_ref.v[1], y_max_c));
+      memcpy(&lcu->left_ref.y[1], &ver_buf->y[1], LCU_WIDTH);
+      memcpy(&lcu->left_ref.u[1], &ver_buf->u[1], LCU_WIDTH);
+      memcpy(&lcu->left_ref.v[1], &ver_buf->v[1], LCU_WIDTH);
     }
     // Copy top-left reference pixel.
     if (x > 0 && y > 0) {
-      lcu->top_ref.y[0] = pic->y_recdata[(x - 1) + (y - 1) * pic_width];
-      lcu->left_ref.y[0] = pic->y_recdata[(x - 1) + (y - 1) * pic_width];
+      lcu->top_ref.y[0] = ver_buf->y[0];
+      lcu->left_ref.y[0] = ver_buf->y[0];
 
-      lcu->top_ref.u[0] = pic->u_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
-      lcu->left_ref.u[0] = pic->u_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
+      lcu->top_ref.u[0] = ver_buf->u[0];
+      lcu->left_ref.u[0] = ver_buf->u[0];
 
-      lcu->top_ref.v[0] = pic->v_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
-      lcu->left_ref.v[0] = pic->v_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
-
-      assert(ver_buf->y[0] == lcu->top_ref.y[0]);
-      assert(ver_buf->u[0] == lcu->top_ref.u[0]);
-      assert(ver_buf->v[0] == lcu->top_ref.v[0]);
+      lcu->top_ref.v[0] = ver_buf->v[0];
+      lcu->left_ref.v[0] = ver_buf->v[0];
     }
   }
 
