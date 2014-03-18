@@ -977,9 +977,9 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
                           &lcu->left_ref.v[1],
                           1, y_max_c, pic_width_c, 1);
 
-      assert(!memcmp(ver_buf->y, &lcu->left_ref.y[1], y_max));
-      assert(!memcmp(ver_buf->u, &lcu->left_ref.u[1], y_max_c));
-      assert(!memcmp(ver_buf->v, &lcu->left_ref.v[1], y_max_c));
+      assert(!memcmp(&ver_buf->y[1], &lcu->left_ref.y[1], y_max));
+      assert(!memcmp(&ver_buf->u[1], &lcu->left_ref.u[1], y_max_c));
+      assert(!memcmp(&ver_buf->v[1], &lcu->left_ref.v[1], y_max_c));
     }
     // Copy top-left reference pixel.
     if (x > 0 && y > 0) {
@@ -991,6 +991,10 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
 
       lcu->top_ref.v[0] = pic->v_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
       lcu->left_ref.v[0] = pic->v_recdata[(x_c - 1) + (y_c - 1) * pic_width_c];
+
+      assert(ver_buf->y[0] == lcu->top_ref.y[0]);
+      assert(ver_buf->u[0] == lcu->top_ref.u[0]);
+      assert(ver_buf->v[0] == lcu->top_ref.v[0]);
     }
   }
 

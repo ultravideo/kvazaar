@@ -384,7 +384,9 @@ static void write_aud(encoder_control* encoder)
 void encode_one_frame(encoder_control* encoder)
 {
   yuv_t *hor_buf = alloc_yuv_t(encoder->in.width);
-  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH);
+  // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
+  // for the extra pixel on the top right.
+  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
 
   const int is_first_frame = (encoder->frame == 0);
   const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder->frame % 2 == 0);
@@ -483,6 +485,14 @@ void encode_one_frame(encoder_control* encoder)
 
         search_lcu(encoder, px.x, px.y, hor_buf, ver_buf);
 
+        // Take the bottom right pixel from the LCU above and put it as the
+        // first pixel in this LCUs rightmost pixels.
+        if (lcu.y > 0) {
+          ver_buf->y[0] = hor_buf->y[right - 1];
+          ver_buf->u[0] = hor_buf->u[right / 2 - 1];
+          ver_buf->v[0] = hor_buf->v[right / 2 - 1];
+        }
+
         // Take bottom and right pixels from this LCU to be used on the search of next LCU.
         picture_blit_pixels(&pic->y_recdata[(bottom - 1) * size.x + px.x],
                             &hor_buf->y[px.x],
@@ -495,13 +505,13 @@ void encode_one_frame(encoder_control* encoder)
                             lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
 
         picture_blit_pixels(&pic->y_recdata[px.y * size.x + right - 1],
-                            ver_buf->y,
+                            &ver_buf->y[1],
                             1, lcu_dim.y, size.x, 1);
         picture_blit_pixels(&pic->u_recdata[px.y * size.x / 4 + (right / 2) - 1],
-                            ver_buf->u,
+                            &ver_buf->u[1],
                             1, lcu_dim.y / 2, size.x / 2, 1);
         picture_blit_pixels(&pic->v_recdata[px.y * size.x / 4 + (right / 2) - 1],
-                            ver_buf->v,
+                            &ver_buf->v[1],
                             1, lcu_dim.y / 2, size.x / 2, 1);
 
         //encode_lcu(encoder, x.px, y.px, hor_buf, ver_buf);

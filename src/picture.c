@@ -36,16 +36,22 @@
 
 yuv_t * alloc_yuv_t(int luma_size)
 {
-  yuv_t * yuv = (yuv_t *)malloc(sizeof(yuv_t) + luma_size * sizeof(pixel) * 2);
+  // Get buffers with separate mallocs in order to take advantage of
+  // automatic buffer overrun checks.
+  yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
+  yuv->y = (pixel *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (pixel *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (pixel *)malloc(luma_size / 2 * sizeof(*yuv->v));
   yuv->size = luma_size;
-  yuv->y = (pixel *)yuv + sizeof(yuv_t);
-  yuv->u = yuv->y + luma_size * sizeof(pixel);
-  yuv->v = yuv->u + luma_size / 2 * sizeof(pixel);
+
   return yuv;
 }
 
 void dealloc_yuv_t(yuv_t * yuv)
 {
+  free(yuv->y);
+  free(yuv->u);
+  free(yuv->v);
   free(yuv);
 }
 
