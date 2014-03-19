@@ -302,10 +302,26 @@ int main(int argc, char *argv[])
     encode_one_frame(encoder);
 
     if (cfg->debug != NULL) {
-      // Write reconstructed frame out (for debugging purposes)
-      fwrite(encoder->in.cur_pic->y_recdata, cfg->width * cfg->height, 1, recout);
-      fwrite(encoder->in.cur_pic->u_recdata, (cfg->width * cfg->height)>>2, 1, recout);
-      fwrite(encoder->in.cur_pic->v_recdata, (cfg->width * cfg->height)>>2, 1, recout);
+      // Write reconstructed frame out.
+      // Use conformance-window dimensions instead of internal ones.
+      const int width = encoder->in.width;
+      const int height = encoder->in.height;
+      const int out_width = encoder->in.real_width;
+      const int out_height = encoder->in.real_height;
+      int y;
+      const pixel *y_rec = encoder->in.cur_pic->y_recdata;
+      const pixel *u_rec = encoder->in.cur_pic->u_recdata;
+      const pixel *v_rec = encoder->in.cur_pic->v_recdata;
+
+      for (y = 0; y < out_height; ++y) {
+        fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
+      }
+      for (y = 0; y < out_height / 2; ++y) {
+        fwrite(&u_rec[y * width / 2], sizeof(*u_rec), out_width / 2, recout);
+      }
+      for (y = 0; y < out_height / 2; ++y) {
+        fwrite(&v_rec[y * width / 2], sizeof(*v_rec), out_width / 2, recout);
+      }
     }
 
     // Calculate the bytes pushed to output for this frame
