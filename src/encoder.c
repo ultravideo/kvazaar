@@ -514,7 +514,25 @@ void encode_one_frame(encoder_control* encoder)
                             &ver_buf->v[1],
                             1, lcu_dim.y / 2, size.x / 2, 1);
 
-        //encode_lcu(encoder, x.px, y.px, hor_buf, ver_buf);
+        if (encoder->deblock_enable) {
+          filter_deblock_cu(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_VER);
+
+          // Filter rightmost 4 pixels from last LCU now that they have been
+          // finally deblocked vertically.
+          if (lcu.x > 0) {
+            int y;
+            for (y = 0; y < 64; y += 8) {
+              if (lcu.y + y == 0) continue;
+              filter_deblock_edge_luma(encoder, lcu.x * 64 - 4, lcu.y * 64 + y, 4, EDGE_HOR);
+            }
+            for (y = 0; y < 32; y += 8) {
+              if (lcu.y + y == 0) continue;
+              filter_deblock_edge_chroma(encoder, lcu.x * 32 - 4, lcu.y * 32 + y, 4, EDGE_HOR);
+            }
+          }
+
+          filter_deblock_cu(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_HOR);
+        }
       }
     }
   }
@@ -1261,11 +1279,6 @@ void encode_slice_data(encoder_control* encoder)
   uint16_t x_ctb, y_ctb;
   picture *pic = encoder->in.cur_pic;
   const vector2d size_lcu = { encoder->in.width_in_lcu, encoder->in.height_in_lcu };
-
-  // Filtering
-  if(encoder->deblock_enable) {
-    filter_deblock(encoder);
-  }
 
   if (encoder->sao_enable) {
     pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);

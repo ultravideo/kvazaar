@@ -179,6 +179,14 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
   int8_t strength = 0;
 
+  {
+    // Don't do anything if there is no PU or TU edge here.
+    int cu_width = LCU_WIDTH >> cu_q->depth;
+    if (dir == EDGE_HOR && ypos % cu_width != 0) {
+      return;
+    }
+  }
+
 
   if(dir == EDGE_VER) {
     offset = 1;
@@ -199,8 +207,19 @@ void filter_deblock_edge_luma(encoder_control *encoder,
     // For each 4-pixel part in the edge
     for (block_idx = 0; block_idx < blocks_in_part; ++block_idx) {
       int32_t dp0, dq0, dp3, dq3, d0, d3, dp, dq, d;
-      if((block_idx & 1) == 0)
+
       {
+        vector2d px = {
+          (dir == EDGE_HOR ? xpos + block_idx * 4 : xpos),
+          (dir == EDGE_VER ? ypos + block_idx * 4 : ypos)
+        };
+
+        // Don't deblock the last 4x4 block of the LCU. This will be deblocked
+        // when processing the next LCU.
+        if (block_idx > 0 && dir == EDGE_HOR && (px.x + 4) % 64 == 0 && (px.x + 4 != encoder->in.width)) {
+          continue;
+        }
+
         // CU in the side we are filtering, update every 8-pixels
         cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx>>1 : 0)) +
                                                          (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx>>1 : 0))
@@ -283,9 +302,17 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
   int8_t strength = 2;
 
   // We cannot filter edges not on 8x8 grid
-  if((depth == MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
+  if((depth >= MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
   {
     return;
+  }
+
+  {
+    // Don't do anything if there is no PU or TU edge here.
+    int cu_width = (LCU_WIDTH / 2) >> (cu_q->depth);
+    if (dir == EDGE_HOR && y % cu_width != 0) {
+      return;
+    }
   }
 
   if(dir == EDGE_VER)
@@ -300,14 +327,25 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
     int32_t bitdepth_scale = 1 << (g_bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
-    uint32_t blocks_in_part= (LCU_WIDTH>>(depth+1)) / 4;
+    uint32_t blocks_in_part= (LCU_WIDTH>>(depth == 4 ? depth : depth + 1)) / 4;
     uint32_t blk_idx;
 
     for (blk_idx = 0; blk_idx < blocks_in_part; ++blk_idx)
     {
+      vector2d px = {
+        (dir == EDGE_HOR ? x + blk_idx * 4 : x),
+        (dir == EDGE_VER ? y + blk_idx * 4 : y)
+      };
       cu_p = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? blk_idx : 0)) +
                                                          (y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? blk_idx : 0))
                                                           * (encoder->in.width_in_lcu << MAX_DEPTH)];
+
+      // Don't deblock the last 4x4 block of the LCU. This will be deblocked
+      // when processing the next LCU.
+      if (depth != 4 && dir == EDGE_HOR && (px.x + 4) % 32 == 0 && (px.x + 4 != encoder->in.width / 2)) {
+        continue;
+      }
+
       // Only filter when strenght == 2 (one of the blocks is intra coded)
       if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
         // Chroma U
