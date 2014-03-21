@@ -27,8 +27,9 @@
 #include "global.h"
 
 #include "encoder.h"
+#include "picture.h"
 
 
-void search_lcu(encoder_control *encoder, int x, int y);
+void search_lcu(encoder_control *encoder, int x, int y, yuv_t *hor_buf, yuv_t *ver_buf);
 
 #endif

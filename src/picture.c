@@ -33,6 +33,29 @@
 
 #define PSNRMAX (255.0 * 255.0)
 
+
+yuv_t * alloc_yuv_t(int luma_size)
+{
+  // Get buffers with separate mallocs in order to take advantage of
+  // automatic buffer overrun checks.
+  yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
+  yuv->y = (pixel *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (pixel *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (pixel *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->size = luma_size;
+
+  return yuv;
+}
+
+void dealloc_yuv_t(yuv_t * yuv)
+{
+  free(yuv->y);
+  free(yuv->u);
+  free(yuv->v);
+  free(yuv);
+}
+
+
 /**
  * \brief BLock Image Transfer from one buffer to another.
  *

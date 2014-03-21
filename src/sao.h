@@ -51,5 +51,6 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
 void sao_reconstruct(picture *pic, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i);
+void sao_reconstruct_frame(encoder_control *encoder);
 
 #endif

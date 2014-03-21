@@ -109,7 +109,6 @@ int read_one_frame(FILE *file, encoder_control *encoder);
 void encode_seq_parameter_set(encoder_control *encoder);
 void encode_pic_parameter_set(encoder_control *encoder);
 void encode_vid_parameter_set(encoder_control *encoder);
-void encode_slice_data(encoder_control *encoder);
 void encode_slice_header(encoder_control *encoder);
 void encode_access_unit_delimiter(encoder_control* encoder);
 void encode_prefix_sei_version(encoder_control* encoder);

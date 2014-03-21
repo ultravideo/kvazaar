@@ -50,6 +50,9 @@ int8_t g_convert_to_bit[LCU_WIDTH + 1];
 /* Local functions. */
 static void add_checksum(encoder_control* encoder);
 static void encode_VUI(encoder_control* encoder);
+static void encode_sao(encoder_control *encoder,
+                       unsigned x_lcu, uint16_t y_lcu,
+                       sao_info *sao_luma, sao_info *sao_chroma);
 
 /**
  * Initialize g_sig_last_scan with scan positions for a transform block of
@@ -383,10 +386,17 @@ static void write_aud(encoder_control* encoder)
 
 void encode_one_frame(encoder_control* encoder)
 {
+  yuv_t *hor_buf = alloc_yuv_t(encoder->in.width);
+  // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
+  // for the extra pixel on the top right.
+  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
+
   const int is_first_frame = (encoder->frame == 0);
   const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder->frame % 2 == 0);
   const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder->frame % encoder->cfg->intra_period) == 0);
   const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+
+  picture *pic = encoder->in.cur_pic;
 
   // Initialize lambda value(s) to use in search
   init_lambda(encoder);
@@ -464,17 +474,91 @@ void encode_one_frame(encoder_control* encoder)
 
   {
     vector2d lcu;
+    const vector2d size = { encoder->in.width, encoder->in.height };
+    const vector2d size_lcu = { encoder->in.width_in_lcu, encoder->in.height_in_lcu };
 
     for (lcu.y = 0; lcu.y < encoder->in.height_in_lcu; lcu.y++) {
       for (lcu.x = 0; lcu.x < encoder->in.width_in_lcu; lcu.x++) {
         const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
 
-        search_lcu(encoder, px.x, px.y);
+        // Handle partial LCUs on the right and bottom.
+        const vector2d lcu_dim = {
+          MIN(LCU_WIDTH, size.x - px.x), MIN(LCU_WIDTH, size.y - px.y)
+        };
+        const int right = px.x + lcu_dim.x;
+        const int bottom = px.y + lcu_dim.y;
+
+        search_lcu(encoder, px.x, px.y, hor_buf, ver_buf);
+
+        // Take the bottom right pixel from the LCU above and put it as the
+        // first pixel in this LCUs rightmost pixels.
+        if (lcu.y > 0) {
+          ver_buf->y[0] = hor_buf->y[right - 1];
+          ver_buf->u[0] = hor_buf->u[right / 2 - 1];
+          ver_buf->v[0] = hor_buf->v[right / 2 - 1];
+        }
+
+        // Take bottom and right pixels from this LCU to be used on the search of next LCU.
+        picture_blit_pixels(&pic->y_recdata[(bottom - 1) * size.x + px.x],
+                            &hor_buf->y[px.x],
+                            lcu_dim.x, 1, size.x, size.x);
+        picture_blit_pixels(&pic->u_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
+                            &hor_buf->u[px.x / 2],
+                            lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
+        picture_blit_pixels(&pic->v_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
+                            &hor_buf->v[px.x / 2],
+                            lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
+
+        picture_blit_pixels(&pic->y_recdata[px.y * size.x + right - 1],
+                            &ver_buf->y[1],
+                            1, lcu_dim.y, size.x, 1);
+        picture_blit_pixels(&pic->u_recdata[px.y * size.x / 4 + (right / 2) - 1],
+                            &ver_buf->u[1],
+                            1, lcu_dim.y / 2, size.x / 2, 1);
+        picture_blit_pixels(&pic->v_recdata[px.y * size.x / 4 + (right / 2) - 1],
+                            &ver_buf->v[1],
+                            1, lcu_dim.y / 2, size.x / 2, 1);
+
+        if (encoder->deblock_enable) {
+          filter_deblock_lcu(encoder, px.x, px.y);
+        }
+
+        if (encoder->sao_enable) {
+          const int stride = encoder->in.width_in_lcu;
+          sao_info *sao_luma = &pic->sao_luma[lcu.y * stride + lcu.x];
+          sao_info *sao_chroma = &pic->sao_chroma[lcu.y * stride + lcu.x];
+          init_sao_info(sao_luma);
+          init_sao_info(sao_chroma);
+
+          {
+            sao_info *sao_top = lcu. y != 0 ? &pic->sao_luma[(lcu.y - 1) * stride + lcu.x] : NULL;
+            sao_info *sao_left = lcu.x != 0 ? &pic->sao_luma[lcu.y * stride + lcu.x -1] : NULL;
+            sao_search_luma(encoder->in.cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
+          }
+
+          {
+            sao_info *sao_top = lcu.y != 0 ? &pic->sao_chroma[(lcu.y - 1) * stride + lcu.x] : NULL;
+            sao_info *sao_left = lcu.x != 0 ? &pic->sao_chroma[lcu.y * stride + lcu.x - 1] : NULL;
+            sao_search_chroma(encoder->in.cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
+          }
+
+          // Merge only if both luma and chroma can be merged
+          sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
+          sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+
+          encode_sao(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
+        }
+
+        encode_coding_tree(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+
+        {
+          const int last_lcu = (lcu.x == size_lcu.x - 1 && lcu.y == size_lcu.y - 1);
+          cabac_encode_bin_trm(&cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
+        }
       }
     }
   }
 
-  encode_slice_data(encoder);
   cabac_flush(&cabac);
   bitstream_align(encoder->stream);
   bitstream_flush(encoder->stream);
@@ -491,10 +575,17 @@ void encode_one_frame(encoder_control* encoder)
 
   bitstream_clear_buffer(encoder->stream);
 
+  if (encoder->sao_enable) {
+    sao_reconstruct_frame(encoder);
+  }
+
   // Calculate checksum
   add_checksum(encoder);
 
   encoder->in.cur_pic->poc = encoder->poc;
+
+  dealloc_yuv_t(hor_buf);
+  dealloc_yuv_t(ver_buf);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
@@ -1190,7 +1281,7 @@ static void encode_sao_merge_flags(sao_info *sao,
 }
 
 /**
- * \brief Stub that encodes all LCU's as none type.
+ * \brief Encode SAO information.
  */
 static void encode_sao(encoder_control *encoder,
                        unsigned x_lcu, uint16_t y_lcu,
@@ -1207,82 +1298,6 @@ static void encode_sao(encoder_control *encoder,
   }
 }
 
-void encode_slice_data(encoder_control* encoder)
-{
-  uint16_t x_ctb, y_ctb;
-  picture *pic = encoder->in.cur_pic;
-  const vector2d size_lcu = { encoder->in.width_in_lcu, encoder->in.height_in_lcu };
-
-  // Filtering
-  if(encoder->deblock_enable) {
-    filter_deblock(encoder);
-  }
-
-  if (encoder->sao_enable) {
-    pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
-    pixel *new_u_data = MALLOC(pixel, (pic->width * pic->height) >> 2);
-    pixel *new_v_data = MALLOC(pixel, (pic->width * pic->height) >> 2);
-    memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
-    memcpy(new_u_data, pic->u_recdata, sizeof(pixel) * (pic->width * pic->height) >> 2);
-    memcpy(new_v_data, pic->v_recdata, sizeof(pixel) * (pic->width * pic->height) >> 2);
-
-    for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
-      for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
-        unsigned stride = encoder->in.width_in_lcu;
-
-        //Fetch luma top and left merge candidate
-        sao_info *sao_top = y_ctb!=0?&pic->sao_luma[(y_ctb-1) * stride + x_ctb]:NULL;
-        sao_info *sao_left = x_ctb!=0?&pic->sao_luma[y_ctb * stride + x_ctb -1]:NULL;
-
-        sao_info *sao_luma = &pic->sao_luma[y_ctb * stride + x_ctb];
-        sao_info *sao_chroma = &pic->sao_chroma[y_ctb * stride + x_ctb];
-        init_sao_info(sao_luma);
-        init_sao_info(sao_chroma);
-
-        sao_search_luma(encoder->in.cur_pic, x_ctb, y_ctb, sao_luma, sao_top, sao_left);
-        // Chroma top and left merge candidate
-        sao_top = y_ctb!=0?&pic->sao_chroma[(y_ctb-1) * stride + x_ctb]:NULL;
-        sao_left = x_ctb!=0?&pic->sao_chroma[y_ctb * stride + x_ctb -1]:NULL;
-        sao_search_chroma(encoder->in.cur_pic, x_ctb, y_ctb, sao_chroma, sao_top, sao_left);
-
-        // Merge only if both luma and chroma can be merged
-        sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
-        sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
-
-        // sao_do_rdo(encoder, x_ctb, y_ctb, sao_luma, sao_chroma);
-        sao_reconstruct(pic, new_y_data, x_ctb, y_ctb, sao_luma, COLOR_Y);
-        sao_reconstruct(pic, new_u_data, x_ctb, y_ctb, sao_chroma, COLOR_U);
-        sao_reconstruct(pic, new_v_data, x_ctb, y_ctb, sao_chroma, COLOR_V);
-      }
-    }
-
-    free(new_y_data);
-    free(new_u_data);
-    free(new_v_data);
-  }
-
-  // Loop through every LCU in the slice
-  for (y_ctb = 0; y_ctb < encoder->in.height_in_lcu; y_ctb++) {
-    for (x_ctb = 0; x_ctb < encoder->in.width_in_lcu; x_ctb++) {
-      uint8_t depth = 0;
-      const int last_lcu = (x_ctb == size_lcu.x - 1 && y_ctb == size_lcu.y - 1);
-
-      if (encoder->sao_enable) {
-        picture *pic = encoder->in.cur_pic;
-        unsigned stride = encoder->in.width_in_lcu;
-        sao_info sao_luma = pic->sao_luma[y_ctb * stride + x_ctb];
-        sao_info sao_chroma = pic->sao_chroma[y_ctb * stride + x_ctb];
-
-        encode_sao(encoder, x_ctb, y_ctb, &sao_luma, &sao_chroma);
-      }
-
-      // Recursive function for looping through all the sub-blocks
-      encode_coding_tree(encoder, x_ctb << MAX_DEPTH, y_ctb << MAX_DEPTH, depth);
-
-      cabac_encode_bin_trm(&cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
-    }
-  }
-}
 
 void encode_coding_tree(encoder_control *encoder, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth)
