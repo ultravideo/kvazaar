@@ -451,6 +451,40 @@ void filter_deblock(encoder_control* encoder)
 
 
 /**
+ * \brief Deblock a single LCU without using data from right or down.
+ *
+ * Filter all the following edges:
+ * - All edges within the LCU, except for the last 4 pixels on the right when
+ *   using horizontal filtering.
+ * - Left edge and top edge.
+ * - After vertical filtering the left edge, filter the last 4 pixels of
+ *   horizontal edges in the LCU to the left.
+ */
+void filter_deblock_lcu(encoder_control *encoder, int x_px, int y_px)
+{
+  const vector2d lcu = { x_px / LCU_WIDTH, y_px / LCU_WIDTH };
+
+  filter_deblock_cu(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_VER);
+
+  // Filter rightmost 4 pixels from last LCU now that they have been
+  // finally deblocked vertically.
+  if (lcu.x > 0) {
+    int y;
+    for (y = 0; y < 64; y += 8) {
+      if (lcu.y + y == 0) continue;
+      filter_deblock_edge_luma(encoder, lcu.x * 64 - 4, lcu.y * 64 + y, 4, EDGE_HOR);
+    }
+    for (y = 0; y < 32; y += 8) {
+      if (lcu.y + y == 0) continue;
+      filter_deblock_edge_chroma(encoder, lcu.x * 32 - 4, lcu.y * 32 + y, 4, EDGE_HOR);
+    }
+  }
+
+  filter_deblock_cu(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_HOR);
+}
+
+
+/**
  * \brief Interpolation for chroma half-pixel
  * \param src source image in integer pels (-2..width+3, -2..height+3)
  * \param src_stride stride of source image
