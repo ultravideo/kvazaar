@@ -166,18 +166,7 @@ void filter_deblock_edge_luma(encoder_control *encoder,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
-  int32_t stride = encoder->in.cur_pic->width;
-  int32_t offset = stride;
-  int32_t beta_offset_div2 = encoder->beta_offset_div2;
-  int32_t tc_offset_div2   = encoder->tc_offset_div2;
-  // TODO: support 10+bits
-  pixel *orig_src = &encoder->in.cur_pic->y_recdata[xpos + ypos*stride];
-  pixel *src = orig_src;
-  int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  cu_info *cu_p = NULL;
-  int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
-  int8_t strength = 0;
 
   {
     // Return if called with a coordinate which is not at CU or TU boundary.
@@ -188,13 +177,19 @@ void filter_deblock_edge_luma(encoder_control *encoder,
     if (dir == EDGE_VER && (xpos & (tu_width - 1))) return;
   }
 
-
-  if(dir == EDGE_VER) {
-    offset = 1;
-    step = stride;
-  }
-
   {
+    int32_t stride = encoder->in.cur_pic->width;
+    int32_t offset = stride;
+    int32_t beta_offset_div2 = encoder->beta_offset_div2;
+    int32_t tc_offset_div2   = encoder->tc_offset_div2;
+    // TODO: support 10+bits
+    pixel *orig_src = &encoder->in.cur_pic->y_recdata[xpos + ypos*stride];
+    pixel *src = orig_src;
+    int32_t step = 1;
+    cu_info *cu_p = NULL;
+    int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
+    int8_t strength = 0;
+
     int32_t qp              = encoder->QP;
     int32_t bitdepth_scale  = 1 << (g_bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
@@ -203,6 +198,12 @@ void filter_deblock_edge_luma(encoder_control *encoder,
     uint32_t blocks_in_part = (LCU_WIDTH >> depth) / 4;
     uint32_t block_idx;
     int32_t tc_index,tc,thr_cut;
+
+    if (dir == EDGE_VER) {
+      offset = 1;
+      step = stride;
+    }
+
     // TODO: add CU based QP calculation
 
     // For each 4-pixel part in the edge
@@ -289,47 +290,51 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
                                 int32_t x, int32_t y,
                                 int8_t depth, int8_t dir)
 {
-  int32_t stride = encoder->in.cur_pic->width >> 1;
-  int32_t tc_offset_div2 = encoder->tc_offset_div2;
-  // TODO: support 10+bits
-  pixel *src_u = &encoder->in.cur_pic->u_recdata[x + y*stride];
-  pixel *src_v = &encoder->in.cur_pic->v_recdata[x + y*stride];
-  // Init offset and step to EDGE_HOR
-  int32_t offset = stride;
-  int32_t step = 1;
   cu_info *cu_q = &encoder->in.cur_pic->cu_array[MAX_DEPTH][(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (encoder->in.width_in_lcu << MAX_DEPTH)];
-  cu_info *cu_p = NULL;
-  int16_t x_cu = x>>(MIN_SIZE-1),y_cu = y>>(MIN_SIZE-1);
-  int8_t strength = 2;
 
-  // We cannot filter edges not on 8x8 grid
-  if((depth >= MAX_DEPTH && (( (y & 0x7) && dir == EDGE_HOR ) || ( (x & 0x7) && dir == EDGE_VER ) ) ))
-  {
-    return;
+  // Chroma edges that do not lay on a 8x8 grid are not deblocked.
+  if (depth >= MAX_DEPTH) {
+    if (dir == EDGE_HOR && (y & (8 - 1))) return;
+    if (dir == EDGE_VER && (x & (8 - 1))) return;
   }
 
   {
-    // Don't do anything if there is no PU or TU edge here.
-    int cu_width = (LCU_WIDTH / 2) >> (cu_q->depth);
-    if (dir == EDGE_HOR && y % cu_width != 0) {
-      return;
-    }
-  }
-
-  if(dir == EDGE_VER)
-  {
-    offset = 1;
-    step = stride;
+    // Return if called with a coordinate which is not at CU or TU boundary.
+    // TODO: Add handling for asymmetric inter CU boundaries which do not coincide
+    // with transform boundaries.
+    const int tu_width = (LCU_WIDTH / 2) >> cu_q->tr_depth;
+    if (dir == EDGE_HOR && (y & (tu_width - 1))) return;
+    if (dir == EDGE_VER && (x & (tu_width - 1))) return;
   }
 
   // For each subpart
   {
+    int32_t stride = encoder->in.cur_pic->width >> 1;
+    int32_t tc_offset_div2 = encoder->tc_offset_div2;
+    // TODO: support 10+bits
+    pixel *src_u = &encoder->in.cur_pic->u_recdata[x + y*stride];
+    pixel *src_v = &encoder->in.cur_pic->v_recdata[x + y*stride];
+    // Init offset and step to EDGE_HOR
+    int32_t offset = stride;
+    int32_t step = 1;
+    cu_info *cu_p = NULL;
+    int16_t x_cu = x>>(MIN_SIZE-1),y_cu = y>>(MIN_SIZE-1);
+    int8_t strength = 2;
+
     int32_t QP             = g_chroma_scale[encoder->QP];
     int32_t bitdepth_scale = 1 << (g_bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
+
+    // Special handling for depth 4. It's meaning is that we want to bypass
+    // last block in LCU check in order to deblock just that block.
     uint32_t blocks_in_part= (LCU_WIDTH>>(depth == 4 ? depth : depth + 1)) / 4;
     uint32_t blk_idx;
+
+    if(dir == EDGE_VER) {
+      offset = 1;
+      step = stride;
+    }
 
     for (blk_idx = 0; blk_idx < blocks_in_part; ++blk_idx)
     {
