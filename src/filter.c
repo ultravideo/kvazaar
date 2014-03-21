@@ -180,11 +180,12 @@ void filter_deblock_edge_luma(encoder_control *encoder,
   int8_t strength = 0;
 
   {
-    // Don't do anything if there is no PU or TU edge here.
-    int cu_width = LCU_WIDTH >> cu_q->depth;
-    if (dir == EDGE_HOR && ypos % cu_width != 0) {
-      return;
-    }
+    // Return if called with a coordinate which is not at CU or TU boundary.
+    // TODO: Add handling for asymmetric inter CU boundaries which do not coincide
+    // with transform boundaries.
+    const int tu_width = LCU_WIDTH >> cu_q->tr_depth;
+    if (dir == EDGE_HOR && (ypos & (tu_width - 1))) return;
+    if (dir == EDGE_VER && (xpos & (tu_width - 1))) return;
   }
 
 
