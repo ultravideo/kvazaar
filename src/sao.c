@@ -634,3 +634,36 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   rec_list[0] = rec;
   sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left);
 }
+
+void sao_reconstruct_frame(encoder_control *encoder)
+{
+  vector2d lcu;
+  picture *pic = encoder->in.cur_pic;
+
+  // These are needed because SAO needs the pre-SAO pixels form left and
+  // top LCUs. Single pixel wide buffers, like what search_lcu takes, would
+  // be enough though.
+  pixel *new_y_data = MALLOC(pixel, pic->width * pic->height);
+  pixel *new_u_data = MALLOC(pixel, (pic->width * pic->height) >> 2);
+  pixel *new_v_data = MALLOC(pixel, (pic->width * pic->height) >> 2);
+  memcpy(new_y_data, pic->y_recdata, sizeof(pixel) * pic->width * pic->height);
+  memcpy(new_u_data, pic->u_recdata, sizeof(pixel) * (pic->width * pic->height) >> 2);
+  memcpy(new_v_data, pic->v_recdata, sizeof(pixel) * (pic->width * pic->height) >> 2);
+
+  for (lcu.y = 0; lcu.y < encoder->in.height_in_lcu; lcu.y++) {
+    for (lcu.x = 0; lcu.x < encoder->in.width_in_lcu; lcu.x++) {
+      unsigned stride = encoder->in.width_in_lcu;
+      sao_info *sao_luma = &pic->sao_luma[lcu.y * stride + lcu.x];
+      sao_info *sao_chroma = &pic->sao_chroma[lcu.y * stride + lcu.x];
+
+      // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
+      sao_reconstruct(pic, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
+      sao_reconstruct(pic, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
+      sao_reconstruct(pic, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
+    }
+  }
+
+  free(new_y_data);
+  free(new_u_data);
+  free(new_v_data);
+}
