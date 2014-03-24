@@ -208,8 +208,9 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
 
   // Set output file
-  encoder->output = output;
 
+  encoder->output = output;
+  encoder->stream->output = output;
   // input init (TODO: read from commandline / config)
   encoder->bitdepth = 8;
   encoder->frame    = 0;
@@ -386,7 +387,6 @@ int main(int argc, char *argv[])
   picture_list_destroy(encoder->ref);
   picture_destroy(encoder->in.cur_pic);
   FREE_POINTER(encoder->in.cur_pic);
-  bitstream_free(encoder->stream);
   FREE_POINTER(encoder->stream);
   free(encoder);
   free_tables();

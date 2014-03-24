@@ -35,16 +35,12 @@
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
  */
-void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
-               uint8_t nal_ref, uint8_t nal_type, uint8_t temporal_id,
-               int long_start_code)
+void nal_write(FILE *output,uint8_t nal_ref, uint8_t nal_type,
+               uint8_t temporal_id,int long_start_code)
 {
   uint8_t byte;
-  uint32_t i;
-  uint8_t zerocount = 0;
 
   // Some useful constants
-  const uint8_t emulation_prevention_three_byte = 0x03;
   const uint8_t start_code_prefix_one_3bytes = 0x01;
   const uint8_t zero = 0x00;
 
@@ -70,29 +66,6 @@ void nal_write(FILE *output, uint8_t *buffer, uint32_t buffer_len,
   // 5bits of nuh_layer_id + nuh_temporal_id_plus1(3)
   byte = (temporal_id + 1) & 7;
   fwrite(&byte, 1, 1, output);
-
-  // Write out bytes and add emulation_prevention_three_byte when needed
-  for (i = 0; i < buffer_len; ++i) {
-    // Prevent 0x0000 + 00/01/02 byte sequences from occurring by prefixing
-    // the last byte with 0x03. Do the same for 0x03.
-    if (zerocount == 2 && buffer[i] < 4) {
-      fwrite(&emulation_prevention_three_byte, 1, 1, output);
-      zerocount = 0;
-    }
-    if(buffer[i] == 0) {
-      zerocount++;
-    } else {
-      zerocount = 0;
-    }
-
-    // Write the actual data
-    fwrite(&buffer[i], 1, 1, output);
-  }
-
-  // If last byte was 0, add emulation_prevention_three_byte
-  if (buffer[buffer_len - 1] == 0) {
-    fwrite(&emulation_prevention_three_byte, 1, 1, output);
-  }
 }
 
 

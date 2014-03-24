@@ -35,6 +35,18 @@
 #include <arpa/inet.h>
 #endif
 
+const uint32_t bit_set_mask[] =
+{
+0x00000001,0x00000002,0x00000004,0x00000008,
+0x00000010,0x00000020,0x00000040,0x00000080,
+0x00000100,0x00000200,0x00000400,0x00000800,
+0x00001000,0x00002000,0x00004000,0x00008000,
+0x00010000,0x00020000,0x00040000,0x00080000,
+0x00100000,0x00200000,0x00400000,0x00800000,
+0x01000000,0x02000000,0x04000000,0x08000000,
+0x10000000,0x20000000,0x40000000,0x80000000
+};
+
 
 //#define VERBOSE
 
@@ -93,7 +105,7 @@ int init_exp_golomb(uint32_t len)
 /**
  * \brief Create and initialize a new bitstream
  */
-bitstream *create_bitstream(int32_t width)
+bitstream *create_bitstream()
 {
   bitstream *stream = malloc(sizeof(bitstream));
   if (!stream) {
@@ -101,74 +113,13 @@ bitstream *create_bitstream(int32_t width)
     return stream;
   }
 
-  // Initialize the bitstream
-  bitstream_reinit(stream);
-
   // Initialize buffer-related values
-  stream->output     = NULL;
-  stream->buffer     = NULL;
-  stream->buffer_pos = 0;
-  stream->bufferlen  = 0;
-
-  // Alloc 2kB*width for bitstream buffer (for one coded frame)
-  bitstream_alloc(stream, 1024*2*width);
-  if (!stream->buffer) {
-    fprintf(stderr, "Failed to allocate the bitstream buffer!\n");
-    goto creation_failure;
-  }
-
-  //Clear buffer just to be sure
-  bitstream_clear_buffer(stream);
+  stream->data = 0;
+  stream->cur_bit = 0;
+  stream->zerocount = 0;
 
   // Return the created bitstream
   return stream;
-
-creation_failure:
-  // In case of failure, free whatever was allocated
-  free(stream->buffer);
-  free(stream);
-
-  return NULL;
-}
-
-/**
- * \brief Reinitialize bitstream
- */
-void bitstream_reinit(bitstream *stream)
-{
-  stream->cur_byte = 0;
-  stream->cur_bit = 0;
-  memset(stream->data, 0, sizeof(uint32_t)*32);
-}
-
-/**
- *  \brief Allocate buffer
- *  \param stream pointer bitstream to put the data
- *  \param alloc size to allocate
- */
-void bitstream_alloc(bitstream *stream, uint32_t alloc)
-{
-  stream->buffer = (uint8_t*)malloc(alloc);
-  if (stream->buffer)
-    stream->bufferlen = alloc;
-}
-
-/**
- *  \brief Free bitstream buffer
- */
-void bitstream_free(bitstream *stream)
-{
-  free(stream->buffer);
-  stream->bufferlen = 0;
-}
-
-/**
- *  \brief clear output buffer
- */
-void bitstream_clear_buffer(bitstream *stream)
-{
-  memset(stream->buffer, 0, stream->bufferlen);
-  stream->buffer_pos = 0;
 }
 
 /**
@@ -179,43 +130,29 @@ void bitstream_clear_buffer(bitstream *stream)
  */
 void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
 {
-  uint8_t bitsleft = 32 - stream->cur_bit;
-  #ifdef VERBOSE
-  uint8_t i=0;
-  printf_bitstream("put: ");
-  for (i = 0; i < bits; i++) {
-      printf("%i",(data&(1<<(bits-i-1)))?1:0);
-  }
-  printf_bitstream("\n");
-  //printf_bitstream(" count: %i\n",bits);
-  #endif
+  const uint8_t emulation_prevention_three_byte = 0x03;
+  while(bits--) {
+    stream->data <<= 1;
 
-  //There's space for all the bits
-  if (bits <= bitsleft) {
-    stream->data[stream->cur_byte] |= (data<<((bitsleft-bits)));
-    stream->cur_bit += bits;
-    bits = 0;
-  } else { //No space for everything, store the bits we can and continue later
-    stream->data[stream->cur_byte] |= (data>>(bits-bitsleft));
-    stream->cur_bit = 32;
-    bits -= bitsleft;
-  }
-
-  //Check if the buffer is full, and flush to output if it is
-  if (stream->cur_bit == 32) {
-    bitsleft = 32;
-    stream->cur_byte++;
-    stream->cur_bit = 0;
-    if (stream->cur_byte == 32) {
-      //Flush data out
-      bitstream_flush(stream);
+    if (data & bit_set_mask[bits]) {
+      stream->data |= 1;
     }
-  }
+    stream->cur_bit++;
 
-  //Write the last of the bits (if buffer was full and flushed before)
-  if (bits != 0) {
-    stream->data[stream->cur_byte] |= (data<<(bitsleft-bits));
-    stream->cur_bit += bits;
+  // write byte to output
+    if (stream->cur_bit==8) {
+      if((stream->zerocount == 2) && (stream->data < 4)) {
+        fwrite(&emulation_prevention_three_byte, 1, 1, stream->output);
+        stream->zerocount = 0;
+      }
+      if(stream->data == 0) {
+        stream->zerocount++;
+      } else {
+        stream->zerocount = 0;
+      }
+      fwrite(&stream->data, 1, 1, stream->output);
+      stream->cur_bit = 0;
+    }
   }
 }
 
@@ -238,36 +175,4 @@ void bitstream_align_zero(bitstream *stream)
   if ((stream->cur_bit & 7) != 0) {
     bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
   }
-}
-
-/**
- * \brief Flush bitstream to output
- */
-void bitstream_flush(bitstream *stream)
-{
-  int i;
-  uint32_t correct_endian;
-  //If output open, write to output
-  if (stream->output) {
-    if (stream->cur_byte) fwrite(&stream->data[0], stream->cur_byte * 4, 1, stream->output);
-    if (stream->cur_bit>>3) fwrite(&stream->data[stream->cur_byte], stream->cur_bit>>3, 1, stream->output);
-  } else { //No file open, write to buffer
-    if (stream->cur_byte) {
-      //Handle endianness issue
-      for (i = 0; i < stream->cur_byte; i++) {
-        //"network" is big-endian
-        correct_endian = htonl(stream->data[i]);
-        memcpy((uint8_t*)&stream->buffer[stream->buffer_pos], &correct_endian, 4);
-        stream->buffer_pos += 4;
-      }
-    }
-
-    if (stream->cur_bit>>3) {
-      correct_endian = htonl(stream->data[stream->cur_byte]);
-      memcpy((uint8_t*)&stream->buffer[stream->buffer_pos], &correct_endian, stream->cur_bit>>3);
-      stream->buffer_pos += stream->cur_bit>>3;
-    }
-  }
-  //Stream flushed, zero out the values
-  bitstream_reinit(stream);
 }

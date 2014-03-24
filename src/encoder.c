@@ -279,7 +279,7 @@ encoder_control *init_encoder_control(config *cfg)
   enc_c->sao_enable = 1;
 
   // Allocate the bitstream struct
-  stream = create_bitstream(enc_c->cfg->width);
+  stream = create_bitstream();
   if (!stream) {
     fprintf(stderr, "Failed to allocate the bitstream object!\n");
     goto init_failure;
@@ -377,11 +377,8 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
 static void write_aud(encoder_control* encoder)
 {
   encode_access_unit_delimiter(encoder);
+  nal_write(encoder->output, 0, AUD_NUT, 0, 1);
   bitstream_align(encoder->stream);
-  bitstream_flush(encoder->stream);
-  nal_write(encoder->output, encoder->stream->buffer,
-            encoder->stream->buffer_pos, 0, AUD_NUT, 0, 1);
-  bitstream_clear_buffer(encoder->stream);
 }
 
 void encode_one_frame(encoder_control* encoder)
@@ -424,37 +421,25 @@ void encode_one_frame(encoder_control* encoder)
       write_aud(encoder);
 
     // Video Parameter Set (VPS)
+    nal_write(encoder->output, 0, NAL_VPS_NUT, 0, 1);
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_VPS_NUT, 0, 1);
-    bitstream_clear_buffer(encoder->stream);
 
     // Sequence Parameter Set (SPS)
+    nal_write(encoder->output, 0, NAL_SPS_NUT, 0, 1);
     encode_seq_parameter_set(encoder);
     bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_SPS_NUT, 0, 1);
-    bitstream_clear_buffer(encoder->stream);
 
     // Picture Parameter Set (PPS)
+    nal_write(encoder->output, 0, NAL_PPS_NUT, 0, 1);
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
-    bitstream_flush(encoder->stream);
-    nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0, NAL_PPS_NUT, 0, 1);
-    bitstream_clear_buffer(encoder->stream);
 
     if (encoder->frame == 0) {
       // Prefix SEI
+      nal_write(encoder->output, 0, PREFIX_SEI_NUT, 0, 0);
       encode_prefix_sei_version(encoder);
       bitstream_align(encoder->stream);
-      bitstream_flush(encoder->stream);
-      nal_write(encoder->output, encoder->stream->buffer,
-                encoder->stream->buffer_pos, 0, PREFIX_SEI_NUT, 0, 0);
-      bitstream_clear_buffer(encoder->stream);
     }
   } else {
     // When intra period == 1, all pictures are intra
@@ -464,6 +449,15 @@ void encode_one_frame(encoder_control* encoder)
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
       write_aud(encoder);
+  }
+
+  {
+    // Not quite sure if this is correct, but it seems to have worked so far
+    // so I tried to not change it's behavior.
+    int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
+
+    nal_write(encoder->output,  0,
+              is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
 
   cabac_start(&cabac);
@@ -561,19 +555,6 @@ void encode_one_frame(encoder_control* encoder)
 
   cabac_flush(&cabac);
   bitstream_align(encoder->stream);
-  bitstream_flush(encoder->stream);
-
-  {
-    // Not quite sure if this is correct, but it seems to have worked so far
-    // so I tried to not change it's behavior.
-    int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
-
-    nal_write(encoder->output, encoder->stream->buffer,
-              encoder->stream->buffer_pos, 0,
-              is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
-  }
-
-  bitstream_clear_buffer(encoder->stream);
 
   if (encoder->sao_enable) {
     sao_reconstruct_frame(encoder);
@@ -679,6 +660,8 @@ static void add_checksum(encoder_control* encoder)
   uint32_t checksum_val;
   unsigned int i;
 
+  nal_write(encoder->output, 0, NAL_SUFFIT_SEI_NUT, 0, 0);
+
   picture_checksum(encoder->in.cur_pic, checksum);
 
   WRITE_U(encoder->stream, 132, 8, "sei_type");
@@ -694,10 +677,6 @@ static void add_checksum(encoder_control* encoder)
   }
 
   bitstream_align(encoder->stream);
-  bitstream_flush(encoder->stream);
-  nal_write(encoder->output, encoder->stream->buffer,
-            encoder->stream->buffer_pos, 0, NAL_SUFFIT_SEI_NUT, 0, 0);
-  bitstream_clear_buffer(encoder->stream);
 }
 
 void encode_access_unit_delimiter(encoder_control* encoder)
