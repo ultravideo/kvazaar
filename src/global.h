@@ -54,31 +54,38 @@ typedef int16_t coefficient;
 //#define VERBOSE 1
 
 /* CONFIG VARIABLES */
-#define LCU_WIDTH 64 /*!< Largest Coding Unit (IT'S 64x64, DO NOT TOUCH!) */
 
+//spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
+
+//Search depth for intra and inter. Block sizes: 0 => 64x64, 1 => 32x32, 2 => 16x16, 3 => 8x8, 4 => 4x4
 #define MAX_INTER_SEARCH_DEPTH 3
 #define MIN_INTER_SEARCH_DEPTH 0
 
-#define MAX_INTRA_SEARCH_DEPTH 4 /*!< Max search depth -> min block size (3 == 8x8) */
-#define MIN_INTRA_SEARCH_DEPTH 1 /*!< Min search depth -> max block size (0 == 64x64) */
+#define MAX_INTRA_SEARCH_DEPTH 4 
+#define MIN_INTRA_SEARCH_DEPTH 1
 
+#define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */
+#define MIN_SIZE 3   /*!< spec: MinCbLog2SizeY */
+#define MAX_PU_DEPTH 4 /*!< Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu() */
 
-#define MAX_DEPTH 3  /*!< smallest CU is LCU_WIDTH>>MAX_DEPTH */
-#define MAX_PU_DEPTH 4
-#define MIN_SIZE 3   /*!< log2_min_coding_block_size */
-#define CU_MIN_SIZE_PIXELS 8 /*!< pow(2, MIN_SIZE) */
+#define TR_DEPTH_INTRA 2 /*!< spec: max_transform_hierarchy_depth_intra */
+#define TR_DEPTH_INTER 2 /*!< spec: max_transform_hierarchy_depth_inter */
 
-#define TR_DEPTH_INTRA 2
-#define TR_DEPTH_INTER 2
-
-#define ENABLE_PCM 0 /*!< Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
-#define ENABLE_SIGN_HIDING 1
+#define ENABLE_PCM 0 /*!< spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
+#define ENABLE_SIGN_HIDING 1 /*!< spec: sign_data_hiding_enabled_flag */
 
 #define ENABLE_TEMPORAL_MVP 0 /*!< Enable usage of temporal Motion Vector Prediction */
 
 #define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0 /*!< skip residual coding when it's under _some_ threshold */
 
 /* END OF CONFIG VARIABLES */
+
+#define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE) /*!< pow(2, MIN_SIZE) */
+#define LCU_WIDTH (1 << (MAX_DEPTH + MIN_SIZE)) /*!< Largest Coding Unit, spec: CtbSizeY */
+
+#if LCU_WIDTH != 64
+  #error "Kvazaar only support LCU_WIDTH == 64"
+#endif
 
 #define LCU_LUMA_SIZE (LCU_WIDTH * LCU_WIDTH)
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
