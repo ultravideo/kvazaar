@@ -751,7 +751,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_SE(encoder->stream, ((int8_t)encoder->QP)-26, "pic_init_qp_minus26");
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(encoder->stream, 1, 1, "transform_skip_enabled_flag");
+  WRITE_U(encoder->stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "cu_qp_delta_enabled_flag");
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(encoder->stream, 0, "diff_cu_qp_delta_depth");
@@ -1926,14 +1926,13 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
     }
     #endif
 
-    // Transform and quant residual to coeffs
-    if(width == 4) {
+    // For 4x4 blocks, check for transform skip
+    if(width == 4 && encoder->trskip_enable) {
       int i;
-      coefficient temp_block[16];
-      coefficient temp_coeff[16];
-      coefficient temp_block2[16];
-      coefficient temp_coeff2[16];
+      coefficient temp_block[16];  coefficient temp_coeff[16];
+      coefficient temp_block2[16]; coefficient temp_coeff2[16];
       uint32_t cost = 0,cost2 = 0;
+      uint32_t coeffcost = 0,coeffcost2 = 0;
 
       // Test for transform skip
       transformskip(block,pre_quant_coeff,width);
@@ -2362,7 +2361,7 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
   memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
 
   // transform skip flag
-  if(width == 4) {
+  if(width == 4 && encoder->trskip_enable) {
     cabac.ctx = (type == 0) ? &g_transform_skip_model_luma : &g_transform_skip_model_chroma;
     CABAC_BIN(&cabac, tr_skip, "transform_skip_flag");
   }

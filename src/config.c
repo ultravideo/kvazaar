@@ -65,6 +65,7 @@ int config_init(config *cfg)
   cfg->deblock_tc      = 0;
   cfg->sao_enable      = 1;
   cfg->rdoq_enable     = 1;
+  cfg->trskip_enable   = 1;
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
   cfg->vui.overscan    = 0; /* undef */
@@ -225,6 +226,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->sao_enable = atobool(value);
   OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
+  OPT("transform-skip")
+    cfg->trskip_enable = atobool(value);
   OPT("sar") {
       int sar_width, sar_height;
       if (2 == sscanf(value, "%d:%d", &sar_width, &sar_height)) {
@@ -291,6 +294,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
     { "no-rdoq",                  no_argument, NULL, 0 },
+    { "no-transform-skip",        no_argument, NULL, 0 },
     { "sar",                required_argument, NULL, 0 },
     { "overscan",           required_argument, NULL, 0 },
     { "videoformat",        required_argument, NULL, 0 },

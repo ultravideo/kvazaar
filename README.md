@@ -30,7 +30,8 @@ meant to be user configurable later.
               --deblock <beta:tc>    : Deblocking filter parameters
                                        beta and tc range is -6..6 [0:0]
               --no-sao               : Disable sample adaptive offset
-              --no-rdoq              : Disable RDO quantiztion
+              --no-rdoq              : Disable RDO quantization
+              --no-transform-skip    : Disable transform skip
               --aud                  : Use access unit delimiters
               --cqmfile <string>     : Custom Quantization Matrices from a file
               --debug <string>       : Output encoders reconstruction.

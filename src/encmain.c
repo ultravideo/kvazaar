@@ -102,7 +102,8 @@ int main(int argc, char *argv[])
             "          --deblock <beta:tc>    : Deblocking filter parameters\n"
             "                                   beta and tc range is -6..6 [0:0]\n"
             "          --no-sao               : Disable sample adaptive offset\n"
-            "          --no-rdoq              : Disable RDO quantiztion\n"
+            "          --no-rdoq              : Disable RDO quantization\n"
+            "          --no-transform-skip    : Disable transform skip\n"
             "          --aud                  : Use access unit delimiters\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
             "          --debug <string>       : Output encoders reconstruction.\n"
@@ -224,6 +225,8 @@ int main(int argc, char *argv[])
   encoder->sao_enable = (int8_t)encoder->cfg->sao_enable;
   // RDOQ
   encoder->rdoq_enable = (int8_t)encoder->cfg->rdoq_enable;
+  // TR SKIP
+  encoder->trskip_enable = (int8_t)encoder->cfg->trskip_enable;
   // VUI
   encoder->vui.sar_width   = (int16_t)encoder->cfg->vui.sar_width;
   encoder->vui.sar_height  = (int16_t)encoder->cfg->vui.sar_height;
