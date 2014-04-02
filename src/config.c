@@ -81,6 +81,13 @@ int config_init(config *cfg)
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
   cfg->seek            = 0;
 
+#if USE_TILES
+  cfg->tiles_width_count         = 0;
+  cfg->tiles_height_count         = 0;
+  cfg->tiles_width_split          = NULL;
+  cfg->tiles_height_split          = NULL;
+#endif //USE_TILES
+
   return 1;
 }
 
@@ -94,6 +101,10 @@ int config_destroy(config *cfg)
   FREE_POINTER(cfg->input);
   FREE_POINTER(cfg->output);
   FREE_POINTER(cfg->cqmfile);
+#if USE_TILES
+  FREE_POINTER(cfg->tiles_width_split);
+  FREE_POINTER(cfg->tiles_height_split);
+#endif //USE_TILES
   free(cfg);
 
   return 1;
@@ -144,6 +155,66 @@ static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
 
   return 0;
 }
+
+#if USE_TILES
+static int parse_tiles_specification(const char* const arg, int32_t * const ntiles, int32_t** const array) {
+  const char* current_arg = NULL;
+  int32_t current_value;
+  int32_t values[256];
+  
+  int i;
+  
+  //Free pointer in any case
+  if (*array) {
+    FREE_POINTER(*array);
+  }
+  
+  //If the arg starts with u, we want an uniform split
+  if (arg[0]=='u') {
+    *ntiles = atoi(arg+1)-1;
+    if (MAX_TILES_PER_DIM <= *ntiles || 0 >= *ntiles) {
+      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
+      return 0;
+    }
+    //Done with parsing
+    return 1;
+  }
+  
+  //We have a comma-separated list of int for the split...
+  current_arg = arg;
+  *ntiles = 0;
+  do {
+    int ret = sscanf(current_arg, "%d", &current_value);
+    if (ret != 1) {
+      fprintf(stderr, "Could not parse integer \"%s\"!\n", current_arg);
+      return 0;
+    }
+    current_arg = strchr(current_arg, ',');
+    //Skip the , if we found one
+    if (current_arg) ++current_arg;
+    values[*ntiles] = current_value;
+    ++(*ntiles);
+  } while (current_arg);
+  
+  if (MAX_TILES_PER_DIM <= *ntiles || 0 >= *ntiles) {
+    fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
+    return 0;
+  }
+  
+  *array = MALLOC(int32_t, *ntiles);
+  if (!*array) {
+    fprintf(stderr, "Could not allocate array for tiles\n");
+    return 0;
+  }
+  
+  //TODO: memcpy?
+  for (i = 0; i < *ntiles; ++i) {
+    (*array)[i] = values[i];
+  }
+  
+  return 1;
+}
+#endif //USE_TILES
 
 static int config_parse(config *cfg, const char *name, const char *value)
 {
@@ -271,6 +342,12 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->cqmfile = copy_string(value);
   else if OPT("seek")
     cfg->seek = atoi(value);
+#if USE_TILES
+  else if OPT("tiles-width-split")
+    error = !parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
+  else if OPT("tiles-height-split")
+    error = !parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+#endif //USE_TILES
   else
     return 0;
 #undef OPT
@@ -317,6 +394,10 @@ int config_read(config *cfg,int argc, char *argv[])
     { "aud",                      no_argument, NULL, 0 },
     { "cqmfile",            required_argument, NULL, 0 },
     { "seek",               required_argument, NULL, 0 },
+#if USE_TILES
+    { "tiles-width-split",             required_argument, NULL, 0 },
+    { "tiles-height-split",             required_argument, NULL, 0 },
+#endif
     {0, 0, 0, 0}
   };
 
@@ -368,5 +449,49 @@ int config_validate(config *cfg)
     fprintf(stderr, "Input error: one of the dimensions is 0: dims=%dx%d", cfg->width, cfg->height);
     return 0;
   }
+#if USE_TILES
+  //Tile separation should be at round position in terms of LCU, should be monotonic, and should not start by 0
+  if (cfg->tiles_width_split) {
+    int i;
+    int32_t prev_tile_split = 0;
+    for (i=0; i < cfg->tiles_width_count; ++i) {
+      if (cfg->tiles_width_split[i] <= prev_tile_split) {
+        fprintf(stderr, "Input error: tile separations in width should be strictly monotonic (%d <= %d)\n", cfg->tiles_width_split[i], prev_tile_split);
+        return 0;
+      }
+      if ((cfg->tiles_width_split[i] % LCU_WIDTH) != 0) {
+        fprintf(stderr, "Input error: tile separation in width %d (at %d) is not at a multiple of LCU_WIDTH (%d)\n", i, cfg->tiles_width_split[i], LCU_WIDTH);
+        return 0;
+      }
+      prev_tile_split = cfg->tiles_width_split[i];
+    }
+    
+    if (cfg->tiles_width_split[cfg->tiles_width_count-1] >= cfg->width) {
+      fprintf(stderr, "Input error: last x tile separation in width (%d) should smaller than image width (%d)\n", cfg->tiles_width_split[cfg->tiles_width_count-1], cfg->width);
+      return 0;
+    }
+  }
+  
+  if (cfg->tiles_height_split) {
+    int i;
+    int32_t prev_tile_split = 0;
+    for (i=0; i < cfg->tiles_height_count; ++i) {
+      if (cfg->tiles_height_split[i] <= prev_tile_split) {
+        fprintf(stderr, "Input error: tile separations in height should be strictly monotonic (%d <= %d)\n", cfg->tiles_height_split[i], prev_tile_split);
+        return 0;
+      }
+      if ((cfg->tiles_height_split[i] % LCU_WIDTH) != 0) {
+        fprintf(stderr, "Input error: tile separation in height %d (at %d) is not at a multiple of LCU_WIDTH (%d)\n", i, cfg->tiles_height_split[i], LCU_WIDTH);
+        return 0;
+      }
+      prev_tile_split = cfg->tiles_height_split[i];
+    }
+    
+    if (cfg->tiles_height_split[cfg->tiles_height_count-1] >= cfg->height) {
+      fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count-1], cfg->height);
+      return 0;
+    }
+  }
+#endif //USE_TILES
   return 1;
 }
