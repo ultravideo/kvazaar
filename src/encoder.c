@@ -748,6 +748,7 @@ void encode_prefix_sei_version(encoder_state * const encoder_state)
 
 void encode_pic_parameter_set(encoder_state * const encoder_state)
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
@@ -778,13 +779,35 @@ void encode_pic_parameter_set(encoder_state * const encoder_state)
 
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(stream, 0, 1, "transquant_bypass_enable_flag");
-  WRITE_U(stream, 0, 1, "tiles_enabled_flag");
+  WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
   WRITE_U(stream, 0, 1, "entropy_coding_sync_enabled_flag");
-  //TODO: enable tiles for concurrency
-  //IF tiles
-  //ENDIF
+
+#if USE_TILES
+  if (encoder->tiles_enable) {
+    WRITE_UE(stream, encoder->tiles_num_tile_columns - 1, "num_tile_columns_minus1");
+    WRITE_UE(stream, encoder->tiles_num_tile_rows - 1, "num_tile_rows_minus1");
+    
+    WRITE_U(stream, encoder->tiles_uniform_spacing_flag, 1, "uniform_spacing_flag");
+    
+    if (!encoder->tiles_uniform_spacing_flag) {
+      int i;
+      for (i = 0; i < encoder->tiles_num_tile_columns - 1; ++i) {
+        WRITE_UE(stream, encoder->tiles_col_width[i] - 1, "column_width_minus1[...]");
+      }
+      for (i = 0; i < encoder->tiles_num_tile_rows - 1; ++i) {
+        WRITE_UE(stream, encoder->tiles_row_height[i] - 1, "row_height_minus1[...]");
+      }
+    }
+    WRITE_U(stream, 0, 1, "loop_filter_across_tiles_enabled_flag");
+    
+  }
+#else
+  assert(encoder->tiles_enable == 0);
+#endif
+  
   WRITE_U(stream, 0, 1, "loop_filter_across_slice_flag");
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
+
   //IF deblocking_filter
     WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
   WRITE_U(stream, encoder_state->encoder_control->deblock_enable ? 0 : 1, 1,
@@ -1214,6 +1237,13 @@ void encode_slice_header(encoder_state * const encoder_state)
   // if !entropy_slice_flag
     WRITE_SE(stream, 0, "slice_qp_delta");
     //WRITE_U(stream, 1, 1, "alignment");
+   
+#if USE_TILES
+  if (encoder->tiles_enable) {
+    //FIXME: use entry points
+    WRITE_UE(stream, 0, "num_entry_point_offsets");
+  }
+#endif //USE_TILES
 }
 
 
