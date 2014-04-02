@@ -131,7 +131,11 @@ typedef int16_t coefficient;
 // tiles are used with asserts. They should be set to 1 if they are ever
 // implemented.
 #define USE_SLICES 0
+#ifndef USE_TILES
 #define USE_TILES 0
+#endif
+
+#define MAX_TILES_PER_DIM 16
 
 /* Inlining functions */
 #ifdef _MSC_VER /* Visual studio */
