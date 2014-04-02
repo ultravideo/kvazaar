@@ -1945,19 +1945,23 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       dequant(encoder, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
       itransform2d(temp_block2,pre_quant_coeff,width,0);
 
-
-      // SAD between reconstruction and original + sum of coeffs
+      // SSD between reconstruction and original + sum of coeffs
       for (i = 0; i < 16; i++) {
-        cost += abs((int)temp_block[i] - (int)block[i]);
-        cost += temp_coeff[i]*temp_coeff[i];
+        int diff = temp_block[i]-block[i];
+        cost += diff*diff;
+        coeffcost += abs((int)temp_coeff[i]);
 
-        cost2 += abs((int)temp_block2[i] - (int)block[i]);
-        cost2 += temp_coeff2[i]*temp_coeff2[i];
+        diff = temp_block2[i] - block[i];
+        cost2 += diff*diff;
+        coeffcost2 += abs((int)temp_coeff2[i]);
       }
+      cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
+      cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
 
       cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
     }
 
+    // Transform and quant residual to coeffs
     if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
       transformskip(block,pre_quant_coeff,width);
     } else {

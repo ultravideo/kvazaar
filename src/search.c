@@ -722,7 +722,7 @@ static int search_cu_intra(encoder_control *encoder,
  * Calculate "final cost" for the block
  * \return Cost of block
  *
- * Take SAD between reconstruction and original and add cost from
+ * Take SSD between reconstruction and original and add cost from
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
  * here as (coefficient_sum * 1.5) * lambda)
  */
@@ -738,18 +738,21 @@ static int lcu_get_final_cost(encoder_control *encoder,
   int x,y;
   cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
 
-  // SAD between reconstruction and original + sum of coeffs
+  // SSD between reconstruction and original + sum of coeffs
   for (y = y_local; y < y_local+width; ++y) {
     for (x = x_local; x < x_local+width; ++x) {
-      cost += abs((int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x]);
+      int diff = (int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x];
+      cost += diff*diff;
       coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
     }
   }
-  // Chroma SAD + sum of coeffs
+  // Chroma SSD + sum of coeffs
   for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
     for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
-      cost += abs((int)lcu->rec.u[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.u[y * (LCU_WIDTH>>1) + x]);
-      cost += abs((int)lcu->rec.v[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.v[y * (LCU_WIDTH>>1) + x]);
+      int diff = (int)lcu->rec.u[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.u[y * (LCU_WIDTH>>1) + x];
+      cost += diff*diff;
+      diff = (int)lcu->rec.v[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.v[y * (LCU_WIDTH>>1) + x];
+      cost += diff*diff;
 
       coeff_cost += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
       coeff_cost += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
