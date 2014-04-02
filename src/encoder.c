@@ -113,10 +113,14 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   }
   scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
   
+  //Tiles
+  encoder->tiles_enable = 0;
+  
   return 1;
 }
 
 int encoder_control_finalize(encoder_control * const encoder) {
+  //Tiles
   scalinglist_destroy(&encoder->scaling_list);
   
   return 1;

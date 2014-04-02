@@ -99,6 +99,29 @@ typedef struct
 
   //scaling list
   scaling_list scaling_list;
+  
+  //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
+  int8_t tiles_enable; /*!<spec: tiles_enabled */
+  
+#if USE_TILES
+  int8_t tiles_uniform_spacing_flag; /*!<spec: uniform_spacing_flag */
+  
+  uint8_t tiles_num_tile_columns; /*!<spec: num_tile_columns_minus1 + 1 */
+  uint8_t tiles_num_tile_rows; /*!<spec: num_tile_rows_minus1 + 1*/
+  
+  const int32_t *tiles_col_width; /*!<spec: colWidth (6.5.1); dimension: tiles_num_tile_columns */
+  const int32_t *tiles_row_height; /*!<spec: rowHeight (6.5.1); dimension: tiles_num_tile_rows */
+  
+  const int32_t *tiles_col_bd; /*!<spec: colBd (6.5.1); dimension: tiles_num_tile_columns + 1 */
+  const int32_t *tiles_row_bd; /*!<spec: rowBd (6.5.1); dimension: tiles_num_tile_rows + 1  */
+  
+  //PicSizeInCtbsY = height_in_lcu * width_in_lcu
+  const int32_t *tiles_ctb_addr_rs_to_ts; /*!<spec:  CtbAddrRsToTs (6.5.1); dimension: PicSizeInCtbsY */
+  const int32_t *tiles_ctb_addr_ts_to_rs; /*!<spec:  CtbAddrTsToRs (6.5.1); dimension: PicSizeInCtbsY */
+  
+  const int32_t *tiles_tile_id; /*!<spec:  TileId (6.5.1); dimension: PicSizeInCtbsY */
+#endif //USE_TILES
+  
 } encoder_control;
 
 typedef struct encoder_state {
