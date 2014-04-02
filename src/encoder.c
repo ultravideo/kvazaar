@@ -751,7 +751,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_UE(encoder->stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_SE(encoder->stream, ((int8_t)encoder->QP)-26, "pic_init_qp_minus26");
   WRITE_U(encoder->stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(encoder->stream, 0, 1, "transform_skip_enabled_flag");
+  WRITE_U(encoder->stream, 1, 1, "transform_skip_enabled_flag");
   WRITE_U(encoder->stream, 0, 1, "cu_qp_delta_enabled_flag");
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(encoder->stream, 0, "diff_cu_qp_delta_depth");
@@ -1927,7 +1927,43 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
     #endif
 
     // Transform and quant residual to coeffs
-    transform2d(block,pre_quant_coeff,width,0);
+    if(width == 4) {
+      int i;
+      coefficient temp_block[16];
+      coefficient temp_coeff[16];
+      coefficient temp_block2[16];
+      coefficient temp_coeff2[16];
+      uint32_t cost = 0,cost2 = 0;
+
+      // Test for transform skip
+      transformskip(block,pre_quant_coeff,width);
+      quant(encoder, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      dequant(encoder, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
+      itransformskip(temp_block,pre_quant_coeff,width);
+
+      transform2d(block,pre_quant_coeff,width,0);
+      quant(encoder, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      dequant(encoder, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
+      itransform2d(temp_block2,pre_quant_coeff,width,0);
+
+
+      // SAD between reconstruction and original + sum of coeffs
+      for (i = 0; i < 16; i++) {
+        cost += abs((int)temp_block[i] - (int)block[i]);
+        cost += temp_coeff[i]*temp_coeff[i];
+
+        cost2 += abs((int)temp_block2[i] - (int)block[i]);
+        cost2 += temp_coeff2[i]*temp_coeff2[i];
+      }
+
+      cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
+    }
+
+    if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
+      transformskip(block,pre_quant_coeff,width);
+    } else {
+      transform2d(block,pre_quant_coeff,width,0);
+    }
 
     if (encoder->rdoq_enable) {
       rdoq(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
@@ -1972,7 +2008,11 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       }
 
       dequant(encoder, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
-      itransform2d(block,pre_quant_coeff,width,0);
+      if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
+        itransformskip(block,pre_quant_coeff,width);
+      } else {
+        itransform2d(block,pre_quant_coeff,width,0);
+      }
 
       i = 0;
 
@@ -2135,7 +2175,7 @@ static void encode_transform_unit(encoder_control *encoder,
       }
     }
 
-    encode_coeff_nxn(encoder, coeff_y, width, 0, scan_idx);
+    encode_coeff_nxn(encoder, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
@@ -2191,11 +2231,11 @@ static void encode_transform_unit(encoder_control *encoder,
     }
 
     if (cur_cu->coeff_top_u[depth]) {
-      encode_coeff_nxn(encoder, coeff_u, width_c, 2, scan_idx);
+      encode_coeff_nxn(encoder, coeff_u, width_c, 2, scan_idx, 0);
     }
 
     if (cur_cu->coeff_top_v[depth]) {
-      encode_coeff_nxn(encoder, coeff_v, width_c, 2, scan_idx);
+      encode_coeff_nxn(encoder, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
 }
@@ -2290,7 +2330,7 @@ void encode_transform_coeff(encoder_control *encoder, int32_t x_pu,int32_t y_pu,
 }
 
 void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t width,
-                      uint8_t type, int8_t scan_mode)
+                      uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
   int c1 = 1;
   uint8_t last_coeff_x = 0;
@@ -2320,6 +2360,12 @@ void encode_coeff_nxn(encoder_control *encoder, coefficient *coeff, uint8_t widt
   cabac_ctx *baseCtx           = (type == 0) ? &g_cu_sig_model_luma[0] :
                                  &g_cu_sig_model_chroma[0];
   memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
+
+  // transform skip flag
+  if(width == 4) {
+    cabac.ctx = (type == 0) ? &g_transform_skip_model_luma : &g_transform_skip_model_chroma;
+    CABAC_BIN(&cabac, tr_skip, "transform_skip_flag");
+  }
 
   // Count non-zero coeffs
   for (i = 0; i < width * width; i++) {

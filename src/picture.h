@@ -56,6 +56,7 @@ typedef struct
   uint32_t bitcost;
   int8_t mode;
   int8_t mode_chroma;
+  int8_t tr_skip;    //!< \brief transform skip flag
 } cu_info_intra;
 
 /**

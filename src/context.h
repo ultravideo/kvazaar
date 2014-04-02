@@ -77,6 +77,8 @@ extern cabac_ctx g_cu_mvd_model[2];
 extern cabac_ctx g_cu_ref_pic_model[2];
 extern cabac_ctx g_mvp_idx_model[2];
 extern cabac_ctx g_cu_qt_root_cbf_model;
+extern cabac_ctx g_transform_skip_model_luma;
+extern cabac_ctx g_transform_skip_model_chroma;
 #define CNU 154
 
 #endif

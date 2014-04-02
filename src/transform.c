@@ -729,6 +729,43 @@ static void partial_butterfly_inverse_32(int16_t *src, int16_t *dst,
   }
 }
 
+/**
+ * \brief NxN inverse transform (2D)
+ * \param coeff input data (transform coefficients)
+ * \param block output data (residual)
+ * \param block_size input data (width of transform)
+ */
+void transformskip(int16_t *block,int16_t *coeff, int8_t block_size)
+{
+  uint32_t log2_tr_size =  g_convert_to_bit[block_size] + 2;
+  int32_t  shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;
+  int32_t  j,k;
+  for (j = 0; j < block_size; j++) {
+    for(k = 0; k < block_size; k ++) {
+      coeff[j * block_size + k] = block[j * block_size + k] << shift;
+    }
+  }
+}
+
+/**
+ * \brief inverse transform skip
+ * \param coeff input data (transform coefficients)
+ * \param block output data (residual)
+ * \param block_size width of transform
+ */
+void itransformskip(int16_t *block,int16_t *coeff, int8_t block_size)
+{
+  uint32_t log2_tr_size =  g_convert_to_bit[block_size] + 2;
+  int32_t  shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;
+  int32_t  j,k;
+  int32_t offset;
+  offset = (1 << (shift -1)); // For rounding
+  for ( j = 0; j < block_size; j++ ) {
+    for(k = 0; k < block_size; k ++) {
+      block[j * block_size + k] =  (coeff[j * block_size + k] + offset) >> shift;
+    }
+  }
+}
 
 /**
  * \brief forward transform (2D)

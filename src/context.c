@@ -166,6 +166,13 @@ const uint8_t INIT_ABS_FLAG[3][6] =
   { 138,153,136,167,152,152},
 };
 
+static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
+{
+  { 139,  139},
+  { 139,  139},
+  { 139,  139},
+};
+
 
 // CONTEXTS
 cabac_ctx g_sao_merge_flag_model;
@@ -196,6 +203,8 @@ cabac_ctx g_cu_mvd_model[2];
 cabac_ctx g_cu_ref_pic_model[2];
 cabac_ctx g_mvp_idx_model[2];
 cabac_ctx g_cu_qt_root_cbf_model;
+cabac_ctx g_transform_skip_model_luma;
+cabac_ctx g_transform_skip_model_chroma;
 
 
 
@@ -227,6 +236,9 @@ void init_contexts(encoder_control *encoder, int8_t slice)
   uint16_t i;
 
   // Initialize contexts
+  ctx_init(&g_transform_skip_model_luma, encoder->QP, INIT_TRANSFORMSKIP_FLAG[slice][0]);
+  ctx_init(&g_transform_skip_model_chroma, encoder->QP, INIT_TRANSFORMSKIP_FLAG[slice][1]);
+
   ctx_init(&g_sao_merge_flag_model, encoder->QP, INIT_SAO_MERGE_FLAG[slice]);
   ctx_init(&g_sao_type_idx_model, encoder->QP, INIT_SAO_TYPE_IDX[slice]);
 
