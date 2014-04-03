@@ -309,7 +309,6 @@ int main(int argc, char *argv[])
       // Write reconstructed frame out.
       // Use conformance-window dimensions instead of internal ones.
       const int width = encoder->in.width;
-      const int height = encoder->in.height;
       const int out_width = encoder->in.real_width;
       const int out_height = encoder->in.real_height;
       int y;

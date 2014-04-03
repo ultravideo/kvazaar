@@ -129,12 +129,7 @@ void encode_block_residual(encoder_control *encoder,
 extern double g_lambda_cost[55];
 extern double g_cur_lambda_cost;
 extern int8_t g_convert_to_bit[LCU_WIDTH + 1];
-static int8_t g_bitdepth     = 8;
-static int8_t g_bit_increment = 0;
-
-#define MAX_NUM_SPU_W ((1 << (MAX_DEPTH)) / 4)
-static uint32_t g_z_scan_to_raster[MAX_NUM_SPU_W * MAX_NUM_SPU_W] = { 0, };
-static uint32_t g_raster_to_z_scan[MAX_NUM_SPU_W * MAX_NUM_SPU_W] = { 0, };
+static int8_t g_bitdepth = 8;
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
@@ -192,7 +187,7 @@ static const uint32_t g_sig_last_scan_32x32[64] = {
  * First index: (log2 - 2) of transform block size
  * Second index: scan pattern 0 = diagonal, 1 = horizontal, 2 = vertical
  */
-static const uint32_t *g_sig_last_scan_cg[4][3] = {
+static const uint32_t *const g_sig_last_scan_cg[4][3] = {
   { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },  // 4x4, only first element is used
   { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },
   { g_sig_last_scan_16x16, 0, 0 },

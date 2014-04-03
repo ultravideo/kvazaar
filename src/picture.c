@@ -210,8 +210,6 @@ int picture_list_add(picture_list *list,picture* pic)
  */
 int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
 {
-  int i;
-
   // Must be within list boundaries
   if (n >= list->used_size)
   {
@@ -229,6 +227,7 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
     list->used_size--;
   } else {
     // Shift all following pics one backward in the list
+    int i;
     for (i = n; n < list->used_size - 1; ++n) {
       list->pics[n] = list->pics[n + 1];
     }

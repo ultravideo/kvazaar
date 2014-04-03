@@ -775,7 +775,7 @@ void itransformskip(int16_t *block,int16_t *coeff, int8_t block_size)
  */
 void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
 {
-  int32_t shift_1st = g_convert_to_bit[block_size]  + 1 + g_bit_increment;
+  int32_t shift_1st = g_convert_to_bit[block_size]  + 1 + (8 - g_bitdepth);
   int32_t shift_2nd = g_convert_to_bit[block_size]  + 8;
 
   int16_t tmp[LCU_WIDTH * LCU_WIDTH];

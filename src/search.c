@@ -121,8 +121,6 @@ static int calc_mvd_cost(int x, int y, const vector2d *pred,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
-  int cost = 0;
-
   uint32_t temp_bitcost = 0;
   uint32_t merge_idx;
   int cand1_cost,cand2_cost;
@@ -1017,7 +1015,6 @@ static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, co
   {
     picture *const pic = encoder->in.cur_pic;
     const int pic_width = encoder->in.width;
-    const int pic_height = encoder->in.height;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, encoder->in.height) - y_px;
     const int luma_index = x_px + y_px * pic_width;

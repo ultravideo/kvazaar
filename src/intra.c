@@ -111,7 +111,6 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
 int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
                                     cu_info* cur_cu, cu_info* left_cu, cu_info* above_cu)
 {
-  int x_cu = x>>3;
   int y_cu = y>>3;
 
   // The default mode if block is not coded yet is INTRA_DC.
@@ -777,8 +776,6 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
 
   int8_t width = LCU_WIDTH >> depth;
   int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
-  static vector2d offsets[4] = {{0,0},{1,0},{0,1},{1,1}};
-  int num_pu = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
   int i = PU_INDEX(x >> 2, y >> 2);
 
   cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
