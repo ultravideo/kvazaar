@@ -476,12 +476,28 @@ void encode_one_frame(encoder_state * const encoder_state)
 
   {
     picture* const cur_pic = encoder_state->cur_pic;
+    int lcu_id;
+    int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
+    
     vector2d lcu;
     const vector2d size = { cur_pic->width, cur_pic->height };
-    const vector2d size_lcu = { cur_pic->width_in_lcu, cur_pic->height_in_lcu };
+    //FIXME: not used?
+    //const vector2d size_lcu = { cur_pic->width_in_lcu, cur_pic->height_in_lcu };
+    
+    //lcu_id use raster scan if not USE_TILES, otherwise it's tile scan.
+    for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
+      if (encoder->tiles_enable && USE_TILES) {
+#if USE_TILES
+        //lcu_id is the address in TS
+        lcu.x = encoder->tiles_ctb_addr_ts_to_rs[lcu_id] % encoder->in.width_in_lcu;
+        lcu.y = encoder->tiles_ctb_addr_ts_to_rs[lcu_id] / encoder->in.width_in_lcu;
+#endif //USE_TILES
+      } else {
+        lcu.x = lcu_id % encoder->in.width_in_lcu;
+        lcu.y = lcu_id / encoder->in.width_in_lcu;
+      }
 
-    for (lcu.y = 0; lcu.y < cur_pic->height_in_lcu; lcu.y++) {
-      for (lcu.x = 0; lcu.x < cur_pic->width_in_lcu; lcu.x++) {
+      {
         const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
 
         // Handle partial LCUs on the right and bottom.
@@ -555,8 +571,21 @@ void encode_one_frame(encoder_state * const encoder_state)
         encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
 
         {
-          const int last_lcu = (lcu.x == size_lcu.x - 1 && lcu.y == size_lcu.y - 1);
-          cabac_encode_bin_trm(&encoder_state->cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
+          const int last_lcu = (lcu_id == lcu_count - 1);
+
+#if USE_TILES
+          if (USE_TILES && !last_lcu && encoder->tiles_enable && encoder->tiles_tile_id[lcu_id+1] != encoder->tiles_tile_id[lcu_id]) {
+            //Terminate the current tile, and reinitialize CABAC context
+            cabac_encode_bin_trm(&encoder_state->cabac, 0); // end_of_slice_segment_flag
+            cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
+            cabac_flush(&encoder_state->cabac);
+            init_contexts(encoder_state, encoder_state->QP, cur_pic->slicetype);
+          } else {
+#else
+          if (1) {
+#endif //USE_TILES
+            cabac_encode_bin_trm(&encoder_state->cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
+          }
         }
       }
     }
