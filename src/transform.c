@@ -995,7 +995,6 @@ void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t w
 
   shift = 20 - QUANT_SHIFT - transform_shift;
 
-  UNREFERENCED_PARAMETER(block_type);
   if (g_scaling_list_enable)
   {
     uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;

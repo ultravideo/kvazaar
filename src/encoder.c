@@ -2568,8 +2568,6 @@ void encode_last_significant_xy(encoder_control *encoder,
   cabac_ctx *base_ctx_x = (type ? g_cu_ctx_last_x_chroma : g_cu_ctx_last_x_luma);
   cabac_ctx *base_ctx_y = (type ? g_cu_ctx_last_y_chroma : g_cu_ctx_last_y_luma);
 
-  UNREFERENCED_PARAMETER(encoder);
-
   if (scan == SCAN_VER) {
     SWAP( lastpos_x, lastpos_y,uint8_t );
   }

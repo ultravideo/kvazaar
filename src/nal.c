@@ -35,7 +35,7 @@
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
  */
-void nal_write(FILE *output,uint8_t nal_ref, uint8_t nal_type,
+void nal_write(FILE *output, uint8_t nal_ref, uint8_t nal_type,
                uint8_t temporal_id,int long_start_code)
 {
   uint8_t byte;
@@ -43,10 +43,6 @@ void nal_write(FILE *output,uint8_t nal_ref, uint8_t nal_type,
   // Some useful constants
   const uint8_t start_code_prefix_one_3bytes = 0x01;
   const uint8_t zero = 0x00;
-
-  // This parameter might not be needed, but I'm not going to remove it
-  // right away.
-  UNREFERENCED_PARAMETER(nal_ref);
 
   // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
   // and PPS, or the first NALU of an access unit
