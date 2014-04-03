@@ -279,8 +279,8 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
   |A1|_________|
   |A0|
   */
-  int32_t x_cu = (x & LCU_WIDTH-1) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
-  int32_t y_cu = (y & LCU_WIDTH-1) >> MAX_DEPTH;
+  int32_t x_cu = (x & (LCU_WIDTH - 1)) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
+  int32_t y_cu = (y & (LCU_WIDTH - 1)) >> MAX_DEPTH;
   cu_info* cu = &lcu->cu[LCU_CU_OFFSET];
   // A0 and A1 availability testing
   if (x != 0) {
