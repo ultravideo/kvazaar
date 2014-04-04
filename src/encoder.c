@@ -51,7 +51,7 @@ int8_t g_convert_to_bit[LCU_WIDTH + 1];
 static void add_checksum(encoder_control* encoder);
 static void encode_VUI(encoder_control* encoder);
 static void encode_sao(encoder_control *encoder,
-		       cabac_data *cabac,
+                       cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
 
@@ -392,7 +392,7 @@ void encode_one_frame(encoder_control* encoder)
   const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
 
   picture *pic = encoder->in.cur_pic;
-  
+
   cabac_data cabac;
 
   // Initialize lambda value(s) to use in search
@@ -459,7 +459,7 @@ void encode_one_frame(encoder_control* encoder)
     nal_write(encoder->output,
               is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
-  
+
   // Set CABAC output bitstream
   cabac.stream = encoder->stream;
 
@@ -1266,7 +1266,7 @@ static void encode_sao_merge_flags(sao_info *sao, cabac_data *cabac,
  * \brief Encode SAO information.
  */
 static void encode_sao(encoder_control *encoder,
-		       cabac_data *cabac,
+                       cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma)
 {
@@ -1283,7 +1283,7 @@ static void encode_sao(encoder_control *encoder,
 
 
 void encode_coding_tree(encoder_control *encoder, cabac_data *cabac,
-			uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
+                        uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);

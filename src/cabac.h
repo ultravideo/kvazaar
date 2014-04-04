@@ -45,7 +45,7 @@ typedef struct
   int32_t    bits_left;
   int8_t     only_count;
   bitstream *stream;
-  
+
   // CONTEXTS
   cabac_ctx ctx_sao_merge_flag_model;
   cabac_ctx ctx_sao_type_idx_model;

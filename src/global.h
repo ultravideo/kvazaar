@@ -61,7 +61,7 @@ typedef int16_t coefficient;
 #define MAX_INTER_SEARCH_DEPTH 3
 #define MIN_INTER_SEARCH_DEPTH 0
 
-#define MAX_INTRA_SEARCH_DEPTH 4 
+#define MAX_INTRA_SEARCH_DEPTH 4
 #define MIN_INTRA_SEARCH_DEPTH 1
 
 #define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */

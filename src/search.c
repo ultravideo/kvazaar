@@ -725,7 +725,7 @@ static int search_cu_intra(encoder_control *encoder,
  * here as (coefficient_sum * 1.5) * lambda)
  */
 static int lcu_get_final_cost(encoder_control *encoder,
-			      cabac_data *cabac,
+                              cabac_data *cabac,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {

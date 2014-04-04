@@ -107,7 +107,7 @@ int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient 
 
   // Store cabac state
   memcpy(&temp_cabac,cabac,sizeof(cabac_data));
-  
+
   // Clear bytes and bits and set mode to "count"
   cabac->only_count = 1;
   cabac->num_buffered_bytes = 0;
@@ -156,7 +156,7 @@ int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient 
  * From HM 12.0
  */
 double get_ic_rate_cost  (cabac_data *cabac,
-			  uint32_t abs_level,
+                          uint32_t abs_level,
                           uint16_t ctx_num_one,
                           uint16_t ctx_num_abs,
                           uint16_t abs_go_rice,
