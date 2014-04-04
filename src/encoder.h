@@ -132,7 +132,7 @@ void encode_block_residual(encoder_control *encoder,
 extern double g_lambda_cost[55];
 extern double g_cur_lambda_cost;
 extern int8_t g_convert_to_bit[LCU_WIDTH + 1];
-static int8_t g_bitdepth = 8;
+extern int8_t g_bitdepth;
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
