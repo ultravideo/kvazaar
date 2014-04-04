@@ -30,6 +30,7 @@
 #include "context.h"
 #include "cabac.h"
 
+
 #define QUANT_SHIFT          14
 #define MAX_TR_DYNAMIC_RANGE 15
 #define SCAN_SET_SIZE        16
@@ -55,6 +56,85 @@ const uint32_t entropy_bits[128] =
   0x007ba, 0x24df7, 0x00753, 0x25797, 0x006f2, 0x26137, 0x00696, 0x26ad7, 0x0063f, 0x27477, 0x005ed, 0x27e17, 0x0059f, 0x287b6, 0x00554, 0x29156,
   0x0050e, 0x29af6, 0x004cc, 0x2a497, 0x0048d, 0x2ae35, 0x00451, 0x2b7d6, 0x00418, 0x2c176, 0x003e2, 0x2cb15, 0x003af, 0x2d4b5, 0x0037f, 0x2de55
 };
+
+
+int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t width, int32_t type)
+{
+  cabac_data temp_cabac;
+  int32_t cost = 0;
+  //Context to save
+  cabac_ctx sig_coeff_group[4];
+  cabac_ctx sig_model[27];
+  cabac_ctx transform_skip;
+  cabac_ctx one_model[16];
+  cabac_ctx abs_model[4];
+  cabac_ctx last_x[15];
+  cabac_ctx last_y[15];
+  int i;
+  int found = 0;
+
+  for(i = 0; i < width*width; i++) {
+    if(coeff != 0) {
+      found = 1;
+      break;
+    }
+  }
+
+  if(!found) return 0;
+
+  // Store contexts
+  if(type==0) {
+    memcpy(last_x,g_cu_ctx_last_x_luma, sizeof(cabac_ctx)*15);
+    memcpy(last_y,g_cu_ctx_last_y_luma, sizeof(cabac_ctx)*15);
+    memcpy(abs_model,g_cu_abs_model_luma, sizeof(cabac_ctx)*4);
+    memcpy(one_model,g_cu_one_model_luma, sizeof(cabac_ctx)*16);
+    memcpy(sig_model,g_cu_sig_model_luma, sizeof(cabac_ctx)*27);
+    memcpy(&transform_skip,&g_transform_skip_model_luma, sizeof(cabac_ctx));
+  } else {
+    memcpy(last_x,g_cu_ctx_last_x_chroma, sizeof(cabac_ctx)*15);
+    memcpy(last_y,g_cu_ctx_last_y_chroma, sizeof(cabac_ctx)*15);
+    memcpy(abs_model,g_cu_abs_model_chroma, sizeof(cabac_ctx)*2);
+    memcpy(one_model,g_cu_one_model_chroma, sizeof(cabac_ctx)*8);
+    memcpy(sig_model,g_cu_sig_model_chroma, sizeof(cabac_ctx)*15);
+    memcpy(&transform_skip,&g_transform_skip_model_chroma, sizeof(cabac_ctx));
+  }
+  memcpy(sig_coeff_group,g_cu_sig_coeff_group_model,sizeof(cabac_ctx)*4);
+
+  // Store cabac state
+  memcpy(&temp_cabac,&cabac,sizeof(cabac_data));
+  cabac.only_count = 1;
+  cabac.num_buffered_bytes = 0;
+  cabac.bits_left = 23;
+
+  encode_coeff_nxn(encoder, coeff, width, type, width < 8? SCAN_VER:SCAN_DIAG, 0);
+
+  cost = (23-cabac.bits_left) + (cabac.num_buffered_bytes << 3);
+
+  // Restore cabac state
+  memcpy(&cabac,&temp_cabac,sizeof(cabac_data));
+
+  // Restore contexts
+  if(type==0) {
+    memcpy(g_cu_ctx_last_x_luma,last_x, sizeof(cabac_ctx)*15);
+    memcpy(g_cu_ctx_last_y_luma,last_y, sizeof(cabac_ctx)*15);
+    memcpy(g_cu_abs_model_luma,abs_model, sizeof(cabac_ctx)*4);
+    memcpy(g_cu_one_model_luma,one_model, sizeof(cabac_ctx)*16);
+    memcpy(g_cu_sig_model_luma,sig_model, sizeof(cabac_ctx)*27);
+    memcpy(&g_transform_skip_model_luma,&transform_skip, sizeof(cabac_ctx));
+  } else {
+    memcpy(g_cu_ctx_last_x_chroma,last_x, sizeof(cabac_ctx)*15);
+    memcpy(g_cu_ctx_last_y_chroma,last_y, sizeof(cabac_ctx)*15);
+    memcpy(g_cu_abs_model_chroma,abs_model, sizeof(cabac_ctx)*2);
+    memcpy(g_cu_one_model_chroma,one_model, sizeof(cabac_ctx)*8);
+    memcpy(g_cu_sig_model_chroma,sig_model, sizeof(cabac_ctx)*15);
+    memcpy(&g_transform_skip_model_chroma,&transform_skip, sizeof(cabac_ctx));
+  }
+  memcpy(g_cu_sig_coeff_group_model,sig_coeff_group,sizeof(cabac_ctx)*4);
+
+
+  return cost;
+}
+
 
 
 #define COEF_REMAIN_BIN_REDUCTION 3

@@ -90,6 +90,7 @@ void cabac_start(cabac_data *data)
   data->bits_left = 23;
   data->num_buffered_bytes = 0;
   data->buffered_byte = 0xff;
+  data->only_count = 0; // By default, write bits out
 }
 
 /**
@@ -99,7 +100,6 @@ void cabac_encode_bin(cabac_data *data, uint32_t bin_value)
 {
   uint32_t lps;
 
-  data->ctx->bins_coded = 1;
 
   lps = g_auc_lpst_table[CTX_STATE(data->ctx)][(data->range >> 6) & 3];
   data->range -= lps;
@@ -135,6 +135,12 @@ void cabac_write(cabac_data *data)
   uint32_t lead_byte = data->low >> (24 - data->bits_left);
   data->bits_left += 8;
   data->low &= 0xffffffffu >> data->bits_left;
+
+  // Binary counter mode
+  if(data->only_count) {
+    data->num_buffered_bytes++;
+    return;
+  }
 
   if (lead_byte == 0xff) {
     data->num_buffered_bytes++;

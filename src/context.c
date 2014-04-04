@@ -223,7 +223,6 @@ void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
   } else {
     ctx->uc_state = (63 - init_state) << 1;
   }
-  ctx->bins_coded = 0;
 }
 
 /**

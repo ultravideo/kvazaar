@@ -33,7 +33,6 @@
 typedef struct
 {
   uint8_t  uc_state;
-  uint32_t bins_coded;
 } cabac_ctx;
 
 
