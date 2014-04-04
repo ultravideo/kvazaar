@@ -113,7 +113,7 @@ int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t wid
   cabac.bits_left = 23;
 
   // Execute the coding function
-  encode_coeff_nxn(encoder, coeff, width, type, width < 8? SCAN_VER:SCAN_DIAG, 0);
+  encode_coeff_nxn(encoder, coeff, width, type, SCAN_DIAG, 0);
 
   // Store bitcost before restoring cabac
   cost = (23-cabac.bits_left) + (cabac.num_buffered_bytes << 3);
