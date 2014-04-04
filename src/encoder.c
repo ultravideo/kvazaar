@@ -1936,12 +1936,20 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
 
       // Test for transform skip
       transformskip(block,pre_quant_coeff,width);
-      quant(encoder, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      if (encoder->rdoq_enable) {
+        rdoq(encoder, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+      } else {
+        quant(encoder, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      }
       dequant(encoder, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
       itransformskip(temp_block,pre_quant_coeff,width);
 
       transform2d(block,pre_quant_coeff,width,0);
-      quant(encoder, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      if (encoder->rdoq_enable) {
+        rdoq(encoder, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+      } else {
+        quant(encoder, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      }
       dequant(encoder, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
       itransform2d(temp_block2,pre_quant_coeff,width,0);
 
@@ -1949,14 +1957,21 @@ void encode_transform_tree(encoder_control* encoder, int32_t x, int32_t y, uint8
       for (i = 0; i < 16; i++) {
         int diff = temp_block[i]-block[i];
         cost += diff*diff;
-        coeffcost += abs((int)temp_coeff[i]);
+        //coeffcost += abs((int)temp_coeff[i]);
 
         diff = temp_block2[i] - block[i];
         cost2 += diff*diff;
-        coeffcost2 += abs((int)temp_coeff2[i]);
+        //coeffcost2 += abs((int)temp_coeff2[i]);
       }
-      cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
-      cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
+      // TODO: add an option to use estimated RD-calculation
+      //cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
+      //cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
+
+      coeffcost = get_coeff_cost(encoder, temp_coeff, 4, 0);
+      coeffcost2 = get_coeff_cost(encoder, temp_coeff2, 4, 0);
+
+      cost  += coeffcost*((int)g_cur_lambda_cost+0.5);
+      cost2 += coeffcost2*((int)g_cur_lambda_cost+0.5);
 
       cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
     }
