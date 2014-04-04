@@ -34,7 +34,7 @@
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"
-
+#include "rdo.h"
 
 // Temporarily for debugging.
 #define SEARCH_MV_FULL_RADIUS 0
@@ -724,13 +724,15 @@ static int search_cu_intra(encoder_control *encoder,
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
  * here as (coefficient_sum * 1.5) * lambda)
  */
-static int lcu_get_final_cost(const int x_px, const int y_px,
+static int lcu_get_final_cost(encoder_control *encoder,
+                              const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {
   cu_info *cur_cu;
   int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
   int cost = 0;
   int coeff_cost = 0;
+  //int coeff_cost_temp = 0;
   int width = LCU_WIDTH>>depth;
   int x,y;
   cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
@@ -740,7 +742,8 @@ static int lcu_get_final_cost(const int x_px, const int y_px,
     for (x = x_local; x < x_local+width; ++x) {
       int diff = (int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x];
       cost += diff*diff;
-      coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
+      // TODO: add an option to use estimated RD-calculation
+      //coeff_cost_temp += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
     }
   }
   // Chroma SSD + sum of coeffs
@@ -750,17 +753,56 @@ static int lcu_get_final_cost(const int x_px, const int y_px,
       cost += diff*diff;
       diff = (int)lcu->rec.v[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.v[y * (LCU_WIDTH>>1) + x];
       cost += diff*diff;
-
-      coeff_cost += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
-      coeff_cost += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
+      // TODO: add an option to use estimated RD-calculation
+      //coeff_cost_temp += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
+      //coeff_cost_temp += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
     }
   }
 
   // Bitcost
   cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
 
-  // Coefficient costs (TODO: more tuning of the cost)
-  cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
+  // Coefficient costs
+  // TODO: add an option to use estimated RD-calculation
+  //cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
+
+  // Calculate actual bit costs for coding the coeffs
+  // RDO
+  {
+    coefficient coeff_temp[32*32];
+    coefficient coeff_temp_u[16*16];
+    coefficient coeff_temp_v[16*16];
+    int i;
+    int blocks = (width == 64)?4:1;
+
+    for(i = 0; i < blocks; i++) {
+      // For 64x64 blocks we need to do transform split to 32x32
+      int blk_y = i&2 ? 32:0 + y_local;
+      int blk_x = i&1 ? 32:0 + x_local;
+      int blockwidth = (width == 64)?32:width;
+
+      // Calculate luma coeff bit count
+      picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
+      coeff_cost += get_coeff_cost(encoder, coeff_temp, blockwidth, 0);
+
+      // 2x2 block cannot be coded..
+      if(blockwidth != 4) {
+        blk_y >>= 1;
+        blk_x >>= 1;
+        blockwidth >>= 1;
+
+        // Calculate chroma coeff bit count
+        picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
+        picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
+
+        coeff_cost += get_coeff_cost(encoder, coeff_temp_u, blockwidth, 2);
+        coeff_cost += get_coeff_cost(encoder, coeff_temp_v, blockwidth, 2);
+      }
+    }
+  }
+  // Multiply bit count with lambda to get RD-cost
+  cost += coeff_cost * (int32_t)(g_cur_lambda_cost+0.5);
+
 
   return cost;
 }
@@ -842,7 +884,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = lcu_get_final_cost(x, y, depth, &work_tree[depth]);
+    cost = lcu_get_final_cost(encoder, x, y, depth, &work_tree[depth]);
   }
 
   // Recursively split all the way to max search depth.

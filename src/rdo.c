@@ -57,12 +57,17 @@ const uint32_t entropy_bits[128] =
   0x0050e, 0x29af6, 0x004cc, 0x2a497, 0x0048d, 0x2ae35, 0x00451, 0x2b7d6, 0x00418, 0x2c176, 0x003e2, 0x2cb15, 0x003af, 0x2d4b5, 0x0037f, 0x2de55
 };
 
-
+/** Calculate actual (or really close to actual) bitcost for coding coefficients
+ * \param coeff coefficient array
+ * \param width coeff block width
+ * \param type data type (0 == luma)
+ * \returns bits needed to code input coefficients
+ */
 int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t width, int32_t type)
 {
   cabac_data temp_cabac;
   int32_t cost = 0;
-  //Context to save
+  //Context to save  TODO: handle contexts better
   cabac_ctx sig_coeff_group[4];
   cabac_ctx sig_model[27];
   cabac_ctx transform_skip;
@@ -82,7 +87,7 @@ int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t wid
 
   if(!found) return 0;
 
-  // Store contexts
+  // Store contexts TODO: handle contexts better
   if(type==0) {
     memcpy(last_x,g_cu_ctx_last_x_luma, sizeof(cabac_ctx)*15);
     memcpy(last_y,g_cu_ctx_last_y_luma, sizeof(cabac_ctx)*15);
@@ -102,18 +107,21 @@ int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t wid
 
   // Store cabac state
   memcpy(&temp_cabac,&cabac,sizeof(cabac_data));
+  // Clear bytes and bits and set mode to "count"
   cabac.only_count = 1;
   cabac.num_buffered_bytes = 0;
   cabac.bits_left = 23;
 
+  // Execute the coding function
   encode_coeff_nxn(encoder, coeff, width, type, width < 8? SCAN_VER:SCAN_DIAG, 0);
 
+  // Store bitcost before restoring cabac
   cost = (23-cabac.bits_left) + (cabac.num_buffered_bytes << 3);
 
   // Restore cabac state
   memcpy(&cabac,&temp_cabac,sizeof(cabac_data));
 
-  // Restore contexts
+  // Restore contexts TODO: handle contexts better
   if(type==0) {
     memcpy(g_cu_ctx_last_x_luma,last_x, sizeof(cabac_ctx)*15);
     memcpy(g_cu_ctx_last_y_luma,last_y, sizeof(cabac_ctx)*15);
