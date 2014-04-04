@@ -157,7 +157,6 @@ static int config_parse(config *cfg, const char *name, const char *value)
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
 
-  int i;
   int error = 0;
 
   if (!name)
@@ -165,8 +164,9 @@ static int config_parse(config *cfg, const char *name, const char *value)
   if (!value)
     value = "true";
 
-  if ((!strncmp(name, "no-", 3) && (i = 3))) {
-    name += i;
+  // Treat "--no-param" as --param 0
+  if ((!strncmp(name, "no-", 3))) {
+    name += 3;
     value = atobool(value) ? "false" : "true";
   }
 
