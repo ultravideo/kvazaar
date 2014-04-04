@@ -31,6 +31,11 @@
 # include <config.h>
 #endif
 
+/* Don't show warnings about unusued parameters or old style decl. */
+#ifdef _MSC_VER
+#  pragma warning(disable : 4100 4131)
+#endif
+
 #if !defined __STDC__ || !__STDC__
 /* This is a separate conditional since some stdc systems
    reject `defined (const)'.  */
