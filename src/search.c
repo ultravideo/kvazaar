@@ -132,7 +132,7 @@ static int calc_mvd_cost(int x, int y, const vector2d *pred,
   y <<= 2;
 
   // Check every candidate to find a match
-  for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+  for(merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
     if (merge_cand[merge_idx][0] == x &&
         merge_cand[merge_idx][1] == y &&
         merge_cand[merge_idx][2] == ref_idx) {
@@ -373,7 +373,7 @@ static unsigned search_mv_full(unsigned depth,
 static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lcu_t *lcu)
 {
   picture *cur_pic = encoder->in.cur_pic;
-  int32_t ref_idx = 0;
+  uint32_t ref_idx = 0;
   int x_local = (x&0x3f), y_local = (y&0x3f);
   int x_cu = x>>3;
   int y_cu = y>>3;
@@ -427,7 +427,7 @@ static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lc
     for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
       if (merge_cand[merge_idx][0] == mv.x &&
           merge_cand[merge_idx][1] == mv.y &&
-          merge_cand[merge_idx][2] == ref_idx) {
+          (uint32_t)merge_cand[merge_idx][2] == ref_idx) {
         merged = 1;
         break;
       }
@@ -699,9 +699,9 @@ static int search_cu_intra(encoder_control *encoder,
 
   // Find best intra mode for 2Nx2N.
   {
-    uint32_t cost = -1;
+    uint32_t cost = UINT32_MAX;
     int16_t mode = -1;
-    uint32_t bitcost = -1;
+    uint32_t bitcost = UINT32_MAX;
     pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
     mode = intra_prediction(ref_pixels, LCU_WIDTH,

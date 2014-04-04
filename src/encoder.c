@@ -837,7 +837,7 @@ static void encode_scaling_list(encoder_control* encoder)
 {
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
-    uint32_t list_id;
+    int32_t list_id;
     for (list_id = 0; list_id < g_scaling_list_num[size_id]; list_id++) {
       uint8_t scaling_list_pred_mode_flag = 1;
       int32_t pred_list_idx;
