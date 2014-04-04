@@ -147,9 +147,11 @@ int main(int argc, char *argv[])
     sprintf(dim_str, "_%dx%d.yuv", cfg->width, cfg->height);
     left_len = strlen(cfg->debug);
     right_len = strlen(dim_str);
-    if (realloc(cfg->debug, left_len + right_len + 1)) {
-      strcpy(cfg->debug + left_len, dim_str);
+    if (!(cfg->debug = realloc(cfg->debug, left_len + right_len + 1))) {
+      fprintf(stderr, "realloc failed!\n");
+      return EXIT_FAILURE;
     }
+    strcpy(cfg->debug + left_len, dim_str);
   }
 
   // Do more validation to make sure the parameters we have make sense.
