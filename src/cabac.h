@@ -27,10 +27,14 @@
 #include "global.h"
 
 #include "bitstream.h"
-#include "context.h"
 
 
 // Types
+typedef struct
+{
+  uint8_t  uc_state;
+} cabac_ctx;
+
 typedef struct
 {
   cabac_ctx *ctx;
@@ -41,6 +45,38 @@ typedef struct
   int32_t    bits_left;
   int8_t     only_count;
   bitstream *stream;
+
+  // CONTEXTS
+  cabac_ctx ctx_sao_merge_flag_model;
+  cabac_ctx ctx_sao_type_idx_model;
+  cabac_ctx ctx_split_flag_model[3]; //!< \brief split flag context models
+  cabac_ctx ctx_intra_mode_model;    //!< \brief intra mode context models
+  cabac_ctx ctx_chroma_pred_model[2];
+  cabac_ctx ctx_trans_subdiv_model[3]; //!< \brief intra mode context models
+  cabac_ctx ctx_qt_cbf_model_luma[3];
+  cabac_ctx ctx_qt_cbf_model_chroma[3];
+  cabac_ctx ctx_part_size_model[4];
+  cabac_ctx ctx_cu_sig_coeff_group_model[4];
+  cabac_ctx ctx_cu_sig_model_luma[27];
+  cabac_ctx ctx_cu_sig_model_chroma[15];
+  cabac_ctx ctx_cu_ctx_last_y_luma[15];
+  cabac_ctx ctx_cu_ctx_last_y_chroma[15];
+  cabac_ctx ctx_cu_ctx_last_x_luma[15];
+  cabac_ctx ctx_cu_ctx_last_x_chroma[15];
+  cabac_ctx ctx_cu_one_model_luma[16];
+  cabac_ctx ctx_cu_one_model_chroma[8];
+  cabac_ctx ctx_cu_abs_model_luma[4];
+  cabac_ctx ctx_cu_abs_model_chroma[2];
+  cabac_ctx ctx_cu_pred_mode_model;
+  cabac_ctx ctx_cu_skip_flag_model[3];
+  cabac_ctx ctx_cu_merge_idx_ext_model;
+  cabac_ctx ctx_cu_merge_flag_ext_model;
+  cabac_ctx ctx_cu_mvd_model[2];
+  cabac_ctx ctx_cu_ref_pic_model[2];
+  cabac_ctx ctx_mvp_idx_model[2];
+  cabac_ctx ctx_cu_qt_root_cbf_model;
+  cabac_ctx ctx_transform_skip_model_luma;
+  cabac_ctx ctx_transform_skip_model_chroma;
 } cabac_data;
 
 
@@ -49,7 +85,6 @@ extern const uint8_t g_auc_next_state_mps[128];
 extern const uint8_t g_auc_next_state_lps[128];
 extern const uint8_t g_auc_lpst_table[64][4];
 extern const uint8_t g_auc_renorm_table[32];
-extern cabac_data cabac;
 
 
 // Functions

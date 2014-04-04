@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
   FREE_POINTER(encoder->stream);
   free(encoder);
   free_tables();
-  FREE_POINTER(g_exp_table);
+  free_exp_golomb();
 
   return EXIT_SUCCESS;
 }

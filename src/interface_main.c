@@ -4,11 +4,11 @@
  *
  * This file is needed for Visual Studio, because it will not link the main
  * function from the .lib if the project has no .c files.
- * 
- * \author Marko Viitanen ( fador@iki.fi ), 
+ *
+ * \author Marko Viitanen ( fador@iki.fi ),
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
- * \author Ari Koivula ( ari@koivu.la ), 
+ * \author Ari Koivula ( ari@koivu.la ),
  *         Tampere University of Technology,
  *         Department of Pervasive Computing.
  */

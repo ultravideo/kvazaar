@@ -49,6 +49,6 @@ void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* p_dst, int32_
 
 void intra_recon(pixel* rec, uint32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
-void intra_recon_lcu(encoder_control *encoder, int32_t x, int32_t y, int32_t depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
+void intra_recon_lcu(encoder_control* encoder, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
 
 #endif
