@@ -265,8 +265,7 @@ static void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data,
  * \param rec  Top-left corner of the LCU
  */
 static void sao_calc_band_block_dims(const picture *pic, color_index color_i,
-                                     const sao_info *sao, vector2d *rec,
-                                     vector2d *block)
+                                     vector2d *rec, vector2d *block)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
   int width = pic->width >> is_chroma;
@@ -406,7 +405,7 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
   if (sao->type == SAO_TYPE_BAND) {
     tl.x = 0; tl.y = 0;
     br.x = 0; br.y = 0;
-    sao_calc_band_block_dims(pic, color_i, sao,&ofs, &block);
+    sao_calc_band_block_dims(pic, color_i, &ofs, &block);
   }
   else {
     sao_calc_edge_block_dims(pic, color_i, sao, &ofs, &tl, &br, &block);

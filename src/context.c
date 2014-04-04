@@ -357,7 +357,7 @@ int32_t context_calc_pattern_sig_ctx(const uint32_t *sig_coeff_group_flag, uint3
  */
 
 int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int32_t pos_x,
-                                int32_t pos_y, int32_t block_type, int32_t width, int8_t texture_type)
+                                int32_t pos_y, int32_t block_type, int8_t texture_type)
 {
   const int32_t ctx_ind_map[16] =
   {

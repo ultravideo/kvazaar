@@ -408,7 +408,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
           uint32_t  pos_y    = blkpos >> log2_block_size;
           uint32_t  pos_x    = blkpos - ( pos_y << log2_block_size );
           uint16_t  ctx_sig  = (uint16_t)context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
-                                                       log2_block_size, width, type);
+                                                       log2_block_size, type);
           level              = get_coded_level(encoder, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
                                                c1_idx, c2_idx, q_bits, temp, 0, type );

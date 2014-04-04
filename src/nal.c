@@ -35,7 +35,7 @@
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
  */
-void nal_write(FILE *output, uint8_t nal_ref, uint8_t nal_type,
+void nal_write(FILE *output, uint8_t nal_type,
                uint8_t temporal_id,int long_start_code)
 {
   uint8_t byte;

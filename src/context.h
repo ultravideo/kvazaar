@@ -46,7 +46,7 @@ uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t po
 
 
 int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
-                                int32_t pos_y,int32_t block_type,int32_t width, int8_t texture_type);
+                                int32_t pos_y,int32_t block_type, int8_t texture_type);
 
 // CONTEXTS
 extern cabac_ctx g_sao_merge_flag_model;

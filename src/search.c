@@ -117,7 +117,7 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
   return bitcost;
 }
 
-static int calc_mvd_cost(int x, int y, const vector2d *pred,
+static int calc_mvd_cost(int x, int y,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
@@ -203,7 +203,7 @@ static unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + pattern->x, mv.y + pattern->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -217,7 +217,7 @@ static unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x, orig->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(0, 0, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
@@ -233,7 +233,7 @@ static unsigned hexagon_search(unsigned depth,
                                  orig->x + pattern->x,
                                  orig->y + pattern->y,
                                  block_width, block_width);
-        cost += calc_mvd_cost(pattern->x, pattern->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        cost += calc_mvd_cost(pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
         if (cost < best_cost) {
           best_cost    = cost;
@@ -268,7 +268,7 @@ static unsigned hexagon_search(unsigned depth,
                                orig->x + mv.x + offset->x,
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
-      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
       if (cost < best_cost) {
         best_cost    = cost;
@@ -291,7 +291,7 @@ static unsigned hexagon_search(unsigned depth,
                              orig->x + mv.x + offset->x,
                              orig->y + mv.y + offset->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
       best_cost    = cost;
@@ -347,7 +347,7 @@ static unsigned search_mv_full(unsigned depth,
                                orig->x + x,
                                orig->y + y,
                                block_width, block_width);
-      cost += calc_mvd_cost(x, y, mv_in_out,mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(x, y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
       if (cost < best_cost) {
         best_cost    = cost;
         best_bitcost = bitcost;
@@ -724,8 +724,7 @@ static int search_cu_intra(encoder_control *encoder,
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
  * here as (coefficient_sum * 1.5) * lambda)
  */
-static int lcu_get_final_cost(encoder_control *encoder,
-                              const int x_px, const int y_px,
+static int lcu_get_final_cost(const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {
   cu_info *cur_cu;
@@ -843,7 +842,7 @@ static int search_cu(encoder_control *encoder, int x, int y, int depth, lcu_t wo
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = lcu_get_final_cost(encoder, x, y, depth, &work_tree[depth]);
+    cost = lcu_get_final_cost(x, y, depth, &work_tree[depth]);
   }
 
   // Recursively split all the way to max search depth.
