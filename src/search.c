@@ -988,8 +988,8 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
     // Copy left reference pixels.
     if (x > 0) {
       memcpy(&lcu->left_ref.y[1], &ver_buf->y[1], LCU_WIDTH);
-      memcpy(&lcu->left_ref.u[1], &ver_buf->u[1], LCU_WIDTH);
-      memcpy(&lcu->left_ref.v[1], &ver_buf->v[1], LCU_WIDTH);
+      memcpy(&lcu->left_ref.u[1], &ver_buf->u[1], LCU_WIDTH / 2);
+      memcpy(&lcu->left_ref.v[1], &ver_buf->v[1], LCU_WIDTH / 2);
     }
     // Copy top-left reference pixel.
     if (x > 0 && y > 0) {
