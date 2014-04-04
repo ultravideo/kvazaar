@@ -49,7 +49,6 @@ extern const uint8_t g_auc_next_state_mps[128];
 extern const uint8_t g_auc_next_state_lps[128];
 extern const uint8_t g_auc_lpst_table[64][4];
 extern const uint8_t g_auc_renorm_table[32];
-extern cabac_data cabac;
 
 
 // Functions

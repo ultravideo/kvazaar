@@ -77,9 +77,6 @@ const uint8_t g_auc_renorm_table[32] =
   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
 };
 
-cabac_data cabac;
-
-
 /**
  * \brief Initialize struct cabac_data.
  */
