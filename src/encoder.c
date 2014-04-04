@@ -842,7 +842,7 @@ static void encode_scaling_list(encoder_control* encoder)
       uint8_t scaling_list_pred_mode_flag = 1;
       int32_t pred_list_idx;
       int32_t i;
-      uint32_t ref_matrix_id;
+      uint32_t ref_matrix_id = UINT32_MAX;
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
         int32_t *pred_list = (list_id == pred_list_idx) ?

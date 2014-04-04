@@ -522,7 +522,7 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
       int src_pos = src_pos_y+x;
 
       // Temporary variables..
-      int32_t ae_temp, ae_temp1, ae_temp2, ae_temp3;
+      int32_t ae_temp = 0;
 
       // Original pixel (not really needed)
       dst[dst_pos] = src[src_pos]; //B0,0
@@ -539,6 +539,7 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
       if (hor_flag && ver_flag) {
+        int32_t ae_temp1, ae_temp2, ae_temp3;
         // Calculate temporary values..
         //TODO: optimization, store these values
         src_pos -= src_stride;  //0,-1
