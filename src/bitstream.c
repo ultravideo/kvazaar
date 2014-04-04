@@ -103,6 +103,14 @@ int init_exp_golomb(uint32_t len)
 }
 
 /**
+ * \brief Free Exp Golomb tables
+ */
+int free_exp_golomb()
+{
+  FREE_POINTER(g_exp_table);
+}
+
+/**
  * \brief Create and initialize a new bitstream
  */
 bitstream *create_bitstream()

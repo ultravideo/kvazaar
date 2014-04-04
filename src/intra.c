@@ -759,7 +759,7 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
   }
 }
 
-void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
+void intra_recon_lcu(encoder_control* encoder, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
 {
   int x_local = (x&0x3f), y_local = (y&0x3f);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
@@ -819,5 +819,5 @@ void intra_recon_lcu(encoder_control* encoder, int x, int y, int depth, lcu_t *l
                             rec_stride, width, width);
   }
 
-  encode_transform_tree(encoder, x, y, depth, lcu);
+  encode_transform_tree(encoder, cabac, x, y, depth, lcu);
 }

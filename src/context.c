@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "encoder.h"
 
 
 // stuff
@@ -174,39 +175,6 @@ static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
 };
 
 
-// CONTEXTS
-cabac_ctx g_sao_merge_flag_model;
-cabac_ctx g_sao_type_idx_model;
-cabac_ctx g_split_flag_model[3]; //!< \brief split flag context models
-cabac_ctx g_intra_mode_model;    //!< \brief intra mode context models
-cabac_ctx g_chroma_pred_model[2];
-cabac_ctx g_trans_subdiv_model[3]; //!< \brief intra mode context models
-cabac_ctx g_qt_cbf_model_luma[3];
-cabac_ctx g_qt_cbf_model_chroma[3];
-cabac_ctx g_part_size_model[4];
-cabac_ctx g_cu_sig_coeff_group_model[4];
-cabac_ctx g_cu_sig_model_luma[27];
-cabac_ctx g_cu_sig_model_chroma[15];
-cabac_ctx g_cu_ctx_last_y_luma[15];
-cabac_ctx g_cu_ctx_last_y_chroma[15];
-cabac_ctx g_cu_ctx_last_x_luma[15];
-cabac_ctx g_cu_ctx_last_x_chroma[15];
-cabac_ctx g_cu_one_model_luma[16];
-cabac_ctx g_cu_one_model_chroma[8];
-cabac_ctx g_cu_abs_model_luma[4];
-cabac_ctx g_cu_abs_model_chroma[2];
-cabac_ctx g_cu_pred_mode_model;
-cabac_ctx g_cu_skip_flag_model[3];
-cabac_ctx g_cu_merge_idx_ext_model;
-cabac_ctx g_cu_merge_flag_ext_model;
-cabac_ctx g_cu_mvd_model[2];
-cabac_ctx g_cu_ref_pic_model[2];
-cabac_ctx g_mvp_idx_model[2];
-cabac_ctx g_cu_qt_root_cbf_model;
-cabac_ctx g_transform_skip_model_luma;
-cabac_ctx g_transform_skip_model_chroma;
-
-
 
 
 /**
@@ -230,76 +198,77 @@ void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
  * \param encoder encoder control struct
  * \param slice type of slice we are coding (P/B/I)
  */
-void init_contexts(encoder_control *encoder, int8_t slice)
+
+void init_contexts(cabac_data *cabac, int8_t QP, int8_t slice)
 {
   uint16_t i;
 
   // Initialize contexts
-  ctx_init(&g_transform_skip_model_luma, encoder->QP, INIT_TRANSFORMSKIP_FLAG[slice][0]);
-  ctx_init(&g_transform_skip_model_chroma, encoder->QP, INIT_TRANSFORMSKIP_FLAG[slice][1]);
+  ctx_init(&cabac->ctx_transform_skip_model_luma, QP, INIT_TRANSFORMSKIP_FLAG[slice][0]);
+  ctx_init(&cabac->ctx_transform_skip_model_chroma, QP, INIT_TRANSFORMSKIP_FLAG[slice][1]);
 
-  ctx_init(&g_sao_merge_flag_model, encoder->QP, INIT_SAO_MERGE_FLAG[slice]);
-  ctx_init(&g_sao_type_idx_model, encoder->QP, INIT_SAO_TYPE_IDX[slice]);
+  ctx_init(&cabac->ctx_sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice]);
+  ctx_init(&cabac->ctx_sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice]);
 
-  ctx_init(&g_cu_merge_flag_ext_model, encoder->QP, INIT_MERGE_FLAG_EXT[slice][0]);
-  ctx_init(&g_cu_merge_idx_ext_model, encoder->QP, INIT_MERGE_IDX_EXT[slice][0]);
-  ctx_init(&g_cu_pred_mode_model, encoder->QP, INIT_PRED_MODE[slice][0]);
+  ctx_init(&cabac->ctx_cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0]);
+  ctx_init(&cabac->ctx_cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0]);
+  ctx_init(&cabac->ctx_cu_pred_mode_model, QP, INIT_PRED_MODE[slice][0]);
 
-  ctx_init(&g_cu_skip_flag_model[0], encoder->QP, INIT_SKIP_FLAG[slice][0]);
-  ctx_init(&g_cu_skip_flag_model[1], encoder->QP, INIT_SKIP_FLAG[slice][1]);
-  ctx_init(&g_cu_skip_flag_model[2], encoder->QP, INIT_SKIP_FLAG[slice][2]);
+  ctx_init(&cabac->ctx_cu_skip_flag_model[0], QP, INIT_SKIP_FLAG[slice][0]);
+  ctx_init(&cabac->ctx_cu_skip_flag_model[1], QP, INIT_SKIP_FLAG[slice][1]);
+  ctx_init(&cabac->ctx_cu_skip_flag_model[2], QP, INIT_SKIP_FLAG[slice][2]);
 
-  ctx_init(&g_split_flag_model[0], encoder->QP, INIT_SPLIT_FLAG[slice][0]);
-  ctx_init(&g_split_flag_model[1], encoder->QP, INIT_SPLIT_FLAG[slice][1]);
-  ctx_init(&g_split_flag_model[2], encoder->QP, INIT_SPLIT_FLAG[slice][2]);
+  ctx_init(&cabac->ctx_split_flag_model[0], QP, INIT_SPLIT_FLAG[slice][0]);
+  ctx_init(&cabac->ctx_split_flag_model[1], QP, INIT_SPLIT_FLAG[slice][1]);
+  ctx_init(&cabac->ctx_split_flag_model[2], QP, INIT_SPLIT_FLAG[slice][2]);
 
-  ctx_init(&g_intra_mode_model, encoder->QP, INIT_INTRA_PRED_MODE[slice]);
+  ctx_init(&cabac->ctx_intra_mode_model, QP, INIT_INTRA_PRED_MODE[slice]);
 
-  ctx_init(&g_chroma_pred_model[0], encoder->QP, INIT_CHROMA_PRED_MODE[slice][0]);
-  ctx_init(&g_chroma_pred_model[1], encoder->QP, INIT_CHROMA_PRED_MODE[slice][1]);
+  ctx_init(&cabac->ctx_chroma_pred_model[0], QP, INIT_CHROMA_PRED_MODE[slice][0]);
+  ctx_init(&cabac->ctx_chroma_pred_model[1], QP, INIT_CHROMA_PRED_MODE[slice][1]);
 
-  ctx_init(&g_cu_abs_model_chroma[0], encoder->QP, INIT_ABS_FLAG[slice][4]);
-  ctx_init(&g_cu_abs_model_chroma[1], encoder->QP, INIT_ABS_FLAG[slice][5]);
+  ctx_init(&cabac->ctx_cu_abs_model_chroma[0], QP, INIT_ABS_FLAG[slice][4]);
+  ctx_init(&cabac->ctx_cu_abs_model_chroma[1], QP, INIT_ABS_FLAG[slice][5]);
 
   //TODO: ignore P/B contexts on intra frame
-  ctx_init(&g_cu_qt_root_cbf_model, encoder->QP, INIT_QT_ROOT_CBF[slice][0]);
+  ctx_init(&cabac->ctx_cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0]);
 
-  ctx_init(&g_cu_mvd_model[0], encoder->QP, INIT_MVD[slice][0]);
-  ctx_init(&g_cu_mvd_model[1], encoder->QP, INIT_MVD[slice][1]);
-  ctx_init(&g_cu_ref_pic_model[0], encoder->QP, INIT_REF_PIC[slice][0]);
-  ctx_init(&g_cu_ref_pic_model[1], encoder->QP, INIT_REF_PIC[slice][1]);
-  ctx_init(&g_mvp_idx_model[0], encoder->QP, INIT_MVP_IDX[slice][0]);
-  ctx_init(&g_mvp_idx_model[1], encoder->QP, INIT_MVP_IDX[slice][1]);
+  ctx_init(&cabac->ctx_cu_mvd_model[0], QP, INIT_MVD[slice][0]);
+  ctx_init(&cabac->ctx_cu_mvd_model[1], QP, INIT_MVD[slice][1]);
+  ctx_init(&cabac->ctx_cu_ref_pic_model[0], QP, INIT_REF_PIC[slice][0]);
+  ctx_init(&cabac->ctx_cu_ref_pic_model[1], QP, INIT_REF_PIC[slice][1]);
+  ctx_init(&cabac->ctx_mvp_idx_model[0], QP, INIT_MVP_IDX[slice][0]);
+  ctx_init(&cabac->ctx_mvp_idx_model[1], QP, INIT_MVP_IDX[slice][1]);
 
   for (i = 0; i < 4; i++) {
-    ctx_init(&g_cu_sig_coeff_group_model[i], encoder->QP, INIT_SIG_CG_FLAG[slice][i]);
-    ctx_init(&g_cu_abs_model_luma[i], encoder->QP, INIT_ABS_FLAG[slice][i]);
-    ctx_init(&g_part_size_model[i], encoder->QP, INIT_PART_SIZE[slice][i]);
+    ctx_init(&cabac->ctx_cu_sig_coeff_group_model[i], QP, INIT_SIG_CG_FLAG[slice][i]);
+    ctx_init(&cabac->ctx_cu_abs_model_luma[i], QP, INIT_ABS_FLAG[slice][i]);
+    ctx_init(&cabac->ctx_part_size_model[i], QP, INIT_PART_SIZE[slice][i]);
   }
   for (i = 0; i < 3; i++) {
-    ctx_init(&g_trans_subdiv_model[i], encoder->QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
-    ctx_init(&g_qt_cbf_model_luma[i], encoder->QP, INIT_QT_CBF[slice][i]);
-    ctx_init(&g_qt_cbf_model_chroma[i], encoder->QP, INIT_QT_CBF[slice][i+3]);
+    ctx_init(&cabac->ctx_trans_subdiv_model[i], QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
+    ctx_init(&cabac->ctx_qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
+    ctx_init(&cabac->ctx_qt_cbf_model_chroma[i], QP, INIT_QT_CBF[slice][i+3]);
   }
 
   for (i = 0; i < 8; i++) {
-    ctx_init(&g_cu_one_model_chroma[i], encoder->QP, INIT_ONE_FLAG[slice][i+16]);
+    ctx_init(&cabac->ctx_cu_one_model_chroma[i], QP, INIT_ONE_FLAG[slice][i+16]);
   }
 
   for (i = 0; i < 15; i++) {
-    ctx_init(&g_cu_ctx_last_y_luma[i], encoder->QP, INIT_LAST[slice][i] );
-    ctx_init(&g_cu_ctx_last_x_luma[i], encoder->QP, INIT_LAST[slice][i] );
+    ctx_init(&cabac->ctx_cu_ctx_last_y_luma[i], QP, INIT_LAST[slice][i] );
+    ctx_init(&cabac->ctx_cu_ctx_last_x_luma[i], QP, INIT_LAST[slice][i] );
 
-    ctx_init(&g_cu_ctx_last_y_chroma[i], encoder->QP, INIT_LAST[slice][i+15] );
-    ctx_init(&g_cu_ctx_last_x_chroma[i], encoder->QP, INIT_LAST[slice][i+15] );
+    ctx_init(&cabac->ctx_cu_ctx_last_y_chroma[i], QP, INIT_LAST[slice][i+15] );
+    ctx_init(&cabac->ctx_cu_ctx_last_x_chroma[i], QP, INIT_LAST[slice][i+15] );
 
-    ctx_init(&g_cu_one_model_luma[i], encoder->QP, INIT_ONE_FLAG[slice][i]);
+    ctx_init(&cabac->ctx_cu_one_model_luma[i], QP, INIT_ONE_FLAG[slice][i]);
   }
-  ctx_init(&g_cu_one_model_luma[15], encoder->QP, INIT_ONE_FLAG[slice][15]);
+  ctx_init(&cabac->ctx_cu_one_model_luma[15], QP, INIT_ONE_FLAG[slice][15]);
 
   for (i = 0; i < 27; i++) {
-    ctx_init(&g_cu_sig_model_luma[i], encoder->QP, INIT_SIG_FLAG[slice][i]);
-    if(i < 15) ctx_init(&g_cu_sig_model_chroma[i], encoder->QP, INIT_SIG_FLAG[slice][i+27]);
+    ctx_init(&cabac->ctx_cu_sig_model_luma[i], QP, INIT_SIG_FLAG[slice][i]);
+    if(i < 15) ctx_init(&cabac->ctx_cu_sig_model_chroma[i], QP, INIT_SIG_FLAG[slice][i+27]);
   }
 }
 

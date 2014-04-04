@@ -63,7 +63,7 @@ const uint32_t entropy_bits[128] =
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t width, int32_t type)
+int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient *coeff, int32_t width, int32_t type)
 {
   cabac_data temp_cabac;
   int32_t cost = 0;
@@ -89,55 +89,56 @@ int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t wid
 
   // Store contexts TODO: handle contexts better
   if(type==0) {
-    memcpy(last_x,g_cu_ctx_last_x_luma, sizeof(cabac_ctx)*15);
-    memcpy(last_y,g_cu_ctx_last_y_luma, sizeof(cabac_ctx)*15);
-    memcpy(abs_model,g_cu_abs_model_luma, sizeof(cabac_ctx)*4);
-    memcpy(one_model,g_cu_one_model_luma, sizeof(cabac_ctx)*16);
-    memcpy(sig_model,g_cu_sig_model_luma, sizeof(cabac_ctx)*27);
-    memcpy(&transform_skip,&g_transform_skip_model_luma, sizeof(cabac_ctx));
+    memcpy(last_x,cabac->ctx_cu_ctx_last_x_luma, sizeof(cabac_ctx)*15);
+    memcpy(last_y,cabac->ctx_cu_ctx_last_y_luma, sizeof(cabac_ctx)*15);
+    memcpy(abs_model,cabac->ctx_cu_abs_model_luma, sizeof(cabac_ctx)*4);
+    memcpy(one_model,cabac->ctx_cu_one_model_luma, sizeof(cabac_ctx)*16);
+    memcpy(sig_model,cabac->ctx_cu_sig_model_luma, sizeof(cabac_ctx)*27);
+    memcpy(&transform_skip,&cabac->ctx_transform_skip_model_luma, sizeof(cabac_ctx));
   } else {
-    memcpy(last_x,g_cu_ctx_last_x_chroma, sizeof(cabac_ctx)*15);
-    memcpy(last_y,g_cu_ctx_last_y_chroma, sizeof(cabac_ctx)*15);
-    memcpy(abs_model,g_cu_abs_model_chroma, sizeof(cabac_ctx)*2);
-    memcpy(one_model,g_cu_one_model_chroma, sizeof(cabac_ctx)*8);
-    memcpy(sig_model,g_cu_sig_model_chroma, sizeof(cabac_ctx)*15);
-    memcpy(&transform_skip,&g_transform_skip_model_chroma, sizeof(cabac_ctx));
+    memcpy(last_x,cabac->ctx_cu_ctx_last_x_chroma, sizeof(cabac_ctx)*15);
+    memcpy(last_y,cabac->ctx_cu_ctx_last_y_chroma, sizeof(cabac_ctx)*15);
+    memcpy(abs_model,cabac->ctx_cu_abs_model_chroma, sizeof(cabac_ctx)*2);
+    memcpy(one_model,cabac->ctx_cu_one_model_chroma, sizeof(cabac_ctx)*8);
+    memcpy(sig_model,cabac->ctx_cu_sig_model_chroma, sizeof(cabac_ctx)*15);
+    memcpy(&transform_skip,&cabac->ctx_transform_skip_model_chroma, sizeof(cabac_ctx));
   }
-  memcpy(sig_coeff_group,g_cu_sig_coeff_group_model,sizeof(cabac_ctx)*4);
+  memcpy(sig_coeff_group,cabac->ctx_cu_sig_coeff_group_model,sizeof(cabac_ctx)*4);
 
   // Store cabac state
-  memcpy(&temp_cabac,&cabac,sizeof(cabac_data));
+  memcpy(&temp_cabac,cabac,sizeof(cabac_data));
+  
   // Clear bytes and bits and set mode to "count"
-  cabac.only_count = 1;
-  cabac.num_buffered_bytes = 0;
-  cabac.bits_left = 23;
+  cabac->only_count = 1;
+  cabac->num_buffered_bytes = 0;
+  cabac->bits_left = 23;
 
   // Execute the coding function
-  encode_coeff_nxn(encoder, coeff, width, type, SCAN_DIAG, 0);
+  encode_coeff_nxn(encoder, cabac, coeff, width, type, SCAN_DIAG, 0);
 
   // Store bitcost before restoring cabac
-  cost = (23-cabac.bits_left) + (cabac.num_buffered_bytes << 3);
+  cost = (23-cabac->bits_left) + (cabac->num_buffered_bytes << 3);
 
   // Restore cabac state
-  memcpy(&cabac,&temp_cabac,sizeof(cabac_data));
+  memcpy(cabac,&temp_cabac,sizeof(cabac_data));
 
   // Restore contexts TODO: handle contexts better
   if(type==0) {
-    memcpy(g_cu_ctx_last_x_luma,last_x, sizeof(cabac_ctx)*15);
-    memcpy(g_cu_ctx_last_y_luma,last_y, sizeof(cabac_ctx)*15);
-    memcpy(g_cu_abs_model_luma,abs_model, sizeof(cabac_ctx)*4);
-    memcpy(g_cu_one_model_luma,one_model, sizeof(cabac_ctx)*16);
-    memcpy(g_cu_sig_model_luma,sig_model, sizeof(cabac_ctx)*27);
-    memcpy(&g_transform_skip_model_luma,&transform_skip, sizeof(cabac_ctx));
+    memcpy(cabac->ctx_cu_ctx_last_x_luma,last_x, sizeof(cabac_ctx)*15);
+    memcpy(cabac->ctx_cu_ctx_last_y_luma,last_y, sizeof(cabac_ctx)*15);
+    memcpy(cabac->ctx_cu_abs_model_luma,abs_model, sizeof(cabac_ctx)*4);
+    memcpy(cabac->ctx_cu_one_model_luma,one_model, sizeof(cabac_ctx)*16);
+    memcpy(cabac->ctx_cu_sig_model_luma,sig_model, sizeof(cabac_ctx)*27);
+    memcpy(&cabac->ctx_transform_skip_model_luma,&transform_skip, sizeof(cabac_ctx));
   } else {
-    memcpy(g_cu_ctx_last_x_chroma,last_x, sizeof(cabac_ctx)*15);
-    memcpy(g_cu_ctx_last_y_chroma,last_y, sizeof(cabac_ctx)*15);
-    memcpy(g_cu_abs_model_chroma,abs_model, sizeof(cabac_ctx)*2);
-    memcpy(g_cu_one_model_chroma,one_model, sizeof(cabac_ctx)*8);
-    memcpy(g_cu_sig_model_chroma,sig_model, sizeof(cabac_ctx)*15);
-    memcpy(&g_transform_skip_model_chroma,&transform_skip, sizeof(cabac_ctx));
+    memcpy(cabac->ctx_cu_ctx_last_x_chroma,last_x, sizeof(cabac_ctx)*15);
+    memcpy(cabac->ctx_cu_ctx_last_y_chroma,last_y, sizeof(cabac_ctx)*15);
+    memcpy(cabac->ctx_cu_abs_model_chroma,abs_model, sizeof(cabac_ctx)*2);
+    memcpy(cabac->ctx_cu_one_model_chroma,one_model, sizeof(cabac_ctx)*8);
+    memcpy(cabac->ctx_cu_sig_model_chroma,sig_model, sizeof(cabac_ctx)*15);
+    memcpy(&cabac->ctx_transform_skip_model_chroma,&transform_skip, sizeof(cabac_ctx));
   }
-  memcpy(g_cu_sig_coeff_group_model,sig_coeff_group,sizeof(cabac_ctx)*4);
+  memcpy(cabac->ctx_cu_sig_coeff_group_model,sig_coeff_group,sizeof(cabac_ctx)*4);
 
 
   return cost;
@@ -154,7 +155,8 @@ int32_t get_coeff_cost(encoder_control *encoder, coefficient *coeff, int32_t wid
  * \returns cost of given absolute transform level
  * From HM 12.0
  */
-double get_ic_rate_cost  (uint32_t abs_level,
+double get_ic_rate_cost  (cabac_data *cabac,
+			  uint32_t abs_level,
                           uint16_t ctx_num_one,
                           uint16_t ctx_num_abs,
                           uint16_t abs_go_rice,
@@ -165,8 +167,8 @@ double get_ic_rate_cost  (uint32_t abs_level,
 {
   double rate = 32768.0;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  cabac_ctx *base_one_ctx = (type == 0) ? &g_cu_one_model_luma[0] : &g_cu_one_model_chroma[0];
-  cabac_ctx *base_abs_ctx = (type == 0) ? &g_cu_abs_model_luma[0] : &g_cu_abs_model_chroma[0];
+  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx_cu_one_model_luma[0]) : &(cabac->ctx_cu_one_model_chroma[0]);
+  cabac_ctx *base_abs_ctx = (type == 0) ? &(cabac->ctx_cu_abs_model_luma[0]) : &(cabac->ctx_cu_abs_model_chroma[0]);
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
@@ -201,13 +203,13 @@ double get_ic_rate_cost  (uint32_t abs_level,
 }
 
 
-int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
+int32_t get_ic_rate( cabac_data *cabac, uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
                      uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type)
 {
   int32_t rate = 0;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  cabac_ctx *base_one_ctx = (type == 0) ? &g_cu_one_model_luma[0] : &g_cu_one_model_chroma[0];
-  cabac_ctx *base_abs_ctx = (type == 0) ? &g_cu_abs_model_luma[0] : &g_cu_abs_model_chroma[0];
+  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx_cu_one_model_luma[0]) : &(cabac->ctx_cu_one_model_chroma[0]);
+  cabac_ctx *base_abs_ctx = (type == 0) ? &(cabac->ctx_cu_abs_model_luma[0]) : &(cabac->ctx_cu_abs_model_chroma[0]);
 
   if(!abs_level) return 0;
 
@@ -262,7 +264,7 @@ int32_t get_ic_rate( uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_a
  * This method calculates the best quantized transform level for a given scan position.
  * From HM 12.0
  */
-uint32_t get_coded_level ( encoder_control* encoder, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
+uint32_t get_coded_level ( encoder_control* encoder, cabac_data *cabac, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                            uint16_t abs_go_rice,
@@ -273,7 +275,7 @@ uint32_t get_coded_level ( encoder_control* encoder, double *coded_cost, double 
   uint32_t best_abs_level = 0;
   int32_t abs_level;
   int32_t min_abs_level;
-  cabac_ctx* base_sig_model = type?g_cu_sig_model_chroma:g_cu_sig_model_luma;
+  cabac_ctx* base_sig_model = type?(cabac->ctx_cu_sig_model_chroma):(cabac->ctx_cu_sig_model_luma);
 
   if( !last && max_abs_level < 3 ) {
     *coded_cost_sig = g_lambda_cost[encoder->QP] * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 0);
@@ -291,7 +293,7 @@ uint32_t get_coded_level ( encoder_control* encoder, double *coded_cost, double 
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
     double err       = (double)(level_double - ( abs_level << q_bits ) );
     double cur_cost  = err * err * temp + g_lambda_cost[encoder->QP] *
-                       get_ic_rate_cost( abs_level, ctx_num_one, ctx_num_abs,
+                       get_ic_rate_cost( cabac, abs_level, ctx_num_one, ctx_num_abs,
                                          abs_go_rice, c1_idx, c2_idx, type);
     cur_cost        += cur_cost_sig;
 
@@ -330,15 +332,15 @@ static double get_rate_last(encoder_control* encoder,
   return g_lambda_cost[encoder->QP]*uiCost;
 }
 
-static void calc_last_bits(int32_t width, int32_t height, int8_t type,
+static void calc_last_bits(cabac_data *cabac, int32_t width, int32_t height, int8_t type,
                            int32_t* last_x_bits, int32_t* last_y_bits)
 {
   int32_t bits_x = 0, bits_y = 0;
   int32_t blk_size_offset_x, blk_size_offset_y, shiftX, shiftY;
   int32_t ctx;
 
-  cabac_ctx *base_ctx_x = (type ? g_cu_ctx_last_x_chroma : g_cu_ctx_last_x_luma);
-  cabac_ctx *base_ctx_y = (type ? g_cu_ctx_last_y_chroma : g_cu_ctx_last_y_luma);
+  cabac_ctx *base_ctx_x = (type ? cabac->ctx_cu_ctx_last_x_chroma : cabac->ctx_cu_ctx_last_x_luma);
+  cabac_ctx *base_ctx_y = (type ? cabac->ctx_cu_ctx_last_y_chroma : cabac->ctx_cu_ctx_last_y_luma);
 
   blk_size_offset_x = type ? 0: (g_convert_to_bit[ width ] *3 + ((g_convert_to_bit[ width ] +1)>>2));
   blk_size_offset_y = type ? 0: (g_convert_to_bit[ height ]*3 + ((g_convert_to_bit[ height ]+1)>>2));
@@ -366,7 +368,7 @@ static void calc_last_bits(int32_t width, int32_t height, int8_t type,
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
-void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff, int32_t width,
+void  rdoq(encoder_control *encoder, cabac_data *cabac, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;
@@ -421,9 +423,9 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   uint32_t cg_num = width * height >> 4;
   int32_t  scanpos;
 
-  cabac_ctx *base_coeff_group_ctx = &g_cu_sig_coeff_group_model[type];
-  cabac_ctx *baseCtx              = (type == 0) ? &g_cu_sig_model_luma[0] : &g_cu_sig_model_chroma[0];
-  cabac_ctx *base_one_ctx = (type == 0) ? &g_cu_one_model_luma[0] : &g_cu_one_model_chroma[0];
+  cabac_ctx *base_coeff_group_ctx = &(cabac->ctx_cu_sig_coeff_group_model[type]);
+  cabac_ctx *baseCtx              = (type == 0) ? &(cabac->ctx_cu_sig_model_luma[0]) : &(cabac->ctx_cu_sig_model_chroma[0]);
+  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx_cu_one_model_luma[0]) : &(cabac->ctx_cu_one_model_chroma[0]);
 
   double  best_cost        = 0;
   int32_t ctx_cbf          = 0;
@@ -434,7 +436,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
   coeffgroup_rd_stats rd_stats;
 
   int32_t last_x_bits[32],last_y_bits[32];
-  calc_last_bits(width, height, type,last_x_bits, last_y_bits);
+  calc_last_bits(cabac, width, height, type,last_x_bits, last_y_bits);
 
   memset( cost_coeff,     0, sizeof(double) *  max_num_coeff );
   memset( cost_sig,       0, sizeof(double) *  max_num_coeff );
@@ -489,7 +491,7 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
         uint16_t  abs_ctx = ctx_set + c2;
 
         if( scanpos == last_scanpos ) {
-          level            = get_coded_level(encoder, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
+          level            = get_coded_level(encoder, cabac, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, 0, one_ctx, abs_ctx, go_rice_param,
                                                c1_idx, c2_idx, q_bits, temp, 1, type );
         } else {
@@ -497,16 +499,16 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
           uint32_t  pos_x    = blkpos - ( pos_y << log2_block_size );
           uint16_t  ctx_sig  = (uint16_t)context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                                        log2_block_size, type);
-          level              = get_coded_level(encoder, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
+          level              = get_coded_level(encoder, cabac, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
                                                c1_idx, c2_idx, q_bits, temp, 0, type );
           sig_rate_delta[ blkpos ] = CTX_ENTROPY_BITS(&baseCtx[ctx_sig],1) - CTX_ENTROPY_BITS(&baseCtx[ctx_sig],0);
         }
         delta_u[ blkpos ] = (level_double - ((int32_t)level << q_bits)) >> (q_bits-8);
         if( level > 0 ) {
-          int32_t rate_now = get_ic_rate( level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
-          rate_inc_up  [blkpos] = get_ic_rate( level+1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
-          rate_inc_down[blkpos] = get_ic_rate( level-1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
+          int32_t rate_now = get_ic_rate( cabac, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
+          rate_inc_up  [blkpos] = get_ic_rate( cabac, level+1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
+          rate_inc_down[blkpos] = get_ic_rate( cabac, level-1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
         } else { // level == 0
           rate_inc_up[blkpos] = CTX_ENTROPY_BITS(&base_one_ctx[one_ctx],0);
         }
@@ -626,10 +628,10 @@ void  rdoq(encoder_control *encoder, coefficient *coef, coefficient *dest_coeff,
 
 
   if( block_type != CU_INTRA && !type/* && pcCU->getTransformIdx( uiAbsPartIdx ) == 0*/ ) {
-    best_cost  = block_uncoded_cost +   g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&g_cu_qt_root_cbf_model,0);
-    base_cost +=   g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&g_cu_qt_root_cbf_model,1);
+    best_cost  = block_uncoded_cost +   g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&(cabac->ctx_cu_qt_root_cbf_model),0);
+    base_cost +=   g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&(cabac->ctx_cu_qt_root_cbf_model),1);
   } else {
-    cabac_ctx* base_cbf_model = type?g_qt_cbf_model_chroma:g_qt_cbf_model_luma;
+    cabac_ctx* base_cbf_model = type?(cabac->ctx_qt_cbf_model_chroma):(cabac->ctx_qt_cbf_model_luma);
     ctx_cbf   = ( type ? tr_depth : !tr_depth);
     best_cost  = block_uncoded_cost +  g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   g_lambda_cost[encoder->QP]*CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);

@@ -30,6 +30,6 @@
 #include "picture.h"
 
 
-void search_lcu(encoder_control *encoder, int x, int y, yuv_t *hor_buf, yuv_t *ver_buf);
+void search_lcu(encoder_control *encoder, cabac_data *cabac, int x, int y, yuv_t *hor_buf, yuv_t *ver_buf);
 
 #endif
