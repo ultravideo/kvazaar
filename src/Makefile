@@ -45,7 +45,7 @@ else
 endif
 
 CC = gcc
-CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib
+CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib -Wall
 LDFLAGS += -lm
 LD = gcc
 YASM = yasm
