@@ -461,7 +461,7 @@ void encode_one_frame(encoder_control* encoder)
   }
 
   cabac_start(&cabac);
-  init_contexts(encoder, encoder->in.cur_pic->slicetype);
+  init_contexts(encoder->QP, encoder->in.cur_pic->slicetype);
   scalinglist_process();
   encode_slice_header(encoder);
   bitstream_align(encoder->stream);
