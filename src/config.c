@@ -170,37 +170,36 @@ static int config_parse(config *cfg, const char *name, const char *value)
     value = atobool(value) ? "false" : "true";
   }
 
-#define OPT(STR) else if (!strcmp(name, STR))
-  if (0);
-  OPT("input")
+#define OPT(STR) (!strcmp(name, STR))
+  if OPT("input")
     cfg->input = copy_string(value);
-  OPT("output")
+  else if OPT("output")
     cfg->output = copy_string(value);
-  OPT("debug")
+  else if OPT("debug")
     cfg->debug = copy_string(value);
-  OPT("width")
+  else if OPT("width")
     cfg->width = atoi(value);
-  OPT("height")
+  else if OPT("height")
     cfg->height = atoi(value);
-  OPT("input-res") {
+  else if OPT("input-res") {
     if (2 != sscanf(value, "%dx%d", &cfg->width, &cfg->height)) {
       cfg->width = cfg->height = 0;
     }
   }
-  OPT("frames")
+  else if OPT("frames")
     cfg->frames = atoi(value);
-  OPT("qp")
+  else if OPT("qp")
     cfg->qp = atoi(value);
-  OPT("period")
+  else if OPT("period")
     cfg->intra_period = atoi(value);
-  OPT("ref") {
+  else if OPT("ref") {
     cfg->ref_frames = atoi(value);
     if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
       fprintf(stderr, "--ref out of range [1..15], set to 3\n");
       cfg->ref_frames = 3;
     }
   }
-  OPT("deblock") {
+  else if OPT("deblock") {
     int beta, tc;
     if (2 == sscanf(value, "%d:%d", &beta, &tc)) {
       cfg->deblock_enable = 1;
@@ -222,13 +221,13 @@ static int config_parse(config *cfg, const char *name, const char *value)
       cfg->deblock_tc = 0;
     }
   }
-  OPT("sao")
+  else if OPT("sao")
     cfg->sao_enable = atobool(value);
-  OPT("rdoq")
+  else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
-  OPT("transform-skip")
+  else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
-  OPT("sar") {
+  else if OPT("sar") {
       int sar_width, sar_height;
       if (2 == sscanf(value, "%d:%d", &sar_width, &sar_height)) {
         cfg->vui.sar_width  = sar_width;
@@ -236,30 +235,30 @@ static int config_parse(config *cfg, const char *name, const char *value)
       } else
         error = 1;
   }
-  OPT("overscan")
+  else if OPT("overscan")
     error = !parse_enum(value, overscan_names, &cfg->vui.overscan);
-  OPT("videoformat")
+  else if OPT("videoformat")
     error = !parse_enum(value, videoformat_names, &cfg->vui.videoformat);
-  OPT("range")
+  else if OPT("range")
     error = !parse_enum(value, range_names, &cfg->vui.fullrange);
-  OPT("colorprim")
+  else if OPT("colorprim")
     error = !parse_enum(value, colorprim_names, &cfg->vui.colorprim);
-  OPT("transfer")
+  else if OPT("transfer")
     error = !parse_enum(value, transfer_names, &cfg->vui.transfer);
-  OPT("colormatrix")
+  else if OPT("colormatrix")
     error = !parse_enum(value, colormatrix_names, &cfg->vui.colormatrix);
-  OPT("chromaloc") {
+  else if OPT("chromaloc") {
       cfg->vui.chroma_loc = atoi(value);
       if (cfg->vui.chroma_loc < 0 || cfg->vui.chroma_loc > 5) {
         fprintf(stderr, "--chromaloc parameter out of range [0..5], set to 0\n");
         cfg->vui.chroma_loc = 0;
       }
   }
-  OPT("aud")
+  else if OPT("aud")
     cfg->aud_enable = atobool(value);
-  OPT("cqmfile")
+  else if OPT("cqmfile")
     cfg->cqmfile = copy_string(value);
-  OPT("seek")
+  else if OPT("seek")
     cfg->seek = atoi(value);
   else
     return 0;
