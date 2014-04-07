@@ -67,17 +67,10 @@ int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient 
 {
   cabac_data temp_cabac;
   int32_t cost = 0;
-  //Context to save  TODO: handle contexts better
-  cabac_ctx sig_coeff_group[4];
-  cabac_ctx sig_model[27];
-  cabac_ctx transform_skip;
-  cabac_ctx one_model[16];
-  cabac_ctx abs_model[4];
-  cabac_ctx last_x[15];
-  cabac_ctx last_y[15];
   int i;
   int found = 0;
 
+  // Make sure there are coeffs present
   for(i = 0; i < width*width; i++) {
     if(coeff != 0) {
       found = 1;
@@ -87,25 +80,7 @@ int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient 
 
   if(!found) return 0;
 
-  // Store contexts TODO: handle contexts better
-  if(type==0) {
-    memcpy(last_x,cabac->ctx_cu_ctx_last_x_luma, sizeof(cabac_ctx)*15);
-    memcpy(last_y,cabac->ctx_cu_ctx_last_y_luma, sizeof(cabac_ctx)*15);
-    memcpy(abs_model,cabac->ctx_cu_abs_model_luma, sizeof(cabac_ctx)*4);
-    memcpy(one_model,cabac->ctx_cu_one_model_luma, sizeof(cabac_ctx)*16);
-    memcpy(sig_model,cabac->ctx_cu_sig_model_luma, sizeof(cabac_ctx)*27);
-    memcpy(&transform_skip,&cabac->ctx_transform_skip_model_luma, sizeof(cabac_ctx));
-  } else {
-    memcpy(last_x,cabac->ctx_cu_ctx_last_x_chroma, sizeof(cabac_ctx)*15);
-    memcpy(last_y,cabac->ctx_cu_ctx_last_y_chroma, sizeof(cabac_ctx)*15);
-    memcpy(abs_model,cabac->ctx_cu_abs_model_chroma, sizeof(cabac_ctx)*2);
-    memcpy(one_model,cabac->ctx_cu_one_model_chroma, sizeof(cabac_ctx)*8);
-    memcpy(sig_model,cabac->ctx_cu_sig_model_chroma, sizeof(cabac_ctx)*15);
-    memcpy(&transform_skip,&cabac->ctx_transform_skip_model_chroma, sizeof(cabac_ctx));
-  }
-  memcpy(sig_coeff_group,cabac->ctx_cu_sig_coeff_group_model,sizeof(cabac_ctx)*4);
-
-  // Store cabac state
+  // Store cabac state and contexts
   memcpy(&temp_cabac,cabac,sizeof(cabac_data));
 
   // Clear bytes and bits and set mode to "count"
@@ -119,27 +94,8 @@ int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient 
   // Store bitcost before restoring cabac
   cost = (23-cabac->bits_left) + (cabac->num_buffered_bytes << 3);
 
-  // Restore cabac state
+  // Restore cabac state and contexts
   memcpy(cabac,&temp_cabac,sizeof(cabac_data));
-
-  // Restore contexts TODO: handle contexts better
-  if(type==0) {
-    memcpy(cabac->ctx_cu_ctx_last_x_luma,last_x, sizeof(cabac_ctx)*15);
-    memcpy(cabac->ctx_cu_ctx_last_y_luma,last_y, sizeof(cabac_ctx)*15);
-    memcpy(cabac->ctx_cu_abs_model_luma,abs_model, sizeof(cabac_ctx)*4);
-    memcpy(cabac->ctx_cu_one_model_luma,one_model, sizeof(cabac_ctx)*16);
-    memcpy(cabac->ctx_cu_sig_model_luma,sig_model, sizeof(cabac_ctx)*27);
-    memcpy(&cabac->ctx_transform_skip_model_luma,&transform_skip, sizeof(cabac_ctx));
-  } else {
-    memcpy(cabac->ctx_cu_ctx_last_x_chroma,last_x, sizeof(cabac_ctx)*15);
-    memcpy(cabac->ctx_cu_ctx_last_y_chroma,last_y, sizeof(cabac_ctx)*15);
-    memcpy(cabac->ctx_cu_abs_model_chroma,abs_model, sizeof(cabac_ctx)*2);
-    memcpy(cabac->ctx_cu_one_model_chroma,one_model, sizeof(cabac_ctx)*8);
-    memcpy(cabac->ctx_cu_sig_model_chroma,sig_model, sizeof(cabac_ctx)*15);
-    memcpy(&cabac->ctx_transform_skip_model_chroma,&transform_skip, sizeof(cabac_ctx));
-  }
-  memcpy(cabac->ctx_cu_sig_coeff_group_model,sig_coeff_group,sizeof(cabac_ctx)*4);
-
 
   return cost;
 }
