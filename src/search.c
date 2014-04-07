@@ -786,19 +786,21 @@ static int lcu_get_final_cost(encoder_control *encoder,
       picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
       coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp, blockwidth, 0);
 
-      // 2x2 block cannot be coded..
-      if(blockwidth != 4) {
-        blk_y >>= 1;
-        blk_x >>= 1;
+      blk_y >>= 1;
+      blk_x >>= 1;
+      if (blockwidth > 4) {
+        // Chroma is 1/4th of luma unless luma is 4x4.
         blockwidth >>= 1;
-
-        // Calculate chroma coeff bit count
-        picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
-        picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
-
-        coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_u, blockwidth, 2);
-        coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2);
+      } else if (x_px % 8 != 0 || y_px % 8 != 0) {
+        // Only add chroma cost for 4x4 blocks for the one on the 8x8 grid.
+        break;
       }
+
+      picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
+      picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
+
+      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_u, blockwidth, 2);
+      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2);
     }
   }
   // Multiply bit count with lambda to get RD-cost
