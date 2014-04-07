@@ -31,6 +31,10 @@ meant to be user configurable later.
                                        beta and tc range is -6..6 [0:0]
               --no-sao               : Disable sample adaptive offset
               --no-rdoq              : Disable RDO quantization
+              --rd <integer>         : Rate-Distortion Optimization level [1]\n"
+                                         0: no RDO\n"
+                                         1: estimated RDO\n"
+                                         2: full RDO\n"
               --no-transform-skip    : Disable transform skip
               --aud                  : Use access unit delimiters
               --cqmfile <string>     : Custom Quantization Matrices from a file

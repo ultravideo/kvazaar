@@ -279,6 +279,8 @@ encoder_control *init_encoder_control(config *cfg)
   enc_c->tc_offset_div2    = 0;
   // SAO
   enc_c->sao_enable = 1;
+  // Rate-distortion optimization level
+  enc_c->rdo        = 1;
 
   // Allocate the bitstream struct
   stream = create_bitstream();
@@ -395,6 +397,7 @@ void encode_one_frame(encoder_control* encoder)
   picture *pic = encoder->in.cur_pic;
 
   cabac_data cabac;
+
 
   /** IDR picture when: period == 0 and frame == 0
    *                    period == 1 && frame%2 == 0
@@ -1943,25 +1946,32 @@ void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t 
       dequant(encoder, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
       itransform2d(temp_block2,pre_quant_coeff,width,0);
 
-      // SSD between reconstruction and original + sum of coeffs
+      // SSD between original and reconstructed
       for (i = 0; i < 16; i++) {
         int diff = temp_block[i]-block[i];
         cost += diff*diff;
-        //coeffcost += abs((int)temp_coeff[i]);
 
         diff = temp_block2[i] - block[i];
         cost2 += diff*diff;
-        //coeffcost2 += abs((int)temp_coeff2[i]);
       }
-      // TODO: add an option to use estimated RD-calculation
-      //cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
-      //cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
 
-      coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0, scan_idx_luma);
-      coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0, scan_idx_luma);
+      // Simple RDO
+      if(encoder->rdo == 1) {
+        // SSD between reconstruction and original + sum of coeffs
+        for (i = 0; i < 16; i++) {
+          coeffcost += abs((int)temp_coeff[i]);
+          coeffcost2 += abs((int)temp_coeff2[i]);
+        }
+        cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
+        cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
+        // Full RDO
+      } else if(encoder->rdo == 2) {
+        coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0, scan_idx_luma);
+        coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0, scan_idx_luma);
 
-      cost  += coeffcost*((int)g_cur_lambda_cost+0.5);
-      cost2 += coeffcost2*((int)g_cur_lambda_cost+0.5);
+        cost  += coeffcost*((int)g_cur_lambda_cost+0.5);
+        cost2 += coeffcost2*((int)g_cur_lambda_cost+0.5);
+      }
 
       cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
     }

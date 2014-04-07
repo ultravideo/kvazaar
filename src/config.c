@@ -65,6 +65,7 @@ int config_init(config *cfg)
   cfg->deblock_tc      = 0;
   cfg->sao_enable      = 1;
   cfg->rdoq_enable     = 1;
+  cfg->rdo             = 1;
   cfg->trskip_enable   = 1;
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
@@ -225,6 +226,16 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->sao_enable = atobool(value);
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
+  else if OPT("rd") {
+    int rdo = 0;
+    if (sscanf(value, "%d", &rdo)) {
+      if(rdo < 0 || rdo > 2) {
+        fprintf(stderr, "--rd parameter out of range [0..2], set to 1\n");
+        rdo = 1;
+      }
+      cfg->rdo = rdo;
+    }
+  }
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
   else if OPT("sar") {
@@ -293,6 +304,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
     { "no-rdoq",                  no_argument, NULL, 0 },
+    { "rd",                 required_argument, NULL, 0 },
     { "no-transform-skip",        no_argument, NULL, 0 },
     { "sar",                required_argument, NULL, 0 },
     { "overscan",           required_argument, NULL, 0 },

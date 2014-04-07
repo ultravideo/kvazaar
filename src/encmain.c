@@ -103,6 +103,10 @@ int main(int argc, char *argv[])
             "                                   beta and tc range is -6..6 [0:0]\n"
             "          --no-sao               : Disable sample adaptive offset\n"
             "          --no-rdoq              : Disable RDO quantization\n"
+            "          --rd <integer>         : Rate-Distortion Optimization level [1]\n"
+            "                                     0: no RDO\n"
+            "                                     1: estimated RDO\n"
+            "                                     2: full RDO\n"
             "          --no-transform-skip    : Disable transform skip\n"
             "          --aud                  : Use access unit delimiters\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
@@ -227,8 +231,9 @@ int main(int argc, char *argv[])
   encoder->tc_offset_div2   = (int8_t)encoder->cfg->deblock_tc;
   // SAO
   encoder->sao_enable = (int8_t)encoder->cfg->sao_enable;
-  // RDOQ
+  // RDO
   encoder->rdoq_enable = (int8_t)encoder->cfg->rdoq_enable;
+  encoder->rdo         = (int8_t)encoder->cfg->rdo;
   // TR SKIP
   encoder->trskip_enable = (int8_t)encoder->cfg->trskip_enable;
   // VUI
@@ -379,7 +384,7 @@ int main(int argc, char *argv[])
   fgetpos(output,(fpos_t*)&curpos);
 
   // Print statistics of the coding
-  printf(" Processed %d frames, %10d bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, ((int32_t)curpos)<<3,
+  printf(" Processed %d frames, %10lld bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, curpos<<3,
          psnr[0] / encoder->frame, psnr[1] / encoder->frame, psnr[2] / encoder->frame);
 
   fclose(input);

@@ -44,6 +44,7 @@ typedef struct
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
+  int32_t rdo;            /*!< \brief RD-calculation level (0..2) */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
   int32_t deblock_beta;   /*!< \brief (deblocking) beta offset (div 2), range -6...6 */
   int32_t deblock_tc;     /*!< \brief (deblocking) tc offset (div 2), range -6...6 */

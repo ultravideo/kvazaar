@@ -733,43 +733,48 @@ static int lcu_get_final_cost(encoder_control *encoder,
   int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
   int cost = 0;
   int coeff_cost = 0;
-  //int coeff_cost_temp = 0;
+
   int width = LCU_WIDTH>>depth;
   int x,y;
   cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
 
-  // SSD between reconstruction and original + sum of coeffs
+  // SSD between reconstruction and original
   for (y = y_local; y < y_local+width; ++y) {
     for (x = x_local; x < x_local+width; ++x) {
       int diff = (int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x];
       cost += diff*diff;
-      // TODO: add an option to use estimated RD-calculation
-      //coeff_cost_temp += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
     }
   }
-  // Chroma SSD + sum of coeffs
+  // Chroma SSD
   for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
     for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
       int diff = (int)lcu->rec.u[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.u[y * (LCU_WIDTH>>1) + x];
       cost += diff*diff;
       diff = (int)lcu->rec.v[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.v[y * (LCU_WIDTH>>1) + x];
       cost += diff*diff;
-      // TODO: add an option to use estimated RD-calculation
-      //coeff_cost_temp += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
-      //coeff_cost_temp += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
     }
   }
 
-  // Bitcost
-  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
-
-  // Coefficient costs
-  // TODO: add an option to use estimated RD-calculation
-  //cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
+  if(encoder->rdo == 1) {
+    // sum of coeffs
+    for (y = y_local; y < y_local+width; ++y) {
+      for (x = x_local; x < x_local+width; ++x) {
+        coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
+      }
+    }
+    // Chroma sum of coeffs
+    for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
+      for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
+        coeff_cost += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
+        coeff_cost += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
+      }
+    }
+    // Coefficient costs
+    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
 
   // Calculate actual bit costs for coding the coeffs
   // RDO
-  {
+  } else if (encoder->rdo == 2) {
     coefficient coeff_temp[32*32];
     coefficient coeff_temp_u[16*16];
     coefficient coeff_temp_v[16*16];
@@ -826,10 +831,12 @@ static int lcu_get_final_cost(encoder_control *encoder,
       coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
       coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
     }
+    // Multiply bit count with lambda to get RD-cost
+    cost += coeff_cost * (int32_t)(g_cur_lambda_cost+0.5);
   }
-  // Multiply bit count with lambda to get RD-cost
-  cost += coeff_cost * (int32_t)(g_cur_lambda_cost+0.5);
 
+  // Bitcost
+  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
 
   return cost;
 }
