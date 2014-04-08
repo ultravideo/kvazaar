@@ -396,9 +396,6 @@ void encode_one_frame(encoder_control* encoder)
 
   cabac_data cabac;
 
-  // Initialize lambda value(s) to use in search
-  init_lambda(encoder);
-
   /** IDR picture when: period == 0 and frame == 0
    *                    period == 1 && frame%2 == 0
    *                    period != 0 && frame%period == 0
@@ -469,6 +466,9 @@ void encode_one_frame(encoder_control* encoder)
   scalinglist_process();
   encode_slice_header(encoder);
   bitstream_align(encoder->stream);
+
+  // Initialize lambda value(s) to use in search
+  init_lambda(encoder);
 
   {
     vector2d lcu;
