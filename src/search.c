@@ -775,6 +775,8 @@ static int lcu_get_final_cost(encoder_control *encoder,
     coefficient coeff_temp_v[16*16];
     int i;
     int blocks = (width == 64)?4:1;
+    int8_t luma_scan_mode = SCAN_DIAG;
+    int8_t chroma_scan_mode = SCAN_DIAG;
 
     for(i = 0; i < blocks; i++) {
       // For 64x64 blocks we need to do transform split to 32x32
@@ -782,9 +784,31 @@ static int lcu_get_final_cost(encoder_control *encoder,
       int blk_x = i&1 ? 32:0 + x_local;
       int blockwidth = (width == 64)?32:width;
 
+      if (cur_cu->type == CU_INTRA) {
+        // Scan mode is diagonal, except for 4x4 and 8x8, where:
+        // - angular 6-14 = vertical
+        // - angular 22-30 = horizontal
+        int luma_mode = cur_cu->intra[i].mode;
+        int chroma_mode = cur_cu->intra[0].mode_chroma;
+
+        if (width <= 8) {
+          if (luma_mode >= 6 && luma_mode <= 14) {
+            luma_scan_mode = SCAN_VER;
+          } else if (luma_mode >= 22 && luma_mode <= 30) {
+            luma_scan_mode = SCAN_HOR;
+          }
+
+          if (chroma_mode >= 6 && chroma_mode <= 14) {
+            chroma_scan_mode = SCAN_VER;
+          } else if (chroma_mode >= 22 && chroma_mode <= 30) {
+            chroma_scan_mode = SCAN_HOR;
+          }
+        }
+      }
+
       // Calculate luma coeff bit count
       picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
-      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp, blockwidth, 0);
+      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp, blockwidth, 0, luma_scan_mode);
 
       blk_y >>= 1;
       blk_x >>= 1;
@@ -799,8 +823,8 @@ static int lcu_get_final_cost(encoder_control *encoder,
       picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
       picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
 
-      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_u, blockwidth, 2);
-      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2);
+      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
     }
   }
   // Multiply bit count with lambda to get RD-cost

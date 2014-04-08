@@ -1957,8 +1957,8 @@ void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t 
       //cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
       //cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
 
-      coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0);
-      coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0);
+      coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0, scan_idx_luma);
+      coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0, scan_idx_luma);
 
       cost  += coeffcost*((int)g_cur_lambda_cost+0.5);
       cost2 += coeffcost2*((int)g_cur_lambda_cost+0.5);

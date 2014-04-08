@@ -63,7 +63,7 @@ const uint32_t entropy_bits[128] =
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient *coeff, int32_t width, int32_t type)
+int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode)
 {
   cabac_data temp_cabac;
   int32_t cost = 0;
@@ -114,7 +114,7 @@ int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient 
   cabac->bits_left = 23;
 
   // Execute the coding function
-  encode_coeff_nxn(encoder, cabac, coeff, width, type, SCAN_DIAG, 0);
+  encode_coeff_nxn(encoder, cabac, coeff, width, type, scan_mode, 0);
 
   // Store bitcost before restoring cabac
   cost = (23-cabac->bits_left) + (cabac->num_buffered_bytes << 3);
