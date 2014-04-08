@@ -1844,10 +1844,8 @@ void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t 
     // INTRA PREDICTION
 
     uint32_t ac_sum = 0;
-    uint32_t ctx_idx;
     uint8_t scan_idx_luma   = SCAN_DIAG;
     uint8_t scan_idx_chroma = SCAN_DIAG;
-    uint8_t dir_mode;
 
     int32_t x_pu = x_local >> 2;
     int32_t y_pu = y_local >> 2;
@@ -1858,23 +1856,18 @@ void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t 
     uint32_t residual_sum = 0;
     #endif
 
-    switch (width) {
-      case  2: ctx_idx = 6; break;
-      case  4: ctx_idx = 5; break;
-      case  8: ctx_idx = 4; break;
-      case 16: ctx_idx = 3; break;
-      case 32: ctx_idx = 2; break;
-      case 64: ctx_idx = 1; break;
-      default: ctx_idx = 0; break;
-    }
-
-    if(cur_cu->type == CU_INTRA)
-    {
+    // Pick coeff scan mode according to intra prediction mode.
+    if (cur_cu->type == CU_INTRA) {
       int pu_index = PU_INDEX(x_pu, y_pu);
       int luma_mode = cur_cu->intra[pu_index].mode;
+      int chroma_mode = cur_cu->intra[0].mode_chroma;
+      if (chroma_mode == 36) {
+        chroma_mode = luma_mode;
+      }
       scan_idx_luma = SCAN_DIAG;
+      scan_idx_chroma = SCAN_DIAG;
 
-      // Scan mode is diagonal, except for 4x4 and 8x8, where:
+      // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
       // - angular 6-14 = vertical
       // - angular 22-30 = horizontal
       if (width <= 8) {
@@ -1883,20 +1876,12 @@ void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t 
         } else if (luma_mode >= 22 && luma_mode <= 30) {
           scan_idx_luma = SCAN_HOR;
         }
-      }
 
-      // TODO : chroma intra prediction
-      cur_cu->intra[0].mode_chroma = 36;
-      // Chroma scanmode
-      ctx_idx++;
-      dir_mode = cur_cu->intra[0].mode_chroma;
-
-      if (dir_mode == 36) {
-        // TODO: support NxN
-        dir_mode = cur_cu->intra[0].mode;
-      }
-      if (ctx_idx > 4 && ctx_idx < 7) { // if multiple scans supported for transform size
-        scan_idx_chroma = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
+        if (chroma_mode >= 6 && chroma_mode <= 14) {
+          scan_idx_chroma = SCAN_VER;
+        } else if (chroma_mode >= 22 && chroma_mode <= 30) {
+          scan_idx_chroma = SCAN_HOR;
+        }
       }
     }
 
