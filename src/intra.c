@@ -30,6 +30,8 @@
 
 #include "config.h"
 #include "encoder.h"
+#include "transform.h"
+#include "rdo.h"
 
 
 const uint8_t intra_hor_ver_dist_thres[5] = {0,7,1,0,0};
@@ -233,6 +235,34 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 }
 
 /**
+ * \brief Function to compare RDO costs
+ * \param rdo_costs array of current costs
+ * \param cost new cost to check
+ * \returns -1 if cost is worse than the one in the array or array position for worst cost
+
+ This function derives the prediction samples for planar mode (intra coding).
+*/
+static int intra_rdo_cost_compare(uint32_t rdo_costs[3], uint32_t cost)
+{
+  int i;
+  int found = 0;
+
+  for(i = 0; i < 3; i++) {
+    if(rdo_costs[i] > cost) {
+      found = 1;
+      break;
+    }
+  }
+  if(found) {
+    if(rdo_costs[0] > rdo_costs[1] && rdo_costs[0] > rdo_costs[2]) return 0;
+    if(rdo_costs[1] > rdo_costs[2]) return 1;
+    return 2;
+  }
+
+  return -1;
+}
+
+/**
  * \brief Function to test best intra prediction mode
  * \param orig original picture data
  * \param origstride original picture stride
@@ -248,9 +278,9 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
+int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
                          uint8_t width, pixel *dst, int32_t dststride, uint32_t *sad_out,
-                         int8_t *intra_preds, uint32_t *bitcost_out)
+                         int8_t *intra_preds, uint32_t *bitcost_out, cabac_data *cabac)
 {
   uint32_t best_sad = 0xffffffff;
   uint32_t sad = 0;
@@ -259,6 +289,10 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
   int32_t x,y;
   int16_t i;
   uint32_t bitcost = 0;
+
+
+  int8_t   rdo_modes[3] = {-1,-1,-1};
+  uint32_t rdo_costs[3] = {UINT_MAX,UINT_MAX,UINT_MAX};
 
   cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
 
@@ -276,6 +310,9 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
   #define COPY_PRED_TO_DST() for (y = 0; y < (int32_t)width; y++)  { for (x = 0; x < (int32_t)width; x++) { dst[x + y*dststride] = pred[x + y*width]; } }
   #define CHECK_FOR_BEST(mode, additional_sad)  sad = cost_func(pred, orig_block); \
                                                 sad += additional_sad;\
+                                                { int rdo_mode = intra_rdo_cost_compare(rdo_costs,sad); \
+                                                  if(rdo_mode != -1) {rdo_modes[rdo_mode] = mode; rdo_costs[rdo_mode] = sad;} \
+                                                } \
                                                 if(sad < best_sad)\
                                                 {\
                                                   best_bitcost = bitcost;\
@@ -338,6 +375,24 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
       intra_get_angular_pred(rec_filtered, recstride, pred, width, width, i, filter);
       bitcost = intra_pred_ratecost(i,intra_preds);
       CHECK_FOR_BEST(i,bitcost*(int)(g_cur_lambda_cost+0.5));
+    }
+  }
+
+  // Select from three best modes if using RDO
+  if(encoder->rdo == 2) {
+    int rdo_mode;
+    best_sad = UINT_MAX;
+    for(rdo_mode = 0; rdo_mode < 3; rdo_mode ++) {
+      // The reconstruction is calculated again here, it could be saved from before..
+      intra_recon(rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
+      rdo_costs[rdo_mode] = rdo_cost_intra(encoder,pred,orig_block,width,cabac,rdo_modes[rdo_mode]);
+      if(rdo_costs[rdo_mode] < best_sad) {
+        best_sad = rdo_costs[rdo_mode];
+        // Bitcost also calculated again for this mode
+        best_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
+        best_mode = rdo_modes[rdo_mode];
+        COPY_PRED_TO_DST();
+      }
     }
   }
 

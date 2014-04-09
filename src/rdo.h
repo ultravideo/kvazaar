@@ -45,6 +45,8 @@ extern const uint32_t g_go_rice_prefix_len[5];
 void  rdoq(encoder_control *encoder, cabac_data *cabac, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
+uint32_t rdo_cost_intra(encoder_control *encoder, pixel *pred, pixel *orig_block, int width, cabac_data *cabac, int8_t mode);
+
 int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode);
 
 int32_t get_ic_rate(cabac_data *cabac, uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,

@@ -661,7 +661,7 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  */
 static int search_cu_intra(encoder_control *encoder,
                            const int x_px, const int y_px,
-                           const int depth, lcu_t *lcu)
+                           const int depth, lcu_t *lcu, cabac_data *cabac)
 {
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
@@ -704,10 +704,10 @@ static int search_cu_intra(encoder_control *encoder,
     uint32_t bitcost = UINT32_MAX;
     pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
-    mode = intra_prediction(ref_pixels, LCU_WIDTH,
+    mode = intra_prediction(encoder,ref_pixels, LCU_WIDTH,
                             cu_in_rec_buffer, cu_width * 2 + 8, cu_width,
                             pred_buffer, cu_width,
-                            &cost, candidate_modes, &bitcost);
+                            &cost, candidate_modes, &bitcost, cabac);
     cur_cu->intra[pu_index].mode = (int8_t)mode;
     cur_cu->intra[pu_index].cost = cost;
     cur_cu->intra[pu_index].bitcost = bitcost;
@@ -891,7 +891,7 @@ static int search_cu(encoder_control *encoder, cabac_data *cabac, int x, int y, 
     if (depth >= MIN_INTRA_SEARCH_DEPTH &&
         depth <= MAX_INTRA_SEARCH_DEPTH)
     {
-      int mode_cost = search_cu_intra(encoder, x, y, depth, &work_tree[depth]);
+      int mode_cost = search_cu_intra(encoder, x, y, depth, &work_tree[depth], cabac);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTRA;

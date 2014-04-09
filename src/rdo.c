@@ -29,6 +29,7 @@
 #include "transform.h"
 #include "context.h"
 #include "cabac.h"
+#include "transform.h"
 
 
 #define QUANT_SHIFT          14
@@ -56,6 +57,70 @@ const uint32_t entropy_bits[128] =
   0x007ba, 0x24df7, 0x00753, 0x25797, 0x006f2, 0x26137, 0x00696, 0x26ad7, 0x0063f, 0x27477, 0x005ed, 0x27e17, 0x0059f, 0x287b6, 0x00554, 0x29156,
   0x0050e, 0x29af6, 0x004cc, 0x2a497, 0x0048d, 0x2ae35, 0x00451, 0x2b7d6, 0x00418, 0x2c176, 0x003e2, 0x2cb15, 0x003af, 0x2d4b5, 0x0037f, 0x2de55
 };
+
+/**
+ * \brief RDO function to calculate cost for intra
+ * \returns cost to code pred block
+
+ ** Only for luma
+ */
+uint32_t rdo_cost_intra(encoder_control *encoder, pixel *pred, pixel *orig_block, int width, cabac_data *cabac, int8_t mode)
+{
+    coefficient pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
+    int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
+    coefficient temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    uint32_t ac_sum;
+    uint32_t cost = 0;
+    uint32_t coeffcost = 0;
+    int8_t luma_scan_mode = SCAN_DIAG;
+
+    int i = 0,x,y;
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
+        block[i++] = orig_block[x + y*width]- pred[x + y*width];
+      }
+    }
+    // Scan mode is diagonal, except for 4x4 and 8x8, where:
+    // - angular 6-14 = vertical
+    // - angular 22-30 = horizontal
+    if (width <= 8) {
+      if (mode >= 6 && mode <= 14) {
+        luma_scan_mode = SCAN_VER;
+      } else if (mode >= 22 && mode <= 30) {
+        luma_scan_mode = SCAN_HOR;
+      }
+    }
+    transform2d(block,pre_quant_coeff,width,0);
+    if(encoder->rdoq_enable) {
+      rdoq(encoder, cabac, pre_quant_coeff, temp_coeff, width, width, &ac_sum, 0, luma_scan_mode, CU_INTRA,0);
+    } else {
+      quant(encoder, pre_quant_coeff, temp_coeff, width, width, &ac_sum, 0, luma_scan_mode, CU_INTRA);
+    }
+    dequant(encoder, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
+    itransform2d(temp_block,pre_quant_coeff,width,0);
+
+    // SSD between original and reconstructed
+    for (i = 0; i < width*width; i++) {
+      int diff = temp_block[i]-block[i];
+      cost += diff*diff;
+    }
+
+    // Simple RDO
+    if(encoder->rdo == 1) {
+      // SSD between reconstruction and original + sum of coeffs
+      for (i = 0; i < width*width; i++) {
+        coeffcost += abs((int)temp_coeff[i]);
+      }
+      cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
+      // Full RDO
+    } else if(encoder->rdo == 2) {
+      coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, width, 0, luma_scan_mode);
+
+      cost  += coeffcost*((int)g_cur_lambda_cost+0.5);
+    }
+    return cost;
+}
 
 /** Calculate actual (or really close to actual) bitcost for coding coefficients
  * \param coeff coefficient array
