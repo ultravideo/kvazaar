@@ -670,7 +670,6 @@ static int search_cu_intra(encoder_control *encoder,
 
   cu_info *cur_cu = &lcu->cu[cu_index];
 
-  pixel pred_buffer[LCU_WIDTH * LCU_WIDTH + 1];
   pixel rec_buffer[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
   pixel *cu_in_rec_buffer = &rec_buffer[cu_width * 2 + 8 + 1];
 
@@ -706,7 +705,6 @@ static int search_cu_intra(encoder_control *encoder,
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
     mode = intra_prediction(encoder,ref_pixels, LCU_WIDTH,
                             cu_in_rec_buffer, cu_width * 2 + 8, cu_width,
-                            pred_buffer, cu_width,
                             &cost, candidate_modes, &bitcost, cabac);
     cur_cu->intra[pu_index].mode = (int8_t)mode;
     cur_cu->intra[pu_index].cost = cost;
