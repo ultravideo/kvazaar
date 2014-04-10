@@ -339,9 +339,10 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
 
   // Check 8 modes for 4x4 and 8x8, 3 for others
   int8_t   rdo_modes_to_check = (width == 4 || width == 8)? 8 : 3;
-  int8_t   rdo_modes[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
-  uint32_t rdo_costs[8] = {UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX,
-                           UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX};
+  int8_t   rdo_modes[11] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+  uint32_t rdo_costs[11] = {UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX,
+                            UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX,
+                            UINT_MAX, UINT_MAX, UINT_MAX};
 
   cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
 
@@ -391,6 +392,23 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
   // Select from three best modes if using RDO
   if(encoder->rdo == 2) {
     int rdo_mode;
+    int pred_mode;
+    // Check that the predicted modes are in the RDO mode list
+    for(pred_mode = 0; pred_mode < 3; pred_mode++) {
+      int mode_found = 0;
+      for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
+        if(intra_preds[pred_mode] == rdo_modes[rdo_mode]) {
+          mode_found = 1;
+          break;
+        }
+      }
+      // Add this prediction mode to RDO checking
+      if(!mode_found) {
+        rdo_modes[rdo_modes_to_check] = intra_preds[pred_mode];
+        rdo_modes_to_check++;
+      }
+    }
+
     best_sad = UINT_MAX;
     for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
       // The reconstruction is calculated again here, it could be saved from before..
