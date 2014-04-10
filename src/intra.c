@@ -459,14 +459,14 @@ void intra_recon(pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int3
     }
     for (x = 0; x < recstride; x++) {
       ref[1][x - recstride] = rec[x - recstride];
-  }
+    }
     intra_filter(ref[1], recstride, width, 0);
-      }
+  }
 
   intra_get_pred(ref, recstride, pred, width, mode, chroma);
 
   picture_blit_pixels(pred, dst, width, width, width, dststride);
-    }
+}
 
 /**
  * \brief Build top and left borders for a reference block.
