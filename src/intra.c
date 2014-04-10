@@ -261,9 +261,9 @@ static int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check,
     for(i = 0; i < rdo_modes_to_check; i++) {
       if(rdo_costs[i] > worst_cost) {
         worst_cost = rdo_costs[i];
-        worst_mode = i;        
+        worst_mode = i;
       }
-    }    
+    }
     return worst_mode;
   }
 
@@ -273,7 +273,7 @@ static int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check,
 /**
  * \param rec  Reference pixel. 0 points to unfiltered and 1 to filtered.
  * \param recstride  Stride for rec pixel arrays.
- * \param dst  
+ * \param dst
  */
 static void intra_get_pred(pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
 {
@@ -302,7 +302,6 @@ static void intra_get_pred(pixel *rec[2], int recstride, pixel *dst, int width, 
       dst[i] = val;
     }
   } else {
-
     int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     int filter = !is_chroma && width < 32;
@@ -386,7 +385,7 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
       best_bitcost = mode_cost;
       best_sad = sad;
       best_mode = mode;
-    } 
+    }
   }
 
   // Select from three best modes if using RDO
@@ -411,13 +410,18 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
 
     best_sad = UINT_MAX;
     for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
+      int rdo_bitcost;
       // The reconstruction is calculated again here, it could be saved from before..
       intra_recon(rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
       rdo_costs[rdo_mode] = rdo_cost_intra(encoder,pred,orig_block,width,cabac,rdo_modes[rdo_mode]);
+      // Bitcost also calculated again for this mode
+      rdo_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
+      // Add bitcost * lambda
+      rdo_costs[rdo_mode] += rdo_bitcost * (int)(g_cur_lambda_cost + 0.5);
+
       if(rdo_costs[rdo_mode] < best_sad) {
         best_sad = rdo_costs[rdo_mode];
-        // Bitcost also calculated again for this mode
-        best_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
+        best_bitcost = rdo_bitcost;
         best_mode = rdo_modes[rdo_mode];
       }
     }
