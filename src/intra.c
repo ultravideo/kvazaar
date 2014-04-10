@@ -238,25 +238,41 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
  * \param recstride  Stride for rec pixel arrays.
  * \param dst  
  */
-static void intra_get_pred(pixel *rec[2], int recstride, pixel *dst, int width, int mode)
+static void intra_get_pred(pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
 {
-  if (mode == 0) {
-    intra_get_planar_pred(rec[1], recstride, width, dst, width);
-  } else if (mode == 1) {
-    int i;
-    pixel val = intra_get_dc_pred(rec[0], recstride, width);
-    for (i = 0; i < width * width; i++) {
-      dst[i] = val;
-    }
+  pixel *ref_pixels = rec[0];
+  if (is_chroma || mode == 1 || width == 4) {
+    // For chroma, DC and 4x4 blocks, always use unfiltered reference.
+  } else if (mode == 0) {
+    // Otherwise, use filtered for planar.
+    ref_pixels = rec[1];
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
+    if (dist_from_vert_or_hor > filter_threshold) {
+      ref_pixels = rec[1];
+    }
+  }
+
+  if (mode == 0) {
+    intra_get_planar_pred(ref_pixels, recstride, width, dst, width);
+  } else if (mode == 1) {
+    int i;
+    pixel val = intra_get_dc_pred(ref_pixels, recstride, width);
+    for (i = 0; i < width * width; i++) {
+      dst[i] = val;
+    }
+  } else {
+
+    int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
+    int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
+    int filter = !is_chroma && width < 32;
     if (dist_from_vert_or_hor <= filter_threshold) {
-      intra_get_angular_pred(rec[0], recstride, dst, width, width, mode, width<32);
+      intra_get_angular_pred(ref_pixels, recstride, dst, width, width, mode, filter);
     } else {
-      intra_get_angular_pred(rec[1], recstride, dst, width, width, mode, width<32);
+      intra_get_angular_pred(ref_pixels, recstride, dst, width, width, mode, filter);
     }
   }
 }
@@ -310,7 +326,7 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
 
   // Try all modes and select the best one.
   for (mode = 0; mode < 35; mode++) {
-    intra_get_pred(ref, recstride, pred, width, mode);
+    intra_get_pred(ref, recstride, pred, width, mode, 0);
 
     {
       uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
@@ -343,42 +359,27 @@ int16_t intra_prediction(pixel *orig, int32_t origstride, pixel *rec, int16_t re
  * \param chroma chroma-block flag
 
 */
-void intra_recon(pixel* rec, uint32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
 {
-  int32_t x,y;
   pixel pred[LCU_WIDTH * LCU_WIDTH];
-  int8_t filter = !chroma && width < 32;
+  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
 
-
-  // Filtering apply if luma and not DC
-  if (!chroma && mode != 1 && width > 4) {
-    uint8_t threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
-    if(MIN(abs(mode-26),abs(mode-10)) > threshold) {
-      intra_filter(rec,recstride,width,0);
+  // Generate filtered reference pixels.
+  {
+    int x, y;
+    for (y = -1; y < recstride; y++) {
+      ref[1][y*recstride - 1] = rec[y*recstride - 1];
     }
+    for (x = 0; x < recstride; x++) {
+      ref[1][x - recstride] = rec[x - recstride];
+    }
+    intra_filter(ref[1], recstride, width, 0);
   }
 
-  // planar
-  if (mode == 0)  {
-    intra_get_planar_pred(rec, recstride, width, pred, width);
-  } else if (mode == 1) { // DC
-    pixel val = intra_get_dc_pred(rec, (uint16_t)recstride, (uint8_t)width);
-    for (y = 0; y < (int32_t)width; y++) {
-      for (x = 0; x < (int32_t)width; x++) {
-        dst[x + y*dststride] = val;
-      }
-    }
-    // Assigned value directly to output, no need to stay here
-    return;
-  } else {  // directional predictions
-    intra_get_angular_pred(rec, recstride,pred, width, width, mode, filter);
-  }
+  intra_get_pred(ref, recstride, pred, width, mode, chroma);
 
-  for(y = 0; y < (int32_t)width; y++)  {
-    for(x = 0; x < (int32_t)width; x++) {
-      dst[x+y*dststride] = pred[x+y*width];
-    }
-  }
+  picture_blit_pixels(pred, dst, width, width, width, dststride);
 }
 
 /**

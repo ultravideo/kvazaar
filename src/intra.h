@@ -47,7 +47,7 @@ pixel intra_get_dc_pred(pixel* pic, uint16_t pic_width, uint8_t width);
 void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride);
 void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* p_dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter);
 
-void intra_recon(pixel* rec, uint32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
+void intra_recon(pixel* rec, int32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
 void intra_recon_lcu(encoder_control* encoder, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
 
