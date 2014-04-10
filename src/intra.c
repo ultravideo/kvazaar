@@ -243,21 +243,28 @@ static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-static int intra_rdo_cost_compare(uint32_t rdo_costs[3], uint32_t cost)
+static int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost)
 {
   int i;
   int found = 0;
 
-  for(i = 0; i < 3; i++) {
+  for(i = 0; i < rdo_modes_to_check; i++) {
     if(rdo_costs[i] > cost) {
       found = 1;
       break;
     }
   }
+  // Search for worst cost
   if(found) {
-    if(rdo_costs[0] > rdo_costs[1] && rdo_costs[0] > rdo_costs[2]) return 0;
-    if(rdo_costs[1] > rdo_costs[2]) return 1;
-    return 2;
+    uint32_t worst_cost = 0;
+    int worst_mode = -1;
+    for(i = 0; i < rdo_modes_to_check; i++) {
+      if(rdo_costs[i] > worst_cost) {
+        worst_cost = rdo_costs[i];
+        worst_mode = i;        
+      }
+    }    
+    return worst_mode;
   }
 
   return -1;
@@ -330,9 +337,11 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
   uint32_t best_bitcost = 0;
   int16_t mode;
 
-
-  int8_t   rdo_modes[3] = {-1,-1,-1};
-  uint32_t rdo_costs[3] = {UINT_MAX,UINT_MAX,UINT_MAX};
+  // Check 8 modes for 4x4 and 8x8, 3 for others
+  int8_t   rdo_modes_to_check = (width == 4 || width == 8)? 8 : 3;
+  int8_t   rdo_modes[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
+  uint32_t rdo_costs[8] = {UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX,
+                           UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX};
 
   cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
 
@@ -365,13 +374,14 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
 
     sad = cost_func(pred, orig_block);
     sad += mode_cost * (int)(g_cur_lambda_cost + 0.5);
-    {
-      int rdo_mode = intra_rdo_cost_compare(rdo_costs, sad);
+    // When rdo == 2, store best costs to an array and do full RDO later
+    if(encoder->rdo == 2) {
+      int rdo_mode = intra_rdo_cost_compare(rdo_costs, rdo_modes_to_check, sad);
       if(rdo_mode != -1) {
         rdo_modes[rdo_mode] = mode; rdo_costs[rdo_mode] = sad;
       }
-    }
-    if (sad < best_sad) {
+    // Without rdo compare costs
+    } else if (sad < best_sad) {
       best_bitcost = mode_cost;
       best_sad = sad;
       best_mode = mode;
@@ -382,7 +392,7 @@ int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstri
   if(encoder->rdo == 2) {
     int rdo_mode;
     best_sad = UINT_MAX;
-    for(rdo_mode = 0; rdo_mode < 3; rdo_mode ++) {
+    for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
       // The reconstruction is calculated again here, it could be saved from before..
       intra_recon(rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
       rdo_costs[rdo_mode] = rdo_cost_intra(encoder,pred,orig_block,width,cabac,rdo_modes[rdo_mode]);
