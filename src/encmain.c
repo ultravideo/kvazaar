@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
-  fprintf(stderr, "  Video size: %dx%d\n (%dx%d)\n",
+  fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
