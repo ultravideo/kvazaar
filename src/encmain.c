@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 
   // Dig CPU features with cpuid
   kvz_cpu_cpuid(&ecx,&edx);
-  printf("CPU features enabled: ");
+  fprintf(stderr, "CPU features enabled: ");
   // EDX
   if (edx & (1<<BIT_MMX))  printf("MMX ");
   if (edx & (1<<BIT_SSE))  printf("SSE ");
@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
   if (ecx & (1<<BIT_SSE41)) printf("SSE4.1 ");
   if (ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
   if (ecx & (1<<BIT_AVX))   printf("AVX ");
-  printf("\r\n");
+  fprintf(stderr, "\n");
 
   // Check if the input file name is a dash, this means stdin
   if (!strcmp(cfg->input, "-")) {
@@ -256,8 +256,8 @@ int main(int argc, char *argv[])
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
-  printf("Input: %s, output: %s\n", cfg->input, cfg->output);
-  printf("  Video size: %dx%d\n (%dx%d)\n",
+  fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
+  fprintf(stderr, "  Video size: %dx%d\n (%dx%d)\n",
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
@@ -309,7 +309,7 @@ int main(int argc, char *argv[])
     // Read one frame from the input
     if (!read_one_frame(input, encoder)) {
       if (!feof(input))
-        printf("Failed to read a frame %d\n", encoder->frame);
+        fprintf(stderr, "Failed to read a frame %d\n", encoder->frame);
       break;
     }
 
@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
     temp_psnr[1] = image_psnr(encoder->in.cur_pic->u_data, encoder->in.cur_pic->u_recdata, cfg->width>>1, cfg->height>>1);
     temp_psnr[2] = image_psnr(encoder->in.cur_pic->v_data, encoder->in.cur_pic->v_recdata, cfg->width>>1, cfg->height>>1);
 
-    printf("POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame,
+    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame,
            "BPI"[encoder->in.cur_pic->slicetype%3], diff<<3,
            temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
@@ -386,9 +386,9 @@ int main(int argc, char *argv[])
   fgetpos(output,(fpos_t*)&curpos);
 
   // Print statistics of the coding
-  printf(" Processed %d frames, %10lld bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, curpos<<3,
+  fprintf(stderr, " Processed %d frames, %10lld bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, curpos<<3,
          psnr[0] / encoder->frame, psnr[1] / encoder->frame, psnr[2] / encoder->frame);
-  printf (" Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
+  fprintf(stderr, " Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
   fclose(input);
   fclose(output);
