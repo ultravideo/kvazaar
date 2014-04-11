@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "global.h"
 #include "config.h"
@@ -64,6 +65,7 @@ int main(int argc, char *argv[])
   uint64_t curpos  = 0;
   uint64_t lastpos = 0;
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
+  clock_t start_time = clock();
 
   // Stdin and stdout need to be binary for input and output to work.
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -386,6 +388,7 @@ int main(int argc, char *argv[])
   // Print statistics of the coding
   printf(" Processed %d frames, %10lld bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, curpos<<3,
          psnr[0] / encoder->frame, psnr[1] / encoder->frame, psnr[2] / encoder->frame);
+  printf (" Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
   fclose(input);
   fclose(output);
