@@ -404,8 +404,8 @@ void  rdoq(const encoder_control * const encoder, cabac_data *cabac, coefficient
   {
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
-  int32_t *quant_coeff  = g_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
-  double *err_scale     = g_error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
 

@@ -397,7 +397,7 @@ int main(int argc, char *argv[])
 
   // Deallocating
   config_destroy(cfg);
-  scalinglist_destroy();
+  scalinglist_destroy(encoder);
   picture_list_destroy(encoder->ref);
   picture_destroy(encoder->in.cur_pic);
   FREE_POINTER(encoder->in.cur_pic);

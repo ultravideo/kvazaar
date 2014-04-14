@@ -31,6 +31,15 @@
 #include "cabac.h"
 #include "config.h"
 
+typedef struct {
+  int32_t  scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
+  int32_t* scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
+  int32_t* quant_coeff[4][6][6];
+  int32_t *de_quant_coeff  [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
+  double*  error_scale[4][6][6];
+} scaling_list;
+  
+
 
 /* TODO: add ME data */
 typedef struct
@@ -98,6 +107,10 @@ typedef struct
 
   int8_t aud_enable;
   FILE *cqmfile; // \brief Costum Quantization Matrices
+
+  //scaling list
+  uint8_t      scaling_list_enable;
+  scaling_list scaling_list;
 } encoder_control;
 
 void init_tables(void);

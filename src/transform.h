@@ -30,19 +30,6 @@
 
 #include <math.h>
 
-#define SCALING_LIST_4x4      0
-#define SCALING_LIST_8x8      1
-#define SCALING_LIST_16x16    2
-#define SCALING_LIST_32x32    3
-#define SCALING_LIST_SIZE_NUM 4
-#define SCALING_LIST_NUM      6
-#define MAX_MATRIX_COEF_NUM   64
-
-extern uint8_t  g_scaling_list_enable;
-extern int32_t  g_scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-extern int32_t* g_scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-extern int32_t* g_quant_coeff[4][6][6];
-extern double* g_error_scale[4][6][6];
 extern const uint8_t g_scaling_list_num[4];
 extern const uint16_t g_scaling_list_size[4];
 extern const int32_t g_quant_intra_default_8x8[64];
@@ -60,16 +47,16 @@ void itransformskip(int16_t *block,int16_t *coeff, int8_t block_size);
 void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
 void itransform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
 
-void scalinglist_init(void);
-void scalinglist_process_enc( int32_t *coeff, int32_t *quant_coeff, int32_t quant_scales,
+void scalinglist_init(encoder_control*const encoder);
+void scalinglist_process_enc(const int32_t * const coeff, int32_t *quant_coeff, int32_t quant_scales,
                              uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat);
-void scalinglist_process(void);
-void scalinglist_set(int32_t *coeff, uint32_t list_id, uint32_t size_id, uint32_t qp);
-void scalinglist_set_err_scale(uint32_t list,uint32_t size, uint32_t qp);
-void scalinglist_destroy(void);
+void scalinglist_process(const encoder_control * const encoder);
+void scalinglist_set(const encoder_control * const encoder, const int32_t * const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp);
+void scalinglist_set_err_scale(const encoder_control * const encoder, uint32_t list, uint32_t size, uint32_t qp);
+void scalinglist_destroy(encoder_control * const encoder);
 
 int32_t *scalinglist_get_default(uint32_t size_id, uint32_t list_id);
-int scalinglist_parse(FILE *fp);
+int scalinglist_parse(encoder_control * const encoder, FILE *fp);
 
 int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
 
