@@ -634,7 +634,7 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left);
 }
 
-void sao_reconstruct_frame(encoder_control *encoder)
+void sao_reconstruct_frame(const encoder_control * const encoder)
 {
   vector2d lcu;
   picture *pic = encoder->in.cur_pic;

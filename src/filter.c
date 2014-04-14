@@ -162,7 +162,7 @@ INLINE void filter_deblock_chroma(pixel *src, int32_t offset, int32_t tc,
 /**
  * \brief
  */
-void filter_deblock_edge_luma(encoder_control *encoder,
+void filter_deblock_edge_luma(const encoder_control * const encoder,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
@@ -286,7 +286,7 @@ void filter_deblock_edge_luma(encoder_control *encoder,
 /**
  * \brief
  */
-void filter_deblock_edge_chroma(encoder_control *encoder,
+void filter_deblock_edge_chroma(const encoder_control * const encoder,
                                 int32_t x, int32_t y,
                                 int8_t depth, int8_t dir)
 {
@@ -381,7 +381,7 @@ void filter_deblock_edge_chroma(encoder_control *encoder,
  * until the coded block size has been achived. Calls luma and chroma filtering
  * functions for each coded CU size.
  */
-void filter_deblock_cu(encoder_control *encoder, int32_t x, int32_t y, int8_t depth, int32_t edge)
+void filter_deblock_cu(const encoder_control * const encoder, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x + y*(encoder->in.width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
@@ -425,7 +425,7 @@ void filter_deblock_cu(encoder_control *encoder, int32_t x, int32_t y, int8_t de
  * the Largest Coding Units (LCU) and call filter_deblock_cu with absolute
  * X and Y coordinates of the LCU.
  */
-void filter_deblock(encoder_control* encoder)
+void filter_deblock(const encoder_control * const encoder)
 {
   int16_t x, y;
 
@@ -460,7 +460,7 @@ void filter_deblock(encoder_control* encoder)
  * - After vertical filtering the left edge, filter the last 4 pixels of
  *   horizontal edges in the LCU to the left.
  */
-void filter_deblock_lcu(encoder_control *encoder, int x_px, int y_px)
+void filter_deblock_lcu(const encoder_control * const encoder, int x_px, int y_px)
 {
   const vector2d lcu = { x_px / LCU_WIDTH, y_px / LCU_WIDTH };
 

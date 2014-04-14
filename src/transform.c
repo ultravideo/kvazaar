@@ -854,7 +854,7 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode
  * \brief quantize transformed coefficents
  *
  */
-void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t width,
+void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef, int32_t width,
            int32_t height, uint32_t *ac_sum, int8_t type, int8_t scan_idx, int8_t block_type )
 {
   uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
@@ -985,7 +985,7 @@ void quant(encoder_control *encoder, int16_t *coef, int16_t *q_coef, int32_t wid
  * \brief inverse quantize transformed and quantized coefficents
  *
  */
-void dequant(encoder_control *encoder, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
+void dequant(const encoder_control * const encoder, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
   int32_t shift,add,coeff_q,clip_q_coef;
   int32_t n;

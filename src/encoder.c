@@ -49,9 +49,9 @@ int8_t g_convert_to_bit[LCU_WIDTH + 1];
 int8_t g_bitdepth = 8;
 
 /* Local functions. */
-static void add_checksum(encoder_control* encoder);
-static void encode_VUI(encoder_control* encoder);
-static void encode_sao(encoder_control *encoder,
+static void add_checksum(const encoder_control * const encoder);
+static void encode_VUI(const encoder_control * const encoder);
+static void encode_sao(const encoder_control * const encoder,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
@@ -214,7 +214,7 @@ void init_tables(void)
   Implementation closer to HM (Used HM12 as reference)
    - Still missing functionality when GOP and B-pictures are used
  */
-void init_lambda(encoder_control *encoder)
+void init_lambda(const encoder_control * const encoder)
 {
   double qp = encoder->QP;
   double lambda_scale = 1.0;
@@ -375,7 +375,7 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
   #endif
 }
 
-static void write_aud(encoder_control* encoder)
+static void write_aud(const encoder_control * const encoder)
 {
   encode_access_unit_delimiter(encoder);
   nal_write(encoder->output, AUD_NUT, 0, 1);
@@ -615,9 +615,9 @@ static int read_and_fill_frame_data(FILE *file,
   return 1;
 }
 
-int read_one_frame(FILE* file, encoder_control* encoder)
+int read_one_frame(FILE* file, const encoder_control * const encoder)
 {
-  encoder_input* in = &encoder->in;
+  const encoder_input* const in = &encoder->in;
   unsigned width = in->real_width;
   unsigned height = in->real_height;
   unsigned array_width = in->cur_pic->width;
@@ -661,7 +661,7 @@ int read_one_frame(FILE* file, encoder_control* encoder)
  * \param encoder The encoder.
  * \returns Void
  */
-static void add_checksum(encoder_control* encoder)
+static void add_checksum(const encoder_control * const encoder)
 {
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
@@ -686,7 +686,7 @@ static void add_checksum(encoder_control* encoder)
   bitstream_align(encoder->stream);
 }
 
-void encode_access_unit_delimiter(encoder_control* encoder)
+void encode_access_unit_delimiter(const encoder_control * const encoder)
 {
   uint8_t pic_type = encoder->in.cur_pic->slicetype == SLICE_I ? 0
                    : encoder->in.cur_pic->slicetype == SLICE_P ? 1
@@ -694,7 +694,7 @@ void encode_access_unit_delimiter(encoder_control* encoder)
   WRITE_U(encoder->stream, pic_type, 3, "pic_type");
 }
 
-void encode_prefix_sei_version(encoder_control* encoder)
+void encode_prefix_sei_version(const encoder_control * const encoder)
 {
 #define STR_BUF_LEN 1000
 
@@ -741,7 +741,7 @@ void encode_prefix_sei_version(encoder_control* encoder)
 #undef STR_BUF_LEN
 }
 
-void encode_pic_parameter_set(encoder_control* encoder)
+void encode_pic_parameter_set(const encoder_control * const encoder)
 {
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
@@ -801,7 +801,7 @@ void encode_pic_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "pps_extension_flag");
 }
 
-static void encode_PTL(encoder_control *encoder)
+static void encode_PTL(const encoder_control * const encoder)
 {
   int i;
   // PTL
@@ -840,7 +840,7 @@ static void encode_PTL(encoder_control *encoder)
   // end PTL
 }
 
-static void encode_scaling_list(encoder_control* encoder)
+static void encode_scaling_list(const encoder_control * const encoder)
 {
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
@@ -895,9 +895,9 @@ static void encode_scaling_list(encoder_control* encoder)
   }
 }
 
-void encode_seq_parameter_set(encoder_control* encoder)
+void encode_seq_parameter_set(const encoder_control * const encoder)
 {
-  encoder_input* const in = &encoder->in;
+  const encoder_input* const in = &encoder->in;
 
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
@@ -998,7 +998,7 @@ void encode_seq_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "sps_extension_flag");
 }
 
-void encode_vid_parameter_set(encoder_control* encoder)
+void encode_vid_parameter_set(const encoder_control * const encoder)
 {
   int i;
 #ifdef _DEBUG
@@ -1033,7 +1033,7 @@ void encode_vid_parameter_set(encoder_control* encoder)
   WRITE_U(encoder->stream, 0, 1, "vps_extension_flag");
 }
 
-static void encode_VUI(encoder_control* encoder)
+static void encode_VUI(const encoder_control * const encoder)
 {
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
@@ -1132,7 +1132,7 @@ static void encode_VUI(encoder_control* encoder)
   //ENDIF
 }
 
-void encode_slice_header(encoder_control* encoder)
+void encode_slice_header(const encoder_control * const encoder)
 {
   picture *cur_pic = encoder->in.cur_pic;
 
@@ -1202,7 +1202,7 @@ void encode_slice_header(encoder_control* encoder)
 }
 
 
-static void encode_sao_color(encoder_control *encoder, cabac_data *cabac, sao_info *sao,
+static void encode_sao_color(const encoder_control * const encoder, cabac_data *cabac, sao_info *sao,
                              color_index color_i)
 {
   picture *pic = encoder->in.cur_pic;
@@ -1269,7 +1269,7 @@ static void encode_sao_merge_flags(sao_info *sao, cabac_data *cabac,
 /**
  * \brief Encode SAO information.
  */
-static void encode_sao(encoder_control *encoder,
+static void encode_sao(const encoder_control * const encoder,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma)
@@ -1286,7 +1286,7 @@ static void encode_sao(encoder_control *encoder,
 }
 
 
-void encode_coding_tree(encoder_control *encoder, cabac_data *cabac,
+void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
   cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
@@ -1704,7 +1704,7 @@ void encode_coding_tree(encoder_control *encoder, cabac_data *cabac,
   /* end coding_unit */
 }
 
-static void transform_chroma(encoder_control *encoder, cabac_data *cabac, cu_info *cur_cu,
+static void transform_chroma(const encoder_control * const encoder, cabac_data *cabac, cu_info *cur_cu,
                              int depth, pixel *base_u, pixel *pred_u,
                              coefficient *coeff_u, int8_t scan_idx_chroma,
                              coefficient *pre_quant_coeff, coefficient *block)
@@ -1737,7 +1737,7 @@ static void transform_chroma(encoder_control *encoder, cabac_data *cabac, cu_inf
   }
 }
 
-static void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
+static void reconstruct_chroma(const encoder_control * const encoder, cu_info *cur_cu,
                                int depth, int has_coeffs, coefficient *coeff_u,
                                pixel *recbase_u, pixel *pred_u, int color_type,
                                coefficient *pre_quant_coeff, coefficient *block)
@@ -1774,7 +1774,7 @@ static void reconstruct_chroma(encoder_control *encoder, cu_info *cur_cu,
   }
 }
 
-void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t x, int32_t y, uint8_t depth, lcu_t *lcu)
+void encode_transform_tree(const encoder_control * const encoder, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   int x_local = (x&0x3f), y_local = (y&0x3f);
@@ -2117,7 +2117,7 @@ void encode_transform_tree(encoder_control* encoder, cabac_data *cabac, int32_t 
   // end Residual Coding
 }
 
-static void encode_transform_unit(encoder_control *encoder, cabac_data *cabac,
+static void encode_transform_unit(const encoder_control * const encoder, cabac_data *cabac,
                                   int x_pu, int y_pu, int depth, int tr_depth)
 {
   uint8_t width = LCU_WIDTH >> depth;
@@ -2267,7 +2267,7 @@ static void encode_transform_unit(encoder_control *encoder, cabac_data *cabac,
  * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
-void encode_transform_coeff(encoder_control *encoder, cabac_data *cabac, int32_t x_pu,int32_t y_pu,
+void encode_transform_coeff(const encoder_control * const encoder, cabac_data *cabac, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
   int32_t x_cu = x_pu / 2;
@@ -2347,7 +2347,7 @@ void encode_transform_coeff(encoder_control *encoder, cabac_data *cabac, int32_t
   }
 }
 
-void encode_coeff_nxn(encoder_control *encoder, cabac_data *cabac, coefficient *coeff, uint8_t width,
+void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, coefficient *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
   int c1 = 1;
