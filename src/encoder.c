@@ -301,7 +301,7 @@ encoder_control *init_encoder_control(config *cfg)
   }
 
   // Initialize the scaling list
-  scalinglist_init();
+  scalinglist_init(enc_c);
 
   pic_list = picture_list_init(MAX_REF_PIC_COUNT);
   if(!pic_list) {
@@ -410,7 +410,7 @@ void encode_one_frame(encoder_control* encoder)
     }
 
     if (encoder->frame == 0 && encoder->cqmfile)
-      scalinglist_parse(encoder->cqmfile);
+      scalinglist_parse(encoder, encoder->cqmfile);
 
     encoder->poc = 0;
 
@@ -466,7 +466,7 @@ void encode_one_frame(encoder_control* encoder)
 
   cabac_start(&cabac);
   init_contexts(&cabac, encoder->QP, encoder->in.cur_pic->slicetype);
-  scalinglist_process();
+  scalinglist_process(encoder);
   encode_slice_header(encoder);
   bitstream_align(encoder->stream);
 
@@ -852,13 +852,13 @@ static void encode_scaling_list(const encoder_control * const encoder)
       uint32_t ref_matrix_id = UINT32_MAX;
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
-        int32_t *pred_list = (list_id == pred_list_idx) ?
-                             scalinglist_get_default(size_id, pred_list_idx) :
-                             g_scaling_list_coeff[size_id][pred_list_idx];
+        int32_t * const pred_list  = (list_id == pred_list_idx) ?
+                                     scalinglist_get_default(size_id, pred_list_idx) :
+                                     encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
 
-        if (!memcmp(g_scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, g_scaling_list_size[size_id])) &&
+        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, g_scaling_list_size[size_id])) &&
             ((size_id < SCALING_LIST_16x16) ||
-             (g_scaling_list_dc[size_id][list_id] == g_scaling_list_dc[size_id][pred_list_idx]))) {
+             (encoder->scaling_list.scaling_list_dc[size_id][list_id] == encoder->scaling_list.scaling_list_dc[size_id][pred_list_idx]))) {
           ref_matrix_id = pred_list_idx;
           scaling_list_pred_mode_flag = 0;
           break;
@@ -870,14 +870,14 @@ static void encode_scaling_list(const encoder_control * const encoder)
         WRITE_UE(encoder->stream, list_id - ref_matrix_id, "scaling_list_pred_matrix_id_delta");
       } else {
         int32_t delta;
-        int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, g_scaling_list_size[size_id]);
-        const uint32_t *scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
+        const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, g_scaling_list_size[size_id]);
+        const uint32_t * const scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
         int32_t next_coef = 8;
-        int32_t *coef_list = g_scaling_list_coeff[size_id][list_id];
+        const int32_t * const coef_list = encoder->scaling_list.scaling_list_coeff[size_id][list_id];
 
         if (size_id >= SCALING_LIST_16x16) {
-          WRITE_SE(encoder->stream, g_scaling_list_dc[size_id][list_id] - 8, "scaling_list_dc_coef_minus8");
-          next_coef = g_scaling_list_dc[size_id][list_id];
+          WRITE_SE(encoder->stream, encoder->scaling_list.scaling_list_dc[size_id][list_id] - 8, "scaling_list_dc_coef_minus8");
+          next_coef = encoder->scaling_list.scaling_list_dc[size_id][list_id];
         }
 
         for (i = 0; i < coef_num; i++) {
@@ -960,8 +960,8 @@ void encode_seq_parameter_set(const encoder_control * const encoder)
   WRITE_UE(encoder->stream, TR_DEPTH_INTRA, "max_transform_hierarchy_depth_intra");
 
   // scaling list
-  WRITE_U(encoder->stream, g_scaling_list_enable, 1, "scaling_list_enable_flag");
-  if (g_scaling_list_enable) {
+  WRITE_U(encoder->stream, encoder->scaling_list_enable, 1, "scaling_list_enable_flag");
+  if (encoder->scaling_list_enable) {
     WRITE_U(encoder->stream, 1, 1, "sps_scaling_list_data_present_flag");
     encode_scaling_list(encoder);
   }
