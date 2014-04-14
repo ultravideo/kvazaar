@@ -116,32 +116,38 @@ int free_exp_golomb()
  */
 bitstream *create_bitstream(const bitstream_type type)
 {
-  bitstream *stream = malloc(sizeof(bitstream));
-  if (!stream) {
-    fprintf(stderr, "Failed to allocate the bitstream object!\n");
+  bitstream *stream = NULL;
+
+  if (type == BITSTREAM_TYPE_MEMORY) {
+    bitstream_mem *stream_mem = malloc(sizeof(bitstream_mem));
+    if (!stream_mem) {
+      fprintf(stderr, "Failed to allocate the bitstream object!\n");
+      return NULL;
+    }
+    stream_mem->allocated_length = 0;
+    stream_mem->output_data = NULL;
+    stream_mem->output_length = 0;
+    stream = (bitstream*) stream_mem;
+  } else if (type == BITSTREAM_TYPE_FILE) {
+    bitstream_file *stream_file = malloc(sizeof(bitstream_file));
+    if (!stream_file) {
+      fprintf(stderr, "Failed to allocate the bitstream object!\n");
+      return NULL;
+    }
+    //FIXME: it would make sense to avoid constructing an incomplete object
+    stream_file->output = NULL;
+    stream = (bitstream*) stream_file;
+  } else {
+    fprintf(stderr, "Unknown type for bitstream!\n");
     return NULL;
   }
-
+  
   // Initialize buffer-related values
   stream->data = 0;
   stream->cur_bit = 0;
   stream->zerocount = 0;
   stream->type = type;
   
-  if (stream->type == BITSTREAM_TYPE_MEMORY) {
-    bitstream_mem *stream_mem = (bitstream_mem*) stream;
-    stream_mem->allocated_length = 0;
-    stream_mem->output_data = NULL;
-    stream_mem->output_length = 0;
-  } else if (stream->type == BITSTREAM_TYPE_FILE) {
-    bitstream_file *stream_file = (bitstream_file*) stream;
-    //FIXME: it would make sense to avoid constructing an incomplete object
-    stream_file->output = NULL;
-  } else {
-    free(stream);
-    fprintf(stderr, "Unknown type for bitstream!\n");
-    return NULL;
-  }
 
   // Return the created bitstream
   return stream;
