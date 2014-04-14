@@ -161,7 +161,7 @@ void free_bitstream(bitstream* stream)
     stream_file->output = NULL;
   } else {
     fprintf(stderr, "Unknown type for bitstream!\n");
-    return NULL;
+    return;
   }
   
   FREE_POINTER(stream);
