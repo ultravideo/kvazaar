@@ -101,33 +101,33 @@ typedef struct
 } encoder_control;
 
 void init_tables(void);
-void init_lambda(encoder_control* encoder);
+void init_lambda(const encoder_control * const encoder);
 void free_tables(void);
 encoder_control *init_encoder_control(config *cfg);
 void init_encoder_input(encoder_input *input, FILE* inputfile,
                         int32_t width, int32_t height);
 void encode_one_frame(encoder_control *encoder);
-int read_one_frame(FILE *file, encoder_control *encoder);
+int read_one_frame(FILE *file, const encoder_control * const encoder);
 
-void encode_seq_parameter_set(encoder_control *encoder);
-void encode_pic_parameter_set(encoder_control *encoder);
-void encode_vid_parameter_set(encoder_control *encoder);
-void encode_slice_header(encoder_control *encoder);
-void encode_access_unit_delimiter(encoder_control* encoder);
-void encode_prefix_sei_version(encoder_control* encoder);
-void encode_coding_tree(encoder_control *encoder, cabac_data *cabac, uint16_t x_ctb,
+void encode_seq_parameter_set(const encoder_control * const encoder);
+void encode_pic_parameter_set(const encoder_control * const encoder);
+void encode_vid_parameter_set(const encoder_control * const encoder);
+void encode_slice_header(const encoder_control * const encoder);
+void encode_access_unit_delimiter(const encoder_control * const encoder);
+void encode_prefix_sei_version(const encoder_control * const encoder);
+void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
 void encode_last_significant_xy(cabac_data *cabac,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan);
-void encode_coeff_nxn(encoder_control *encoder, cabac_data *cabac, int16_t *coeff, uint8_t width,
+void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void encode_transform_tree( encoder_control* encoder, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu );
-void encode_transform_coeff(encoder_control *encoder, cabac_data *cabac, int32_t x_cu, int32_t y_cu,
+void encode_transform_tree(const encoder_control * const encoder, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu );
+void encode_transform_coeff(const encoder_control * const encoder, cabac_data *cabac, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
-void encode_block_residual(encoder_control *encoder,
+void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
 extern double g_lambda_cost[55];

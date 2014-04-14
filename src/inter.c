@@ -322,7 +322,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(encoder_control *encoder, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
+void inter_get_mv_cand(const encoder_control * const encoder, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;

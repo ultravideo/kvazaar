@@ -39,7 +39,7 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
 void intra_filter(pixel* ref, int32_t stride, int32_t width, int8_t mode);
 
 /* Predictions */
-int16_t intra_prediction(encoder_control *encoder, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
+int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
                          uint8_t width, uint32_t *sad_out,
                          int8_t *intra_preds, uint32_t *bitcost_out, cabac_data *cabac);
 
@@ -49,6 +49,6 @@ void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* p_dst, int32_
 
 void intra_recon(pixel* rec, int32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
-void intra_recon_lcu(encoder_control* encoder, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
+void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
 
 #endif

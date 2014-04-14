@@ -42,18 +42,18 @@ extern const uint32_t g_go_rice_range[5];
 extern const uint32_t g_go_rice_prefix_len[5];
 
 
-void  rdoq(encoder_control *encoder, cabac_data *cabac, coefficient *coef, coefficient *dest_coeff, int32_t width,
+void  rdoq(const encoder_control * const encoder, cabac_data *cabac, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
-uint32_t rdo_cost_intra(encoder_control *encoder, pixel *pred, pixel *orig_block, int width, cabac_data *cabac, int8_t mode);
+uint32_t rdo_cost_intra(const encoder_control * const encoder, pixel* pred, pixel* orig_block, int width, cabac_data* cabac, int8_t mode);
 
-int32_t get_coeff_cost(encoder_control *encoder, cabac_data *cabac, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode);
+int32_t get_coeff_cost(const encoder_control * const encoder, cabac_data *cabac, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode);
 
 int32_t get_ic_rate(cabac_data *cabac, uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
                      uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
 double get_ic_rate_cost  (cabac_data *cabac, uint32_t abs_level, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                           uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
-uint32_t get_coded_level ( encoder_control* encoder, cabac_data *cabac, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
+uint32_t get_coded_level ( const encoder_control * const encoder, cabac_data *cabac, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                            uint16_t abs_go_rice,

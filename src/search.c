@@ -370,7 +370,7 @@ static unsigned search_mv_full(unsigned depth,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_inter(encoder_control *encoder, int x, int y, int depth, lcu_t *lcu)
+static int search_cu_inter(const encoder_control * const encoder, int x, int y, int depth, lcu_t *lcu)
 {
   picture *cur_pic = encoder->in.cur_pic;
   uint32_t ref_idx = 0;
@@ -659,7 +659,7 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_intra(encoder_control *encoder,
+static int search_cu_intra(const encoder_control * const encoder,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu, cabac_data *cabac)
 {
@@ -722,7 +722,7 @@ static int search_cu_intra(encoder_control *encoder,
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
  * here as (coefficient_sum * 1.5) * lambda)
  */
-static int lcu_get_final_cost(encoder_control *encoder,
+static int lcu_get_final_cost(const encoder_control * const encoder,
                               cabac_data *cabac,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
@@ -849,7 +849,7 @@ static int lcu_get_final_cost(encoder_control *encoder,
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static int search_cu(encoder_control *encoder, cabac_data *cabac, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static int search_cu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
   int cu_width = LCU_WIDTH >> depth;
   int cost = MAX_INT;
@@ -957,7 +957,7 @@ static int search_cu(encoder_control *encoder, cabac_data *cabac, int x, int y, 
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  */
-static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
+static void init_lcu_t(const encoder_control * const encoder, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -1061,7 +1061,7 @@ static void init_lcu_t(encoder_control *encoder, const int x, const int y, lcu_t
 /**
  * Copy CU and pixel data to it's place in picture datastructure.
  */
-static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, const lcu_t *lcu)
+static void copy_lcu_to_cu_data(const encoder_control * const encoder, int x_px, int y_px, const lcu_t *lcu)
 {
   // Copy non-reference CUs to picture.
   {
@@ -1114,7 +1114,7 @@ static void copy_lcu_to_cu_data(encoder_control *encoder, int x_px, int y_px, co
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void search_lcu(encoder_control *encoder, cabac_data *cabac, int x, int y, yuv_t *hor_buf, yuv_t *ver_buf)
+void search_lcu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, yuv_t* hor_buf, yuv_t* ver_buf)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;
