@@ -5,7 +5,7 @@ ifeq (, $(ARCH))
 endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
-DFLAGS = -O2 -g
+DFLAGS = -O2 -g -Werror
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
