@@ -207,6 +207,13 @@ void scalinglist_init(encoder_control * const encoder)
     encoder->scaling_list.error_scale[3][3][qp]    = encoder->scaling_list.error_scale[3][1][qp];
   }
   
+  //Initialize dc (otherwise we switch on undef in scalinglist_set)
+  for (sizeId = 0; sizeId < SCALING_LIST_SIZE_NUM; ++sizeId) {
+    for (listId = 0; listId < SCALING_LIST_NUM; ++listId) {
+      encoder->scaling_list.scaling_list_dc[sizeId][listId] = 0;
+    }
+  }
+  
   encoder->scaling_list_enable = 0;
 }
 
