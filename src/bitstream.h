@@ -56,6 +56,7 @@ void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
 void bitstream_align(bitstream* stream);
 void bitstream_align_zero(bitstream* stream);
 int init_exp_golomb(uint32_t len);
+void free_exp_golomb();
 
 
 /* In debug mode print out some extra info */
