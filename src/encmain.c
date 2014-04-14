@@ -386,7 +386,7 @@ int main(int argc, char *argv[])
   fgetpos(output,(fpos_t*)&curpos);
 
   // Print statistics of the coding
-  fprintf(stderr, " Processed %d frames, %10lld bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, curpos<<3,
+  fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, (long long unsigned int) curpos<<3,
          psnr[0] / encoder->frame, psnr[1] / encoder->frame, psnr[2] / encoder->frame);
   fprintf(stderr, " Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
