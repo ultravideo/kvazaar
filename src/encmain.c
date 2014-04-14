@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
   // Set output file
 
   encoder->output = output;
-  encoder->stream->output = output;
+  ((bitstream_file*) encoder->stream)->output = output;
   // input init (TODO: read from commandline / config)
   encoder->bitdepth = 8;
   encoder->frame    = 0;
@@ -401,7 +401,7 @@ int main(int argc, char *argv[])
   picture_list_destroy(encoder->ref);
   picture_destroy(encoder->in.cur_pic);
   FREE_POINTER(encoder->in.cur_pic);
-  FREE_POINTER(encoder->stream);
+  free_bitstream(encoder->stream);
   free(encoder);
   free_tables();
   free_exp_golomb();

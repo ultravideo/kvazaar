@@ -26,14 +26,31 @@
 
 #include "global.h"
 
+typedef enum {BITSTREAM_TYPE_FILE, BITSTREAM_TYPE_MEMORY} bitstream_type;
+
+#define BASE_BITSTREAM uint8_t data; uint8_t cur_bit;  uint8_t zerocount; bitstream_type type;
+
+//Size of the allocation for a memory bitstream in bytes
+#define BITSTREAM_MEMORY_CHUNK_SIZE 4096
 
 typedef struct
 {
-  uint8_t data;
-  uint8_t cur_bit;
-  uint8_t zerocount;
-  FILE*    output;
+  BASE_BITSTREAM
 } bitstream;
+
+typedef struct
+{
+  BASE_BITSTREAM
+  FILE*    output;
+} bitstream_file;
+
+typedef struct
+{
+  BASE_BITSTREAM
+  uint8_t* output_data;
+  uint32_t output_length;
+  uint32_t allocated_length;
+} bitstream_mem;
 
 typedef struct
 {
@@ -46,6 +63,7 @@ extern bit_table *g_exp_table;
 int floor_log2(unsigned int n);
 
 bitstream *create_bitstream();
+void free_bitstream(bitstream* stream);
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
 
 /* Use macros to force inlining */
