@@ -28,6 +28,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 //for hton
 #ifdef _WIN32
 #include <Winsock2.h>
@@ -113,21 +114,101 @@ void free_exp_golomb()
 /**
  * \brief Create and initialize a new bitstream
  */
-bitstream *create_bitstream()
+bitstream *create_bitstream(const bitstream_type type)
 {
-  bitstream *stream = malloc(sizeof(bitstream));
-  if (!stream) {
-    fprintf(stderr, "Failed to allocate the bitstream object!\n");
-    return stream;
-  }
+  bitstream *stream = NULL;
 
+  if (type == BITSTREAM_TYPE_MEMORY) {
+    bitstream_mem *stream_mem = malloc(sizeof(bitstream_mem));
+    if (!stream_mem) {
+      fprintf(stderr, "Failed to allocate the bitstream object!\n");
+      return NULL;
+    }
+    stream_mem->allocated_length = 0;
+    stream_mem->output_data = NULL;
+    stream_mem->output_length = 0;
+    stream = (bitstream*) stream_mem;
+  } else if (type == BITSTREAM_TYPE_FILE) {
+    bitstream_file *stream_file = malloc(sizeof(bitstream_file));
+    if (!stream_file) {
+      fprintf(stderr, "Failed to allocate the bitstream object!\n");
+      return NULL;
+    }
+    //FIXME: it would make sense to avoid constructing an incomplete object
+    stream_file->output = NULL;
+    stream = (bitstream*) stream_file;
+  } else {
+    fprintf(stderr, "Unknown type for bitstream!\n");
+    return NULL;
+  }
+  
   // Initialize buffer-related values
   stream->data = 0;
   stream->cur_bit = 0;
   stream->zerocount = 0;
+  stream->type = type;
+  
 
   // Return the created bitstream
   return stream;
+}
+
+/**
+ * \brief Free a bitstream
+ */
+void free_bitstream(bitstream* stream)
+{
+  if (stream->type == BITSTREAM_TYPE_MEMORY) {
+    bitstream_mem *stream_mem = (bitstream_mem*) stream;
+    FREE_POINTER(stream_mem->output_data);
+  } else if (stream->type == BITSTREAM_TYPE_FILE) {
+    bitstream_file *stream_file = (bitstream_file*) stream;
+    //FIXME: if we fix create_bitstream, we would maybe have to do something here
+    stream_file->output = NULL;
+  } else {
+    fprintf(stderr, "Unknown type for bitstream!\n");
+    return;
+  }
+  
+  FREE_POINTER(stream);
+}
+
+/**
+ * \brief Write a byte to bitstream
+ * \param stream_abstract pointer bitstream to put the data
+ * \param byte byte to write
+ * \return 1 on success, 0 on failure
+ */
+static int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
+  if (stream_abstract->type == BITSTREAM_TYPE_FILE) {
+    bitstream_file *stream = (bitstream_file*) stream_abstract;
+    if (fwrite(&byte, 1, 1, stream->output) != 1) {
+      fprintf(stderr, "Could not write byte to bitstream_file object.");
+      return 0;
+    } else {
+      return 1;
+    }
+  } else if (stream_abstract->type == BITSTREAM_TYPE_MEMORY) {
+    bitstream_mem *stream = (bitstream_mem*) stream_abstract;
+    if (stream->allocated_length==stream->output_length) {
+      //Need to reallocate
+      uint32_t new_size = stream->allocated_length + BITSTREAM_MEMORY_CHUNK_SIZE;
+      uint8_t* new_data = realloc(stream->output_data, new_size);
+      if (!new_data) {
+        fprintf(stderr, "Failed to allocate memory for bitstream_mem object");
+        return 0;
+      }
+      stream->output_data = new_data;
+      stream->allocated_length = new_size;
+    }
+    //Write byte
+    stream->output_data[stream->output_length++] = byte;
+    
+    return 1;
+  } else {
+    fprintf(stderr, "Unknown stream type %d.", stream_abstract->type);
+    return 0;
+  }
 }
 
 /**
@@ -150,7 +231,7 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
   // write byte to output
     if (stream->cur_bit==8) {
       if((stream->zerocount == 2) && (stream->data < 4)) {
-        fwrite(&emulation_prevention_three_byte, 1, 1, stream->output);
+        bitstream_writebyte(stream, emulation_prevention_three_byte);
         stream->zerocount = 0;
       }
       if(stream->data == 0) {
@@ -158,7 +239,7 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
       } else {
         stream->zerocount = 0;
       }
-      fwrite(&stream->data, 1, 1, stream->output);
+      bitstream_writebyte(stream, stream->data);
       stream->cur_bit = 0;
     }
   }

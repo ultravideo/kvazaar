@@ -283,7 +283,7 @@ encoder_control *init_encoder_control(config *cfg)
   enc_c->rdo        = 1;
 
   // Allocate the bitstream struct
-  stream = create_bitstream();
+  stream = create_bitstream(BITSTREAM_TYPE_FILE);
   if (!stream) {
     fprintf(stderr, "Failed to allocate the bitstream object!\n");
     goto init_failure;
