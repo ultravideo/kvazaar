@@ -593,15 +593,15 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     pixel *data = &pic->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
     pixel *recdata = &pic->recdata[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
     picture_blit_pixels(data, orig[color_i - 1], block_width, block_height,
-                        pic->width / 2, LCU_WIDTH / 2);
+                        pic->width / 2, block_width / 2);
     picture_blit_pixels(recdata, rec[color_i - 1], block_width, block_height,
-                        pic->width / 2, LCU_WIDTH / 2);
+                        pic->width / 2, block_width / 2);
     orig_list[color_i - 1] = &orig[color_i - 1][0];
     rec_list[color_i - 1] = &rec[color_i - 1][0];
   }
 
   // Calculate
-  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left);
+  sao_search_best_mode(orig_list, rec_list, block_width / 2, block_height / 2, 2, sao, sao_top, sao_left);
 }
 
 void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
@@ -626,8 +626,8 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
   sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
-  picture_blit_pixels(data, orig, block_width, block_height, pic->width, LCU_WIDTH);
-  picture_blit_pixels(recdata, rec, block_width, block_height, pic->width, LCU_WIDTH);
+  picture_blit_pixels(data, orig, block_width, block_height, pic->width, block_width);
+  picture_blit_pixels(recdata, rec, block_width, block_height, pic->width, block_width);
 
   orig_list[0] = orig;
   rec_list[0] = rec;
