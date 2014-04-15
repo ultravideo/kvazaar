@@ -106,7 +106,6 @@ typedef struct
   } vui;
 
   int8_t aud_enable;
-  FILE *cqmfile; // \brief Costum Quantization Matrices
 
   //scaling list
   uint8_t      scaling_list_enable;
