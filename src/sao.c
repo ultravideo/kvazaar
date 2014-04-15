@@ -40,6 +40,70 @@ static const vector2d g_sao_edge_offsets[SAO_NUM_EO][2] = {
   { { 1, -1 }, { -1, 1 } }
 };
 
+// Mapping of edge_idx values to eo-classes.
+static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
+// Mapping relationships between a, b and c to eo_idx.
+#define EO_IDX(a, b, c) (2 + SIGN3((c) - (a)) + SIGN3((c) - (b)))
+
+
+
+int sao_band_ddistortion(const pixel *orig_data, const pixel *rec_data,
+                         int block_width, int block_height,
+                         int band_pos, int sao_bands[4])
+{
+  int y, x;
+  int shift = g_bitdepth-5;
+  int sum = 0;
+
+  for (y = 0; y < block_height; ++y) {
+    for (x = 0; x < block_width; ++x) {
+      int band = (rec_data[y * block_width + x] >> shift) - band_pos;
+      int offset = 0;
+      if (band >= 0 && band < 4) {
+        offset = sao_bands[band];
+      }
+      if (offset != 0) {
+        int diff = orig_data[y * block_width + x] - rec_data[y * block_width + x];
+        // Offset is applied to reconstruction, so it is subtracted from diff.
+        sum += (diff - offset) * (diff - offset) - diff * diff;
+      }
+    }
+  }
+
+  return sum;
+}
+
+
+int sao_edge_ddistortion(const pixel *orig_data, const pixel *rec_data,
+                         int block_width, int block_height,
+                         int eo_class, int offsets[NUM_SAO_EDGE_CATEGORIES])
+{
+  int y, x;
+  int sum = 0;
+  vector2d a_ofs = g_sao_edge_offsets[eo_class][0];
+  vector2d b_ofs = g_sao_edge_offsets[eo_class][1];
+
+  for (y = 1; y < block_height - 1; ++y) {
+    for (x = 1; x < block_width - 1; ++x) {
+      const pixel *c_data = &rec_data[y * block_width + x];
+      pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
+      pixel c = c_data[0];
+      pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
+
+      int eo_idx = EO_IDX(a, b, c);
+      int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
+      int offset = offsets[eo_cat];
+
+      if (offset != 0) {
+        int diff = orig_data[y * block_width + x] - c;
+        // Offset is applied to reconstruction, so it is subtracted from diff.
+        sum += (diff - offset) * (diff - offset) - diff * diff;
+      }
+    }
+  }
+
+  return sum;
+}
 
 
 void init_sao_info(sao_info *sao) {
@@ -48,10 +112,6 @@ void init_sao_info(sao_info *sao) {
   sao->merge_up_flag = 0;
 }
 
-// Mapping of edge_idx values to eo-classes.
-static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-// Mapping relationships between a, b and c to eo_idx.
-#define EO_IDX(a, b, c) (2 + SIGN3((c) - (a)) + SIGN3((c) - (b)))
 
 /**
  * \brief Check merge conditions
@@ -74,6 +134,53 @@ static int sao_check_merge(const sao_info *sao_candidate, int type,
   }
   return 0;
 }
+
+
+static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
+                              sao_info *sao_top, sao_info *sao_left)
+{
+  int mode_bits = 0;
+
+  if ((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class)) ||
+      (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class))) {
+    mode_bits += 1;
+  } else {
+    sao_eo_cat edge_cat;
+    for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
+      int abs_offset = abs(offsets[edge_cat]);
+      mode_bits += 2 + abs_offset;
+      if (abs_offset == SAO_ABS_OFFSET_MAX) {
+        mode_bits -= 1;
+      }
+    }
+  }
+
+  return mode_bits;
+}
+
+
+static int sao_mode_bits_band(int band_position, int offsets[NUM_SAO_EDGE_CATEGORIES],
+                              sao_info *sao_top, sao_info *sao_left)
+{
+  int mode_bits = 0;
+
+  if ((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0)) ||
+      (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0))) {
+    mode_bits += 1;
+  } else {
+    sao_eo_cat edge_cat;
+    for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
+      int abs_offset = abs(offsets[edge_cat]);
+      mode_bits += 2 + abs_offset;
+      if (abs_offset == SAO_ABS_OFFSET_MAX) {
+        mode_bits -= 1;
+      }
+    }
+  }
+
+  return mode_bits;
+}
+
 
 /**
  * \brief calculate an array of intensity correlations for each intensity value
@@ -577,6 +684,34 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
 
   sao_search_edge_sao(data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
   sao_search_band_sao(data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
+
+  {
+    int mode_bits = sao_mode_bits_edge(edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
+    int ddistortion = mode_bits * (int)(g_cur_lambda_cost + 0.5);
+    unsigned buf_i;
+    
+    for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
+      ddistortion += sao_edge_ddistortion(data[buf_i], recdata[buf_i], 
+                                          block_width, block_height,
+                                          edge_sao.eo_class, edge_sao.offsets);
+    }
+    
+    edge_sao.ddistortion = ddistortion;
+  }
+
+  {
+    int mode_bits = sao_mode_bits_band(band_sao.band_position, band_sao.offsets, sao_top, sao_left);
+    int ddistortion = mode_bits * (int)(g_cur_lambda_cost + 0.5);
+    unsigned buf_i;
+    
+    for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
+      ddistortion += sao_band_ddistortion(data[buf_i], recdata[buf_i], 
+                                          block_width, block_height, 
+                                          band_sao.band_position, &band_sao.offsets[1]);
+    }
+    
+    band_sao.ddistortion = ddistortion;
+  }
 
   if (edge_sao.ddistortion <= band_sao.ddistortion) {
     *sao_out = edge_sao;
