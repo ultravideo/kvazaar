@@ -60,7 +60,7 @@ static int sao_check_merge(const sao_info *sao_candidate, int type,
                            int offsets[NUM_SAO_EDGE_CATEGORIES],
                            int band_position, int eo_class)
 {
-  if (sao_candidate->type == type) {
+  if (sao_candidate && sao_candidate->type == type) {
     if (offsets[1] == sao_candidate->offsets[1] &&
         offsets[2] == sao_candidate->offsets[2] &&
         offsets[3] == sao_candidate->offsets[3] &&
@@ -224,8 +224,6 @@ static void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data,
                                   int block_width, int block_height)
 {
   int y, x;
-  vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-  vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
   // Arrays orig_data and rec_data are quarter size for chroma.
 
 
@@ -242,6 +240,8 @@ static void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data,
     // their neighbours.
     for (y = 0; y < block_height; ++y) {
       for (x = 0; x < block_width; ++x) {
+        vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
+        vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
         const pixel *c_data = &rec_data[y * stride + x];
         pixel *new_data = &new_rec_data[y * new_stride + x];
         pixel a = c_data[a_ofs.y * stride + a_ofs.x];
@@ -445,6 +445,7 @@ static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
   int temp_rate = 0;
   memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
 
+  sao_out->type = SAO_TYPE_EDGE;
   sao_out->ddistortion = INT_MAX;
 
   for (edge_class = SAO_EO0; edge_class <= SAO_EO3; ++edge_class) {
@@ -523,6 +524,9 @@ static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
 {
   unsigned i;
 
+  sao_out->type = SAO_TYPE_BAND;
+  sao_out->ddistortion = MAX_INT;
+
   // Band offset
   {
     int sao_bands[2][32];
@@ -568,26 +572,29 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
                                  sao_info *sao_out, sao_info *sao_top,
                                  sao_info *sao_left)
 {
-  sao_search_edge_sao(data, recdata, block_width, block_height, buf_cnt, sao_out, sao_top, sao_left);
-  sao_search_band_sao(data, recdata, block_width, block_height, buf_cnt, sao_out, sao_top, sao_left);
+  sao_info edge_sao;
+  sao_info band_sao;
+
+  sao_search_edge_sao(data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
+  sao_search_band_sao(data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
+
+  if (edge_sao.ddistortion <= band_sao.ddistortion) {
+    *sao_out = edge_sao;
+  } else {
+    *sao_out = band_sao;
+  }
 
   // When BD-rate would increase because of SAO, disable it
   if(sao_out->ddistortion >= 0) {
     sao_out->type = SAO_TYPE_NONE;
-    return;
   }
 
-  // Check for merge modes
-  if (sao_top != NULL) {
-    sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
-                                             sao_out->band_position, sao_out->eo_class);
-  }
+  sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
+                                            sao_out->band_position, sao_out->eo_class);
+  sao_out->merge_left_flag = sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
+                                              sao_out->band_position, sao_out->eo_class);
 
-  // Check for merge modes
-  if (sao_left != NULL) {
-    sao_out->merge_left_flag = sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
-                                               sao_out->band_position, sao_out->eo_class);
-  }
+  return;
 }
 
  void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
