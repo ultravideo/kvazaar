@@ -431,19 +431,12 @@ void sao_reconstruct(picture *pic, const pixel *old_rec,
 }
 
 
-/**
- * \param data     Array of pointers to reference pixels.
- * \param recdata  Array of pointers to reconstructed pixels.
- * \param block_width   Width of the area to be examined.
- * \param block_height  Height of the area to be examined.
- * \param buf_cnt  Number of pointers data and recdata have.
- * \param sao_out  Output parameter for the best sao parameters.
- */
-static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
-                                 int block_width, int block_height,
-                                 unsigned buf_cnt,
-                                 sao_info *sao_out, sao_info *sao_top,
-                                 sao_info *sao_left)
+
+static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
+                                int block_width, int block_height,
+                                unsigned buf_cnt,
+                                sao_info *sao_out, sao_info *sao_top,
+                                sao_info *sao_left)
 {
   sao_eo_class edge_class;
   // This array is used to calculate the mean offset used to minimize distortion.
@@ -519,6 +512,16 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       memcpy(sao_out->offsets, edge_offset, sizeof(int) * NUM_SAO_EDGE_CATEGORIES);
     }
   }
+}
+
+
+static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
+                               int block_width, int block_height,
+                               unsigned buf_cnt,
+                               sao_info *sao_out, sao_info *sao_top,
+                               sao_info *sao_left)
+{
+  unsigned i;
 
   // Band offset
   {
@@ -548,6 +551,25 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
       memcpy(&sao_out->offsets[1], temp_offsets, sizeof(int) * 4);
     }
   }
+}
+
+
+/**
+ * \param data     Array of pointers to reference pixels.
+ * \param recdata  Array of pointers to reconstructed pixels.
+ * \param block_width   Width of the area to be examined.
+ * \param block_height  Height of the area to be examined.
+ * \param buf_cnt  Number of pointers data and recdata have.
+ * \param sao_out  Output parameter for the best sao parameters.
+ */
+static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
+                                 int block_width, int block_height,
+                                 unsigned buf_cnt,
+                                 sao_info *sao_out, sao_info *sao_top,
+                                 sao_info *sao_left)
+{
+  sao_search_edge_sao(data, recdata, block_width, block_height, buf_cnt, sao_out, sao_top, sao_left);
+  sao_search_band_sao(data, recdata, block_width, block_height, buf_cnt, sao_out, sao_top, sao_left);
 
   // When BD-rate would increase because of SAO, disable it
   if(sao_out->ddistortion >= 0) {
