@@ -857,8 +857,8 @@ void itransform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode
 void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef, int32_t width,
            int32_t height, uint32_t *ac_sum, int8_t type, int8_t scan_idx, int8_t block_type )
 {
-  uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
-  uint32_t *scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
+  const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
+  const uint32_t * const scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
 
   #if ENABLE_SIGN_HIDING == 1
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
@@ -1103,7 +1103,7 @@ int scalinglist_parse(encoder_control * const encoder, FILE *fp)
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     uint32_t list_id;
     uint32_t size = MIN(MAX_MATRIX_COEF_NUM, (int32_t)g_scaling_list_size[size_id]);
-    //uint32_t *scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
+    //const uint32_t * const scan = (size_id == 0) ? g_sig_last_scan[SCAN_DIAG][1] : g_sig_last_scan_32x32;
 
     for (list_id = 0; list_id < g_scaling_list_num[size_id]; list_id++) {
       int found;

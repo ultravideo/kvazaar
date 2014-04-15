@@ -44,7 +44,7 @@
 
 double g_lambda_cost[55];
 double g_cur_lambda_cost;
-uint32_t* g_sig_last_scan[3][5];
+const uint32_t* g_sig_last_scan[3][5];
 int8_t g_convert_to_bit[LCU_WIDTH + 1];
 int8_t g_bitdepth = 8;
 
@@ -198,12 +198,17 @@ void init_tables(void)
 
   c = 2;
   for (i = 0; i < 5; i++) {
-    g_sig_last_scan[0][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
-    g_sig_last_scan[1][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
-    g_sig_last_scan[2][i] = (uint32_t*)malloc(c*c*sizeof(uint32_t));
+    uint32_t *sls0, *sls1, *sls2;
+    sls0 = (uint32_t*)malloc(c*c*sizeof(uint32_t));
+    sls1 = (uint32_t*)malloc(c*c*sizeof(uint32_t));
+    sls2 = (uint32_t*)malloc(c*c*sizeof(uint32_t));
 
-    init_sig_last_scan(g_sig_last_scan[0][i], g_sig_last_scan[1][i],
-                       g_sig_last_scan[2][i], c, c);
+    init_sig_last_scan(sls0, sls1, sls2, c, c);
+    
+    g_sig_last_scan[0][i] = sls0;
+    g_sig_last_scan[1][i] = sls1;
+    g_sig_last_scan[2][i] = sls2;
+    
     c <<= 1;
   }
 }
@@ -242,9 +247,9 @@ void free_tables(void)
 {
   int i;
   for (i = 0; i < 5; i++) {
-    free(g_sig_last_scan[0][i]);
-    free(g_sig_last_scan[1][i]);
-    free(g_sig_last_scan[2][i]);
+    FREE_POINTER(g_sig_last_scan[0][i]);
+    FREE_POINTER(g_sig_last_scan[1][i]);
+    FREE_POINTER(g_sig_last_scan[2][i]);
   }
 }
 encoder_control *init_encoder_control(config *cfg)
