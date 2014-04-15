@@ -311,7 +311,17 @@ encoder_control *init_encoder_control(config *cfg)
 
   enc_c->ref = pic_list;
   enc_c->ref_list = REF_PIC_LIST_0;
-
+  
+  // CQM
+  {
+    FILE* cqmfile;
+    cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
+    if (cqmfile) {
+      scalinglist_parse(enc_c, cqmfile);
+      fclose(cqmfile);
+    }
+  }
+  
   return enc_c;
 
 init_failure:
@@ -408,9 +418,6 @@ void encode_one_frame(encoder_control* encoder)
     while (encoder->ref->used_size) {
       picture_list_rem(encoder->ref, encoder->ref->used_size - 1, 1);
     }
-
-    if (encoder->frame == 0 && encoder->cqmfile)
-      scalinglist_parse(encoder, encoder->cqmfile);
 
     encoder->poc = 0;
 
