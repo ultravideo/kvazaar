@@ -58,7 +58,7 @@ typedef struct
   uint32_t value;
 } bit_table;
 
-extern bit_table *g_exp_table;
+extern const bit_table *g_exp_table;
 
 int floor_log2(unsigned int n);
 

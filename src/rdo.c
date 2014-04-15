@@ -438,7 +438,7 @@ void  rdoq(const encoder_control * const encoder, cabac_data *cabac, coefficient
   uint32_t    c2_idx     = 0;
   int32_t     base_level;
 
-  uint32_t *scan = g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
+  const uint32_t *scan = g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
 
 
   uint32_t cg_num = width * height >> 4;
