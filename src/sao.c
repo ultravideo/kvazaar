@@ -141,10 +141,22 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
 {
   int mode_bits = 0;
 
-  if ((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class)) ||
-      (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class))) {
+  // FL coded merges.
+  if (sao_left != NULL) {
     mode_bits += 1;
-  } else {
+    if (sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class)) {
+      return mode_bits;
+    }
+  }
+  if (sao_top != NULL) {
+    mode_bits += 1;
+    if (sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class)) {
+      return mode_bits;
+    }
+  }
+
+  // TR coded offsets.
+  {
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int abs_offset = abs(offsets[edge_cat]);
@@ -153,33 +165,44 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
       } else {
         mode_bits += abs_offset + 2;
       }
-    }
+    }    
+  }
 
-    // TR coded sao_eo_class_
-    if (edge_class == SAO_EO0 || edge_class == SAO_EO3) {
-      mode_bits += 1;
-    } else {
-      mode_bits += 2;
-    }
-    
+  // TR coded sao_eo_class_
+  if (edge_class == SAO_EO0 || edge_class == SAO_EO3) {
+    mode_bits += 1;
+  } else {
+    mode_bits += 2;
   }
 
   return mode_bits;
 }
 
 
-static int sao_mode_bits_band(int band_position, int offsets[NUM_SAO_EDGE_CATEGORIES],
+static int sao_mode_bits_band(int band_position, int offsets[4],
                               sao_info *sao_top, sao_info *sao_left)
 {
   int mode_bits = 0;
 
-  if ((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0)) ||
-      (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0))) {
+  // FL coded merges.
+  if (sao_left != NULL) {
     mode_bits += 1;
-  } else {
-    sao_eo_cat edge_cat;
-    for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
-      int abs_offset = abs(offsets[edge_cat]);
+    if (sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0)) {
+      return mode_bits;
+    }
+  }
+  if (sao_top != NULL) {
+    mode_bits += 1;
+    if (sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0)) {
+      return mode_bits;
+    }
+  }
+
+  // TR coded offsets and possible FL coded offset signs.
+  {
+    int i;
+    for (i = 0; i < 4; ++i) {
+      int abs_offset = abs(offsets[i]);
       if (abs_offset == 0) {
         mode_bits += abs_offset + 1;
       } else if (abs_offset == SAO_ABS_OFFSET_MAX) {
@@ -188,9 +211,10 @@ static int sao_mode_bits_band(int band_position, int offsets[NUM_SAO_EDGE_CATEGO
         mode_bits += abs_offset + 2 + 1;
       }
     }
-
-    mode_bits += 5; // FL coded band position.
   }
+
+  // FL coded band position.
+  mode_bits += 5;
 
   return mode_bits;
 }
@@ -714,7 +738,7 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   }
 
   {
-    int mode_bits = sao_mode_bits_band(band_sao.band_position, band_sao.offsets, sao_top, sao_left);
+    int mode_bits = sao_mode_bits_band(band_sao.band_position, &band_sao.offsets[1], sao_top, sao_left);
     int ddistortion = mode_bits * (int)(g_cur_lambda_cost + 0.5);
     unsigned buf_i;
     
