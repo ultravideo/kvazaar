@@ -65,10 +65,10 @@ $(PROG): $(OBJS) $(ASMOBJS)
 cpu.o: x86/cpu.asm
 	$(YASM) $(ASMFLAGS) x86/cpu.asm -o cpu.o
 
-%.o: %.c
+%.o: %.c Makefile
 	$(CC) $(CCFLAGS) -c $< -o $@
 
-%.d: %.c
+%.d: %.c Makefile
 	$(CC) $(CCFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
 
 clean:
