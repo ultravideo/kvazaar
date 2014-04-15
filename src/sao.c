@@ -148,9 +148,10 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int abs_offset = abs(offsets[edge_cat]);
-      mode_bits += 2 + abs_offset;
-      if (abs_offset == SAO_ABS_OFFSET_MAX) {
-        mode_bits -= 1;
+      if (abs_offset == 0 || abs_offset == SAO_ABS_OFFSET_MAX) {
+        mode_bits += abs_offset + 1;
+      } else {
+        mode_bits += abs_offset + 2;
       }
     }
   }
@@ -171,9 +172,10 @@ static int sao_mode_bits_band(int band_position, int offsets[NUM_SAO_EDGE_CATEGO
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int abs_offset = abs(offsets[edge_cat]);
-      mode_bits += 2 + abs_offset;
-      if (abs_offset == SAO_ABS_OFFSET_MAX) {
-        mode_bits -= 1;
+      if (abs_offset == 0 || abs_offset == SAO_ABS_OFFSET_MAX) {
+        mode_bits += abs_offset + 1;
+      } else {
+        mode_bits += abs_offset + 2;
       }
     }
   }
