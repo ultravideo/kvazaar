@@ -154,6 +154,14 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
         mode_bits += abs_offset + 2;
       }
     }
+
+    // TR coded sao_eo_class_
+    if (edge_class == SAO_EO0 || edge_class == SAO_EO3) {
+      mode_bits += 1;
+    } else {
+      mode_bits += 2;
+    }
+    
   }
 
   return mode_bits;
@@ -172,12 +180,16 @@ static int sao_mode_bits_band(int band_position, int offsets[NUM_SAO_EDGE_CATEGO
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int abs_offset = abs(offsets[edge_cat]);
-      if (abs_offset == 0 || abs_offset == SAO_ABS_OFFSET_MAX) {
+      if (abs_offset == 0) {
         mode_bits += abs_offset + 1;
+      } else if (abs_offset == SAO_ABS_OFFSET_MAX) {
+        mode_bits += abs_offset + 1 + 1;
       } else {
-        mode_bits += abs_offset + 2;
+        mode_bits += abs_offset + 2 + 1;
       }
     }
+
+    mode_bits += 5; // FL coded band position.
   }
 
   return mode_bits;
