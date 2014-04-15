@@ -121,18 +121,47 @@ static int sao_check_merge(const sao_info *sao_candidate, int type,
                            int band_position, int eo_class)
 {
   if (sao_candidate && sao_candidate->type == type) {
+    if (type == SAO_TYPE_NONE) {
+      return 1;
+    }
     if (offsets[1] == sao_candidate->offsets[1] &&
         offsets[2] == sao_candidate->offsets[2] &&
         offsets[3] == sao_candidate->offsets[3] &&
         offsets[4] == sao_candidate->offsets[4]) {
       // Type must be BAND or EDGE
       if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position) ||
-        (type == SAO_TYPE_EDGE && eo_class == sao_candidate->eo_class)) {
+          (type == SAO_TYPE_EDGE && eo_class == sao_candidate->eo_class))
+      {
           return 1;
       }
     }
   }
   return 0;
+}
+
+
+static int sao_mode_bits_none(sao_info *sao_top, sao_info *sao_left)
+{
+  int mode_bits = 0;
+
+  // FL coded merges.
+  if (sao_left != NULL) {
+    mode_bits += 1;
+    if (sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0)) {
+      return mode_bits;
+    }
+  }
+  if (sao_top != NULL) {
+    mode_bits += 1;
+    if (sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0)) {
+      return mode_bits;
+    }
+  }
+
+  // TR coded type_idx_, none = 0
+  mode_bits += 1;
+
+  return mode_bits;
 }
 
 
@@ -750,9 +779,13 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     *sao_out = band_sao;
   }
 
-  // When BD-rate would increase because of SAO, disable it
-  if(sao_out->ddistortion >= 0) {
-    sao_out->type = SAO_TYPE_NONE;
+  // Choose between SAO and doing nothing, taking into account the
+  // rate-distortion cost of coding do nothing.
+  {
+    int cost_of_nothing = sao_mode_bits_none(sao_top, sao_left) * (int)(g_cur_lambda_cost + 0.5);
+    if (sao_out->ddistortion >= cost_of_nothing) {
+      sao_out->type = SAO_TYPE_NONE;
+    }
   }
 
   sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
