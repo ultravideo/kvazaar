@@ -620,13 +620,16 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
   for (y = y_cu; y < y_cu + width_cu; ++y) {
     for (x = x_cu; x < x_cu + width_cu; ++x) {
       cu_info *cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
+      //Check if this could be moved inside the if
       cu->coded    = 1;
-      cu->depth    = cur_cu->depth;
-      cu->type     = CU_INTER;
-      cu->tr_depth = cur_cu->tr_depth;
-      cu->merged   = cur_cu->merged;
-      cu->skipped  = cur_cu->skipped;
-      memcpy(&cu->inter, &cur_cu->inter, sizeof(cu_info_inter));
+      if (cu != cur_cu) {
+        cu->depth    = cur_cu->depth;
+        cu->type     = CU_INTER;
+        cu->tr_depth = cur_cu->tr_depth;
+        cu->merged   = cur_cu->merged;
+        cu->skipped  = cur_cu->skipped;
+        memcpy(&cu->inter, &cur_cu->inter, sizeof(cu_info_inter));
+      }
     }
   }
 }
@@ -648,8 +651,10 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
       // Use TU top-left CU to propagate coeff flags
       uint32_t mask = ~((width_cu>>tr_split)-1);
       cu_info *cu_from = &lcu_cu[(x & mask) + (y & mask) * LCU_T_CU_WIDTH];
-      // Chroma coeff data is not used, luma is needed for deblocking
-      memcpy(cu->coeff_top_y, cu_from->coeff_top_y, 8);
+      if (cu != cu_from) {
+        // Chroma coeff data is not used, luma is needed for deblocking
+        memcpy(cu->coeff_top_y, cu_from->coeff_top_y, 8);
+      }
     }
   }
 }
