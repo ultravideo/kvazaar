@@ -155,6 +155,9 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
     }
   }
 
+  // TR coded type_idx_, edge = 2 = cMax
+  mode_bits += 1;
+
   // TR coded offsets.
   {
     sao_eo_cat edge_cat;
@@ -197,6 +200,9 @@ static int sao_mode_bits_band(int band_position, int offsets[4],
       return mode_bits;
     }
   }
+
+  // TR coded sao_type_idx_, band = 1
+  mode_bits += 2;
 
   // TR coded offsets and possible FL coded offset signs.
   {
