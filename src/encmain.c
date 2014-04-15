@@ -59,7 +59,6 @@ int main(int argc, char *argv[])
   config *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
-  FILE *cqmfile = NULL; //!< HM-compatible CQM file
   encoder_control *encoder = NULL; //!< Encoder control struct
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint64_t curpos  = 0;
@@ -250,9 +249,6 @@ int main(int argc, char *argv[])
   encoder->vui.chroma_loc  = (int8_t)encoder->cfg->vui.chroma_loc;
   // AUD
   encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
-  // CQM
-  cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
-  encoder->cqmfile = cqmfile;
 
   init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
 
@@ -392,7 +388,6 @@ int main(int argc, char *argv[])
 
   fclose(input);
   fclose(output);
-  if(cqmfile != NULL) fclose(cqmfile);
   if(recout != NULL) fclose(recout);
 
   // Deallocating
