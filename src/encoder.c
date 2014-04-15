@@ -708,7 +708,7 @@ void encode_prefix_sei_version(const encoder_control * const encoder)
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  config *cfg = encoder->cfg;
+  const config *cfg = encoder->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
