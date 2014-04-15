@@ -148,7 +148,7 @@ typedef int16_t coefficient;
   #define MALLOC(type, num) malloc(sizeof(type) * num)
 #endif
 
-#define FREE_POINTER(pointer) { free(pointer); pointer = NULL; }
+#define FREE_POINTER(pointer) { free((void*)pointer); pointer = NULL; }
 #define MOVE_POINTER(dst_pointer,src_pointer) { dst_pointer = src_pointer; src_pointer = NULL; }
 
 #ifndef MAX_INT

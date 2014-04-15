@@ -80,10 +80,9 @@ void free_exp_golomb();
 /* In debug mode print out some extra info */
 #ifdef NOTDEFINED//_DEBUG
 /* Counter to keep up with bits written */
-static int WRITE_VALUE = 0;
-#define WRITE_U(stream, data, bits, name) { printf("%8d  %-40s u(%d) : %d\n",WRITE_VALUE, name,bits,data); bitstream_put(stream,data,bits); WRITE_VALUE++;}
-#define WRITE_UE(stream, data, name) { printf("%8d  %-40s ue(v): %d\n",WRITE_VALUE, name,data); bitstream_put_ue(stream,data); WRITE_VALUE++;}
-#define WRITE_SE(stream, data, name) { printf("%8d  %-40s se(v): %d\n",WRITE_VALUE, name,data); bitstream_put_se(stream,(data)); WRITE_VALUE++;}
+#define WRITE_U(stream, data, bits, name) { printf("%-40s u(%d) : %d\n", name,bits,data); bitstream_put(stream,data,bits);}
+#define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); bitstream_put_ue(stream,data);}
+#define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); bitstream_put_se(stream,(data));}
 #else
 #define WRITE_U(stream, data, bits, name) { bitstream_put(stream,data,bits); }
 #define WRITE_UE(stream, data, name) { bitstream_put_ue(stream,data); }
