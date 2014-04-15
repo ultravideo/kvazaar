@@ -63,7 +63,7 @@ void printf_bitstream(char *msg, ...)
 }
 #endif
 
-bit_table *g_exp_table;
+const bit_table *g_exp_table;
 
 //From wikipedia
 //http://en.wikipedia.org/wiki/Binary_logarithm#Algorithm
@@ -89,16 +89,19 @@ int init_exp_golomb(uint32_t len)
   uint32_t code_num;
   uint8_t M;
   uint32_t info;
-  g_exp_table = (bit_table*)malloc(len*sizeof(bit_table));
-  if(!g_exp_table)
+  bit_table* exp_table;
+  exp_table = (bit_table*)malloc(len*sizeof(bit_table));
+  if(!exp_table)
     return 0;
 
   for (code_num = 0; code_num < len; code_num++) {
     M = (uint8_t)floor_log2(code_num + 1);
     info = code_num + 1 - (uint32_t)pow(2, M);
-    g_exp_table[code_num].len = M * 2 + 1;
-    g_exp_table[code_num].value = (1<<M) | info;
+    exp_table[code_num].len = M * 2 + 1;
+    exp_table[code_num].value = (1<<M) | info;
   }
+  
+  g_exp_table = exp_table;
 
   return 1;
 }
