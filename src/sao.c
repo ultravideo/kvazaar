@@ -634,19 +634,9 @@ static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
       // increase increase SSE by h^2 and all pixels that are improved by
       // offset decrease SSE by h*E.
       sum_ddistortion += cat_cnt * offset * offset - 2 * offset * cat_sum;
+    }
 
-      // Calculate used rate to code this
-      temp_rate += abs(offset+2);
-      // When max offset, no need to signal final bit
-      if (abs(offset)==SAO_ABS_OFFSET_MAX) {
-        temp_rate --;
-      }
-    }
-    // If can merge, use lower cost
-    if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_EDGE, edge_offset,0, edge_class)) ||
-       (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_EDGE, edge_offset,0, edge_class))) {
-          temp_rate = 1;
-    }
+    temp_rate = sao_mode_bits_edge(edge_class, edge_offset, sao_top, sao_left);
     sum_ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
@@ -687,10 +677,7 @@ static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
 
     ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position, &temp_rate);
 
-    if((sao_top != NULL && sao_check_merge(sao_top, SAO_TYPE_BAND, temp_offsets,sao_out->band_position, 0)) ||
-       (sao_left != NULL && sao_check_merge(sao_left, SAO_TYPE_BAND, temp_offsets,sao_out->band_position, 0))) {
-          temp_rate = 1;
-    }
+    temp_rate = sao_mode_bits_band(sao_out->band_position, temp_offsets, sao_top, sao_left);
     ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
 
     // Select band sao over edge sao when distortion is lower
