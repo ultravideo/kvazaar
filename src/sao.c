@@ -282,7 +282,7 @@ static void calc_sao_offset_array(const sao_info *sao, int *offset)
  * \param sao_bands an array of bands for original and reconstructed block
  */
 static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
-                                 int *band_position, int *rate)
+                                 int *band_position)
 {
   int band;
   int offset;
@@ -309,12 +309,6 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
     while(offset != 0) {
       temp_dist = sao_bands[1][band]*offset*offset - 2*offset*sao_bands[0][band];
 
-      // Calculate used rate to code this
-      temp_rate[band] = abs(offset+2);
-      // When max offset, no need to signal final bit
-      if (abs(offset)==SAO_ABS_OFFSET_MAX) {
-        temp_rate[band] --;
-      }
       // Store best distortion and offset
       if(temp_dist < best_dist) {
         dist[band] = temp_dist;
@@ -333,8 +327,6 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
       best_dist_pos = band;
     }
   }
-  *rate = temp_rate[best_dist_pos]+temp_rate[best_dist_pos+1]+
-          temp_rate[best_dist_pos+2]+temp_rate[best_dist_pos+3];
   // Copy best offsets to output
   memcpy(offsets, &temp_offsets[best_dist_pos], 4*sizeof(int));
 
@@ -622,7 +614,6 @@ static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
   // This array is used to calculate the mean offset used to minimize distortion.
   int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES];
   unsigned i = 0;
-  int temp_rate = 0;
   memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
 
   sao_out->type = SAO_TYPE_EDGE;
@@ -671,8 +662,10 @@ static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
       sum_ddistortion += cat_cnt * offset * offset - 2 * offset * cat_sum;
     }
 
-    temp_rate = sao_mode_bits_edge(edge_class, edge_offset, sao_top, sao_left);
-    sum_ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
+    {
+      int mode_bits = sao_mode_bits_edge(edge_class, edge_offset, sao_top, sao_left);
+      sum_ddistortion += (int)((double)mode_bits*(g_cur_lambda_cost+0.5));
+    }
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
 
@@ -710,7 +703,7 @@ static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
                      block_height,sao_bands);
     }
 
-    ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position, &temp_rate);
+    ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position);
 
     temp_rate = sao_mode_bits_band(sao_out->band_position, temp_offsets, sao_top, sao_left);
     ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
