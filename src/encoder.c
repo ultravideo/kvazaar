@@ -29,6 +29,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "tables.h"
 #include "config.h"
 #include "cabac.h"
 #include "picture.h"
@@ -44,8 +45,6 @@
 
 double g_lambda_cost[55];
 double g_cur_lambda_cost;
-const uint32_t* g_sig_last_scan[3][5];
-int8_t g_convert_to_bit[LCU_WIDTH + 1];
 int8_t g_bitdepth = 8;
 
 /* Local functions. */
@@ -55,163 +54,6 @@ static void encode_sao(const encoder_control * const encoder,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
-
-/**
- * Initialize g_sig_last_scan with scan positions for a transform block of
- * size width x height.
- */
-static void init_sig_last_scan(uint32_t *buff_d, uint32_t *buff_h,
-                               uint32_t *buff_v,
-                               int32_t width, int32_t height)
-{
-  uint32_t num_scan_pos  = width * width;
-  uint32_t next_scan_pos = 0;
-  int32_t  xx, yy, x, y;
-  uint32_t scan_line;
-  uint32_t blk_y, blk_x;
-  uint32_t blk;
-  uint32_t cnt = 0;
-
-  assert(width == height && width <= 32);
-
-  if (width <= 4) {
-    uint32_t *buff_tmp = buff_d;
-
-    for (scan_line = 0; next_scan_pos < num_scan_pos; scan_line++) {
-      int    primary_dim  = scan_line;
-      int    second_dim  = 0;
-
-      while (primary_dim >= width) {
-        second_dim++;
-        primary_dim--;
-      }
-
-      while (primary_dim >= 0 && second_dim < width) {
-        buff_tmp[next_scan_pos] = primary_dim * width + second_dim ;
-        next_scan_pos++;
-        second_dim++;
-        primary_dim--;
-      }
-    }
-  }
-
-  if (width > 4 && width <= 32) {
-    uint32_t num_blk_side = width >> 2;
-    uint32_t num_blks   = num_blk_side * num_blk_side;
-    uint32_t log2_width = g_to_bits[width];
-
-    for (blk = 0; blk < num_blks; blk++) {
-      uint32_t init_blk_pos = g_sig_last_scan_cg[log2_width][SCAN_DIAG][blk];
-      next_scan_pos   = 0;
-
-      {
-        uint32_t offset_y    = init_blk_pos / num_blk_side;
-        uint32_t offset_x    = init_blk_pos - offset_y * num_blk_side;
-        uint32_t offset_d    = 4 * (offset_x + offset_y * width);
-        uint32_t offset_scan = 16 * blk;
-
-        for (scan_line = 0; next_scan_pos < 16; scan_line++) {
-          int    primary_dim  = scan_line;
-          int    second_dim  = 0;
-
-          //TODO: optimize
-          while (primary_dim >= 4) {
-            second_dim++;
-            primary_dim--;
-          }
-
-          while (primary_dim >= 0 && second_dim < 4) {
-            buff_d[next_scan_pos + offset_scan] = primary_dim * width +
-                                                  second_dim + offset_d;
-            next_scan_pos++;
-            second_dim++;
-            primary_dim--;
-          }
-        }
-      }
-    }
-  }
-
-  if (width > 2) {
-    uint32_t num_blk_side = width >> 2;
-
-    for (blk_y = 0; blk_y < num_blk_side; blk_y++) {
-      for (blk_x = 0; blk_x < num_blk_side; blk_x++) {
-        uint32_t offset    = blk_y * 4 * width + blk_x * 4;
-
-        for (y = 0; y < 4; y++) {
-          for (x = 0; x < 4; x++) {
-            buff_h[cnt] = y * width + x + offset;
-            cnt ++;
-          }
-        }
-      }
-    }
-
-    cnt = 0;
-
-    for (blk_x = 0; blk_x < num_blk_side; blk_x++) {
-      for (blk_y = 0; blk_y < num_blk_side; blk_y++) {
-        uint32_t offset = blk_y * 4 * width + blk_x * 4;
-
-        for (x = 0; x < 4; x++) {
-          for (y = 0; y < 4; y++) {
-            buff_v[cnt] = y * width + x + offset;
-            cnt ++;
-          }
-        }
-      }
-    }
-  } else {
-    for (yy = 0; yy < height; yy++) {
-      for (xx = 0; xx < width; xx++) {
-        buff_h[cnt] = yy * width + xx;
-        cnt ++;
-  }
-      }
-
-    cnt = 0;
-
-    for (xx = 0; xx < width; xx++) {
-      for (yy = 0; yy < height; yy++) {
-        buff_v[cnt] = yy * width + xx;
-        cnt ++;
-      }
-    }
-  }
-}
-
-
-void init_tables(void)
-{
-  int i;
-  int c = 0;
-
-  memset( g_convert_to_bit,-1, sizeof( g_convert_to_bit ) );
-
-  for (i = 4; i < LCU_WIDTH; i *= 2) {
-    g_convert_to_bit[i] = (int8_t)c;
-    c++;
-  }
-
-  g_convert_to_bit[i] = (int8_t)c;
-
-  c = 2;
-  for (i = 0; i < 5; i++) {
-    uint32_t *sls0, *sls1, *sls2;
-    sls0 = (uint32_t*)malloc(c*c*sizeof(uint32_t));
-    sls1 = (uint32_t*)malloc(c*c*sizeof(uint32_t));
-    sls2 = (uint32_t*)malloc(c*c*sizeof(uint32_t));
-
-    init_sig_last_scan(sls0, sls1, sls2, c, c);
-    
-    g_sig_last_scan[0][i] = sls0;
-    g_sig_last_scan[1][i] = sls1;
-    g_sig_last_scan[2][i] = sls2;
-    
-    c <<= 1;
-  }
-}
 
 /*!
   \brief Initializes lambda-value for current QP
@@ -243,15 +85,6 @@ void init_lambda(const encoder_control * const encoder)
   g_cur_lambda_cost = lambda;
 }
 
-void free_tables(void)
-{
-  int i;
-  for (i = 0; i < 5; i++) {
-    FREE_POINTER(g_sig_last_scan[0][i]);
-    FREE_POINTER(g_sig_last_scan[1][i]);
-    FREE_POINTER(g_sig_last_scan[2][i]);
-  }
-}
 encoder_control *init_encoder_control(config *cfg)
 {
   encoder_control *enc_c    = NULL;
@@ -306,7 +139,7 @@ encoder_control *init_encoder_control(config *cfg)
   }
 
   // Initialize the scaling list
-  scalinglist_init(enc_c);
+  scalinglist_init(&enc_c->scaling_list);
 
   pic_list = picture_list_init(MAX_REF_PIC_COUNT);
   if(!pic_list) {
@@ -322,7 +155,7 @@ encoder_control *init_encoder_control(config *cfg)
     FILE* cqmfile;
     cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
     if (cqmfile) {
-      scalinglist_parse(enc_c, cqmfile);
+      scalinglist_parse(&enc_c->scaling_list, cqmfile);
       fclose(cqmfile);
     }
   }
@@ -478,7 +311,7 @@ void encode_one_frame(encoder_control* encoder)
 
   cabac_start(&cabac);
   init_contexts(&cabac, encoder->QP, encoder->in.cur_pic->slicetype);
-  scalinglist_process(encoder);
+  scalinglist_process(&encoder->scaling_list);
   encode_slice_header(encoder);
   bitstream_align(encoder->stream);
 
@@ -864,7 +697,7 @@ static void encode_scaling_list(const encoder_control * const encoder)
       uint32_t ref_matrix_id = UINT32_MAX;
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
-        int32_t * const pred_list  = (list_id == pred_list_idx) ?
+        const int32_t * const pred_list  = (list_id == pred_list_idx) ?
                                      scalinglist_get_default(size_id, pred_list_idx) :
                                      encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
 
@@ -972,8 +805,8 @@ void encode_seq_parameter_set(const encoder_control * const encoder)
   WRITE_UE(encoder->stream, TR_DEPTH_INTRA, "max_transform_hierarchy_depth_intra");
 
   // scaling list
-  WRITE_U(encoder->stream, encoder->scaling_list_enable, 1, "scaling_list_enable_flag");
-  if (encoder->scaling_list_enable) {
+  WRITE_U(encoder->stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
+  if (encoder->scaling_list.enable) {
     WRITE_U(encoder->stream, 1, 1, "sps_scaling_list_data_present_flag");
     encode_scaling_list(encoder);
   }

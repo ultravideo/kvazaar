@@ -30,9 +30,6 @@
 
 #include <math.h>
 
-extern const uint8_t g_scaling_list_num[4];
-extern const uint16_t g_scaling_list_size[4];
-extern const int32_t g_quant_intra_default_8x8[64];
 extern const uint8_t g_chroma_scale[58];
 extern const int16_t g_inv_quant_scales[6];
 
@@ -46,17 +43,6 @@ void itransformskip(int16_t *block,int16_t *coeff, int8_t block_size);
 
 void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
 void itransform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
-
-void scalinglist_init(encoder_control*const encoder);
-void scalinglist_process_enc(const int32_t * const coeff, int32_t *quant_coeff, int32_t quant_scales,
-                             uint32_t height,uint32_t width, uint32_t ratio, int32_t size_num, uint32_t dc, uint8_t flat);
-void scalinglist_process(const encoder_control * const encoder);
-void scalinglist_set(const encoder_control * const encoder, const int32_t * const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp);
-void scalinglist_set_err_scale(const encoder_control * const encoder, uint32_t list, uint32_t size, uint32_t qp);
-void scalinglist_destroy(encoder_control * const encoder);
-
-int32_t *scalinglist_get_default(uint32_t size_id, uint32_t list_id);
-int scalinglist_parse(encoder_control * const encoder, FILE *fp);
 
 int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
 

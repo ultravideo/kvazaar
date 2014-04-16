@@ -33,7 +33,6 @@
 
 
 #define QUANT_SHIFT          14
-#define MAX_TR_DYNAMIC_RANGE 15
 #define SCAN_SET_SIZE        16
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
@@ -404,8 +403,8 @@ void  rdoq(const encoder_control * const encoder, cabac_data *cabac, coefficient
   {
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
-  int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
-  double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const double *err_scale     = encoder->scaling_list.error_scale[log2_tr_size-2][scalinglist_type][qp_scaled%6];
 
   double block_uncoded_cost = 0;
 

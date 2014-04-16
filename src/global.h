@@ -171,5 +171,9 @@ typedef int16_t coefficient;
 #define MAX_MATRIX_COEF_NUM   64
 #define SCALING_LIST_REM_NUM  6
 
+#define MAX_TR_DYNAMIC_RANGE 15
+
+//Defined in encoder.c. It's global for now since it affects a lot of functions.
+extern int8_t g_bitdepth;
 
 #endif
