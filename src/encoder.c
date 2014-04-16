@@ -139,7 +139,7 @@ encoder_control *init_encoder_control(config *cfg)
   }
 
   // Initialize the scaling list
-  scalinglist_init(enc_c);
+  scalinglist_init(&enc_c->scaling_list);
 
   pic_list = picture_list_init(MAX_REF_PIC_COUNT);
   if(!pic_list) {
@@ -155,7 +155,7 @@ encoder_control *init_encoder_control(config *cfg)
     FILE* cqmfile;
     cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
     if (cqmfile) {
-      scalinglist_parse(enc_c, cqmfile);
+      scalinglist_parse(&enc_c->scaling_list, cqmfile);
       fclose(cqmfile);
     }
   }
@@ -311,7 +311,7 @@ void encode_one_frame(encoder_control* encoder)
 
   cabac_start(&cabac);
   init_contexts(&cabac, encoder->QP, encoder->in.cur_pic->slicetype);
-  scalinglist_process(encoder);
+  scalinglist_process(&encoder->scaling_list);
   encode_slice_header(encoder);
   bitstream_align(encoder->stream);
 
@@ -697,7 +697,7 @@ static void encode_scaling_list(const encoder_control * const encoder)
       uint32_t ref_matrix_id = UINT32_MAX;
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
-        int32_t * const pred_list  = (list_id == pred_list_idx) ?
+        const int32_t * const pred_list  = (list_id == pred_list_idx) ?
                                      scalinglist_get_default(size_id, pred_list_idx) :
                                      encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
 

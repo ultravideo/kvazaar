@@ -31,15 +31,7 @@
 #include "cabac.h"
 #include "config.h"
 #include "tables.h"
-
-typedef struct {
-  int32_t  scaling_list_dc   [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-  int32_t* scaling_list_coeff[SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM];
-  int32_t* quant_coeff[4][6][6];
-  int32_t *de_quant_coeff  [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
-  double*  error_scale[4][6][6];
-} scaling_list;
-  
+#include "scalinglist.h"
 
 
 /* TODO: add ME data */
@@ -56,8 +48,8 @@ enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 typedef struct
 {
   FILE *file;
-  int32_t width;  /*!< \brief input picture width */
-  int32_t height; /*!< \brief input picture height */
+  int32_t width;  /*!< \brief input picture width (divisible by the minimum block size)*/
+  int32_t height; /*!< \brief input picture height (divisible by the minimum block size) */
   int32_t real_width;  /*!< \brief real input picture width */
   int32_t real_height; /*!< \brief real input picture width */
   int32_t height_in_lcu; /*!< \brief input picture width in LCU*/
@@ -143,7 +135,6 @@ void encode_block_residual(const encoder_control * const encoder,
 
 extern double g_lambda_cost[55];
 extern double g_cur_lambda_cost;
-extern int8_t g_bitdepth;
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
