@@ -54,6 +54,8 @@ OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
+DEPS = $(OBJS:.o=.d)
+
 all: $(PROGS)
 .PHONY: all clean
 
@@ -63,8 +65,13 @@ $(PROG): $(OBJS) $(ASMOBJS)
 cpu.o: x86/cpu.asm
 	$(YASM) $(ASMFLAGS) x86/cpu.asm -o cpu.o
 
-%.o: %.c
+%.o: %.c Makefile
 	$(CC) $(CCFLAGS) -c $< -o $@
 
+%.d: %.c Makefile
+	$(CC) $(CCFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
+
 clean:
-	rm -f $(OBJS) $(PROGS) $(ASMOBJS)
+	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)
+
+-include $(DEPS)
