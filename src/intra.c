@@ -839,22 +839,22 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
   pixel *recbase_v = &lcu->rec.v[x_local/2 + (y_local * LCU_WIDTH)/4];
   int32_t rec_stride = LCU_WIDTH;
 
-
-  pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
-  pixel *rec_shift  = &rec[(LCU_WIDTH >> (depth)) * 2 + 8 + 1];
-
   int8_t width = LCU_WIDTH >> depth;
   int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
+
+  pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+  pixel *rec_shift  = &rec[width * 2 + 8 + 1];
+
   int i = PU_INDEX(x >> 2, y >> 2);
 
   cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
 
   // Reconstruct chroma.
   if (!(x & 4 || y & 4)) {
-    rec_shift  = &rec[width_c * 2 + 8 + 1];
+    pixel *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
     intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
                                      pic_width/2, pic_height/2, lcu);
-    intra_recon(rec_shift,
+    intra_recon(rec_shift_c,
                 width_c * 2 + 8,
                 width_c,
                 recbase_u,
@@ -864,7 +864,7 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
 
     intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
                                      pic_width/2, pic_height/2, lcu);
-    intra_recon(rec_shift,
+    intra_recon(rec_shift_c,
                 width_c * 2 + 8,
                 width_c,
                 recbase_v,
@@ -873,10 +873,6 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
                 2);
   }
 
-  // Build reconstructed block to use in prediction with extrapolated borders
-  recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
-
-  rec_shift  = &rec[width * 2 + 8 + 1];
   intra_build_reference_border(x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
                                 pic_width, pic_height, lcu);
   intra_recon(rec_shift, width * 2 + 8,
