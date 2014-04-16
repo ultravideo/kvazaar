@@ -41,10 +41,17 @@ static const vector2d g_sao_edge_offsets[SAO_NUM_EO][2] = {
 };
 
 // Mapping of edge_idx values to eo-classes.
-static const unsigned g_sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-// Mapping relationships between a, b and c to eo_idx.
-#define EO_IDX(a, b, c) (2 + SIGN3((c) - (a)) + SIGN3((c) - (b)))
 
+
+static int sao_calc_eo_cat(pixel a, pixel b, pixel c)
+{
+  // Mapping relationships between a, b and c to eo_idx.
+  static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
+
+  int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
+
+  return sao_eo_idx_to_eo_category[eo_idx];
+}
 
 
 int sao_band_ddistortion(const pixel *orig_data, const pixel *rec_data,
@@ -90,9 +97,7 @@ int sao_edge_ddistortion(const pixel *orig_data, const pixel *rec_data,
       pixel c = c_data[0];
       pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
 
-      int eo_idx = EO_IDX(a, b, c);
-      int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
-      int offset = offsets[eo_cat];
+      int offset = offsets[sao_calc_eo_cat(a, b, c)];
 
       if (offset != 0) {
         int diff = orig_data[y * block_width + x] - c;
@@ -381,8 +386,7 @@ static void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
       pixel c = c_data[0];
       pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
 
-      int eo_idx = EO_IDX(a, b, c);
-      int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
+      int eo_cat = sao_calc_eo_cat(a, b, c);
 
       cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + x] - c;
       cat_sum_cnt[1][eo_cat] += 1;
@@ -420,8 +424,7 @@ static void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data,
         pixel c = c_data[0];
         pixel b = c_data[b_ofs.y * stride + b_ofs.x];
 
-        int eo_idx = EO_IDX(a, b, c);
-        int eo_cat = g_sao_eo_idx_to_eo_category[eo_idx];
+        int eo_cat = sao_calc_eo_cat(a, b, c);
 
         new_data[0] = (pixel)CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat]);
       }
