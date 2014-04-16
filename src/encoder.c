@@ -159,6 +159,7 @@ encoder_control *init_encoder_control(config *cfg)
       fclose(cqmfile);
     }
   }
+  scalinglist_process(&enc_c->scaling_list);
   
   return enc_c;
 
@@ -311,7 +312,6 @@ void encode_one_frame(encoder_control* encoder)
 
   cabac_start(&cabac);
   init_contexts(&cabac, encoder->QP, encoder->in.cur_pic->slicetype);
-  scalinglist_process(&encoder->scaling_list);
   encode_slice_header(encoder);
   bitstream_align(encoder->stream);
 
