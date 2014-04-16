@@ -50,7 +50,7 @@ LDFLAGS += -lm
 LD = gcc
 YASM = yasm
 ASMOBJS = cpu.o
-OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o search.o transform.o extras/getopt.o
+OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o search.o tables.o transform.o extras/getopt.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
@@ -70,6 +70,13 @@ cpu.o: x86/cpu.asm
 
 %.d: %.c Makefile
 	$(CC) $(CCFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
+
+generate_tables: tables.c global.h
+	$(CC) $(CCFLAGS) -DMAKE_GENERATE_TABLES=1 $< -o $@
+
+tables_generated.h: generate_tables
+	./generate_tables > $@
+	
 
 clean:
 	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)
