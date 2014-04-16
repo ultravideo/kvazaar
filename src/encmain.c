@@ -41,6 +41,7 @@
 #include "cabac.h"
 #include "picture.h"
 #include "transform.h"
+#include "scalinglist.h"
 
 // Assembly optimization headers
 #include "x86/cpu.h"
@@ -392,7 +393,7 @@ int main(int argc, char *argv[])
 
   // Deallocating
   config_destroy(cfg);
-  scalinglist_destroy(encoder);
+  scalinglist_destroy(&encoder->scaling_list);
   picture_list_destroy(encoder->ref);
   picture_destroy(encoder->in.cur_pic);
   FREE_POINTER(encoder->in.cur_pic);
