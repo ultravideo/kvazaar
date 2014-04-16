@@ -71,7 +71,7 @@ typedef struct
 {
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */
-  config *cfg;
+  const config *cfg;
   encoder_input in;
   encoder_me me;
   bitstream *stream;
@@ -161,7 +161,7 @@ static const uint8_t g_min_in_group[10] = {
  * First index: scan pattern 0 = diagonal, 1 = horizontal, 2 = vertical
  * Second index: (log2 - 1) size of transform block. 2x2 .. 32x32
  */
-extern uint32_t* g_sig_last_scan[3][5];
+extern const uint32_t* g_sig_last_scan[3][5];
 
 /***
   * List of indices for 4x4 coefficient groups within 8x8 transform block.
