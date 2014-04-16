@@ -805,8 +805,8 @@ void encode_seq_parameter_set(const encoder_control * const encoder)
   WRITE_UE(encoder->stream, TR_DEPTH_INTRA, "max_transform_hierarchy_depth_intra");
 
   // scaling list
-  WRITE_U(encoder->stream, encoder->scaling_list_enable, 1, "scaling_list_enable_flag");
-  if (encoder->scaling_list_enable) {
+  WRITE_U(encoder->stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
+  if (encoder->scaling_list.enable) {
     WRITE_U(encoder->stream, 1, 1, "sps_scaling_list_data_present_flag");
     encode_scaling_list(encoder);
   }

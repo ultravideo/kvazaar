@@ -101,7 +101,6 @@ typedef struct
   int8_t aud_enable;
 
   //scaling list
-  uint8_t      scaling_list_enable;
   scaling_list scaling_list;
 } encoder_control;
 
