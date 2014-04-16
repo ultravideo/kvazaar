@@ -106,7 +106,9 @@
     <ClCompile Include="..\..\src\picture.c" />
     <ClCompile Include="..\..\src\rdo.c" />
     <ClCompile Include="..\..\src\sao.c" />
+    <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClCompile Include="..\..\src\tables.c" />
     <ClCompile Include="..\..\src\transform.c" />
   </ItemGroup>
   <ItemGroup>
@@ -124,7 +126,9 @@
     <ClInclude Include="..\..\src\picture.h" />
     <ClInclude Include="..\..\src\rdo.h" />
     <ClInclude Include="..\..\src\sao.h" />
+    <ClInclude Include="..\..\src\scalinglist.h" />
     <ClInclude Include="..\..\src\search.h" />
+    <ClInclude Include="..\..\src\tables.h" />
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\x86\cpu.h" />
   </ItemGroup>

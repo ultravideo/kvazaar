@@ -69,6 +69,12 @@
     <ClCompile Include="..\..\src\extras\getopt.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\scalinglist.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\tables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -120,6 +126,12 @@
       <Filter>Header Files\x86</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\extras\getopt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\scalinglist.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\tables.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
