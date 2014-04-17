@@ -65,6 +65,7 @@ int floor_log2(unsigned int n);
 bitstream *create_bitstream(const bitstream_type type);
 void free_bitstream(bitstream* stream);
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
+int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
 
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }

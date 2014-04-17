@@ -182,7 +182,7 @@ void free_bitstream(bitstream* stream)
  * \param byte byte to write
  * \return 1 on success, 0 on failure
  */
-static int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
+int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
   if (stream_abstract->type == BITSTREAM_TYPE_FILE) {
     bitstream_file *stream = (bitstream_file*) stream_abstract;
     if (fwrite(&byte, 1, 1, stream->output) != 1) {

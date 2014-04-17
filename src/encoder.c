@@ -227,7 +227,7 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
 static void write_aud(const encoder_control * const encoder)
 {
   encode_access_unit_delimiter(encoder);
-  nal_write(encoder->output, AUD_NUT, 0, 1);
+  nal_write(encoder->stream, AUD_NUT, 0, 1);
   bitstream_align(encoder->stream);
 }
 
@@ -268,23 +268,23 @@ void encode_one_frame(encoder_control* encoder)
       write_aud(encoder);
 
     // Video Parameter Set (VPS)
-    nal_write(encoder->output, NAL_VPS_NUT, 0, 1);
+    nal_write(encoder->stream, NAL_VPS_NUT, 0, 1);
     encode_vid_parameter_set(encoder);
     bitstream_align(encoder->stream);
 
     // Sequence Parameter Set (SPS)
-    nal_write(encoder->output, NAL_SPS_NUT, 0, 1);
+    nal_write(encoder->stream, NAL_SPS_NUT, 0, 1);
     encode_seq_parameter_set(encoder);
     bitstream_align(encoder->stream);
 
     // Picture Parameter Set (PPS)
-    nal_write(encoder->output, NAL_PPS_NUT, 0, 1);
+    nal_write(encoder->stream, NAL_PPS_NUT, 0, 1);
     encode_pic_parameter_set(encoder);
     bitstream_align(encoder->stream);
 
     if (encoder->frame == 0) {
       // Prefix SEI
-      nal_write(encoder->output, PREFIX_SEI_NUT, 0, 0);
+      nal_write(encoder->stream, PREFIX_SEI_NUT, 0, 0);
       encode_prefix_sei_version(encoder);
       bitstream_align(encoder->stream);
     }
@@ -303,7 +303,7 @@ void encode_one_frame(encoder_control* encoder)
     // so I tried to not change it's behavior.
     int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
 
-    nal_write(encoder->output,
+    nal_write(encoder->stream,
               is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
 
@@ -512,7 +512,7 @@ static void add_checksum(const encoder_control * const encoder)
   uint32_t checksum_val;
   unsigned int i;
 
-  nal_write(encoder->output, NAL_SUFFIT_SEI_NUT, 0, 0);
+  nal_write(encoder->stream, NAL_SUFFIT_SEI_NUT, 0, 0);
 
   picture_checksum(encoder->in.cur_pic, checksum);
 
