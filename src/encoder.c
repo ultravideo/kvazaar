@@ -43,7 +43,6 @@
 #include "sao.h"
 #include "rdo.h"
 
-double g_lambda_cost[55];
 double g_cur_lambda_cost;
 
 /* Local functions. */
@@ -81,7 +80,6 @@ void init_lambda(const encoder_control * const encoder)
     lambda *= 0.95;
   }
 
-  g_lambda_cost[encoder->QP] = lambda;
   g_cur_lambda_cost = lambda;
 }
 

@@ -128,7 +128,6 @@ void encode_transform_coeff(const encoder_control * const encoder, cabac_data *c
 void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
-extern double g_lambda_cost[55];
 extern double g_cur_lambda_cost;
 
 static const uint8_t g_group_idx[32] = {

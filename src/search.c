@@ -928,7 +928,7 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
-    int split_cost = (int)(4.5 * g_lambda_cost[encoder->QP]);
+    int split_cost = (int)(4.5 * g_cur_lambda_cost);
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
