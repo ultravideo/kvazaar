@@ -23,6 +23,7 @@
 
 #include "filter.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -397,6 +398,9 @@ void filter_deblock_cu(const encoder_control * const encoder, int32_t x, int32_t
 
   // split 64x64, on split flag and on border
   if (depth == 0 || split_flag || border) {
+    // Tell clang-analyzer that everything is ok.
+    assert(depth >= 0 && depth < MAX_DEPTH);
+
     // Split the four sub-blocks of this block recursively.
     uint8_t change = 1 << (MAX_DEPTH - 1 - depth);
     filter_deblock_cu(encoder, x, y, depth + 1, edge);
