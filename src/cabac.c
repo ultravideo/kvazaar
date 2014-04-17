@@ -80,7 +80,7 @@ const uint8_t g_auc_renorm_table[32] =
 /**
  * \brief Initialize struct cabac_data.
  */
-void cabac_start(cabac_data *data)
+void cabac_start(cabac_data * const data)
 {
   data->low = 0;
   data->range = 510;
@@ -93,7 +93,7 @@ void cabac_start(cabac_data *data)
 /**
  * \brief
  */
-void cabac_encode_bin(cabac_data *data, uint32_t bin_value)
+void cabac_encode_bin(cabac_data * const data, const uint32_t bin_value)
 {
   uint32_t lps;
 
@@ -127,7 +127,7 @@ void cabac_encode_bin(cabac_data *data, uint32_t bin_value)
 /**
  * \brief
  */
-void cabac_write(cabac_data *data)
+void cabac_write(cabac_data * const data)
 {
   uint32_t lead_byte = data->low >> (24 - data->bits_left);
   data->bits_left += 8;
@@ -163,7 +163,7 @@ void cabac_write(cabac_data *data)
 /**
  * \brief
  */
-void cabac_finish(cabac_data *data)
+void cabac_finish(cabac_data * const data)
 {
   assert(data->bits_left <= 32);
 
@@ -194,7 +194,7 @@ void cabac_finish(cabac_data *data)
   \brief Encode terminating bin
   \param binValue bin value
 */
-void cabac_encode_bin_trm(cabac_data *data, uint8_t bin_value)
+void cabac_encode_bin_trm(cabac_data * const data, const uint8_t bin_value)
 {
   data->range -= 2;
   if(bin_value) {
@@ -218,7 +218,7 @@ void cabac_encode_bin_trm(cabac_data *data, uint8_t bin_value)
 /**
  * \brief
  */
-void cabac_flush(cabac_data *data)
+void cabac_flush(cabac_data * const data)
 {
   cabac_finish(data);
   bitstream_put(data->stream, 1, 1);
@@ -229,7 +229,7 @@ void cabac_flush(cabac_data *data)
 /**
  * \brief
  */
-void cabac_encode_bin_ep(cabac_data *data, uint32_t bin_value)
+void cabac_encode_bin_ep(cabac_data * const data, const uint32_t bin_value)
 {
   data->low <<= 1;
   if (bin_value) {
@@ -245,7 +245,7 @@ void cabac_encode_bin_ep(cabac_data *data, uint32_t bin_value)
 /**
  * \brief
  */
-void cabac_encode_bins_ep(cabac_data *data, uint32_t bin_values, int num_bins)
+void cabac_encode_bins_ep(cabac_data * const data, uint32_t bin_values, int num_bins)
 {
   uint32_t pattern;
 
@@ -276,7 +276,7 @@ void cabac_encode_bins_ep(cabac_data *data, uint32_t bin_values, int num_bins)
  * \param symbol Value of coeff_abs_level_minus3.
  * \param r_param Reference to Rice parameter.
  */
-void cabac_write_coeff_remain(cabac_data *cabac, uint32_t symbol, uint32_t r_param)
+void cabac_write_coeff_remain(cabac_data * const cabac, const uint32_t symbol, const uint32_t r_param)
 {
   int32_t code_number = symbol;
   uint32_t length;
@@ -299,7 +299,7 @@ void cabac_write_coeff_remain(cabac_data *cabac, uint32_t symbol, uint32_t r_par
 /**
  * \brief
  */
-void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx, uint32_t symbol, int32_t offset, uint32_t max_symbol)
+void cabac_write_unary_max_symbol(cabac_data * const data, cabac_ctx * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
 {
   int8_t code_last = max_symbol > symbol;
 
@@ -325,7 +325,7 @@ void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx, uint32_t sym
 /**
  * This can be used for Truncated Rice binarization with cRiceParam=0.
  */
-void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned max_symbol)
+void cabac_write_unary_max_symbol_ep(cabac_data * const data, unsigned int symbol, const unsigned int max_symbol)
 {
   /*if (symbol == 0) {
     CABAC_BIN_EP(data, 0, "ums_ep");
@@ -355,7 +355,7 @@ void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned
 /**
  * \brief
  */
-void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol, uint32_t count)
+void cabac_write_ep_ex_golomb(cabac_data * const data, uint32_t symbol, uint32_t count)
 {
   uint32_t bins = 0;
   int32_t num_bins = 0;
