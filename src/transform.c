@@ -623,9 +623,10 @@ void itransform2d(const encoder_control * const encoder,int16_t *block,int16_t *
  * \brief quantize transformed coefficents
  *
  */
-void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef, int32_t width,
+void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
            int32_t height, uint32_t *ac_sum, int8_t type, int8_t scan_idx, int8_t block_type )
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
   const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   const uint32_t * const scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
 
@@ -633,7 +634,7 @@ void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
   #endif
 
-  int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, encoder_state->QP, 0);
 
   //New block for variable definitions
   {
@@ -645,7 +646,7 @@ void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef
 
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
-  int32_t add = ((encoder->in.cur_pic->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
+  int32_t add = ((encoder_state->cur_pic->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
 
   int32_t q_bits8 = q_bits - 8;
   for (n = 0; n < width * height; n++) {
@@ -754,13 +755,14 @@ void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef
  * \brief inverse quantize transformed and quantized coefficents
  *
  */
-void dequant(const encoder_control * const encoder, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
+void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
   int32_t shift,add,coeff_q,clip_q_coef;
   int32_t n;
   int32_t transform_shift = 15 - encoder->bitdepth - (g_convert_to_bit[ width ] + 2);
 
-  int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, encoder_state->QP, 0);
 
   shift = 20 - QUANT_SHIFT - transform_shift;
 

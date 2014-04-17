@@ -163,11 +163,13 @@ INLINE void filter_deblock_chroma(const encoder_control * const encoder, pixel *
 /**
  * \brief
  */
-void filter_deblock_edge_luma(const encoder_control * const encoder,
+void filter_deblock_edge_luma(encoder_state * const encoder_state,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  
   cu_info *cu_q = &cur_pic->cu_array[MAX_DEPTH][(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (cur_pic->width_in_lcu << MAX_DEPTH)];
 
   {
@@ -192,7 +194,7 @@ void filter_deblock_edge_luma(const encoder_control * const encoder,
     int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
     int8_t strength = 0;
 
-    int32_t qp              = encoder->QP;
+    int32_t qp              = encoder_state->QP;
     int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
     int32_t beta            = g_beta_table_8x8[b_index] * bitdepth_scale;
@@ -288,11 +290,12 @@ void filter_deblock_edge_luma(const encoder_control * const encoder,
 /**
  * \brief
  */
-void filter_deblock_edge_chroma(const encoder_control * const encoder,
+void filter_deblock_edge_chroma(encoder_state * const encoder_state,
                                 int32_t x, int32_t y,
                                 int8_t depth, int8_t dir)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const picture * const cur_pic = encoder_state->cur_pic;
   cu_info *cu_q = &cur_pic->cu_array[MAX_DEPTH][(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (cur_pic->width_in_lcu << MAX_DEPTH)];
 
   // Chroma edges that do not lay on a 8x8 grid are not deblocked.
@@ -324,7 +327,7 @@ void filter_deblock_edge_chroma(const encoder_control * const encoder,
     int16_t x_cu = x>>(MIN_SIZE-1),y_cu = y>>(MIN_SIZE-1);
     int8_t strength = 2;
 
-    int32_t QP             = g_chroma_scale[encoder->QP];
+    int32_t QP             = g_chroma_scale[encoder_state->QP];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
@@ -384,9 +387,9 @@ void filter_deblock_edge_chroma(const encoder_control * const encoder,
  * until the coded block size has been achived. Calls luma and chroma filtering
  * functions for each coded CU size.
  */
-void filter_deblock_cu(const encoder_control * const encoder, int32_t x, int32_t y, int8_t depth, int32_t edge)
+void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x + y*(cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
   uint8_t border_x = (cur_pic->width  < x*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;
@@ -404,15 +407,15 @@ void filter_deblock_cu(const encoder_control * const encoder, int32_t x, int32_t
     // Tell clang-analyzer that everything is ok.
     assert(depth >= 0 && depth < MAX_DEPTH);
 
-    filter_deblock_cu(encoder, x, y, depth + 1, edge);
+    filter_deblock_cu(encoder_state, x, y, depth + 1, edge);
     if(!border_x || border_split_x) {
-      filter_deblock_cu(encoder, x + change, y, depth + 1, edge);
+      filter_deblock_cu(encoder_state, x + change, y, depth + 1, edge);
     }
     if(!border_y || border_split_y) {
-      filter_deblock_cu(encoder, x , y + change, depth + 1, edge);
+      filter_deblock_cu(encoder_state, x , y + change, depth + 1, edge);
     }
     if((!border_x && !border_y) || (border_split_x && border_split_y)) {
-      filter_deblock_cu(encoder, x + change, y + change, depth + 1, edge);
+      filter_deblock_cu(encoder_state, x + change, y + change, depth + 1, edge);
     }
     return;
   }
@@ -421,8 +424,8 @@ void filter_deblock_cu(const encoder_control * const encoder, int32_t x, int32_t
   if ((x == 0 && edge == EDGE_VER) || (y == 0 && edge == EDGE_HOR)) return;
 
   // do the filtering for block edge
-  filter_deblock_edge_luma(encoder,   x*(LCU_WIDTH >> MAX_DEPTH),       y*(LCU_WIDTH >> MAX_DEPTH),       depth, edge);
-  filter_deblock_edge_chroma(encoder, x*(LCU_WIDTH >> (MAX_DEPTH + 1)), y*(LCU_WIDTH >> (MAX_DEPTH + 1)), depth, edge);
+  filter_deblock_edge_luma(encoder_state,   x*(LCU_WIDTH >> MAX_DEPTH),       y*(LCU_WIDTH >> MAX_DEPTH),       depth, edge);
+  filter_deblock_edge_chroma(encoder_state, x*(LCU_WIDTH >> (MAX_DEPTH + 1)), y*(LCU_WIDTH >> (MAX_DEPTH + 1)), depth, edge);
 }
 
 /**
@@ -433,9 +436,9 @@ void filter_deblock_cu(const encoder_control * const encoder, int32_t x, int32_t
  * the Largest Coding Units (LCU) and call filter_deblock_cu with absolute
  * X and Y coordinates of the LCU.
  */
-void filter_deblock(const encoder_control * const encoder)
+void filter_deblock(encoder_state * const encoder_state)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   int16_t x, y;
 
   // TODO: Optimization: add thread for each LCU
@@ -444,7 +447,7 @@ void filter_deblock(const encoder_control * const encoder)
   {
     for (x = 0; x < cur_pic->width_in_lcu; x++)
     {
-      filter_deblock_cu(encoder, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_VER);
+      filter_deblock_cu(encoder_state, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_VER);
     }
   }
 
@@ -453,7 +456,7 @@ void filter_deblock(const encoder_control * const encoder)
   {
     for (x = 0; x < cur_pic->width_in_lcu; x++)
     {
-      filter_deblock_cu(encoder, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_HOR);
+      filter_deblock_cu(encoder_state, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_HOR);
     }
   }
 }
@@ -469,11 +472,11 @@ void filter_deblock(const encoder_control * const encoder)
  * - After vertical filtering the left edge, filter the last 4 pixels of
  *   horizontal edges in the LCU to the left.
  */
-void filter_deblock_lcu(const encoder_control * const encoder, int x_px, int y_px)
+void filter_deblock_lcu(encoder_state * const encoder_state, int x_px, int y_px)
 {
   const vector2d lcu = { x_px / LCU_WIDTH, y_px / LCU_WIDTH };
 
-  filter_deblock_cu(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_VER);
+  filter_deblock_cu(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_VER);
 
   // Filter rightmost 4 pixels from last LCU now that they have been
   // finally deblocked vertically.
@@ -481,15 +484,15 @@ void filter_deblock_lcu(const encoder_control * const encoder, int x_px, int y_p
     int y;
     for (y = 0; y < 64; y += 8) {
       if (lcu.y + y == 0) continue;
-      filter_deblock_edge_luma(encoder, lcu.x * 64 - 4, lcu.y * 64 + y, 4, EDGE_HOR);
+      filter_deblock_edge_luma(encoder_state, lcu.x * 64 - 4, lcu.y * 64 + y, 4, EDGE_HOR);
     }
     for (y = 0; y < 32; y += 8) {
       if (lcu.y + y == 0) continue;
-      filter_deblock_edge_chroma(encoder, lcu.x * 32 - 4, lcu.y * 32 + y, 4, EDGE_HOR);
+      filter_deblock_edge_chroma(encoder_state, lcu.x * 32 - 4, lcu.y * 32 + y, 4, EDGE_HOR);
     }
   }
 
-  filter_deblock_cu(encoder, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_HOR);
+  filter_deblock_cu(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_HOR);
 }
 
 

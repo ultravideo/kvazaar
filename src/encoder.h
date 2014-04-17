@@ -44,33 +44,33 @@ typedef struct
 
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 
-/* Input info struct */
-typedef struct
-{
-  FILE *file;
-  int32_t real_width;  /*!< \brief real input picture width */
-  int32_t real_height; /*!< \brief real input picture width */
-  picture *cur_pic;
-  int8_t video_format;
-  int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
-} encoder_input;
-
 /* Encoder control options, the main struct */
 typedef struct
 {
-  int32_t frame;
-  int32_t poc; /*!< \brief picture order count */
+  /* Configuration */
   const config *cfg;
-  encoder_input in;
+  
+  /* Input */
+  struct {
+    FILE *file;
+    int32_t width;
+    int32_t height;
+    int32_t width_in_lcu;
+    int32_t height_in_lcu;
+    int32_t real_width;  /*!< \brief real input picture width */
+    int32_t real_height; /*!< \brief real input picture width */
+    int8_t video_format;
+    int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
+  } in;
+  
+  /* Output */
+  struct {
+    FILE *file;
+  } out;
+  
   encoder_me me;
-  bitstream stream;
-  FILE *output;
-  picture_list *ref;
-  int8_t ref_list;
-  int8_t ref_idx_num[2];
-  int8_t QP;             // \brief Quantization parameter
+  
   int8_t bitdepth;
-  double cur_lambda_cost;
 
   /* Filtering */
   int8_t deblock_enable; // \brief Flag to enable deblocking filter
@@ -101,20 +101,48 @@ typedef struct
   scaling_list scaling_list;
 } encoder_control;
 
-void init_lambda(encoder_control *encoder);
-encoder_control *init_encoder_control(config *cfg);
-void init_encoder_input(encoder_input *input, FILE* inputfile,
-                        int32_t width, int32_t height);
-void encode_one_frame(encoder_control *encoder);
-int read_one_frame(FILE *file, const encoder_control * const encoder);
+typedef struct encoder_state {
+  const encoder_control *encoder_control;
+  
+  picture *cur_pic;
+  int32_t frame;
+  int32_t poc; /*!< \brief picture order count */
+  
+  bitstream stream;
+  
+  picture_list *ref;
+  int8_t ref_list;
+  int8_t ref_idx_num[2];
+  int8_t QP;             // \brief Quantization parameter
+  
+  double cur_lambda_cost;
+  
+  cabac_data cabac;
+  
+  struct encoder_state *children;
+} encoder_state;
 
-void encode_seq_parameter_set(encoder_control * const encoder);
-void encode_pic_parameter_set(encoder_control * const encoder);
-void encode_vid_parameter_set(encoder_control * const encoder);
-void encode_slice_header(encoder_control * const encoder);
-void encode_access_unit_delimiter(encoder_control * const encoder);
-void encode_prefix_sei_version(encoder_control * const encoder);
-void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac, uint16_t x_ctb,
+int encoder_control_init(encoder_control *encoder, const config *cfg);
+int encoder_control_finalize(encoder_control *encoder);
+
+void encoder_control_input_init(encoder_control *encoder, FILE *inputfile, int32_t width, int32_t height);
+
+int encoder_state_init(encoder_state *encoder_state, const encoder_control * encoder);
+int encoder_state_finalize(encoder_state *encoder_state);
+void encoder_state_init_lambda(encoder_state *encoder_state);
+
+void init_encoder_input(encoder_control *encoder, FILE* inputfile,
+                        int32_t width, int32_t height);
+void encode_one_frame(encoder_state *encoder_state);
+int read_one_frame(FILE* file, const encoder_state *encoder);
+
+void encode_seq_parameter_set(encoder_state *encoder);
+void encode_pic_parameter_set(encoder_state *encoder);
+void encode_vid_parameter_set(encoder_state *encoder);
+void encode_slice_header(encoder_state * encoder);
+void encode_access_unit_delimiter(encoder_state *encoder);
+void encode_prefix_sei_version(encoder_state *encoder);
+void encode_coding_tree(encoder_state *encoder, cabac_data *cabac, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
 void encode_last_significant_xy(cabac_data *cabac,
@@ -123,8 +151,8 @@ void encode_last_significant_xy(cabac_data *cabac,
                                 uint8_t type, uint8_t scan);
 void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void encode_transform_tree(const encoder_control * const encoder, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu );
-void encode_transform_coeff(const encoder_control * const encoder, cabac_data *cabac, int32_t x_cu, int32_t y_cu,
+void encode_transform_tree(encoder_state *encoder_state, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu );
+void encode_transform_coeff(encoder_state *encoder_state, cabac_data *cabac, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);

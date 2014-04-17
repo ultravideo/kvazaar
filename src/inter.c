@@ -322,7 +322,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(const encoder_control * const encoder, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
+void inter_get_mv_cand(const encoder_state * const encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
@@ -332,8 +332,8 @@ void inter_get_mv_cand(const encoder_control * const encoder, int32_t x, int32_t
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand) {int td = encoder->poc - encoder->ref->pics[(cu)->inter.mv_ref]->poc;\
-                                   int tb = encoder->poc - encoder->ref->pics[cur_cu->inter.mv_ref]->poc;\
+#define APPLY_MV_SCALING(cu, cand) {int td = encoder_state->poc - encoder_state->ref->pics[(cu)->inter.mv_ref]->poc;\
+                                   int tb = encoder_state->poc - encoder_state->ref->pics[cur_cu->inter.mv_ref]->poc;\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[0] + 127 + (scale * (cu)->inter.mv[0] < 0)) >> 8 ); \

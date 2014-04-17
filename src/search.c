@@ -117,7 +117,7 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
   return bitcost;
 }
 
-static int calc_mvd_cost(const encoder_control * const encoder, int x, int y,
+static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
@@ -159,7 +159,7 @@ static int calc_mvd_cost(const encoder_control * const encoder, int x, int y,
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(encoder->cur_lambda_cost+0.5);
+  return temp_bitcost*(int32_t)(encoder_state->cur_lambda_cost+0.5);
 }
 
 
@@ -183,7 +183,7 @@ static int calc_mvd_cost(const encoder_control * const encoder, int x, int y,
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static unsigned hexagon_search(const encoder_control * const encoder, unsigned depth,
+static unsigned hexagon_search(const encoder_state * const encoder_state, unsigned depth,
                                const picture *pic, const picture *ref,
                                const vector2d *orig, vector2d *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
@@ -203,7 +203,7 @@ static unsigned hexagon_search(const encoder_control * const encoder, unsigned d
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(encoder, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -217,7 +217,7 @@ static unsigned hexagon_search(const encoder_control * const encoder, unsigned d
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x, orig->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(encoder, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
@@ -233,7 +233,7 @@ static unsigned hexagon_search(const encoder_control * const encoder, unsigned d
                                  orig->x + pattern->x,
                                  orig->y + pattern->y,
                                  block_width, block_width);
-        cost += calc_mvd_cost(encoder, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
         if (cost < best_cost) {
           best_cost    = cost;
@@ -268,7 +268,7 @@ static unsigned hexagon_search(const encoder_control * const encoder, unsigned d
                                orig->x + mv.x + offset->x,
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
-      cost += calc_mvd_cost(encoder, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
       if (cost < best_cost) {
         best_cost    = cost;
@@ -291,7 +291,7 @@ static unsigned hexagon_search(const encoder_control * const encoder, unsigned d
                              orig->x + mv.x + offset->x,
                              orig->y + mv.y + offset->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(encoder, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
       best_cost    = cost;
@@ -370,9 +370,9 @@ static unsigned search_mv_full(unsigned depth,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_inter(const encoder_control * const encoder, int x, int y, int depth, lcu_t *lcu)
+static int search_cu_inter(const encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   uint32_t ref_idx = 0;
   int x_local = (x&0x3f), y_local = (y&0x3f);
   int x_cu = x>>3;
@@ -392,8 +392,8 @@ static int search_cu_inter(const encoder_control * const encoder, int x, int y, 
 
   cur_cu->inter.cost = UINT_MAX;
 
-  for (ref_idx = 0; ref_idx < encoder->ref->used_size; ref_idx++) {
-    picture *ref_pic = encoder->ref->pics[ref_idx];
+  for (ref_idx = 0; ref_idx < encoder_state->ref->used_size; ref_idx++) {
+    picture *ref_pic = encoder_state->ref->pics[ref_idx];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
     cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_cu * width_in_scu + x_cu];
     uint32_t temp_bitcost = 0;
@@ -413,13 +413,13 @@ static int search_cu_inter(const encoder_control * const encoder, int x, int y, 
     }
     // Get MV candidates
     cur_cu->inter.mv_ref = ref_idx;
-    inter_get_mv_cand(encoder, x, y, depth, mv_cand, cur_cu, lcu);
+    inter_get_mv_cand(encoder_state, x, y, depth, mv_cand, cur_cu, lcu);
     cur_cu->inter.mv_ref = temp_ref_idx;
 
 #if SEARCH_MV_FULL_RADIUS
     temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
-    temp_cost += hexagon_search(encoder, depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost += hexagon_search(encoder_state, depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
 
     merged = 0;
@@ -664,11 +664,11 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_intra(const encoder_control * const encoder,
+static int search_cu_intra(const encoder_state * const encoder_state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu, cabac_data *cabac)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
@@ -696,7 +696,7 @@ static int search_cu_intra(const encoder_control * const encoder,
   intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   // Build reconstructed block to use in prediction with extrapolated borders
-  intra_build_reference_border(encoder, x_px, y_px, cu_width * 2 + 8,
+  intra_build_reference_border(encoder_state->encoder_control, x_px, y_px, cu_width * 2 + 8,
                                rec_buffer, cu_width * 2 + 8, 0,
                                cur_pic->width,
                                cur_pic->height,
@@ -709,7 +709,7 @@ static int search_cu_intra(const encoder_control * const encoder,
     uint32_t bitcost = UINT32_MAX;
     pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
-    mode = intra_prediction(encoder,ref_pixels, LCU_WIDTH,
+    mode = intra_prediction(encoder_state,ref_pixels, LCU_WIDTH,
                             cu_in_rec_buffer, cu_width * 2 + 8, cu_width,
                             &cost, candidate_modes, &bitcost, cabac);
     cur_cu->intra[pu_index].mode = (int8_t)mode;
@@ -728,7 +728,7 @@ static int search_cu_intra(const encoder_control * const encoder,
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
  * here as (coefficient_sum * 1.5) * lambda)
  */
-static int lcu_get_final_cost(const encoder_control * const encoder,
+static int lcu_get_final_cost(const encoder_state * const encoder_state,
                               cabac_data *cabac,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
@@ -737,6 +737,7 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
   int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
   int cost = 0;
   int coeff_cost = 0;
+  const int rdo = encoder_state->encoder_control->rdo;
 
   int width = LCU_WIDTH>>depth;
   int x,y;
@@ -759,7 +760,7 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
     }
   }
 
-  if(encoder->rdo == 1) {
+  if(rdo == 1) {
     // sum of coeffs
     for (y = y_local; y < y_local+width; ++y) {
       for (x = x_local; x < x_local+width; ++x) {
@@ -774,11 +775,11 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
       }
     }
     // Coefficient costs
-    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder->cur_lambda_cost+0.5);
+    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder_state->cur_lambda_cost+0.5);
 
   // Calculate actual bit costs for coding the coeffs
   // RDO
-  } else if (encoder->rdo == 2) {
+  } else if (rdo == 2) {
     coefficient coeff_temp[32*32];
     coefficient coeff_temp_u[16*16];
     coefficient coeff_temp_v[16*16];
@@ -817,7 +818,7 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
 
       // Calculate luma coeff bit count
       picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
-      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp, blockwidth, 0, luma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder_state->encoder_control, cabac, coeff_temp, blockwidth, 0, luma_scan_mode);
 
       blk_y >>= 1;
       blk_x >>= 1;
@@ -832,15 +833,15 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
       picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
       picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
 
-      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
-      coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder_state->encoder_control, cabac, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder_state->encoder_control, cabac, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
     }
     // Multiply bit count with lambda to get RD-cost
-    cost += coeff_cost * (int32_t)(encoder->cur_lambda_cost+0.5);
+    cost += coeff_cost * (int32_t)(encoder_state->cur_lambda_cost+0.5);
   }
 
   // Bitcost
-  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(encoder->cur_lambda_cost+0.5);
+  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(encoder_state->cur_lambda_cost+0.5);
 
   return cost;
 }
@@ -855,9 +856,9 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static int search_cu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static int search_cu(encoder_state * const encoder_state, cabac_data *cabac, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   int cu_width = LCU_WIDTH >> depth;
   int cost = MAX_INT;
   cu_info *cur_cu;
@@ -885,7 +886,7 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
         depth >= MIN_INTER_SEARCH_DEPTH &&
         depth <= MAX_INTER_SEARCH_DEPTH)
     {
-      int mode_cost = search_cu_inter(encoder, x, y, depth, &work_tree[depth]);
+      int mode_cost = search_cu_inter(encoder_state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTER;
@@ -895,7 +896,7 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
     if (depth >= MIN_INTRA_SEARCH_DEPTH &&
         depth <= MAX_INTRA_SEARCH_DEPTH)
     {
-      int mode_cost = search_cu_intra(encoder, x, y, depth, &work_tree[depth], cabac);
+      int mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth], cabac);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTRA;
@@ -906,10 +907,10 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, cur_cu->part_size);
-      intra_recon_lcu(encoder, cabac, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
+      intra_recon_lcu(encoder_state, cabac, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
-      inter_recon_lcu(encoder, encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
-      encode_transform_tree(encoder, cabac, x, y, depth, &work_tree[depth]);
+      inter_recon_lcu(encoder_state->encoder_control, encoder_state->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      encode_transform_tree(encoder_state, cabac, x, y, depth, &work_tree[depth]);
 
       if(cur_cu->merged && !cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
         cur_cu->merged = 0;
@@ -922,23 +923,23 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = lcu_get_final_cost(encoder, cabac, x, y, depth, &work_tree[depth]);
+    cost = lcu_get_final_cost(encoder_state, cabac, x, y, depth, &work_tree[depth]);
   }
 
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
-    int split_cost = (int)(4.5 * encoder->cur_lambda_cost);
+    int split_cost = (int)(4.5 * encoder_state->cur_lambda_cost);
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
     if(cur_cu->type == CU_NOTSET || cur_cu->coeff_top_y[depth] ||
        cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
-      split_cost += search_cu(encoder, cabac, x,           y,           depth + 1, work_tree);
-      split_cost += search_cu(encoder, cabac, x + half_cu, y,           depth + 1, work_tree);
-      split_cost += search_cu(encoder, cabac, x,           y + half_cu, depth + 1, work_tree);
-      split_cost += search_cu(encoder, cabac, x + half_cu, y + half_cu, depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, cabac, x,           y,           depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, cabac, x + half_cu, y,           depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, cabac, x,           y + half_cu, depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, cabac, x + half_cu, y + half_cu, depth + 1, work_tree);
     } else {
       split_cost = INT_MAX;
     }
@@ -963,9 +964,9 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  */
-static void init_lcu_t(const encoder_control * const encoder, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
+static void init_lcu_t(const encoder_state * const encoder_state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -1045,7 +1046,7 @@ static void init_lcu_t(const encoder_control * const encoder, const int x, const
 
   // Copy LCU pixels.
   {
-    const picture * const pic = encoder->in.cur_pic;
+    const picture * const pic = encoder_state->cur_pic;
     int pic_width = cur_pic->width;
     int x_max = MIN(x + LCU_WIDTH, pic_width) - x;
     int y_max = MIN(y + LCU_WIDTH, cur_pic->height) - y;
@@ -1069,13 +1070,13 @@ static void init_lcu_t(const encoder_control * const encoder, const int x, const
 /**
  * Copy CU and pixel data to it's place in picture datastructure.
  */
-static void copy_lcu_to_cu_data(const encoder_control * const encoder, int x_px, int y_px, const lcu_t *lcu)
+static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x_px, int y_px, const lcu_t *lcu)
 {
   // Copy non-reference CUs to picture.
   {
     const int x_cu = x_px >> MAX_DEPTH;
     const int y_cu = y_px >> MAX_DEPTH;
-    const picture * const cur_pic = encoder->in.cur_pic;
+    const picture * const cur_pic = encoder_state->cur_pic;
     const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
     cu_info *const cu_array = cur_pic->cu_array[MAX_DEPTH];
 
@@ -1095,7 +1096,7 @@ static void copy_lcu_to_cu_data(const encoder_control * const encoder, int x_px,
 
   // Copy pixels to picture.
   {
-    picture * const pic = encoder->in.cur_pic;
+    picture * const pic = encoder_state->cur_pic;
     const int pic_width = pic->width;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
@@ -1123,18 +1124,18 @@ static void copy_lcu_to_cu_data(const encoder_control * const encoder, int x_px,
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void search_lcu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, yuv_t* hor_buf, yuv_t* ver_buf)
+void search_lcu(encoder_state * const encoder_state, cabac_data *cabac, int x, int y, yuv_t* hor_buf, yuv_t* ver_buf)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;
   // Initialize work tree.
   for (depth = 0; depth <= MAX_PU_DEPTH; ++depth) {
     memset(&work_tree[depth], 0, sizeof(work_tree[depth]));
-    init_lcu_t(encoder, x, y, &work_tree[depth], hor_buf, ver_buf);
+    init_lcu_t(encoder_state, x, y, &work_tree[depth], hor_buf, ver_buf);
   }
 
   // Start search from depth 0.
-  search_cu(encoder, cabac, x, y, 0, work_tree);
+  search_cu(encoder_state, cabac, x, y, 0, work_tree);
 
-  copy_lcu_to_cu_data(encoder, x, y, &work_tree[0]);
+  copy_lcu_to_cu_data(encoder_state, x, y, &work_tree[0]);
 }

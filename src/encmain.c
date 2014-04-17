@@ -60,7 +60,9 @@ int main(int argc, char *argv[])
   config *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
-  encoder_control *encoder = NULL; //!< Encoder control struct
+  encoder_control encoder;
+  encoder_state encoder_state;
+  picture *cur_pic;
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint64_t curpos  = 0;
   uint64_t lastpos = 0;
@@ -206,68 +208,79 @@ int main(int argc, char *argv[])
       goto exit_failure;
     }
   }
-
-  encoder = init_encoder_control(cfg);
-  if (!encoder)
+  
+  //Allocate and init exp golomb table
+  if (!init_exp_golomb(4096*8)) {
+    fprintf(stderr, "Failed to allocate the exp golomb code table, shutting down!\n");
     goto exit_failure;
+  }
 
+  if (!encoder_control_init(&encoder, cfg)) {
+    goto exit_failure;
+  }
+  
   // Set output file
-
-  encoder->output = output;
-  encoder->stream.file.output = output;
+  encoder.out.file = output;
+  
   // input init (TODO: read from commandline / config)
-  encoder->bitdepth = 8;
-  encoder->frame    = 0;
-  encoder->QP       = (int8_t)encoder->cfg->qp;
-  encoder->in.video_format = FORMAT_420;
+  encoder.bitdepth = 8;
+  encoder.in.video_format = FORMAT_420;
+  
   // deblocking filter
-  encoder->deblock_enable   = (int8_t)encoder->cfg->deblock_enable;
-  encoder->beta_offset_div2 = (int8_t)encoder->cfg->deblock_beta;
-  encoder->tc_offset_div2   = (int8_t)encoder->cfg->deblock_tc;
+  encoder.deblock_enable   = (int8_t)encoder.cfg->deblock_enable;
+  encoder.beta_offset_div2 = (int8_t)encoder.cfg->deblock_beta;
+  encoder.tc_offset_div2   = (int8_t)encoder.cfg->deblock_tc;
   // SAO
-  encoder->sao_enable = (int8_t)encoder->cfg->sao_enable;
+  encoder.sao_enable = (int8_t)encoder.cfg->sao_enable;
   // RDO
-  encoder->rdoq_enable = (int8_t)encoder->cfg->rdoq_enable;
-  encoder->rdo         = (int8_t)encoder->cfg->rdo;
+  encoder.rdoq_enable = (int8_t)encoder.cfg->rdoq_enable;
+  encoder.rdo         = (int8_t)encoder.cfg->rdo;
   // TR SKIP
-  encoder->trskip_enable = (int8_t)encoder->cfg->trskip_enable;
+  encoder.trskip_enable = (int8_t)encoder.cfg->trskip_enable;
   // VUI
-  encoder->vui.sar_width   = (int16_t)encoder->cfg->vui.sar_width;
-  encoder->vui.sar_height  = (int16_t)encoder->cfg->vui.sar_height;
-  encoder->vui.overscan    = encoder->cfg->vui.overscan;
-  encoder->vui.videoformat = encoder->cfg->vui.videoformat;
-  encoder->vui.fullrange   = encoder->cfg->vui.fullrange;
-  encoder->vui.colorprim   = encoder->cfg->vui.colorprim;
-  encoder->vui.transfer    = encoder->cfg->vui.transfer;
-  encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
-  encoder->vui.chroma_loc  = (int8_t)encoder->cfg->vui.chroma_loc;
+  encoder.vui.sar_width   = (int16_t)encoder.cfg->vui.sar_width;
+  encoder.vui.sar_height  = (int16_t)encoder.cfg->vui.sar_height;
+  encoder.vui.overscan    = encoder.cfg->vui.overscan;
+  encoder.vui.videoformat = encoder.cfg->vui.videoformat;
+  encoder.vui.fullrange   = encoder.cfg->vui.fullrange;
+  encoder.vui.colorprim   = encoder.cfg->vui.colorprim;
+  encoder.vui.transfer    = encoder.cfg->vui.transfer;
+  encoder.vui.colormatrix = encoder.cfg->vui.colormatrix;
+  encoder.vui.chroma_loc  = (int8_t)encoder.cfg->vui.chroma_loc;
   // AUD
-  encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
+  encoder.aud_enable = (int8_t)encoder.cfg->aud_enable;
 
-  init_encoder_input(&encoder->in, input, cfg->width, cfg->height);
+  encoder_control_input_init(&encoder, input, cfg->width, cfg->height);
 
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
-         encoder->in.cur_pic->width, encoder->in.cur_pic->height,
-         encoder->in.real_width, encoder->in.real_height);
+         encoder.in.width, encoder.in.height,
+         encoder.in.real_width, encoder.in.real_height);
+  
+  if (!encoder_state_init(&encoder_state, &encoder)) {
+    goto exit_failure;
+  }
+  
+  encoder_state.frame    = 0;
+  encoder_state.QP       = (int8_t)encoder.cfg->qp;
 
   // Only the code that handles conformance window coding needs to know
   // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
   // change the input values here to be the real values. For a real fix
   // encoder.in probably needs to be merged into cfg.
   // The real fix would be: never go dig in cfg
-  //cfg->width = encoder->in.width;
-  //cfg->height = encoder->in.height;
+  //cfg->width = encoder.in.width;
+  //cfg->height = encoder.in.height;
 
   // Start coding cycle while data on input and not on the last frame
-  while(!cfg->frames || encoder->frame < cfg->frames) {
+  while(!cfg->frames || encoder_state.frame < cfg->frames) {
     int32_t diff;
     double temp_psnr[3];
 
     // Skip '--seek' frames before input.
     // This block can be moved outside this while loop when there is a
     // mechanism to skip the while loop on error.
-    if (encoder->frame == 0 && cfg->seek > 0) {
+    if (encoder_state.frame == 0 && cfg->seek > 0) {
       int frame_bytes = cfg->width * cfg->height * 3 / 2;
       int error = 0;
 
@@ -275,7 +288,7 @@ int main(int argc, char *argv[])
         // Input is stdin.
         int i;
         for (i = 0; !error && i < cfg->seek; ++i) {
-          error = !read_one_frame(input, encoder);
+          error = !read_one_frame(input, &encoder_state);
         }
       } else {
         // input is a file. We hope. Proper detection is OS dependent.
@@ -288,25 +301,27 @@ int main(int argc, char *argv[])
     }
 
     // Read one frame from the input
-    if (!read_one_frame(input, encoder)) {
+    if (!read_one_frame(input, &encoder_state)) {
       if (!feof(input))
-        fprintf(stderr, "Failed to read a frame %d\n", encoder->frame);
+        fprintf(stderr, "Failed to read a frame %d\n", encoder_state.frame);
       break;
     }
 
     // The actual coding happens here, after this function we have a coded frame
-    encode_one_frame(encoder);
+    encode_one_frame(&encoder_state);
+    
+    cur_pic = encoder_state.cur_pic;
 
     if (cfg->debug != NULL) {
       // Write reconstructed frame out.
       // Use conformance-window dimensions instead of internal ones.
-      const int width = encoder->in.cur_pic->width;
-      const int out_width = encoder->in.real_width;
-      const int out_height = encoder->in.real_height;
+      const int width = cur_pic->width;
+      const int out_width = encoder.in.real_width;
+      const int out_height = encoder.in.real_height;
       int y;
-      const pixel *y_rec = encoder->in.cur_pic->y_recdata;
-      const pixel *u_rec = encoder->in.cur_pic->u_recdata;
-      const pixel *v_rec = encoder->in.cur_pic->v_recdata;
+      const pixel *y_rec = cur_pic->y_recdata;
+      const pixel *u_rec = cur_pic->u_recdata;
+      const pixel *v_rec = cur_pic->v_recdata;
 
       for (y = 0; y < out_height; ++y) {
         fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
@@ -325,12 +340,12 @@ int main(int argc, char *argv[])
     lastpos = curpos;
 
     // PSNR calculations
-    temp_psnr[0] = image_psnr(encoder->in.cur_pic->y_data, encoder->in.cur_pic->y_recdata, cfg->width, cfg->height);
-    temp_psnr[1] = image_psnr(encoder->in.cur_pic->u_data, encoder->in.cur_pic->u_recdata, cfg->width>>1, cfg->height>>1);
-    temp_psnr[2] = image_psnr(encoder->in.cur_pic->v_data, encoder->in.cur_pic->v_recdata, cfg->width>>1, cfg->height>>1);
+    temp_psnr[0] = image_psnr(cur_pic->y_data, cur_pic->y_recdata, cfg->width, cfg->height);
+    temp_psnr[1] = image_psnr(cur_pic->u_data, cur_pic->u_recdata, cfg->width>>1, cfg->height>>1);
+    temp_psnr[2] = image_psnr(cur_pic->v_data, cur_pic->v_recdata, cfg->width>>1, cfg->height>>1);
 
-    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder->frame,
-           "BPI"[encoder->in.cur_pic->slicetype%3], diff<<3,
+    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state.frame,
+           "BPI"[cur_pic->slicetype%3], diff<<3,
            temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
     // Increment total PSNR
@@ -342,33 +357,33 @@ int main(int argc, char *argv[])
     // TODO: add more than one reference
 
     // Remove the ref pic (if present)
-    if (encoder->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
-      picture_list_rem(encoder->ref, encoder->ref->used_size-1, 1);
+    if (encoder_state.ref->used_size == (uint32_t)encoder.cfg->ref_frames) {
+      picture_list_rem(encoder_state.ref, encoder_state.ref->used_size-1, 1);
     }
     // Add current picture as reference
-    picture_list_add(encoder->ref, encoder->in.cur_pic);
+    picture_list_add(encoder_state.ref, cur_pic);
     // Allocate new memory to current picture
     // TODO: reuse memory from old reference
-    encoder->in.cur_pic = picture_init(encoder->in.cur_pic->width, encoder->in.cur_pic->height, encoder->in.cur_pic->width_in_lcu, encoder->in.cur_pic->height_in_lcu);
+    encoder_state.cur_pic = picture_init(encoder_state.cur_pic->width, encoder_state.cur_pic->height, encoder_state.cur_pic->width_in_lcu, encoder_state.cur_pic->height_in_lcu);
 
     // Copy pointer from the last cur_pic because we don't want to reallocate it
-    MOVE_POINTER(encoder->in.cur_pic->coeff_y,encoder->ref->pics[0]->coeff_y);
-    MOVE_POINTER(encoder->in.cur_pic->coeff_u,encoder->ref->pics[0]->coeff_u);
-    MOVE_POINTER(encoder->in.cur_pic->coeff_v,encoder->ref->pics[0]->coeff_v);
+    MOVE_POINTER(encoder_state.cur_pic->coeff_y,encoder_state.ref->pics[0]->coeff_y);
+    MOVE_POINTER(encoder_state.cur_pic->coeff_u,encoder_state.ref->pics[0]->coeff_u);
+    MOVE_POINTER(encoder_state.cur_pic->coeff_v,encoder_state.ref->pics[0]->coeff_v);
 
-    MOVE_POINTER(encoder->in.cur_pic->pred_y,encoder->ref->pics[0]->pred_y);
-    MOVE_POINTER(encoder->in.cur_pic->pred_u,encoder->ref->pics[0]->pred_u);
-    MOVE_POINTER(encoder->in.cur_pic->pred_v,encoder->ref->pics[0]->pred_v);
+    MOVE_POINTER(encoder_state.cur_pic->pred_y,encoder_state.ref->pics[0]->pred_y);
+    MOVE_POINTER(encoder_state.cur_pic->pred_u,encoder_state.ref->pics[0]->pred_u);
+    MOVE_POINTER(encoder_state.cur_pic->pred_v,encoder_state.ref->pics[0]->pred_v);
 
-    encoder->frame++;
-    encoder->poc++;
+    encoder_state.frame++;
+    encoder_state.poc++;
   }
   // Coding finished
   fgetpos(output,(fpos_t*)&curpos);
 
   // Print statistics of the coding
-  fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder->frame, (long long unsigned int) curpos<<3,
-         psnr[0] / encoder->frame, psnr[1] / encoder->frame, psnr[2] / encoder->frame);
+  fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder_state.frame, (long long unsigned int) curpos<<3,
+         psnr[0] / encoder_state.frame, psnr[1] / encoder_state.frame, psnr[2] / encoder_state.frame);
   fprintf(stderr, " Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
   fclose(input);
@@ -377,12 +392,9 @@ int main(int argc, char *argv[])
 
   // Deallocating
   config_destroy(cfg);
-  scalinglist_destroy(&encoder->scaling_list);
-  picture_list_destroy(encoder->ref);
-  picture_destroy(encoder->in.cur_pic);
-  FREE_POINTER(encoder->in.cur_pic);
-  bitstream_finalize(&encoder->stream);
-  free(encoder);
+  encoder_state_finalize(&encoder_state);
+  encoder_control_finalize(&encoder);
+
   free_exp_golomb();
 
   return EXIT_SUCCESS;
