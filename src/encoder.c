@@ -63,6 +63,7 @@ static void encode_sao(const encoder_control * const encoder,
  */
 void init_lambda(const encoder_control * const encoder)
 {
+  const picture * const cur_pic = encoder->in.cur_pic;
   double qp = encoder->QP;
   double lambda_scale = 1.0;
   double qp_temp      = qp - 12;
@@ -71,13 +72,13 @@ void init_lambda(const encoder_control * const encoder)
   // Default QP-factor from HM config
   double qp_factor = 0.4624;
 
-  if (encoder->in.cur_pic->slicetype == SLICE_I) {
+  if (cur_pic->slicetype == SLICE_I) {
     qp_factor=0.57*lambda_scale;
   }
 
   lambda = qp_factor*pow( 2.0, qp_temp/3.0 );
 
-  if (encoder->in.cur_pic->slicetype != SLICE_I ) {
+  if (cur_pic->slicetype != SLICE_I ) {
     lambda *= 0.95;
   }
 
@@ -245,7 +246,7 @@ void encode_one_frame(encoder_control* encoder)
   const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder->frame % encoder->cfg->intra_period) == 0);
   const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
 
-  picture *pic = encoder->in.cur_pic;
+  picture * const cur_pic = encoder->in.cur_pic;
 
   cabac_data cabac;
 
@@ -262,8 +263,8 @@ void encode_one_frame(encoder_control* encoder)
 
     encoder->poc = 0;
 
-    encoder->in.cur_pic->slicetype = SLICE_I;
-    encoder->in.cur_pic->type = NAL_IDR_W_RADL;
+    cur_pic->slicetype = SLICE_I;
+    cur_pic->type = NAL_IDR_W_RADL;
 
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
@@ -292,8 +293,8 @@ void encode_one_frame(encoder_control* encoder)
     }
   } else {
     // When intra period == 1, all pictures are intra
-    encoder->in.cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
-    encoder->in.cur_pic->type = NAL_TRAIL_R;
+    cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+    cur_pic->type = NAL_TRAIL_R;
 
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
@@ -313,7 +314,7 @@ void encode_one_frame(encoder_control* encoder)
   cabac.stream = stream;
 
   cabac_start(&cabac);
-  init_contexts(&cabac, encoder->QP, encoder->in.cur_pic->slicetype);
+  init_contexts(&cabac, encoder->QP, cur_pic->slicetype);
   encode_slice_header(encoder);
   bitstream_align(stream);
 
@@ -347,23 +348,23 @@ void encode_one_frame(encoder_control* encoder)
         }
 
         // Take bottom and right pixels from this LCU to be used on the search of next LCU.
-        picture_blit_pixels(&pic->y_recdata[(bottom - 1) * size.x + px.x],
+        picture_blit_pixels(&cur_pic->y_recdata[(bottom - 1) * size.x + px.x],
                             &hor_buf->y[px.x],
                             lcu_dim.x, 1, size.x, size.x);
-        picture_blit_pixels(&pic->u_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
+        picture_blit_pixels(&cur_pic->u_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
                             &hor_buf->u[px.x / 2],
                             lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
-        picture_blit_pixels(&pic->v_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
+        picture_blit_pixels(&cur_pic->v_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
                             &hor_buf->v[px.x / 2],
                             lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
 
-        picture_blit_pixels(&pic->y_recdata[px.y * size.x + right - 1],
+        picture_blit_pixels(&cur_pic->y_recdata[px.y * size.x + right - 1],
                             &ver_buf->y[1],
                             1, lcu_dim.y, size.x, 1);
-        picture_blit_pixels(&pic->u_recdata[px.y * size.x / 4 + (right / 2) - 1],
+        picture_blit_pixels(&cur_pic->u_recdata[px.y * size.x / 4 + (right / 2) - 1],
                             &ver_buf->u[1],
                             1, lcu_dim.y / 2, size.x / 2, 1);
-        picture_blit_pixels(&pic->v_recdata[px.y * size.x / 4 + (right / 2) - 1],
+        picture_blit_pixels(&cur_pic->v_recdata[px.y * size.x / 4 + (right / 2) - 1],
                             &ver_buf->v[1],
                             1, lcu_dim.y / 2, size.x / 2, 1);
 
@@ -373,21 +374,21 @@ void encode_one_frame(encoder_control* encoder)
 
         if (encoder->sao_enable) {
           const int stride = encoder->in.width_in_lcu;
-          sao_info *sao_luma = &pic->sao_luma[lcu.y * stride + lcu.x];
-          sao_info *sao_chroma = &pic->sao_chroma[lcu.y * stride + lcu.x];
+          sao_info *sao_luma = &cur_pic->sao_luma[lcu.y * stride + lcu.x];
+          sao_info *sao_chroma = &cur_pic->sao_chroma[lcu.y * stride + lcu.x];
           init_sao_info(sao_luma);
           init_sao_info(sao_chroma);
 
           {
-            sao_info *sao_top = lcu. y != 0 ? &pic->sao_luma[(lcu.y - 1) * stride + lcu.x] : NULL;
-            sao_info *sao_left = lcu.x != 0 ? &pic->sao_luma[lcu.y * stride + lcu.x -1] : NULL;
-            sao_search_luma(encoder->in.cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
+            sao_info *sao_top = lcu. y != 0 ? &cur_pic->sao_luma[(lcu.y - 1) * stride + lcu.x] : NULL;
+            sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_luma[lcu.y * stride + lcu.x -1] : NULL;
+            sao_search_luma(cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
           }
 
           {
-            sao_info *sao_top = lcu.y != 0 ? &pic->sao_chroma[(lcu.y - 1) * stride + lcu.x] : NULL;
-            sao_info *sao_left = lcu.x != 0 ? &pic->sao_chroma[lcu.y * stride + lcu.x - 1] : NULL;
-            sao_search_chroma(encoder->in.cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
+            sao_info *sao_top = lcu.y != 0 ? &cur_pic->sao_chroma[(lcu.y - 1) * stride + lcu.x] : NULL;
+            sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_chroma[lcu.y * stride + lcu.x - 1] : NULL;
+            sao_search_chroma(cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
           }
 
           // Merge only if both luma and chroma can be merged
@@ -417,7 +418,7 @@ void encode_one_frame(encoder_control* encoder)
   // Calculate checksum
   add_checksum(encoder);
 
-  encoder->in.cur_pic->poc = encoder->poc;
+  cur_pic->poc = encoder->poc;
 
   dealloc_yuv_t(hor_buf);
   dealloc_yuv_t(ver_buf);
@@ -511,13 +512,14 @@ int read_one_frame(FILE* file, const encoder_control * const encoder)
 static void add_checksum(const encoder_control * const encoder)
 {
   bitstream * const stream = encoder->stream;
+  const picture * const cur_pic = encoder->in.cur_pic;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
   unsigned int i;
 
   nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
 
-  picture_checksum(encoder->in.cur_pic, checksum);
+  picture_checksum(cur_pic, checksum);
 
   WRITE_U(stream, 132, 8, "sei_type");
   WRITE_U(stream, 13, 8, "size");
@@ -537,8 +539,9 @@ static void add_checksum(const encoder_control * const encoder)
 void encode_access_unit_delimiter(const encoder_control * const encoder)
 {
   bitstream * const stream = encoder->stream;
-  uint8_t pic_type = encoder->in.cur_pic->slicetype == SLICE_I ? 0
-                   : encoder->in.cur_pic->slicetype == SLICE_P ? 1
+  const picture * const cur_pic = encoder->in.cur_pic;
+  uint8_t pic_type = cur_pic->slicetype == SLICE_I ? 0
+                   : cur_pic->slicetype == SLICE_P ? 1
                    :                                             2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 }
@@ -990,7 +993,7 @@ static void encode_VUI(const encoder_control * const encoder)
 void encode_slice_header(const encoder_control * const encoder)
 {
   bitstream * const stream = encoder->stream;
-  picture *cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder->in.cur_pic;
 
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
@@ -998,8 +1001,8 @@ void encode_slice_header(const encoder_control * const encoder)
 
   WRITE_U(stream, 1, 1, "first_slice_segment_in_pic_flag");
 
-  if (encoder->in.cur_pic->type >= NAL_BLA_W_LP
-      && encoder->in.cur_pic->type <= NAL_RSV_IRAP_VCL23) {
+  if (cur_pic->type >= NAL_BLA_W_LP
+      && cur_pic->type <= NAL_RSV_IRAP_VCL23) {
     WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
   }
 
@@ -1007,7 +1010,7 @@ void encode_slice_header(const encoder_control * const encoder)
 
   //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
 
-  WRITE_UE(stream, encoder->in.cur_pic->slicetype, "slice_type");
+  WRITE_UE(stream, cur_pic->slicetype, "slice_type");
 
   // if !entropy_slice_flag
 
@@ -1015,8 +1018,8 @@ void encode_slice_header(const encoder_control * const encoder)
       //WRITE_U(stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-  if (encoder->in.cur_pic->type != NAL_IDR_W_RADL
-      && encoder->in.cur_pic->type != NAL_IDR_N_LP) {
+  if (cur_pic->type != NAL_IDR_W_RADL
+      && cur_pic->type != NAL_IDR_N_LP) {
       int j;
       int ref_negative = encoder->ref->used_size;
       int ref_positive = 0;
@@ -1041,13 +1044,13 @@ void encode_slice_header(const encoder_control * const encoder)
     WRITE_U(stream, cur_pic->slice_sao_chroma_flag, 1, "slice_sao_chroma_flag");
   }
 
-  if (encoder->in.cur_pic->slicetype != SLICE_I) {
+  if (cur_pic->slicetype != SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
         WRITE_UE(stream, encoder->ref->used_size-1, "num_ref_idx_l0_active_minus1");
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
-  if (encoder->in.cur_pic->slicetype == SLICE_B) {
+  if (cur_pic->slicetype == SLICE_B) {
       WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
   }
 
@@ -1061,12 +1064,12 @@ void encode_slice_header(const encoder_control * const encoder)
 static void encode_sao_color(const encoder_control * const encoder, cabac_data *cabac, sao_info *sao,
                              color_index color_i)
 {
-  picture *pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder->in.cur_pic;
   sao_eo_cat i;
 
   // Skip colors with no SAO.
-  if (color_i == COLOR_Y && !pic->slice_sao_luma_flag) return;
-  if (color_i != COLOR_Y && !pic->slice_sao_chroma_flag) return;
+  if (color_i == COLOR_Y && !cur_pic->slice_sao_luma_flag) return;
+  if (color_i != COLOR_Y && !cur_pic->slice_sao_chroma_flag) return;
 
   /// sao_type_idx_luma:   TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
   /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
@@ -1145,7 +1148,8 @@ static void encode_sao(const encoder_control * const encoder,
 void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  const picture * const cur_pic = encoder->in.cur_pic;
+  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
 
@@ -1162,11 +1166,11 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
     // Implisit split flag when on border
     if (!border) {
       // Get left and top block split_flags and if they are present and true, increase model number
-      if (x_ctb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)]), depth) == 1) {
+      if (x_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)]), depth) == 1) {
         split_model++;
       }
 
-      if (y_ctb > 0 && GET_SPLITDATA(&(encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)]), depth) == 1) {
+      if (y_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)]), depth) == 1) {
         split_model++;
       }
 
@@ -1196,16 +1200,16 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
 
 
     // Encode skip flag
-  if (encoder->in.cur_pic->slicetype != SLICE_I) {
+  if (cur_pic->slicetype != SLICE_I) {
     int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
     // Get left and top skipped flags and if they are present and true, increase context number
-    if (x_ctb > 0 && (&encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
+    if (x_ctb > 0 && (&cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
       ctx_skip++;
     }
 
-    if (y_ctb > 0 && (&encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
+    if (y_ctb > 0 && (&cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
       ctx_skip++;
     }
 
@@ -1235,7 +1239,7 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
   // ENDIF SKIP
 
   // Prediction mode
-  if (encoder->in.cur_pic->slicetype != SLICE_I) {
+  if (cur_pic->slicetype != SLICE_I) {
     cabac->ctx = &(cabac->ctx_cu_pred_mode_model);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }
@@ -1282,7 +1286,7 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
       uint32_t ref_list_idx;
       /*
       // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-      if(encoder->in.cur_pic->slicetype == SLICE_B)
+      if(cur_pic->slicetype == SLICE_B)
       {
         // Code Inter Dir
         const UInt uiInterDir = pcCU->getInterDir( uiAbsPartIdx ) - 1;
@@ -1418,11 +1422,11 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
       cu_info *above_cu = 0;
 
       if (x_ctb > 0) {
-        left_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        left_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
       }
       // Don't take the above CU across the LCU boundary.
       if (y_ctb > 0 && (y_ctb & 7) != 0) {
-        above_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        above_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)];
       }
 
       intra_get_dir_luma_predictor((x_ctb<<3) + (offset[j].x<<2),
@@ -1522,9 +1526,9 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
       {
       unsigned y, x;
 
-      pixel *base_y = &encoder->in.cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))    + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
-      pixel *base_u = &encoder->in.cur_pic->u_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
-      pixel *base_v = &encoder->in.cur_pic->v_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
+      pixel *base_y = &cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))    + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
+      pixel *base_u = &cur_pic->u_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
+      pixel *base_v = &cur_pic->v_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
 
       // Luma
       for (y = 0; y < LCU_WIDTH >> depth; y++) {
@@ -1872,7 +1876,7 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
     if (cbf_y) {
       // Combine inverese quantized coefficients with the prediction to get
       // reconstructed image.
-      //picture_set_block_residual(encoder->in.cur_pic,x_cu,y_cu,depth,1);
+      //picture_set_block_residual(cur_pic,x_cu,y_cu,depth,1);
       i = 0;
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
@@ -1976,12 +1980,13 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
 static void encode_transform_unit(const encoder_control * const encoder, cabac_data *cabac,
                                   int x_pu, int y_pu, int depth, int tr_depth)
 {
+  const picture * const cur_pic = encoder->in.cur_pic;
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> 1);
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];
   coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
@@ -2003,7 +2008,7 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
   if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
     int y = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
-    coefficient *orig_pos = &encoder->in.cur_pic->coeff_y[x + y * encoder->in.width];
+    coefficient *orig_pos = &cur_pic->coeff_y[x + y * encoder->in.width];
     for (y = 0; y < width; y++) {
       for (x = 0; x < width; x++) {
         coeff_y[x+y*width] = orig_pos[x];
@@ -2071,8 +2076,8 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
       x = x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1));
       y = y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1));
     }
-    orig_pos_u = &encoder->in.cur_pic->coeff_u[x + y * (encoder->in.width >> 1)];
-    orig_pos_v = &encoder->in.cur_pic->coeff_v[x + y * (encoder->in.width >> 1)];
+    orig_pos_u = &cur_pic->coeff_u[x + y * (encoder->in.width >> 1)];
+    orig_pos_v = &cur_pic->coeff_v[x + y * (encoder->in.width >> 1)];
     for (y = 0; y < (width_c); y++) {
       for (x = 0; x < (width_c); x++) {
         coeff_u[x+y*(width_c)] = orig_pos_u[x];
@@ -2128,7 +2133,8 @@ void encode_transform_coeff(const encoder_control * const encoder, cabac_data *c
 {
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
-  cu_info *cur_cu = &encoder->in.cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  const picture * const cur_pic = encoder->in.cur_pic;
+  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
