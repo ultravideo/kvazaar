@@ -140,10 +140,7 @@ int main(int argc, char *argv[])
             "       -w, --width               : Width of input in pixels\n"
             "       -h, --height              : Height of input in pixels\n");
 
-    if (cfg)
-      config_destroy(cfg);
-
-    return EXIT_FAILURE;
+    goto exit_failure;
   }
 
   // Add dimensions to the reconstructions file name.
@@ -156,15 +153,14 @@ int main(int argc, char *argv[])
     cfg->debug = realloc(cfg->debug, left_len + right_len + 1);
     if (!cfg->debug) {
       fprintf(stderr, "realloc failed!\n");
-      return EXIT_FAILURE;
+      goto exit_failure;
     }
     strcpy(cfg->debug + left_len, dim_str);
   }
 
   // Do more validation to make sure the parameters we have make sense.
   if (!config_validate(cfg)) {
-    config_destroy(cfg);
-    return EXIT_FAILURE;
+    goto exit_failure;
   }
 
   // Dig CPU features with cpuid
@@ -193,30 +189,27 @@ int main(int argc, char *argv[])
   // Check that input was opened correctly
   if (input == NULL) {
     fprintf(stderr, "Could not open input file, shutting down!\n");
-    config_destroy(cfg);
-    return EXIT_FAILURE;
+    goto exit_failure;
   }
 
   // Open output file and check that it was opened correctly
   output = fopen(cfg->output, "wb");
   if (output == NULL) {
     fprintf(stderr, "Could not open output file, shutting down!\n");
-    config_destroy(cfg);
-    return EXIT_FAILURE;
+    goto exit_failure;
   }
 
   if (cfg->debug != NULL) {
     recout = fopen(cfg->debug, "wb");
     if (recout == NULL) {
       fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", cfg->debug);
-      config_destroy(cfg);
-      return EXIT_FAILURE;
+      goto exit_failure;
     }
   }
 
   encoder = init_encoder_control(cfg);
   if (!encoder)
-    return EXIT_FAILURE;
+    goto exit_failure;
 
   // Set output file
 
@@ -403,4 +396,11 @@ int main(int argc, char *argv[])
   free_exp_golomb();
 
   return EXIT_SUCCESS;
+
+exit_failure:
+  if (cfg) config_destroy(cfg);
+  if (input) fclose(input);
+  if (output) fclose(output);
+  if (recout) fclose(recout);
+  return EXIT_FAILURE;
 }
