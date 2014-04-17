@@ -373,7 +373,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
     intra_get_pred(encoder, ref, recstride, pred, width, mode, 0);
 
     sad = cost_func(pred, orig_block);
-    sad += mode_cost * (int)(g_cur_lambda_cost + 0.5);
+    sad += mode_cost * (int)(encoder->cur_lambda_cost + 0.5);
     // When rdo == 2, store best costs to an array and do full RDO later
     if(encoder->rdo == 2) {
       int rdo_mode = intra_rdo_cost_compare(rdo_costs, rdo_modes_to_check, sad);
@@ -417,7 +417,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
       // Bitcost also calculated again for this mode
       rdo_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
       // Add bitcost * lambda
-      rdo_costs[rdo_mode] += rdo_bitcost * (int)(g_cur_lambda_cost + 0.5);
+      rdo_costs[rdo_mode] += rdo_bitcost * (int)(encoder->cur_lambda_cost + 0.5);
 
       if(rdo_costs[rdo_mode] < best_sad) {
         best_sad = rdo_costs[rdo_mode];

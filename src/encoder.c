@@ -43,9 +43,6 @@
 #include "sao.h"
 #include "rdo.h"
 
-double g_lambda_cost[55];
-double g_cur_lambda_cost;
-
 /* Local functions. */
 static void add_checksum(encoder_control * const encoder);
 static void encode_VUI(encoder_control * const encoder);
@@ -60,7 +57,7 @@ static void encode_sao(encoder_control * const encoder,
   Implementation closer to HM (Used HM12 as reference)
    - Still missing functionality when GOP and B-pictures are used
  */
-void init_lambda(const encoder_control * const encoder)
+void init_lambda(encoder_control * const encoder)
 {
   const picture * const cur_pic = encoder->in.cur_pic;
   double qp = encoder->QP;
@@ -81,8 +78,7 @@ void init_lambda(const encoder_control * const encoder)
     lambda *= 0.95;
   }
 
-  g_lambda_cost[encoder->QP] = lambda;
-  g_cur_lambda_cost = lambda;
+  encoder->cur_lambda_cost = lambda;
 }
 
 encoder_control *init_encoder_control(config *cfg)
@@ -1829,15 +1825,15 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
           coeffcost += abs((int)temp_coeff[i]);
           coeffcost2 += abs((int)temp_coeff2[i]);
         }
-        cost += (1 + coeffcost + (coeffcost>>1))*((int)g_cur_lambda_cost+0.5);
-        cost2 += (coeffcost2 + (coeffcost2>>1))*((int)g_cur_lambda_cost+0.5);
+        cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder->cur_lambda_cost+0.5);
+        cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder->cur_lambda_cost+0.5);
         // Full RDO
       } else if(encoder->rdo == 2) {
         coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0, scan_idx_luma);
         coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0, scan_idx_luma);
 
-        cost  += coeffcost*((int)g_cur_lambda_cost+0.5);
-        cost2 += coeffcost2*((int)g_cur_lambda_cost+0.5);
+        cost  += coeffcost*((int)encoder->cur_lambda_cost+0.5);
+        cost2 += coeffcost2*((int)encoder->cur_lambda_cost+0.5);
       }
 
       cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
