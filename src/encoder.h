@@ -48,12 +48,8 @@ enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 typedef struct
 {
   FILE *file;
-  int32_t width;  /*!< \brief input picture width (divisible by the minimum block size)*/
-  int32_t height; /*!< \brief input picture height (divisible by the minimum block size) */
   int32_t real_width;  /*!< \brief real input picture width */
   int32_t real_height; /*!< \brief real input picture width */
-  int32_t height_in_lcu; /*!< \brief input picture width in LCU*/
-  int32_t width_in_lcu;  /*!< \brief input picture height in LCU */
   picture *cur_pic;
   int8_t video_format;
   int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
@@ -67,7 +63,7 @@ typedef struct
   const config *cfg;
   encoder_input in;
   encoder_me me;
-  bitstream *stream;
+  bitstream stream;
   FILE *output;
   picture_list *ref;
   int8_t ref_list;
@@ -111,12 +107,12 @@ void init_encoder_input(encoder_input *input, FILE* inputfile,
 void encode_one_frame(encoder_control *encoder);
 int read_one_frame(FILE *file, const encoder_control * const encoder);
 
-void encode_seq_parameter_set(const encoder_control * const encoder);
-void encode_pic_parameter_set(const encoder_control * const encoder);
-void encode_vid_parameter_set(const encoder_control * const encoder);
-void encode_slice_header(const encoder_control * const encoder);
-void encode_access_unit_delimiter(const encoder_control * const encoder);
-void encode_prefix_sei_version(const encoder_control * const encoder);
+void encode_seq_parameter_set(encoder_control * const encoder);
+void encode_pic_parameter_set(encoder_control * const encoder);
+void encode_vid_parameter_set(encoder_control * const encoder);
+void encode_slice_header(encoder_control * const encoder);
+void encode_access_unit_delimiter(encoder_control * const encoder);
+void encode_prefix_sei_version(encoder_control * const encoder);
 void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 

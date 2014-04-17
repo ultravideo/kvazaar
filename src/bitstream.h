@@ -36,7 +36,7 @@ typedef enum {BITSTREAM_TYPE_FILE, BITSTREAM_TYPE_MEMORY} bitstream_type;
 typedef struct
 {
   BASE_BITSTREAM
-} bitstream;
+} bitstream_base;
 
 typedef struct
 {
@@ -52,6 +52,13 @@ typedef struct
   uint32_t allocated_length;
 } bitstream_mem;
 
+typedef union
+{
+  bitstream_base base;
+  bitstream_file file;
+  bitstream_mem mem;
+} bitstream;
+
 typedef struct
 {
   uint8_t len;
@@ -60,19 +67,18 @@ typedef struct
 
 extern const bit_table *g_exp_table;
 
-int floor_log2(unsigned int n);
-
-bitstream *create_bitstream();
-void free_bitstream(bitstream* stream);
-void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
+int bitstream_init(bitstream * stream, bitstream_type type);
+int bitstream_finalize(bitstream * stream);
+void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits);
+int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
 
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
                                          bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
 
-void bitstream_align(bitstream* stream);
-void bitstream_align_zero(bitstream* stream);
+void bitstream_align(bitstream *stream);
+void bitstream_align_zero(bitstream *stream);
 int init_exp_golomb(uint32_t len);
 void free_exp_golomb();
 

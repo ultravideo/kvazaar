@@ -505,10 +505,10 @@ static void partial_butterfly_inverse_32(int16_t *src, int16_t *dst,
  * \param block output data (residual)
  * \param block_size input data (width of transform)
  */
-void transformskip(int16_t *block,int16_t *coeff, int8_t block_size)
+void transformskip(const encoder_control * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   uint32_t log2_tr_size =  g_convert_to_bit[block_size] + 2;
-  int32_t  shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;
+  int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
   int32_t  j,k;
   for (j = 0; j < block_size; j++) {
     for(k = 0; k < block_size; k ++) {
@@ -523,10 +523,10 @@ void transformskip(int16_t *block,int16_t *coeff, int8_t block_size)
  * \param block output data (residual)
  * \param block_size width of transform
  */
-void itransformskip(int16_t *block,int16_t *coeff, int8_t block_size)
+void itransformskip(const encoder_control * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   uint32_t log2_tr_size =  g_convert_to_bit[block_size] + 2;
-  int32_t  shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;
+  int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
   int32_t  j,k;
   int32_t offset;
   offset = (1 << (shift -1)); // For rounding
@@ -543,9 +543,9 @@ void itransformskip(int16_t *block,int16_t *coeff, int8_t block_size)
  * \param coeff transform coefficients
  * \param block_size width of transform
  */
-void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
+void transform2d(const encoder_control * const encoder, int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
 {
-  int32_t shift_1st = g_convert_to_bit[block_size]  + 1 + (g_bitdepth - 8);
+  int32_t shift_1st = g_convert_to_bit[block_size]  + 1 + (encoder->bitdepth - 8);
   int32_t shift_2nd = g_convert_to_bit[block_size]  + 8;
 
   int16_t tmp[LCU_WIDTH * LCU_WIDTH];
@@ -584,10 +584,10 @@ void transform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
  * \param block_size input data (width of transform)
  * \param mode
  */
-void itransform2d(int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
+void itransform2d(const encoder_control * const encoder,int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
 {
   int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (g_bitdepth - 8);
+  int32_t shift_2nd = 12 - (encoder->bitdepth - 8);
   int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
   if( block_size == 4) {
@@ -643,7 +643,7 @@ void quant(const encoder_control * const encoder, int16_t *coef, int16_t *q_coef
 
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
 
-  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size; //!< Represents scaling through forward transform
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
   int32_t add = ((encoder->in.cur_pic->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
 
@@ -758,7 +758,7 @@ void dequant(const encoder_control * const encoder, int16_t *q_coef, int16_t *co
 {
   int32_t shift,add,coeff_q,clip_q_coef;
   int32_t n;
-  int32_t transform_shift = 15 - g_bitdepth - (g_convert_to_bit[ width ] + 2);
+  int32_t transform_shift = 15 - encoder->bitdepth - (g_convert_to_bit[ width ] + 2);
 
   int32_t qp_scaled = get_scaled_qp(type, encoder->QP, 0);
 

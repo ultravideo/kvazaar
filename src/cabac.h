@@ -103,7 +103,7 @@ void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol,
 void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx,
                                   uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
-void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned symbol, unsigned max_symbol);
+void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned int symbol, unsigned int max_symbol);
 
 
 // Macros

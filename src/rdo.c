@@ -90,14 +90,14 @@ uint32_t rdo_cost_intra(const encoder_control * const encoder, pixel *pred, pixe
         luma_scan_mode = SCAN_HOR;
       }
     }
-    transform2d(block,pre_quant_coeff,width,0);
+    transform2d(encoder, block,pre_quant_coeff,width,0);
     if(encoder->rdoq_enable) {
       rdoq(encoder, cabac, pre_quant_coeff, temp_coeff, width, width, &ac_sum, 0, luma_scan_mode, CU_INTRA,0);
     } else {
       quant(encoder, pre_quant_coeff, temp_coeff, width, width, &ac_sum, 0, luma_scan_mode, CU_INTRA);
     }
     dequant(encoder, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
-    itransform2d(temp_block,pre_quant_coeff,width,0);
+    itransform2d(encoder, temp_block,pre_quant_coeff,width,0);
 
     // SSD between original and reconstructed
     for (i = 0; i < width*width; i++) {
@@ -392,7 +392,7 @@ void  rdoq(const encoder_control * const encoder, cabac_data *cabac, coefficient
            int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;
-  int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;  // Represents scaling through forward transform
+  int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param   = 0;
   uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   uint32_t max_num_coeff   = width * height;
@@ -708,7 +708,7 @@ void  rdoq(const encoder_control * const encoder, cabac_data *cabac, coefficient
   if(*abs_sum >= 2) {
     int64_t rd_factor = (int64_t) (
                      g_inv_quant_scales[qp_scaled%6] * g_inv_quant_scales[qp_scaled%6] * (1<<(2*(qp_scaled/6)))
-                   /  g_lambda_cost[encoder->QP] / 16 / (1<<(2*(g_bitdepth-8)))
+                   /  g_lambda_cost[encoder->QP] / 16 / (1<<(2*(encoder->bitdepth-8)))
                    + 0.5);
     int32_t lastCG = -1;
     int32_t absSum = 0;

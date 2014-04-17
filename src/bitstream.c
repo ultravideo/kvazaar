@@ -67,7 +67,7 @@ const bit_table *g_exp_table;
 
 //From wikipedia
 //http://en.wikipedia.org/wiki/Binary_logarithm#Algorithm
-int floor_log2(unsigned int n) {
+static int floor_log2(unsigned int n) {
   int pos = 0;
   if (n >= 1<<16) { n >>= 16; pos += 16; }
   if (n >= 1<< 8) { n >>=  8; pos +=  8; }
@@ -84,12 +84,12 @@ int floor_log2(unsigned int n) {
  *
  * Allocates g_exp_table with len*sizeof(bit_table) and fills it with exponential golomb codes
  */
-int init_exp_golomb(uint32_t len)
+int init_exp_golomb(const uint32_t len)
 {
   uint32_t code_num;
   uint8_t M;
   uint32_t info;
-  bit_table* exp_table;
+  bit_table *exp_table;
   exp_table = (bit_table*)malloc(len*sizeof(bit_table));
   if(!exp_table)
     return 0;
@@ -115,103 +115,94 @@ void free_exp_golomb()
 }
 
 /**
- * \brief Create and initialize a new bitstream
+ * \brief Initialize a new bitstream
  */
-bitstream *create_bitstream(const bitstream_type type)
-{
-  bitstream *stream = NULL;
-
-  if (type == BITSTREAM_TYPE_MEMORY) {
-    bitstream_mem *stream_mem = malloc(sizeof(bitstream_mem));
-    if (!stream_mem) {
-      fprintf(stderr, "Failed to allocate the bitstream object!\n");
-      return NULL;
-    }
-    stream_mem->allocated_length = 0;
-    stream_mem->output_data = NULL;
-    stream_mem->output_length = 0;
-    stream = (bitstream*) stream_mem;
-  } else if (type == BITSTREAM_TYPE_FILE) {
-    bitstream_file *stream_file = malloc(sizeof(bitstream_file));
-    if (!stream_file) {
-      fprintf(stderr, "Failed to allocate the bitstream object!\n");
-      return NULL;
-    }
-    //FIXME: it would make sense to avoid constructing an incomplete object
-    stream_file->output = NULL;
-    stream = (bitstream*) stream_file;
-  } else {
-    fprintf(stderr, "Unknown type for bitstream!\n");
-    return NULL;
+int bitstream_init(bitstream * const stream, const bitstream_type type) {
+  switch (type) {
+    case BITSTREAM_TYPE_MEMORY:
+      stream->mem.allocated_length = 0;
+      stream->mem.output_data = NULL;
+      stream->mem.output_length = 0;
+      break;
+      
+    case BITSTREAM_TYPE_FILE:
+      stream->file.output = NULL;
+      break;
+      
+    default:
+      fprintf(stderr, "Unknown type for bitstream!\n");
+      return 0;
   }
   
-  // Initialize buffer-related values
-  stream->data = 0;
-  stream->cur_bit = 0;
-  stream->zerocount = 0;
-  stream->type = type;
+  stream->base.cur_bit = 0;
+  stream->base.data = 0;
+  stream->base.zerocount = 0;
+  stream->base.type = type;
   
-
-  // Return the created bitstream
-  return stream;
+  return 1;
 }
 
 /**
- * \brief Free a bitstream
+ * \brief Finalize bitstream internal structures
  */
-void free_bitstream(bitstream* stream)
-{
-  if (stream->type == BITSTREAM_TYPE_MEMORY) {
-    bitstream_mem *stream_mem = (bitstream_mem*) stream;
-    FREE_POINTER(stream_mem->output_data);
-  } else if (stream->type == BITSTREAM_TYPE_FILE) {
-    bitstream_file *stream_file = (bitstream_file*) stream;
-    //FIXME: if we fix create_bitstream, we would maybe have to do something here
-    stream_file->output = NULL;
-  } else {
-    fprintf(stderr, "Unknown type for bitstream!\n");
-    return;
+
+int bitstream_finalize(bitstream * const stream) {
+  switch (stream->base.type) {
+    case BITSTREAM_TYPE_MEMORY:
+      FREE_POINTER(stream->mem.output_data);
+      stream->mem.allocated_length = 0;
+      stream->mem.output_length = 0;
+      break;
+      
+    case BITSTREAM_TYPE_FILE:
+      //FIXME: if we fix create_bitstream, we would maybe have to do something here
+      stream->file.output = NULL;
+      break;
+      
+    default:
+      fprintf(stderr, "Unknown type for bitstream!\n");
+      return 0;
   }
   
-  FREE_POINTER(stream);
+  return 1;
 }
+
 
 /**
  * \brief Write a byte to bitstream
- * \param stream_abstract pointer bitstream to put the data
+ * \param stream pointer bitstream to put the data
  * \param byte byte to write
  * \return 1 on success, 0 on failure
  */
-static int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
-  if (stream_abstract->type == BITSTREAM_TYPE_FILE) {
-    bitstream_file *stream = (bitstream_file*) stream_abstract;
-    if (fwrite(&byte, 1, 1, stream->output) != 1) {
-      fprintf(stderr, "Could not write byte to bitstream_file object.");
-      return 0;
-    } else {
-      return 1;
-    }
-  } else if (stream_abstract->type == BITSTREAM_TYPE_MEMORY) {
-    bitstream_mem *stream = (bitstream_mem*) stream_abstract;
-    if (stream->allocated_length==stream->output_length) {
-      //Need to reallocate
-      uint32_t new_size = stream->allocated_length + BITSTREAM_MEMORY_CHUNK_SIZE;
-      uint8_t* new_data = realloc(stream->output_data, new_size);
-      if (!new_data) {
-        fprintf(stderr, "Failed to allocate memory for bitstream_mem object");
+int bitstream_writebyte(bitstream * const stream, const uint8_t byte) {
+  switch (stream->base.type) {
+    case BITSTREAM_TYPE_FILE:
+      if (fwrite(&byte, 1, 1, stream->file.output) != 1) {
+        fprintf(stderr, "Could not write byte to bitstream_file object.");
         return 0;
       }
-      stream->output_data = new_data;
-      stream->allocated_length = new_size;
-    }
-    //Write byte
-    stream->output_data[stream->output_length++] = byte;
-    
-    return 1;
-  } else {
-    fprintf(stderr, "Unknown stream type %d.", stream_abstract->type);
-    return 0;
+      break;
+      
+    case BITSTREAM_TYPE_MEMORY:
+      if (stream->mem.allocated_length==stream->mem.output_length) {
+        //Need to reallocate
+        uint32_t new_size = stream->mem.allocated_length + BITSTREAM_MEMORY_CHUNK_SIZE;
+        uint8_t* new_data = realloc(stream->mem.output_data, new_size);
+        if (!new_data) {
+          fprintf(stderr, "Failed to allocate memory for bitstream_mem object");
+          return 0;
+        }
+        stream->mem.output_data = new_data;
+        stream->mem.allocated_length = new_size;
+      }
+      //Write byte
+      stream->mem.output_data[stream->mem.output_length++] = byte;
+      
+    default:
+      fprintf(stderr, "Unknown stream type!\n");
+      return 0;
   }
+  return 1;
 }
 
 /**
@@ -220,30 +211,30 @@ static int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
  * \param data input data
  * \param bits number of bits to write from data to stream
  */
-void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
+void bitstream_put(bitstream * const stream, const uint32_t data, uint8_t bits)
 {
   const uint8_t emulation_prevention_three_byte = 0x03;
   while(bits--) {
-    stream->data <<= 1;
+    stream->base.data <<= 1;
 
     if (data & bit_set_mask[bits]) {
-      stream->data |= 1;
+      stream->base.data |= 1;
     }
-    stream->cur_bit++;
+    stream->base.cur_bit++;
 
   // write byte to output
-    if (stream->cur_bit==8) {
-      if((stream->zerocount == 2) && (stream->data < 4)) {
+    if (stream->base.cur_bit==8) {
+      if((stream->base.zerocount == 2) && (stream->base.data < 4)) {
         bitstream_writebyte(stream, emulation_prevention_three_byte);
-        stream->zerocount = 0;
+        stream->base.zerocount = 0;
       }
-      if(stream->data == 0) {
-        stream->zerocount++;
+      if(stream->base.data == 0) {
+        stream->base.zerocount++;
       } else {
-        stream->zerocount = 0;
+        stream->base.zerocount = 0;
       }
-      bitstream_writebyte(stream, stream->data);
-      stream->cur_bit = 0;
+      bitstream_writebyte(stream, stream->base.data);
+      stream->base.cur_bit = 0;
     }
   }
 }
@@ -251,20 +242,20 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
 /**
  * \brief Align the bitstream with one-bit padding
  */
-void bitstream_align(bitstream *stream)
+void bitstream_align(bitstream * const stream)
 {
   bitstream_put(stream, 1, 1);
-  if ((stream->cur_bit & 7) != 0) {
-    bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+  if ((stream->base.cur_bit & 7) != 0) {
+    bitstream_put(stream, 0, 8 - (stream->base.cur_bit & 7));
   }
 }
 
 /**
  * \brief Align the bitstream with zero
  */
-void bitstream_align_zero(bitstream *stream)
+void bitstream_align_zero(bitstream * const stream)
 {
-  if ((stream->cur_bit & 7) != 0) {
-    bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+  if ((stream->base.cur_bit & 7) != 0) {
+    bitstream_put(stream, 0, 8 - (stream->base.cur_bit & 7));
   }
 }

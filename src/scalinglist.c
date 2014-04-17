@@ -332,10 +332,10 @@ void scalinglist_process_enc(const int32_t * const coeff, int32_t* quantcoeff, c
  * \param uiSize Size
  * \param uiQP Quantization parameter
  */
-void scalinglist_set_err_scale(scaling_list * const scaling_list, uint32_t list,uint32_t size, uint32_t qp)
+static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list * const scaling_list, uint32_t list,uint32_t size, uint32_t qp)
 {
   uint32_t log2_tr_size   = g_convert_to_bit[ g_scaling_list_size_x[size] ] + 2;
-  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - g_bitdepth - log2_tr_size;  // Represents scaling through forward transform
+  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - bitdepth - log2_tr_size;  // Represents scaling through forward transform
 
   uint32_t i,max_num_coeff  = g_scaling_list_size[size];
   const int32_t *quantcoeff = scaling_list->quant_coeff[size][list][qp];
@@ -347,7 +347,7 @@ void scalinglist_set_err_scale(scaling_list * const scaling_list, uint32_t list,
   // Compensate for scaling through forward transform
   scale = scale*pow(2.0,-2.0*transform_shift);
   for(i=0;i<max_num_coeff;i++) {
-    err_scale[i] = scale / quantcoeff[i] / quantcoeff[i] / (1<<(2*(g_bitdepth-8)));
+    err_scale[i] = scale / quantcoeff[i] / quantcoeff[i] / (1<<(2*(bitdepth-8)));
   }
 }
 
@@ -388,7 +388,7 @@ void scalinglist_set(scaling_list * const scaling_list, const int32_t * const co
  * \brief
  *
  */
-void scalinglist_process(scaling_list * const scaling_list)
+void scalinglist_process(scaling_list * const scaling_list, uint8_t bitdepth)
 {
   uint32_t size,list,qp;
 
@@ -400,7 +400,7 @@ void scalinglist_process(scaling_list * const scaling_list)
 
       for (qp = 0; qp < SCALING_LIST_REM_NUM; qp++) {
         scalinglist_set(scaling_list, list_ptr, list, size, qp);
-        scalinglist_set_err_scale(scaling_list, list, size, qp);
+        scalinglist_set_err_scale(bitdepth, scaling_list, list, size, qp);
       }
     }
   }

@@ -29,6 +29,7 @@
 #include <stdio.h>
 
 #include "picture.h"
+#include "bitstream.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -92,8 +93,8 @@ enum {
 
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
-void nal_write(FILE *output, uint8_t nal_type,
-               uint8_t temporal_id,int long_start_code);
+void nal_write(bitstream * const bitstream, const uint8_t nal_type,
+               const uint8_t temporal_id, const int long_start_code);
 void picture_checksum(const picture *pic,
                       unsigned char checksum_out[][SEI_HASH_MAX_LENGTH]);
 

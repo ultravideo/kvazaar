@@ -44,10 +44,7 @@ void scalinglist_init(scaling_list * const scaling_list);
 void scalinglist_destroy(scaling_list * const scaling_list);
 
 int  scalinglist_parse(scaling_list * const scaling_list, FILE *fp);
-void scalinglist_process(scaling_list * const scaling_list);
-
-//void scalinglist_set(scaling_list * const scaling_list, const int32_t * const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp);
-//void scalinglist_set_err_scale(scaling_list * const scaling_list, uint32_t list, uint32_t size, uint32_t qp);
+void scalinglist_process(scaling_list *scaling_list, uint8_t bitdepth);
 
 
 
