@@ -36,7 +36,7 @@ typedef enum {BITSTREAM_TYPE_FILE, BITSTREAM_TYPE_MEMORY} bitstream_type;
 typedef struct
 {
   BASE_BITSTREAM
-} bitstream;
+} bitstream_base;
 
 typedef struct
 {
@@ -52,6 +52,13 @@ typedef struct
   uint32_t allocated_length;
 } bitstream_mem;
 
+typedef union
+{
+  bitstream_base base;
+  bitstream_file file;
+  bitstream_mem mem;
+} bitstream;
+
 typedef struct
 {
   uint8_t len;
@@ -60,8 +67,8 @@ typedef struct
 
 extern const bit_table *g_exp_table;
 
-bitstream *create_bitstream(bitstream_type type);
-void free_bitstream(bitstream *stream);
+int bitstream_init(bitstream * stream, bitstream_type type);
+int bitstream_finalize(bitstream * stream);
 void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits);
 int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
 

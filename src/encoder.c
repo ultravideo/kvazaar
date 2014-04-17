@@ -48,9 +48,9 @@ double g_cur_lambda_cost;
 int8_t g_bitdepth = 8;
 
 /* Local functions. */
-static void add_checksum(const encoder_control * const encoder);
-static void encode_VUI(const encoder_control * const encoder);
-static void encode_sao(const encoder_control * const encoder,
+static void add_checksum(encoder_control * const encoder);
+static void encode_VUI(encoder_control * const encoder);
+static void encode_sao(encoder_control * const encoder,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
@@ -122,13 +122,7 @@ encoder_control *init_encoder_control(config *cfg)
   enc_c->rdo        = 1;
 
   // Allocate the bitstream struct
-  stream = create_bitstream(BITSTREAM_TYPE_FILE);
-  if (!stream) {
-    fprintf(stderr, "Failed to allocate the bitstream object!\n");
-    goto init_failure;
-  }
-
-  enc_c->stream = stream;
+  bitstream_init(&enc_c->stream, BITSTREAM_TYPE_FILE);
 
   // Initialize tables
   init_tables();
@@ -225,9 +219,9 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
   #endif
 }
 
-static void write_aud(const encoder_control * const encoder)
+static void write_aud(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   encode_access_unit_delimiter(encoder);
   nal_write(stream, AUD_NUT, 0, 1);
   bitstream_align(stream);
@@ -235,7 +229,7 @@ static void write_aud(const encoder_control * const encoder)
 
 void encode_one_frame(encoder_control* encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   yuv_t *hor_buf = alloc_yuv_t(encoder->in.width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
@@ -509,9 +503,9 @@ int read_one_frame(FILE* file, const encoder_control * const encoder)
  * \param encoder The encoder.
  * \returns Void
  */
-static void add_checksum(const encoder_control * const encoder)
+static void add_checksum(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   const picture * const cur_pic = encoder->in.cur_pic;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
@@ -536,9 +530,9 @@ static void add_checksum(const encoder_control * const encoder)
   bitstream_align(stream);
 }
 
-void encode_access_unit_delimiter(const encoder_control * const encoder)
+void encode_access_unit_delimiter(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   const picture * const cur_pic = encoder->in.cur_pic;
   uint8_t pic_type = cur_pic->slicetype == SLICE_I ? 0
                    : cur_pic->slicetype == SLICE_P ? 1
@@ -546,10 +540,10 @@ void encode_access_unit_delimiter(const encoder_control * const encoder)
   WRITE_U(stream, pic_type, 3, "pic_type");
 }
 
-void encode_prefix_sei_version(const encoder_control * const encoder)
+void encode_prefix_sei_version(encoder_control * const encoder)
 {
 #define STR_BUF_LEN 1000
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
@@ -593,9 +587,9 @@ void encode_prefix_sei_version(const encoder_control * const encoder)
 #undef STR_BUF_LEN
 }
 
-void encode_pic_parameter_set(const encoder_control * const encoder)
+void encode_pic_parameter_set(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
@@ -654,9 +648,9 @@ void encode_pic_parameter_set(const encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "pps_extension_flag");
 }
 
-static void encode_PTL(const encoder_control * const encoder)
+static void encode_PTL(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   int i;
   // PTL
   // Profile Tier
@@ -694,9 +688,9 @@ static void encode_PTL(const encoder_control * const encoder)
   // end PTL
 }
 
-static void encode_scaling_list(const encoder_control * const encoder)
+static void encode_scaling_list(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
@@ -750,9 +744,9 @@ static void encode_scaling_list(const encoder_control * const encoder)
   }
 }
 
-void encode_seq_parameter_set(const encoder_control * const encoder)
+void encode_seq_parameter_set(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   const encoder_input* const in = &encoder->in;
 
 #ifdef _DEBUG
@@ -854,9 +848,9 @@ void encode_seq_parameter_set(const encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "sps_extension_flag");
 }
 
-void encode_vid_parameter_set(const encoder_control * const encoder)
+void encode_vid_parameter_set(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   int i;
 #ifdef _DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
@@ -890,9 +884,9 @@ void encode_vid_parameter_set(const encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "vps_extension_flag");
 }
 
-static void encode_VUI(const encoder_control * const encoder)
+static void encode_VUI(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
@@ -990,9 +984,9 @@ static void encode_VUI(const encoder_control * const encoder)
   //ENDIF
 }
 
-void encode_slice_header(const encoder_control * const encoder)
+void encode_slice_header(encoder_control * const encoder)
 {
-  bitstream * const stream = encoder->stream;
+  bitstream * const stream = &encoder->stream;
   const picture * const cur_pic = encoder->in.cur_pic;
 
 #ifdef _DEBUG
@@ -1128,7 +1122,7 @@ static void encode_sao_merge_flags(sao_info *sao, cabac_data *cabac,
 /**
  * \brief Encode SAO information.
  */
-static void encode_sao(const encoder_control * const encoder,
+static void encode_sao(encoder_control * const encoder,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma)
