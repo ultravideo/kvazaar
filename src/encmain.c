@@ -383,7 +383,6 @@ int main(int argc, char *argv[])
   FREE_POINTER(encoder->in.cur_pic);
   bitstream_finalize(&encoder->stream);
   free(encoder);
-  free_tables();
   free_exp_golomb();
 
   return EXIT_SUCCESS;

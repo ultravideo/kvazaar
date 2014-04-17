@@ -123,9 +123,6 @@ encoder_control *init_encoder_control(config *cfg)
   // Allocate the bitstream struct
   bitstream_init(&enc_c->stream, BITSTREAM_TYPE_FILE);
 
-  // Initialize tables
-  init_tables();
-
   //Allocate and init exp golomb table
   if (!init_exp_golomb(4096*8)) {
     fprintf(stderr, "Failed to allocate the exp golomb code table, shutting down!\n");

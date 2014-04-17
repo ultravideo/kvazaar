@@ -71,12 +71,6 @@ cpu.o: x86/cpu.asm
 %.d: %.c Makefile
 	$(CC) $(CCFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
 
-generate_tables: tables.c global.h
-	$(CC) $(CCFLAGS) -DMAKE_GENERATE_TABLES=1 $< -o $@
-
-tables_generated.h: generate_tables
-	./generate_tables > $@
-	
 
 clean:
 	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)

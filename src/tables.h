@@ -20,10 +20,6 @@
  ****************************************************************************/
 
 #include "global.h"
-#include "tables_generated.h"
-
-void init_tables(void);
-void free_tables(void);
 
 //4 8 16 32 64 128
 //0 1  2  3  4   5
@@ -80,7 +76,7 @@ static const uint32_t g_sig_last_scan_32x32[64] = {
  * First index: (log2 - 2) of transform block size
  * Second index: scan pattern 0 = diagonal, 1 = horizontal, 2 = vertical
  */
-static const uint32_t *const g_sig_last_scan_cg[4][3] = {
+static const uint32_t * const g_sig_last_scan_cg[4][3] = {
   { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },  // 4x4, only first element is used
   { g_sig_last_scan_8x8[0], g_sig_last_scan_8x8[1], g_sig_last_scan_8x8[2] },
   { g_sig_last_scan_16x16, 0, 0 },
@@ -96,14 +92,12 @@ enum COEFF_SCAN_TYPE
 };
 
 
-#ifndef USING_GENERATED_TABLES
 /**
  * List of mappings for coefficients within a transform block.
  * First index: scan pattern 0 = diagonal, 1 = horizontal, 2 = vertical
  * Second index: (log2 - 1) size of transform block. 2x2 .. 32x32
  */
-extern const uint32_t* g_sig_last_scan[3][5];
+extern const uint32_t* const g_sig_last_scan[3][5];
+extern const int8_t g_convert_to_bit[LCU_WIDTH + 1];
 
-extern int8_t g_convert_to_bit[LCU_WIDTH + 1];
-#endif
 #endif //TABLES_H_
