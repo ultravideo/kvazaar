@@ -168,11 +168,15 @@ init_failure:
 }
 
 void init_encoder_input(encoder_input *input, FILE *inputfile,
-                        int32_t width, int32_t height)
+                        const int32_t width, const int32_t height)
 {
+  int32_t i_width = width; /*!< \brief input picture width (divisible by the minimum block size)*/
+  int32_t i_height = height; /*!< \brief input picture height (divisible by the minimum block size) */
+  int32_t i_width_in_lcu; /*!< \brief input picture width in LCU*/
+  int32_t i_height_in_lcu;  /*!< \brief input picture height in LCU */
   input->file = inputfile;
-  input->width = width;
-  input->height = height;
+  i_width = width;
+  i_height = height;
   input->real_width = width;
   input->real_height = height;
 
@@ -180,30 +184,30 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
   // pixels to the dimensions, so that they are. These extra pixels will be
   // compressed along with the real ones but they will be cropped out before
   // rendering.
-  if (width % CU_MIN_SIZE_PIXELS) {
-    input->width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
+  if (i_width % CU_MIN_SIZE_PIXELS) {
+    i_width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
   }
 
-  if (height % CU_MIN_SIZE_PIXELS) {
-    input->height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
+  if (i_height % CU_MIN_SIZE_PIXELS) {
+    i_height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
   }
 
-  input->height_in_lcu = input->height / LCU_WIDTH;
-  input->width_in_lcu  = input->width / LCU_WIDTH;
+  i_height_in_lcu = i_height / LCU_WIDTH;
+  i_width_in_lcu  = i_width / LCU_WIDTH;
 
   // Add one extra LCU when image not divisible by LCU_WIDTH
-  if (input->height_in_lcu * LCU_WIDTH < height) {
-    input->height_in_lcu++;
+  if (i_height_in_lcu * LCU_WIDTH < height) {
+    i_height_in_lcu++;
   }
 
-  if (input->width_in_lcu * LCU_WIDTH < width) {
-    input->width_in_lcu++;
+  if (i_width_in_lcu * LCU_WIDTH < width) {
+    i_width_in_lcu++;
   }
 
   // Allocate the picture and CU array
-  input->cur_pic = picture_init(input->width, input->height,
-                                input->width_in_lcu,
-                                input->height_in_lcu);
+  input->cur_pic = picture_init(i_width, i_height,
+                                i_width_in_lcu,
+                                i_height_in_lcu);
 
   if (!input->cur_pic) {
     printf("Error allocating picture!\r\n");
@@ -211,12 +215,22 @@ void init_encoder_input(encoder_input *input, FILE *inputfile,
   }
 
   #ifdef _DEBUG
-  if (width != input->width || height != input->height) {
+  if (width != i_width || height != i_height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
-    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, input->width, height,
-           input->height);
+    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, i_width, height,
+           i_height);
   }
   #endif
+  
+  // Init coeff data table
+  input->cur_pic->coeff_y = MALLOC(coefficient, i_width * i_height);
+  input->cur_pic->coeff_u = MALLOC(coefficient, (i_width * i_height) >> 2);
+  input->cur_pic->coeff_v = MALLOC(coefficient, (i_width * i_height) >> 2);
+
+  // Init predicted data table
+  input->cur_pic->pred_y = MALLOC(pixel, i_width * i_height);
+  input->cur_pic->pred_u = MALLOC(pixel, (i_width * i_height) >> 2);
+  input->cur_pic->pred_v = MALLOC(pixel, (i_width * i_height) >> 2);
 }
 
 static void write_aud(encoder_control * const encoder)
@@ -230,7 +244,9 @@ static void write_aud(encoder_control * const encoder)
 void encode_one_frame(encoder_control* encoder)
 {
   bitstream * const stream = &encoder->stream;
-  yuv_t *hor_buf = alloc_yuv_t(encoder->in.width);
+  picture * const cur_pic = encoder->in.cur_pic;
+  
+  yuv_t *hor_buf = alloc_yuv_t(cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
   yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
@@ -240,7 +256,7 @@ void encode_one_frame(encoder_control* encoder)
   const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder->frame % encoder->cfg->intra_period) == 0);
   const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
 
-  picture * const cur_pic = encoder->in.cur_pic;
+  
 
   cabac_data cabac;
 
@@ -317,11 +333,11 @@ void encode_one_frame(encoder_control* encoder)
 
   {
     vector2d lcu;
-    const vector2d size = { encoder->in.width, encoder->in.height };
-    const vector2d size_lcu = { encoder->in.width_in_lcu, encoder->in.height_in_lcu };
+    const vector2d size = { cur_pic->width, cur_pic->height };
+    const vector2d size_lcu = { cur_pic->width_in_lcu, cur_pic->height_in_lcu };
 
-    for (lcu.y = 0; lcu.y < encoder->in.height_in_lcu; lcu.y++) {
-      for (lcu.x = 0; lcu.x < encoder->in.width_in_lcu; lcu.x++) {
+    for (lcu.y = 0; lcu.y < cur_pic->height_in_lcu; lcu.y++) {
+      for (lcu.x = 0; lcu.x < cur_pic->width_in_lcu; lcu.x++) {
         const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
 
         // Handle partial LCUs on the right and bottom.
@@ -367,7 +383,7 @@ void encode_one_frame(encoder_control* encoder)
         }
 
         if (encoder->sao_enable) {
-          const int stride = encoder->in.width_in_lcu;
+          const int stride = cur_pic->width_in_lcu;
           sao_info *sao_luma = &cur_pic->sao_luma[lcu.y * stride + lcu.x];
           sao_info *sao_chroma = &cur_pic->sao_chroma[lcu.y * stride + lcu.x];
           init_sao_info(sao_luma);
@@ -747,6 +763,7 @@ static void encode_scaling_list(encoder_control * const encoder)
 void encode_seq_parameter_set(encoder_control * const encoder)
 {
   bitstream * const stream = &encoder->stream;
+  const picture * const cur_pic = encoder->in.cur_pic;
   const encoder_input* const in = &encoder->in;
 
 #ifdef _DEBUG
@@ -768,21 +785,21 @@ void encode_seq_parameter_set(encoder_control * const encoder)
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
-  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
-  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
+  WRITE_UE(stream, cur_pic->width, "pic_width_in_luma_samples");
+  WRITE_UE(stream, cur_pic->height, "pic_height_in_luma_samples");
 
-  if (in->width != in->real_width || in->height != in->real_height) {
+  if (cur_pic->width != in->real_width || cur_pic->height != in->real_height) {
     // The standard does not seem to allow setting conf_win values such that
     // the number of luma samples is not a multiple of 2. Options are to either
     // hide one line or show an extra line of non-video. Neither seems like a
     // very good option, so let's not even try.
-    assert(!(in->width % 2));
+    assert(!(cur_pic->width % 2));
     WRITE_U(stream, 1, 1, "conformance_window_flag");
     WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (in->width - in->real_width) >> 1,
+    WRITE_UE(stream, (cur_pic->width - in->real_width) >> 1,
              "conf_win_right_offset");
     WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (in->height - in->real_height) >> 1,
+    WRITE_UE(stream, (cur_pic->height - in->real_height) >> 1,
              "conf_win_bottom_offset");
   } else {
     WRITE_U(stream, 0, 1, "conformance_window_flag");
@@ -1143,15 +1160,15 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
   const picture * const cur_pic = encoder->in.cur_pic;
-  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
 
   // Check for slice border
-  uint8_t border_x = ((encoder->in.width) < (x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_y = ((encoder->in.height) < (y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_split_x = ((encoder->in.width)  < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border_split_y = ((encoder->in.height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
+  uint8_t border_x = ((cur_pic->width) < (x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
+  uint8_t border_y = ((cur_pic->height) < (y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
+  uint8_t border_split_x = ((cur_pic->width)  < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
+  uint8_t border_split_y = ((cur_pic->height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
 
 
@@ -1160,11 +1177,11 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
     // Implisit split flag when on border
     if (!border) {
       // Get left and top block split_flags and if they are present and true, increase model number
-      if (x_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)]), depth) == 1) {
+      if (x_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)]), depth) == 1) {
         split_model++;
       }
 
-      if (y_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)]), depth) == 1) {
+      if (y_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (cur_pic->width_in_lcu << MAX_DEPTH)]), depth) == 1) {
         split_model++;
       }
 
@@ -1199,11 +1216,11 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
     // Get left and top skipped flags and if they are present and true, increase context number
-    if (x_ctb > 0 && (&cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
+    if (x_ctb > 0 && (&cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)])->skipped) {
       ctx_skip++;
     }
 
-    if (y_ctb > 0 && (&cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)])->skipped) {
+    if (y_ctb > 0 && (&cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (cur_pic->width_in_lcu << MAX_DEPTH)])->skipped) {
       ctx_skip++;
     }
 
@@ -1416,11 +1433,11 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
       cu_info *above_cu = 0;
 
       if (x_ctb > 0) {
-        left_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        left_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb - 1 + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
       }
       // Don't take the above CU across the LCU boundary.
       if (y_ctb > 0 && (y_ctb & 7) != 0) {
-        above_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (encoder->in.width_in_lcu << MAX_DEPTH)];
+        above_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + (y_ctb - 1) * (cur_pic->width_in_lcu << MAX_DEPTH)];
       }
 
       intra_get_dir_luma_predictor((x_ctb<<3) + (offset[j].x<<2),
@@ -1980,12 +1997,12 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
-  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (cur_pic->width_in_lcu << MAX_DEPTH)];
 
   coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];
   coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
   coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
-  int32_t coeff_stride = encoder->in.width;
+  int32_t coeff_stride = cur_pic->width;
 
   uint32_t ctx_idx;
   int8_t scan_idx = SCAN_DIAG;
@@ -2002,7 +2019,7 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
   if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
     int y = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
-    coefficient *orig_pos = &cur_pic->coeff_y[x + y * encoder->in.width];
+    coefficient *orig_pos = &cur_pic->coeff_y[x + y * cur_pic->width];
     for (y = 0; y < width; y++) {
       for (x = 0; x < width; x++) {
         coeff_y[x+y*width] = orig_pos[x];
@@ -2070,8 +2087,8 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
       x = x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1));
       y = y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1));
     }
-    orig_pos_u = &cur_pic->coeff_u[x + y * (encoder->in.width >> 1)];
-    orig_pos_v = &cur_pic->coeff_v[x + y * (encoder->in.width >> 1)];
+    orig_pos_u = &cur_pic->coeff_u[x + y * (cur_pic->width >> 1)];
+    orig_pos_v = &cur_pic->coeff_v[x + y * (cur_pic->width >> 1)];
     for (y = 0; y < (width_c); y++) {
       for (x = 0; x < (width_c); x++) {
         coeff_u[x+y*(width_c)] = orig_pos_u[x];
@@ -2128,7 +2145,7 @@ void encode_transform_coeff(const encoder_control * const encoder, cabac_data *c
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   const picture * const cur_pic = encoder->in.cur_pic;
-  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (encoder->in.width_in_lcu << MAX_DEPTH)];
+  cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (cur_pic->width_in_lcu << MAX_DEPTH)];
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when

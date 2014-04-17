@@ -857,13 +857,14 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
  */
 static int search_cu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
+  const picture * const cur_pic = encoder->in.cur_pic;
   int cu_width = LCU_WIDTH >> depth;
   int cost = MAX_INT;
   cu_info *cur_cu;
   int x_local = (x&0x3f), y_local = (y&0x3f);
 
   // Stop recursion if the CU is completely outside the frame.
-  if (x >= encoder->in.width || y >= encoder->in.height) {
+  if (x >= cur_pic->width || y >= cur_pic->height) {
     // Return zero cost because this CU does not have to be coded.
     return 0;
   }
@@ -876,10 +877,9 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
   cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
-  if (x + cu_width <= encoder->in.width &&
-      y + cu_width <= encoder->in.height)
+  if (x + cu_width <= cur_pic->width &&
+      y + cu_width <= cur_pic->height)
   {
-    const picture * const cur_pic = encoder->in.cur_pic;
 
     if (cur_pic->slicetype != SLICE_I &&
         depth >= MIN_INTER_SEARCH_DEPTH &&
@@ -965,12 +965,13 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
  */
 static void init_lcu_t(const encoder_control * const encoder, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
+  const picture * const cur_pic = encoder->in.cur_pic;
+  
   // Copy reference cu_info structs from neighbouring LCUs.
   {
     const int x_cu = x >> MAX_DEPTH;
     const int y_cu = y >> MAX_DEPTH;
-    const int cu_array_width = encoder->in.width_in_lcu << MAX_DEPTH;
-    const picture * const cur_pic = encoder->in.cur_pic;
+    const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
     cu_info *const cu_array = cur_pic->cu_array[MAX_DEPTH];
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
@@ -1012,7 +1013,7 @@ static void init_lcu_t(const encoder_control * const encoder, const int x, const
 
   // Copy reference pixels.
   {
-    const int pic_width = encoder->in.width;
+    const int pic_width = cur_pic->width;
 
     // Copy top reference pixels.
     if (y > 0) {
@@ -1045,9 +1046,9 @@ static void init_lcu_t(const encoder_control * const encoder, const int x, const
   // Copy LCU pixels.
   {
     const picture * const pic = encoder->in.cur_pic;
-    int pic_width = encoder->in.width;
+    int pic_width = cur_pic->width;
     int x_max = MIN(x + LCU_WIDTH, pic_width) - x;
-    int y_max = MIN(y + LCU_WIDTH, encoder->in.height) - y;
+    int y_max = MIN(y + LCU_WIDTH, cur_pic->height) - y;
 
     int x_c = x / 2;
     int y_c = y / 2;
@@ -1075,7 +1076,7 @@ static void copy_lcu_to_cu_data(const encoder_control * const encoder, int x_px,
     const int x_cu = x_px >> MAX_DEPTH;
     const int y_cu = y_px >> MAX_DEPTH;
     const picture * const cur_pic = encoder->in.cur_pic;
-    const int cu_array_width = encoder->in.width_in_lcu << MAX_DEPTH;
+    const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
     cu_info *const cu_array = cur_pic->cu_array[MAX_DEPTH];
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
@@ -1095,9 +1096,9 @@ static void copy_lcu_to_cu_data(const encoder_control * const encoder, int x_px,
   // Copy pixels to picture.
   {
     picture * const pic = encoder->in.cur_pic;
-    const int pic_width = encoder->in.width;
+    const int pic_width = pic->width;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
-    const int y_max = MIN(y_px + LCU_WIDTH, encoder->in.height) - y_px;
+    const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
     const int luma_index = x_px + y_px * pic_width;
     const int chroma_index = (x_px / 2) + (y_px / 2) * (pic_width / 2);
 

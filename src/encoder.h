@@ -48,12 +48,8 @@ enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 typedef struct
 {
   FILE *file;
-  int32_t width;  /*!< \brief input picture width (divisible by the minimum block size)*/
-  int32_t height; /*!< \brief input picture height (divisible by the minimum block size) */
   int32_t real_width;  /*!< \brief real input picture width */
   int32_t real_height; /*!< \brief real input picture width */
-  int32_t height_in_lcu; /*!< \brief input picture width in LCU*/
-  int32_t width_in_lcu;  /*!< \brief input picture height in LCU */
   picture *cur_pic;
   int8_t video_format;
   int8_t bitdepth;  /*!< \brief input bit depth (8,10) */

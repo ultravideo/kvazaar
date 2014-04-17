@@ -248,25 +248,16 @@ int main(int argc, char *argv[])
 
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
-         encoder->in.width, encoder->in.height,
+         encoder->in.cur_pic->width, encoder->in.cur_pic->height,
          encoder->in.real_width, encoder->in.real_height);
 
   // Only the code that handles conformance window coding needs to know
   // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
   // change the input values here to be the real values. For a real fix
   // encoder.in probably needs to be merged into cfg.
-  cfg->width = encoder->in.width;
-  cfg->height = encoder->in.height;
-
-  // Init coeff data table
-  encoder->in.cur_pic->coeff_y = MALLOC(coefficient, cfg->width * cfg->height);
-  encoder->in.cur_pic->coeff_u = MALLOC(coefficient, (cfg->width * cfg->height) >> 2);
-  encoder->in.cur_pic->coeff_v = MALLOC(coefficient, (cfg->width * cfg->height) >> 2);
-
-  // Init predicted data table
-  encoder->in.cur_pic->pred_y = MALLOC(pixel, cfg->width * cfg->height);
-  encoder->in.cur_pic->pred_u = MALLOC(pixel, (cfg->width * cfg->height) >> 2);
-  encoder->in.cur_pic->pred_v = MALLOC(pixel, (cfg->width * cfg->height) >> 2);
+  // The real fix would be: never go dig in cfg
+  //cfg->width = encoder->in.width;
+  //cfg->height = encoder->in.height;
 
   // Start coding cycle while data on input and not on the last frame
   while(!cfg->frames || encoder->frame < cfg->frames) {
@@ -309,7 +300,7 @@ int main(int argc, char *argv[])
     if (cfg->debug != NULL) {
       // Write reconstructed frame out.
       // Use conformance-window dimensions instead of internal ones.
-      const int width = encoder->in.width;
+      const int width = encoder->in.cur_pic->width;
       const int out_width = encoder->in.real_width;
       const int out_height = encoder->in.real_height;
       int y;
@@ -358,7 +349,7 @@ int main(int argc, char *argv[])
     picture_list_add(encoder->ref, encoder->in.cur_pic);
     // Allocate new memory to current picture
     // TODO: reuse memory from old reference
-    encoder->in.cur_pic = picture_init(encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+    encoder->in.cur_pic = picture_init(encoder->in.cur_pic->width, encoder->in.cur_pic->height, encoder->in.cur_pic->width_in_lcu, encoder->in.cur_pic->height_in_lcu);
 
     // Copy pointer from the last cur_pic because we don't want to reallocate it
     MOVE_POINTER(encoder->in.cur_pic->coeff_y,encoder->ref->pics[0]->coeff_y);

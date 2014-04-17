@@ -873,9 +873,9 @@ void sao_reconstruct_frame(const encoder_control * const encoder)
   memcpy(new_u_data, cur_pic->u_recdata, sizeof(pixel) * (cur_pic->width * cur_pic->height) >> 2);
   memcpy(new_v_data, cur_pic->v_recdata, sizeof(pixel) * (cur_pic->width * cur_pic->height) >> 2);
 
-  for (lcu.y = 0; lcu.y < encoder->in.height_in_lcu; lcu.y++) {
-    for (lcu.x = 0; lcu.x < encoder->in.width_in_lcu; lcu.x++) {
-      unsigned stride = encoder->in.width_in_lcu;
+  for (lcu.y = 0; lcu.y < cur_pic->height_in_lcu; lcu.y++) {
+    for (lcu.x = 0; lcu.x < cur_pic->width_in_lcu; lcu.x++) {
+      unsigned stride = cur_pic->width_in_lcu;
       sao_info *sao_luma = &cur_pic->sao_luma[lcu.y * stride + lcu.x];
       sao_info *sao_chroma = &cur_pic->sao_chroma[lcu.y * stride + lcu.x];
 
