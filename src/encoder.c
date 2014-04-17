@@ -45,7 +45,6 @@
 
 double g_lambda_cost[55];
 double g_cur_lambda_cost;
-int8_t g_bitdepth = 8;
 
 /* Local functions. */
 static void add_checksum(encoder_control * const encoder);
@@ -154,7 +153,7 @@ encoder_control *init_encoder_control(config *cfg)
       fclose(cqmfile);
     }
   }
-  scalinglist_process(&enc_c->scaling_list);
+  scalinglist_process(&enc_c->scaling_list, enc_c->bitdepth);
   
   return enc_c;
 
@@ -392,13 +391,13 @@ void encode_one_frame(encoder_control* encoder)
           {
             sao_info *sao_top = lcu. y != 0 ? &cur_pic->sao_luma[(lcu.y - 1) * stride + lcu.x] : NULL;
             sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_luma[lcu.y * stride + lcu.x -1] : NULL;
-            sao_search_luma(cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
+            sao_search_luma(encoder, cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
           }
 
           {
             sao_info *sao_top = lcu.y != 0 ? &cur_pic->sao_chroma[(lcu.y - 1) * stride + lcu.x] : NULL;
             sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_chroma[lcu.y * stride + lcu.x - 1] : NULL;
-            sao_search_chroma(cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
+            sao_search_chroma(encoder, cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
           }
 
           // Merge only if both luma and chroma can be merged
@@ -1598,7 +1597,7 @@ static void transform_chroma(const encoder_control * const encoder, cabac_data *
     }
   }
 
-  transform2d(block, pre_quant_coeff, width_c, 65535);
+  transform2d(encoder, block, pre_quant_coeff, width_c, 65535);
   if (encoder->rdoq_enable) {
     rdoq(encoder, cabac, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
          scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
@@ -1622,7 +1621,7 @@ static void reconstruct_chroma(const encoder_control * const encoder, cu_info *c
   if (has_coeffs) {
     // RECONSTRUCT for predictions
     dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
-    itransform2d(block, pre_quant_coeff, width_c, 65535);
+    itransform2d(encoder, block, pre_quant_coeff, width_c, 65535);
 
     i = 0;
 
@@ -1799,23 +1798,23 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
       uint32_t coeffcost = 0,coeffcost2 = 0;
 
       // Test for transform skip
-      transformskip(block,pre_quant_coeff,width);
+      transformskip(encoder, block,pre_quant_coeff,width);
       if (encoder->rdoq_enable) {
         rdoq(encoder, cabac, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
       } else {
         quant(encoder, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
       }
       dequant(encoder, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
-      itransformskip(temp_block,pre_quant_coeff,width);
+      itransformskip(encoder, temp_block,pre_quant_coeff,width);
 
-      transform2d(block,pre_quant_coeff,width,0);
+      transform2d(encoder, block,pre_quant_coeff,width,0);
       if (encoder->rdoq_enable) {
         rdoq(encoder, cabac, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
       } else {
         quant(encoder, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
       }
       dequant(encoder, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
-      itransform2d(temp_block2,pre_quant_coeff,width,0);
+      itransform2d(encoder, temp_block2,pre_quant_coeff,width,0);
 
       // SSD between original and reconstructed
       for (i = 0; i < 16; i++) {
@@ -1849,9 +1848,9 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
 
     // Transform and quant residual to coeffs
     if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
-      transformskip(block,pre_quant_coeff,width);
+      transformskip(encoder, block,pre_quant_coeff,width);
     } else {
-      transform2d(block,pre_quant_coeff,width,0);
+      transform2d(encoder, block,pre_quant_coeff,width,0);
     }
 
     if (encoder->rdoq_enable) {
@@ -1898,9 +1897,9 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
 
       dequant(encoder, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
       if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
-        itransformskip(block,pre_quant_coeff,width);
+        itransformskip(encoder, block,pre_quant_coeff,width);
       } else {
-        itransform2d(block,pre_quant_coeff,width,0);
+        itransform2d(encoder, block,pre_quant_coeff,width,0);
       }
 
       i = 0;

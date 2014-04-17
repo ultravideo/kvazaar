@@ -696,7 +696,7 @@ static int search_cu_intra(const encoder_control * const encoder,
   intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   // Build reconstructed block to use in prediction with extrapolated borders
-  intra_build_reference_border(x_px, y_px, cu_width * 2 + 8,
+  intra_build_reference_border(encoder, x_px, y_px, cu_width * 2 + 8,
                                rec_buffer, cu_width * 2 + 8, 0,
                                cur_pic->width,
                                cur_pic->height,
@@ -908,7 +908,7 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, cur_cu->part_size);
       intra_recon_lcu(encoder, cabac, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
-      inter_recon_lcu(encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      inter_recon_lcu(encoder, encoder->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
       encode_transform_tree(encoder, cabac, x, y, depth, &work_tree[depth]);
 
       if(cur_cu->merged && !cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {

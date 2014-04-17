@@ -81,7 +81,7 @@ const int16_t g_chroma_filter[8][4] =
 /**
  * \brief
  */
-INLINE void filter_deblock_luma(pixel *src, int32_t offset,
+INLINE void filter_deblock_luma(const encoder_control * const encoder, pixel *src, int32_t offset,
                                 int32_t tc, int8_t sw,
                                 int8_t part_P_nofilter, int8_t part_Q_nofilter,
                                 int32_t thr_cut,
@@ -112,16 +112,16 @@ INLINE void filter_deblock_luma(pixel *src, int32_t offset,
     if (abs(delta) < thr_cut) {
       int32_t tc2  = tc >> 1;
       delta        = CLIP(-tc, tc, delta);
-      src[-offset] = CLIP(0, (1 << g_bitdepth) - 1, (m3 + delta));
-      src[0]       = CLIP(0, (1 << g_bitdepth) - 1, (m4 - delta));
+      src[-offset] = CLIP(0, (1 << encoder->bitdepth) - 1, (m3 + delta));
+      src[0]       = CLIP(0, (1 << encoder->bitdepth) - 1, (m4 - delta));
 
       if(filter_second_P) {
         int32_t delta1   = CLIP(-tc2, tc2, (((m1 + m3 + 1) >> 1) - m2 + delta) >> 1);
-        src[-offset * 2] = CLIP(0, (1 << g_bitdepth) - 1, m2 + delta1);
+        src[-offset * 2] = CLIP(0, (1 << encoder->bitdepth) - 1, m2 + delta1);
       }
       if(filter_second_Q) {
         int32_t delta2 = CLIP(-tc2, tc2, (((m6 + m4 + 1) >> 1) - m5 - delta) >> 1);
-        src[offset]    = CLIP(0, (1 << g_bitdepth) - 1, m5 + delta2);
+        src[offset]    = CLIP(0, (1 << encoder->bitdepth) - 1, m5 + delta2);
       }
     }
   }
@@ -141,7 +141,7 @@ INLINE void filter_deblock_luma(pixel *src, int32_t offset,
 /**
  * \brief
  */
-INLINE void filter_deblock_chroma(pixel *src, int32_t offset, int32_t tc,
+INLINE void filter_deblock_chroma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc,
                                   int8_t part_P_nofilter, int8_t part_Q_nofilter)
 {
   int32_t delta;
@@ -152,10 +152,10 @@ INLINE void filter_deblock_chroma(pixel *src, int32_t offset, int32_t tc,
 
   delta = CLIP(-tc,tc, (((m4 - m3) << 2) + m2 - m5 + 4 ) >> 3);
   if(!part_P_nofilter) {
-    src[-offset] = CLIP(0, (1 << g_bitdepth) - 1, m3 + delta);
+    src[-offset] = CLIP(0, (1 << encoder->bitdepth) - 1, m3 + delta);
   }
   if(!part_Q_nofilter) {
-    src[0] = CLIP(0, (1 << g_bitdepth) - 1, m4 - delta);
+    src[0] = CLIP(0, (1 << encoder->bitdepth) - 1, m4 - delta);
   }
 }
 
@@ -192,7 +192,7 @@ void filter_deblock_edge_luma(const encoder_control * const encoder,
     int8_t strength = 0;
 
     int32_t qp              = encoder->QP;
-    int32_t bitdepth_scale  = 1 << (g_bitdepth - 8);
+    int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
     int32_t beta            = g_beta_table_8x8[b_index] * bitdepth_scale;
     int32_t side_threshold  = (beta + (beta >>1 )) >> 3;
@@ -275,10 +275,10 @@ void filter_deblock_edge_luma(const encoder_control * const encoder,
                     useStrongFiltering(offset, 2*d3, (src+step*(block_idx*4+3)));
 
         // Filter four rows/columns
-        filter_deblock_luma(src + step * (4*block_idx + 0), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
-        filter_deblock_luma(src + step * (4*block_idx + 1), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
-        filter_deblock_luma(src + step * (4*block_idx + 2), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
-        filter_deblock_luma(src + step * (4*block_idx + 3), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        filter_deblock_luma(encoder, src + step * (4*block_idx + 0), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        filter_deblock_luma(encoder, src + step * (4*block_idx + 1), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        filter_deblock_luma(encoder, src + step * (4*block_idx + 2), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        filter_deblock_luma(encoder, src + step * (4*block_idx + 3), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
       }
     }
   }
@@ -324,7 +324,7 @@ void filter_deblock_edge_chroma(const encoder_control * const encoder,
     int8_t strength = 2;
 
     int32_t QP             = g_chroma_scale[encoder->QP];
-    int32_t bitdepth_scale = 1 << (g_bitdepth-8);
+    int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
 
@@ -357,15 +357,15 @@ void filter_deblock_edge_chroma(const encoder_control * const encoder,
       // Only filter when strenght == 2 (one of the blocks is intra coded)
       if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
         // Chroma U
-        filter_deblock_chroma(src_u + step * (4*blk_idx + 0), offset, Tc, 0, 0);
-        filter_deblock_chroma(src_u + step * (4*blk_idx + 1), offset, Tc, 0, 0);
-        filter_deblock_chroma(src_u + step * (4*blk_idx + 2), offset, Tc, 0, 0);
-        filter_deblock_chroma(src_u + step * (4*blk_idx + 3), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 0), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 1), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 2), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 3), offset, Tc, 0, 0);
         // Chroma V
-        filter_deblock_chroma(src_v + step * (4*blk_idx + 0), offset, Tc, 0, 0);
-        filter_deblock_chroma(src_v + step * (4*blk_idx + 1), offset, Tc, 0, 0);
-        filter_deblock_chroma(src_v + step * (4*blk_idx + 2), offset, Tc, 0, 0);
-        filter_deblock_chroma(src_v + step * (4*blk_idx + 3), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 0), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 1), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 2), offset, Tc, 0, 0);
+        filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 3), offset, Tc, 0, 0);
       }
     }
   }
@@ -498,7 +498,7 @@ void filter_deblock_lcu(const encoder_control * const encoder, int x_px, int y_p
  * \param dst_stride stride of destination image
  *
  */
-void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_halfpel_chroma(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
    * | B0,0|ae0,0|
@@ -510,9 +510,9 @@ void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, in
    */
 
   int32_t x, y;
-  int32_t shift1 = g_bitdepth-8;
+  int32_t shift1 = encoder->bitdepth-8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14-g_bitdepth;
+  int32_t shift3 = 14-encoder->bitdepth;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 

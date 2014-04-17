@@ -54,12 +54,12 @@ static int sao_calc_eo_cat(pixel a, pixel b, pixel c)
 }
 
 
-int sao_band_ddistortion(const pixel *orig_data, const pixel *rec_data,
+int sao_band_ddistortion(const encoder_control * const encoder, const pixel *orig_data, const pixel *rec_data,
                          int block_width, int block_height,
                          int band_pos, int sao_bands[4])
 {
   int y, x;
-  int shift = g_bitdepth-5;
+  int shift = encoder->bitdepth-5;
   int sum = 0;
 
   for (y = 0; y < block_height; ++y) {
@@ -263,11 +263,11 @@ static int sao_mode_bits_band(int band_position, int offsets[4],
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
-static void calc_sao_offset_array(const sao_info *sao, int *offset)
+static void calc_sao_offset_array(const encoder_control * const encoder, const sao_info *sao, int *offset)
 {
   int val;
-  int values = (1<<g_bitdepth);
-  int shift = g_bitdepth-5;
+  int values = (1<<encoder->bitdepth);
+  int shift = encoder->bitdepth-5;
 
   // Loop through all intensity values and construct an offset array
   for (val = 0; val < values; val++) {
@@ -345,12 +345,12 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
  * \param sao_bands an array of bands for original and reconstructed block
  */
-static void calc_sao_bands(const pixel *orig_data, const pixel *rec_data,
+static void calc_sao_bands(const encoder_control * const encoder, const pixel *orig_data, const pixel *rec_data,
                            int block_width, int block_height,
                            int sao_bands[2][32])
 {
   int y, x;
-  int shift = g_bitdepth-5;
+  int shift = encoder->bitdepth-5;
 
   //Loop pixels and take top 5 bits to classify different bands
   for (y = 0; y < block_height; ++y) {
@@ -394,7 +394,8 @@ static void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
   }
 }
 
-static void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data,
+static void sao_reconstruct_color(const encoder_control * const encoder, 
+                                  const pixel *rec_data, pixel *new_rec_data,
                                   const sao_info *sao,
                                   int stride, int new_stride,
                                   int block_width, int block_height)
@@ -405,7 +406,7 @@ static void sao_reconstruct_color(const pixel *rec_data, pixel *new_rec_data,
 
   if(sao->type == SAO_TYPE_BAND) {
     int offsets[1<<BIT_DEPTH];
-    calc_sao_offset_array(sao, offsets);
+    calc_sao_offset_array(encoder, sao, offsets);
     for (y = 0; y < block_height; ++y) {
       for (x = 0; x < block_width; ++x) {
         new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
@@ -548,7 +549,7 @@ static void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
   rec->x = (rec->x == 0 ? 0 : -1);
 }
 
-void sao_reconstruct(picture * pic, const pixel *old_rec,
+void sao_reconstruct(const encoder_control * const encoder, picture * pic, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i)
 {
@@ -593,7 +594,7 @@ void sao_reconstruct(picture * pic, const pixel *old_rec,
                       tl.y + block.y + br.y,
                       pic_stride, buf_stride);
 
-  sao_reconstruct_color(&buf_rec[tl.y * buf_stride + tl.x],
+  sao_reconstruct_color(encoder, &buf_rec[tl.y * buf_stride + tl.x],
                         &new_rec[(ofs.y + tl.y) * lcu_stride + ofs.x + tl.x],
                         sao,
                         buf_stride, lcu_stride,
@@ -682,7 +683,7 @@ static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
 }
 
 
-static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
+static void sao_search_band_sao(const encoder_control * const encoder, const pixel * data[], const pixel * recdata[],
                                int block_width, int block_height,
                                unsigned buf_cnt,
                                sao_info *sao_out, sao_info *sao_top,
@@ -702,7 +703,7 @@ static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
 
     memset(sao_bands, 0, 2 * 32 * sizeof(int));
     for (i = 0; i < buf_cnt; ++i) {
-      calc_sao_bands(data[i], recdata[i],block_width,
+      calc_sao_bands(encoder, data[i], recdata[i],block_width,
                      block_height,sao_bands);
     }
 
@@ -729,7 +730,7 @@ static void sao_search_band_sao(const pixel * data[], const pixel * recdata[],
  * \param buf_cnt  Number of pointers data and recdata have.
  * \param sao_out  Output parameter for the best sao parameters.
  */
-static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
+static void sao_search_best_mode(const encoder_control * const encoder, const pixel * data[], const pixel * recdata[],
                                  int block_width, int block_height,
                                  unsigned buf_cnt,
                                  sao_info *sao_out, sao_info *sao_top,
@@ -739,7 +740,7 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   sao_info band_sao;
 
   sao_search_edge_sao(data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
-  sao_search_band_sao(data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
+  sao_search_band_sao(encoder, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
 
   {
     int mode_bits = sao_mode_bits_edge(edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
@@ -761,7 +762,7 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
-      ddistortion += sao_band_ddistortion(data[buf_i], recdata[buf_i], 
+      ddistortion += sao_band_ddistortion(encoder, data[buf_i], recdata[buf_i], 
                                           block_width, block_height, 
                                           band_sao.band_position, &band_sao.offsets[1]);
     }
@@ -792,7 +793,7 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   return;
 }
 
- void sao_search_chroma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
+ void sao_search_chroma(const encoder_control * const encoder, const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -825,10 +826,10 @@ static void sao_search_best_mode(const pixel * data[], const pixel * recdata[],
   }
 
   // Calculate
-  sao_search_best_mode(orig_list, rec_list, block_width / 2, block_height / 2, 2, sao, sao_top, sao_left);
+  sao_search_best_mode(encoder, orig_list, rec_list, block_width / 2, block_height / 2, 2, sao, sao_top, sao_left);
 }
 
-void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
+void sao_search_luma(const encoder_control * const encoder, const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
@@ -855,7 +856,7 @@ void sao_search_luma(const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_inf
 
   orig_list[0] = orig;
   rec_list[0] = rec;
-  sao_search_best_mode(orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left);
+  sao_search_best_mode(encoder, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left);
 }
 
 void sao_reconstruct_frame(const encoder_control * const encoder)
@@ -880,9 +881,9 @@ void sao_reconstruct_frame(const encoder_control * const encoder)
       sao_info *sao_chroma = &cur_pic->sao_chroma[lcu.y * stride + lcu.x];
 
       // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
-      sao_reconstruct(cur_pic, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
-      sao_reconstruct(cur_pic, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
-      sao_reconstruct(cur_pic, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
+      sao_reconstruct(encoder, cur_pic, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
+      sao_reconstruct(encoder, cur_pic, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
+      sao_reconstruct(encoder, cur_pic, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
     }
   }
 

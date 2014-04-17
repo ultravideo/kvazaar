@@ -74,7 +74,7 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_control * const encoder, picture* ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -139,8 +139,8 @@ void inter_recon_lcu(picture* ref,int32_t xpos, int32_t ypos,int32_t width, cons
     }
 
     // Filter the block to half-pel resolution
-    filter_inter_halfpel_chroma(halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH, abs_mv_x, abs_mv_y);
-    filter_inter_halfpel_chroma(halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
+    filter_inter_halfpel_chroma(encoder, halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH, abs_mv_x, abs_mv_y);
+    filter_inter_halfpel_chroma(encoder, halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
 
     // Assign filtered pixels to output, take every second half-pel sample with offset of abs_mv_y/x
     for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {

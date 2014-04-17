@@ -275,7 +275,7 @@ static int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check,
  * \param recstride  Stride for rec pixel arrays.
  * \param dst
  */
-static void intra_get_pred(pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
+static void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
 {
   pixel *ref_pixels = rec[0];
   if (is_chroma || mode == 1 || width == 4) {
@@ -306,9 +306,9 @@ static void intra_get_pred(pixel *rec[2], int recstride, pixel *dst, int width, 
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     int filter = !is_chroma && width < 32;
     if (dist_from_vert_or_hor <= filter_threshold) {
-      intra_get_angular_pred(ref_pixels, recstride, dst, width, width, mode, filter);
+      intra_get_angular_pred(encoder, ref_pixels, recstride, dst, width, width, mode, filter);
     } else {
-      intra_get_angular_pred(ref_pixels, recstride, dst, width, width, mode, filter);
+      intra_get_angular_pred(encoder, ref_pixels, recstride, dst, width, width, mode, filter);
     }
   }
 }
@@ -370,7 +370,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
   // Try all modes and select the best one.
   for (mode = 0; mode < 35; mode++) {
     uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
-    intra_get_pred(ref, recstride, pred, width, mode, 0);
+    intra_get_pred(encoder, ref, recstride, pred, width, mode, 0);
 
     sad = cost_func(pred, orig_block);
     sad += mode_cost * (int)(g_cur_lambda_cost + 0.5);
@@ -412,7 +412,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
     for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
       int rdo_bitcost;
       // The reconstruction is calculated again here, it could be saved from before..
-      intra_recon(rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
+      intra_recon(encoder, rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
       rdo_costs[rdo_mode] = rdo_cost_intra(encoder,pred,orig_block,width,cabac,rdo_modes[rdo_mode]);
       // Bitcost also calculated again for this mode
       rdo_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
@@ -445,7 +445,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
  * \param chroma chroma-block flag
 
 */
-void intra_recon(pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
 {
   pixel pred[LCU_WIDTH * LCU_WIDTH];
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
@@ -463,7 +463,7 @@ void intra_recon(pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int3
     intra_filter(ref[1], recstride, width, 0);
   }
 
-  intra_get_pred(ref, recstride, pred, width, mode, chroma);
+  intra_get_pred(encoder, ref, recstride, pred, width, mode, chroma);
 
   picture_blit_pixels(pred, dst, width, width, width, dststride);
 }
@@ -477,7 +477,7 @@ void intra_recon(pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int3
  * The end result is 2*width+8 x 2*width+8 array, with only the top and left
  * edge pixels filled with the reconstructed pixels.
  */
-void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_width,
+void intra_build_reference_border(const encoder_control * const encoder, int32_t x_luma, int32_t y_luma, int16_t out_width,
                                       pixel *dst, int32_t dst_stride, int8_t chroma,
                                       int32_t pic_width, int32_t pic_height,
                                       lcu_t *lcu)
@@ -536,7 +536,7 @@ void intra_build_reference_border(int32_t x_luma, int32_t y_luma, int16_t out_wi
     { 64,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4 }
   };
 
-  const pixel dc_val = 1 << (g_bitdepth - 1);
+  const pixel dc_val = 1 << (encoder->bitdepth - 1);
   const int is_chroma = chroma ? 1 : 0;
 
   // input picture pointer
@@ -658,7 +658,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
+void intra_get_angular_pred(const encoder_control * const encoder, pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
 {
   int32_t k,l;
   int32_t blk_size        = width;
@@ -716,7 +716,7 @@ void intra_get_angular_pred(pixel* src, int32_t src_stride, pixel* dst, int32_t 
 
     if (filter) {
       for (k=0;k<blk_size;k++) {
-        dst[k * dst_stride] = CLIP(0, (1<<g_bitdepth) - 1, dst[k * dst_stride] + (( ref_side[k + 1] - ref_side[0]) >> 1));
+        dst[k * dst_stride] = CLIP(0, (1<<encoder->bitdepth) - 1, dst[k * dst_stride] + (( ref_side[k + 1] - ref_side[0]) >> 1));
       }
     }
   } else {
@@ -852,9 +852,10 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
   // Reconstruct chroma.
   if (!(x & 4 || y & 4)) {
     pixel *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
-    intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
+    intra_build_reference_border(encoder, x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
                                      pic_width/2, pic_height/2, lcu);
-    intra_recon(rec_shift_c,
+    intra_recon(encoder,
+                rec_shift_c,
                 width_c * 2 + 8,
                 width_c,
                 recbase_u,
@@ -862,9 +863,10 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
                 cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
                 1);
 
-    intra_build_reference_border(x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
+    intra_build_reference_border(encoder, x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
                                      pic_width/2, pic_height/2, lcu);
-    intra_recon(rec_shift_c,
+    intra_recon(encoder,
+                rec_shift_c,
                 width_c * 2 + 8,
                 width_c,
                 recbase_v,
@@ -873,9 +875,9 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
                 2);
   }
 
-  intra_build_reference_border(x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+  intra_build_reference_border(encoder, x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
                                 pic_width, pic_height, lcu);
-  intra_recon(rec_shift, width * 2 + 8,
+  intra_recon(encoder, rec_shift, width * 2 + 8,
               width, recbase_y, rec_stride, cur_cu->intra[i].mode, 0);
 
   // Filter DC-prediction

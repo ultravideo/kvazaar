@@ -42,15 +42,16 @@ void filter_deblock_edge_chroma(const encoder_control * const encoder,
                                 int8_t depth, int8_t dir);
 void filter_deblock(const encoder_control * const encoder);
 void filter_deblock_lcu(const encoder_control * const encoder, int x_px, int y_px);
-void filter_deblock_luma(pixel *src, int32_t offset, int32_t tc , int8_t sw,
+void filter_deblock_luma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc , int8_t sw,
                          int8_t part_p_nofilter, int8_t part_q_nofilter,
                          int32_t thr_cut,
                          int8_t filter_second_p, int8_t filter_second_q);
-void filter_deblock_chroma(pixel *src, int32_t offset, int32_t tc,
+void filter_deblock_chroma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc,
                            int8_t part_p_nofilter, int8_t part_q_nofilter);
 
 // INTERPOLATION
-void filter_inter_halfpel_chroma(int16_t *src, int16_t src_stride, int width, int height,
+void filter_inter_halfpel_chroma(const encoder_control * encoder,
+                                 int16_t *src, int16_t src_stride, int width, int height,
                                  int16_t *dst, int16_t dst_stride,  int8_t hor_flag, int8_t ver_flag);
 
 // SAO
