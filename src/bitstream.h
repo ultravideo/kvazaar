@@ -62,7 +62,7 @@ extern const bit_table *g_exp_table;
 
 int floor_log2(unsigned int n);
 
-bitstream *create_bitstream();
+bitstream *create_bitstream(const bitstream_type type);
 void free_bitstream(bitstream* stream);
 void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
 
