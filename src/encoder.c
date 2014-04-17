@@ -1637,19 +1637,23 @@ static void reconstruct_chroma(const encoder_control * const encoder, cu_info *c
   }
 }
 
-void encode_transform_tree(const encoder_control * const encoder, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu)
+void encode_transform_tree(const encoder_control * const encoder, cabac_data* cabac, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   int x_local = (x&0x3f), y_local = (y&0x3f);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
 
   int i;
-  int8_t width = LCU_WIDTH>>depth;
-  int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width >> 1);
+  const int8_t width = LCU_WIDTH>>depth;
+  const int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width  / 2);
+
+  // Tell clang-analyzer what is up. For some reason it can't figure out from
+  // asserting just depth.
+  assert(width == 4 || width == 8 || width == 16 || width == 32);
 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
-    int offset = LCU_WIDTH>>(depth+1);
+    int offset = width_c;
     encode_transform_tree(encoder, cabac, x,          y,          depth+1, lcu);
     encode_transform_tree(encoder, cabac, x + offset, y,          depth+1, lcu);
     encode_transform_tree(encoder, cabac, x,          y + offset, depth+1, lcu);
@@ -1753,8 +1757,8 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
 
 
     // Copy Luma and Chroma to the pred-block
-    for(y = 0; y < LCU_WIDTH>>depth; y++) {
-      for(x = 0; x < LCU_WIDTH>>depth; x++) {
+    for(y = 0; y < width; y++) {
+      for(x = 0; x < width; x++) {
         pred_y[x+y*pred_stride]=recbase_y[x+y*recbase_stride];
       }
     }
@@ -1765,8 +1769,8 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
     i = 0;
     ac_sum = 0;
 
-    for (y = 0; y < LCU_WIDTH >> depth; y++) {
-      for (x = 0; x < LCU_WIDTH >> depth; x++) {
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
         block[i] = ((int16_t)base_y[x + y * base_stride]) -
                    pred_y[x + y * pred_stride];
         #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
@@ -1777,8 +1781,8 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
     }
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     #define RESIDUAL_THRESHOLD 500
-    if(residual_sum < RESIDUAL_THRESHOLD/(LCU_WIDTH >> depth)) {
-      memset(block, 0, sizeof(int16_t)*(LCU_WIDTH >> depth)*(LCU_WIDTH >> depth));
+    if(residual_sum < RESIDUAL_THRESHOLD/(width)) {
+      memset(block, 0, sizeof(int16_t)*(width)*(width));
     }
     #endif
 
@@ -1985,7 +1989,7 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
 {
   const picture * const cur_pic = encoder->in.cur_pic;
   uint8_t width = LCU_WIDTH >> depth;
-  uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width >> 1);
+  uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
