@@ -24,6 +24,7 @@
 
 #include "intra.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -678,6 +679,9 @@ void intra_get_angular_pred(const encoder_control * const encoder, pixel* src, i
   pixel *ref_side;
   pixel  ref_above[2 * LCU_WIDTH + 1];
   pixel  ref_left[2 * LCU_WIDTH + 1];
+
+  // Tell clang-analyzer that everything is ok.
+  assert(width == 4 || width == 8 || width == 16 || width == 32);
 
   abs_ang           = ang_table[abs_ang];
   intra_pred_angle  = sign_ang * abs_ang;
