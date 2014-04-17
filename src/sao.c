@@ -608,7 +608,8 @@ void sao_reconstruct(const encoder_control * const encoder, picture * pic, const
 
 
 
-static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
+static void sao_search_edge_sao(const encoder_control * const encoder, 
+                                const pixel * data[], const pixel * recdata[],
                                 int block_width, int block_height,
                                 unsigned buf_cnt,
                                 sao_info *sao_out, sao_info *sao_top,
@@ -668,7 +669,7 @@ static void sao_search_edge_sao(const pixel * data[], const pixel * recdata[],
 
     {
       int mode_bits = sao_mode_bits_edge(edge_class, edge_offset, sao_top, sao_left);
-      sum_ddistortion += (int)((double)mode_bits*(g_cur_lambda_cost+0.5));
+      sum_ddistortion += (int)((double)mode_bits*(encoder->cur_lambda_cost+0.5));
     }
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
@@ -710,7 +711,7 @@ static void sao_search_band_sao(const encoder_control * const encoder, const pix
     ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position);
 
     temp_rate = sao_mode_bits_band(sao_out->band_position, temp_offsets, sao_top, sao_left);
-    ddistortion += (int)((double)temp_rate*(g_cur_lambda_cost+0.5));
+    ddistortion += (int)((double)temp_rate*(encoder->cur_lambda_cost+0.5));
 
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
@@ -739,12 +740,12 @@ static void sao_search_best_mode(const encoder_control * const encoder, const pi
   sao_info edge_sao;
   sao_info band_sao;
 
-  sao_search_edge_sao(data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
+  sao_search_edge_sao(encoder, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
   sao_search_band_sao(encoder, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
 
   {
     int mode_bits = sao_mode_bits_edge(edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
-    int ddistortion = mode_bits * (int)(g_cur_lambda_cost + 0.5);
+    int ddistortion = mode_bits * (int)(encoder->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -758,7 +759,7 @@ static void sao_search_best_mode(const encoder_control * const encoder, const pi
 
   {
     int mode_bits = sao_mode_bits_band(band_sao.band_position, &band_sao.offsets[1], sao_top, sao_left);
-    int ddistortion = mode_bits * (int)(g_cur_lambda_cost + 0.5);
+    int ddistortion = mode_bits * (int)(encoder->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -779,7 +780,7 @@ static void sao_search_best_mode(const encoder_control * const encoder, const pi
   // Choose between SAO and doing nothing, taking into account the
   // rate-distortion cost of coding do nothing.
   {
-    int cost_of_nothing = sao_mode_bits_none(sao_top, sao_left) * (int)(g_cur_lambda_cost + 0.5);
+    int cost_of_nothing = sao_mode_bits_none(sao_top, sao_left) * (int)(encoder->cur_lambda_cost + 0.5);
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
     }

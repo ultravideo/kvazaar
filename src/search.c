@@ -117,7 +117,7 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
   return bitcost;
 }
 
-static int calc_mvd_cost(int x, int y,
+static int calc_mvd_cost(const encoder_control * const encoder, int x, int y,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
@@ -159,7 +159,7 @@ static int calc_mvd_cost(int x, int y,
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(g_cur_lambda_cost+0.5);
+  return temp_bitcost*(int32_t)(encoder->cur_lambda_cost+0.5);
 }
 
 
@@ -183,7 +183,7 @@ static int calc_mvd_cost(int x, int y,
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static unsigned hexagon_search(unsigned depth,
+static unsigned hexagon_search(const encoder_control * const encoder, unsigned depth,
                                const picture *pic, const picture *ref,
                                const vector2d *orig, vector2d *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
@@ -203,7 +203,7 @@ static unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(encoder, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -217,7 +217,7 @@ static unsigned hexagon_search(unsigned depth,
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
                              orig->x, orig->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(encoder, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
@@ -233,7 +233,7 @@ static unsigned hexagon_search(unsigned depth,
                                  orig->x + pattern->x,
                                  orig->y + pattern->y,
                                  block_width, block_width);
-        cost += calc_mvd_cost(pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        cost += calc_mvd_cost(encoder, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
         if (cost < best_cost) {
           best_cost    = cost;
@@ -268,7 +268,7 @@ static unsigned hexagon_search(unsigned depth,
                                orig->x + mv.x + offset->x,
                                orig->y + mv.y + offset->y,
                                block_width, block_width);
-      cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
       if (cost < best_cost) {
         best_cost    = cost;
@@ -291,7 +291,7 @@ static unsigned hexagon_search(unsigned depth,
                              orig->x + mv.x + offset->x,
                              orig->y + mv.y + offset->y,
                              block_width, block_width);
-    cost += calc_mvd_cost(mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd_cost(encoder, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
       best_cost    = cost;
@@ -419,7 +419,7 @@ static int search_cu_inter(const encoder_control * const encoder, int x, int y, 
 #if SEARCH_MV_FULL_RADIUS
     temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
-    temp_cost += hexagon_search(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost += hexagon_search(encoder, depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
 
     merged = 0;
@@ -774,7 +774,7 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
       }
     }
     // Coefficient costs
-    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(g_cur_lambda_cost+0.5);
+    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder->cur_lambda_cost+0.5);
 
   // Calculate actual bit costs for coding the coeffs
   // RDO
@@ -836,11 +836,11 @@ static int lcu_get_final_cost(const encoder_control * const encoder,
       coeff_cost += get_coeff_cost(encoder, cabac, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
     }
     // Multiply bit count with lambda to get RD-cost
-    cost += coeff_cost * (int32_t)(g_cur_lambda_cost+0.5);
+    cost += coeff_cost * (int32_t)(encoder->cur_lambda_cost+0.5);
   }
 
   // Bitcost
-  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(g_cur_lambda_cost+0.5);
+  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(encoder->cur_lambda_cost+0.5);
 
   return cost;
 }
@@ -928,7 +928,7 @@ static int search_cu(const encoder_control * const encoder, cabac_data *cabac, i
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
-    int split_cost = (int)(4.5 * g_cur_lambda_cost);
+    int split_cost = (int)(4.5 * encoder->cur_lambda_cost);
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting

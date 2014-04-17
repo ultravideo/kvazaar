@@ -70,6 +70,7 @@ typedef struct
   int8_t ref_idx_num[2];
   int8_t QP;             // \brief Quantization parameter
   int8_t bitdepth;
+  double cur_lambda_cost;
 
   /* Filtering */
   int8_t deblock_enable; // \brief Flag to enable deblocking filter
@@ -100,7 +101,7 @@ typedef struct
   scaling_list scaling_list;
 } encoder_control;
 
-void init_lambda(const encoder_control * const encoder);
+void init_lambda(encoder_control *encoder);
 encoder_control *init_encoder_control(config *cfg);
 void init_encoder_input(encoder_input *input, FILE* inputfile,
                         int32_t width, int32_t height);
@@ -127,8 +128,6 @@ void encode_transform_coeff(const encoder_control * const encoder, cabac_data *c
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
-
-extern double g_cur_lambda_cost;
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
