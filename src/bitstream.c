@@ -67,7 +67,7 @@ const bit_table *g_exp_table;
 
 //From wikipedia
 //http://en.wikipedia.org/wiki/Binary_logarithm#Algorithm
-int floor_log2(unsigned int n) {
+static int floor_log2(unsigned int n) {
   int pos = 0;
   if (n >= 1<<16) { n >>= 16; pos += 16; }
   if (n >= 1<< 8) { n >>=  8; pos +=  8; }
@@ -84,12 +84,12 @@ int floor_log2(unsigned int n) {
  *
  * Allocates g_exp_table with len*sizeof(bit_table) and fills it with exponential golomb codes
  */
-int init_exp_golomb(uint32_t len)
+int init_exp_golomb(const uint32_t len)
 {
   uint32_t code_num;
   uint8_t M;
   uint32_t info;
-  bit_table* exp_table;
+  bit_table *exp_table;
   exp_table = (bit_table*)malloc(len*sizeof(bit_table));
   if(!exp_table)
     return 0;
@@ -159,7 +159,7 @@ bitstream *create_bitstream(const bitstream_type type)
 /**
  * \brief Free a bitstream
  */
-void free_bitstream(bitstream* stream)
+void free_bitstream(bitstream *stream)
 {
   if (stream->type == BITSTREAM_TYPE_MEMORY) {
     bitstream_mem *stream_mem = (bitstream_mem*) stream;
@@ -182,9 +182,9 @@ void free_bitstream(bitstream* stream)
  * \param byte byte to write
  * \return 1 on success, 0 on failure
  */
-int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
+int bitstream_writebyte(bitstream * const stream_abstract, const uint8_t byte) {
   if (stream_abstract->type == BITSTREAM_TYPE_FILE) {
-    bitstream_file *stream = (bitstream_file*) stream_abstract;
+    bitstream_file * const stream = (bitstream_file * const) stream_abstract;
     if (fwrite(&byte, 1, 1, stream->output) != 1) {
       fprintf(stderr, "Could not write byte to bitstream_file object.");
       return 0;
@@ -192,7 +192,7 @@ int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
       return 1;
     }
   } else if (stream_abstract->type == BITSTREAM_TYPE_MEMORY) {
-    bitstream_mem *stream = (bitstream_mem*) stream_abstract;
+    bitstream_mem * const stream = (bitstream_mem * const) stream_abstract;
     if (stream->allocated_length==stream->output_length) {
       //Need to reallocate
       uint32_t new_size = stream->allocated_length + BITSTREAM_MEMORY_CHUNK_SIZE;
@@ -220,7 +220,7 @@ int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte) {
  * \param data input data
  * \param bits number of bits to write from data to stream
  */
-void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
+void bitstream_put(bitstream * const stream, const uint32_t data, uint8_t bits)
 {
   const uint8_t emulation_prevention_three_byte = 0x03;
   while(bits--) {
@@ -251,7 +251,7 @@ void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits)
 /**
  * \brief Align the bitstream with one-bit padding
  */
-void bitstream_align(bitstream *stream)
+void bitstream_align(bitstream * const stream)
 {
   bitstream_put(stream, 1, 1);
   if ((stream->cur_bit & 7) != 0) {
@@ -262,7 +262,7 @@ void bitstream_align(bitstream *stream)
 /**
  * \brief Align the bitstream with zero
  */
-void bitstream_align_zero(bitstream *stream)
+void bitstream_align_zero(bitstream * const stream)
 {
   if ((stream->cur_bit & 7) != 0) {
     bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));

@@ -60,11 +60,9 @@ typedef struct
 
 extern const bit_table *g_exp_table;
 
-int floor_log2(unsigned int n);
-
-bitstream *create_bitstream(const bitstream_type type);
-void free_bitstream(bitstream* stream);
-void bitstream_put(bitstream* stream, uint32_t data, uint8_t bits);
+bitstream *create_bitstream(bitstream_type type);
+void free_bitstream(bitstream *stream);
+void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits);
 int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
 
 /* Use macros to force inlining */
@@ -72,8 +70,8 @@ int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
                                          bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
 
-void bitstream_align(bitstream* stream);
-void bitstream_align_zero(bitstream* stream);
+void bitstream_align(bitstream *stream);
+void bitstream_align_zero(bitstream *stream);
 int init_exp_golomb(uint32_t len);
 void free_exp_golomb();
 
