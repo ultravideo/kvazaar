@@ -341,7 +341,6 @@ int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int3
 
   if (block_type == 2) return ctx_ind_map[4 * pos_y + pos_x];
 
-  cnt = 0;
   offset = (block_type == 3) ? ((scan_idx == SCAN_DIAG) ? 9 : 15) : ((texture_type == 0) ? 21 : 12);
   pos_x_in_subset = pos_x - ((pos_x>>2)<<2);
   pos_y_in_subset = pos_y - ((pos_y>>2)<<2);
