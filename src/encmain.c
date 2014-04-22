@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
   // AUD
   encoder.aud_enable = (int8_t)encoder.cfg->aud_enable;
 
-  encoder_control_input_init(&encoder, input, cfg->width, cfg->height);
+  encoder.in.file = input;
 
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",

@@ -148,7 +148,7 @@ typedef struct encoder_state {
 int encoder_control_init(encoder_control *encoder, const config *cfg);
 int encoder_control_finalize(encoder_control *encoder);
 
-void encoder_control_input_init(encoder_control *encoder, FILE *inputfile, int32_t width, int32_t height);
+void encoder_control_input_init(encoder_control *encoder, int32_t width, int32_t height);
 
 int encoder_state_init(encoder_state *encoder_state, const encoder_control * encoder);
 int encoder_state_finalize(encoder_state *encoder_state);

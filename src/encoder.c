@@ -113,6 +113,8 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   }
   scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
   
+  encoder_control_input_init(encoder, cfg->width, cfg->height);
+  
   //Tiles
   encoder->tiles_enable = 0;
   
@@ -187,10 +189,9 @@ int encoder_state_finalize(encoder_state * const encoder_state) {
   return 1;
 }
 
-void encoder_control_input_init(encoder_control * const encoder, FILE *inputfile,
+void encoder_control_input_init(encoder_control * const encoder,
                         const int32_t width, const int32_t height)
 {
-  encoder->in.file = inputfile;
   encoder->in.width = width;
   encoder->in.height = height;
   encoder->in.real_width = width;
