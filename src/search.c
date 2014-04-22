@@ -664,9 +664,9 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_intra(const encoder_state * const encoder_state,
+static int search_cu_intra(encoder_state * const encoder_state,
                            const int x_px, const int y_px,
-                           const int depth, lcu_t *lcu, cabac_data *cabac)
+                           const int depth, lcu_t *lcu)
 {
   const picture * const cur_pic = encoder_state->cur_pic;
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
@@ -711,7 +711,7 @@ static int search_cu_intra(const encoder_state * const encoder_state,
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
     mode = intra_prediction(encoder_state,ref_pixels, LCU_WIDTH,
                             cu_in_rec_buffer, cu_width * 2 + 8, cu_width,
-                            &cost, candidate_modes, &bitcost, cabac);
+                            &cost, candidate_modes, &bitcost);
     cur_cu->intra[pu_index].mode = (int8_t)mode;
     cur_cu->intra[pu_index].cost = cost;
     cur_cu->intra[pu_index].bitcost = bitcost;
@@ -729,7 +729,6 @@ static int search_cu_intra(const encoder_state * const encoder_state,
  * here as (coefficient_sum * 1.5) * lambda)
  */
 static int lcu_get_final_cost(const encoder_state * const encoder_state,
-                              cabac_data *cabac,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {
@@ -818,7 +817,7 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
 
       // Calculate luma coeff bit count
       picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
-      coeff_cost += get_coeff_cost(encoder_state->encoder_control, cabac, coeff_temp, blockwidth, 0, luma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder_state, coeff_temp, blockwidth, 0, luma_scan_mode);
 
       blk_y >>= 1;
       blk_x >>= 1;
@@ -833,8 +832,8 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
       picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
       picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
 
-      coeff_cost += get_coeff_cost(encoder_state->encoder_control, cabac, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
-      coeff_cost += get_coeff_cost(encoder_state->encoder_control, cabac, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder_state, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
+      coeff_cost += get_coeff_cost(encoder_state, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
     }
     // Multiply bit count with lambda to get RD-cost
     cost += coeff_cost * (int32_t)(encoder_state->cur_lambda_cost+0.5);
@@ -856,7 +855,7 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static int search_cu(encoder_state * const encoder_state, cabac_data *cabac, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static int search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
   const picture * const cur_pic = encoder_state->cur_pic;
   int cu_width = LCU_WIDTH >> depth;
@@ -896,7 +895,7 @@ static int search_cu(encoder_state * const encoder_state, cabac_data *cabac, int
     if (depth >= MIN_INTRA_SEARCH_DEPTH &&
         depth <= MAX_INTRA_SEARCH_DEPTH)
     {
-      int mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth], cabac);
+      int mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTRA;
@@ -907,10 +906,10 @@ static int search_cu(encoder_state * const encoder_state, cabac_data *cabac, int
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, cur_cu->part_size);
-      intra_recon_lcu(encoder_state, cabac, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
+      intra_recon_lcu(encoder_state, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
       inter_recon_lcu(encoder_state->encoder_control, encoder_state->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
-      encode_transform_tree(encoder_state, cabac, x, y, depth, &work_tree[depth]);
+      encode_transform_tree(encoder_state, x, y, depth, &work_tree[depth]);
 
       if(cur_cu->merged && !cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
         cur_cu->merged = 0;
@@ -923,7 +922,7 @@ static int search_cu(encoder_state * const encoder_state, cabac_data *cabac, int
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = lcu_get_final_cost(encoder_state, cabac, x, y, depth, &work_tree[depth]);
+    cost = lcu_get_final_cost(encoder_state, x, y, depth, &work_tree[depth]);
   }
 
   // Recursively split all the way to max search depth.
@@ -936,10 +935,10 @@ static int search_cu(encoder_state * const encoder_state, cabac_data *cabac, int
     // might not give any better results but takes more time to do.
     if(cur_cu->type == CU_NOTSET || cur_cu->coeff_top_y[depth] ||
        cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
-      split_cost += search_cu(encoder_state, cabac, x,           y,           depth + 1, work_tree);
-      split_cost += search_cu(encoder_state, cabac, x + half_cu, y,           depth + 1, work_tree);
-      split_cost += search_cu(encoder_state, cabac, x,           y + half_cu, depth + 1, work_tree);
-      split_cost += search_cu(encoder_state, cabac, x + half_cu, y + half_cu, depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, x,           y,           depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, x + half_cu, y,           depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, x,           y + half_cu, depth + 1, work_tree);
+      split_cost += search_cu(encoder_state, x + half_cu, y + half_cu, depth + 1, work_tree);
     } else {
       split_cost = INT_MAX;
     }
@@ -1124,7 +1123,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void search_lcu(encoder_state * const encoder_state, cabac_data *cabac, int x, int y, yuv_t* hor_buf, yuv_t* ver_buf)
+void search_lcu(encoder_state * const encoder_state, int x, int y, yuv_t* hor_buf, yuv_t* ver_buf)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;
@@ -1135,7 +1134,7 @@ void search_lcu(encoder_state * const encoder_state, cabac_data *cabac, int x, i
   }
 
   // Start search from depth 0.
-  search_cu(encoder_state, cabac, x, y, 0, work_tree);
+  search_cu(encoder_state, x, y, 0, work_tree);
 
   copy_lcu_to_cu_data(encoder_state, x, y, &work_tree[0]);
 }

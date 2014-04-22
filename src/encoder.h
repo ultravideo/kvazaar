@@ -142,17 +142,17 @@ void encode_vid_parameter_set(encoder_state *encoder);
 void encode_slice_header(encoder_state * encoder);
 void encode_access_unit_delimiter(encoder_state *encoder);
 void encode_prefix_sei_version(encoder_state *encoder);
-void encode_coding_tree(encoder_state *encoder, cabac_data *cabac, uint16_t x_ctb,
+void encode_coding_tree(encoder_state *encoder, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
-void encode_last_significant_xy(cabac_data *cabac,
+void encode_last_significant_xy(encoder_state *encoder,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan);
-void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, int16_t *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state *encoder, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void encode_transform_tree(encoder_state *encoder_state, cabac_data* cabac, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu );
-void encode_transform_coeff(encoder_state *encoder_state, cabac_data *cabac, int32_t x_cu, int32_t y_cu,
+void encode_transform_tree(encoder_state *encoder_state, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu );
+void encode_transform_coeff(encoder_state *encoder_state, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
