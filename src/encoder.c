@@ -346,10 +346,62 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
   // Set CABAC output bitstream
   encoder_state->cabac.stream = &encoder_state->stream;
   
+#if USE_TILES
+  if (encoder->tiles_enable) {
+    int i,x,y;
+    //Allocate subencoders
+    encoder_state->children = MALLOC(struct encoder_state, encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows);
+    for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+      for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+        int tile_width = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
+        int tile_height = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
+        i = y * encoder->tiles_num_tile_columns + x;
+        
+        encoder_state->children[i].encoder_control = encoder;
+        if (!bitstream_init(&encoder_state->children[i].stream, BITSTREAM_TYPE_MEMORY)) {
+          fprintf(stderr, "Could not initialize stream (subencoder)!\n");
+          return 0;
+        }
+        
+        encoder_state->children[i].cur_pic = picture_init(tile_width * LCU_WIDTH, tile_height * LCU_WIDTH,
+                                tile_width, tile_height);
+
+        if (!encoder_state->children[i].cur_pic) {
+          printf("Error allocating picture (subencoder)!\r\n");
+          return 0;
+        }
+        
+        //FIXME: allocate coeff_* and pred_*?
+        
+        encoder_state->children[i].children = NULL;
+      }
+    }
+  }
+#endif //USE_TILES
+  
   return 1;
 }
 
 int encoder_state_finalize(encoder_state * const encoder_state) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  
+#if USE_TILES
+  if (encoder->tiles_enable) {
+    int i,x,y;
+    for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+      for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+        i = y * encoder->tiles_num_tile_columns + x;
+        
+        picture_destroy(encoder_state->children[i].cur_pic);
+        FREE_POINTER(encoder_state->children[i].cur_pic);
+        
+        bitstream_finalize(&encoder_state->children[i].stream);
+      }
+    }
+    FREE_POINTER(encoder_state->children);
+  }
+#endif //USE_TILES
+  
   picture_destroy(encoder_state->cur_pic);
   FREE_POINTER(encoder_state->cur_pic);
   
