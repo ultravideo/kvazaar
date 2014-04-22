@@ -199,8 +199,9 @@ void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
  * \param slice type of slice we are coding (P/B/I)
  */
 
-void init_contexts(cabac_data *cabac, int8_t QP, int8_t slice)
+void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
 {
+  cabac_data * const cabac = &encoder_state->cabac;
   uint16_t i;
 
   // Initialize contexts

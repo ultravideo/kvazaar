@@ -47,7 +47,6 @@
 static void add_checksum(encoder_state *encoder);
 static void encode_VUI(encoder_state *encoder);
 static void encode_sao(encoder_state *encoder,
-                       cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
 
@@ -312,7 +311,7 @@ void encode_one_frame(encoder_state * const encoder_state)
   }
 
   cabac_start(&encoder_state->cabac);
-  init_contexts(&encoder_state->cabac, encoder_state->QP, encoder_state->cur_pic->slicetype);
+  init_contexts(encoder_state, encoder_state->QP, encoder_state->cur_pic->slicetype);
   encode_slice_header(encoder_state);
   bitstream_align(stream);
 
@@ -336,7 +335,7 @@ void encode_one_frame(encoder_state * const encoder_state)
         const int right = px.x + lcu_dim.x;
         const int bottom = px.y + lcu_dim.y;
 
-        search_lcu(encoder_state, &encoder_state->cabac, px.x, px.y, hor_buf, ver_buf);
+        search_lcu(encoder_state, px.x, px.y, hor_buf, ver_buf);
 
         // Take the bottom right pixel from the LCU above and put it as the
         // first pixel in this LCUs rightmost pixels.
@@ -394,10 +393,10 @@ void encode_one_frame(encoder_state * const encoder_state)
           sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
           sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
 
-          encode_sao(encoder_state, &encoder_state->cabac, lcu.x, lcu.y, sao_luma, sao_chroma);
+          encode_sao(encoder_state, lcu.x, lcu.y, sao_luma, sao_chroma);
         }
         
-        encode_coding_tree(encoder_state, &encoder_state->cabac, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+        encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
 
         {
           const int last_lcu = (lcu.x == size_lcu.x - 1 && lcu.y == size_lcu.y - 1);
@@ -1062,9 +1061,10 @@ void encode_slice_header(encoder_state * const encoder_state)
 }
 
 
-static void encode_sao_color(const encoder_state * const encoder_state, cabac_data *cabac, sao_info *sao,
+static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
                              color_index color_i)
 {
+  cabac_data * const cabac = &encoder_state->cabac;
   const picture * const cur_pic = encoder_state->cur_pic;
   sao_eo_cat i;
 
@@ -1112,9 +1112,9 @@ static void encode_sao_color(const encoder_state * const encoder_state, cabac_da
   }
 }
 
-static void encode_sao_merge_flags(sao_info *sao, cabac_data *cabac,
-                                   unsigned x_ctb, unsigned y_ctb)
+static void encode_sao_merge_flags(encoder_state * const encoder_state, sao_info *sao, unsigned x_ctb, unsigned y_ctb)
 {
+  cabac_data * const cabac = &encoder_state->cabac;
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
     cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
@@ -1130,25 +1130,25 @@ static void encode_sao_merge_flags(sao_info *sao, cabac_data *cabac,
  * \brief Encode SAO information.
  */
 static void encode_sao(encoder_state * const encoder_state,
-                       cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma)
 {
   // TODO: transmit merge flags outside sao_info
-  encode_sao_merge_flags(sao_luma, cabac, x_lcu, y_lcu);
+  encode_sao_merge_flags(encoder_state, sao_luma, x_lcu, y_lcu);
 
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
-    encode_sao_color(encoder_state, cabac, sao_luma, COLOR_Y);
-    encode_sao_color(encoder_state, cabac, sao_chroma, COLOR_U);
-    encode_sao_color(encoder_state, cabac, sao_chroma, COLOR_V);
+    encode_sao_color(encoder_state, sao_luma, COLOR_Y);
+    encode_sao_color(encoder_state, sao_chroma, COLOR_U);
+    encode_sao_color(encoder_state, sao_chroma, COLOR_V);
   }
 }
 
 
-void encode_coding_tree(encoder_state * const encoder_state, cabac_data *cabac,
+void encode_coding_tree(encoder_state * const encoder_state,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
+  cabac_data * const cabac = &encoder_state->cabac;
   const picture * const cur_pic = encoder_state->cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
@@ -1182,17 +1182,17 @@ void encode_coding_tree(encoder_state * const encoder_state, cabac_data *cabac,
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
-      encode_coding_tree(encoder_state, cabac, x_ctb, y_ctb, depth + 1); // x,y
+      encode_coding_tree(encoder_state, x_ctb, y_ctb, depth + 1); // x,y
 
       // TODO: fix when other half of the block would not be completely over the border
       if (!border_x || border_split_x) {
-        encode_coding_tree(encoder_state, cabac, x_ctb + change, y_ctb, depth + 1);
+        encode_coding_tree(encoder_state, x_ctb + change, y_ctb, depth + 1);
       }
       if (!border_y || border_split_y) {
-        encode_coding_tree(encoder_state, cabac, x_ctb, y_ctb + change, depth + 1);
+        encode_coding_tree(encoder_state, x_ctb, y_ctb + change, depth + 1);
       }
       if (!border || (border_split_x && border_split_y)) {
-        encode_coding_tree(encoder_state, cabac, x_ctb + change, y_ctb + change, depth + 1);
+        encode_coding_tree(encoder_state, x_ctb + change, y_ctb + change, depth + 1);
       }
       return;
     }
@@ -1392,7 +1392,7 @@ void encode_coding_tree(encoder_state * const encoder_state, cabac_data *cabac,
     // Code (possible) coeffs to bitstream
 
     if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
-      encode_transform_coeff(encoder_state, cabac, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+      encode_transform_coeff(encoder_state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
     }
 
 
@@ -1514,7 +1514,7 @@ void encode_coding_tree(encoder_state * const encoder_state, cabac_data *cabac,
       }
     }  // end intra chroma pred mode coding
 
-    encode_transform_coeff(encoder_state, cabac, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+    encode_transform_coeff(encoder_state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
   }
 
     #if ENABLE_PCM == 1
@@ -1565,7 +1565,7 @@ void encode_coding_tree(encoder_state * const encoder_state, cabac_data *cabac,
   /* end coding_unit */
 }
 
-static void transform_chroma(encoder_state * const encoder_state, cabac_data *cabac, cu_info *cur_cu,
+static void transform_chroma(encoder_state * const encoder_state, cu_info *cur_cu,
                              int depth, pixel *base_u, pixel *pred_u,
                              coefficient *coeff_u, int8_t scan_idx_chroma,
                              coefficient *pre_quant_coeff, coefficient *block)
@@ -1591,7 +1591,7 @@ static void transform_chroma(encoder_state * const encoder_state, cabac_data *ca
 
   transform2d(encoder, block, pre_quant_coeff, width_c, 65535);
   if (encoder->rdoq_enable) {
-    rdoq(encoder_state, cabac, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+    rdoq(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
          scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
   } else {
     quant(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
@@ -1636,7 +1636,7 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
   }
 }
 
-void encode_transform_tree(encoder_state * const encoder_state, cabac_data* cabac, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
+void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   // we have 64>>depth transform size
@@ -1654,10 +1654,10 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width_c;
-    encode_transform_tree(encoder_state, cabac, x,          y,          depth+1, lcu);
-    encode_transform_tree(encoder_state, cabac, x + offset, y,          depth+1, lcu);
-    encode_transform_tree(encoder_state, cabac, x,          y + offset, depth+1, lcu);
-    encode_transform_tree(encoder_state, cabac, x + offset, y + offset, depth+1, lcu);
+    encode_transform_tree(encoder_state, x,          y,          depth+1, lcu);
+    encode_transform_tree(encoder_state, x + offset, y,          depth+1, lcu);
+    encode_transform_tree(encoder_state, x,          y + offset, depth+1, lcu);
+    encode_transform_tree(encoder_state, x + offset, y + offset, depth+1, lcu);
 
     // Derive coded coeff flags from the next depth
     if (depth == MAX_DEPTH) {
@@ -1796,7 +1796,7 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
       // Test for transform skip
       transformskip(encoder, block,pre_quant_coeff,width);
       if (encoder->rdoq_enable) {
-        rdoq(encoder_state, cabac, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+        rdoq(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
       } else {
         quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
       }
@@ -1805,7 +1805,7 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
 
       transform2d(encoder, block,pre_quant_coeff,width,0);
       if (encoder->rdoq_enable) {
-        rdoq(encoder_state, cabac, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+        rdoq(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
       } else {
         quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
       }
@@ -1832,8 +1832,8 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
         cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder_state->cur_lambda_cost+0.5);
         // Full RDO
       } else if(encoder->rdo == 2) {
-        coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0, scan_idx_luma);
-        coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0, scan_idx_luma);
+        coeffcost = get_coeff_cost(encoder_state, temp_coeff, 4, 0, scan_idx_luma);
+        coeffcost2 = get_coeff_cost(encoder_state, temp_coeff2, 4, 0, scan_idx_luma);
 
         cost  += coeffcost*((int)encoder_state->cur_lambda_cost+0.5);
         cost2 += coeffcost2*((int)encoder_state->cur_lambda_cost+0.5);
@@ -1850,7 +1850,7 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
     }
 
     if (encoder->rdoq_enable) {
-      rdoq(encoder_state, cabac, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
+      rdoq(encoder_state, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
            scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
     } else {
       quant(encoder_state, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
@@ -1934,7 +1934,7 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
         }
       }
 
-      transform_chroma(encoder_state, cabac, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
+      transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           int d;
@@ -1944,7 +1944,7 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
           break;
         }
       }
-      transform_chroma(encoder_state, cabac, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
+      transform_chroma(encoder_state, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           int d;
@@ -1983,10 +1983,9 @@ void encode_transform_tree(encoder_state * const encoder_state, cabac_data* caba
   // end Residual Coding
 }
 
-static void encode_transform_unit(encoder_state * const encoder_state, cabac_data *cabac,
+static void encode_transform_unit(encoder_state * const encoder_state,
                                   int x_pu, int y_pu, int depth, int tr_depth)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
   const picture * const cur_pic = encoder_state->cur_pic;
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
@@ -2061,7 +2060,7 @@ static void encode_transform_unit(encoder_state * const encoder_state, cabac_dat
       }
     }
 
-    encode_coeff_nxn(encoder, cabac, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
+    encode_coeff_nxn(encoder_state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
@@ -2117,11 +2116,11 @@ static void encode_transform_unit(encoder_state * const encoder_state, cabac_dat
     }
 
     if (cur_cu->coeff_top_u[depth]) {
-      encode_coeff_nxn(encoder, cabac, coeff_u, width_c, 2, scan_idx, 0);
+      encode_coeff_nxn(encoder_state, coeff_u, width_c, 2, scan_idx, 0);
     }
 
     if (cur_cu->coeff_top_v[depth]) {
-      encode_coeff_nxn(encoder, cabac, coeff_v, width_c, 2, scan_idx, 0);
+      encode_coeff_nxn(encoder_state, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
 }
@@ -2135,9 +2134,10 @@ static void encode_transform_unit(encoder_state * const encoder_state, cabac_dat
  * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
-void encode_transform_coeff(encoder_state * const encoder_state, cabac_data *cabac, int32_t x_pu,int32_t y_pu,
+void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
+  cabac_data * const cabac = &encoder_state->cabac;
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   const picture * const cur_pic = encoder_state->cur_pic;
@@ -2194,10 +2194,10 @@ void encode_transform_coeff(encoder_state * const encoder_state, cabac_data *cab
 
   if (split) {
     uint8_t pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
-    encode_transform_coeff(encoder_state, cabac, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder_state, cabac, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder_state, cabac, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder_state, cabac, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 
@@ -2212,13 +2212,15 @@ void encode_transform_coeff(encoder_state * const encoder_state, cabac_data *cab
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
-    encode_transform_unit(encoder_state, cabac, x_pu, y_pu, depth, tr_depth);
+    encode_transform_unit(encoder_state, x_pu, y_pu, depth, tr_depth);
   }
 }
 
-void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, coefficient *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  cabac_data * const cabac = &encoder_state->cabac;
   int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
@@ -2282,7 +2284,7 @@ void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, 
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
-  encode_last_significant_xy(cabac, last_coeff_x, last_coeff_y, width, width,
+  encode_last_significant_xy(encoder_state, last_coeff_x, last_coeff_y, width, width,
                              type, scan_mode);
 
   scan_pos_sig  = scan_pos_last;
@@ -2439,11 +2441,12 @@ void encode_coeff_nxn(const encoder_control * const encoder, cabac_data *cabac, 
 
  This method encodes the X and Y component within a block of the last significant coefficient.
 */
-void encode_last_significant_xy(cabac_data *cabac,
+void encode_last_significant_xy(encoder_state * const encoder_state,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan)
 {
+  cabac_data * const cabac = &encoder_state->cabac;
   uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
   uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
   int group_idx_x;
