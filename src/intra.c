@@ -327,7 +327,7 @@ static void intra_get_pred(const encoder_control * const encoder, pixel *rec[2],
  * \param sad_out sad value of best mode
  * \returns best intra mode
 */
-int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
+int16_t intra_prediction(const encoder_state * const encoder_state, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
                          uint8_t width, uint32_t *sad_out,
                          int8_t *intra_preds, uint32_t *bitcost_out, cabac_data *cabac)
 {
@@ -336,6 +336,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
   int16_t best_mode = 1;
   uint32_t best_bitcost = 0;
   int16_t mode;
+  int8_t rdo = encoder_state->encoder_control->rdo;
 
   // Check 8 modes for 4x4 and 8x8, 3 for others
   int8_t   rdo_modes_to_check = (width == 4 || width == 8)? 8 : 3;
@@ -371,12 +372,12 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
   // Try all modes and select the best one.
   for (mode = 0; mode < 35; mode++) {
     uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
-    intra_get_pred(encoder, ref, recstride, pred, width, mode, 0);
+    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
 
     sad = cost_func(pred, orig_block);
-    sad += mode_cost * (int)(encoder->cur_lambda_cost + 0.5);
+    sad += mode_cost * (int)(encoder_state->cur_lambda_cost + 0.5);
     // When rdo == 2, store best costs to an array and do full RDO later
-    if(encoder->rdo == 2) {
+    if(rdo == 2) {
       int rdo_mode = intra_rdo_cost_compare(rdo_costs, rdo_modes_to_check, sad);
       if(rdo_mode != -1) {
         rdo_modes[rdo_mode] = mode; rdo_costs[rdo_mode] = sad;
@@ -390,7 +391,7 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
   }
 
   // Select from three best modes if using RDO
-  if(encoder->rdo == 2) {
+  if(rdo == 2) {
     int rdo_mode;
     int pred_mode;
     // Check that the predicted modes are in the RDO mode list
@@ -413,12 +414,12 @@ int16_t intra_prediction(const encoder_control * const encoder, pixel *orig, int
     for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
       int rdo_bitcost;
       // The reconstruction is calculated again here, it could be saved from before..
-      intra_recon(encoder, rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
-      rdo_costs[rdo_mode] = rdo_cost_intra(encoder,pred,orig_block,width,cabac,rdo_modes[rdo_mode]);
+      intra_recon(encoder_state->encoder_control, rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
+      rdo_costs[rdo_mode] = rdo_cost_intra(encoder_state,pred,orig_block,width,cabac,rdo_modes[rdo_mode]);
       // Bitcost also calculated again for this mode
       rdo_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
       // Add bitcost * lambda
-      rdo_costs[rdo_mode] += rdo_bitcost * (int)(encoder->cur_lambda_cost + 0.5);
+      rdo_costs[rdo_mode] += rdo_bitcost * (int)(encoder_state->cur_lambda_cost + 0.5);
 
       if(rdo_costs[rdo_mode] < best_sad) {
         best_sad = rdo_costs[rdo_mode];
@@ -832,8 +833,9 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
   }
 }
 
-void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
+void intra_recon_lcu(encoder_state * const encoder_state, cabac_data *cabac, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height)
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
   int x_local = (x&0x3f), y_local = (y&0x3f);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
 
@@ -890,5 +892,5 @@ void intra_recon_lcu(const encoder_control * const encoder, cabac_data *cabac, i
                             rec_stride, width, width);
   }
 
-  encode_transform_tree(encoder, cabac, x, y, depth, lcu);
+  encode_transform_tree(encoder_state, cabac, x, y, depth, lcu);
 }

@@ -44,9 +44,9 @@
 #include "rdo.h"
 
 /* Local functions. */
-static void add_checksum(encoder_control * const encoder);
-static void encode_VUI(encoder_control * const encoder);
-static void encode_sao(encoder_control * const encoder,
+static void add_checksum(encoder_state *encoder);
+static void encode_VUI(encoder_state *encoder);
+static void encode_sao(encoder_state *encoder,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
@@ -57,10 +57,10 @@ static void encode_sao(encoder_control * const encoder,
   Implementation closer to HM (Used HM12 as reference)
    - Still missing functionality when GOP and B-pictures are used
  */
-void init_lambda(encoder_control * const encoder)
+void encoder_state_init_lambda(encoder_state * const encoder_state)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
-  double qp = encoder->QP;
+  const picture * const cur_pic = encoder_state->cur_pic;
+  double qp = encoder_state->QP;
   double lambda_scale = 1.0;
   double qp_temp      = qp - 12;
   double lambda;
@@ -78,179 +78,178 @@ void init_lambda(encoder_control * const encoder)
     lambda *= 0.95;
   }
 
-  encoder->cur_lambda_cost = lambda;
+  encoder_state->cur_lambda_cost = lambda;
 }
 
-encoder_control *init_encoder_control(config *cfg)
-{
-  encoder_control *enc_c    = NULL;
-  bitstream       *stream   = NULL;
-  picture_list    *pic_list = NULL;
-
+int encoder_control_init(encoder_control * const encoder, const config * const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
-    goto init_failure;
+    return 0;
   }
-
-  // Allocate the main struct
-  enc_c = malloc(sizeof(encoder_control));
-  if(!enc_c){
-    fprintf(stderr, "Failed to allocate encoder_control!\n");
-    goto init_failure;
-  }
-
-  // Config pointer to encoder struct
-  enc_c->cfg = cfg;
-
-  // input init (TODO: read from commandline / config)
-  enc_c->bitdepth = 8;
-  enc_c->frame    = 0;
-  enc_c->QP       = (int8_t)enc_c->cfg->qp;
-  enc_c->in.video_format = FORMAT_420;
+  
+  // Config pointer to config struct
+  encoder->cfg = cfg;
+  encoder->bitdepth = 8;
+  
   // deblocking filter
-  enc_c->deblock_enable    = 1;
-  enc_c->beta_offset_div2  = 0;
-  enc_c->tc_offset_div2    = 0;
+  encoder->deblock_enable    = 1;
+  encoder->beta_offset_div2  = 0;
+  encoder->tc_offset_div2    = 0;
   // SAO
-  enc_c->sao_enable = 1;
+  encoder->sao_enable = 1;
   // Rate-distortion optimization level
-  enc_c->rdo        = 1;
-
-  // Allocate the bitstream struct
-  bitstream_init(&enc_c->stream, BITSTREAM_TYPE_FILE);
-
-  //Allocate and init exp golomb table
-  if (!init_exp_golomb(4096*8)) {
-    fprintf(stderr, "Failed to allocate the exp golomb code table, shutting down!\n");
-    goto init_failure;
-  }
-
+  encoder->rdo        = 1;
+  
   // Initialize the scaling list
-  scalinglist_init(&enc_c->scaling_list);
-
-  pic_list = picture_list_init(MAX_REF_PIC_COUNT);
-  if(!pic_list) {
-    fprintf(stderr, "Failed to allocate the picture list!\n");
-    goto init_failure;
-  }
-
-  enc_c->ref = pic_list;
-  enc_c->ref_list = REF_PIC_LIST_0;
+  scalinglist_init(&encoder->scaling_list);
   
   // CQM
   {
     FILE* cqmfile;
     cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
     if (cqmfile) {
-      scalinglist_parse(&enc_c->scaling_list, cqmfile);
+      scalinglist_parse(&encoder->scaling_list, cqmfile);
       fclose(cqmfile);
     }
   }
-  scalinglist_process(&enc_c->scaling_list, enc_c->bitdepth);
+  scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
   
-  return enc_c;
-
-init_failure:
-  // Free everything allocated in this function
-  free(pic_list);
-  free(stream);
-  free(enc_c);
-
-  return NULL;
+  return 1;
 }
 
-void init_encoder_input(encoder_input *input, FILE *inputfile,
+int encoder_control_finalize(encoder_control * const encoder) {
+  scalinglist_destroy(&encoder->scaling_list);
+  
+  return 1;
+}
+
+int encoder_state_init(encoder_state * const encoder_state, const encoder_control * const encoder) {
+  picture_list    *pic_list = NULL;
+  
+  encoder_state->encoder_control = encoder;
+  
+  // Allocate the bitstream struct
+  if (!bitstream_init(&encoder_state->stream, BITSTREAM_TYPE_FILE)) {
+    fprintf(stderr, "Could not initialize stream!\n");
+    return 0;
+  }
+  
+  pic_list = picture_list_init(MAX_REF_PIC_COUNT);
+  if(!pic_list) {
+    fprintf(stderr, "Failed to allocate the picture list!\n");
+    return 0;
+  }
+  
+  encoder_state->ref = pic_list;
+  encoder_state->ref_list = REF_PIC_LIST_0;
+  
+  encoder_state->frame = 0;
+  encoder_state->poc = 0;
+  
+  // Allocate the picture and CU array
+  encoder_state->cur_pic = picture_init(encoder->in.width, encoder->in.height,
+                                encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+
+  if (!encoder_state->cur_pic) {
+    printf("Error allocating picture!\r\n");
+    return 0;
+  }
+  
+  // Init coeff data table
+  encoder_state->cur_pic->coeff_y = MALLOC(coefficient, encoder->in.width * encoder->in.height);
+  encoder_state->cur_pic->coeff_u = MALLOC(coefficient, (encoder->in.width * encoder->in.height) >> 2);
+  encoder_state->cur_pic->coeff_v = MALLOC(coefficient, (encoder->in.width * encoder->in.height) >> 2);
+
+  // Init predicted data table
+  encoder_state->cur_pic->pred_y = MALLOC(pixel, encoder->in.width * encoder->in.height);
+  encoder_state->cur_pic->pred_u = MALLOC(pixel, (encoder->in.width * encoder->in.height) >> 2);
+  encoder_state->cur_pic->pred_v = MALLOC(pixel, (encoder->in.width * encoder->in.height) >> 2);
+  
+  encoder_state->children = NULL;
+  
+  encoder_state->stream.file.output = encoder->out.file;
+  
+  // Set CABAC output bitstream
+  encoder_state->cabac.stream = &encoder_state->stream;
+  
+  return 1;
+}
+
+int encoder_state_finalize(encoder_state * const encoder_state) {
+  picture_destroy(encoder_state->cur_pic);
+  FREE_POINTER(encoder_state->cur_pic);
+  
+  picture_list_destroy(encoder_state->ref);
+  bitstream_finalize(&encoder_state->stream);
+  return 1;
+}
+
+void encoder_control_input_init(encoder_control * const encoder, FILE *inputfile,
                         const int32_t width, const int32_t height)
 {
-  int32_t i_width = width; /*!< \brief input picture width (divisible by the minimum block size)*/
-  int32_t i_height = height; /*!< \brief input picture height (divisible by the minimum block size) */
-  int32_t i_width_in_lcu; /*!< \brief input picture width in LCU*/
-  int32_t i_height_in_lcu;  /*!< \brief input picture height in LCU */
-  input->file = inputfile;
-  i_width = width;
-  i_height = height;
-  input->real_width = width;
-  input->real_height = height;
+  encoder->in.file = inputfile;
+  encoder->in.width = width;
+  encoder->in.height = height;
+  encoder->in.real_width = width;
+  encoder->in.real_height = height;
 
   // If input dimensions are not divisible by the smallest block size, add
   // pixels to the dimensions, so that they are. These extra pixels will be
   // compressed along with the real ones but they will be cropped out before
   // rendering.
-  if (i_width % CU_MIN_SIZE_PIXELS) {
-    i_width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
+  if (encoder->in.width % CU_MIN_SIZE_PIXELS) {
+    encoder->in.width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
   }
 
-  if (i_height % CU_MIN_SIZE_PIXELS) {
-    i_height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
+  if (encoder->in.height % CU_MIN_SIZE_PIXELS) {
+    encoder->in.height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
   }
 
-  i_height_in_lcu = i_height / LCU_WIDTH;
-  i_width_in_lcu  = i_width / LCU_WIDTH;
+  encoder->in.height_in_lcu = encoder->in.height / LCU_WIDTH;
+  encoder->in.width_in_lcu  = encoder->in.width / LCU_WIDTH;
 
   // Add one extra LCU when image not divisible by LCU_WIDTH
-  if (i_height_in_lcu * LCU_WIDTH < height) {
-    i_height_in_lcu++;
+  if (encoder->in.height_in_lcu * LCU_WIDTH < height) {
+    encoder->in.height_in_lcu++;
   }
 
-  if (i_width_in_lcu * LCU_WIDTH < width) {
-    i_width_in_lcu++;
+  if (encoder->in.width_in_lcu * LCU_WIDTH < width) {
+    encoder->in.width_in_lcu++;
   }
 
-  // Allocate the picture and CU array
-  input->cur_pic = picture_init(i_width, i_height,
-                                i_width_in_lcu,
-                                i_height_in_lcu);
 
-  if (!input->cur_pic) {
-    printf("Error allocating picture!\r\n");
-    exit(1);
-  }
 
   #ifdef _DEBUG
   if (width != i_width || height != i_height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
-    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, i_width, height,
-           i_height);
+    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, encoder->in.width, height,
+           encoder->in.height);
   }
   #endif
-  
-  // Init coeff data table
-  input->cur_pic->coeff_y = MALLOC(coefficient, i_width * i_height);
-  input->cur_pic->coeff_u = MALLOC(coefficient, (i_width * i_height) >> 2);
-  input->cur_pic->coeff_v = MALLOC(coefficient, (i_width * i_height) >> 2);
-
-  // Init predicted data table
-  input->cur_pic->pred_y = MALLOC(pixel, i_width * i_height);
-  input->cur_pic->pred_u = MALLOC(pixel, (i_width * i_height) >> 2);
-  input->cur_pic->pred_v = MALLOC(pixel, (i_width * i_height) >> 2);
 }
 
-static void write_aud(encoder_control * const encoder)
+static void write_aud(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
-  encode_access_unit_delimiter(encoder);
+  bitstream * const stream = &encoder_state->stream;
+  encode_access_unit_delimiter(encoder_state);
   nal_write(stream, AUD_NUT, 0, 1);
   bitstream_align(stream);
 }
 
-void encode_one_frame(encoder_control* encoder)
+void encode_one_frame(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
-  picture * const cur_pic = encoder->in.cur_pic;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  bitstream * const stream = &encoder_state->stream;
   
-  yuv_t *hor_buf = alloc_yuv_t(cur_pic->width);
+  yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
   yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
 
-  const int is_first_frame = (encoder->frame == 0);
-  const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder->frame % 2 == 0);
-  const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder->frame % encoder->cfg->intra_period) == 0);
+  const int is_first_frame = (encoder_state->frame == 0);
+  const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder_state->frame % 2 == 0);
+  const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder_state->frame % encoder->cfg->intra_period) == 0);
   const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
-
-  
-
-  cabac_data cabac;
 
 
   /** IDR picture when: period == 0 and frame == 0
@@ -259,48 +258,48 @@ void encode_one_frame(encoder_control* encoder)
    **/
   if (is_radl_frame) {
     // Clear the reference list
-    while (encoder->ref->used_size) {
-      picture_list_rem(encoder->ref, encoder->ref->used_size - 1, 1);
+    while (encoder_state->ref->used_size) {
+      picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1, 1);
     }
 
-    encoder->poc = 0;
+    encoder_state->poc = 0;
 
-    cur_pic->slicetype = SLICE_I;
-    cur_pic->type = NAL_IDR_W_RADL;
+    encoder_state->cur_pic->slicetype = SLICE_I;
+    encoder_state->cur_pic->type = NAL_IDR_W_RADL;
 
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
-      write_aud(encoder);
+      write_aud(encoder_state);
 
     // Video Parameter Set (VPS)
     nal_write(stream, NAL_VPS_NUT, 0, 1);
-    encode_vid_parameter_set(encoder);
+    encode_vid_parameter_set(encoder_state);
     bitstream_align(stream);
 
     // Sequence Parameter Set (SPS)
     nal_write(stream, NAL_SPS_NUT, 0, 1);
-    encode_seq_parameter_set(encoder);
+    encode_seq_parameter_set(encoder_state);
     bitstream_align(stream);
 
     // Picture Parameter Set (PPS)
     nal_write(stream, NAL_PPS_NUT, 0, 1);
-    encode_pic_parameter_set(encoder);
+    encode_pic_parameter_set(encoder_state);
     bitstream_align(stream);
 
-    if (encoder->frame == 0) {
+    if (encoder_state->frame == 0) {
       // Prefix SEI
       nal_write(stream, PREFIX_SEI_NUT, 0, 0);
-      encode_prefix_sei_version(encoder);
+      encode_prefix_sei_version(encoder_state);
       bitstream_align(stream);
     }
   } else {
     // When intra period == 1, all pictures are intra
-    cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
-    cur_pic->type = NAL_TRAIL_R;
+    encoder_state->cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+    encoder_state->cur_pic->type = NAL_TRAIL_R;
 
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
-      write_aud(encoder);
+      write_aud(encoder_state);
   }
 
   {
@@ -312,18 +311,16 @@ void encode_one_frame(encoder_control* encoder)
               is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
 
-  // Set CABAC output bitstream
-  cabac.stream = stream;
-
-  cabac_start(&cabac);
-  init_contexts(&cabac, encoder->QP, cur_pic->slicetype);
-  encode_slice_header(encoder);
+  cabac_start(&encoder_state->cabac);
+  init_contexts(&encoder_state->cabac, encoder_state->QP, encoder_state->cur_pic->slicetype);
+  encode_slice_header(encoder_state);
   bitstream_align(stream);
 
   // Initialize lambda value(s) to use in search
-  init_lambda(encoder);
+  encoder_state_init_lambda(encoder_state);
 
   {
+    picture* const cur_pic = encoder_state->cur_pic;
     vector2d lcu;
     const vector2d size = { cur_pic->width, cur_pic->height };
     const vector2d size_lcu = { cur_pic->width_in_lcu, cur_pic->height_in_lcu };
@@ -339,7 +336,7 @@ void encode_one_frame(encoder_control* encoder)
         const int right = px.x + lcu_dim.x;
         const int bottom = px.y + lcu_dim.y;
 
-        search_lcu(encoder, &cabac, px.x, px.y, hor_buf, ver_buf);
+        search_lcu(encoder_state, &encoder_state->cabac, px.x, px.y, hor_buf, ver_buf);
 
         // Take the bottom right pixel from the LCU above and put it as the
         // first pixel in this LCUs rightmost pixels.
@@ -371,7 +368,7 @@ void encode_one_frame(encoder_control* encoder)
                             1, lcu_dim.y / 2, size.x / 2, 1);
 
         if (encoder->deblock_enable) {
-          filter_deblock_lcu(encoder, px.x, px.y);
+          filter_deblock_lcu(encoder_state, px.x, px.y);
         }
 
         if (encoder->sao_enable) {
@@ -384,43 +381,43 @@ void encode_one_frame(encoder_control* encoder)
           {
             sao_info *sao_top = lcu. y != 0 ? &cur_pic->sao_luma[(lcu.y - 1) * stride + lcu.x] : NULL;
             sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_luma[lcu.y * stride + lcu.x -1] : NULL;
-            sao_search_luma(encoder, cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
+            sao_search_luma(encoder_state, cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
           }
 
           {
             sao_info *sao_top = lcu.y != 0 ? &cur_pic->sao_chroma[(lcu.y - 1) * stride + lcu.x] : NULL;
             sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_chroma[lcu.y * stride + lcu.x - 1] : NULL;
-            sao_search_chroma(encoder, cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
+            sao_search_chroma(encoder_state, cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
           }
 
           // Merge only if both luma and chroma can be merged
           sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
           sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
 
-          encode_sao(encoder, &cabac, lcu.x, lcu.y, sao_luma, sao_chroma);
+          encode_sao(encoder_state, &encoder_state->cabac, lcu.x, lcu.y, sao_luma, sao_chroma);
         }
-
-        encode_coding_tree(encoder, &cabac, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+        
+        encode_coding_tree(encoder_state, &encoder_state->cabac, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
 
         {
           const int last_lcu = (lcu.x == size_lcu.x - 1 && lcu.y == size_lcu.y - 1);
-          cabac_encode_bin_trm(&cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
+          cabac_encode_bin_trm(&encoder_state->cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
         }
       }
     }
   }
 
-  cabac_flush(&cabac);
+  cabac_flush(&encoder_state->cabac);
   bitstream_align(stream);
 
   if (encoder->sao_enable) {
-    sao_reconstruct_frame(encoder);
+    sao_reconstruct_frame(encoder_state);
   }
 
   // Calculate checksum
-  add_checksum(encoder);
+  add_checksum(encoder_state);
 
-  cur_pic->poc = encoder->poc;
+  encoder_state->cur_pic->poc = encoder_state->poc;
 
   dealloc_yuv_t(hor_buf);
   dealloc_yuv_t(ver_buf);
@@ -465,43 +462,42 @@ static int read_and_fill_frame_data(FILE *file,
   return 1;
 }
 
-int read_one_frame(FILE* file, const encoder_control * const encoder)
+int read_one_frame(FILE* file, const encoder_state * const encoder_state)
 {
-  const encoder_input* const in = &encoder->in;
-  unsigned width = in->real_width;
-  unsigned height = in->real_height;
-  unsigned array_width = in->cur_pic->width;
-  unsigned array_height = in->cur_pic->height;
+  unsigned width = encoder_state->encoder_control->in.real_width;
+  unsigned height = encoder_state->encoder_control->in.real_height;
+  unsigned array_width = encoder_state->cur_pic->width;
+  unsigned array_height = encoder_state->cur_pic->height;
 
   if (width != array_width) {
     // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
     if (!read_and_fill_frame_data(file, width, height, array_width,
-                                  in->cur_pic->y_data) ||
+                                  encoder_state->cur_pic->y_data) ||
         !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  in->cur_pic->u_data) ||
+                                  encoder_state->cur_pic->u_data) ||
         !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  in->cur_pic->v_data))
+                                  encoder_state->cur_pic->v_data))
       return 0;
   } else {
     // Otherwise the data can be read directly to the array.
     unsigned y_size = width * height;
     unsigned uv_size = (width >> 1) * (height >> 1);
-    if (y_size  != fread(in->cur_pic->y_data, sizeof(unsigned char),
+    if (y_size  != fread(encoder_state->cur_pic->y_data, sizeof(unsigned char),
                          y_size, file) ||
-        uv_size != fread(in->cur_pic->u_data, sizeof(unsigned char),
+        uv_size != fread(encoder_state->cur_pic->u_data, sizeof(unsigned char),
                          uv_size, file) ||
-        uv_size != fread(in->cur_pic->v_data, sizeof(unsigned char),
+        uv_size != fread(encoder_state->cur_pic->v_data, sizeof(unsigned char),
                          uv_size, file))
       return 0;
   }
 
   if (height != array_height) {
     fill_after_frame(height, array_width, array_height,
-                     in->cur_pic->y_data);
+                     encoder_state->cur_pic->y_data);
     fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     in->cur_pic->u_data);
+                     encoder_state->cur_pic->u_data);
     fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     in->cur_pic->v_data);
+                     encoder_state->cur_pic->v_data);
   }
   return 1;
 }
@@ -511,10 +507,10 @@ int read_one_frame(FILE* file, const encoder_control * const encoder)
  * \param encoder The encoder.
  * \returns Void
  */
-static void add_checksum(encoder_control * const encoder)
+static void add_checksum(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
-  const picture * const cur_pic = encoder->in.cur_pic;
+  bitstream * const stream = &encoder_state->stream;
+  const picture * const cur_pic = encoder_state->cur_pic;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
   unsigned int i;
@@ -538,24 +534,24 @@ static void add_checksum(encoder_control * const encoder)
   bitstream_align(stream);
 }
 
-void encode_access_unit_delimiter(encoder_control * const encoder)
+void encode_access_unit_delimiter(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
-  const picture * const cur_pic = encoder->in.cur_pic;
+  bitstream * const stream = &encoder_state->stream;
+  const picture * const cur_pic = encoder_state->cur_pic;
   uint8_t pic_type = cur_pic->slicetype == SLICE_I ? 0
                    : cur_pic->slicetype == SLICE_P ? 1
                    :                                             2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 }
 
-void encode_prefix_sei_version(encoder_control * const encoder)
+void encode_prefix_sei_version(encoder_state * const encoder_state)
 {
 #define STR_BUF_LEN 1000
-  bitstream * const stream = &encoder->stream;
+  bitstream * const stream = &encoder_state->stream;
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  const config *cfg = encoder->cfg;
+  const config * const cfg = encoder_state->encoder_control->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
@@ -595,9 +591,9 @@ void encode_prefix_sei_version(encoder_control * const encoder)
 #undef STR_BUF_LEN
 }
 
-void encode_pic_parameter_set(encoder_control * const encoder)
+void encode_pic_parameter_set(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
+  bitstream * const stream = &encoder_state->stream;
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
@@ -611,9 +607,9 @@ void encode_pic_parameter_set(encoder_control * const encoder)
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
-  WRITE_SE(stream, ((int8_t)encoder->QP)-26, "pic_init_qp_minus26");
+  WRITE_SE(stream, ((int8_t)encoder_state->QP)-26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
+  WRITE_U(stream, encoder_state->encoder_control->trskip_enable, 1, "transform_skip_enabled_flag");
   WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
@@ -636,13 +632,13 @@ void encode_pic_parameter_set(encoder_control * const encoder)
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
   //IF deblocking_filter
     WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
-  WRITE_U(stream, encoder->deblock_enable ? 0 : 1, 1,
+  WRITE_U(stream, encoder_state->encoder_control->deblock_enable ? 0 : 1, 1,
           "pps_disable_deblocking_filter_flag");
 
     //IF !disabled
-  if (encoder->deblock_enable) {
-     WRITE_SE(stream, encoder->beta_offset_div2, "beta_offset_div2");
-     WRITE_SE(stream, encoder->tc_offset_div2, "tc_offset_div2");
+  if (encoder_state->encoder_control->deblock_enable) {
+     WRITE_SE(stream, encoder_state->encoder_control->beta_offset_div2, "beta_offset_div2");
+     WRITE_SE(stream, encoder_state->encoder_control->tc_offset_div2, "tc_offset_div2");
     }
 
     //ENDIF
@@ -656,9 +652,9 @@ void encode_pic_parameter_set(encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "pps_extension_flag");
 }
 
-static void encode_PTL(encoder_control * const encoder)
+static void encode_PTL(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
+  bitstream * const stream = &encoder_state->stream;
   int i;
   // PTL
   // Profile Tier
@@ -696,9 +692,10 @@ static void encode_PTL(encoder_control * const encoder)
   // end PTL
 }
 
-static void encode_scaling_list(encoder_control * const encoder)
+static void encode_scaling_list(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  bitstream * const stream = &encoder_state->stream;
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
@@ -752,11 +749,10 @@ static void encode_scaling_list(encoder_control * const encoder)
   }
 }
 
-void encode_seq_parameter_set(encoder_control * const encoder)
+void encode_seq_parameter_set(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
-  const picture * const cur_pic = encoder->in.cur_pic;
-  const encoder_input* const in = &encoder->in;
+  bitstream * const stream = &encoder_state->stream;
+  const picture * const cur_pic = encoder_state->cur_pic;
 
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
@@ -767,20 +763,20 @@ void encode_seq_parameter_set(encoder_control * const encoder)
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
 
-  encode_PTL(encoder);
+  encode_PTL(encoder_state);
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, encoder->in.video_format,
+  WRITE_UE(stream, encoder_state->encoder_control->in.video_format,
            "chroma_format_idc");
 
-  if (encoder->in.video_format == 3) {
+  if (encoder_state->encoder_control->in.video_format == 3) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
   WRITE_UE(stream, cur_pic->width, "pic_width_in_luma_samples");
   WRITE_UE(stream, cur_pic->height, "pic_height_in_luma_samples");
 
-  if (cur_pic->width != in->real_width || cur_pic->height != in->real_height) {
+  if (cur_pic->width != encoder_state->encoder_control->in.real_width || cur_pic->height != encoder_state->encoder_control->in.real_height) {
     // The standard does not seem to allow setting conf_win values such that
     // the number of luma samples is not a multiple of 2. Options are to either
     // hide one line or show an extra line of non-video. Neither seems like a
@@ -788,10 +784,10 @@ void encode_seq_parameter_set(encoder_control * const encoder)
     assert(!(cur_pic->width % 2));
     WRITE_U(stream, 1, 1, "conformance_window_flag");
     WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (cur_pic->width - in->real_width) >> 1,
+    WRITE_UE(stream, (cur_pic->width - encoder_state->encoder_control->in.real_width) >> 1,
              "conf_win_right_offset");
     WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (cur_pic->height - in->real_height) >> 1,
+    WRITE_UE(stream, (cur_pic->height - encoder_state->encoder_control->in.real_height) >> 1,
              "conf_win_bottom_offset");
   } else {
     WRITE_U(stream, 0, 1, "conformance_window_flag");
@@ -800,8 +796,8 @@ void encode_seq_parameter_set(encoder_control * const encoder)
   //IF window flag
   //END IF
 
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
+  WRITE_UE(stream, encoder_state->encoder_control->bitdepth-8, "bit_depth_luma_minus8");
+  WRITE_UE(stream, encoder_state->encoder_control->bitdepth-8, "bit_depth_chroma_minus8");
   WRITE_UE(stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
@@ -819,14 +815,14 @@ void encode_seq_parameter_set(encoder_control * const encoder)
   WRITE_UE(stream, TR_DEPTH_INTRA, "max_transform_hierarchy_depth_intra");
 
   // scaling list
-  WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
-  if (encoder->scaling_list.enable) {
+  WRITE_U(stream, encoder_state->encoder_control->scaling_list.enable, 1, "scaling_list_enable_flag");
+  if (encoder_state->encoder_control->scaling_list.enable) {
     WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
-    encode_scaling_list(encoder);
+    encode_scaling_list(encoder_state);
   }
 
   WRITE_U(stream, 0, 1, "amp_enabled_flag");
-  WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
+  WRITE_U(stream, encoder_state->encoder_control->sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
@@ -852,14 +848,14 @@ void encode_seq_parameter_set(encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
-  encode_VUI(encoder);
+  encode_VUI(encoder_state);
 
   WRITE_U(stream, 0, 1, "sps_extension_flag");
 }
 
-void encode_vid_parameter_set(encoder_control * const encoder)
+void encode_vid_parameter_set(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
+  bitstream * const stream = &encoder_state->stream;
   int i;
 #ifdef _DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
@@ -872,7 +868,7 @@ void encode_vid_parameter_set(encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
-  encode_PTL(encoder);
+  encode_PTL(encoder_state);
 
   WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
@@ -893,9 +889,10 @@ void encode_vid_parameter_set(encoder_control * const encoder)
   WRITE_U(stream, 0, 1, "vps_extension_flag");
 }
 
-static void encode_VUI(encoder_control * const encoder)
+static void encode_VUI(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
+  bitstream * const stream = &encoder_state->stream;
+  const encoder_control * const encoder = encoder_state->encoder_control;
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
@@ -993,10 +990,11 @@ static void encode_VUI(encoder_control * const encoder)
   //ENDIF
 }
 
-void encode_slice_header(encoder_control * const encoder)
+void encode_slice_header(encoder_state * const encoder_state)
 {
-  bitstream * const stream = &encoder->stream;
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  bitstream * const stream = &encoder_state->stream;
+  const picture * const cur_pic = encoder_state->cur_pic;
 
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
@@ -1024,9 +1022,9 @@ void encode_slice_header(encoder_control * const encoder)
   if (cur_pic->type != NAL_IDR_W_RADL
       && cur_pic->type != NAL_IDR_N_LP) {
       int j;
-      int ref_negative = encoder->ref->used_size;
+      int ref_negative = encoder_state->ref->used_size;
       int ref_positive = 0;
-      WRITE_U(stream, encoder->poc&0xf, 4, "pic_order_cnt_lsb");
+      WRITE_U(stream, encoder_state->poc&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
@@ -1049,7 +1047,7 @@ void encode_slice_header(encoder_control * const encoder)
 
   if (cur_pic->slicetype != SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
-        WRITE_UE(stream, encoder->ref->used_size-1, "num_ref_idx_l0_active_minus1");
+        WRITE_UE(stream, encoder_state->ref->used_size-1, "num_ref_idx_l0_active_minus1");
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
@@ -1064,10 +1062,10 @@ void encode_slice_header(encoder_control * const encoder)
 }
 
 
-static void encode_sao_color(const encoder_control * const encoder, cabac_data *cabac, sao_info *sao,
+static void encode_sao_color(const encoder_state * const encoder_state, cabac_data *cabac, sao_info *sao,
                              color_index color_i)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   sao_eo_cat i;
 
   // Skip colors with no SAO.
@@ -1131,7 +1129,7 @@ static void encode_sao_merge_flags(sao_info *sao, cabac_data *cabac,
 /**
  * \brief Encode SAO information.
  */
-static void encode_sao(encoder_control * const encoder,
+static void encode_sao(encoder_state * const encoder_state,
                        cabac_data *cabac,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma)
@@ -1141,17 +1139,17 @@ static void encode_sao(encoder_control * const encoder,
 
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
-    encode_sao_color(encoder, cabac, sao_luma, COLOR_Y);
-    encode_sao_color(encoder, cabac, sao_chroma, COLOR_U);
-    encode_sao_color(encoder, cabac, sao_chroma, COLOR_V);
+    encode_sao_color(encoder_state, cabac, sao_luma, COLOR_Y);
+    encode_sao_color(encoder_state, cabac, sao_chroma, COLOR_U);
+    encode_sao_color(encoder_state, cabac, sao_chroma, COLOR_V);
   }
 }
 
 
-void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac,
+void encode_coding_tree(encoder_state * const encoder_state, cabac_data *cabac,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
@@ -1184,17 +1182,17 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
-      encode_coding_tree(encoder, cabac, x_ctb, y_ctb, depth + 1); // x,y
+      encode_coding_tree(encoder_state, cabac, x_ctb, y_ctb, depth + 1); // x,y
 
       // TODO: fix when other half of the block would not be completely over the border
       if (!border_x || border_split_x) {
-        encode_coding_tree(encoder, cabac, x_ctb + change, y_ctb, depth + 1);
+        encode_coding_tree(encoder_state, cabac, x_ctb + change, y_ctb, depth + 1);
       }
       if (!border_y || border_split_y) {
-        encode_coding_tree(encoder, cabac, x_ctb, y_ctb + change, depth + 1);
+        encode_coding_tree(encoder_state, cabac, x_ctb, y_ctb + change, depth + 1);
       }
       if (!border || (border_split_x && border_split_y)) {
-        encode_coding_tree(encoder, cabac, x_ctb + change, y_ctb + change, depth + 1);
+        encode_coding_tree(encoder_state, cabac, x_ctb + change, y_ctb + change, depth + 1);
       }
       return;
     }
@@ -1307,10 +1305,10 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
       */
 
       for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
-            //if(encoder->ref_idx_num[uiRefListIdx] > 0)
+            //if(encoder_state->ref_idx_num[uiRefListIdx] > 0)
             {
           if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-            if (encoder->ref->used_size != 1) { //encoder->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
+            if (encoder_state->ref->used_size != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
               // parseRefFrmIdx
               int32_t ref_frame = cur_cu->inter.mv_ref;
 
@@ -1319,7 +1317,7 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
 
               if (ref_frame > 0) {
                 int32_t i;
-                int32_t ref_num = encoder->ref->used_size - 2;
+                int32_t ref_num = encoder_state->ref->used_size - 2;
 
                 cabac->ctx = &(cabac->ctx_cu_ref_pic_model[1]);
                 ref_frame--;
@@ -1337,7 +1335,7 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
               }
             }
 
-            if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
+            if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder_state->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
               const int32_t mvd_hor = cur_cu->inter.mvd[0];
               const int32_t mvd_ver = cur_cu->inter.mvd[1];
               const int8_t hor_abs_gr0 = mvd_hor != 0;
@@ -1394,7 +1392,7 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
     // Code (possible) coeffs to bitstream
 
     if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
-      encode_transform_coeff(encoder, cabac, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+      encode_transform_coeff(encoder_state, cabac, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
     }
 
 
@@ -1516,7 +1514,7 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
       }
     }  // end intra chroma pred mode coding
 
-    encode_transform_coeff(encoder, cabac, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+    encode_transform_coeff(encoder_state, cabac, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
   }
 
     #if ENABLE_PCM == 1
@@ -1567,11 +1565,12 @@ void encode_coding_tree(const encoder_control * const encoder, cabac_data *cabac
   /* end coding_unit */
 }
 
-static void transform_chroma(const encoder_control * const encoder, cabac_data *cabac, cu_info *cur_cu,
+static void transform_chroma(encoder_state * const encoder_state, cabac_data *cabac, cu_info *cur_cu,
                              int depth, pixel *base_u, pixel *pred_u,
                              coefficient *coeff_u, int8_t scan_idx_chroma,
                              coefficient *pre_quant_coeff, coefficient *block)
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
   int base_stride = LCU_WIDTH;
   int pred_stride = LCU_WIDTH;
 
@@ -1592,15 +1591,15 @@ static void transform_chroma(const encoder_control * const encoder, cabac_data *
 
   transform2d(encoder, block, pre_quant_coeff, width_c, 65535);
   if (encoder->rdoq_enable) {
-    rdoq(encoder, cabac, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+    rdoq(encoder_state, cabac, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
          scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
   } else {
-    quant(encoder, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+    quant(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
           scan_idx_chroma, cur_cu->type);
   }
 }
 
-static void reconstruct_chroma(const encoder_control * const encoder, cu_info *cur_cu,
+static void reconstruct_chroma(const encoder_state * const encoder_state, cu_info *cur_cu,
                                int depth, int has_coeffs, coefficient *coeff_u,
                                pixel *recbase_u, pixel *pred_u, int color_type,
                                coefficient *pre_quant_coeff, coefficient *block)
@@ -1613,8 +1612,8 @@ static void reconstruct_chroma(const encoder_control * const encoder, cu_info *c
 
   if (has_coeffs) {
     // RECONSTRUCT for predictions
-    dequant(encoder, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
-    itransform2d(encoder, block, pre_quant_coeff, width_c, 65535);
+    dequant(encoder_state, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
+    itransform2d(encoder_state->encoder_control, block, pre_quant_coeff, width_c, 65535);
 
     i = 0;
 
@@ -1637,8 +1636,9 @@ static void reconstruct_chroma(const encoder_control * const encoder, cu_info *c
   }
 }
 
-void encode_transform_tree(const encoder_control * const encoder, cabac_data* cabac, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
+void encode_transform_tree(encoder_state * const encoder_state, cabac_data* cabac, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
+  const encoder_control * const encoder = encoder_state->encoder_control;
   // we have 64>>depth transform size
   int x_local = (x&0x3f), y_local = (y&0x3f);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
@@ -1654,10 +1654,10 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width_c;
-    encode_transform_tree(encoder, cabac, x,          y,          depth+1, lcu);
-    encode_transform_tree(encoder, cabac, x + offset, y,          depth+1, lcu);
-    encode_transform_tree(encoder, cabac, x,          y + offset, depth+1, lcu);
-    encode_transform_tree(encoder, cabac, x + offset, y + offset, depth+1, lcu);
+    encode_transform_tree(encoder_state, cabac, x,          y,          depth+1, lcu);
+    encode_transform_tree(encoder_state, cabac, x + offset, y,          depth+1, lcu);
+    encode_transform_tree(encoder_state, cabac, x,          y + offset, depth+1, lcu);
+    encode_transform_tree(encoder_state, cabac, x + offset, y + offset, depth+1, lcu);
 
     // Derive coded coeff flags from the next depth
     if (depth == MAX_DEPTH) {
@@ -1796,20 +1796,20 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
       // Test for transform skip
       transformskip(encoder, block,pre_quant_coeff,width);
       if (encoder->rdoq_enable) {
-        rdoq(encoder, cabac, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+        rdoq(encoder_state, cabac, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
       } else {
-        quant(encoder, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+        quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
       }
-      dequant(encoder, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
+      dequant(encoder_state, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
       itransformskip(encoder, temp_block,pre_quant_coeff,width);
 
       transform2d(encoder, block,pre_quant_coeff,width,0);
       if (encoder->rdoq_enable) {
-        rdoq(encoder, cabac, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+        rdoq(encoder_state, cabac, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
       } else {
-        quant(encoder, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+        quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
       }
-      dequant(encoder, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
+      dequant(encoder_state, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
       itransform2d(encoder, temp_block2,pre_quant_coeff,width,0);
 
       // SSD between original and reconstructed
@@ -1828,15 +1828,15 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
           coeffcost += abs((int)temp_coeff[i]);
           coeffcost2 += abs((int)temp_coeff2[i]);
         }
-        cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder->cur_lambda_cost+0.5);
-        cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder->cur_lambda_cost+0.5);
+        cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->cur_lambda_cost+0.5);
+        cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder_state->cur_lambda_cost+0.5);
         // Full RDO
       } else if(encoder->rdo == 2) {
         coeffcost = get_coeff_cost(encoder, cabac, temp_coeff, 4, 0, scan_idx_luma);
         coeffcost2 = get_coeff_cost(encoder, cabac, temp_coeff2, 4, 0, scan_idx_luma);
 
-        cost  += coeffcost*((int)encoder->cur_lambda_cost+0.5);
-        cost2 += coeffcost2*((int)encoder->cur_lambda_cost+0.5);
+        cost  += coeffcost*((int)encoder_state->cur_lambda_cost+0.5);
+        cost2 += coeffcost2*((int)encoder_state->cur_lambda_cost+0.5);
       }
 
       cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
@@ -1850,10 +1850,10 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
     }
 
     if (encoder->rdoq_enable) {
-      rdoq(encoder, cabac, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
+      rdoq(encoder_state, cabac, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
            scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
     } else {
-      quant(encoder, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+      quant(encoder_state, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
     }
 
     // Check for non-zero coeffs
@@ -1891,7 +1891,7 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
         }
       }
 
-      dequant(encoder, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
+      dequant(encoder_state, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
       if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
         itransformskip(encoder, block,pre_quant_coeff,width);
       } else {
@@ -1934,7 +1934,7 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
         }
       }
 
-      transform_chroma(encoder, cabac, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
+      transform_chroma(encoder_state, cabac, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
           int d;
@@ -1944,7 +1944,7 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
           break;
         }
       }
-      transform_chroma(encoder, cabac, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
+      transform_chroma(encoder_state, cabac, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
           int d;
@@ -1967,11 +1967,11 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
         }
       }
 
-      reconstruct_chroma(encoder, cur_cu, chroma_depth,
+      reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
                          cur_cu->coeff_top_u[depth],
                          coeff_u, recbase_u, pred_u, color_type_u,
                          pre_quant_coeff, block);
-      reconstruct_chroma(encoder, cur_cu, chroma_depth,
+      reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
                          cur_cu->coeff_top_v[depth],
                          coeff_v, recbase_v, pred_v, color_type_v,
                          pre_quant_coeff, block);
@@ -1983,10 +1983,11 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
   // end Residual Coding
 }
 
-static void encode_transform_unit(const encoder_control * const encoder, cabac_data *cabac,
+static void encode_transform_unit(encoder_state * const encoder_state, cabac_data *cabac,
                                   int x_pu, int y_pu, int depth, int tr_depth)
 {
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const picture * const cur_pic = encoder_state->cur_pic;
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
@@ -2134,12 +2135,12 @@ static void encode_transform_unit(const encoder_control * const encoder, cabac_d
  * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
-void encode_transform_coeff(const encoder_control * const encoder, cabac_data *cabac, int32_t x_pu,int32_t y_pu,
+void encode_transform_coeff(encoder_state * const encoder_state, cabac_data *cabac, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
-  const picture * const cur_pic = encoder->in.cur_pic;
+  const picture * const cur_pic = encoder_state->cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_cu + y_cu * (cur_pic->width_in_lcu << MAX_DEPTH)];
 
   // NxN signifies implicit transform split at the first transform level.
@@ -2193,10 +2194,10 @@ void encode_transform_coeff(const encoder_control * const encoder, cabac_data *c
 
   if (split) {
     uint8_t pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
-    encode_transform_coeff(encoder, cabac, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder, cabac, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder, cabac, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder, cabac, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, cabac, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, cabac, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, cabac, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(encoder_state, cabac, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 
@@ -2211,7 +2212,7 @@ void encode_transform_coeff(const encoder_control * const encoder, cabac_data *c
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
-    encode_transform_unit(encoder, cabac, x_pu, y_pu, depth, tr_depth);
+    encode_transform_unit(encoder_state, cabac, x_pu, y_pu, depth, tr_depth);
   }
 }
 
