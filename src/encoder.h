@@ -154,8 +154,6 @@ int encoder_state_init(encoder_state *encoder_state, const encoder_control * enc
 int encoder_state_finalize(encoder_state *encoder_state);
 void encoder_state_init_lambda(encoder_state *encoder_state);
 
-void init_encoder_input(encoder_control *encoder, FILE* inputfile,
-                        int32_t width, int32_t height);
 void encode_one_frame(encoder_state *encoder_state);
 int read_one_frame(FILE* file, const encoder_state *encoder);
 
