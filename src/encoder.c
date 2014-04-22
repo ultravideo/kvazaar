@@ -393,7 +393,7 @@ void encoder_control_input_init(encoder_control * const encoder,
 
 
   #ifdef _DEBUG
-  if (width != i_width || height != i_height) {
+  if (width != encoder->in.width || height != encoder->in.height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
     printf("  Width = %d (%d), Height = %d (%d)\r\n", width, encoder->in.width, height,
            encoder->in.height);
