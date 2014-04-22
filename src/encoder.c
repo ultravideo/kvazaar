@@ -249,7 +249,25 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     
     encoder->tiles_tile_id = tiles_tile_id;
 
-
+#ifdef _DEBUG
+    printf("Tiles columns width:");
+    for (i=0; i < encoder->tiles_num_tile_columns; ++i) {
+      printf(" %d", encoder->tiles_col_width[i]);
+    }
+    printf("\n");
+    printf("Tiles row height:");
+    for (i=0; i < encoder->tiles_num_tile_rows; ++i) {
+      printf(" %d", encoder->tiles_row_height[i]);
+    }
+    printf("\n");
+    //Print tile index map
+    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
+      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
+        printf("%2d ", encoder->tiles_tile_id[encoder->tiles_ctb_addr_rs_to_ts[y * encoder->in.width_in_lcu + x]]);
+      }
+      printf("\n");
+    }
+#endif //_DEBUG
 
   }
   
