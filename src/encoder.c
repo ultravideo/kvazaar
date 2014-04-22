@@ -1649,7 +1649,7 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
 
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
-  assert(width == 4 || width == 8 || width == 16 || width == 32);
+  assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
@@ -1675,7 +1675,6 @@ void encode_transform_tree(const encoder_control * const encoder, cabac_data* ca
       cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1] | cu_a->coeff_top_v[depth+1] | cu_b->coeff_top_v[depth+1]
                                     | cu_c->coeff_top_v[depth+1];
     }
-
 
     return;
   }
