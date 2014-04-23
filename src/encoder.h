@@ -127,6 +127,9 @@ typedef struct
 typedef struct encoder_state {
   const encoder_control *encoder_control;
   
+  int32_t lcu_offset_x;
+  int32_t lcu_offset_y;
+  
   picture *cur_pic;
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */

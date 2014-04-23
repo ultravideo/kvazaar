@@ -298,8 +298,6 @@ int encoder_control_finalize(encoder_control * const encoder) {
 }
 
 int encoder_state_init(encoder_state * const encoder_state, const encoder_control * const encoder) {
-  picture_list    *pic_list = NULL;
-  
   encoder_state->encoder_control = encoder;
   
   // Allocate the bitstream struct
@@ -308,17 +306,19 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
     return 0;
   }
   
-  pic_list = picture_list_init(MAX_REF_PIC_COUNT);
-  if(!pic_list) {
+  encoder_state->ref = picture_list_init(MAX_REF_PIC_COUNT);
+  if(!encoder_state->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
     return 0;
   }
   
-  encoder_state->ref = pic_list;
   encoder_state->ref_list = REF_PIC_LIST_0;
   
   encoder_state->frame = 0;
   encoder_state->poc = 0;
+  
+  encoder_state->lcu_offset_x = 0;
+  encoder_state->lcu_offset_y = 0;
   
   // Allocate the picture and CU array
   encoder_state->cur_pic = picture_init(encoder->in.width, encoder->in.height,
@@ -353,28 +353,51 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
     encoder_state->children = MALLOC(struct encoder_state, encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows);
     for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
-        int tile_width = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
-        int tile_height = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
+        const int tile_width_in_lcu = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
+        const int tile_height_in_lcu = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
+        const int tile_width = tile_width_in_lcu * LCU_WIDTH;
+        const int tile_height = tile_height_in_lcu * LCU_WIDTH;
         i = y * encoder->tiles_num_tile_columns + x;
         
         encoder_state->children[i].encoder_control = encoder;
+        
+        encoder_state->children[i].lcu_offset_x = encoder->tiles_col_bd[x];
+        encoder_state->children[i].lcu_offset_y = encoder->tiles_row_bd[y];
+        
         if (!bitstream_init(&encoder_state->children[i].stream, BITSTREAM_TYPE_MEMORY)) {
           fprintf(stderr, "Could not initialize stream (subencoder)!\n");
           return 0;
         }
         
-        encoder_state->children[i].cur_pic = picture_init(tile_width * LCU_WIDTH, tile_height * LCU_WIDTH,
-                                tile_width, tile_height);
+        encoder_state->children[i].ref = picture_list_init(MAX_REF_PIC_COUNT);
+        if(!encoder_state->children[i].ref) {
+          fprintf(stderr, "Failed to allocate the picture list (subencoder)!\n");
+          return 0;
+        }
+        encoder_state->ref_list = REF_PIC_LIST_0;
+        
+        encoder_state->children[i].cur_pic = picture_init(tile_width, tile_height,
+                                tile_width_in_lcu, tile_height_in_lcu);
 
         if (!encoder_state->children[i].cur_pic) {
           printf("Error allocating picture (subencoder)!\r\n");
           return 0;
         }
         
-        //FIXME: allocate coeff_* and pred_*?
+        // Init coeff data table
+        encoder_state->children[i].cur_pic->coeff_y = MALLOC(coefficient, tile_width * tile_height);
+        encoder_state->children[i].cur_pic->coeff_u = MALLOC(coefficient, (tile_width * tile_height) >> 2);
+        encoder_state->children[i].cur_pic->coeff_v = MALLOC(coefficient, (tile_width * tile_height) >> 2);
+
+        // Init predicted data table
+        encoder_state->children[i].cur_pic->pred_y = MALLOC(pixel, tile_width * tile_height);
+        encoder_state->children[i].cur_pic->pred_u = MALLOC(pixel, (tile_width * tile_height) >> 2);
+        encoder_state->children[i].cur_pic->pred_v = MALLOC(pixel, (tile_width * tile_height) >> 2);
         
-        encoder_state->children[i].children = NULL;
-      }
+        // Set CABAC output bitstream
+        encoder_state->children[i].cabac.stream = &encoder_state->children[i].stream;
+        
+        encoder_state->children[i].children = NULL;      }
     }
   }
 #endif //USE_TILES
@@ -461,7 +484,7 @@ static void write_aud(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
-static void substream_encode(encoder_state * const encoder_state) {
+static void substream_encode(encoder_state * const encoder_state, const int last_part) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   
   yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
@@ -487,16 +510,8 @@ static void substream_encode(encoder_state * const encoder_state) {
     
     //lcu_id use raster scan if not USE_TILES, otherwise it's tile scan.
     for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
-      if (encoder->tiles_enable && USE_TILES) {
-#if USE_TILES
-        //lcu_id is the address in TS
-        lcu.x = encoder->tiles_ctb_addr_ts_to_rs[lcu_id] % encoder->in.width_in_lcu;
-        lcu.y = encoder->tiles_ctb_addr_ts_to_rs[lcu_id] / encoder->in.width_in_lcu;
-#endif //USE_TILES
-      } else {
-        lcu.x = lcu_id % encoder->in.width_in_lcu;
-        lcu.y = lcu_id / encoder->in.width_in_lcu;
-      }
+      lcu.x = lcu_id % cur_pic->width_in_lcu;
+      lcu.y = lcu_id / cur_pic->width_in_lcu;
 
       {
         const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
@@ -573,7 +588,7 @@ static void substream_encode(encoder_state * const encoder_state) {
 
         {
           const int last_lcu = (lcu_id == lcu_count - 1);
-
+/*
 #if USE_TILES
           if (USE_TILES && !last_lcu && encoder->tiles_enable && encoder->tiles_tile_id[lcu_id+1] != encoder->tiles_tile_id[lcu_id]) {
             //Terminate the current tile, and reinitialize CABAC context
@@ -585,8 +600,8 @@ static void substream_encode(encoder_state * const encoder_state) {
 #else
           if (1) {
 #endif //USE_TILES
-            cabac_encode_bin_trm(&encoder_state->cabac, last_lcu ? 1 : 0);  // end_of_slice_segment_flag
-          }
+*/
+          cabac_encode_bin_trm(&encoder_state->cabac, (last_lcu && last_part) ? 1 : 0);  // end_of_slice_segment_flag
         }
       }
     }
@@ -670,11 +685,65 @@ void encode_one_frame(encoder_state * const encoder_state)
 
   encode_slice_header(encoder_state);
   bitstream_align(&encoder_state->stream);
-  
-  substream_encode(encoder_state);
 
-  cabac_flush(&encoder_state->cabac);
-  bitstream_align(stream);
+  if (USE_TILES && encoder->tiles_enable) {
+#if USE_TILES
+    int i,x,y;
+    //This can be parallelized
+    for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+      for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+        const int tile_width_in_lcu = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
+        const int tile_height_in_lcu = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
+        const int tile_width = tile_width_in_lcu * LCU_WIDTH;
+        const int tile_height = tile_height_in_lcu * LCU_WIDTH;
+        const int tile_offset_x = encoder->tiles_col_bd[x] * LCU_WIDTH;
+        const int tile_offset_y = encoder->tiles_row_bd[y] * LCU_WIDTH;
+        const int tile_offset_full = tile_offset_x+tile_offset_y*encoder_state->cur_pic->width;
+        const int tile_offset_low = tile_offset_x/2+tile_offset_y/2*encoder_state->cur_pic->width/2;
+        i = y * encoder->tiles_num_tile_columns + x;
+        
+        //TODO: ref frames
+        
+        encoder_state->children[i].QP = encoder_state->QP;
+        
+        picture_blit_pixels(encoder_state->cur_pic->y_data + tile_offset_full, encoder_state->children[i].cur_pic->y_data, tile_width, tile_height, encoder_state->cur_pic->width, tile_width);
+        picture_blit_pixels(encoder_state->cur_pic->u_data + tile_offset_low, encoder_state->children[i].cur_pic->u_data, tile_width/2, tile_height/2, encoder_state->cur_pic->width/2, tile_width/2);
+        picture_blit_pixels(encoder_state->cur_pic->v_data + tile_offset_low, encoder_state->children[i].cur_pic->v_data, tile_width/2, tile_height/2, encoder_state->cur_pic->width/2, tile_width/2);
+        
+        encoder_state->children[i].cur_pic->slicetype = encoder_state->cur_pic->slicetype;
+        encoder_state->children[i].cur_pic->type = encoder_state->cur_pic->type;
+        
+        substream_encode(&encoder_state->children[i], x == (encoder->tiles_num_tile_columns-1) && y == (encoder->tiles_num_tile_rows-1));
+      }
+    }
+    
+    //This has to be serial
+    for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+      for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+        i = y * encoder->tiles_num_tile_columns + x;
+        
+        if (x == (encoder->tiles_num_tile_columns-1) && y == (encoder->tiles_num_tile_rows-1)) {
+          //Last tile
+          cabac_flush(&encoder_state->children[i].cabac);
+          bitstream_align(&encoder_state->children[i].stream);
+        } else {
+          //Other tiles
+          cabac_encode_bin_trm(&encoder_state->children[i].cabac, 1); // end_of_sub_stream_one_bit == 1
+          cabac_flush(&encoder_state->children[i].cabac);
+        }
+        //Append bitstream to main stream
+        bitstream_append(&encoder_state->stream, &encoder_state->children[i].stream);
+        bitstream_clear(&encoder_state->children[i].stream);
+      }
+    }
+    
+#endif //USE_TILES
+  } else {
+    //Encode the whole thing as one stream
+    substream_encode(encoder_state, 1);
+    cabac_flush(&encoder_state->cabac);
+    bitstream_align(stream);
+  }
 
   if (encoder->sao_enable) {
     sao_reconstruct_frame(encoder_state);
@@ -1450,14 +1519,17 @@ void encode_coding_tree(encoder_state * const encoder_state,
   cu_info *cur_cu = &cur_pic->cu_array[MAX_DEPTH][x_ctb + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
+  
+  //Absolute ctb
+  uint16_t abs_x_ctb = x_ctb + (encoder_state->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
+  uint16_t abs_y_ctb = y_ctb + (encoder_state->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
 
   // Check for slice border
-  uint8_t border_x = ((cur_pic->width) < (x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_y = ((cur_pic->height) < (y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_split_x = ((cur_pic->width)  < ((x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border_split_y = ((cur_pic->height) < ((y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
+  uint8_t border_x = ((encoder_state->encoder_control->in.width) < (abs_x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
+  uint8_t border_y = ((encoder_state->encoder_control->in.height) < (abs_y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
+  uint8_t border_split_x = ((encoder_state->encoder_control->in.width)  < ((abs_x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
+  uint8_t border_split_y = ((encoder_state->encoder_control->in.height) < ((abs_y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
-
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
@@ -1855,6 +1927,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
 #endif /* END ENABLE_PCM */
   else { /* Should not happend */
     printf("UNHANDLED TYPE!\r\n");
+    assert(0);
     exit(1);
   }
 
@@ -2801,3 +2874,4 @@ void encode_last_significant_xy(encoder_state * const encoder_state,
 
   // end LastSignificantXY
 }
+
