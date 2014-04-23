@@ -355,8 +355,10 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
         const int tile_width_in_lcu = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
         const int tile_height_in_lcu = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
-        const int tile_width = tile_width_in_lcu * LCU_WIDTH;
-        const int tile_height = tile_height_in_lcu * LCU_WIDTH;
+        const int tile_offset_x = encoder->tiles_col_bd[x] * LCU_WIDTH;
+        const int tile_offset_y = encoder->tiles_row_bd[y] * LCU_WIDTH;
+        const int tile_width = MIN(tile_width_in_lcu * LCU_WIDTH, encoder->in.width - tile_offset_x);
+        const int tile_height = MIN(tile_height_in_lcu * LCU_WIDTH, encoder->in.height - tile_offset_y);
         i = y * encoder->tiles_num_tile_columns + x;
         
         encoder_state->children[i].encoder_control = encoder;
@@ -678,10 +680,10 @@ void encode_one_frame(encoder_state * const encoder_state)
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
         const int tile_width_in_lcu = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
         const int tile_height_in_lcu = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
-        const int tile_width = tile_width_in_lcu * LCU_WIDTH;
-        const int tile_height = tile_height_in_lcu * LCU_WIDTH;
         const int tile_offset_x = encoder->tiles_col_bd[x] * LCU_WIDTH;
         const int tile_offset_y = encoder->tiles_row_bd[y] * LCU_WIDTH;
+        const int tile_width = MIN(tile_width_in_lcu * LCU_WIDTH, encoder->in.width - tile_offset_x);
+        const int tile_height = MIN(tile_height_in_lcu * LCU_WIDTH, encoder->in.height - tile_offset_y);
         const int tile_offset_full = tile_offset_x+tile_offset_y*encoder_state->cur_pic->width;
         const int tile_offset_half = tile_offset_x/2+tile_offset_y/2*encoder_state->cur_pic->width/2;
         i = y * encoder->tiles_num_tile_columns + x;
