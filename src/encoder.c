@@ -700,6 +700,10 @@ void encode_one_frame(encoder_state * const encoder_state)
         encoder_state->children[i].cur_pic->type = encoder_state->cur_pic->type;
         
         substream_encode(&encoder_state->children[i], x == (encoder->tiles_num_tile_columns-1) && y == (encoder->tiles_num_tile_rows-1));
+        
+        picture_blit_pixels(encoder_state->children[i].cur_pic->y_recdata, encoder_state->cur_pic->y_recdata + tile_offset_full, tile_width, tile_height, tile_width, encoder_state->cur_pic->width);
+        picture_blit_pixels(encoder_state->children[i].cur_pic->u_recdata, encoder_state->cur_pic->u_recdata + tile_offset_half, tile_width/2, tile_height/2, tile_width/2, encoder_state->cur_pic->width/2);
+        picture_blit_pixels(encoder_state->children[i].cur_pic->v_recdata, encoder_state->cur_pic->v_recdata + tile_offset_half, tile_width/2, tile_height/2, tile_width/2, encoder_state->cur_pic->width/2);
       }
     }
     
