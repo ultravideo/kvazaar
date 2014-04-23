@@ -586,23 +586,7 @@ static void substream_encode(encoder_state * const encoder_state, const int last
         
         encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
 
-        {
-          const int last_lcu = (lcu_id == lcu_count - 1);
-/*
-#if USE_TILES
-          if (USE_TILES && !last_lcu && encoder->tiles_enable && encoder->tiles_tile_id[lcu_id+1] != encoder->tiles_tile_id[lcu_id]) {
-            //Terminate the current tile, and reinitialize CABAC context
-            cabac_encode_bin_trm(&encoder_state->cabac, 0); // end_of_slice_segment_flag
-            cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
-            cabac_flush(&encoder_state->cabac);
-            init_contexts(encoder_state, encoder_state->QP, cur_pic->slicetype);
-          } else {
-#else
-          if (1) {
-#endif //USE_TILES
-*/
-          cabac_encode_bin_trm(&encoder_state->cabac, (last_lcu && last_part) ? 1 : 0);  // end_of_slice_segment_flag
-        }
+        cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && last_part) ? 1 : 0);  // end_of_slice_segment_flag
       }
     }
   }
@@ -699,7 +683,7 @@ void encode_one_frame(encoder_state * const encoder_state)
         const int tile_offset_x = encoder->tiles_col_bd[x] * LCU_WIDTH;
         const int tile_offset_y = encoder->tiles_row_bd[y] * LCU_WIDTH;
         const int tile_offset_full = tile_offset_x+tile_offset_y*encoder_state->cur_pic->width;
-        const int tile_offset_low = tile_offset_x/2+tile_offset_y/2*encoder_state->cur_pic->width/2;
+        const int tile_offset_half = tile_offset_x/2+tile_offset_y/2*encoder_state->cur_pic->width/2;
         i = y * encoder->tiles_num_tile_columns + x;
         
         //TODO: ref frames
@@ -707,8 +691,8 @@ void encode_one_frame(encoder_state * const encoder_state)
         encoder_state->children[i].QP = encoder_state->QP;
         
         picture_blit_pixels(encoder_state->cur_pic->y_data + tile_offset_full, encoder_state->children[i].cur_pic->y_data, tile_width, tile_height, encoder_state->cur_pic->width, tile_width);
-        picture_blit_pixels(encoder_state->cur_pic->u_data + tile_offset_low, encoder_state->children[i].cur_pic->u_data, tile_width/2, tile_height/2, encoder_state->cur_pic->width/2, tile_width/2);
-        picture_blit_pixels(encoder_state->cur_pic->v_data + tile_offset_low, encoder_state->children[i].cur_pic->v_data, tile_width/2, tile_height/2, encoder_state->cur_pic->width/2, tile_width/2);
+        picture_blit_pixels(encoder_state->cur_pic->u_data + tile_offset_half, encoder_state->children[i].cur_pic->u_data, tile_width/2, tile_height/2, encoder_state->cur_pic->width/2, tile_width/2);
+        picture_blit_pixels(encoder_state->cur_pic->v_data + tile_offset_half, encoder_state->children[i].cur_pic->v_data, tile_width/2, tile_height/2, encoder_state->cur_pic->width/2, tile_width/2);
         
         encoder_state->children[i].cur_pic->slicetype = encoder_state->cur_pic->slicetype;
         encoder_state->children[i].cur_pic->type = encoder_state->cur_pic->type;
