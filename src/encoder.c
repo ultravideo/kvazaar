@@ -461,85 +461,16 @@ static void write_aud(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
-void encode_one_frame(encoder_state * const encoder_state)
-{
+static void substream_encode(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
   
   yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
   yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
-
-  const int is_first_frame = (encoder_state->frame == 0);
-  const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder_state->frame % 2 == 0);
-  const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder_state->frame % encoder->cfg->intra_period) == 0);
-  const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
-
-
-  /** IDR picture when: period == 0 and frame == 0
-   *                    period == 1 && frame%2 == 0
-   *                    period != 0 && frame%period == 0
-   **/
-  if (is_radl_frame) {
-    // Clear the reference list
-    while (encoder_state->ref->used_size) {
-      picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1, 1);
-    }
-
-    encoder_state->poc = 0;
-
-    encoder_state->cur_pic->slicetype = SLICE_I;
-    encoder_state->cur_pic->type = NAL_IDR_W_RADL;
-
-    // Access Unit Delimiter (AUD)
-    if (encoder->aud_enable)
-      write_aud(encoder_state);
-
-    // Video Parameter Set (VPS)
-    nal_write(stream, NAL_VPS_NUT, 0, 1);
-    encode_vid_parameter_set(encoder_state);
-    bitstream_align(stream);
-
-    // Sequence Parameter Set (SPS)
-    nal_write(stream, NAL_SPS_NUT, 0, 1);
-    encode_seq_parameter_set(encoder_state);
-    bitstream_align(stream);
-
-    // Picture Parameter Set (PPS)
-    nal_write(stream, NAL_PPS_NUT, 0, 1);
-    encode_pic_parameter_set(encoder_state);
-    bitstream_align(stream);
-
-    if (encoder_state->frame == 0) {
-      // Prefix SEI
-      nal_write(stream, PREFIX_SEI_NUT, 0, 0);
-      encode_prefix_sei_version(encoder_state);
-      bitstream_align(stream);
-    }
-  } else {
-    // When intra period == 1, all pictures are intra
-    encoder_state->cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
-    encoder_state->cur_pic->type = NAL_TRAIL_R;
-
-    // Access Unit Delimiter (AUD)
-    if (encoder->aud_enable)
-      write_aud(encoder_state);
-  }
-
-  {
-    // Not quite sure if this is correct, but it seems to have worked so far
-    // so I tried to not change it's behavior.
-    int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
-
-    nal_write(stream,
-              is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
-  }
-
+  
   cabac_start(&encoder_state->cabac);
   init_contexts(encoder_state, encoder_state->QP, encoder_state->cur_pic->slicetype);
-  encode_slice_header(encoder_state);
-  bitstream_align(stream);
 
   // Initialize lambda value(s) to use in search
   encoder_state_init_lambda(encoder_state);
@@ -660,6 +591,87 @@ void encode_one_frame(encoder_state * const encoder_state)
       }
     }
   }
+}
+
+void encode_one_frame(encoder_state * const encoder_state)
+{
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  bitstream * const stream = &encoder_state->stream;
+  
+  yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
+  // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
+  // for the extra pixel on the top right.
+  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
+
+  const int is_first_frame = (encoder_state->frame == 0);
+  const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder_state->frame % 2 == 0);
+  const int is_p_radl = (encoder->cfg->intra_period > 1 && (encoder_state->frame % encoder->cfg->intra_period) == 0);
+  const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+
+
+  /** IDR picture when: period == 0 and frame == 0
+   *                    period == 1 && frame%2 == 0
+   *                    period != 0 && frame%period == 0
+   **/
+  if (is_radl_frame) {
+    // Clear the reference list
+    while (encoder_state->ref->used_size) {
+      picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1, 1);
+    }
+
+    encoder_state->poc = 0;
+
+    encoder_state->cur_pic->slicetype = SLICE_I;
+    encoder_state->cur_pic->type = NAL_IDR_W_RADL;
+
+    // Access Unit Delimiter (AUD)
+    if (encoder->aud_enable)
+      write_aud(encoder_state);
+
+    // Video Parameter Set (VPS)
+    nal_write(stream, NAL_VPS_NUT, 0, 1);
+    encode_vid_parameter_set(encoder_state);
+    bitstream_align(stream);
+
+    // Sequence Parameter Set (SPS)
+    nal_write(stream, NAL_SPS_NUT, 0, 1);
+    encode_seq_parameter_set(encoder_state);
+    bitstream_align(stream);
+
+    // Picture Parameter Set (PPS)
+    nal_write(stream, NAL_PPS_NUT, 0, 1);
+    encode_pic_parameter_set(encoder_state);
+    bitstream_align(stream);
+
+    if (encoder_state->frame == 0) {
+      // Prefix SEI
+      nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+      encode_prefix_sei_version(encoder_state);
+      bitstream_align(stream);
+    }
+  } else {
+    // When intra period == 1, all pictures are intra
+    encoder_state->cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+    encoder_state->cur_pic->type = NAL_TRAIL_R;
+
+    // Access Unit Delimiter (AUD)
+    if (encoder->aud_enable)
+      write_aud(encoder_state);
+  }
+
+  {
+    // Not quite sure if this is correct, but it seems to have worked so far
+    // so I tried to not change it's behavior.
+    int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
+
+    nal_write(stream,
+              is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
+  }
+
+  encode_slice_header(encoder_state);
+  bitstream_align(&encoder_state->stream);
+  
+  substream_encode(encoder_state);
 
   cabac_flush(&encoder_state->cabac);
   bitstream_align(stream);
