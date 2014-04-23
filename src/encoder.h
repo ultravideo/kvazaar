@@ -160,6 +160,8 @@ void encoder_state_init_lambda(encoder_state *encoder_state);
 void encode_one_frame(encoder_state *encoder_state);
 int read_one_frame(FILE* file, const encoder_state *encoder);
 
+void encoder_next_frame(encoder_state *encoder_state);
+
 void encode_seq_parameter_set(encoder_state *encoder);
 void encode_pic_parameter_set(encoder_state *encoder);
 void encode_vid_parameter_set(encoder_state *encoder);

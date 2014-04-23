@@ -370,27 +370,7 @@ int main(int argc, char *argv[])
 
     // TODO: add more than one reference
 
-    // Remove the ref pic (if present)
-    if (encoder_state.ref->used_size == (uint32_t)encoder.cfg->ref_frames) {
-      picture_list_rem(encoder_state.ref, encoder_state.ref->used_size-1, 1);
-    }
-    // Add current picture as reference
-    picture_list_add(encoder_state.ref, cur_pic);
-    // Allocate new memory to current picture
-    // TODO: reuse memory from old reference
-    encoder_state.cur_pic = picture_init(encoder_state.cur_pic->width, encoder_state.cur_pic->height, encoder_state.cur_pic->width_in_lcu, encoder_state.cur_pic->height_in_lcu);
-
-    // Copy pointer from the last cur_pic because we don't want to reallocate it
-    MOVE_POINTER(encoder_state.cur_pic->coeff_y,encoder_state.ref->pics[0]->coeff_y);
-    MOVE_POINTER(encoder_state.cur_pic->coeff_u,encoder_state.ref->pics[0]->coeff_u);
-    MOVE_POINTER(encoder_state.cur_pic->coeff_v,encoder_state.ref->pics[0]->coeff_v);
-
-    MOVE_POINTER(encoder_state.cur_pic->pred_y,encoder_state.ref->pics[0]->pred_y);
-    MOVE_POINTER(encoder_state.cur_pic->pred_u,encoder_state.ref->pics[0]->pred_u);
-    MOVE_POINTER(encoder_state.cur_pic->pred_v,encoder_state.ref->pics[0]->pred_v);
-
-    encoder_state.frame++;
-    encoder_state.poc++;
+    encoder_next_frame(&encoder_state);
   }
   // Coding finished
   fgetpos(output,(fpos_t*)&curpos);

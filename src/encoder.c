@@ -376,7 +376,7 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
           fprintf(stderr, "Failed to allocate the picture list (subencoder)!\n");
           return 0;
         }
-        encoder_state->ref_list = REF_PIC_LIST_0;
+        encoder_state->children[i].ref_list = REF_PIC_LIST_0;
         
         encoder_state->children[i].cur_pic = picture_init(tile_width, tile_height,
                                 tile_width_in_lcu, tile_height_in_lcu);
@@ -433,6 +433,31 @@ int encoder_state_finalize(encoder_state * const encoder_state) {
   picture_list_destroy(encoder_state->ref);
   bitstream_finalize(&encoder_state->stream);
   return 1;
+}
+
+static void encoder_clear_refs(encoder_state *encoder_state) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  
+  while (encoder_state->ref->used_size) {
+    picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1, 1);
+  }
+
+  encoder_state->poc = 0;
+  
+  if (USE_TILES && encoder->tiles_enable) {
+#if USE_TILES
+    if (encoder_state->children) {
+      int x,y;
+      //Allocate subencoders
+      for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+        for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+          const int i = y * encoder->tiles_num_tile_columns + x;
+          encoder_clear_refs(&encoder_state->children[i]);
+        }
+      }
+    } 
+#endif //USE_TILES
+  }
 }
 
 void encoder_control_input_init(encoder_control * const encoder,
@@ -639,11 +664,7 @@ void encode_one_frame(encoder_state * const encoder_state)
    **/
   if (is_radl_frame) {
     // Clear the reference list
-    while (encoder_state->ref->used_size) {
-      picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1, 1);
-    }
-
-    encoder_state->poc = 0;
+    encoder_clear_refs(encoder_state);
 
     encoder_state->cur_pic->slicetype = SLICE_I;
     encoder_state->cur_pic->type = NAL_IDR_W_RADL;
@@ -766,7 +787,7 @@ void encode_one_frame(encoder_state * const encoder_state)
   if (encoder->sao_enable) {
     sao_reconstruct_frame(encoder_state);
   }
-
+  
   // Calculate checksum
   add_checksum(encoder_state);
 
@@ -1364,6 +1385,47 @@ static void encode_VUI(encoder_state * const encoder_state)
 
   //IF bitstream restriction
   //ENDIF
+}
+
+void encoder_next_frame(encoder_state *encoder_state) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  
+  // Remove the ref pic (if present)
+  if (encoder_state->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
+    picture_list_rem(encoder_state->ref, encoder_state->ref->used_size-1, 1);
+  }
+  // Add current picture as reference
+  picture_list_add(encoder_state->ref, encoder_state->cur_pic);
+  // Allocate new memory to current picture
+  // TODO: reuse memory from old reference
+  encoder_state->cur_pic = picture_init(encoder_state->cur_pic->width, encoder_state->cur_pic->height, encoder_state->cur_pic->width_in_lcu, encoder_state->cur_pic->height_in_lcu);
+
+  // Copy pointer from the last cur_pic because we don't want to reallocate it
+  MOVE_POINTER(encoder_state->cur_pic->coeff_y,encoder_state->ref->pics[0]->coeff_y);
+  MOVE_POINTER(encoder_state->cur_pic->coeff_u,encoder_state->ref->pics[0]->coeff_u);
+  MOVE_POINTER(encoder_state->cur_pic->coeff_v,encoder_state->ref->pics[0]->coeff_v);
+
+  MOVE_POINTER(encoder_state->cur_pic->pred_y,encoder_state->ref->pics[0]->pred_y);
+  MOVE_POINTER(encoder_state->cur_pic->pred_u,encoder_state->ref->pics[0]->pred_u);
+  MOVE_POINTER(encoder_state->cur_pic->pred_v,encoder_state->ref->pics[0]->pred_v);
+
+  encoder_state->frame++;
+  encoder_state->poc++;
+  
+  if (USE_TILES && encoder->tiles_enable) {
+#if USE_TILES
+    if (encoder_state->children) {
+      int x,y;
+      //Allocate subencoders
+      for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+        for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+          const int i = y * encoder->tiles_num_tile_columns + x;
+          encoder_next_frame(&encoder_state->children[i]);
+        }
+      }
+    } 
+#endif //USE_TILES
+  }
 }
 
 void encode_slice_header(encoder_state * const encoder_state)
