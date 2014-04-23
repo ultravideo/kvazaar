@@ -76,6 +76,8 @@ void picture_blit_pixels(const pixel *orig, pixel *dst,
                          unsigned orig_stride, unsigned dst_stride)
 {
   unsigned y, x;
+  //Fix problem with reading unitialized memory
+  if (width > orig_stride) width = orig_stride;
 
   for (y = 0; y < height; ++y) {
     for (x = 0; x < width; ++x) {
