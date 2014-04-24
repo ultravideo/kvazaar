@@ -404,9 +404,8 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
 }
 
 int encoder_state_finalize(encoder_state * const encoder_state) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  
 #if USE_TILES
+  const encoder_control * const encoder = encoder_state->encoder_control;
   if (encoder->tiles_enable) {
     int i,x,y;
     for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
@@ -615,6 +614,7 @@ static void substream_encode(encoder_state * const encoder_state, const int last
   }
 }
 
+#if USE_TILES
 static void substream_merge_sao(encoder_state * const parent_encoder, const encoder_state * const child_encoder) {
     picture* const parent_pic = parent_encoder->cur_pic;
     const picture* const child_pic = child_encoder->cur_pic;
@@ -637,6 +637,7 @@ static void substream_merge_sao(encoder_state * const parent_encoder, const enco
       memcpy(dst_addr_chroma, src_addr_chroma, length);
     }
 }
+#endif //USE_TILES
 
 void encode_one_frame(encoder_state * const encoder_state)
 {
