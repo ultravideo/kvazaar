@@ -99,10 +99,36 @@ typedef struct
 
   //scaling list
   scaling_list scaling_list;
+  
+  //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
+  int8_t tiles_enable; /*!<spec: tiles_enabled */
+  
+#if USE_TILES
+  int8_t tiles_uniform_spacing_flag; /*!<spec: uniform_spacing_flag */
+  
+  uint8_t tiles_num_tile_columns; /*!<spec: num_tile_columns_minus1 + 1 */
+  uint8_t tiles_num_tile_rows; /*!<spec: num_tile_rows_minus1 + 1*/
+  
+  const int32_t *tiles_col_width; /*!<spec: colWidth (6.5.1); dimension: tiles_num_tile_columns */
+  const int32_t *tiles_row_height; /*!<spec: rowHeight (6.5.1); dimension: tiles_num_tile_rows */
+  
+  const int32_t *tiles_col_bd; /*!<spec: colBd (6.5.1); dimension: tiles_num_tile_columns + 1 */
+  const int32_t *tiles_row_bd; /*!<spec: rowBd (6.5.1); dimension: tiles_num_tile_rows + 1  */
+  
+  //PicSizeInCtbsY = height_in_lcu * width_in_lcu
+  const int32_t *tiles_ctb_addr_rs_to_ts; /*!<spec:  CtbAddrRsToTs (6.5.1); dimension: PicSizeInCtbsY */
+  const int32_t *tiles_ctb_addr_ts_to_rs; /*!<spec:  CtbAddrTsToRs (6.5.1); dimension: PicSizeInCtbsY */
+  
+  const int32_t *tiles_tile_id; /*!<spec:  TileId (6.5.1); dimension: PicSizeInCtbsY */
+#endif //USE_TILES
+  
 } encoder_control;
 
 typedef struct encoder_state {
   const encoder_control *encoder_control;
+  
+  int32_t lcu_offset_x;
+  int32_t lcu_offset_y;
   
   picture *cur_pic;
   int32_t frame;
@@ -125,16 +151,16 @@ typedef struct encoder_state {
 int encoder_control_init(encoder_control *encoder, const config *cfg);
 int encoder_control_finalize(encoder_control *encoder);
 
-void encoder_control_input_init(encoder_control *encoder, FILE *inputfile, int32_t width, int32_t height);
+void encoder_control_input_init(encoder_control *encoder, int32_t width, int32_t height);
 
 int encoder_state_init(encoder_state *encoder_state, const encoder_control * encoder);
 int encoder_state_finalize(encoder_state *encoder_state);
 void encoder_state_init_lambda(encoder_state *encoder_state);
 
-void init_encoder_input(encoder_control *encoder, FILE* inputfile,
-                        int32_t width, int32_t height);
 void encode_one_frame(encoder_state *encoder_state);
 int read_one_frame(FILE* file, const encoder_state *encoder);
+
+void encoder_next_frame(encoder_state *encoder_state);
 
 void encode_seq_parameter_set(encoder_state *encoder);
 void encode_pic_parameter_set(encoder_state *encoder);

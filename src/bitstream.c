@@ -29,6 +29,7 @@
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <assert.h>
 //for hton
 #ifdef _WIN32
 #include <Winsock2.h>
@@ -197,9 +198,41 @@ int bitstream_writebyte(bitstream * const stream, const uint8_t byte) {
       }
       //Write byte
       stream->mem.output_data[stream->mem.output_length++] = byte;
+      break;
       
     default:
       fprintf(stderr, "Unknown stream type!\n");
+      assert(0);
+      return 0;
+  }
+  return 1;
+}
+
+int bitstream_append(bitstream * const dst, const bitstream * const src) {
+  int i;
+  
+  switch(src->base.type) {
+    case BITSTREAM_TYPE_MEMORY:
+      for (i = 0; i < src->mem.output_length; ++i) {
+        bitstream_writebyte(dst, src->mem.output_data[i]);
+      }
+      break;
+    default:
+      fprintf(stderr, "Unsupported source stream type for bitstream_append!\n");
+      assert(0);
+      return 0;
+  }
+  return 1;
+}
+
+int bitstream_clear(bitstream * const bitstream) {
+  switch(bitstream->base.type) {
+    case BITSTREAM_TYPE_MEMORY:
+      bitstream->mem.output_length = 0;
+      break;
+    default:
+      fprintf(stderr, "Unsupported stream type for bitstream_clear!\n");
+      assert(0);
       return 0;
   }
   return 1;

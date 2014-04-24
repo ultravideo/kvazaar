@@ -201,7 +201,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = &large_hexbs[i];
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             orig->x + mv.x + pattern->x, orig->y + mv.y + pattern->y,
+                             (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
+                             (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              block_width, block_width);
     cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -215,7 +216,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   // Try the 0,0 vector.
   if (!(mv.x == 0 && mv.y == 0)) {
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             orig->x, orig->y,
+                             (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x, 
+                             (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y,
                              block_width, block_width);
     cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -230,8 +232,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = &large_hexbs[i];
         unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                                 orig->x + pattern->x,
-                                 orig->y + pattern->y,
+                                 (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
+                                 (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
                                  block_width, block_width);
         cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -265,8 +267,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = &large_hexbs[start + i];
       unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                               orig->x + mv.x + offset->x,
-                               orig->y + mv.y + offset->y,
+                               (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
+                               (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                block_width, block_width);
       cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -288,8 +290,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   for (i = 1; i < 5; ++i) {
     const vector2d *offset = &small_hexbs[i];
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             orig->x + mv.x + offset->x,
-                             orig->y + mv.y + offset->y,
+                             (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
+                             (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              block_width, block_width);
     cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 

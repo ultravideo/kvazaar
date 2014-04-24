@@ -131,7 +131,11 @@ typedef int16_t coefficient;
 // tiles are used with asserts. They should be set to 1 if they are ever
 // implemented.
 #define USE_SLICES 0
+#ifndef USE_TILES
 #define USE_TILES 0
+#endif
+
+#define MAX_TILES_PER_DIM 16
 
 /* Inlining functions */
 #ifdef _MSC_VER /* Visual studio */
@@ -143,9 +147,9 @@ typedef int16_t coefficient;
 
 #ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
-  #define MALLOC(type, num) (type *)malloc(sizeof(type) * num)
+  #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))
 #else
-  #define MALLOC(type, num) malloc(sizeof(type) * num)
+  #define MALLOC(type, num) malloc(sizeof(type) * (num))
 #endif
 
 #define FREE_POINTER(pointer) { free((void*)pointer); pointer = NULL; }

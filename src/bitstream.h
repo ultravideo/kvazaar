@@ -72,6 +72,9 @@ int bitstream_finalize(bitstream * stream);
 void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits);
 int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
 
+int bitstream_append(bitstream *dst, const bitstream *src);
+int bitstream_clear(bitstream *stream);
+
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
