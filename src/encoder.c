@@ -196,7 +196,7 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     //(6-7) in ITU-T Rec. H.265 (04/2013)
     //j == ctbAddrRs
     for (j = 0; j < num_ctbs; ++j) {
-      int tileX, tileY;
+      int tileX = 0, tileY = 0;
       int tbX = j % encoder->in.width_in_lcu;
       int tbY = j / encoder->in.width_in_lcu;
       
