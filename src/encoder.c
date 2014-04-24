@@ -371,11 +371,7 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
           return 0;
         }
         
-        encoder_state->children[i].ref = picture_list_init(MAX_REF_PIC_COUNT);
-        if(!encoder_state->children[i].ref) {
-          fprintf(stderr, "Failed to allocate the picture list (subencoder)!\n");
-          return 0;
-        }
+        encoder_state->children[i].ref = encoder_state->ref;
         encoder_state->children[i].ref_list = REF_PIC_LIST_0;
         
         encoder_state->children[i].cur_pic = picture_init(tile_width, tile_height,
@@ -452,7 +448,7 @@ static void encoder_clear_refs(encoder_state *encoder_state) {
       for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
         for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
           const int i = y * encoder->tiles_num_tile_columns + x;
-          encoder_clear_refs(&encoder_state->children[i]);
+          encoder_state->children[i].poc = 0;
         }
       }
     } 
@@ -1420,7 +1416,9 @@ void encoder_next_frame(encoder_state *encoder_state) {
       for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
         for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
           const int i = y * encoder->tiles_num_tile_columns + x;
-          encoder_next_frame(&encoder_state->children[i]);
+          //encoder_next_frame(&encoder_state->children[i]);
+          encoder_state->children[i].frame++;
+          encoder_state->children[i].poc++;
         }
       }
     } 
