@@ -85,6 +85,11 @@ else:
     env_x86.MergeFlags('-m32 -O2 -lm')
     env_x64.MergeFlags('-m64 -O2 -lm')
 
+preprocessor_defines = ARGUMENTS.get('D', '')
+if preprocessor_defines:
+    for define in preprocessor_defines.split():
+        env_x86.MergeFlags('-D' + define)
+        env_x64.MergeFlags('-D' + define)
 
 # Declare build targets.
 x86 = SConscript('src/SConscript',
