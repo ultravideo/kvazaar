@@ -5,7 +5,7 @@ ifeq (, $(ARCH))
 endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
-DFLAGS = -O2 -g -Werror
+DFLAGS = -O2 -g -Werror -DUSE_TILES=1
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
@@ -44,10 +44,10 @@ else
   endif
 endif
 
-CC = gcc
+CC = gcc -fopenmp
 CCFLAGS = $(DFLAGS) -I. -I/usr/local/include -L/usr/local/lib -Wall
 LDFLAGS += -lm
-LD = gcc
+LD = gcc -fopenmp
 YASM = yasm
 ASMOBJS = cpu.o
 OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o scalinglist.o search.o tables.o transform.o extras/getopt.o

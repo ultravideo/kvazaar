@@ -715,8 +715,9 @@ void encode_one_frame(encoder_state * const encoder_state)
 
   if (USE_TILES && encoder->tiles_enable) {
 #if USE_TILES
-    int i,x,y;
+    int x,y;
     //This can be parallelized
+    #pragma omp parallel for private(x,y) collapse(2)
     for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
         const int tile_width_in_lcu = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
@@ -727,7 +728,7 @@ void encode_one_frame(encoder_state * const encoder_state)
         const int tile_height = MIN(tile_height_in_lcu * LCU_WIDTH, encoder->in.height - tile_offset_y);
         const int tile_offset_full = tile_offset_x+tile_offset_y*encoder_state->cur_pic->width;
         const int tile_offset_half = tile_offset_x/2+tile_offset_y/2*encoder_state->cur_pic->width/2;
-        i = y * encoder->tiles_num_tile_columns + x;
+        const int i = y * encoder->tiles_num_tile_columns + x;
         
         //TODO: ref frames
         
@@ -751,7 +752,7 @@ void encode_one_frame(encoder_state * const encoder_state)
     //This has to be serial
     for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
-        i = y * encoder->tiles_num_tile_columns + x;
+        const int i = y * encoder->tiles_num_tile_columns + x;
         
         if (x == (encoder->tiles_num_tile_columns-1) && y == (encoder->tiles_num_tile_rows-1)) {
           //Last tile
