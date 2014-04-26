@@ -183,15 +183,15 @@ int main(int argc, char *argv[])
   kvz_cpu_cpuid(&ecx,&edx);
   fprintf(stderr, "CPU features enabled: ");
   // EDX
-  if (edx & (1<<BIT_MMX))  printf("MMX ");
-  if (edx & (1<<BIT_SSE))  printf("SSE ");
-  if (edx & (1<<BIT_SSE2)) printf("SSE2 ");
+  if (edx & (1<<BIT_MMX))   fprintf(stderr, "MMX ");
+  if (edx & (1<<BIT_SSE))   fprintf(stderr, "SSE ");
+  if (edx & (1<<BIT_SSE2))  fprintf(stderr, "SSE2 ");
   // ECX
-  if (ecx & (1<<BIT_SSE3))  printf("SSE3 ");
-  if (ecx & (1<<BIT_SSSE3)) printf("SSSE3 ");
-  if (ecx & (1<<BIT_SSE41)) printf("SSE4.1 ");
-  if (ecx & (1<<BIT_SSE42)) printf("SSE4.2 ");
-  if (ecx & (1<<BIT_AVX))   printf("AVX ");
+  if (ecx & (1<<BIT_SSE3))  fprintf(stderr, "SSE3 ");
+  if (ecx & (1<<BIT_SSSE3)) fprintf(stderr, "SSSE3 ");
+  if (ecx & (1<<BIT_SSE41)) fprintf(stderr, "SSE4.1 ");
+  if (ecx & (1<<BIT_SSE42)) fprintf(stderr, "SSE4.2 ");
+  if (ecx & (1<<BIT_AVX))   fprintf(stderr, "AVX ");
   fprintf(stderr, "\n");
 
   // Check if the input file name is a dash, this means stdin
