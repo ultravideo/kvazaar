@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "extras/getopt.h"
+#include <getopt.h>
 
 /**
  * \brief Allocate memory for config object
