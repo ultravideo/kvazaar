@@ -26,7 +26,7 @@ ifneq ( ,$(findstring Windows, $(OS)))
     ASMFLAGS += -f win32
     ASMFLAGS += -DPREFIX
   endif
-  LDFLAGS += -lws2_32
+  DFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 # OS X specific flags
 else ifeq ($(SYSTEM),Darwin)
   ifeq ($(ARCH), x86_64)
