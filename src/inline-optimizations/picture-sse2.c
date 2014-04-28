@@ -21,7 +21,7 @@
  * \file
  */
 
-#include "picture.h"
+#include "../picture.h"
 #include <immintrin.h>
 
 #ifdef __SSE2__

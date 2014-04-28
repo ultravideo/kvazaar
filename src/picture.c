@@ -770,7 +770,7 @@ static unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
 
 
 #if defined(__SSE2__)
-#include "picture-sse2.c"
+#include "inline-optimizations/picture-sse2.c"
 #elif defined(__ALTIVEC__)
 #include "picture-altivec.c"
 #else
