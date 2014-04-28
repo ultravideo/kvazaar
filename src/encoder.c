@@ -612,32 +612,11 @@ static void substream_encode(encoder_state * const encoder_state, const int last
       }
     }
   }
+  
+  if (encoder->sao_enable) {
+    sao_reconstruct_frame(encoder_state);
+  }
 }
-
-#if USE_TILES
-static void substream_merge_sao(encoder_state * const parent_encoder, const encoder_state * const child_encoder) {
-    picture* const parent_pic = parent_encoder->cur_pic;
-    const picture* const child_pic = child_encoder->cur_pic;
-    const int parent_stride = parent_pic->width_in_lcu;
-    const int child_stride = child_pic->width_in_lcu;
-    int row_id;
-    
-    //lcu_id use raster scan if not USE_TILES, otherwise it's tile scan.
-    for (row_id = 0; row_id < child_pic->height_in_lcu; ++row_id) {
-      int parent_idx = (child_encoder->lcu_offset_y + row_id) * parent_stride + child_encoder->lcu_offset_x;
-      int child_idx = row_id * child_stride;
-      int length = child_stride * sizeof(sao_info);
-      
-      sao_info *dst_addr_luma = &parent_pic->sao_luma[parent_idx];
-      sao_info *dst_addr_chroma = &parent_pic->sao_chroma[parent_idx];
-      
-      sao_info *src_addr_luma = &child_pic->sao_luma[child_idx];
-      sao_info *src_addr_chroma = &child_pic->sao_chroma[child_idx];
-      memcpy(dst_addr_luma, src_addr_luma, length);
-      memcpy(dst_addr_chroma, src_addr_chroma, length);
-    }
-}
-#endif //USE_TILES
 
 void encode_one_frame(encoder_state * const encoder_state)
 {
@@ -766,11 +745,6 @@ void encode_one_frame(encoder_state * const encoder_state)
         //Append bitstream to main stream
         bitstream_append(&encoder_state->stream, &encoder_state->children[i].stream);
         bitstream_clear(&encoder_state->children[i].stream);
-        
-        //And merge SAO if needed
-        if (encoder->sao_enable) {
-          substream_merge_sao(encoder_state, &encoder_state->children[i]);
-        }
       }
     }
     
@@ -780,10 +754,6 @@ void encode_one_frame(encoder_state * const encoder_state)
     substream_encode(encoder_state, 1);
     cabac_flush(&encoder_state->cabac);
     bitstream_align(stream);
-  }
-  
-  if (encoder->sao_enable) {
-    sao_reconstruct_frame(encoder_state);
   }
   
   // Calculate checksum
