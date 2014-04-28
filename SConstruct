@@ -75,10 +75,8 @@ if 'MSVS' in env_x86:
     # Linker needs TMP
     env_x86['ENV']['TMP'] = os.environ['TMP']
     env_x64['ENV']['TMP'] = os.environ['TMP']
-    # VS version uses winsock2
-    # We probably should be linking against the dll or just not using winsock.
-    env_x86.MergeFlags('-lws2_32')
-    env_x64.MergeFlags('-lws2_32') # ws2_64 isn't found, but 32 works.
+    env_x86.MergeFlags('-Iextras')
+    env_x64.MergeFlags('-Iextras')
 else:
     # GCC flags
     # -m for arch, -O2 for optimization, -lm for math lib
