@@ -397,7 +397,7 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
   for (ref_idx = 0; ref_idx < encoder_state->ref->used_size; ref_idx++) {
     picture *ref_pic = encoder_state->ref->pics[ref_idx];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-    cu_info *ref_cu = &ref_pic->cu_array[MAX_DEPTH][y_cu * width_in_scu + x_cu];
+    cu_info *ref_cu = &ref_pic->cu_array[y_cu * width_in_scu + x_cu];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;
@@ -974,7 +974,7 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
     const int x_cu = x >> MAX_DEPTH;
     const int y_cu = y >> MAX_DEPTH;
     const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
-    cu_info *const cu_array = cur_pic->cu_array[MAX_DEPTH];
+    cu_info *const cu_array = cur_pic->cu_array;
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
@@ -1079,7 +1079,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
     const int y_cu = y_px >> MAX_DEPTH;
     const picture * const cur_pic = encoder_state->cur_pic;
     const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
-    cu_info *const cu_array = cur_pic->cu_array[MAX_DEPTH];
+    cu_info *const cu_array = cur_pic->cu_array;
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.

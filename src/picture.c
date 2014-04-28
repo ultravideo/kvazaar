@@ -251,7 +251,6 @@ picture *picture_init(int32_t width, int32_t height,
   picture *pic = (picture *)malloc(sizeof(picture));
   unsigned int luma_size = width * height;
   unsigned int chroma_size = luma_size / 4;
-  int i = 0;
 
   if (!pic) return 0;
 
@@ -281,18 +280,15 @@ picture *picture_init(int32_t width, int32_t height,
   memset(pic->u_recdata, 128, (chroma_size));
   memset(pic->v_recdata, 128, (chroma_size));
 
-  // Allocate memory for CU info 2D array
-  // TODO: we don't need this much space on LCU...MAX_DEPTH-1
-  pic->cu_array = (cu_info**)malloc(sizeof(cu_info*) * (MAX_DEPTH + 1));
-  for (i = 0; i <= MAX_DEPTH; ++i) {
+  {
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
     unsigned height_in_scu = height_in_lcu << MAX_DEPTH;
     unsigned width_in_scu = width_in_lcu << MAX_DEPTH;
     unsigned cu_array_size = height_in_scu * width_in_scu;
-    pic->cu_array[i] = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
-    memset(pic->cu_array[i], 0, sizeof(cu_info) * cu_array_size);
+    pic->cu_array = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
+    memset(pic->cu_array, 0, sizeof(cu_info) * cu_array_size);
   }
-
+  
   pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
   pic->pred_y = NULL; pic->pred_u = NULL; pic->pred_v = NULL;
 
@@ -311,8 +307,6 @@ picture *picture_init(int32_t width, int32_t height,
  */
 int picture_destroy(picture *pic)
 {
-  int i;
-
   free(pic->u_data);
   free(pic->v_data);
   free(pic->y_data);
@@ -325,14 +319,7 @@ int picture_destroy(picture *pic)
   pic->y_recdata = pic->u_recdata = pic->v_recdata = NULL;
   pic->recdata[COLOR_Y] = pic->recdata[COLOR_U] = pic->recdata[COLOR_V] = NULL;
 
-  for (i = 0; i <= MAX_DEPTH; ++i)
-  {
-    free(pic->cu_array[i]);
-    pic->cu_array[i] = NULL;
-  }
-
-  free(pic->cu_array);
-  pic->cu_array = NULL;
+  FREE_POINTER(pic->cu_array);
 
   FREE_POINTER(pic->coeff_y);
   FREE_POINTER(pic->coeff_u);
