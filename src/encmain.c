@@ -42,9 +42,7 @@
 #include "picture.h"
 #include "transform.h"
 #include "scalinglist.h"
-
-// Assembly optimization headers
-#include "x86/cpu.h"
+#include "strategyselector.h"
 
 /**
  * \brief Program main function.
@@ -54,9 +52,6 @@
  */
 int main(int argc, char *argv[])
 {
-  int ecx = 0,edx =0;
-  /* CPU feature bits */
-  enum { BIT_SSE3 = 0,BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26, BIT_AVX = 28};
   config *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
@@ -76,6 +71,13 @@ int main(int argc, char *argv[])
       _setmode( _fileno( stdout ), _O_BINARY );
       _setmode( _fileno( stderr ), _O_TEXT );
   #endif
+
+  //Initialize strategies
+  if (!strategyselector_init()) {
+    fprintf(stderr, "Failed to initialize strategies.\n");
+    return EXIT_FAILURE;
+  }
+    
 
   // Handle configuration
   cfg = config_alloc();
@@ -178,21 +180,6 @@ int main(int argc, char *argv[])
   if (!config_validate(cfg)) {
     goto exit_failure;
   }
-
-  // Dig CPU features with cpuid
-  kvz_cpu_cpuid(&ecx,&edx);
-  fprintf(stderr, "CPU features enabled: ");
-  // EDX
-  if (edx & (1<<BIT_MMX))   fprintf(stderr, "MMX ");
-  if (edx & (1<<BIT_SSE))   fprintf(stderr, "SSE ");
-  if (edx & (1<<BIT_SSE2))  fprintf(stderr, "SSE2 ");
-  // ECX
-  if (ecx & (1<<BIT_SSE3))  fprintf(stderr, "SSE3 ");
-  if (ecx & (1<<BIT_SSSE3)) fprintf(stderr, "SSSE3 ");
-  if (ecx & (1<<BIT_SSE41)) fprintf(stderr, "SSE4.1 ");
-  if (ecx & (1<<BIT_SSE42)) fprintf(stderr, "SSE4.2 ");
-  if (ecx & (1<<BIT_AVX))   fprintf(stderr, "AVX ");
-  fprintf(stderr, "\n");
 
   // Check if the input file name is a dash, this means stdin
   if (!strcmp(cfg->input, "-")) {
@@ -390,6 +377,8 @@ int main(int argc, char *argv[])
   encoder_control_finalize(&encoder);
 
   free_exp_golomb();
+  
+  strategyselector_free();
 
   return EXIT_SUCCESS;
 
@@ -398,5 +387,6 @@ exit_failure:
   if (input) fclose(input);
   if (output) fclose(output);
   if (recout) fclose(recout);
+  strategyselector_free();
   return EXIT_FAILURE;
 }
