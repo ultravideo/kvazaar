@@ -21,6 +21,7 @@
  * \file
  */
 
+#include <assert.h>
 #include <string.h>
 
 #include "strategyselector.h"
@@ -107,7 +108,11 @@ static void* strategyselector_choose_for(const strategy_list * const strategies,
   char *override = NULL;
   int i = 0;
   
-  snprintf(buffer, 255, "KVAZAAR_OVERRIDE_%s", strategy_type);
+  // Because VS doesn't support snprintf, let's just assert that there is more
+  // than enough room.
+  assert(strnlen(strategy_type, 200));
+  sprintf(buffer, "KVAZAAR_OVERRIDE_%s", strategy_type);
+
   override = getenv(buffer);
   
   for (i=0; i < strategies->count; ++i) {

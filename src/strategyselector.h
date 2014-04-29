@@ -21,6 +21,20 @@
 
 //Hardware data (abstraction of defines). Extend for other compilers
 
+
+// Visual studio does not define __SSE__ or __SSE2__ but does define
+// __AVX__ and __AVX2__. So let's define them here.
+#if defined(_MSC_VER) && defined(_M_IX86_FP)
+  // _M_IX86_FP depends on /arch and is 0, 1 or 2
+  #if _M_IX86_FP >= 1
+    #define __SSE__
+  #endif
+  #if _M_IX86_FP >= 2
+    #define __SSE2__
+  #endif
+#endif
+
+
 #if defined(_M_IX86) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
 #define COMPILE_INTEL 1
 
