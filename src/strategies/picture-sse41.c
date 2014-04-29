@@ -20,12 +20,13 @@
 /*
  * \file
  */
-
+#include "../strategyselector.h"
 #include "../picture.h"
 #include <immintrin.h>
+#include <assert.h>
 
-#ifdef __SSE2__
-static unsigned reg_sad(const pixel * const data1, const pixel * const data2,
+__attribute__ ((__target__ ("sse2,sse4.1")))
+static unsigned reg_sad_sse41(const pixel * const data1, const pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -40,7 +41,6 @@ static unsigned reg_sad(const pixel * const data1, const pixel * const data2,
       sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a,b));
     }
     
-#ifdef __SSE4_1__
     {
       const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
       const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
@@ -74,7 +74,6 @@ static unsigned reg_sad(const pixel * const data1, const pixel * const data2,
       }
       x = (width - (width%2));
     }
-#endif //__SSE4_1__
 
     for (; x < width; ++x) {
       sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
@@ -85,6 +84,7 @@ static unsigned reg_sad(const pixel * const data1, const pixel * const data2,
 
   return sad;
 }
-#else
-#error picture-sse2.c requires __SSE2__
-#endif //__SSE2__
+
+static int strategy_register_picture_sse41(void* opaque) {
+  return strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
+}

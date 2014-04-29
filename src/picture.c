@@ -22,6 +22,7 @@
  */
 
 #include "picture.h"
+#include "strategyselector.h"
 
 #include <string.h>
 #include <stdio.h>
@@ -768,42 +769,6 @@ static unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
   return sad;
 }
 
-
-#if defined(__SSE2__)
-#include "inline-optimizations/picture-sse2.c"
-#elif defined(__ALTIVEC__)
-#include "picture-altivec.c"
-#else
-//Generic implementations
-/**
- * \brief Calculate Sum of Absolute Differences (SAD)
- *
- * Calculate Sum of Absolute Differences (SAD) between two rectangular regions
- * located in arbitrary points in the picture.
- *
- * \param data1   Starting point of the first picture.
- * \param data2   Starting point of the second picture.
- * \param width   Width of the region for which SAD is calculated.
- * \param height  Height of the region for which SAD is calculated.
- * \param stride  Width of the pixel array.
- *
- * \returns Sum of Absolute Differences
- */
-static unsigned reg_sad(const pixel * const data1, const pixel * const data2,
-                        const int width, const int height, const unsigned stride1, const unsigned stride2)
-{
-  int y, x;
-  unsigned sad = 0;
-
-  for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
-      sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
-    }
-  }
-
-  return sad;
-}
-#endif
 
 /**
  * \brief  Handle special cases of comparing blocks that are not completely
