@@ -2050,7 +2050,7 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
     // without coeffs, we only use the prediction
     for (y = 0; y < width_c; y++) {
       for (x = 0; x < width_c; x++) {
-        recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, pred_u[x + y * (pred_stride >> 1)]);
+        recbase_u[x + y * (recbase_stride >> 1)] = pred_u[x + y * (pred_stride >> 1)];
       }
     }
   }
@@ -2331,7 +2331,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       // Without coefficients, just copy the prediction as the reconstructed image.
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
-          recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, pred_y[x + y * pred_stride]);
+          recbase_y[x + y * recbase_stride] = pred_y[x + y * pred_stride];
         }
       }
     }

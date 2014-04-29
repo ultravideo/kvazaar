@@ -758,7 +758,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
-  int32_t shift,add,coeff_q,clip_q_coef;
+  int32_t shift,add,coeff_q;
   int32_t n;
   int32_t transform_shift = 15 - encoder->bitdepth - (g_convert_to_bit[ width ] + 2);
 
@@ -778,15 +778,13 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
       add = 1 << (shift - qp_scaled/6 - 1);
 
       for (n = 0; n < width * height; n++) {
-        clip_q_coef = CLIP(-32768, 32767, q_coef[n]);
-        coeff_q = ((clip_q_coef * dequant_coef[n]) + add ) >> (shift -  qp_scaled/6);
+        coeff_q = ((q_coef[n] * dequant_coef[n]) + add ) >> (shift -  qp_scaled/6);
         coef[n] = (int16_t)CLIP(-32768,32767,coeff_q);
       }
     } else {
       for (n = 0; n < width * height; n++) {
         // Clip to avoid possible overflow in following shift left operation
-        clip_q_coef = CLIP(-32768, 32767, q_coef[n]);
-        coeff_q   = CLIP(-32768, 32767, clip_q_coef * dequant_coef[n]);
+        coeff_q   = CLIP(-32768, 32767, q_coef[n] * dequant_coef[n]);
         coef[n] = (int16_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
       }
     }
@@ -795,8 +793,7 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
     add = 1 << (shift-1);
 
     for (n = 0; n < width*height; n++) {
-      clip_q_coef = CLIP(-32768, 32767, q_coef[n]);
-      coeff_q   = (clip_q_coef * scale + add) >> shift;
+      coeff_q   = (q_coef[n] * scale + add) >> shift;
       coef[n] = (int16_t)CLIP(-32768, 32767, coeff_q);
     }
   }
