@@ -25,7 +25,9 @@
 #include <immintrin.h>
 #include <assert.h>
 
+#ifdef __GNUC__
 __attribute__ ((__target__ ("sse2,sse4.1")))
+#endif
 static unsigned reg_sad_sse41(const pixel * const data1, const pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
