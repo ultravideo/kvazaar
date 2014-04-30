@@ -616,17 +616,15 @@ static void substream_encode(encoder_state * const encoder_state, const int last
   if (encoder->sao_enable) {
     sao_reconstruct_frame(encoder_state);
   }
+
+  dealloc_yuv_t(hor_buf);
+  dealloc_yuv_t(ver_buf);
 }
 
 void encode_one_frame(encoder_state * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
-  
-  yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
-  // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
-  // for the extra pixel on the top right.
-  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
 
   const int is_first_frame = (encoder_state->frame == 0);
   const int is_i_radl = (encoder->cfg->intra_period == 1 && encoder_state->frame % 2 == 0);
@@ -760,9 +758,6 @@ void encode_one_frame(encoder_state * const encoder_state)
   add_checksum(encoder_state);
 
   encoder_state->cur_pic->poc = encoder_state->poc;
-
-  dealloc_yuv_t(hor_buf);
-  dealloc_yuv_t(ver_buf);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
