@@ -637,6 +637,55 @@ static void substream_encode(encoder_state * const encoder_state, const int last
   dealloc_yuv_t(ver_buf);
 }
 
+static void subencoder_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
+  const int source_offset_x = source_enc->lcu_offset_x * LCU_WIDTH;
+  const int source_offset_y = source_enc->lcu_offset_y * LCU_WIDTH;
+  
+  const int target_offset_x = target_enc->lcu_offset_x * LCU_WIDTH;
+  const int target_offset_y = target_enc->lcu_offset_y * LCU_WIDTH;
+  
+  int source_stride = source_enc->cur_pic->width;
+  int target_stride = target_enc->cur_pic->width;
+  
+  int width;
+  int height;
+  
+  int source_offset;
+  int target_offset;
+  
+  //One of them has to be the main encoder
+  assert(target_enc->children || source_enc->children);
+
+  if (is_y_channel) {
+    target_offset = source_offset_x + source_offset_y * target_enc->cur_pic->width;
+    source_offset = target_offset_x + target_offset_y * source_enc->cur_pic->width;
+  } else {
+    target_offset = source_offset_x/2 + source_offset_y/2 * target_enc->cur_pic->width/2;
+    source_offset = target_offset_x/2 + target_offset_y/2 * source_enc->cur_pic->width/2;
+  }
+  
+  if (target_enc->children) {
+    //Use information from the source
+    width = MIN(source_enc->cur_pic->width_in_lcu * LCU_WIDTH, target_enc->cur_pic->width - source_offset_x);
+    height = MIN(source_enc->cur_pic->height_in_lcu * LCU_WIDTH, target_enc->cur_pic->height - source_offset_y);
+  } else {
+    //Use information from the target
+    width = MIN(target_enc->cur_pic->width_in_lcu * LCU_WIDTH, source_enc->cur_pic->width - target_offset_x);
+    height = MIN(target_enc->cur_pic->height_in_lcu * LCU_WIDTH, source_enc->cur_pic->height - target_offset_y);
+  }
+  
+  if (!is_y_channel) {
+    width /= 2;
+    height /= 2;
+    
+    source_stride /= 2;
+    target_stride /= 2;
+  }
+  
+  //picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_enc->cur_pic->width, target_enc->cur_pic->width);
+  picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_stride, target_stride);
+}
+
 void encode_one_frame(encoder_state * const main_state)
 {
   const encoder_control * const encoder = main_state->encoder_control;
@@ -706,7 +755,7 @@ void encode_one_frame(encoder_state * const main_state)
   encode_slice_header(main_state);
   bitstream_align(&main_state->stream);
 
-  if (USE_TILES && encoder->tiles_enable) {
+  if (main_state->children) {
 #if USE_TILES
     int i;
     //This can be parallelized, we don't use a do...while loop because we use OpenMP
@@ -714,33 +763,22 @@ void encode_one_frame(encoder_state * const main_state)
     for (i = 0; i < encoder->tiles_num_tile_rows * encoder->tiles_num_tile_columns; ++i) {
       encoder_state *subencoder = &(main_state->children[i]);
 
-      const int tile_width_in_lcu = subencoder->cur_pic->width_in_lcu;
-      const int tile_height_in_lcu = subencoder->cur_pic->height_in_lcu;
-      const int tile_offset_x = subencoder->lcu_offset_x * LCU_WIDTH;
-      const int tile_offset_y = subencoder->lcu_offset_y * LCU_WIDTH;
-      const int tile_width = MIN(tile_width_in_lcu * LCU_WIDTH, encoder->in.width - tile_offset_x);
-      const int tile_height = MIN(tile_height_in_lcu * LCU_WIDTH, encoder->in.height - tile_offset_y);
-      
-      const int tile_offset_full = tile_offset_x+tile_offset_y*main_state->cur_pic->width;
-      const int tile_offset_half = tile_offset_x/2+tile_offset_y/2*main_state->cur_pic->width/2;
-
-        
       //TODO: ref frames
       
       subencoder->QP = main_state->QP;
-        
-      picture_blit_pixels(main_state->cur_pic->y_data + tile_offset_full, subencoder->cur_pic->y_data, tile_width, tile_height, main_state->cur_pic->width, tile_width);
-      picture_blit_pixels(main_state->cur_pic->u_data + tile_offset_half, subencoder->cur_pic->u_data, tile_width/2, tile_height/2, main_state->cur_pic->width/2, tile_width/2);
-      picture_blit_pixels(main_state->cur_pic->v_data + tile_offset_half, subencoder->cur_pic->v_data, tile_width/2, tile_height/2, main_state->cur_pic->width/2, tile_width/2);
+      
+      subencoder_blit_pixels(subencoder, subencoder->cur_pic->y_data, main_state, main_state->cur_pic->y_data, 1);
+      subencoder_blit_pixels(subencoder, subencoder->cur_pic->u_data, main_state, main_state->cur_pic->u_data, 0);
+      subencoder_blit_pixels(subencoder, subencoder->cur_pic->v_data, main_state, main_state->cur_pic->v_data, 0);
       
       subencoder->cur_pic->slicetype = main_state->cur_pic->slicetype;
       subencoder->cur_pic->type = main_state->cur_pic->type;
       
       substream_encode(subencoder, !(main_state->children[i+1].encoder_control));
       
-      picture_blit_pixels(subencoder->cur_pic->y_recdata, main_state->cur_pic->y_recdata + tile_offset_full, tile_width, tile_height, tile_width, main_state->cur_pic->width);
-      picture_blit_pixels(subencoder->cur_pic->u_recdata, main_state->cur_pic->u_recdata + tile_offset_half, tile_width/2, tile_height/2, tile_width/2, main_state->cur_pic->width/2);
-      picture_blit_pixels(subencoder->cur_pic->v_recdata, main_state->cur_pic->v_recdata + tile_offset_half, tile_width/2, tile_height/2, tile_width/2, main_state->cur_pic->width/2);
+      subencoder_blit_pixels(main_state, main_state->cur_pic->y_recdata, subencoder, subencoder->cur_pic->y_recdata, 1);
+      subencoder_blit_pixels(main_state, main_state->cur_pic->u_recdata, subencoder, subencoder->cur_pic->u_recdata, 0);
+      subencoder_blit_pixels(main_state, main_state->cur_pic->v_recdata, subencoder, subencoder->cur_pic->v_recdata, 0);
     }
     
     //This has to be serial
