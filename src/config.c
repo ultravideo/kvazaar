@@ -81,12 +81,10 @@ int config_init(config *cfg)
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
   cfg->seek            = 0;
 
-#if USE_TILES
   cfg->tiles_width_count         = 0;
   cfg->tiles_height_count         = 0;
   cfg->tiles_width_split          = NULL;
   cfg->tiles_height_split          = NULL;
-#endif //USE_TILES
 
   return 1;
 }
@@ -101,10 +99,8 @@ int config_destroy(config *cfg)
   FREE_POINTER(cfg->input);
   FREE_POINTER(cfg->output);
   FREE_POINTER(cfg->cqmfile);
-#if USE_TILES
   FREE_POINTER(cfg->tiles_width_split);
   FREE_POINTER(cfg->tiles_height_split);
-#endif //USE_TILES
   free(cfg);
 
   return 1;
@@ -156,7 +152,6 @@ static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
   return 0;
 }
 
-#if USE_TILES
 static int parse_tiles_specification(const char* const arg, int32_t * const ntiles, int32_t** const array) {
   const char* current_arg = NULL;
   int32_t current_value;
@@ -214,7 +209,6 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   
   return 1;
 }
-#endif //USE_TILES
 
 static int config_parse(config *cfg, const char *name, const char *value)
 {
@@ -342,12 +336,10 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->cqmfile = copy_string(value);
   else if OPT("seek")
     cfg->seek = atoi(value);
-#if USE_TILES
   else if OPT("tiles-width-split")
     error = !parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
   else if OPT("tiles-height-split")
     error = !parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
-#endif //USE_TILES
   else
     return 0;
 #undef OPT
@@ -394,10 +386,8 @@ int config_read(config *cfg,int argc, char *argv[])
     { "aud",                      no_argument, NULL, 0 },
     { "cqmfile",            required_argument, NULL, 0 },
     { "seek",               required_argument, NULL, 0 },
-#if USE_TILES
-    { "tiles-width-split",             required_argument, NULL, 0 },
-    { "tiles-height-split",             required_argument, NULL, 0 },
-#endif
+    { "tiles-width-split",  required_argument, NULL, 0 },
+    { "tiles-height-split", required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 
@@ -449,7 +439,6 @@ int config_validate(config *cfg)
     fprintf(stderr, "Input error: one of the dimensions is 0: dims=%dx%d", cfg->width, cfg->height);
     return 0;
   }
-#if USE_TILES
   //Tile separation should be at round position in terms of LCU, should be monotonic, and should not start by 0
   if (cfg->tiles_width_split) {
     int i;
@@ -492,6 +481,5 @@ int config_validate(config *cfg)
       return 0;
     }
   }
-#endif //USE_TILES
   return 1;
 }
