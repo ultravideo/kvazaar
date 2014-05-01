@@ -103,7 +103,6 @@ typedef struct
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */
   
-#if USE_TILES
   int8_t tiles_uniform_spacing_flag; /*!<spec: uniform_spacing_flag */
   
   uint8_t tiles_num_tile_columns; /*!<spec: num_tile_columns_minus1 + 1 */
@@ -120,7 +119,6 @@ typedef struct
   const int32_t *tiles_ctb_addr_ts_to_rs; /*!<spec:  CtbAddrTsToRs (6.5.1); dimension: PicSizeInCtbsY */
   
   const int32_t *tiles_tile_id; /*!<spec:  TileId (6.5.1); dimension: PicSizeInCtbsY */
-#endif //USE_TILES
   
 } encoder_control;
 

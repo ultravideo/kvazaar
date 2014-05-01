@@ -117,7 +117,6 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   
   //Tiles
   encoder->tiles_enable = 0;
-#if USE_TILES
   if (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0) {
     int i, j; //iteration variables
     const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
@@ -279,14 +278,11 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
 
   }
   
-#endif //USE_TILES
-  
   return 1;
 }
 
 int encoder_control_finalize(encoder_control * const encoder) {
   //Tiles
-#if USE_TILES
   if (encoder->tiles_enable) {
     FREE_POINTER(encoder->tiles_col_width);
     FREE_POINTER(encoder->tiles_row_height);
@@ -299,7 +295,6 @@ int encoder_control_finalize(encoder_control * const encoder) {
     
     FREE_POINTER(encoder->tiles_tile_id);
   }
-#endif //USE_TILES
   scalinglist_destroy(&encoder->scaling_list);
   
   return 1;
@@ -330,7 +325,6 @@ static int encoder_state_init_one(encoder_state * const state, const encoder_sta
     assert(encoder);
     state->encoder_control = parent_state->encoder_control;
     
-#if USE_TILES
     state->lcu_offset_x = encoder->tiles_col_bd[tile_x];
     state->lcu_offset_y = encoder->tiles_row_bd[tile_y];
     
@@ -338,12 +332,6 @@ static int encoder_state_init_one(encoder_state * const state, const encoder_sta
     height_in_lcu = encoder->tiles_row_bd[tile_y+1]-encoder->tiles_row_bd[tile_y];
     width = MIN(width_in_lcu * LCU_WIDTH, encoder->in.width - state->lcu_offset_x * LCU_WIDTH);
     height = MIN(height_in_lcu * LCU_WIDTH, encoder->in.height - state->lcu_offset_y * LCU_WIDTH);
-    
-
-#else
-    assert(0); //Tiles are not activated, we should not try to alloc sub-encoders
-    return 0;
-#endif //USE_TILES
   }
   
   //Ok we have all the variables initialized, do the real work now
@@ -409,7 +397,6 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
   
   encoder_state->stream.file.output = encoder->out.file;
   
-#if USE_TILES
   if (encoder->tiles_enable) {
     int x,y;
     //Allocate subencoders (valid subencoder have a non null encoder_control field, so we use a null one to mark the end of the list)
@@ -427,7 +414,6 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
       }
     }
   }
-#endif //USE_TILES
   
   return 1;
 }
@@ -546,7 +532,6 @@ static void substream_encode(encoder_state * const encoder_state, const int last
     //FIXME: not used?
     //const vector2d size_lcu = { cur_pic->width_in_lcu, cur_pic->height_in_lcu };
     
-    //lcu_id use raster scan if not USE_TILES, otherwise it's tile scan.
     for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
       lcu.x = lcu_id % cur_pic->width_in_lcu;
       lcu.y = lcu_id / cur_pic->width_in_lcu;
@@ -755,8 +740,8 @@ void encode_one_frame(encoder_state * const main_state)
   encode_slice_header(main_state);
   bitstream_align(&main_state->stream);
 
+  
   if (main_state->children) {
-#if USE_TILES
     int i;
     //This can be parallelized, we don't use a do...while loop because we use OpenMP
     #pragma omp parallel for
@@ -798,7 +783,6 @@ void encode_one_frame(encoder_state * const main_state)
       bitstream_clear(&main_state->children[i].stream);
     } while (main_state->children[++i].encoder_control);
     
-#endif //USE_TILES
   } else {
     //Encode the whole thing as one stream
     substream_encode(main_state, 1);
@@ -1016,7 +1000,6 @@ void encode_pic_parameter_set(encoder_state * const encoder_state)
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
   WRITE_U(stream, 0, 1, "entropy_coding_sync_enabled_flag");
 
-#if USE_TILES
   if (encoder->tiles_enable) {
     WRITE_UE(stream, encoder->tiles_num_tile_columns - 1, "num_tile_columns_minus1");
     WRITE_UE(stream, encoder->tiles_num_tile_rows - 1, "num_tile_rows_minus1");
@@ -1035,9 +1018,6 @@ void encode_pic_parameter_set(encoder_state * const encoder_state)
     WRITE_U(stream, 0, 1, "loop_filter_across_tiles_enabled_flag");
     
   }
-#else
-  assert(encoder->tiles_enable == 0);
-#endif
   
   WRITE_U(stream, 0, 1, "loop_filter_across_slice_flag");
   WRITE_U(stream, 1, 1, "deblocking_filter_control_present_flag");
@@ -1427,22 +1407,16 @@ void encoder_next_frame(encoder_state *encoder_state) {
   encoder_state->frame++;
   encoder_state->poc++;
   
-  if (USE_TILES && encoder->tiles_enable) {
-#if USE_TILES
-    if (encoder_state->children) {
-      int x,y;
-      //Allocate subencoders
-      for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
-        for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
-          const int i = y * encoder->tiles_num_tile_columns + x;
-          //encoder_next_frame(&encoder_state->children[i]);
-          encoder_state->children[i].frame++;
-          encoder_state->children[i].poc++;
-        }
+  if (encoder_state->children) {
+    int x,y;
+    for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
+      for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
+        const int i = y * encoder->tiles_num_tile_columns + x;
+        encoder_state->children[i].frame++;
+        encoder_state->children[i].poc++;
       }
-    } 
-#endif //USE_TILES
-  }
+    }
+  } 
 }
 
 void encode_slice_header(encoder_state * const encoder_state)
@@ -1515,12 +1489,10 @@ void encode_slice_header(encoder_state * const encoder_state)
     WRITE_SE(stream, 0, "slice_qp_delta");
     //WRITE_U(stream, 1, 1, "alignment");
    
-#if USE_TILES
   if (encoder->tiles_enable) {
     //FIXME: use entry points
     WRITE_UE(stream, 0, "num_entry_point_offsets");
   }
-#endif //USE_TILES
 }
 
 

@@ -138,7 +138,6 @@ int main(int argc, char *argv[])
             "                                     - undef, bt709, fcc, bt470bg, smpte170m,\n"
             "                                       smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
             "          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
-#if USE_TILES
             "\n"
             "  Tiles:\n"
             "          --tiles-width-split <string>|u<int>: \n"
@@ -151,7 +150,6 @@ int main(int argc, char *argv[])
             "                                   positions of tiles rows separation coordinates.\n"
             "                                   Can also be u followed by and a single int n,\n"
             "                                   in which case it produces rows of uniform height.\n"
-#endif //USE TILES
             "\n"
             "  Deprecated parameters: (might be removed at some point)\n"
             "     Use --input-res:\n"
