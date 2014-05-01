@@ -305,105 +305,125 @@ int encoder_control_finalize(encoder_control * const encoder) {
   return 1;
 }
 
-int encoder_state_init(encoder_state * const encoder_state, const encoder_control * const encoder) {
-  encoder_state->encoder_control = encoder;
+static int encoder_state_init_one(encoder_state * const state, const encoder_state * const parent_state, const int tile_x, const int tile_y) {
+  const encoder_control *encoder;
+  int width_in_lcu;
+  int height_in_lcu;
+  int width;
+  int height;
   
-  // Allocate the bitstream struct
-  if (!bitstream_init(&encoder_state->stream, BITSTREAM_TYPE_FILE)) {
-    fprintf(stderr, "Could not initialize stream!\n");
-    return 0;
-  }
-  
-  encoder_state->ref = picture_list_init(MAX_REF_PIC_COUNT);
-  if(!encoder_state->ref) {
-    fprintf(stderr, "Failed to allocate the picture list!\n");
-    return 0;
-  }
-  
-  encoder_state->ref_list = REF_PIC_LIST_0;
-  
-  encoder_state->frame = 0;
-  encoder_state->poc = 0;
-  
-  encoder_state->lcu_offset_x = 0;
-  encoder_state->lcu_offset_y = 0;
-  
-  // Allocate the picture and CU array
-  encoder_state->cur_pic = picture_init(encoder->in.width, encoder->in.height,
-                                encoder->in.width_in_lcu, encoder->in.height_in_lcu);
+  if (!parent_state) {
+    //Use encoder_control from current state (has to be initialized)
+    encoder = state->encoder_control;
+    assert(encoder);
+    
+    width_in_lcu = encoder->in.width_in_lcu;
+    height_in_lcu = encoder->in.height_in_lcu;
+    width = encoder->in.width;
+    height = encoder->in.height;
+    
+    state->lcu_offset_x = 0;
+    state->lcu_offset_y = 0;
+  } else {
+    //Use parent encoder_control
+    encoder = parent_state->encoder_control;
+    assert(encoder);
+    state->encoder_control = parent_state->encoder_control;
+    
+#if USE_TILES
+    state->lcu_offset_x = encoder->tiles_col_bd[tile_x];
+    state->lcu_offset_y = encoder->tiles_row_bd[tile_y];
+    
+    width_in_lcu = encoder->tiles_col_bd[tile_x+1]-encoder->tiles_col_bd[tile_x];
+    height_in_lcu = encoder->tiles_row_bd[tile_y+1]-encoder->tiles_row_bd[tile_y];
+    width = MIN(width_in_lcu * LCU_WIDTH, encoder->in.width - state->lcu_offset_x * LCU_WIDTH);
+    height = MIN(height_in_lcu * LCU_WIDTH, encoder->in.height - state->lcu_offset_y * LCU_WIDTH);
+    
 
-  if (!encoder_state->cur_pic) {
+#else
+    assert(0); //Tiles are not activated, we should not try to alloc sub-encoders
+    return 0;
+#endif //USE_TILES
+  }
+  
+  //Ok we have all the variables initialized, do the real work now
+  
+  if (parent_state) {
+    if (!bitstream_init(&state->stream, BITSTREAM_TYPE_MEMORY)) {
+      fprintf(stderr, "Could not initialize stream (subencoder)!\n");
+      return 0;
+    }
+    
+    //FIXME: at some point, we may want to have a ref list for each subencoder (would allow overlapping between frames)
+    state->ref = parent_state->ref;
+    state->ref_list = parent_state->ref_list;
+  } else {
+    // Allocate the bitstream struct
+    if (!bitstream_init(&state->stream, BITSTREAM_TYPE_FILE)) {
+      fprintf(stderr, "Could not initialize stream!\n");
+      return 0;
+    }
+    
+    state->ref = picture_list_init(MAX_REF_PIC_COUNT);
+    if(!state->ref) {
+      fprintf(stderr, "Failed to allocate the picture list!\n");
+      return 0;
+    }
+    state->ref_list = REF_PIC_LIST_0;
+  }
+  
+  state->frame = 0;
+  state->poc = 0;
+  
+  state->cur_pic = picture_init(width, height, width_in_lcu, height_in_lcu);
+
+  if (!state->cur_pic) {
     printf("Error allocating picture!\r\n");
     return 0;
   }
   
   // Init coeff data table
-  encoder_state->cur_pic->coeff_y = MALLOC(coefficient, encoder->in.width * encoder->in.height);
-  encoder_state->cur_pic->coeff_u = MALLOC(coefficient, (encoder->in.width * encoder->in.height) >> 2);
-  encoder_state->cur_pic->coeff_v = MALLOC(coefficient, (encoder->in.width * encoder->in.height) >> 2);
+  state->cur_pic->coeff_y = MALLOC(coefficient, width * height);
+  state->cur_pic->coeff_u = MALLOC(coefficient, (width * height) >> 2);
+  state->cur_pic->coeff_v = MALLOC(coefficient, (width * height) >> 2);
 
   // Init predicted data table
-  encoder_state->cur_pic->pred_y = MALLOC(pixel, encoder->in.width * encoder->in.height);
-  encoder_state->cur_pic->pred_u = MALLOC(pixel, (encoder->in.width * encoder->in.height) >> 2);
-  encoder_state->cur_pic->pred_v = MALLOC(pixel, (encoder->in.width * encoder->in.height) >> 2);
+  state->cur_pic->pred_y = MALLOC(pixel, width * height);
+  state->cur_pic->pred_u = MALLOC(pixel, (width * height) >> 2);
+  state->cur_pic->pred_v = MALLOC(pixel, (width * height) >> 2);
   
-  encoder_state->children = NULL;
+  state->children = NULL;
+  
+  // Set CABAC output bitstream
+  state->cabac.stream = &state->stream;
+  
+  return 1;
+}
+
+int encoder_state_init(encoder_state * const encoder_state, const encoder_control * const encoder) {
+  encoder_state->encoder_control = encoder;
+  if (!encoder_state_init_one(encoder_state, NULL, 0, 0)) {
+    fprintf(stderr, "Could not initialize main encoder state!\n");
+    return 0;
+  }
   
   encoder_state->stream.file.output = encoder->out.file;
   
-  // Set CABAC output bitstream
-  encoder_state->cabac.stream = &encoder_state->stream;
-  
 #if USE_TILES
   if (encoder->tiles_enable) {
-    int i,x,y;
+    int x,y;
     //Allocate subencoders
     encoder_state->children = MALLOC(struct encoder_state, encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows);
     for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
-        const int tile_width_in_lcu = encoder->tiles_col_bd[x+1]-encoder->tiles_col_bd[x];
-        const int tile_height_in_lcu = encoder->tiles_row_bd[y+1]-encoder->tiles_row_bd[y];
-        const int tile_offset_x = encoder->tiles_col_bd[x] * LCU_WIDTH;
-        const int tile_offset_y = encoder->tiles_row_bd[y] * LCU_WIDTH;
-        const int tile_width = MIN(tile_width_in_lcu * LCU_WIDTH, encoder->in.width - tile_offset_x);
-        const int tile_height = MIN(tile_height_in_lcu * LCU_WIDTH, encoder->in.height - tile_offset_y);
-        i = y * encoder->tiles_num_tile_columns + x;
-        
+        const int i = y * encoder->tiles_num_tile_columns + x;
         encoder_state->children[i].encoder_control = encoder;
         
-        encoder_state->children[i].lcu_offset_x = encoder->tiles_col_bd[x];
-        encoder_state->children[i].lcu_offset_y = encoder->tiles_row_bd[y];
-        
-        if (!bitstream_init(&encoder_state->children[i].stream, BITSTREAM_TYPE_MEMORY)) {
-          fprintf(stderr, "Could not initialize stream (subencoder)!\n");
+        if (!encoder_state_init_one(&encoder_state->children[i], encoder_state, x, y)) {
+          fprintf(stderr, "Could not initialize encoder state %d!\n", i);
           return 0;
         }
-        
-        encoder_state->children[i].ref = encoder_state->ref;
-        encoder_state->children[i].ref_list = REF_PIC_LIST_0;
-        
-        encoder_state->children[i].cur_pic = picture_init(tile_width, tile_height,
-                                tile_width_in_lcu, tile_height_in_lcu);
-
-        if (!encoder_state->children[i].cur_pic) {
-          printf("Error allocating picture (subencoder)!\r\n");
-          return 0;
-        }
-        
-        // Init coeff data table
-        encoder_state->children[i].cur_pic->coeff_y = MALLOC(coefficient, tile_width * tile_height);
-        encoder_state->children[i].cur_pic->coeff_u = MALLOC(coefficient, (tile_width * tile_height) >> 2);
-        encoder_state->children[i].cur_pic->coeff_v = MALLOC(coefficient, (tile_width * tile_height) >> 2);
-
-        // Init predicted data table
-        encoder_state->children[i].cur_pic->pred_y = MALLOC(pixel, tile_width * tile_height);
-        encoder_state->children[i].cur_pic->pred_u = MALLOC(pixel, (tile_width * tile_height) >> 2);
-        encoder_state->children[i].cur_pic->pred_v = MALLOC(pixel, (tile_width * tile_height) >> 2);
-        
-        // Set CABAC output bitstream
-        encoder_state->children[i].cabac.stream = &encoder_state->children[i].stream;
-        
-        encoder_state->children[i].children = NULL;      }
+      }
     }
   }
 #endif //USE_TILES
@@ -411,30 +431,32 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
   return 1;
 }
 
+static int encoder_state_finalize_one(encoder_state * const encoder_state) {
+  picture_destroy(encoder_state->cur_pic);
+  FREE_POINTER(encoder_state->cur_pic);
+  
+  bitstream_finalize(&encoder_state->stream);
+  return 1;
+}
+
+
 int encoder_state_finalize(encoder_state * const encoder_state) {
 #if USE_TILES
   const encoder_control * const encoder = encoder_state->encoder_control;
   if (encoder->tiles_enable) {
-    int i,x,y;
+    int x,y;
     for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
       for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
-        i = y * encoder->tiles_num_tile_columns + x;
-        
-        picture_destroy(encoder_state->children[i].cur_pic);
-        FREE_POINTER(encoder_state->children[i].cur_pic);
-        
-        bitstream_finalize(&encoder_state->children[i].stream);
+        const int i = y * encoder->tiles_num_tile_columns + x;
+        encoder_state_finalize_one(&encoder_state->children[i]);
       }
     }
     FREE_POINTER(encoder_state->children);
   }
 #endif //USE_TILES
   
-  picture_destroy(encoder_state->cur_pic);
-  FREE_POINTER(encoder_state->cur_pic);
-  
+  encoder_state_finalize_one(encoder_state);
   picture_list_destroy(encoder_state->ref);
-  bitstream_finalize(&encoder_state->stream);
   return 1;
 }
 
