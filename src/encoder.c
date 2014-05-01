@@ -116,8 +116,8 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   encoder_control_input_init(encoder, cfg->width, cfg->height);
   
   //Tiles
-  encoder->tiles_enable = 0;
-  if (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0) {
+  encoder->tiles_enable = (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0);
+  {
     int i, j; //iteration variables
     const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
     int tileIdx, x, y; //iterations variable for 6-9
@@ -132,8 +132,6 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
       fprintf(stderr, "Too many tiles (height)!\n");
       return 0;
     }
-    
-    encoder->tiles_enable = 1;
     
     //Will be (perhaps) changed later
     encoder->tiles_uniform_spacing_flag = 1;
@@ -283,18 +281,16 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
 
 int encoder_control_finalize(encoder_control * const encoder) {
   //Tiles
-  if (encoder->tiles_enable) {
-    FREE_POINTER(encoder->tiles_col_width);
-    FREE_POINTER(encoder->tiles_row_height);
-    
-    FREE_POINTER(encoder->tiles_col_bd);
-    FREE_POINTER(encoder->tiles_row_bd);
-    
-    FREE_POINTER(encoder->tiles_ctb_addr_rs_to_ts);
-    FREE_POINTER(encoder->tiles_ctb_addr_ts_to_rs);
-    
-    FREE_POINTER(encoder->tiles_tile_id);
-  }
+  FREE_POINTER(encoder->tiles_col_width);
+  FREE_POINTER(encoder->tiles_row_height);
+  
+  FREE_POINTER(encoder->tiles_col_bd);
+  FREE_POINTER(encoder->tiles_row_bd);
+  
+  FREE_POINTER(encoder->tiles_ctb_addr_rs_to_ts);
+  FREE_POINTER(encoder->tiles_ctb_addr_ts_to_rs);
+  
+  FREE_POINTER(encoder->tiles_tile_id);
   scalinglist_destroy(&encoder->scaling_list);
   
   return 1;
