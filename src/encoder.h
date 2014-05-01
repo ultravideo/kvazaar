@@ -143,6 +143,8 @@ typedef struct encoder_state {
   
   cabac_data cabac;
   
+  //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
+  //Use do { } while (encoder_state->children[++i].encoder_control)
   struct encoder_state *children;
 } encoder_state;
 
