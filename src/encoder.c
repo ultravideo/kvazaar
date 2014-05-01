@@ -125,6 +125,14 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
 
     //Temporary pointers to allow encoder fields to be const
     int32_t *tiles_col_width, *tiles_row_height, *tiles_ctb_addr_rs_to_ts, *tiles_ctb_addr_ts_to_rs, *tiles_tile_id, *tiles_col_bd, *tiles_row_bd;
+  
+    if (encoder->cfg->tiles_width_count >= encoder->in.width_in_lcu) {
+      fprintf(stderr, "Too many tiles (width)!\n");
+      return 0;
+    } else if (encoder->cfg->tiles_height_count >= encoder->in.height_in_lcu) {
+      fprintf(stderr, "Too many tiles (height)!\n");
+      return 0;
+    }
     
     encoder->tiles_enable = 1;
     
