@@ -111,10 +111,6 @@ typedef struct picture_struct
   pixel* v_recdata;     //!< \brief Pointer to reconstructed V-data.
   pixel *recdata[NUM_COLORS]; // \brief Alternate access method to same data.
 
-  pixel* pred_y;        //!< \brief Pointer to predicted Y
-  pixel* pred_u;        //!< \brief Pointer to predicted U
-  pixel* pred_v;        //!< \brief Pointer to predicted V
-
   coefficient* coeff_y;   //!< \brief coefficient pointer Y
   coefficient* coeff_u;   //!< \brief coefficient pointer U
   coefficient* coeff_v;   //!< \brief coefficient pointer V
@@ -210,12 +206,12 @@ typedef struct {
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 
-yuv_t * alloc_yuv_t(int luma_size);
-void dealloc_yuv_t(yuv_t * yuv);
+yuv_t * yuv_t_alloc(int luma_size);
+void yuv_t_free(yuv_t * yuv);
 
-picture * picture_init(int32_t width, int32_t height,
+picture * picture_alloc(int32_t width, int32_t height,
                        int32_t width_in_lcu, int32_t height_in_lcu);
-int picture_destroy(picture *pic);
+int picture_free(picture *pic);
 
 void picture_blit_pixels(const pixel* orig, pixel *dst,
                          unsigned width, unsigned height,

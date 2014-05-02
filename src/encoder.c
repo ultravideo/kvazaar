@@ -116,8 +116,8 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   encoder_control_input_init(encoder, cfg->width, cfg->height);
   
   //Tiles
-  encoder->tiles_enable = 0;
-  if (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0) {
+  encoder->tiles_enable = (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0);
+  {
     int i, j; //iteration variables
     const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
     int tileIdx, x, y; //iterations variable for 6-9
@@ -132,8 +132,6 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
       fprintf(stderr, "Too many tiles (height)!\n");
       return 0;
     }
-    
-    encoder->tiles_enable = 1;
     
     //Will be (perhaps) changed later
     encoder->tiles_uniform_spacing_flag = 1;
@@ -283,18 +281,16 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
 
 int encoder_control_finalize(encoder_control * const encoder) {
   //Tiles
-  if (encoder->tiles_enable) {
-    FREE_POINTER(encoder->tiles_col_width);
-    FREE_POINTER(encoder->tiles_row_height);
-    
-    FREE_POINTER(encoder->tiles_col_bd);
-    FREE_POINTER(encoder->tiles_row_bd);
-    
-    FREE_POINTER(encoder->tiles_ctb_addr_rs_to_ts);
-    FREE_POINTER(encoder->tiles_ctb_addr_ts_to_rs);
-    
-    FREE_POINTER(encoder->tiles_tile_id);
-  }
+  FREE_POINTER(encoder->tiles_col_width);
+  FREE_POINTER(encoder->tiles_row_height);
+  
+  FREE_POINTER(encoder->tiles_col_bd);
+  FREE_POINTER(encoder->tiles_row_bd);
+  
+  FREE_POINTER(encoder->tiles_ctb_addr_rs_to_ts);
+  FREE_POINTER(encoder->tiles_ctb_addr_ts_to_rs);
+  
+  FREE_POINTER(encoder->tiles_tile_id);
   scalinglist_destroy(&encoder->scaling_list);
   
   return 1;
@@ -363,7 +359,7 @@ static int encoder_state_init_one(encoder_state * const state, const encoder_sta
   state->frame = 0;
   state->poc = 0;
   
-  state->cur_pic = picture_init(width, height, width_in_lcu, height_in_lcu);
+  state->cur_pic = picture_alloc(width, height, width_in_lcu, height_in_lcu);
 
   if (!state->cur_pic) {
     printf("Error allocating picture!\r\n");
@@ -375,11 +371,6 @@ static int encoder_state_init_one(encoder_state * const state, const encoder_sta
   state->cur_pic->coeff_u = MALLOC(coefficient, (width * height) >> 2);
   state->cur_pic->coeff_v = MALLOC(coefficient, (width * height) >> 2);
 
-  // Init predicted data table
-  state->cur_pic->pred_y = MALLOC(pixel, width * height);
-  state->cur_pic->pred_u = MALLOC(pixel, (width * height) >> 2);
-  state->cur_pic->pred_v = MALLOC(pixel, (width * height) >> 2);
-  
   state->children = NULL;
   
   // Set CABAC output bitstream
@@ -419,8 +410,8 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
 }
 
 static int encoder_state_finalize_one(encoder_state * const encoder_state) {
-  picture_destroy(encoder_state->cur_pic);
-  FREE_POINTER(encoder_state->cur_pic);
+  picture_free(encoder_state->cur_pic);
+  encoder_state->cur_pic = NULL;
   
   bitstream_finalize(&encoder_state->stream);
   return 1;
@@ -511,10 +502,10 @@ static void write_aud(encoder_state * const encoder_state)
 static void substream_encode(encoder_state * const encoder_state, const int last_part) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   
-  yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
+  yuv_t *hor_buf = yuv_t_alloc(encoder_state->cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
-  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
+  yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
   
   cabac_start(&encoder_state->cabac);
   init_contexts(encoder_state, encoder_state->QP, encoder_state->cur_pic->slicetype);
@@ -618,8 +609,8 @@ static void substream_encode(encoder_state * const encoder_state, const int last
     sao_reconstruct_frame(encoder_state);
   }
 
-  dealloc_yuv_t(hor_buf);
-  dealloc_yuv_t(ver_buf);
+  yuv_t_free(hor_buf);
+  yuv_t_free(ver_buf);
 }
 
 static void subencoder_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
@@ -1393,16 +1384,12 @@ void encoder_next_frame(encoder_state *encoder_state) {
   picture_list_add(encoder_state->ref, encoder_state->cur_pic);
   // Allocate new memory to current picture
   // TODO: reuse memory from old reference
-  encoder_state->cur_pic = picture_init(encoder_state->cur_pic->width, encoder_state->cur_pic->height, encoder_state->cur_pic->width_in_lcu, encoder_state->cur_pic->height_in_lcu);
+  encoder_state->cur_pic = picture_alloc(encoder_state->cur_pic->width, encoder_state->cur_pic->height, encoder_state->cur_pic->width_in_lcu, encoder_state->cur_pic->height_in_lcu);
 
   // Copy pointer from the last cur_pic because we don't want to reallocate it
   MOVE_POINTER(encoder_state->cur_pic->coeff_y,encoder_state->ref->pics[0]->coeff_y);
   MOVE_POINTER(encoder_state->cur_pic->coeff_u,encoder_state->ref->pics[0]->coeff_u);
   MOVE_POINTER(encoder_state->cur_pic->coeff_v,encoder_state->ref->pics[0]->coeff_v);
-
-  MOVE_POINTER(encoder_state->cur_pic->pred_y,encoder_state->ref->pics[0]->pred_y);
-  MOVE_POINTER(encoder_state->cur_pic->pred_u,encoder_state->ref->pics[0]->pred_u);
-  MOVE_POINTER(encoder_state->cur_pic->pred_v,encoder_state->ref->pics[0]->pred_v);
 
   encoder_state->frame++;
   encoder_state->poc++;

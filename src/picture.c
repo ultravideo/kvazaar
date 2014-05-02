@@ -36,7 +36,7 @@
 #define PSNRMAX (255.0 * 255.0)
 
 
-yuv_t * alloc_yuv_t(int luma_size)
+yuv_t * yuv_t_alloc(int luma_size)
 {
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
@@ -49,7 +49,7 @@ yuv_t * alloc_yuv_t(int luma_size)
   return yuv;
 }
 
-void dealloc_yuv_t(yuv_t * yuv)
+void yuv_t_free(yuv_t * yuv)
 {
   free(yuv->y);
   free(yuv->u);
@@ -172,8 +172,8 @@ int picture_list_destroy(picture_list *list)
   unsigned int i;
   if (list->used_size > 0) {
     for (i = 0; i < list->used_size; ++i) {
-      picture_destroy(list->pics[i]);
-      FREE_POINTER(list->pics[i]);
+      picture_free(list->pics[i]);
+      list->pics[i] = NULL;
     }
   }
 
@@ -221,8 +221,8 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
   }
 
   if (destroy) {
-    picture_destroy(list->pics[n]);
-    FREE_POINTER(list->pics[n]);
+    picture_free(list->pics[n]);
+    list->pics[n] = NULL;
   }
 
   // The last item is easy to remove
@@ -246,8 +246,8 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
  * \param pic picture pointer
  * \return picture pointer
  */
-picture *picture_init(int32_t width, int32_t height,
-                      int32_t width_in_lcu, int32_t height_in_lcu)
+picture *picture_alloc(const int32_t width, const int32_t height,
+                       const int32_t width_in_lcu, const int32_t height_in_lcu)
 {
   picture *pic = (picture *)malloc(sizeof(picture));
   unsigned int luma_size = width * height;
@@ -291,7 +291,6 @@ picture *picture_init(int32_t width, int32_t height,
   }
   
   pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
-  pic->pred_y = NULL; pic->pred_u = NULL; pic->pred_v = NULL;
 
   pic->slice_sao_luma_flag = 1;
   pic->slice_sao_chroma_flag = 1;
@@ -306,7 +305,7 @@ picture *picture_init(int32_t width, int32_t height,
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
-int picture_destroy(picture *pic)
+int picture_free(picture * const pic)
 {
   free(pic->u_data);
   free(pic->v_data);
@@ -326,12 +325,10 @@ int picture_destroy(picture *pic)
   FREE_POINTER(pic->coeff_u);
   FREE_POINTER(pic->coeff_v);
 
-  FREE_POINTER(pic->pred_y);
-  FREE_POINTER(pic->pred_u);
-  FREE_POINTER(pic->pred_v);
-
   FREE_POINTER(pic->sao_luma);
   FREE_POINTER(pic->sao_chroma);
+  
+  free(pic);
 
   return 1;
 }
