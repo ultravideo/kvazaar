@@ -359,7 +359,7 @@ static int encoder_state_init_one(encoder_state * const state, const encoder_sta
   state->frame = 0;
   state->poc = 0;
   
-  state->cur_pic = picture_init(width, height, width_in_lcu, height_in_lcu);
+  state->cur_pic = picture_alloc(width, height, width_in_lcu, height_in_lcu);
 
   if (!state->cur_pic) {
     printf("Error allocating picture!\r\n");
@@ -415,8 +415,8 @@ int encoder_state_init(encoder_state * const encoder_state, const encoder_contro
 }
 
 static int encoder_state_finalize_one(encoder_state * const encoder_state) {
-  picture_destroy(encoder_state->cur_pic);
-  FREE_POINTER(encoder_state->cur_pic);
+  picture_free(encoder_state->cur_pic);
+  encoder_state->cur_pic = NULL;
   
   bitstream_finalize(&encoder_state->stream);
   return 1;
@@ -1389,7 +1389,7 @@ void encoder_next_frame(encoder_state *encoder_state) {
   picture_list_add(encoder_state->ref, encoder_state->cur_pic);
   // Allocate new memory to current picture
   // TODO: reuse memory from old reference
-  encoder_state->cur_pic = picture_init(encoder_state->cur_pic->width, encoder_state->cur_pic->height, encoder_state->cur_pic->width_in_lcu, encoder_state->cur_pic->height_in_lcu);
+  encoder_state->cur_pic = picture_alloc(encoder_state->cur_pic->width, encoder_state->cur_pic->height, encoder_state->cur_pic->width_in_lcu, encoder_state->cur_pic->height_in_lcu);
 
   // Copy pointer from the last cur_pic because we don't want to reallocate it
   MOVE_POINTER(encoder_state->cur_pic->coeff_y,encoder_state->ref->pics[0]->coeff_y);

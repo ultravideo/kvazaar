@@ -172,8 +172,8 @@ int picture_list_destroy(picture_list *list)
   unsigned int i;
   if (list->used_size > 0) {
     for (i = 0; i < list->used_size; ++i) {
-      picture_destroy(list->pics[i]);
-      FREE_POINTER(list->pics[i]);
+      picture_free(list->pics[i]);
+      list->pics[i] = NULL;
     }
   }
 
@@ -221,8 +221,8 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
   }
 
   if (destroy) {
-    picture_destroy(list->pics[n]);
-    FREE_POINTER(list->pics[n]);
+    picture_free(list->pics[n]);
+    list->pics[n] = NULL;
   }
 
   // The last item is easy to remove
@@ -246,8 +246,8 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
  * \param pic picture pointer
  * \return picture pointer
  */
-picture *picture_init(int32_t width, int32_t height,
-                      int32_t width_in_lcu, int32_t height_in_lcu)
+picture *picture_alloc(const int32_t width, const int32_t height,
+                       const int32_t width_in_lcu, const int32_t height_in_lcu)
 {
   picture *pic = (picture *)malloc(sizeof(picture));
   unsigned int luma_size = width * height;
@@ -306,7 +306,7 @@ picture *picture_init(int32_t width, int32_t height,
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
-int picture_destroy(picture *pic)
+int picture_free(picture * const pic)
 {
   free(pic->u_data);
   free(pic->v_data);
@@ -332,6 +332,8 @@ int picture_destroy(picture *pic)
 
   FREE_POINTER(pic->sao_luma);
   FREE_POINTER(pic->sao_chroma);
+  
+  free(pic);
 
   return 1;
 }
