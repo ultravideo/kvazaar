@@ -111,10 +111,6 @@ typedef struct picture_struct
   pixel* v_recdata;     //!< \brief Pointer to reconstructed V-data.
   pixel *recdata[NUM_COLORS]; // \brief Alternate access method to same data.
 
-  pixel* pred_y;        //!< \brief Pointer to predicted Y
-  pixel* pred_u;        //!< \brief Pointer to predicted U
-  pixel* pred_v;        //!< \brief Pointer to predicted V
-
   coefficient* coeff_y;   //!< \brief coefficient pointer Y
   coefficient* coeff_u;   //!< \brief coefficient pointer U
   coefficient* coeff_v;   //!< \brief coefficient pointer V

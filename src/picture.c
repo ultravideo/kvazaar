@@ -291,7 +291,6 @@ picture *picture_alloc(const int32_t width, const int32_t height,
   }
   
   pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
-  pic->pred_y = NULL; pic->pred_u = NULL; pic->pred_v = NULL;
 
   pic->slice_sao_luma_flag = 1;
   pic->slice_sao_chroma_flag = 1;
@@ -325,10 +324,6 @@ int picture_free(picture * const pic)
   FREE_POINTER(pic->coeff_y);
   FREE_POINTER(pic->coeff_u);
   FREE_POINTER(pic->coeff_v);
-
-  FREE_POINTER(pic->pred_y);
-  FREE_POINTER(pic->pred_u);
-  FREE_POINTER(pic->pred_v);
 
   FREE_POINTER(pic->sao_luma);
   FREE_POINTER(pic->sao_chroma);

@@ -371,11 +371,6 @@ static int encoder_state_init_one(encoder_state * const state, const encoder_sta
   state->cur_pic->coeff_u = MALLOC(coefficient, (width * height) >> 2);
   state->cur_pic->coeff_v = MALLOC(coefficient, (width * height) >> 2);
 
-  // Init predicted data table
-  state->cur_pic->pred_y = MALLOC(pixel, width * height);
-  state->cur_pic->pred_u = MALLOC(pixel, (width * height) >> 2);
-  state->cur_pic->pred_v = MALLOC(pixel, (width * height) >> 2);
-  
   state->children = NULL;
   
   // Set CABAC output bitstream
@@ -1395,10 +1390,6 @@ void encoder_next_frame(encoder_state *encoder_state) {
   MOVE_POINTER(encoder_state->cur_pic->coeff_y,encoder_state->ref->pics[0]->coeff_y);
   MOVE_POINTER(encoder_state->cur_pic->coeff_u,encoder_state->ref->pics[0]->coeff_u);
   MOVE_POINTER(encoder_state->cur_pic->coeff_v,encoder_state->ref->pics[0]->coeff_v);
-
-  MOVE_POINTER(encoder_state->cur_pic->pred_y,encoder_state->ref->pics[0]->pred_y);
-  MOVE_POINTER(encoder_state->cur_pic->pred_u,encoder_state->ref->pics[0]->pred_u);
-  MOVE_POINTER(encoder_state->cur_pic->pred_v,encoder_state->ref->pics[0]->pred_v);
 
   encoder_state->frame++;
   encoder_state->poc++;
