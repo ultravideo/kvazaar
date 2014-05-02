@@ -206,8 +206,8 @@ typedef struct {
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 
-yuv_t * alloc_yuv_t(int luma_size);
-void dealloc_yuv_t(yuv_t * yuv);
+yuv_t * yuv_t_alloc(int luma_size);
+void yuv_t_free(yuv_t * yuv);
 
 picture * picture_alloc(int32_t width, int32_t height,
                        int32_t width_in_lcu, int32_t height_in_lcu);

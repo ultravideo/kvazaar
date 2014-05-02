@@ -36,7 +36,7 @@
 #define PSNRMAX (255.0 * 255.0)
 
 
-yuv_t * alloc_yuv_t(int luma_size)
+yuv_t * yuv_t_alloc(int luma_size)
 {
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
@@ -49,7 +49,7 @@ yuv_t * alloc_yuv_t(int luma_size)
   return yuv;
 }
 
-void dealloc_yuv_t(yuv_t * yuv)
+void yuv_t_free(yuv_t * yuv)
 {
   free(yuv->y);
   free(yuv->u);

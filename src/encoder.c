@@ -502,10 +502,10 @@ static void write_aud(encoder_state * const encoder_state)
 static void substream_encode(encoder_state * const encoder_state, const int last_part) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   
-  yuv_t *hor_buf = alloc_yuv_t(encoder_state->cur_pic->width);
+  yuv_t *hor_buf = yuv_t_alloc(encoder_state->cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
-  yuv_t *ver_buf = alloc_yuv_t(LCU_WIDTH + 2);
+  yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
   
   cabac_start(&encoder_state->cabac);
   init_contexts(encoder_state, encoder_state->QP, encoder_state->cur_pic->slicetype);
@@ -609,8 +609,8 @@ static void substream_encode(encoder_state * const encoder_state, const int last
     sao_reconstruct_frame(encoder_state);
   }
 
-  dealloc_yuv_t(hor_buf);
-  dealloc_yuv_t(ver_buf);
+  yuv_t_free(hor_buf);
+  yuv_t_free(ver_buf);
 }
 
 static void subencoder_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
