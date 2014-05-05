@@ -155,7 +155,7 @@ static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
 static int parse_tiles_specification(const char* const arg, int32_t * const ntiles, int32_t** const array) {
   const char* current_arg = NULL;
   int32_t current_value;
-  int32_t values[256];
+  int32_t values[MAX_TILES_PER_DIM];
   
   int i;
   
@@ -189,6 +189,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
     if (current_arg) ++current_arg;
     values[*ntiles] = current_value;
     ++(*ntiles);
+    if (MAX_TILES_PER_DIM <= *ntiles) break;
   } while (current_arg);
   
   if (MAX_TILES_PER_DIM <= *ntiles || 0 >= *ntiles) {
