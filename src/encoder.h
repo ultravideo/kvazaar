@@ -124,28 +124,29 @@ typedef struct
 
 typedef struct encoder_state {
   const encoder_control *encoder_control;
-  
-  int32_t lcu_offset_x;
-  int32_t lcu_offset_y;
-  
-  picture *cur_pic;
-  int32_t frame;
-  int32_t poc; /*!< \brief picture order count */
-  
-  bitstream stream;
-  
-  picture_list *ref;
-  int8_t ref_list;
-  int8_t ref_idx_num[2];
-  int8_t QP;             // \brief Quantization parameter
-  
   double cur_lambda_cost;
-  
+  bitstream stream;
   cabac_data cabac;
   
   //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
   //Use do { } while (encoder_state->children[++i].encoder_control)
   struct encoder_state *children;
+  
+  //Tile: offset in LCU for current encoder_state
+  int32_t lcu_offset_x;
+  int32_t lcu_offset_y;
+  
+  //Current picture to encode
+  picture *cur_pic;
+  int32_t frame;
+  int32_t poc; /*!< \brief picture order count */
+  
+  //Current picture available references
+  picture_list *ref;
+  int8_t ref_list;
+  int8_t ref_idx_num[2];
+  
+  int8_t QP;             //!< \brief Quantization parameter
 } encoder_state;
 
 int encoder_control_init(encoder_control *encoder, const config *cfg);

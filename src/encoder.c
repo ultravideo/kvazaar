@@ -787,6 +787,8 @@ void encode_one_frame(encoder_state * const main_state)
       subencoder_blit_pixels(main_state, main_state->cur_pic->v_recdata, subencoder, subencoder->cur_pic->v_recdata, 0);
     }
     
+    //We should do the slice header here, because we can have the entry points
+    
     //This has to be serial
     i = 0;
     do {
