@@ -499,7 +499,7 @@ static void write_aud(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
-static void substream_write_bitstream(encoder_state * const encoder_state, const int last_part) {
+static void substream_write_bitstream(encoder_state * const encoder_state, const int end_of_sub_stream) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const picture* const cur_pic = encoder_state->cur_pic;
   const int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
@@ -517,11 +517,18 @@ static void substream_write_bitstream(encoder_state * const encoder_state, const
     
     encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
 
-    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && last_part) ? 1 : 0);  // end_of_slice_segment_flag
+    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && !end_of_sub_stream) ? 1 : 0);  // end_of_slice_segment_flag
+  }
+  if (end_of_sub_stream) {
+    cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
+    cabac_flush(&encoder_state->cabac);
+  } else {
+    cabac_flush(&encoder_state->cabac);
+    bitstream_align(&encoder_state->stream);
   }
 }
 
-static void substream_encode(encoder_state * const encoder_state, const int last_part) {
+static void substream_encode(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
 #ifndef NDEBUG
   const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
@@ -630,9 +637,6 @@ static void substream_encode(encoder_state * const encoder_state, const int last
   
   //We should not have written to bitstream!
   assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
-  
-  //Now, write bitstream
-  substream_write_bitstream(encoder_state, last_part);
 
   yuv_t_free(hor_buf);
   yuv_t_free(ver_buf);
@@ -775,7 +779,8 @@ void encode_one_frame(encoder_state * const main_state)
       subencoder->cur_pic->slicetype = main_state->cur_pic->slicetype;
       subencoder->cur_pic->type = main_state->cur_pic->type;
       
-      substream_encode(subencoder, !(main_state->children[i+1].encoder_control));
+      substream_encode(subencoder);
+      substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
       
       subencoder_blit_pixels(main_state, main_state->cur_pic->y_recdata, subencoder, subencoder->cur_pic->y_recdata, 1);
       subencoder_blit_pixels(main_state, main_state->cur_pic->u_recdata, subencoder, subencoder->cur_pic->u_recdata, 0);
@@ -785,15 +790,6 @@ void encode_one_frame(encoder_state * const main_state)
     //This has to be serial
     i = 0;
     do {
-      if (!main_state->children[i+1].encoder_control) {
-        //last tile
-        cabac_flush(&main_state->children[i].cabac);
-        bitstream_align(&main_state->children[i].stream);
-      } else {
-        //Other tiles
-        cabac_encode_bin_trm(&main_state->children[i].cabac, 1); // end_of_sub_stream_one_bit == 1
-        cabac_flush(&main_state->children[i].cabac);
-      }
       //Append bitstream to main stream
       bitstream_append(&main_state->stream, &main_state->children[i].stream);
       bitstream_clear(&main_state->children[i].stream);
@@ -801,9 +797,8 @@ void encode_one_frame(encoder_state * const main_state)
     
   } else {
     //Encode the whole thing as one stream
-    substream_encode(main_state, 1);
-    cabac_flush(&main_state->cabac);
-    bitstream_align(stream);
+    substream_encode(main_state);
+    substream_write_bitstream(main_state, 0);
   }
   
   // Calculate checksum
