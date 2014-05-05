@@ -120,6 +120,13 @@ typedef struct
   
   const int32_t *tiles_tile_id; /*!<spec:  TileId (6.5.1); dimension: PicSizeInCtbsY */
   
+  //WPP
+  int wpp;
+  
+  //Slices
+  int slice_count;
+  const int* slice_addresses_in_ts;
+  
 } encoder_control;
 
 typedef struct encoder_state {

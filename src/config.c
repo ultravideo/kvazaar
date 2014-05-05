@@ -85,6 +85,12 @@ int config_init(config *cfg)
   cfg->tiles_height_count         = 0;
   cfg->tiles_width_split          = NULL;
   cfg->tiles_height_split          = NULL;
+  
+  cfg->wpp = 0;
+  cfg->slice_count = 1;
+  cfg->slice_addresses_in_ts = MALLOC(int32_t, 1);
+  cfg->slice_addresses_in_ts[0] = 0;
+  
 
   return 1;
 }
@@ -101,6 +107,7 @@ int config_destroy(config *cfg)
   FREE_POINTER(cfg->cqmfile);
   FREE_POINTER(cfg->tiles_width_split);
   FREE_POINTER(cfg->tiles_height_split);
+  FREE_POINTER(cfg->slice_addresses_in_ts);
   free(cfg);
 
   return 1;
@@ -205,6 +212,67 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   
   //TODO: memcpy?
   for (i = 0; i < *ntiles; ++i) {
+    (*array)[i] = values[i];
+  }
+  
+  return 1;
+}
+
+static int parse_slice_specification(const char* const arg, int32_t * const nslices, int32_t** const array) {
+  const char* current_arg = NULL;
+  int32_t current_value;
+  int32_t values[MAX_SLICES];
+  
+  int i;
+  
+  //Free pointer in any case
+  if (*array) {
+    FREE_POINTER(*array);
+  }
+  
+  //If the arg starts with u, we want an uniform split
+  if (arg[0]=='u') {
+    *nslices = atoi(arg+1);
+    if (MAX_SLICES <= *nslices || 0 >= *nslices) {
+      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_SLICES)!\n", *nslices + 1, MAX_SLICES);
+      return 0;
+    }
+    //Done with parsing
+    return 1;
+  }
+  
+  //We have a comma-separated list of int for the split...
+  current_arg = arg;
+  //We always have a slice starting at 0
+  values[0] = 0;
+  *nslices = 1;
+  do {
+    int ret = sscanf(current_arg, "%d", &current_value);
+    if (ret != 1) {
+      fprintf(stderr, "Could not parse integer \"%s\"!\n", current_arg);
+      return 0;
+    }
+    current_arg = strchr(current_arg, ',');
+    //Skip the , if we found one
+    if (current_arg) ++current_arg;
+    values[*nslices] = current_value;
+    ++(*nslices);
+    if (MAX_SLICES <= *nslices) break;
+  } while (current_arg);
+  
+  if (MAX_SLICES <= *nslices || 0 >= *nslices) {
+    fprintf(stderr, "Invalid number of slices (0 < %d <= %d = MAX_SLICES)!\n", *nslices, MAX_SLICES);
+    return 0;
+  }
+  
+  *array = MALLOC(int32_t, *nslices);
+  if (!*array) {
+    fprintf(stderr, "Could not allocate array for slices\n");
+    return 0;
+  }
+  
+  //TODO: memcpy?
+  for (i = 0; i < *nslices; ++i) {
     (*array)[i] = values[i];
   }
   
@@ -341,6 +409,10 @@ static int config_parse(config *cfg, const char *name, const char *value)
     error = !parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
   else if OPT("tiles-height-split")
     error = !parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+  else if OPT("wpp")
+    cfg->wpp = atobool(value);
+  else if OPT("slice-addresses")
+    error = !parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
   else
     return 0;
 #undef OPT
@@ -389,6 +461,8 @@ int config_read(config *cfg,int argc, char *argv[])
     { "seek",               required_argument, NULL, 0 },
     { "tiles-width-split",  required_argument, NULL, 0 },
     { "tiles-height-split", required_argument, NULL, 0 },
+    { "wpp",                      no_argument, NULL, 0 },
+    { "slice-addresses",    required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

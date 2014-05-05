@@ -80,6 +80,26 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
   encoder_state->cur_lambda_cost = lambda;
 }
 
+static int lcu_at_slice_start(encoder_control * const encoder, int lcu_addr_in_rs) {
+  int i;
+  assert(lcu_addr_in_rs >= 0 && lcu_addr_in_rs < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
+  if (lcu_addr_in_rs == 0) return 1;
+  for (i = 0; i < encoder->slice_count; ++i) {
+    if (encoder->slice_addresses_in_ts[i] == lcu_addr_in_rs) return 1;
+  }
+  return 0;
+}
+
+static int lcu_at_slice_end(encoder_control * const encoder, int lcu_addr_in_rs) {
+  int i;
+  assert(lcu_addr_in_rs >= 0 && lcu_addr_in_rs < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
+  if (lcu_addr_in_rs == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
+  for (i = 0; i < encoder->slice_count; ++i) {
+    if (encoder->slice_addresses_in_ts[i] == lcu_addr_in_rs + 1) return 1;
+  }
+  return 0;
+}
+
 int encoder_control_init(encoder_control * const encoder, const config * const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
@@ -253,6 +273,41 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     encoder->tiles_ctb_addr_ts_to_rs = tiles_ctb_addr_ts_to_rs;
     
     encoder->tiles_tile_id = tiles_tile_id;
+    
+    //Slices
+    {
+      int *slice_addresses_in_ts;
+      encoder->slice_count = encoder->cfg->slice_count;
+      if (encoder->slice_count == 0) {
+        encoder->slice_count = 1;
+        slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
+        slice_addresses_in_ts[0] = 0;
+      } else {
+        int i;
+        slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
+        if (!encoder->cfg->slice_addresses_in_ts) {
+          slice_addresses_in_ts[0] = 0;
+          for (i=1; i < encoder->slice_count; ++i) {
+            slice_addresses_in_ts[i] = encoder->in.width_in_lcu * encoder->in.height_in_lcu * i / encoder->slice_count;
+          }
+        } else {
+          for (i=0; i < encoder->slice_count; ++i) {
+            slice_addresses_in_ts[i] = encoder->cfg->slice_addresses_in_ts[i];
+          }
+        }
+      }
+      
+      encoder->slice_addresses_in_ts = slice_addresses_in_ts;
+    }
+    
+    encoder->wpp = encoder->cfg->wpp;
+    
+    //FIXME: remove
+    if (encoder->slice_count) {
+      
+      lcu_at_slice_start(encoder, 0);
+      lcu_at_slice_end(encoder, 0);
+    }
 
 #ifdef _DEBUG
     printf("Tiles columns width:");
@@ -268,11 +323,25 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     //Print tile index map
     for (y = 0; y < encoder->in.height_in_lcu; ++y) {
       for (x = 0; x < encoder->in.width_in_lcu; ++x) {
-        printf("%2d ", encoder->tiles_tile_id[encoder->tiles_ctb_addr_rs_to_ts[y * encoder->in.width_in_lcu + x]]);
+        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
+        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
+        const char slice_start = lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
+        const char slice_end = lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
+        
+        printf("%c%03d%c", slice_start, encoder->tiles_tile_id[lcu_id_ts], slice_end);
       }
       printf("\n");
     }
+    printf("\n");
+    if (encoder->wpp) {
+      printf("Wavefront Parallel Processing: enabled\n");
+    } else {
+      printf("Wavefront Parallel Processing: disabled\n");
+    }
+    printf("\n");
 #endif //_DEBUG
+
+    
 
   }
   
@@ -280,6 +349,9 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
 }
 
 int encoder_control_finalize(encoder_control * const encoder) {
+  //Slices
+  FREE_POINTER(encoder->slice_addresses_in_ts);
+  
   //Tiles
   FREE_POINTER(encoder->tiles_col_width);
   FREE_POINTER(encoder->tiles_row_height);
