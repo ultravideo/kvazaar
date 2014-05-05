@@ -120,6 +120,7 @@ typedef struct picture_struct
   int32_t height_in_lcu;  //!< \brief Picture width in number of LCU's.
   int32_t width_in_lcu;   //!< \brief Picture height in number of LCU's.
   uint8_t referenced;     //!< \brief Whether this picture is referenced.
+  int32_t refcount;     //!< \brief Number of references in reflist to the picture
   cu_info* cu_array;     //!< \brief Info for each CU at each depth.
   uint8_t type;
   uint8_t slicetype;
@@ -224,7 +225,7 @@ picture_list * picture_list_init(int size);
 int picture_list_resize(picture_list *list, unsigned size);
 int picture_list_destroy(picture_list *list);
 int picture_list_add(picture_list *list, picture *pic);
-int picture_list_rem(picture_list *list, unsigned n, int8_t destroy);
+int picture_list_rem(picture_list *list, unsigned n);
 
 typedef unsigned (*cost_16bit_nxn_func)(pixel *block1, pixel *block2);
 
