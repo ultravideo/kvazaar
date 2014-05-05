@@ -499,8 +499,33 @@ static void write_aud(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
+static void substream_write_bitstream(encoder_state * const encoder_state, const int last_part) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const picture* const cur_pic = encoder_state->cur_pic;
+  const int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
+  int lcu_id;
+  vector2d lcu;
+  
+  for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
+    lcu.x = lcu_id % cur_pic->width_in_lcu;
+    lcu.y = lcu_id / cur_pic->width_in_lcu;
+    
+    //Write bitstream
+    if (encoder->sao_enable) {
+      encode_sao(encoder_state, lcu.x, lcu.y, &cur_pic->sao_luma[lcu.y * cur_pic->width_in_lcu + lcu.x], &cur_pic->sao_chroma[lcu.y * cur_pic->width_in_lcu + lcu.x]);
+    }
+    
+    encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+
+    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && last_part) ? 1 : 0);  // end_of_slice_segment_flag
+  }
+}
+
 static void substream_encode(encoder_state * const encoder_state, const int last_part) {
   const encoder_control * const encoder = encoder_state->encoder_control;
+#ifndef NDEBUG
+  const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));;
+#endif
   
   yuv_t *hor_buf = yuv_t_alloc(encoder_state->cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
@@ -594,20 +619,20 @@ static void substream_encode(encoder_state * const encoder_state, const int last
           // Merge only if both luma and chroma can be merged
           sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
           sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
-
-          encode_sao(encoder_state, lcu.x, lcu.y, sao_luma, sao_chroma);
         }
-        
-        encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
-
-        cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && last_part) ? 1 : 0);  // end_of_slice_segment_flag
       }
     }
   }
-  
+
   if (encoder->sao_enable) {
     sao_reconstruct_frame(encoder_state);
   }
+  
+  //We should not have written to bitstream!
+  assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
+  
+  //Now, write bitstream
+  substream_write_bitstream(encoder_state, last_part);
 
   yuv_t_free(hor_buf);
   yuv_t_free(ver_buf);
