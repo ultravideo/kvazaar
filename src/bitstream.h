@@ -71,6 +71,7 @@ int bitstream_init(bitstream * stream, bitstream_type type);
 int bitstream_finalize(bitstream * stream);
 void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits);
 int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
+long long unsigned int bitstream_tell(const bitstream * stream);
 
 int bitstream_append(bitstream *dst, const bitstream *src);
 int bitstream_clear(bitstream *stream);

@@ -21,6 +21,7 @@
  * \file
  */
 
+#include "threads.h"
 #include "picture.h"
 #include "strategyselector.h"
 
@@ -192,6 +193,11 @@ int picture_list_destroy(picture_list *list)
  */
 int picture_list_add(picture_list *list,picture* pic)
 {
+  if (ATOMIC_INC(&(pic->refcount)) == 1) {
+    fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
+    assert(0); //Stop for debugging
+    return 0;
+  }
   int i = 0;
   if (list->size == list->used_size) {
     if (!picture_list_resize(list, list->size*2)) return 0;
@@ -212,7 +218,7 @@ int picture_list_add(picture_list *list,picture* pic)
  * \param picture_list list to use
  * \return 1 on success
  */
-int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
+int picture_list_rem(picture_list * const list, const unsigned n)
 {
   // Must be within list boundaries
   if (n >= list->used_size)
@@ -220,19 +226,21 @@ int picture_list_rem(picture_list *list, unsigned n, int8_t destroy)
     return 0;
   }
 
-  if (destroy) {
-    picture_free(list->pics[n]);
-    list->pics[n] = NULL;
+  if (!picture_free(list->pics[n])) {
+    fprintf(stderr, "Could not free picture!\n");
+    assert(0); //Stop here
+    return 0;
   }
-
+  
   // The last item is easy to remove
   if (n == list->used_size - 1) {
     list->pics[n] = NULL;
     list->used_size--;
   } else {
+    int i = n;
     // Shift all following pics one backward in the list
-    for (; n < list->used_size - 1; ++n) {
-      list->pics[n] = list->pics[n + 1];
+    for (i = n; i < list->used_size - 1; ++i) {
+      list->pics[i] = list->pics[i + 1];
     }
     list->pics[list->used_size - 1] = NULL;
     list->used_size--;
@@ -262,6 +270,7 @@ picture *picture_alloc(const int32_t width, const int32_t height,
   pic->width_in_lcu  = width_in_lcu;
   pic->height_in_lcu = height_in_lcu;
   pic->referenced = 0;
+  pic->refcount = 1; //We give a reference to caller
   // Allocate buffers
   pic->y_data = MALLOC(pixel, luma_size);
   pic->u_data = MALLOC(pixel, chroma_size);
@@ -301,12 +310,14 @@ picture *picture_alloc(const int32_t width, const int32_t height,
 }
 
 /**
- * \brief Free memory allocated to picture
+ * \brief Free memory allocated to picture (if we have no reference left)
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
 int picture_free(picture * const pic)
 {
+  int32_t new_refcount = ATOMIC_DEC(&(pic->refcount));
+  if (new_refcount > 0) return 1;
   free(pic->u_data);
   free(pic->v_data);
   free(pic->y_data);
