@@ -442,7 +442,7 @@ static void encoder_clear_refs(encoder_state *encoder_state) {
   }
   
   while (encoder_state->ref->used_size) {
-    picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1, 1);
+    picture_list_rem(encoder_state->ref, encoder_state->ref->used_size - 1);
   }
 
   encoder_state->poc = 0;
@@ -1375,21 +1375,25 @@ static void encode_VUI(encoder_state * const encoder_state)
 
 void encoder_next_frame(encoder_state *encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
+  picture *old_pic;
   
   // Remove the ref pic (if present)
   if (encoder_state->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
-    picture_list_rem(encoder_state->ref, encoder_state->ref->used_size-1, 1);
+    picture_list_rem(encoder_state->ref, encoder_state->ref->used_size-1);
   }
   // Add current picture as reference
   picture_list_add(encoder_state->ref, encoder_state->cur_pic);
   // Allocate new memory to current picture
+  old_pic = encoder_state->cur_pic;
   // TODO: reuse memory from old reference
   encoder_state->cur_pic = picture_alloc(encoder_state->cur_pic->width, encoder_state->cur_pic->height, encoder_state->cur_pic->width_in_lcu, encoder_state->cur_pic->height_in_lcu);
 
   // Copy pointer from the last cur_pic because we don't want to reallocate it
-  MOVE_POINTER(encoder_state->cur_pic->coeff_y,encoder_state->ref->pics[0]->coeff_y);
-  MOVE_POINTER(encoder_state->cur_pic->coeff_u,encoder_state->ref->pics[0]->coeff_u);
-  MOVE_POINTER(encoder_state->cur_pic->coeff_v,encoder_state->ref->pics[0]->coeff_v);
+  MOVE_POINTER(encoder_state->cur_pic->coeff_y,old_pic->coeff_y);
+  MOVE_POINTER(encoder_state->cur_pic->coeff_u,old_pic->coeff_u);
+  MOVE_POINTER(encoder_state->cur_pic->coeff_v,old_pic->coeff_v);
+  
+  picture_free(old_pic);
 
   encoder_state->frame++;
   encoder_state->poc++;
