@@ -524,7 +524,7 @@ static void substream_write_bitstream(encoder_state * const encoder_state, const
 static void substream_encode(encoder_state * const encoder_state, const int last_part) {
   const encoder_control * const encoder = encoder_state->encoder_control;
 #ifndef NDEBUG
-  const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));;
+  const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
 #endif
   
   yuv_t *hor_buf = yuv_t_alloc(encoder_state->cur_pic->width);

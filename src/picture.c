@@ -193,12 +193,13 @@ int picture_list_destroy(picture_list *list)
  */
 int picture_list_add(picture_list *list,picture* pic)
 {
+  int i = 0;
   if (ATOMIC_INC(&(pic->refcount)) == 1) {
     fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
     assert(0); //Stop for debugging
     return 0;
   }
-  int i = 0;
+
   if (list->size == list->used_size) {
     if (!picture_list_resize(list, list->size*2)) return 0;
   }
@@ -231,7 +232,7 @@ int picture_list_rem(picture_list * const list, const unsigned n)
     assert(0); //Stop here
     return 0;
   }
-  
+
   // The last item is easy to remove
   if (n == list->used_size - 1) {
     list->pics[n] = NULL;
@@ -298,7 +299,7 @@ picture *picture_alloc(const int32_t width, const int32_t height,
     pic->cu_array = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
     memset(pic->cu_array, 0, sizeof(cu_info) * cu_array_size);
   }
-  
+
   pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
 
   pic->slice_sao_luma_flag = 1;
@@ -338,7 +339,7 @@ int picture_free(picture * const pic)
 
   FREE_POINTER(pic->sao_luma);
   FREE_POINTER(pic->sao_chroma);
-  
+
   free(pic);
 
   return 1;

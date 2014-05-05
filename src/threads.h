@@ -27,8 +27,9 @@
 #define ATOMIC_DEC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, -1)
 
 #else //__GNUC__
-
 //TODO: we assume !GCC => Windows... this may be bad
+#include <Windows.h>
+
 #define ATOMIC_INC(ptr)                     InterlockedIncrement((volatile LONG*)ptr)
 #define ATOMIC_DEC(ptr)                     InterlockedDecrement((volatile LONG*)ptr)
 
