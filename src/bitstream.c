@@ -208,6 +208,32 @@ int bitstream_writebyte(bitstream * const stream, const uint8_t byte) {
   return 1;
 }
 
+
+/**
+ * \brief Get the bit position in bitstream
+ * \param stream pointer bitstream
+ * \return position
+ */
+long long unsigned int bitstream_tell(const bitstream * const stream) {
+  long long unsigned int position;
+  
+  switch (stream->base.type) {
+    case BITSTREAM_TYPE_FILE:
+      position = ftell(stream->file.output);
+      break;
+      
+    case BITSTREAM_TYPE_MEMORY:
+      position = stream->mem.output_length;
+      break;
+      
+    default:
+      fprintf(stderr, "Unknown stream type!\n");
+      assert(0);
+      return 0;
+  }
+  return position*8 + stream->base.cur_bit;
+}
+
 int bitstream_append(bitstream * const dst, const bitstream * const src) {
   int i;
   
