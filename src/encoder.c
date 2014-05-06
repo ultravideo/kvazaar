@@ -2110,6 +2110,17 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   // asserting just depth.
   assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
 
+  // Clear coded block flag structures for depths lower than current depth.
+  // This should ensure that the CBF data doesn't get corrupted if this function
+  // is called more than once.
+  {
+    cbf_clear(&cur_cu->cbf.y, depth + PU_INDEX(x >> 2, y >> 2));
+    if (PU_INDEX(x >> 2, y >> 2) == 0) {
+      cbf_clear(&cur_cu->cbf.u, depth);
+      cbf_clear(&cur_cu->cbf.v, depth);
+    }
+  }
+
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width_c;

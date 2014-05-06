@@ -232,6 +232,16 @@ static INLINE void cbf_set(uint8_t *cbf_flags, int depth)
   *cbf_flags |= 1 << (7 - depth);
 }
 
+/**
+ * Set CBF in a levels <= depth to false.
+ */
+static INLINE void cbf_clear(uint8_t *cbf_flags, int depth)
+{
+  static const uint8_t masks[8] = { 0xff, 0x7f, 0x3f, 0x1f, 0x8, 0x4, 0x2, 0x1 };
+
+  *cbf_flags &= ~masks[depth];
+}
+
 yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);
 
