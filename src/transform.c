@@ -634,7 +634,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
   #endif
 
-  int32_t qp_scaled = get_scaled_qp(type, encoder_state->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, encoder_state->global->QP, 0);
 
   //New block for variable definitions
   {
@@ -646,7 +646,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
-  int32_t add = ((encoder_state->cur_pic->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
+  int32_t add = ((encoder_state->tile->cur_pic->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
 
   int32_t q_bits8 = q_bits - 8;
   for (n = 0; n < width * height; n++) {
@@ -762,7 +762,7 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
   int32_t n;
   int32_t transform_shift = 15 - encoder->bitdepth - (g_convert_to_bit[ width ] + 2);
 
-  int32_t qp_scaled = get_scaled_qp(type, encoder_state->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, encoder_state->global->QP, 0);
 
   shift = 20 - QUANT_SHIFT - transform_shift;
 
