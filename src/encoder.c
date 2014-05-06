@@ -1528,7 +1528,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   // Encode sao_type_idx for Y and U+V.
   if (color_i != COLOR_V) {
     cabac->ctx = &(cabac->ctx_sao_type_idx_model);;
-    CABAC_BIN(cabac, sao->type == SAO_TYPE_NONE ? 0 : 1, "sao_type_idx");
+    CABAC_BIN(cabac, sao->type != SAO_TYPE_NONE, "sao_type_idx");
     if (sao->type == SAO_TYPE_BAND) {
       CABAC_BIN_EP(cabac, 0, "sao_type_idx_ep");
     } else if (sao->type == SAO_TYPE_EDGE) {
@@ -1569,11 +1569,11 @@ static void encode_sao_merge_flags(encoder_state * const encoder_state, sao_info
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
     cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
-    CABAC_BIN(cabac, sao->merge_left_flag ? 1 : 0, "sao_merge_left_flag");
+    CABAC_BIN(cabac, sao->merge_left_flag, "sao_merge_left_flag");
   }
   if (y_ctb > 0 && !sao->merge_left_flag) {
     cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
-    CABAC_BIN(cabac, sao->merge_up_flag ? 1 : 0, "sao_merge_up_flag");
+    CABAC_BIN(cabac, sao->merge_up_flag, "sao_merge_up_flag");
   }
 }
 
@@ -1767,7 +1767,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
               int32_t ref_frame = cur_cu->inter.mv_ref;
 
               cabac->ctx = &(cabac->ctx_cu_ref_pic_model[0]);
-              CABAC_BIN(cabac, (ref_frame == 0) ? 0 : 1, "ref_frame_flag");
+              CABAC_BIN(cabac, (ref_frame != 0), "ref_frame_flag");
 
               if (ref_frame > 0) {
                 int32_t i;
@@ -1798,17 +1798,17 @@ void encode_coding_tree(encoder_state * const encoder_state,
               const uint32_t mvd_ver_abs = abs(mvd_ver);
 
               cabac->ctx = &(cabac->ctx_cu_mvd_model[0]);
-              CABAC_BIN(cabac, (mvd_hor!=0)?1:0, "abs_mvd_greater0_flag_hor");
-              CABAC_BIN(cabac, (mvd_ver!=0)?1:0, "abs_mvd_greater0_flag_ver");
+              CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+              CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
 
               cabac->ctx = &(cabac->ctx_cu_mvd_model[1]);
 
               if (hor_abs_gr0) {
-                CABAC_BIN(cabac, (mvd_hor_abs>1)?1:0, "abs_mvd_greater1_flag_hor");
+                CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
               }
 
               if (ver_abs_gr0) {
-                CABAC_BIN(cabac, (mvd_ver_abs>1)?1:0, "abs_mvd_greater1_flag_ver");
+                CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
               }
 
               if (hor_abs_gr0) {

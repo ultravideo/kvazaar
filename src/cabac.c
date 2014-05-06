@@ -308,7 +308,7 @@ void cabac_write_unary_max_symbol(cabac_data * const data, cabac_ctx * const ctx
   if (!max_symbol) return;
 
   data->ctx = &ctx[0];
-  CABAC_BIN(data, symbol ? 1 : 0, "ums");
+  CABAC_BIN(data, symbol, "ums");
 
   if (!symbol) return;
 
