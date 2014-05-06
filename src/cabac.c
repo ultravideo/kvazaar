@@ -102,7 +102,7 @@ void cabac_encode_bin(cabac_data * const data, const uint32_t bin_value)
   data->range -= lps;
 
   // Not the Most Probable Symbol?
-  if (bin_value != (uint32_t)CTX_MPS(data->ctx)) {
+  if ((bin_value ? 1 : 0) != CTX_MPS(data->ctx)) {
     int num_bits = g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
