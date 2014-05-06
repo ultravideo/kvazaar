@@ -387,12 +387,14 @@ int encoder_control_finalize(encoder_control * const encoder) {
   return 1;
 }
 
-static int encoder_state_init_one(encoder_state * const state, const encoder_state * const parent_state, const int tile_x, const int tile_y) {
+static int encoder_state_init_one(encoder_state * const state, encoder_state * const parent_state, const int tile_x, const int tile_y) {
   const encoder_control *encoder;
   int width_in_lcu;
   int height_in_lcu;
   int width;
   int height;
+  
+  state->parent = parent_state;
   
   if (!parent_state) {
     //Use encoder_control from current state (has to be initialized)

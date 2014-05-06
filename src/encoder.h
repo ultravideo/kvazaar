@@ -138,6 +138,7 @@ typedef struct encoder_state {
   //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
   //Use do { } while (encoder_state->children[++i].encoder_control)
   struct encoder_state *children;
+  struct encoder_state *parent;
   
   //Tile: offset in LCU for current encoder_state
   int32_t lcu_offset_x;
