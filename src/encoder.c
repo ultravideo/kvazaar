@@ -2025,7 +2025,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
 }
 
 static void transform_chroma(encoder_state * const encoder_state, cu_info *cur_cu,
-                             int depth, pixel *base_u, pixel *pred_u,
+                             int depth, const pixel *base_u, pixel *pred_u,
                              coefficient *coeff_u, int8_t scan_idx_chroma,
                              coefficient *pre_quant_coeff, coefficient *block)
 {
@@ -2095,6 +2095,11 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
   }
 }
 
+/**
+ * This function calculates the residual coefficients for a region of the LCU
+ * (defined by x, y and depth) and updates the reconstruction with the
+ * kvantized residual.
+ */
 void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -2149,38 +2154,39 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   }
 
   {
-    // INTRAPREDICTION VARIABLES
-      // Pointers to reconstruction arrays
+    // Pointers to current location in arrays with prediction.
     pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
     pixel *recbase_u = &lcu->rec.u[x_local/2 + (y_local * LCU_WIDTH)/4];
     pixel *recbase_v = &lcu->rec.v[x_local/2 + (y_local * LCU_WIDTH)/4];
-    int32_t recbase_stride = LCU_WIDTH;
+    const int32_t recbase_stride = LCU_WIDTH;
 
+    // Pointers to current location in arrays with reference.
+    const pixel *base_y = &lcu->ref.y[x_local + y_local * LCU_WIDTH];
+    const pixel *base_u = &lcu->ref.u[x_local/2 + (y_local * LCU_WIDTH)/4];
+    const pixel *base_v = &lcu->ref.v[x_local/2 + (y_local * LCU_WIDTH)/4];
+    const int32_t base_stride = LCU_WIDTH;
 
-    pixel *base_y = &lcu->ref.y[x_local + y_local * LCU_WIDTH];
-    pixel *base_u = &lcu->ref.u[x_local/2 + (y_local * LCU_WIDTH)/4];
-    pixel *base_v = &lcu->ref.v[x_local/2 + (y_local * LCU_WIDTH)/4];
-    int32_t base_stride = LCU_WIDTH;
-
+    // Temporary buffers. Not really used for much. Possibly unnecessary.
     pixel pred_y[LCU_WIDTH*LCU_WIDTH];
     pixel pred_u[LCU_WIDTH*LCU_WIDTH>>2];
     pixel pred_v[LCU_WIDTH*LCU_WIDTH>>2];
-    int32_t pred_stride = LCU_WIDTH;
+    const int32_t pred_stride = LCU_WIDTH;
 
+    // Buffers for coefficients.
     coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
     coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
+
+    // Pointers to current location in arrays with kvantized coefficients.
     coefficient *orig_coeff_y = &lcu->coeff.y[x_local + y_local * LCU_WIDTH];
     coefficient *orig_coeff_u = &lcu->coeff.u[x_local/2 + (y_local * LCU_WIDTH)/4];
     coefficient *orig_coeff_v = &lcu->coeff.v[x_local/2 + (y_local * LCU_WIDTH)/4];
-    int32_t coeff_stride = LCU_WIDTH;
+    const int32_t coeff_stride = LCU_WIDTH;
 
-    // Quant and transform here...
+    // Temporary buffers for kvantization and transformation.
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
-
-    // INTRA PREDICTION
-
+    
     uint32_t ac_sum = 0;
     uint8_t scan_idx_luma   = SCAN_DIAG;
     uint8_t scan_idx_chroma = SCAN_DIAG;
