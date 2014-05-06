@@ -100,6 +100,24 @@ static int lcu_at_slice_end(encoder_control * const encoder, int lcu_addr_in_rs)
   return 0;
 }
 
+static int lcu_at_tile_start(encoder_control * const encoder, int lcu_addr_in_rs) {
+  assert(lcu_addr_in_rs >= 0 && lcu_addr_in_rs < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
+  if (lcu_addr_in_rs == 0) return 1;
+  if (encoder->tiles_tile_id[encoder->tiles_ctb_addr_rs_to_ts[lcu_addr_in_rs - 1]] != encoder->tiles_tile_id[encoder->tiles_ctb_addr_rs_to_ts[lcu_addr_in_rs]]) {
+    return 1;
+  }
+  return 0;
+}
+
+static int lcu_at_tile_end(encoder_control * const encoder, int lcu_addr_in_rs) {
+  assert(lcu_addr_in_rs >= 0 && lcu_addr_in_rs < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
+  if (lcu_addr_in_rs == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
+  if (encoder->tiles_tile_id[encoder->tiles_ctb_addr_rs_to_ts[lcu_addr_in_rs + 1]] != encoder->tiles_tile_id[encoder->tiles_ctb_addr_rs_to_ts[lcu_addr_in_rs]]) {
+    return 1;
+  }
+  return 0;
+}
+
 int encoder_control_init(encoder_control * const encoder, const config * const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
@@ -304,9 +322,10 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     
     //FIXME: remove
     if (encoder->slice_count) {
-      
       lcu_at_slice_start(encoder, 0);
       lcu_at_slice_end(encoder, 0);
+      lcu_at_tile_start(encoder, 0);
+      lcu_at_tile_end(encoder, 0);
     }
 
 #ifdef _DEBUG
