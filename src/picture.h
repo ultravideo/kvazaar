@@ -74,6 +74,13 @@ typedef struct
   int8_t mode;
 } cu_info_inter;
 
+typedef struct
+{
+  uint8_t y;
+  uint8_t u;
+  uint8_t v;
+} cu_cbf_t;
+
 /**
  * \brief Struct for CU info
  */
@@ -88,10 +95,7 @@ typedef struct
   int8_t merged;     //!< \brief flag to indicate this block is merged
   int8_t merge_idx;  //!< \brief merge index
 
-  // MAX_DEPTH+4 for the 4 PUs at the last level.
-  int8_t coeff_top_y[MAX_DEPTH+5];  //!< \brief is there coded coeffs Y in top level
-  int8_t coeff_top_u[MAX_DEPTH+5];  //!< \brief is there coded coeffs U in top level
-  int8_t coeff_top_v[MAX_DEPTH+5];  //!< \brief is there coded coeffs V in top level
+  cu_cbf_t cbf;
   cu_info_intra intra[4];
   cu_info_inter inter;
 } cu_info;
@@ -206,6 +210,27 @@ typedef struct {
 
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
+
+/**
+ * Check if CBF in a given level >= depth is true.
+ */
+static INLINE int cbf_is_set(uint8_t cbf_flags, int depth)
+{
+  // Transform data for 4x4 blocks is stored at depths 4-8 for luma, so masks
+  // for those levels don't include the other ones.
+  static const uint8_t masks[8] = { 0xff, 0x7f, 0x3f, 0x1f, 0x8, 0x4, 0x2, 0x1 };
+
+  return (cbf_flags & masks[depth]) != 0;
+}
+
+/**
+ * Set CBF in a level to true.
+ */
+static INLINE void cbf_set(uint8_t *cbf_flags, int depth)
+{
+  // Return value of the bit corresponding to the level.
+  *cbf_flags |= 1 << (7 - depth);
+}
 
 yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);

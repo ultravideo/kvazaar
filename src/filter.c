@@ -232,14 +232,14 @@ void filter_deblock_edge_luma(encoder_state * const encoder_state,
                                                           * (cur_pic->width_in_lcu << MAX_DEPTH)];
         // Filter strength
         strength = 0;
-        // Intra blocks have strength 2
         if(cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
           strength = 2;
+        } else if(cbf_is_set(cu_q->cbf.y, cu_q->tr_depth) || cbf_is_set(cu_p->cbf.y, cu_p->tr_depth)) {
           // Non-zero residual/coeffs and transform boundary
-        } else if(cu_q->coeff_top_y[cu_q->tr_depth] || cu_p->coeff_top_y[cu_p->tr_depth]) {
+          // Neither CU is intra so tr_depth <= MAX_DEPTH.
           strength = 1;
-          // Absolute motion vector diff between blocks >= 1 (Integer pixel)
         } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {
+          // Absolute motion vector diff between blocks >= 1 (Integer pixel)
           strength = 1;
         } else if(cu_q->inter.mv_ref != cu_p->inter.mv_ref) {
           strength = 1;

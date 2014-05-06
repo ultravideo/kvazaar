@@ -655,7 +655,7 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
       cu_info *cu_from = &lcu_cu[(x & mask) + (y & mask) * LCU_T_CU_WIDTH];
       if (cu != cu_from) {
         // Chroma coeff data is not used, luma is needed for deblocking
-        memcpy(cu->coeff_top_y, cu_from->coeff_top_y, 8);
+        cu->cbf.y = cu_from->cbf.y;
       }
     }
   }
@@ -910,10 +910,13 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, cur_cu->part_size);
       intra_recon_lcu(encoder_state, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
+      int cbf;
       inter_recon_lcu(encoder_state, encoder_state->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
       encode_transform_tree(encoder_state, x, y, depth, &work_tree[depth]);
 
-      if(cur_cu->merged && !cur_cu->coeff_top_y[depth] && !cur_cu->coeff_top_u[depth] && !cur_cu->coeff_top_v[depth]) {
+      cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
+
+      if(cur_cu->merged && !cbf) {
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
         // Selecting skip reduces bits needed to code the CU
@@ -931,12 +934,12 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
     int split_cost = (int)(4.5 * encoder_state->cur_lambda_cost);
+    int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
-    if(cur_cu->type == CU_NOTSET || cur_cu->coeff_top_y[depth] ||
-       cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
+    if(cur_cu->type == CU_NOTSET || cbf) {
       split_cost += search_cu(encoder_state, x,           y,           depth + 1, work_tree);
       split_cost += search_cu(encoder_state, x + half_cu, y,           depth + 1, work_tree);
       split_cost += search_cu(encoder_state, x,           y + half_cu, depth + 1, work_tree);

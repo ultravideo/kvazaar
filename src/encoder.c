@@ -1836,19 +1836,23 @@ void encode_coding_tree(encoder_state * const encoder_state,
         } // for ref_list
     } // if !merge
 
+    {
+      int cbf = (cbf_is_set(cur_cu->cbf.y, depth) ||
+                 cbf_is_set(cur_cu->cbf.u, depth) ||
+                 cbf_is_set(cur_cu->cbf.v, depth));
 
-    // Only need to signal coded block flag if not skipped or merged
-    // skip = no coded residual, merge = coded residual
-    if (!cur_cu->merged) {
-      cabac->ctx = &(cabac->ctx_cu_qt_root_cbf_model);
-      CABAC_BIN(cabac, cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth], "rqt_root_cbf");
+      // Only need to signal coded block flag if not skipped or merged
+      // skip = no coded residual, merge = coded residual
+      if (!cur_cu->merged) {
+        cabac->ctx = &(cabac->ctx_cu_qt_root_cbf_model);
+        CABAC_BIN(cabac, cbf, "rqt_root_cbf");
+      }
+      // Code (possible) coeffs to bitstream
+
+      if (cbf) {
+        encode_transform_coeff(encoder_state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+      }
     }
-    // Code (possible) coeffs to bitstream
-
-    if(cur_cu->coeff_top_y[depth] | cur_cu->coeff_top_u[depth] | cur_cu->coeff_top_v[depth]) {
-      encode_transform_coeff(encoder_state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
-    }
-
 
     // END for each part
   } else if (cur_cu->type == CU_INTRA) {
@@ -2114,21 +2118,20 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     encode_transform_tree(encoder_state, x,          y + offset, depth+1, lcu);
     encode_transform_tree(encoder_state, x + offset, y + offset, depth+1, lcu);
 
-    // Derive coded coeff flags from the next depth
-    if (depth == MAX_DEPTH) {
-      cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cur_cu->coeff_top_y[depth+2] | cur_cu->coeff_top_y[depth+3] | cur_cu->coeff_top_y[depth+4];
-      cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1];
-      cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1];
-    } else {
+    // Propagate coded block flags from child CUs to parent CU.
+    if (depth < MAX_DEPTH) {
       cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) +  (y_local>>3)        *LCU_T_CU_WIDTH];
       cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (x_local>>3)           + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
       cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
-      cur_cu->coeff_top_y[depth] = cur_cu->coeff_top_y[depth+1] | cu_a->coeff_top_y[depth+1] | cu_b->coeff_top_y[depth+1]
-                                    | cu_c->coeff_top_y[depth+1];
-      cur_cu->coeff_top_u[depth] = cur_cu->coeff_top_u[depth+1] | cu_a->coeff_top_u[depth+1] | cu_b->coeff_top_u[depth+1]
-                                    | cu_c->coeff_top_u[depth+1];
-      cur_cu->coeff_top_v[depth] = cur_cu->coeff_top_v[depth+1] | cu_a->coeff_top_v[depth+1] | cu_b->coeff_top_v[depth+1]
-                                    | cu_c->coeff_top_v[depth+1];
+      if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
+        cbf_set(&cur_cu->cbf.y, depth);
+      }
+      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
+        cbf_set(&cur_cu->cbf.u, depth);
+      }
+      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
+        cbf_set(&cur_cu->cbf.v, depth);
+      }
     }
 
     return;
@@ -2317,19 +2320,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       if (coeff_y[i] != 0) {
         // Found one, we can break here
         cbf_y = 1;
-        if (depth <= MAX_DEPTH) {
-          int d;
-          for (d = 0; d <= depth; ++d) {
-            cur_cu->coeff_top_y[d] = 1;
-          }
-        } else {
-          int pu_index = (x_pu & 1) + 2 * (y_pu & 1);
-          int d;
-          cur_cu->coeff_top_y[depth + pu_index] = 1;
-          for (d = 0; d < depth; ++d) {
-            cur_cu->coeff_top_y[d] = 1;
-          }
-        }
+        cbf_set(&cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
         break;
       }
     }
@@ -2392,26 +2383,19 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_u[i] != 0) {
-          int d;
-          for (d = 0; d <= depth; ++d) {
-            cur_cu->coeff_top_u[d] = 1;
-          }
+          cbf_set(&cur_cu->cbf.u, depth);
           break;
         }
       }
       transform_chroma(encoder_state, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < chroma_size; i++) {
         if (coeff_v[i] != 0) {
-          int d;
-          for (d = 0; d <= depth; ++d) {
-            cur_cu->coeff_top_v[d] = 1;
-          }
+          cbf_set(&cur_cu->cbf.v, depth);
           break;
         }
       }
 
-      // Save coefficients to cu.
-      if (cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
+      if (cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth)) {
         i = 0;
         for (y = 0; y < width_c; y++) {
           for (x = 0; x < width_c; x++) {
@@ -2423,11 +2407,11 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       }
 
       reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                         cur_cu->coeff_top_u[depth],
+                         cbf_is_set(cur_cu->cbf.u, depth),
                          coeff_u, recbase_u, pred_u, color_type_u,
                          pre_quant_coeff, block);
       reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                         cur_cu->coeff_top_v[depth],
+                         cbf_is_set(cur_cu->cbf.v, depth),
                          coeff_v, recbase_v, pred_v, color_type_v,
                          pre_quant_coeff, block);
     }
@@ -2458,13 +2442,7 @@ static void encode_transform_unit(encoder_state * const encoder_state,
   int8_t scan_idx = SCAN_DIAG;
   uint32_t dir_mode;
 
-  int cbf_y;
-  if (depth <= MAX_DEPTH) {
-    cbf_y = cur_cu->coeff_top_y[depth];
-  } else {
-    int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-    cbf_y = cur_cu->coeff_top_y[depth + pu_index];
-  }
+  int cbf_y = cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
 
   if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
@@ -2525,7 +2503,7 @@ static void encode_transform_unit(encoder_state * const encoder_state,
     return;
   }
 
-  if (cur_cu->coeff_top_u[depth] || cur_cu->coeff_top_v[depth]) {
+  if (cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth)) {
     int x, y;
     coefficient *orig_pos_u, *orig_pos_v;
 
@@ -2570,11 +2548,11 @@ static void encode_transform_unit(encoder_state * const encoder_state,
       }
     }
 
-    if (cur_cu->coeff_top_u[depth]) {
+    if (cbf_is_set(cur_cu->cbf.u, depth)) {
       encode_coeff_nxn(encoder_state, coeff_u, width_c, 2, scan_idx, 0);
     }
 
-    if (cur_cu->coeff_top_v[depth]) {
+    if (cbf_is_set(cur_cu->cbf.v, depth)) {
       encode_coeff_nxn(encoder_state, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
@@ -2608,15 +2586,9 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
 
   int8_t split = (cur_cu->tr_depth > depth);
 
-  int8_t cb_flag_u = cur_cu->coeff_top_u[depth];
-  int8_t cb_flag_v = cur_cu->coeff_top_v[depth];
-  int cb_flag_y;
-  if (depth <= MAX_DEPTH) {
-    cb_flag_y = cur_cu->coeff_top_y[depth];
-  } else {
-    int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-    cb_flag_y = cur_cu->coeff_top_y[depth + pu_index];
-  }
+  const int cb_flag_y = cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
+  const int cb_flag_u = cbf_is_set(cur_cu->cbf.u, depth);
+  const int cb_flag_v = cbf_is_set(cur_cu->cbf.v, depth);
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)
