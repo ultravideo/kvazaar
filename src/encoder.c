@@ -442,7 +442,7 @@ static int encoder_state_config_slice_init(encoder_state * const encoder_state,
   encoder_state->slice->end_in_ts = end_address_in_ts - encoder_state->tile->lcu_offset_in_ts;
   
   encoder_state->slice->start_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
-  encoder_state->slice->end_in_ts = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
+  encoder_state->slice->end_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
   return 1;
 }
 
@@ -568,6 +568,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
     //Full span to analyze
     start_in_ts = child_state->tile->lcu_offset_in_ts + child_state->slice->start_in_ts;
     end_in_ts = MIN(child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu, child_state->tile->lcu_offset_in_ts + child_state->slice->end_in_ts);
+    
+    //printf("%c-%p: start_in_ts=%d, end_in_ts=%d\n",child_state->type, child_state, start_in_ts, end_in_ts);
     while (start_in_ts < end_in_ts) {
       encoder_state *new_child = NULL;
       int range_start = start_in_ts;
@@ -590,7 +592,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         }
       }
       
-      //printf("range_start=%d, range_end_slice=%d, range_end_tile=%d, tile_allowed=%d, slice_allowed=%d\n",range_start,range_end_slice,range_end_tile,tile_allowed,slice_allowed);
+      //printf("range_start=%d, range_end_slice=%d, range_end_tile=%d, tile_allowed=%d, slice_allowed=%d end_in_ts=%d\n",range_start,range_end_slice,range_end_tile,tile_allowed,slice_allowed,end_in_ts);
       
       if ((!tile_allowed || (range_end_slice >= range_end_tile)) && !new_child && slice_allowed) {
         //Create a slice
