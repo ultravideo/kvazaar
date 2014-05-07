@@ -186,7 +186,7 @@ typedef struct encoder_state {
   encoder_state_type type;
 
   //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
-  //Use do { } while (encoder_state->children[++i].encoder_control)
+  //Use for (i = 0; encoder_state->children[i].encoder_control; ++i) {
   struct encoder_state *children;
   struct encoder_state *parent;
   

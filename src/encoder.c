@@ -660,32 +660,15 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       printf("Wavefront\n");
     }
   }
-  
-/*  if (encoder->tiles_enable) {
-    int x,y;
-    //Allocate subencoders (valid subencoder have a non null encoder_control field, so we use a null one to mark the end of the list)
-    encoder_state->children = MALLOC(struct encoder_state, encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows + 1);
-    encoder_state->children[encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows].encoder_control = NULL;
-    for (y=0; y < encoder->tiles_num_tile_rows; ++y) {
-      for (x=0; x < encoder->tiles_num_tile_columns; ++x) {
-        const int i = y * encoder->tiles_num_tile_columns + x;
-        encoder_state->children[i].encoder_control = encoder;
-        
-        if (!encoder_state_init_one(&encoder_state->children[i], encoder_state, x, y)) {
-          fprintf(stderr, "Could not initialize encoder state %d!\n", i);
-          return 0;
-        }
-      }
-  */
   return 1;
 }
 
 void encoder_state_finalize(encoder_state * const encoder_state) {
   if (encoder_state->children) {
     int i=0;
-    do {
+    for (i = 0; encoder_state->children[i].encoder_control; ++i) {
       encoder_state_finalize(&encoder_state->children[i]);
-    } while (encoder_state->children[++i].encoder_control);
+    }
     
     FREE_POINTER(encoder_state->children);
   }
@@ -1037,6 +1020,7 @@ void encode_one_frame(encoder_state * const main_state)
   
   if (main_state->children) {
     int i;
+    //FIXME!
     //This can be parallelized, we don't use a do...while loop because we use OpenMP
     #pragma omp parallel for
     for (i = 0; i < encoder->tiles_num_tile_rows * encoder->tiles_num_tile_columns; ++i) {
@@ -1062,11 +1046,11 @@ void encode_one_frame(encoder_state * const main_state)
     
     //This has to be serial
     i = 0;
-    do {
+    for (i = 0; main_state->children[i].encoder_control; ++i) {
       //Append bitstream to main stream
       bitstream_append(&main_state->stream, &main_state->children[i].stream);
       bitstream_clear(&main_state->children[i].stream);
-    } while (main_state->children[++i].encoder_control);
+    }
     
   } else {
     //Encode the whole thing as one stream
