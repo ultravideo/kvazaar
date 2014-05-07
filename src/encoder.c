@@ -439,6 +439,15 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
 
 static int encoder_state_config_slice_init(encoder_state * const encoder_state, 
                                           const int start_address_in_ts, const int end_address_in_ts) {
+  int i = 0, slice_found=0;
+  for (i = 0; i < encoder_state->encoder_control->slice_count; ++i) {
+    if (encoder_state->encoder_control->slice_addresses_in_ts[i] == start_address_in_ts) {
+      encoder_state->slice->id = i;
+      slice_found = 1;
+      break;
+    }
+  }
+  assert(slice_found);
   encoder_state->slice->start_in_ts = start_address_in_ts;
   encoder_state->slice->end_in_ts = end_address_in_ts;
   
@@ -519,6 +528,25 @@ static void encoder_state_dump_graphviz(const encoder_state * const encoder_stat
       }
       printf("</tr>");
     }
+    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>Slice map</b></td></tr>", encoder->in.width_in_lcu);
+    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
+      printf("<tr>");
+      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
+        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
+        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
+        int slice_id = 0;
+        
+        //Not efficient, but who cares
+        for (i=0; i < encoder->slice_count; ++i) {
+          if (encoder->slice_addresses_in_ts[i] <= lcu_id_ts) {
+            slice_id = i;
+          }
+        }
+        
+        printf("<td>%d</td>", slice_id);
+      }
+      printf("</tr>");
+    }
     printf("</table>>\n ]\n");
   }
   
@@ -537,6 +565,7 @@ static void encoder_state_dump_graphviz(const encoder_state * const encoder_stat
   }
   if (!encoder_state->parent || encoder_state->slice != encoder_state->parent->slice) {
     printf("|+ slice\\l");
+    printf(" - id = %d\\l", encoder_state->slice->id);
     printf(" - start_in_ts = %d\\l", encoder_state->slice->start_in_ts);
     printf(" - end_in_ts = %d\\l", encoder_state->slice->end_in_ts);
     printf(" - start_in_rs = %d\\l", encoder_state->slice->start_in_rs);
@@ -645,6 +674,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
     int children_allow_wavefront_row = 0;
     int children_allow_slice = 0;
     int children_allow_tile = 0;
+    int range_start;
     
     int start_in_ts, end_in_ts;
     
@@ -676,16 +706,12 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         assert(0);
     }
     
-    //Full span to analyze
-    start_in_ts = child_state->tile->lcu_offset_in_ts + child_state->slice->start_in_ts;
-    end_in_ts = MIN(child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu, child_state->tile->lcu_offset_in_ts + child_state->slice->end_in_ts);
-    
+    range_start = start_in_ts;
     //printf("%c-%p: start_in_ts=%d, end_in_ts=%d\n",child_state->type, child_state, start_in_ts, end_in_ts);
-    while (start_in_ts < end_in_ts && (children_allow_slice || children_allow_tile)) {
+    while (range_start < end_in_ts && (children_allow_slice || children_allow_tile)) {
       encoder_state *new_child = NULL;
-      int range_start = start_in_ts;
-      int range_end_slice = start_in_ts; //Will be incremented to get the range of the "thing"
-      int range_end_tile = start_in_ts; //Will be incremented to get the range of the "thing"
+      int range_end_slice = range_start; //Will be incremented to get the range of the "thing"
+      int range_end_tile = range_start; //Will be incremented to get the range of the "thing"
       
       int tile_allowed = lcu_at_tile_start(encoder, range_start) && children_allow_tile;
       int slice_allowed = lcu_at_slice_start(encoder, range_start) && children_allow_slice;
@@ -754,17 +780,17 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
           fprintf(stderr, "Failed to allocate memory for children...\n");
           return 0;
         }
-        
-        //Fix children parent (since we changed the address)
+
+        //Fix children parent (since we changed the address), except for the last one which is not ready yet
         {
           int i, j;
-          for (i = 0; child_state->children[i].encoder_control; ++i) {
+          for (i = 0; child_state->children[i].encoder_control && i < child_count; ++i) {
             for (j = 0; child_state->children[i].children[j].encoder_control; ++j) {
               child_state->children[i].children[j].parent = &child_state->children[i];
             }
           }
         }
-          
+        
         if (!encoder_state_init(&child_state->children[child_count], child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
@@ -772,13 +798,91 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         child_count += 1;
       }
       
-      start_in_ts = MAX(range_end_slice, range_end_tile) + 1;
+      range_start = MAX(range_end_slice, range_end_tile) + 1;
     }
     
-    if (children_allow_wavefront_row) {
-      printf("Wavefront\n");
+    //We create wavefronts only if we have no children
+    if (children_allow_wavefront_row && child_count == 0) {
+      int first_row = encoder->tiles_ctb_addr_ts_to_rs[start_in_ts] / encoder->in.width_in_lcu;
+      int last_row = encoder->tiles_ctb_addr_ts_to_rs[start_in_ts] / encoder->in.width_in_lcu;
+      int num_rows;
+      int i;
+      
+      assert(!(children_allow_slice || children_allow_tile));
+      assert(child_count == 0);
+      
+      for (i=start_in_ts; i<end_in_ts; ++i) {
+        const int row = encoder->tiles_ctb_addr_ts_to_rs[i] / encoder->in.width_in_lcu;
+        if (row < first_row) first_row = row;
+        if (row > last_row) last_row = row;
+      }
+      
+      num_rows = last_row - first_row + 1;
+      
+      //When entropy_coding_sync_enabled_flag is equal to 1 and the first coding tree block in a slice is not the first coding
+      //tree block of a row of coding tree blocks in a tile, it is a requirement of bitstream conformance that the last coding tree
+      //block in the slice shall belong to the same row of coding tree blocks as the first coding tree block in the slice.
+      
+      if (encoder->tiles_ctb_addr_ts_to_rs[start_in_ts] % encoder->in.width_in_lcu != child_state->tile->lcu_offset_x) {
+        if (num_rows > 1) {
+          fprintf(stderr, "Invalid: first CTB in slice %d is not at the tile %d edge, and the slice spans on more than one row.\n", child_state->slice->id, child_state->tile->id);
+          return 0;
+        }
+      }
+      
+      //FIXME Do the same kind of check if we implement slice segments
+    
+      
+      child_state->children = realloc(child_state->children, sizeof(encoder_state) * (num_rows + 1));
+      child_state->children[num_rows].encoder_control = NULL;
+      
+      for (i=0; i < num_rows; ++i) {
+        encoder_state *new_child = &child_state->children[i];
+        
+        new_child->encoder_control = encoder;
+        new_child->type = ENCODER_STATE_TYPE_WAVEFRONT_ROW;
+        new_child->global = child_state->global;
+        new_child->tile = child_state->tile;
+        new_child->slice = child_state->slice;
+        new_child->wfrow = MALLOC(encoder_state_config_wfrow, 1);
+        
+        if (!new_child->wfrow || !encoder_state_config_wfrow_init(new_child, i + first_row)) {
+          fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
+          return 0;
+        }
+        
+        if (!encoder_state_init(new_child, child_state)) {
+          fprintf(stderr, "Unable to init child...\n");
+          return 0;
+        }
+      }
     }
   }
+  
+  //Validate the structure
+  if (child_state->type == ENCODER_STATE_TYPE_TILE) {
+    if (child_state->tile->lcu_offset_in_ts < child_state->slice->start_in_ts) {
+      fprintf(stderr, "Tile %d starts before slice %d, in which it should be included!\n", child_state->tile->id, child_state->slice->id);
+      return 0;
+    }
+    if (child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu - 1 > child_state->slice->end_in_ts) {
+      fprintf(stderr, "Tile %d ends after slice %d, in which it should be included!\n", child_state->tile->id, child_state->slice->id);
+      return 0;
+    }
+  }
+  
+  if (child_state->type == ENCODER_STATE_TYPE_SLICE) {
+    if (child_state->slice->start_in_ts < child_state->tile->lcu_offset_in_ts) {
+      fprintf(stderr, "Slice %d starts before tile %d, in which it should be included!\n", child_state->slice->id, child_state->tile->id);
+      return 0;
+    }
+    if (child_state->slice->end_in_ts > child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu - 1) {
+      fprintf(stderr, "Slice %d ends after tile %d, in which it should be included!\n", child_state->slice->id, child_state->tile->id);
+      return 0;
+    }
+  }
+  
+  
 #ifdef _DEBUG
   if (!parent_state) encoder_state_dump_graphviz(child_state);
 #endif //_DEBUG

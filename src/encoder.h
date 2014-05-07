@@ -169,6 +169,8 @@ typedef struct {
 } encoder_state_config_tile;
 
 typedef struct {
+  int32_t id;
+  
   //Global coordinates
   int32_t start_in_ts;
   int32_t end_in_ts;
@@ -179,7 +181,7 @@ typedef struct {
 } encoder_state_config_slice;
 
 typedef struct {
-  //Row of the wavefront, relative to *tile
+  //Row in image coordinates of the wavefront
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow;
 
