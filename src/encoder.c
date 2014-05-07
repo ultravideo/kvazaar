@@ -387,6 +387,49 @@ int encoder_control_finalize(encoder_control * const encoder) {
   return 1;
 }
 
+void encoder_control_input_init(encoder_control * const encoder,
+                        const int32_t width, const int32_t height)
+{
+  encoder->in.width = width;
+  encoder->in.height = height;
+  encoder->in.real_width = width;
+  encoder->in.real_height = height;
+
+  // If input dimensions are not divisible by the smallest block size, add
+  // pixels to the dimensions, so that they are. These extra pixels will be
+  // compressed along with the real ones but they will be cropped out before
+  // rendering.
+  if (encoder->in.width % CU_MIN_SIZE_PIXELS) {
+    encoder->in.width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
+  }
+
+  if (encoder->in.height % CU_MIN_SIZE_PIXELS) {
+    encoder->in.height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
+  }
+
+  encoder->in.height_in_lcu = encoder->in.height / LCU_WIDTH;
+  encoder->in.width_in_lcu  = encoder->in.width / LCU_WIDTH;
+
+  // Add one extra LCU when image not divisible by LCU_WIDTH
+  if (encoder->in.height_in_lcu * LCU_WIDTH < height) {
+    encoder->in.height_in_lcu++;
+  }
+
+  if (encoder->in.width_in_lcu * LCU_WIDTH < width) {
+    encoder->in.width_in_lcu++;
+  }
+
+
+
+  #ifdef _DEBUG
+  if (width != encoder->in.width || height != encoder->in.height) {
+    printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
+    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, encoder->in.width, height,
+           encoder->in.height);
+  }
+  #endif
+}
+
 static int encoder_state_config_global_init(encoder_state * const encoder_state) {
   encoder_state->global->ref = picture_list_init(MAX_REF_PIC_COUNT);
   if(!encoder_state->global->ref) {
@@ -931,48 +974,7 @@ static void encoder_state_clear_refs(encoder_state *encoder_state) {
   encoder_state->global->poc = 0;
 }
 
-void encoder_control_input_init(encoder_control * const encoder,
-                        const int32_t width, const int32_t height)
-{
-  encoder->in.width = width;
-  encoder->in.height = height;
-  encoder->in.real_width = width;
-  encoder->in.real_height = height;
 
-  // If input dimensions are not divisible by the smallest block size, add
-  // pixels to the dimensions, so that they are. These extra pixels will be
-  // compressed along with the real ones but they will be cropped out before
-  // rendering.
-  if (encoder->in.width % CU_MIN_SIZE_PIXELS) {
-    encoder->in.width += CU_MIN_SIZE_PIXELS - (width % CU_MIN_SIZE_PIXELS);
-  }
-
-  if (encoder->in.height % CU_MIN_SIZE_PIXELS) {
-    encoder->in.height += CU_MIN_SIZE_PIXELS - (height % CU_MIN_SIZE_PIXELS);
-  }
-
-  encoder->in.height_in_lcu = encoder->in.height / LCU_WIDTH;
-  encoder->in.width_in_lcu  = encoder->in.width / LCU_WIDTH;
-
-  // Add one extra LCU when image not divisible by LCU_WIDTH
-  if (encoder->in.height_in_lcu * LCU_WIDTH < height) {
-    encoder->in.height_in_lcu++;
-  }
-
-  if (encoder->in.width_in_lcu * LCU_WIDTH < width) {
-    encoder->in.width_in_lcu++;
-  }
-
-
-
-  #ifdef _DEBUG
-  if (width != encoder->in.width || height != encoder->in.height) {
-    printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
-    printf("  Width = %d (%d), Height = %d (%d)\r\n", width, encoder->in.width, height,
-           encoder->in.height);
-  }
-  #endif
-}
 
 static void write_aud(encoder_state * const encoder_state)
 {
