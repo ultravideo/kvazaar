@@ -833,6 +833,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
             for (j = 0; child_state->children[i].children[j].encoder_control; ++j) {
               child_state->children[i].children[j].parent = &child_state->children[i];
             }
+            child_state->children[i].cabac.stream = &child_state->children[i].stream;
           }
         }
         
