@@ -302,8 +302,6 @@ picture *picture_alloc(const int32_t width, const int32_t height,
 
   pic->coeff_y = NULL; pic->coeff_u = NULL; pic->coeff_v = NULL;
 
-  pic->slice_sao_luma_flag = 1;
-  pic->slice_sao_chroma_flag = 1;
   pic->sao_luma = MALLOC(sao_info, width_in_lcu * height_in_lcu);
   pic->sao_chroma = MALLOC(sao_info, width_in_lcu * height_in_lcu);
 

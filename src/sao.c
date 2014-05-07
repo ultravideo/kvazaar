@@ -669,7 +669,7 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
 
     {
       int mode_bits = sao_mode_bits_edge(edge_class, edge_offset, sao_top, sao_left);
-      sum_ddistortion += (int)((double)mode_bits*(encoder_state->cur_lambda_cost+0.5));
+      sum_ddistortion += (int)((double)mode_bits*(encoder_state->global->cur_lambda_cost+0.5));
     }
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
@@ -711,7 +711,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
     ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position);
 
     temp_rate = sao_mode_bits_band(sao_out->band_position, temp_offsets, sao_top, sao_left);
-    ddistortion += (int)((double)temp_rate*(encoder_state->cur_lambda_cost+0.5));
+    ddistortion += (int)((double)temp_rate*(encoder_state->global->cur_lambda_cost+0.5));
 
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
@@ -745,7 +745,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
 
   {
     int mode_bits = sao_mode_bits_edge(edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
-    int ddistortion = mode_bits * (int)(encoder_state->cur_lambda_cost + 0.5);
+    int ddistortion = mode_bits * (int)(encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -759,7 +759,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
 
   {
     int mode_bits = sao_mode_bits_band(band_sao.band_position, &band_sao.offsets[1], sao_top, sao_left);
-    int ddistortion = mode_bits * (int)(encoder_state->cur_lambda_cost + 0.5);
+    int ddistortion = mode_bits * (int)(encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -780,7 +780,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   // Choose between SAO and doing nothing, taking into account the
   // rate-distortion cost of coding do nothing.
   {
-    int cost_of_nothing = sao_mode_bits_none(sao_top, sao_left) * (int)(encoder_state->cur_lambda_cost + 0.5);
+    int cost_of_nothing = sao_mode_bits_none(sao_top, sao_left) * (int)(encoder_state->global->cur_lambda_cost + 0.5);
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
     }
@@ -863,7 +863,7 @@ void sao_search_luma(const encoder_state * const encoder_state, const picture *p
 void sao_reconstruct_frame(encoder_state * const encoder_state)
 {
   vector2d lcu;
-  picture * const cur_pic = encoder_state->cur_pic;
+  picture * const cur_pic = encoder_state->tile->cur_pic;
 
   // These are needed because SAO needs the pre-SAO pixels form left and
   // top LCUs. Single pixel wide buffers, like what search_lcu takes, would

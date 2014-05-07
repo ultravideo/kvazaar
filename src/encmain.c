@@ -151,6 +151,16 @@ int main(int argc, char *argv[])
             "                                   Can also be u followed by and a single int n,\n"
             "                                   in which case it produces rows of uniform height.\n"
             "\n"
+            "  Wpp:\n"
+            "          --wpp:                   Enable wavefront parallel processing\n"
+            "\n"
+            "  Slices:\n"
+            "          --slice-addresses <string>|u<int>: \n"
+            "                                   Specifies a comma separated list of LCU\n"
+            "                                   positions in tile scan order of tile separations.\n"
+            "                                   Can also be u followed by and a single int n,\n"
+            "                                   in which case it produces uniform slice length.\n"
+            "\n"
             "  Deprecated parameters: (might be removed at some point)\n"
             "     Use --input-res:\n"
             "       -w, --width               : Width of input in pixels\n"
@@ -256,12 +266,13 @@ int main(int argc, char *argv[])
          encoder.in.width, encoder.in.height,
          encoder.in.real_width, encoder.in.real_height);
   
-  if (!encoder_state_init(&encoder_state, &encoder)) {
+  encoder_state.encoder_control = &encoder;
+  if (!encoder_state_init(&encoder_state, NULL)) {
     goto exit_failure;
   }
   
-  encoder_state.frame    = 0;
-  encoder_state.QP       = (int8_t)encoder.cfg->qp;
+  encoder_state.global->frame    = 0;
+  encoder_state.global->QP       = (int8_t)encoder.cfg->qp;
 
   // Only the code that handles conformance window coding needs to know
   // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
@@ -272,14 +283,14 @@ int main(int argc, char *argv[])
   //cfg->height = encoder.in.height;
 
   // Start coding cycle while data on input and not on the last frame
-  while(!cfg->frames || encoder_state.frame < cfg->frames) {
+  while(!cfg->frames || encoder_state.global->frame < cfg->frames) {
     int32_t diff;
     double temp_psnr[3];
 
     // Skip '--seek' frames before input.
     // This block can be moved outside this while loop when there is a
     // mechanism to skip the while loop on error.
-    if (encoder_state.frame == 0 && cfg->seek > 0) {
+    if (encoder_state.global->frame == 0 && cfg->seek > 0) {
       int frame_bytes = cfg->width * cfg->height * 3 / 2;
       int error = 0;
 
@@ -302,14 +313,14 @@ int main(int argc, char *argv[])
     // Read one frame from the input
     if (!read_one_frame(input, &encoder_state)) {
       if (!feof(input))
-        fprintf(stderr, "Failed to read a frame %d\n", encoder_state.frame);
+        fprintf(stderr, "Failed to read a frame %d\n", encoder_state.global->frame);
       break;
     }
 
     // The actual coding happens here, after this function we have a coded frame
     encode_one_frame(&encoder_state);
     
-    cur_pic = encoder_state.cur_pic;
+    cur_pic = encoder_state.tile->cur_pic;
 
     if (cfg->debug != NULL) {
       // Write reconstructed frame out.
@@ -343,8 +354,8 @@ int main(int argc, char *argv[])
     temp_psnr[1] = image_psnr(cur_pic->u_data, cur_pic->u_recdata, cfg->width>>1, cfg->height>>1);
     temp_psnr[2] = image_psnr(cur_pic->v_data, cur_pic->v_recdata, cfg->width>>1, cfg->height>>1);
 
-    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state.frame,
-           "BPI"[cur_pic->slicetype%3], diff<<3,
+    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state.global->frame,
+           "BPI"[encoder_state.global->slicetype%3], diff<<3,
            temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
     // Increment total PSNR
@@ -361,8 +372,8 @@ int main(int argc, char *argv[])
   fgetpos(output,(fpos_t*)&curpos);
 
   // Print statistics of the coding
-  fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder_state.frame, (long long unsigned int) curpos<<3,
-         psnr[0] / encoder_state.frame, psnr[1] / encoder_state.frame, psnr[2] / encoder_state.frame);
+  fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder_state.global->frame, (long long unsigned int) curpos<<3,
+         psnr[0] / encoder_state.global->frame, psnr[1] / encoder_state.global->frame, psnr[2] / encoder_state.global->frame);
   fprintf(stderr, " Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
   fclose(input);
