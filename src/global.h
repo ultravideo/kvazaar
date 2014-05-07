@@ -128,6 +128,7 @@ typedef int16_t coefficient;
 #define SIZE_NONE  15
 
 #define MAX_TILES_PER_DIM 16
+#define MAX_SLICES 16
 
 /* Inlining functions */
 #ifdef _MSC_VER /* Visual studio */

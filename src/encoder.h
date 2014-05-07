@@ -120,32 +120,91 @@ typedef struct
   
   const int32_t *tiles_tile_id; /*!<spec:  TileId (6.5.1); dimension: PicSizeInCtbsY */
   
+  //WPP
+  int wpp;
+  
+  //Slices
+  int slice_count;
+  const int* slice_addresses_in_ts;
+  
 } encoder_control;
 
-typedef struct encoder_state {
-  const encoder_control *encoder_control;
+typedef enum {
+  ENCODER_STATE_TYPE_INVALID = 'i',
+  ENCODER_STATE_TYPE_MAIN = 'M',
+  ENCODER_STATE_TYPE_SLICE = 'S',
+  ENCODER_STATE_TYPE_TILE = 'T',
+  ENCODER_STATE_TYPE_WAVEFRONT_ROW = 'W',
+} encoder_state_type;
+
+
+
+typedef struct {
+  double cur_lambda_cost;
   
-  int32_t lcu_offset_x;
-  int32_t lcu_offset_y;
-  
-  picture *cur_pic;
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */
   
-  bitstream stream;
+  int8_t QP;   //!< \brief Quantization parameter
   
+  //Current picture available references
   picture_list *ref;
   int8_t ref_list;
-  int8_t ref_idx_num[2];
-  int8_t QP;             // \brief Quantization parameter
+  //int8_t ref_idx_num[2];
   
-  double cur_lambda_cost;
+  int is_radl_frame;
+  uint8_t pictype;
+  uint8_t slicetype;
   
-  cabac_data cabac;
+} encoder_state_config_global;
+
+typedef struct {
+  //Current picture to encode
+  picture *cur_pic;
   
+  int32_t id;
+  
+  //Tile: offset in LCU for current encoder_state in global coordinates
+  int32_t lcu_offset_x;
+  int32_t lcu_offset_y;
+  
+  //Position of the first element in tile scan in global coordinates
+  int32_t lcu_offset_in_ts;
+} encoder_state_config_tile;
+
+typedef struct {
+  int32_t id;
+  
+  //Global coordinates
+  int32_t start_in_ts;
+  int32_t end_in_ts;
+  
+  //Global coordinates
+  int32_t start_in_rs;
+  int32_t end_in_rs;
+} encoder_state_config_slice;
+
+typedef struct {
+  //Row in image coordinates of the wavefront
+  int32_t lcu_offset_y;
+} encoder_state_config_wfrow;
+
+typedef struct encoder_state {
+  const encoder_control *encoder_control;
+  encoder_state_type type;
+
   //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
-  //Use do { } while (encoder_state->children[++i].encoder_control)
+  //Use for (i = 0; encoder_state->children[i].encoder_control; ++i) {
   struct encoder_state *children;
+  struct encoder_state *parent;
+  
+  encoder_state_config_global *global;
+  encoder_state_config_tile   *tile;
+  encoder_state_config_slice  *slice;
+  encoder_state_config_wfrow  *wfrow;
+  
+  bitstream stream;
+  cabac_data cabac;
 } encoder_state;
 
 int encoder_control_init(encoder_control *encoder, const config *cfg);
@@ -153,8 +212,8 @@ int encoder_control_finalize(encoder_control *encoder);
 
 void encoder_control_input_init(encoder_control *encoder, int32_t width, int32_t height);
 
-int encoder_state_init(encoder_state *encoder_state, const encoder_control * encoder);
-int encoder_state_finalize(encoder_state *encoder_state);
+int encoder_state_init(encoder_state * child_state, encoder_state * parent_state);
+void encoder_state_finalize(encoder_state *encoder_state);
 void encoder_state_init_lambda(encoder_state *encoder_state);
 
 void encode_one_frame(encoder_state *encoder_state);

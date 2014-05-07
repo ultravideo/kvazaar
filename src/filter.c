@@ -167,7 +167,7 @@ void filter_deblock_edge_luma(encoder_state * const encoder_state,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   const encoder_control * const encoder = encoder_state->encoder_control;
   
   cu_info *cu_q = &cur_pic->cu_array[(xpos>>MIN_SIZE) + (ypos>>MIN_SIZE) * (cur_pic->width_in_lcu << MAX_DEPTH)];
@@ -194,7 +194,7 @@ void filter_deblock_edge_luma(encoder_state * const encoder_state,
     int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
     int8_t strength = 0;
 
-    int32_t qp              = encoder_state->QP;
+    int32_t qp              = encoder_state->global->QP;
     int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
     int32_t beta            = g_beta_table_8x8[b_index] * bitdepth_scale;
@@ -295,7 +295,7 @@ void filter_deblock_edge_chroma(encoder_state * const encoder_state,
                                 int8_t depth, int8_t dir)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   cu_info *cu_q = &cur_pic->cu_array[(x>>(MIN_SIZE-1)) + (y>>(MIN_SIZE-1)) * (cur_pic->width_in_lcu << MAX_DEPTH)];
 
   // Chroma edges that do not lay on a 8x8 grid are not deblocked.
@@ -327,7 +327,7 @@ void filter_deblock_edge_chroma(encoder_state * const encoder_state,
     int16_t x_cu = x>>(MIN_SIZE-1),y_cu = y>>(MIN_SIZE-1);
     int8_t strength = 2;
 
-    int32_t QP             = g_chroma_scale[encoder_state->QP];
+    int32_t QP             = g_chroma_scale[encoder_state->global->QP];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = g_tc_table_8x8[TC_index]*bitdepth_scale;
@@ -389,7 +389,7 @@ void filter_deblock_edge_chroma(encoder_state * const encoder_state,
  */
 void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[x + y*(cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
   uint8_t border_x = (cur_pic->width  < x*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;
@@ -437,7 +437,7 @@ void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y
  */
 void filter_deblock(encoder_state * const encoder_state)
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   int16_t x, y;
 
   // TODO: Optimization: add thread for each LCU

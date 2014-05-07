@@ -159,7 +159,7 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(encoder_state->cur_lambda_cost+0.5);
+  return temp_bitcost*(int32_t)(encoder_state->global->cur_lambda_cost+0.5);
 }
 
 
@@ -201,8 +201,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = &large_hexbs[i];
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
-                             (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
+                             (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
+                             (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              block_width, block_width);
     cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -216,8 +216,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   // Try the 0,0 vector.
   if (!(mv.x == 0 && mv.y == 0)) {
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x, 
-                             (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y,
+                             (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
+                             (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
                              block_width, block_width);
     cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -232,8 +232,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = &large_hexbs[i];
         unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                                 (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
-                                 (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
+                                 (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
+                                 (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
                                  block_width, block_width);
         cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -267,8 +267,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = &large_hexbs[start + i];
       unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                               (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                               (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
+                               (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
+                               (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                block_width, block_width);
       cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -290,8 +290,8 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   for (i = 1; i < 5; ++i) {
     const vector2d *offset = &small_hexbs[i];
     unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                             (encoder_state->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                             (encoder_state->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
+                             (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
+                             (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              block_width, block_width);
     cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
@@ -374,7 +374,7 @@ static unsigned search_mv_full(unsigned depth,
  */
 static int search_cu_inter(const encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   uint32_t ref_idx = 0;
   int x_local = (x&0x3f), y_local = (y&0x3f);
   int x_cu = x>>3;
@@ -394,8 +394,8 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 
   cur_cu->inter.cost = UINT_MAX;
 
-  for (ref_idx = 0; ref_idx < encoder_state->ref->used_size; ref_idx++) {
-    picture *ref_pic = encoder_state->ref->pics[ref_idx];
+  for (ref_idx = 0; ref_idx < encoder_state->global->ref->used_size; ref_idx++) {
+    picture *ref_pic = encoder_state->global->ref->pics[ref_idx];
     unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
     cu_info *ref_cu = &ref_pic->cu_array[y_cu * width_in_scu + x_cu];
     uint32_t temp_bitcost = 0;
@@ -670,7 +670,7 @@ static int search_cu_intra(encoder_state * const encoder_state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
@@ -776,7 +776,7 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
       }
     }
     // Coefficient costs
-    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder_state->cur_lambda_cost+0.5);
+    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
 
   // Calculate actual bit costs for coding the coeffs
   // RDO
@@ -838,11 +838,11 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
       coeff_cost += get_coeff_cost(encoder_state, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
     }
     // Multiply bit count with lambda to get RD-cost
-    cost += coeff_cost * (int32_t)(encoder_state->cur_lambda_cost+0.5);
+    cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
   }
 
   // Bitcost
-  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(encoder_state->cur_lambda_cost+0.5);
+  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(encoder_state->global->cur_lambda_cost+0.5);
 
   return cost;
 }
@@ -859,7 +859,7 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
  */
 static int search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   int cu_width = LCU_WIDTH >> depth;
   int cost = MAX_INT;
   cu_info *cur_cu;
@@ -883,7 +883,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       y + cu_width <= cur_pic->height)
   {
 
-    if (cur_pic->slicetype != SLICE_I &&
+    if (encoder_state->global->slicetype != SLICE_I &&
         depth >= MIN_INTER_SEARCH_DEPTH &&
         depth <= MAX_INTER_SEARCH_DEPTH)
     {
@@ -911,7 +911,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       intra_recon_lcu(encoder_state, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
-      inter_recon_lcu(encoder_state, encoder_state->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      inter_recon_lcu(encoder_state, encoder_state->global->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
       encode_transform_tree(encoder_state, x, y, depth, &work_tree[depth]);
 
       cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
@@ -933,7 +933,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
-    int split_cost = (int)(4.5 * encoder_state->cur_lambda_cost);
+    int split_cost = (int)(4.5 * encoder_state->global->cur_lambda_cost);
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
     // If skip mode was selected for the block, skip further search.
@@ -970,7 +970,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
  */
 static void init_lcu_t(const encoder_state * const encoder_state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
-  const picture * const cur_pic = encoder_state->cur_pic;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
   
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -1050,7 +1050,7 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
 
   // Copy LCU pixels.
   {
-    const picture * const pic = encoder_state->cur_pic;
+    const picture * const pic = encoder_state->tile->cur_pic;
     int pic_width = cur_pic->width;
     int x_max = MIN(x + LCU_WIDTH, pic_width) - x;
     int y_max = MIN(y + LCU_WIDTH, cur_pic->height) - y;
@@ -1080,7 +1080,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
   {
     const int x_cu = x_px >> MAX_DEPTH;
     const int y_cu = y_px >> MAX_DEPTH;
-    const picture * const cur_pic = encoder_state->cur_pic;
+    const picture * const cur_pic = encoder_state->tile->cur_pic;
     const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
     cu_info *const cu_array = cur_pic->cu_array;
 
@@ -1100,7 +1100,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
 
   // Copy pixels to picture.
   {
-    picture * const pic = encoder_state->cur_pic;
+    picture * const pic = encoder_state->tile->cur_pic;
     const int pic_width = pic->width;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;

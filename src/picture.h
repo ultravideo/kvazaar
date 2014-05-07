@@ -126,10 +126,6 @@ typedef struct picture_struct
   uint8_t referenced;     //!< \brief Whether this picture is referenced.
   int32_t refcount;     //!< \brief Number of references in reflist to the picture
   cu_info* cu_array;     //!< \brief Info for each CU at each depth.
-  uint8_t type;
-  uint8_t slicetype;
-  uint8_t slice_sao_luma_flag;
-  uint8_t slice_sao_chroma_flag;
   struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count
