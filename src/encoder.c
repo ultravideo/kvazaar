@@ -536,7 +536,7 @@ static void encoder_state_dump_graphviz(const encoder_state * const encoder_stat
     printf(" ]\n\n");
     
     printf(" \"Map\" [\n");
-    printf("  shape=plaintext [\n");
+    printf("  shape=plaintext\n");
     printf("  label = <<table cellborder=\"1\" cellspacing=\"0\" border=\"0\">");
     printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>RS Map</b></td></tr>", encoder->in.width_in_lcu);
     for (y = 0; y < encoder->in.height_in_lcu; ++y) {
