@@ -427,6 +427,8 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   encoder_state->tile->lcu_offset_y = lcu_offset_y;
   
   encoder_state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
+  
+  encoder_state->tile->id = encoder->tiles_tile_id[encoder_state->tile->lcu_offset_in_ts];
   return 1;
 }
 
@@ -437,9 +439,8 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
 
 static int encoder_state_config_slice_init(encoder_state * const encoder_state, 
                                           const int start_address_in_ts, const int end_address_in_ts) {
-  //Has to be called AFTER initializing encoder_state->tile
-  encoder_state->slice->start_in_ts = start_address_in_ts - encoder_state->tile->lcu_offset_in_ts;
-  encoder_state->slice->end_in_ts = end_address_in_ts - encoder_state->tile->lcu_offset_in_ts;
+  encoder_state->slice->start_in_ts = start_address_in_ts;
+  encoder_state->slice->end_in_ts = end_address_in_ts;
   
   encoder_state->slice->start_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
   encoder_state->slice->end_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
@@ -461,6 +462,108 @@ static void encoder_state_config_wfrow_finalize(encoder_state * const encoder_st
   //Nothing to do (yet?)
 }
 
+#ifdef _DEBUG
+static void encoder_state_dump_graphviz(const encoder_state * const encoder_state) {
+  int i;
+  
+  if (!encoder_state->parent) {
+    const encoder_control * const encoder = encoder_state->encoder_control;
+    int y,x;
+    //Empty lines (easier to copy-paste)
+    printf("\n\n\n\n\n");
+    //Some styling...
+    printf("digraph EncoderStates {\n");
+    printf(" fontname = \"Bitstream Vera Sans\"\n");
+    printf(" fontsize = 8\n\n");
+    printf(" node [\n");
+    printf("  fontname = \"Bitstream Vera Sans\"\n");
+    printf("  fontsize = 8\n");
+    printf("  shape = \"record\"\n");
+    printf(" ]\n\n");
+    printf(" edge [\n");
+    printf("  arrowtail = \"empty\"\n");
+    printf(" ]\n\n");
+    
+    printf(" \"Map\" [\n");
+    printf("  shape=plaintext\" [\n");
+    printf("  label = <<table cellborder=\"1\" cellspacing=\"0\" border=\"0\">");
+    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>RS Map</b></td></tr>", encoder->in.width_in_lcu);
+    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
+      printf("<tr>");
+      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
+        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
+        
+        printf("<td>%d</td>", lcu_id_rs);
+      }
+      printf("</tr>");
+    }
+    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>TS Map</b></td></tr>", encoder->in.width_in_lcu);
+    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
+      printf("<tr>");
+      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
+        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
+        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
+        
+        printf("<td>%d</td>", lcu_id_ts);
+      }
+      printf("</tr>");
+    }
+    printf("<tr><td colspan=\"%d\" height=\"20\" valign=\"bottom\"><b>Tile map</b></td></tr>", encoder->in.width_in_lcu);
+    for (y = 0; y < encoder->in.height_in_lcu; ++y) {
+      printf("<tr>");
+      for (x = 0; x < encoder->in.width_in_lcu; ++x) {
+        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
+        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
+        
+        printf("<td>%d</td>", encoder->tiles_tile_id[lcu_id_ts]);
+      }
+      printf("</tr>");
+    }
+    printf("</table>>\n ]\n");
+  }
+  
+  printf(" \"%p\" [\n", encoder_state);
+  printf("  label = \"{encoder_state|");
+  printf("+ type=%c\\l", encoder_state->type);
+  if (!encoder_state->parent || encoder_state->global != encoder_state->parent->global) {
+    printf("|+ global\\l");
+  }
+  if (!encoder_state->parent || encoder_state->tile != encoder_state->parent->tile) {
+    printf("|+ tile\\l");
+    printf(" - id = %d\\l", encoder_state->tile->id);
+    printf(" - lcu_offset_x = %d\\l", encoder_state->tile->lcu_offset_x);
+    printf(" - lcu_offset_y = %d\\l", encoder_state->tile->lcu_offset_y);
+    printf(" - lcu_offset_in_ts = %d\\l", encoder_state->tile->lcu_offset_in_ts);
+  }
+  if (!encoder_state->parent || encoder_state->slice != encoder_state->parent->slice) {
+    printf("|+ slice\\l");
+    printf(" - start_in_ts = %d\\l", encoder_state->slice->start_in_ts);
+    printf(" - end_in_ts = %d\\l", encoder_state->slice->end_in_ts);
+    printf(" - start_in_rs = %d\\l", encoder_state->slice->start_in_rs);
+    printf(" - end_in_rs = %d\\l", encoder_state->slice->end_in_rs);
+  }
+  if (!encoder_state->parent || encoder_state->wfrow != encoder_state->parent->wfrow) {
+    printf("|+ wfrow\\l");
+    printf(" - lcu_offset_y = %d\\l", encoder_state->wfrow->lcu_offset_y);
+  }
+  printf("}\"\n");
+  printf(" ]\n");
+  
+  if (encoder_state->parent) {
+    printf(" \"%p\" -> \"%p\"\n", encoder_state->parent, encoder_state);
+  }
+  
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+    encoder_state_dump_graphviz(&encoder_state->children[i]);
+  }
+  
+  if (!encoder_state->parent) {
+    printf("}\n");
+    //Empty lines (easier to copy-paste)
+    printf("\n\n\n\n\n");
+  }
+}
+#endif //_DEBUG
 
 int encoder_state_init(encoder_state * const child_state, encoder_state * const parent_state) {
   //We require that, if parent_state is NULL:
@@ -472,6 +575,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   //child_state->tile
   //child_state->slice
   //child_state->wfrow
+  
+  printf("Init: %p %p\n", child_state, parent_state);
   
   child_state->parent = parent_state;
   child_state->children = MALLOC(encoder_state, 1);
@@ -547,16 +652,22 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       case ENCODER_STATE_TYPE_MAIN:
         children_allow_slice = 1;
         children_allow_tile = 1;
+        start_in_ts = 0;
+        end_in_ts = child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
         break;
       case ENCODER_STATE_TYPE_SLICE:
         assert(child_state->parent);
         if (child_state->parent->type != ENCODER_STATE_TYPE_TILE) children_allow_tile = 1;
         children_allow_wavefront_row = encoder->wpp;
+        start_in_ts = child_state->slice->start_in_ts;
+        end_in_ts = child_state->slice->end_in_ts;
         break;
       case ENCODER_STATE_TYPE_TILE:
         assert(child_state->parent);
         if (child_state->parent->type != ENCODER_STATE_TYPE_SLICE) children_allow_slice = 1;
         children_allow_wavefront_row = encoder->wpp;
+        start_in_ts = child_state->tile->lcu_offset_in_ts;
+        end_in_ts = child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
         break;
       case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
         break;
@@ -570,7 +681,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
     end_in_ts = MIN(child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu, child_state->tile->lcu_offset_in_ts + child_state->slice->end_in_ts);
     
     //printf("%c-%p: start_in_ts=%d, end_in_ts=%d\n",child_state->type, child_state, start_in_ts, end_in_ts);
-    while (start_in_ts < end_in_ts) {
+    while (start_in_ts < end_in_ts && (children_allow_slice || children_allow_tile)) {
       encoder_state *new_child = NULL;
       int range_start = start_in_ts;
       int range_end_slice = start_in_ts; //Will be incremented to get the range of the "thing"
@@ -596,8 +707,6 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       if ((!tile_allowed || (range_end_slice >= range_end_tile)) && !new_child && slice_allowed) {
         //Create a slice
-        
-        printf("%p slice: %d - %d\n", child_state, range_start, range_end_slice);
         new_child = &child_state->children[child_count];
         new_child->encoder_control = encoder;
         new_child->type = ENCODER_STATE_TYPE_SLICE;
@@ -624,7 +733,6 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         int width = MIN(width_in_lcu * LCU_WIDTH, encoder->in.width - lcu_offset_x * LCU_WIDTH);
         int height = MIN(height_in_lcu * LCU_WIDTH, encoder->in.height - lcu_offset_y * LCU_WIDTH);
         
-        printf("%p tile: %d - %d (%d)\n", child_state, range_start, range_end_tile, tile_id);
         new_child = &child_state->children[child_count];
         new_child->encoder_control = encoder;
         new_child->type = ENCODER_STATE_TYPE_TILE;
@@ -646,6 +754,17 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
           fprintf(stderr, "Failed to allocate memory for children...\n");
           return 0;
         }
+        
+        //Fix children parent (since we changed the address)
+        {
+          int i, j;
+          for (i = 0; child_state->children[i].encoder_control; ++i) {
+            for (j = 0; child_state->children[i].children[j].encoder_control; ++j) {
+              child_state->children[i].children[j].parent = &child_state->children[i];
+            }
+          }
+        }
+          
         if (!encoder_state_init(&child_state->children[child_count], child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
@@ -660,6 +779,9 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       printf("Wavefront\n");
     }
   }
+#ifdef _DEBUG
+  if (!parent_state) encoder_state_dump_graphviz(child_state);
+#endif //_DEBUG
   return 1;
 }
 

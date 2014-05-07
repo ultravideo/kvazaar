@@ -158,6 +158,8 @@ typedef struct {
   //Current picture to encode
   picture *cur_pic;
   
+  int32_t id;
+  
   //Tile: offset in LCU for current encoder_state in global coordinates
   int32_t lcu_offset_x;
   int32_t lcu_offset_y;
@@ -167,7 +169,7 @@ typedef struct {
 } encoder_state_config_tile;
 
 typedef struct {
-  //Local coordinates, relative to *tile
+  //Global coordinates
   int32_t start_in_ts;
   int32_t end_in_ts;
   
