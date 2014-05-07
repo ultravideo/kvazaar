@@ -58,7 +58,6 @@ static void encode_sao(encoder_state *encoder,
  */
 void encoder_state_init_lambda(encoder_state * const encoder_state)
 {
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
   double qp = encoder_state->global->QP;
   double lambda_scale = 1.0;
   double qp_temp      = qp - 12;
@@ -67,13 +66,13 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
   // Default QP-factor from HM config
   double qp_factor = 0.4624;
 
-  if (cur_pic->slicetype == SLICE_I) {
+  if (encoder_state->global->slicetype == SLICE_I) {
     qp_factor=0.57*lambda_scale;
   }
 
   lambda = qp_factor*pow( 2.0, qp_temp/3.0 );
 
-  if (cur_pic->slicetype != SLICE_I ) {
+  if (encoder_state->global->slicetype != SLICE_I ) {
     lambda *= 0.95;
   }
 
@@ -1050,7 +1049,7 @@ static void encoder_state_encode_tile(encoder_state * const encoder_state) {
   yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
   
   cabac_start(&encoder_state->cabac);
-  init_contexts(encoder_state, encoder_state->global->QP, encoder_state->tile->cur_pic->slicetype);
+  init_contexts(encoder_state, encoder_state->global->QP, encoder_state->global->slicetype);
 
   // Initialize lambda value(s) to use in search
   encoder_state_init_lambda(encoder_state);
@@ -1160,10 +1159,6 @@ static void encoder_state_encode(encoder_state * const main_state) {
       encoder_state *sub_state = &(main_state->children[i]);
       
       if (sub_state->tile != main_state->tile) {
-        //FIXME: remove this once these are in slice
-        sub_state->tile->cur_pic->slicetype = main_state->tile->cur_pic->slicetype;
-        sub_state->tile->cur_pic->type = main_state->tile->cur_pic->type;
-        
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->y_data, main_state, main_state->tile->cur_pic->y_data, 1);
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->u_data, main_state, main_state->tile->cur_pic->u_data, 0);
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
@@ -1198,24 +1193,24 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
     const int is_first_frame = (main_state->global->frame == 0);
     const int is_i_radl = (encoder->cfg->intra_period == 1 && main_state->global->frame % 2 == 0);
     const int is_p_radl = (encoder->cfg->intra_period > 1 && (main_state->global->frame % encoder->cfg->intra_period) == 0);
-    const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+    main_state->global->is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
     
-    if (is_radl_frame) {
+    if (main_state->global->is_radl_frame) {
       // Clear the reference list
       encoder_state_clear_refs(main_state);
 
-      main_state->tile->cur_pic->slicetype = SLICE_I;
-      main_state->tile->cur_pic->type = NAL_IDR_W_RADL;
+      main_state->global->slicetype = SLICE_I;
+      main_state->global->pictype = NAL_IDR_W_RADL;
     } else {
-      main_state->tile->cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
-      main_state->tile->cur_pic->type = NAL_TRAIL_R;
+      main_state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+      main_state->global->pictype = NAL_TRAIL_R;
     }
   } else {
     //Clear the bitstream if it's not the main encoder
     bitstream_clear(&main_state->stream);
   }
   
-  init_contexts(main_state, main_state->global->QP, main_state->tile->cur_pic->slicetype);
+  init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
   
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     encoder_state_new_frame(&main_state->children[i]);
@@ -1228,25 +1223,10 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   const encoder_control * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
 
-  const int is_first_frame = (main_state->global->frame == 0);
-  const int is_i_radl = (encoder->cfg->intra_period == 1 && main_state->global->frame % 2 == 0);
-  const int is_p_radl = (encoder->cfg->intra_period > 1 && (main_state->global->frame % encoder->cfg->intra_period) == 0);
-  const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
-  
   int i;
 
 
-  /** IDR picture when: period == 0 and frame == 0
-   *                    period == 1 && frame%2 == 0
-   *                    period != 0 && frame%period == 0
-   **/
-  if (is_radl_frame) {
-    // Clear the reference list
-    encoder_state_clear_refs(main_state);
-
-    main_state->tile->cur_pic->slicetype = SLICE_I;
-    main_state->tile->cur_pic->type = NAL_IDR_W_RADL;
-
+  if (main_state->global->is_radl_frame) {
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
       write_aud(main_state);
@@ -1273,10 +1253,6 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
       bitstream_align(stream);
     }
   } else {
-    // When intra period == 1, all pictures are intra
-    main_state->tile->cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
-    main_state->tile->cur_pic->type = NAL_TRAIL_R;
-
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
       write_aud(main_state);
@@ -1285,10 +1261,10 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   {
     // Not quite sure if this is correct, but it seems to have worked so far
     // so I tried to not change it's behavior.
-    int long_start_code = is_radl_frame || encoder->aud_enable ? 0 : 1;
+    int long_start_code = main_state->global->is_radl_frame || encoder->aud_enable ? 0 : 1;
 
     nal_write(stream,
-              is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
+              main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
   
   for (i = 0; main_state->children[i].encoder_control; ++i) {
@@ -1344,8 +1320,6 @@ static void encoder_state_write_bitstream_slice(encoder_state * const main_state
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     //Append bitstream to main stream
     bitstream_append(&main_state->stream, &main_state->children[i].stream);
-    //FIXME: Move this...
-    bitstream_clear(&main_state->children[i].stream);
   }
 }
 
@@ -1494,9 +1468,8 @@ static void add_checksum(encoder_state * const encoder_state)
 void encode_access_unit_delimiter(encoder_state * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
-  uint8_t pic_type = cur_pic->slicetype == SLICE_I ? 0
-                   : cur_pic->slicetype == SLICE_P ? 1
+  uint8_t pic_type = encoder_state->global->slicetype == SLICE_I ? 0
+                   : encoder_state->global->slicetype == SLICE_P ? 1
                    :                                             2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 }
@@ -1998,7 +1971,6 @@ void encode_slice_header(encoder_state * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
 
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
@@ -2006,8 +1978,8 @@ void encode_slice_header(encoder_state * const encoder_state)
 
   WRITE_U(stream, 1, 1, "first_slice_segment_in_pic_flag");
 
-  if (cur_pic->type >= NAL_BLA_W_LP
-      && cur_pic->type <= NAL_RSV_IRAP_VCL23) {
+  if (encoder_state->global->pictype >= NAL_BLA_W_LP
+      && encoder_state->global->pictype <= NAL_RSV_IRAP_VCL23) {
     WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
   }
 
@@ -2015,7 +1987,7 @@ void encode_slice_header(encoder_state * const encoder_state)
 
   //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
 
-  WRITE_UE(stream, cur_pic->slicetype, "slice_type");
+  WRITE_UE(stream, encoder_state->global->slicetype, "slice_type");
 
   // if !entropy_slice_flag
 
@@ -2023,8 +1995,8 @@ void encode_slice_header(encoder_state * const encoder_state)
       //WRITE_U(stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-  if (cur_pic->type != NAL_IDR_W_RADL
-      && cur_pic->type != NAL_IDR_N_LP) {
+  if (encoder_state->global->pictype != NAL_IDR_W_RADL
+      && encoder_state->global->pictype != NAL_IDR_N_LP) {
       int j;
       int ref_negative = encoder_state->global->ref->used_size;
       int ref_positive = 0;
@@ -2045,17 +2017,17 @@ void encode_slice_header(encoder_state * const encoder_state)
     //end if
   //end if
   if (encoder->sao_enable) {
-    WRITE_U(stream, cur_pic->slice_sao_luma_flag, 1, "slice_sao_luma_flag");
-    WRITE_U(stream, cur_pic->slice_sao_chroma_flag, 1, "slice_sao_chroma_flag");
+    WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
+    WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
   }
 
-  if (cur_pic->slicetype != SLICE_I) {
+  if (encoder_state->global->slicetype != SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
         WRITE_UE(stream, encoder_state->global->ref->used_size-1, "num_ref_idx_l0_active_minus1");
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
-  if (cur_pic->slicetype == SLICE_B) {
+  if (encoder_state->global->slicetype == SLICE_B) {
       WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
   }
 
@@ -2075,12 +2047,12 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
                              color_index color_i)
 {
   cabac_data * const cabac = &encoder_state->cabac;
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
   sao_eo_cat i;
 
   // Skip colors with no SAO.
-  if (color_i == COLOR_Y && !cur_pic->slice_sao_luma_flag) return;
-  if (color_i != COLOR_Y && !cur_pic->slice_sao_chroma_flag) return;
+  //FIXME: for now, we always have SAO for all channels
+  if (color_i == COLOR_Y && 0) return;
+  if (color_i != COLOR_Y && 0) return;
 
   /// sao_type_idx_luma:   TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
   /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
@@ -2214,7 +2186,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
 
 
     // Encode skip flag
-  if (cur_pic->slicetype != SLICE_I) {
+  if (encoder_state->global->slicetype != SLICE_I) {
     int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
@@ -2253,7 +2225,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
   // ENDIF SKIP
 
   // Prediction mode
-  if (cur_pic->slicetype != SLICE_I) {
+  if (encoder_state->global->slicetype != SLICE_I) {
     cabac->ctx = &(cabac->ctx_cu_pred_mode_model);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }

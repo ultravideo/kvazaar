@@ -883,7 +883,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       y + cu_width <= cur_pic->height)
   {
 
-    if (cur_pic->slicetype != SLICE_I &&
+    if (encoder_state->global->slicetype != SLICE_I &&
         depth >= MIN_INTER_SEARCH_DEPTH &&
         depth <= MAX_INTER_SEARCH_DEPTH)
     {

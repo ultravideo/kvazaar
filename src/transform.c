@@ -646,7 +646,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
-  int32_t add = ((encoder_state->tile->cur_pic->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
+  int32_t add = ((encoder_state->global->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
 
   int32_t q_bits8 = q_bits - 8;
   for (n = 0; n < width * height; n++) {

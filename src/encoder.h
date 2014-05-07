@@ -152,6 +152,10 @@ typedef struct {
   int8_t ref_list;
   //int8_t ref_idx_num[2];
   
+  int is_radl_frame;
+  uint8_t pictype;
+  uint8_t slicetype;
+  
 } encoder_state_config_global;
 
 typedef struct {

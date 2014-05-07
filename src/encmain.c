@@ -355,7 +355,7 @@ int main(int argc, char *argv[])
     temp_psnr[2] = image_psnr(cur_pic->v_data, cur_pic->v_recdata, cfg->width>>1, cfg->height>>1);
 
     fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state.global->frame,
-           "BPI"[cur_pic->slicetype%3], diff<<3,
+           "BPI"[encoder_state.global->slicetype%3], diff<<3,
            temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
     // Increment total PSNR
