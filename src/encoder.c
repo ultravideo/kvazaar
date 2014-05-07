@@ -923,7 +923,7 @@ void encoder_state_finalize(encoder_state * const encoder_state) {
 }
 
 
-static void encoder_clear_refs(encoder_state *encoder_state) {
+static void encoder_state_clear_refs(encoder_state *encoder_state) {
   while (encoder_state->global->ref->used_size) {
     picture_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size - 1);
   }
@@ -1191,7 +1191,7 @@ void encode_one_frame(encoder_state * const main_state)
    **/
   if (is_radl_frame) {
     // Clear the reference list
-    encoder_clear_refs(main_state);
+    encoder_state_clear_refs(main_state);
 
     main_state->tile->cur_pic->slicetype = SLICE_I;
     main_state->tile->cur_pic->type = NAL_IDR_W_RADL;
