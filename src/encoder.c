@@ -969,11 +969,61 @@ void encoder_state_finalize(encoder_state * const encoder_state) {
 
 
 static void encoder_state_clear_refs(encoder_state *encoder_state) {
+  //FIXME: Do we need to handle children? At present they all share the same global
   while (encoder_state->global->ref->used_size) {
     picture_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size - 1);
   }
 
   encoder_state->global->poc = 0;
+}
+
+static void encoder_state_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
+  const int source_offset_x = source_enc->tile->lcu_offset_x * LCU_WIDTH;
+  const int source_offset_y = source_enc->tile->lcu_offset_y * LCU_WIDTH;
+  
+  const int target_offset_x = target_enc->tile->lcu_offset_x * LCU_WIDTH;
+  const int target_offset_y = target_enc->tile->lcu_offset_y * LCU_WIDTH;
+  
+  int source_stride = source_enc->tile->cur_pic->width;
+  int target_stride = target_enc->tile->cur_pic->width;
+  
+  int width;
+  int height;
+  
+  int source_offset;
+  int target_offset;
+  
+  //Do nothing if the source and the destination is the same!
+  if (source_enc->tile == target_enc->tile) return;
+
+  if (is_y_channel) {
+    target_offset = source_offset_x + source_offset_y * target_enc->tile->cur_pic->width;
+    source_offset = target_offset_x + target_offset_y * source_enc->tile->cur_pic->width;
+  } else {
+    target_offset = source_offset_x/2 + source_offset_y/2 * target_enc->tile->cur_pic->width/2;
+    source_offset = target_offset_x/2 + target_offset_y/2 * source_enc->tile->cur_pic->width/2;
+  }
+  
+  if (target_enc->children) {
+    //Use information from the source
+    width = MIN(source_enc->tile->cur_pic->width_in_lcu * LCU_WIDTH, target_enc->tile->cur_pic->width - source_offset_x);
+    height = MIN(source_enc->tile->cur_pic->height_in_lcu * LCU_WIDTH, target_enc->tile->cur_pic->height - source_offset_y);
+  } else {
+    //Use information from the target
+    width = MIN(target_enc->tile->cur_pic->width_in_lcu * LCU_WIDTH, source_enc->tile->cur_pic->width - target_offset_x);
+    height = MIN(target_enc->tile->cur_pic->height_in_lcu * LCU_WIDTH, source_enc->tile->cur_pic->height - target_offset_y);
+  }
+  
+  if (!is_y_channel) {
+    width /= 2;
+    height /= 2;
+    
+    source_stride /= 2;
+    target_stride /= 2;
+  }
+  
+  //picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_enc->cur_pic->width, target_enc->cur_pic->width);
+  picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_stride, target_stride);
 }
 
 
@@ -986,36 +1036,8 @@ static void write_aud(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
-static void substream_write_bitstream(encoder_state * const encoder_state, const int end_of_sub_stream) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  const picture* const cur_pic = encoder_state->tile->cur_pic;
-  const int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
-  int lcu_id;
-  vector2d lcu;
-  
-  for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
-    lcu.x = lcu_id % cur_pic->width_in_lcu;
-    lcu.y = lcu_id / cur_pic->width_in_lcu;
-    
-    //Write bitstream
-    if (encoder->sao_enable) {
-      encode_sao(encoder_state, lcu.x, lcu.y, &cur_pic->sao_luma[lcu.y * cur_pic->width_in_lcu + lcu.x], &cur_pic->sao_chroma[lcu.y * cur_pic->width_in_lcu + lcu.x]);
-    }
-    
-    encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
 
-    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && !end_of_sub_stream) ? 1 : 0);  // end_of_slice_segment_flag
-  }
-  if (end_of_sub_stream) {
-    cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
-    cabac_flush(&encoder_state->cabac);
-  } else {
-    cabac_flush(&encoder_state->cabac);
-    bitstream_align(&encoder_state->stream);
-  }
-}
-
-static void substream_encode(encoder_state * const encoder_state) {
+static void encoder_state_encode_tile(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
 #ifndef NDEBUG
   const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
@@ -1129,57 +1151,79 @@ static void substream_encode(encoder_state * const encoder_state) {
   yuv_t_free(ver_buf);
 }
 
-static void subencoder_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
-  const int source_offset_x = source_enc->tile->lcu_offset_x * LCU_WIDTH;
-  const int source_offset_y = source_enc->tile->lcu_offset_y * LCU_WIDTH;
-  
-  const int target_offset_x = target_enc->tile->lcu_offset_x * LCU_WIDTH;
-  const int target_offset_y = target_enc->tile->lcu_offset_y * LCU_WIDTH;
-  
-  int source_stride = source_enc->tile->cur_pic->width;
-  int target_stride = target_enc->tile->cur_pic->width;
-  
-  int width;
-  int height;
-  
-  int source_offset;
-  int target_offset;
-  
-  //One of them has to be the main encoder
-  assert(target_enc->children || source_enc->children);
-
-  if (is_y_channel) {
-    target_offset = source_offset_x + source_offset_y * target_enc->tile->cur_pic->width;
-    source_offset = target_offset_x + target_offset_y * source_enc->tile->cur_pic->width;
+static void encoder_state_encode(encoder_state * const main_state) {
+  //If we have children, encode at child level
+  if (main_state->children[0].encoder_control) {
+    int i=0;
+    for (i=0; main_state->children[i].encoder_control; ++i) {
+      encoder_state *sub_state = &(main_state->children[i]);
+      
+      if (sub_state->tile != main_state->tile) {
+        //FIXME: remove this once these are in slice
+        sub_state->tile->cur_pic->slicetype = main_state->tile->cur_pic->slicetype;
+        sub_state->tile->cur_pic->type = main_state->tile->cur_pic->type;
+        
+        encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->y_data, main_state, main_state->tile->cur_pic->y_data, 1);
+        encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->u_data, main_state, main_state->tile->cur_pic->u_data, 0);
+        encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
+      }
+      encoder_state_encode(&main_state->children[i]);
+      //FIXME: substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
+      
+      if (sub_state->tile != main_state->tile) {
+        encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->y_recdata, sub_state, sub_state->tile->cur_pic->y_recdata, 1);
+        encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->u_recdata, sub_state, sub_state->tile->cur_pic->u_recdata, 0);
+        encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->v_recdata, sub_state, sub_state->tile->cur_pic->v_recdata, 0);
+      }
+    }
   } else {
-    target_offset = source_offset_x/2 + source_offset_y/2 * target_enc->tile->cur_pic->width/2;
-    source_offset = target_offset_x/2 + target_offset_y/2 * source_enc->tile->cur_pic->width/2;
+    switch (main_state->type) {
+      case ENCODER_STATE_TYPE_TILE:
+        encoder_state_encode_tile(main_state);
+        break;
+      default:
+        fprintf(stderr, "Unsupported leaf type %c!\n", main_state->type);
+        assert(0);
+    }
   }
-  
-  if (target_enc->children) {
-    //Use information from the source
-    width = MIN(source_enc->tile->cur_pic->width_in_lcu * LCU_WIDTH, target_enc->tile->cur_pic->width - source_offset_x);
-    height = MIN(source_enc->tile->cur_pic->height_in_lcu * LCU_WIDTH, target_enc->tile->cur_pic->height - source_offset_y);
-  } else {
-    //Use information from the target
-    width = MIN(target_enc->tile->cur_pic->width_in_lcu * LCU_WIDTH, source_enc->tile->cur_pic->width - target_offset_x);
-    height = MIN(target_enc->tile->cur_pic->height_in_lcu * LCU_WIDTH, source_enc->tile->cur_pic->height - target_offset_y);
-  }
-  
-  if (!is_y_channel) {
-    width /= 2;
-    height /= 2;
-    
-    source_stride /= 2;
-    target_stride /= 2;
-  }
-  
-  //picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_enc->cur_pic->width, target_enc->cur_pic->width);
-  picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_stride, target_stride);
 }
 
-void encode_one_frame(encoder_state * const main_state)
-{
+static void encoder_state_new_frame(encoder_state * const main_state) {
+  int i;
+  //FIXME Move this somewhere else!
+  if (main_state->type == ENCODER_STATE_TYPE_MAIN) {
+    const encoder_control * const encoder = main_state->encoder_control;
+    
+    const int is_first_frame = (main_state->global->frame == 0);
+    const int is_i_radl = (encoder->cfg->intra_period == 1 && main_state->global->frame % 2 == 0);
+    const int is_p_radl = (encoder->cfg->intra_period > 1 && (main_state->global->frame % encoder->cfg->intra_period) == 0);
+    const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+    
+    if (is_radl_frame) {
+      // Clear the reference list
+      encoder_state_clear_refs(main_state);
+
+      main_state->tile->cur_pic->slicetype = SLICE_I;
+      main_state->tile->cur_pic->type = NAL_IDR_W_RADL;
+    } else {
+      main_state->tile->cur_pic->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+      main_state->tile->cur_pic->type = NAL_TRAIL_R;
+    }
+  } else {
+    //Clear the bitstream if it's not the main encoder
+    bitstream_clear(&main_state->stream);
+  }
+  
+  init_contexts(main_state, main_state->global->QP, main_state->tile->cur_pic->slicetype);
+  
+  for (i = 0; main_state->children[i].encoder_control; ++i) {
+    encoder_state_new_frame(&main_state->children[i]);
+  }
+  
+
+}
+
+static void encoder_state_write_bitstream_main(encoder_state * const main_state) {
   const encoder_control * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
 
@@ -1187,6 +1231,8 @@ void encode_one_frame(encoder_state * const main_state)
   const int is_i_radl = (encoder->cfg->intra_period == 1 && main_state->global->frame % 2 == 0);
   const int is_p_radl = (encoder->cfg->intra_period > 1 && (main_state->global->frame % encoder->cfg->intra_period) == 0);
   const int is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+  
+  int i;
 
 
   /** IDR picture when: period == 0 and frame == 0
@@ -1243,49 +1289,12 @@ void encode_one_frame(encoder_state * const main_state)
     nal_write(stream,
               is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
-
-  encode_slice_header(main_state);
-  bitstream_align(&main_state->stream);
-
   
-  if (main_state->children) {
-    int i;
-    //FIXME!
-    //This can be parallelized, we don't use a do...while loop because we use OpenMP
-    #pragma omp parallel for
-    for (i = 0; i < encoder->tiles_num_tile_rows * encoder->tiles_num_tile_columns; ++i) {
-      encoder_state *subencoder = &(main_state->children[i]);
-      
-      subencoder_blit_pixels(subencoder, subencoder->tile->cur_pic->y_data, main_state, main_state->tile->cur_pic->y_data, 1);
-      subencoder_blit_pixels(subencoder, subencoder->tile->cur_pic->u_data, main_state, main_state->tile->cur_pic->u_data, 0);
-      subencoder_blit_pixels(subencoder, subencoder->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
-      
-      //FIXME: remove this once these are in slice
-      subencoder->tile->cur_pic->slicetype = main_state->tile->cur_pic->slicetype;
-      subencoder->tile->cur_pic->type = main_state->tile->cur_pic->type;
-      
-      substream_encode(subencoder);
-      substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
-      
-      subencoder_blit_pixels(main_state, main_state->tile->cur_pic->y_recdata, subencoder, subencoder->tile->cur_pic->y_recdata, 1);
-      subencoder_blit_pixels(main_state, main_state->tile->cur_pic->u_recdata, subencoder, subencoder->tile->cur_pic->u_recdata, 0);
-      subencoder_blit_pixels(main_state, main_state->tile->cur_pic->v_recdata, subencoder, subencoder->tile->cur_pic->v_recdata, 0);
-    }
-    
-    //We should do the slice header here, because we can have the entry points
-    
-    //This has to be serial
-    i = 0;
-    for (i = 0; main_state->children[i].encoder_control; ++i) {
-      //Append bitstream to main stream
-      bitstream_append(&main_state->stream, &main_state->children[i].stream);
-      bitstream_clear(&main_state->children[i].stream);
-    }
-    
-  } else {
-    //Encode the whole thing as one stream
-    substream_encode(main_state);
-    substream_write_bitstream(main_state, 0);
+  for (i = 0; main_state->children[i].encoder_control; ++i) {
+    //Append bitstream to main stream
+    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+    //FIXME: Move this...
+    bitstream_clear(&main_state->children[i].stream);
   }
   
   // Calculate checksum
@@ -1293,6 +1302,81 @@ void encode_one_frame(encoder_state * const main_state)
 
   //FIXME: Why is this needed?
   main_state->tile->cur_pic->poc = main_state->global->poc;
+}
+
+static void encoder_state_write_bitstream_tile(encoder_state * const encoder_state) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const picture* const cur_pic = encoder_state->tile->cur_pic;
+  const int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
+  int lcu_id;
+  vector2d lcu;
+  
+  for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
+    lcu.x = lcu_id % cur_pic->width_in_lcu;
+    lcu.y = lcu_id / cur_pic->width_in_lcu;
+    
+    //Write bitstream
+    if (encoder->sao_enable) {
+      encode_sao(encoder_state, lcu.x, lcu.y, &cur_pic->sao_luma[lcu.y * cur_pic->width_in_lcu + lcu.x], &cur_pic->sao_chroma[lcu.y * cur_pic->width_in_lcu + lcu.x]);
+    }
+    
+    encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+
+    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && lcu_at_slice_end(encoder, lcu_id + encoder_state->tile->lcu_offset_in_ts)) ? 1 : 0);  // end_of_slice_segment_flag
+  }
+  if (!lcu_at_slice_end(encoder, encoder_state->tile->lcu_offset_in_ts + cur_pic->width_in_lcu * cur_pic->height_in_lcu - 1)) {
+    cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
+    cabac_flush(&encoder_state->cabac);
+  } else {
+    cabac_flush(&encoder_state->cabac);
+    bitstream_align(&encoder_state->stream);
+  }
+  //We do not handle tiles containing something for now
+  assert(!encoder_state->children[0].encoder_control);
+}
+
+static void encoder_state_write_bitstream_slice(encoder_state * const main_state) {
+  int i;
+  encode_slice_header(main_state);
+  bitstream_align(&main_state->stream); 
+  
+  for (i = 0; main_state->children[i].encoder_control; ++i) {
+    //Append bitstream to main stream
+    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+    //FIXME: Move this...
+    bitstream_clear(&main_state->children[i].stream);
+  }
+}
+
+
+static void encoder_state_write_bitstream(encoder_state * const main_state) {
+  int i;
+  for (i=0; main_state->children[i].encoder_control; ++i) {
+    encoder_state *sub_state = &(main_state->children[i]);
+    encoder_state_write_bitstream(sub_state);
+  }
+  
+  switch (main_state->type) {
+    case ENCODER_STATE_TYPE_MAIN:
+      encoder_state_write_bitstream_main(main_state);
+      break;
+    case ENCODER_STATE_TYPE_TILE:
+      encoder_state_write_bitstream_tile(main_state);
+      break;
+    case ENCODER_STATE_TYPE_SLICE:
+      encoder_state_write_bitstream_slice(main_state);
+      break;
+    default:
+      fprintf(stderr, "Unsupported leaf type %c!\n", main_state->type);
+      assert(0);
+  }
+}
+
+void encode_one_frame(encoder_state * const main_state)
+{
+  encoder_state_new_frame(main_state);
+  encoder_state_encode(main_state);
+  encoder_state_write_bitstream(main_state);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
