@@ -648,8 +648,6 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   //child_state->slice
   //child_state->wfrow
   
-  printf("Init: %p %p\n", child_state, parent_state);
-  
   child_state->parent = parent_state;
   child_state->children = MALLOC(encoder_state, 1);
   child_state->children[0].encoder_control = NULL;
@@ -743,10 +741,14 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         end_in_ts = child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
         break;
       case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
+        //GCC tries to be too clever...
+        start_in_ts = -1;
+        end_in_ts = -1;
         break;
       default:
         fprintf(stderr, "Invalid encoder_state->type %d!\n", child_state->type);
         assert(0);
+        return 0;
     }
     
     range_start = start_in_ts;
