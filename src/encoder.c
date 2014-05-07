@@ -1179,8 +1179,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
         }
       }
     } else {
+      encoder_state *sub_state;
       i=0;
-      encoder_state *sub_state = &(main_state->children[i]);
+      sub_state = &(main_state->children[i]);
       
       if (sub_state->tile != main_state->tile) {
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->y_data, main_state, main_state->tile->cur_pic->y_data, 1);
