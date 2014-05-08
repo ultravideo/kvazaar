@@ -119,6 +119,81 @@ static int lcu_at_tile_end(const encoder_control * const encoder, int lcu_addr_i
   return 0;
 }
 
+//Return 1 if the LCU is at the first row of a structure (tile or slice)
+static int lcu_in_first_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y) {
+    return 1;
+  }
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->slice->start_in_rs / encoder_state->encoder_control->in.width_in_lcu) {
+    return 1;
+  }
+  
+  //One row above is before the start of the slice => it's also a boundary
+  if (lcu_addr_in_rs - encoder_state->encoder_control->in.width_in_lcu < encoder_state->slice->start_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
+//Return 1 if the LCU is at the first row of a structure (tile or slice)
+static int lcu_in_last_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y + encoder_state->tile->cur_pic->height_in_lcu - 1) {
+    return 1;
+  }
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->slice->end_in_rs / encoder_state->encoder_control->in.width_in_lcu) {
+    return 1;
+  }
+  
+  //One row below is before the end of the slice => it's also a boundary
+  if (lcu_addr_in_rs + encoder_state->encoder_control->in.width_in_lcu > encoder_state->slice->end_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
+
+//Return 1 if the LCU is at the first column of a structure (tile or slice)
+static int lcu_in_first_column(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  //First column of tile?
+  if (lcu_addr_in_rs % encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_x) {
+    return 1;
+  }
+  
+  //Slice start may not be aligned with the tile, so we need to allow this
+  if (lcu_addr_in_rs == encoder_state->slice->start_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
+//Return 1 if the LCU is at the last column of a structure (tile or slice)
+static int lcu_in_last_column(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  //First column of tile?
+  if (lcu_addr_in_rs % encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_x + encoder_state->tile->cur_pic->width_in_lcu - 1) {
+    return 1;
+  }
+  
+  //Slice start may not be aligned with the tile, so we need to allow this
+  if (lcu_addr_in_rs == encoder_state->slice->end_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
 int encoder_control_init(encoder_control * const encoder, const config * const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
@@ -934,6 +1009,10 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
         child_state->lcu_order[i].position_next_px.x = child_state->lcu_order[i].position_px.x + child_state->lcu_order[i].size.x;
         child_state->lcu_order[i].position_next_px.y = child_state->lcu_order[i].position_px.y + child_state->lcu_order[i].size.y;
+        child_state->lcu_order[i].first_row = lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_row = lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].first_column = lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_column = lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
       }
     } else {
       child_state->lcu_order_count = 0;

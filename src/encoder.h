@@ -196,6 +196,10 @@ typedef struct {
   vector2d position_px; //Top-left
   vector2d position_next_px; //Right-bottom
   vector2d size;
+  int first_column;
+  int first_row;
+  int last_column;
+  int last_row;
 } lcu_order_element;
 
 typedef struct encoder_state {
