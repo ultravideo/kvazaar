@@ -991,8 +991,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       //Restrict to the current wavefront row if needed
       if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-        lcu_start = MAX(lcu_start, child_state->wfrow->lcu_offset_y * child_state->tile->cur_pic->width_in_lcu);
-        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu);
+        lcu_start = MAX(lcu_start, (child_state->wfrow->lcu_offset_y - child_state->tile->lcu_offset_y) * child_state->tile->cur_pic->width_in_lcu);
+        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y - child_state->tile->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu);
       }
       
       child_state->lcu_order_count = lcu_end - lcu_start;
