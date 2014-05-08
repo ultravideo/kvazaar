@@ -1171,6 +1171,39 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   int i = 0;
   
   assert(encoder_state->is_leaf);
+  assert(encoder_state->lcu_order_count > 0);
+  
+  //For wavefronts, we need to get initial data from the row above
+  if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->lcu_order[0].first_row) {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[0];
+    
+    picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_px.y - 1) * cur_pic->width + lcu->position_px.x],
+                    &hor_buf->y[lcu->position_px.x],
+                    lcu->size.x, 1, cur_pic->width, cur_pic->width);
+    
+    picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                        &hor_buf->u[lcu->position_px.x / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+    
+    picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                        &hor_buf->v[lcu->position_px.x / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+    
+    ver_buf->y[0] = hor_buf->y[lcu->position_next_px.x - 1];
+    ver_buf->u[0] = hor_buf->u[lcu->position_next_px.x / 2 - 1];
+    ver_buf->v[0] = hor_buf->v[lcu->position_next_px.x / 2 - 1];
+    
+    /*picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
+                        &ver_buf->y[1],
+                        1, lcu->size.y, cur_pic->width, 1);
+    picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                        &ver_buf->u[1],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+    picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                        &ver_buf->v[1],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);*/
+
+  }
   
   for (i = 0; i < encoder_state->lcu_order_count; ++i) {
     const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
