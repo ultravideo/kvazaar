@@ -1084,11 +1084,7 @@ static void encoder_state_encode_tile(encoder_state * const encoder_state) {
   // for the extra pixel on the top right.
   yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
   
-  cabac_start(&encoder_state->cabac);
-  init_contexts(encoder_state, encoder_state->global->QP, encoder_state->global->slicetype);
 
-  // Initialize lambda value(s) to use in search
-  encoder_state_init_lambda(encoder_state);
 
   {
     picture* const cur_pic = encoder_state->tile->cur_pic;
@@ -1271,7 +1267,11 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
     bitstream_clear(&main_state->stream);
   }
   
+  cabac_start(&main_state->cabac);
   init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
+
+  // Initialize lambda value(s) to use in search
+  encoder_state_init_lambda(main_state);
   
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     encoder_state_new_frame(&main_state->children[i]);
