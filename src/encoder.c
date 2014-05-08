@@ -1484,20 +1484,23 @@ static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_sta
     }
     
   }
+
   //Last LCU
-  const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
-  const int lcu_addr_in_ts = lcu->id + encoder_state->tile->lcu_offset_in_ts;
-  const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
+  {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
+    const int lcu_addr_in_ts = lcu->id + encoder_state->tile->lcu_offset_in_ts;
+    const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
   
-  cabac_encode_bin_trm(&encoder_state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
+    cabac_encode_bin_trm(&encoder_state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
   
-  if (!end_of_slice_segment_flag) {
-    assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->cur_pic->width_in_lcu - 1));
-    cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
-    cabac_flush(&encoder_state->cabac);
-  } else {
-    cabac_flush(&encoder_state->cabac);
-    bitstream_align(&encoder_state->stream);
+    if (!end_of_slice_segment_flag) {
+      assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->cur_pic->width_in_lcu - 1));
+      cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
+      cabac_flush(&encoder_state->cabac);
+    } else {
+      cabac_flush(&encoder_state->cabac);
+      bitstream_align(&encoder_state->stream);
+    }
   }
 }
 
