@@ -50,6 +50,8 @@ static void encode_sao(encoder_state *encoder,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
 
+static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state);
+
 /*!
   \brief Initializes lambda-value for current QP
 
@@ -1184,7 +1186,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
           encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
         }
         encoder_state_encode(&main_state->children[i]);
-        //FIXME: substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
+        if (main_state->children[i].is_leaf) {
+          encoder_state_write_bitstream_leaf(&main_state->children[i]);
+        }
         
         if (sub_state->tile != main_state->tile) {
           encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->y_recdata, sub_state, sub_state->tile->cur_pic->y_recdata, 1);
@@ -1203,7 +1207,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
       }
       encoder_state_encode(&main_state->children[i]);
-      //FIXME: substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
+      if (main_state->children[i].is_leaf) {
+        encoder_state_write_bitstream_leaf(&main_state->children[i]);
+      }
       
       if (sub_state->tile != main_state->tile) {
         encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->y_recdata, sub_state, sub_state->tile->cur_pic->y_recdata, 1);
@@ -1378,9 +1384,7 @@ static void encoder_state_write_bitstream_slice(encoder_state * const main_state
 
 static void encoder_state_write_bitstream(encoder_state * const main_state) {
   int i;
-  if (main_state->is_leaf) {
-    encoder_state_write_bitstream_leaf(main_state);
-  } else {
+  if (!main_state->is_leaf) {
     for (i=0; main_state->children[i].encoder_control; ++i) {
       encoder_state *sub_state = &(main_state->children[i]);
       encoder_state_write_bitstream(sub_state);
