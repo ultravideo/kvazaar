@@ -1154,16 +1154,6 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
       sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
       sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
     }
-    
-    if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && i == 1) {
-      int j;
-      //Find next encoder (next row)
-      for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
-        if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
-          context_copy(&encoder_state->parent->children[j], encoder_state);
-        }
-      }
-    }
   }
 
   if (encoder->sao_enable) {
@@ -1359,17 +1349,38 @@ static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_sta
   
   for (i = 0; i < encoder_state->lcu_order_count; ++i) {
     const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
-    int at_slice_end = lcu_at_slice_end(encoder, lcu->id + encoder_state->tile->lcu_offset_in_ts);
-    
     if (encoder->sao_enable) {
       encode_sao(encoder_state, lcu->position.x, lcu->position.y, &cur_pic->sao_luma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x], &cur_pic->sao_chroma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x]);
     }
     
     encode_coding_tree(encoder_state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
-    cabac_encode_bin_trm(&encoder_state->cabac, ((i == encoder_state->lcu_order_count - 1) && at_slice_end) ? 1 : 0);  // end_of_slice_segment_flag
+    if (i < encoder_state->lcu_order_count - 1) {
+      //Since we don't handle slice segments, end of slice segment == end of slice
+      //Always 0 since otherwise it would be split
+      cabac_encode_bin_trm(&encoder_state->cabac, 0);  // end_of_slice_segment_flag
+    }
+    
+    if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && i == 1) {
+      int j;
+      //Find next encoder (next row)
+      for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
+        if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
+          context_copy(&encoder_state->parent->children[j], encoder_state);
+        }
+      }
+    }
+    
   }
-  if (!lcu_at_slice_end(encoder, encoder_state->tile->lcu_offset_in_ts + cur_pic->width_in_lcu * cur_pic->height_in_lcu - 1)) {
+  //Last LCU
+  const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
+  const int lcu_addr_in_ts = lcu->id + encoder_state->tile->lcu_offset_in_ts;
+  const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
+  
+  cabac_encode_bin_trm(&encoder_state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
+  
+  if (!end_of_slice_segment_flag) {
+    assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->cur_pic->width_in_lcu - 1));
     cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
     cabac_flush(&encoder_state->cabac);
   } else {
