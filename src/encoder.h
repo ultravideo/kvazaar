@@ -189,6 +189,19 @@ typedef struct {
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow;
 
+typedef struct {
+  //This it used for leaf of the encoding tree. All is relative to the tile.
+  int id;
+  vector2d position;
+  vector2d position_px; //Top-left
+  vector2d position_next_px; //Right-bottom
+  vector2d size;
+  int first_column;
+  int first_row;
+  int last_column;
+  int last_row;
+} lcu_order_element;
+
 typedef struct encoder_state {
   const encoder_control *encoder_control;
   encoder_state_type type;
@@ -202,6 +215,10 @@ typedef struct encoder_state {
   encoder_state_config_tile   *tile;
   encoder_state_config_slice  *slice;
   encoder_state_config_wfrow  *wfrow;
+  
+  int is_leaf; //A leaf encoder state is one which should encode LCUs...
+  lcu_order_element *lcu_order;
+  uint32_t lcu_order_count;
   
   bitstream stream;
   cabac_data cabac;
