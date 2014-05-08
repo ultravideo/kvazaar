@@ -2127,7 +2127,7 @@ void encode_slice_header(encoder_state * const encoder_state)
     WRITE_SE(stream, 0, "slice_qp_delta");
     //WRITE_U(stream, 1, 1, "alignment");
    
-  if (encoder->tiles_enable) {
+  if (encoder->tiles_enable || encoder->wpp) {
     //FIXME: use entry points
     WRITE_UE(stream, 0, "num_entry_point_offsets");
   }
