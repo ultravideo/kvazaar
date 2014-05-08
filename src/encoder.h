@@ -191,7 +191,7 @@ typedef struct {
 
 typedef struct {
   //This it used for leaf of the encoding tree. All is relative to the tile.
-  int lcu_id;
+  int id;
   vector2d position;
   vector2d position_px; //Top-left
   vector2d position_next_px; //Right-bottom
