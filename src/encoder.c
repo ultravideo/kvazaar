@@ -895,8 +895,9 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       }
     }
     
+    child_state->is_leaf = (child_count == 0);
     //This node is a leaf, compute LCU-order
-    if (child_count == 0) {
+    if (child_state->is_leaf) {
       //All LCU computations are relative to the tile
       //Remark: this could be optimized, but since it's run only once, it's better to do it in a understandable way.
       
@@ -1084,7 +1085,7 @@ static void encoder_state_encode_tile(encoder_state * const encoder_state) {
   // for the extra pixel on the top right.
   yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
   
-
+  assert(encoder_state->is_leaf);
 
   {
     picture* const cur_pic = encoder_state->tile->cur_pic;
@@ -1267,12 +1268,14 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
     bitstream_clear(&main_state->stream);
   }
   
-  cabac_start(&main_state->cabac);
-  init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
+  if (main_state->is_leaf) {
+    //Leaf states have cabac and context
+    cabac_start(&main_state->cabac);
+    init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
 
-  // Initialize lambda value(s) to use in search
-  encoder_state_init_lambda(main_state);
-  
+    // Initialize lambda value(s) to use in search
+    encoder_state_init_lambda(main_state);
+  }
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     encoder_state_new_frame(&main_state->children[i]);
   }

@@ -212,6 +212,7 @@ typedef struct encoder_state {
   encoder_state_config_slice  *slice;
   encoder_state_config_wfrow  *wfrow;
   
+  int is_leaf; //A leaf encoder state is one which should encode LCUs...
   lcu_order_element *lcu_order;
   uint32_t lcu_order_count;
   
