@@ -2168,6 +2168,44 @@ void encoder_next_frame(encoder_state *encoder_state) {
   encoder_state->global->poc++;
 }
 
+static int encoder_state_get_entry_point_count(encoder_state * const encoder_state) {
+  int i;
+  int count = 0;
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+    if (encoder_state->children[i].is_leaf) {
+      ++count;
+    } else {
+      count += encoder_state_get_entry_point_count(&encoder_state->children[i]);
+    }
+  }
+  return count;
+}
+
+static int encoder_state_write_entry_points(bitstream * const stream, encoder_state * const encoder_state, const int offset, const int write_length) {
+  int i;
+  int position = 0;
+  if (encoder_state->is_leaf) {
+    if (offset > 0 && write_length > 0) {
+      WRITE_U(stream, offset - 1, write_length, "entry_point_offset-minus1");
+    }
+    return bitstream_tell(&encoder_state->stream)/8;
+  }
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+      position += encoder_state_write_entry_points(stream, &encoder_state->children[i], position, write_length);
+  }
+  return position;
+}
+
+static int num_bitcount(unsigned int n) {
+  int pos = 0;
+  if (n >= 1<<16) { n >>= 16; pos += 16; }
+  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
+  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
+  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
+  if (n >= 1<< 1) {           pos +=  1; }
+  return ((n == 0) ? (-1) : pos);
+}
+
 void encode_slice_header(encoder_state * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -2240,8 +2278,13 @@ void encode_slice_header(encoder_state * const encoder_state)
     //WRITE_U(stream, 1, 1, "alignment");
    
   if (encoder->tiles_enable || encoder->wpp) {
-    //FIXME: use entry points
-    WRITE_UE(stream, 0, "num_entry_point_offsets");
+    int entry_point_count = encoder_state_get_entry_point_count(encoder_state)-1;
+    int bitcount = num_bitcount(encoder_state_write_entry_points(stream, encoder_state, 0, 0));
+    WRITE_UE(stream, entry_point_count, "num_entry_point_offsets");
+    if (entry_point_count > 0) {
+      WRITE_UE(stream, bitcount-1, "offset_len_minus1");
+      encoder_state_write_entry_points(stream, encoder_state, 0, bitcount);
+    }
   }
 }
 
