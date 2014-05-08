@@ -869,7 +869,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       //FIXME Do the same kind of check if we implement slice segments
     
-      
+      child_count = num_rows;
       child_state->children = realloc(child_state->children, sizeof(encoder_state) * (num_rows + 1));
       child_state->children[num_rows].encoder_control = NULL;
       
@@ -893,6 +893,47 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
           return 0;
         }
       }
+    }
+    
+    //This node is a leaf, compute LCU-order
+    if (child_count == 0) {
+      //All LCU computations are relative to the tile
+      //Remark: this could be optimized, but since it's run only once, it's better to do it in a understandable way.
+      
+      //By default, the full tile
+      int i;
+      int lcu_id;
+      int lcu_start = 0;
+      int lcu_end = child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
+      
+      //Restrict to the current slice if needed
+      lcu_start = MAX(lcu_start, child_state->slice->start_in_ts - child_state->tile->lcu_offset_in_ts);
+      lcu_end = MIN(lcu_end, child_state->slice->end_in_ts - child_state->tile->lcu_offset_in_ts);
+      
+      //Restrict to the current wavefront row if needed
+      if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+        lcu_start = MAX(lcu_start, child_state->wfrow->lcu_offset_y * child_state->tile->cur_pic->width_in_lcu);
+        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu - 1);
+      }
+      
+      child_state->lcu_order_count = lcu_end - lcu_start;
+      child_state->lcu_order = MALLOC(lcu_order_element, child_state->lcu_order_count);
+      
+      for (i = 0; i < child_state->lcu_order_count; ++i) {
+        lcu_id = lcu_start + i;
+        child_state->lcu_order[i].lcu_id = lcu_id;
+        child_state->lcu_order[i].position.x = lcu_id % child_state->tile->cur_pic->width_in_lcu;
+        child_state->lcu_order[i].position.y = lcu_id / child_state->tile->cur_pic->width_in_lcu;
+        child_state->lcu_order[i].position_px.x = child_state->lcu_order[i].position.x * LCU_WIDTH;
+        child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
+        child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
+        child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
+        child_state->lcu_order[i].position_next_px.x = child_state->lcu_order[i].position_px.x + child_state->lcu_order[i].size.x;
+        child_state->lcu_order[i].position_next_px.y = child_state->lcu_order[i].position_px.y + child_state->lcu_order[i].size.y;
+      }
+    } else {
+      child_state->lcu_order_count = 0;
+      child_state->lcu_order = NULL;
     }
   }
   
@@ -935,6 +976,9 @@ void encoder_state_finalize(encoder_state * const encoder_state) {
     
     FREE_POINTER(encoder_state->children);
   }
+  
+  FREE_POINTER(encoder_state->lcu_order);
+  encoder_state->lcu_order_count = 0;
   
   if (!encoder_state->parent || (encoder_state->parent->wfrow != encoder_state->wfrow)) {
     encoder_state_config_wfrow_finalize(encoder_state);
