@@ -318,14 +318,6 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     }
     
     encoder->wpp = encoder->cfg->wpp;
-    
-    //FIXME: remove
-    if (encoder->slice_count) {
-      lcu_at_slice_start(encoder, 0);
-      lcu_at_slice_end(encoder, 0);
-      lcu_at_tile_start(encoder, 0);
-      lcu_at_tile_end(encoder, 0);
-    }
 
 #ifdef _DEBUG
     printf("Tiles columns width:");
