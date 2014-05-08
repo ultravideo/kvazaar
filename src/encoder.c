@@ -50,6 +50,8 @@ static void encode_sao(encoder_state *encoder,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info *sao_luma, sao_info *sao_chroma);
 
+static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state);
+
 /*!
   \brief Initializes lambda-value for current QP
 
@@ -114,6 +116,81 @@ static int lcu_at_tile_end(const encoder_control * const encoder, int lcu_addr_i
   if (encoder->tiles_tile_id[lcu_addr_in_ts + 1] != encoder->tiles_tile_id[lcu_addr_in_ts]) {
     return 1;
   }
+  return 0;
+}
+
+//Return 1 if the LCU is at the first row of a structure (tile or slice)
+static int lcu_in_first_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y) {
+    return 1;
+  }
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->slice->start_in_rs / encoder_state->encoder_control->in.width_in_lcu) {
+    return 1;
+  }
+  
+  //One row above is before the start of the slice => it's also a boundary
+  if (lcu_addr_in_rs - encoder_state->encoder_control->in.width_in_lcu < encoder_state->slice->start_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
+//Return 1 if the LCU is at the first row of a structure (tile or slice)
+static int lcu_in_last_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y + encoder_state->tile->cur_pic->height_in_lcu - 1) {
+    return 1;
+  }
+  
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->slice->end_in_rs / encoder_state->encoder_control->in.width_in_lcu) {
+    return 1;
+  }
+  
+  //One row below is before the end of the slice => it's also a boundary
+  if (lcu_addr_in_rs + encoder_state->encoder_control->in.width_in_lcu > encoder_state->slice->end_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
+
+//Return 1 if the LCU is at the first column of a structure (tile or slice)
+static int lcu_in_first_column(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  //First column of tile?
+  if (lcu_addr_in_rs % encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_x) {
+    return 1;
+  }
+  
+  //Slice start may not be aligned with the tile, so we need to allow this
+  if (lcu_addr_in_rs == encoder_state->slice->start_in_rs) {
+    return 1;
+  }
+  
+  return 0;
+}
+
+//Return 1 if the LCU is at the last column of a structure (tile or slice)
+static int lcu_in_last_column(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+  const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
+  
+  //First column of tile?
+  if (lcu_addr_in_rs % encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_x + encoder_state->tile->cur_pic->width_in_lcu - 1) {
+    return 1;
+  }
+  
+  //Slice start may not be aligned with the tile, so we need to allow this
+  if (lcu_addr_in_rs == encoder_state->slice->end_in_rs) {
+    return 1;
+  }
+  
   return 0;
 }
 
@@ -318,14 +395,6 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     }
     
     encoder->wpp = encoder->cfg->wpp;
-    
-    //FIXME: remove
-    if (encoder->slice_count) {
-      lcu_at_slice_start(encoder, 0);
-      lcu_at_slice_end(encoder, 0);
-      lcu_at_tile_start(encoder, 0);
-      lcu_at_tile_end(encoder, 0);
-    }
 
 #ifdef _DEBUG
     printf("Tiles columns width:");
@@ -877,7 +946,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       //FIXME Do the same kind of check if we implement slice segments
     
-      
+      child_count = num_rows;
       child_state->children = realloc(child_state->children, sizeof(encoder_state) * (num_rows + 1));
       child_state->children[num_rows].encoder_control = NULL;
       
@@ -901,6 +970,53 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
           return 0;
         }
       }
+    }
+    
+    child_state->is_leaf = (child_count == 0);
+    //This node is a leaf, compute LCU-order
+    if (child_state->is_leaf) {
+      //All LCU computations are relative to the tile
+      //Remark: this could be optimized, but since it's run only once, it's better to do it in a understandable way.
+      
+      //By default, the full tile
+      int i;
+      int lcu_id;
+      int lcu_start = 0;
+      //End is the element AFTER the end (iterate < lcu_end)
+      int lcu_end = child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
+      
+      //Restrict to the current slice if needed
+      lcu_start = MAX(lcu_start, child_state->slice->start_in_ts - child_state->tile->lcu_offset_in_ts);
+      lcu_end = MIN(lcu_end, child_state->slice->end_in_ts - child_state->tile->lcu_offset_in_ts + 1);
+      
+      //Restrict to the current wavefront row if needed
+      if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+        lcu_start = MAX(lcu_start, (child_state->wfrow->lcu_offset_y - child_state->tile->lcu_offset_y) * child_state->tile->cur_pic->width_in_lcu);
+        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y - child_state->tile->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu);
+      }
+      
+      child_state->lcu_order_count = lcu_end - lcu_start;
+      child_state->lcu_order = MALLOC(lcu_order_element, child_state->lcu_order_count);
+      
+      for (i = 0; i < child_state->lcu_order_count; ++i) {
+        lcu_id = lcu_start + i;
+        child_state->lcu_order[i].id = lcu_id;
+        child_state->lcu_order[i].position.x = lcu_id % child_state->tile->cur_pic->width_in_lcu;
+        child_state->lcu_order[i].position.y = lcu_id / child_state->tile->cur_pic->width_in_lcu;
+        child_state->lcu_order[i].position_px.x = child_state->lcu_order[i].position.x * LCU_WIDTH;
+        child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
+        child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
+        child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
+        child_state->lcu_order[i].position_next_px.x = child_state->lcu_order[i].position_px.x + child_state->lcu_order[i].size.x;
+        child_state->lcu_order[i].position_next_px.y = child_state->lcu_order[i].position_px.y + child_state->lcu_order[i].size.y;
+        child_state->lcu_order[i].first_row = lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_row = lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].first_column = lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_column = lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+      }
+    } else {
+      child_state->lcu_order_count = 0;
+      child_state->lcu_order = NULL;
     }
   }
   
@@ -943,6 +1059,9 @@ void encoder_state_finalize(encoder_state * const encoder_state) {
     
     FREE_POINTER(encoder_state->children);
   }
+  
+  FREE_POINTER(encoder_state->lcu_order);
+  encoder_state->lcu_order_count = 0;
   
   if (!encoder_state->parent || (encoder_state->parent->wfrow != encoder_state->wfrow)) {
     encoder_state_config_wfrow_finalize(encoder_state);
@@ -1037,7 +1156,7 @@ static void write_aud(encoder_state * const encoder_state)
 }
 
 
-static void encoder_state_encode_tile(encoder_state * const encoder_state) {
+static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
 #ifndef NDEBUG
   const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
@@ -1047,96 +1166,105 @@ static void encoder_state_encode_tile(encoder_state * const encoder_state) {
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
   yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
+  //Picture
+  picture* const cur_pic = encoder_state->tile->cur_pic;
+  int i = 0;
   
-  cabac_start(&encoder_state->cabac);
-  init_contexts(encoder_state, encoder_state->global->QP, encoder_state->global->slicetype);
-
-  // Initialize lambda value(s) to use in search
-  encoder_state_init_lambda(encoder_state);
-
-  {
-    picture* const cur_pic = encoder_state->tile->cur_pic;
-    int lcu_id;
-    int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
+  assert(encoder_state->is_leaf);
+  assert(encoder_state->lcu_order_count > 0);
+  
+  //For wavefronts, we need to get initial data from the row above
+  if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->lcu_order[0].first_row) {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[0];
     
-    vector2d lcu;
-    const vector2d size = { cur_pic->width, cur_pic->height };
-    //FIXME: not used?
-    //const vector2d size_lcu = { cur_pic->width_in_lcu, cur_pic->height_in_lcu };
+    picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_px.y - 1) * cur_pic->width + lcu->position_px.x],
+                    &hor_buf->y[lcu->position_px.x],
+                    lcu->size.x, 1, cur_pic->width, cur_pic->width);
     
-    for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
-      lcu.x = lcu_id % cur_pic->width_in_lcu;
-      lcu.y = lcu_id / cur_pic->width_in_lcu;
+    picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                        &hor_buf->u[lcu->position_px.x / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+    
+    picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                        &hor_buf->v[lcu->position_px.x / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+    
+    ver_buf->y[0] = hor_buf->y[lcu->position_next_px.x - 1];
+    ver_buf->u[0] = hor_buf->u[lcu->position_next_px.x / 2 - 1];
+    ver_buf->v[0] = hor_buf->v[lcu->position_next_px.x / 2 - 1];
+    
+    /*picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
+                        &ver_buf->y[1],
+                        1, lcu->size.y, cur_pic->width, 1);
+    picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                        &ver_buf->u[1],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+    picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                        &ver_buf->v[1],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);*/
+
+  }
+  
+  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+
+    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, hor_buf, ver_buf);
+
+    // Take the bottom right pixel from the LCU above and put it as the
+    // first pixel in this LCUs rightmost pixels.
+    if (lcu->position.y > 0) {
+      ver_buf->y[0] = hor_buf->y[lcu->position_next_px.x - 1];
+      ver_buf->u[0] = hor_buf->u[lcu->position_next_px.x / 2 - 1];
+      ver_buf->v[0] = hor_buf->v[lcu->position_next_px.x / 2 - 1];
+    }
+
+    // Take bottom and right pixels from this LCU to be used on the search of next LCU.
+    picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_next_px.y - 1) * cur_pic->width + lcu->position_px.x],
+                        &hor_buf->y[lcu->position_px.x],
+                        lcu->size.x, 1, cur_pic->width, cur_pic->width);
+    picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                        &hor_buf->u[lcu->position_px.x / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+    picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                        &hor_buf->v[lcu->position_px.x / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+
+    picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
+                        &ver_buf->y[1],
+                        1, lcu->size.y, cur_pic->width, 1);
+    picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                        &ver_buf->u[1],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+    picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                        &ver_buf->v[1],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+
+    if (encoder->deblock_enable) {
+      filter_deblock_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y);
+    }
+
+    if (encoder->sao_enable) {
+      const int stride = cur_pic->width_in_lcu;
+      sao_info *sao_luma = &cur_pic->sao_luma[lcu->position.y * stride + lcu->position.x];
+      sao_info *sao_chroma = &cur_pic->sao_chroma[lcu->position.y * stride + lcu->position.x];
+      init_sao_info(sao_luma);
+      init_sao_info(sao_chroma);
 
       {
-        const vector2d px = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
-
-        // Handle partial LCUs on the right and bottom.
-        const vector2d lcu_dim = {
-          MIN(LCU_WIDTH, size.x - px.x), MIN(LCU_WIDTH, size.y - px.y)
-        };
-        const int right = px.x + lcu_dim.x;
-        const int bottom = px.y + lcu_dim.y;
-
-        search_lcu(encoder_state, px.x, px.y, hor_buf, ver_buf);
-
-        // Take the bottom right pixel from the LCU above and put it as the
-        // first pixel in this LCUs rightmost pixels.
-        if (lcu.y > 0) {
-          ver_buf->y[0] = hor_buf->y[right - 1];
-          ver_buf->u[0] = hor_buf->u[right / 2 - 1];
-          ver_buf->v[0] = hor_buf->v[right / 2 - 1];
-        }
-
-        // Take bottom and right pixels from this LCU to be used on the search of next LCU.
-        picture_blit_pixels(&cur_pic->y_recdata[(bottom - 1) * size.x + px.x],
-                            &hor_buf->y[px.x],
-                            lcu_dim.x, 1, size.x, size.x);
-        picture_blit_pixels(&cur_pic->u_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
-                            &hor_buf->u[px.x / 2],
-                            lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
-        picture_blit_pixels(&cur_pic->v_recdata[(bottom / 2 - 1) * size.x / 2 + px.x / 2],
-                            &hor_buf->v[px.x / 2],
-                            lcu_dim.x / 2, 1, size.x / 2, size.x / 2);
-
-        picture_blit_pixels(&cur_pic->y_recdata[px.y * size.x + right - 1],
-                            &ver_buf->y[1],
-                            1, lcu_dim.y, size.x, 1);
-        picture_blit_pixels(&cur_pic->u_recdata[px.y * size.x / 4 + (right / 2) - 1],
-                            &ver_buf->u[1],
-                            1, lcu_dim.y / 2, size.x / 2, 1);
-        picture_blit_pixels(&cur_pic->v_recdata[px.y * size.x / 4 + (right / 2) - 1],
-                            &ver_buf->v[1],
-                            1, lcu_dim.y / 2, size.x / 2, 1);
-
-        if (encoder->deblock_enable) {
-          filter_deblock_lcu(encoder_state, px.x, px.y);
-        }
-
-        if (encoder->sao_enable) {
-          const int stride = cur_pic->width_in_lcu;
-          sao_info *sao_luma = &cur_pic->sao_luma[lcu.y * stride + lcu.x];
-          sao_info *sao_chroma = &cur_pic->sao_chroma[lcu.y * stride + lcu.x];
-          init_sao_info(sao_luma);
-          init_sao_info(sao_chroma);
-
-          {
-            sao_info *sao_top = lcu. y != 0 ? &cur_pic->sao_luma[(lcu.y - 1) * stride + lcu.x] : NULL;
-            sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_luma[lcu.y * stride + lcu.x -1] : NULL;
-            sao_search_luma(encoder_state, cur_pic, lcu.x, lcu.y, sao_luma, sao_top, sao_left);
-          }
-
-          {
-            sao_info *sao_top = lcu.y != 0 ? &cur_pic->sao_chroma[(lcu.y - 1) * stride + lcu.x] : NULL;
-            sao_info *sao_left = lcu.x != 0 ? &cur_pic->sao_chroma[lcu.y * stride + lcu.x - 1] : NULL;
-            sao_search_chroma(encoder_state, cur_pic, lcu.x, lcu.y, sao_chroma, sao_top, sao_left);
-          }
-
-          // Merge only if both luma and chroma can be merged
-          sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
-          sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
-        }
+        sao_info *sao_top =  lcu->position.y != 0 ? &cur_pic->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+        sao_info *sao_left = lcu->position.x != 0 ? &cur_pic->sao_luma[lcu->position.y * stride + lcu->position.x -1] : NULL;
+        sao_search_luma(encoder_state, cur_pic, lcu->position.x, lcu->position.y, sao_luma, sao_top, sao_left);
       }
+
+      {
+        sao_info *sao_top =  lcu->position.y != 0 ? &cur_pic->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+        sao_info *sao_left = lcu->position.x != 0 ? &cur_pic->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
+        sao_search_chroma(encoder_state, cur_pic, lcu->position.x, lcu->position.y, sao_chroma, sao_top, sao_left);
+      }
+
+      // Merge only if both luma and chroma can be merged
+      sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
+      sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
     }
   }
 
@@ -1170,7 +1298,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
           encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
         }
         encoder_state_encode(&main_state->children[i]);
-        //FIXME: substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
+        if (main_state->children[i].is_leaf) {
+          encoder_state_write_bitstream_leaf(&main_state->children[i]);
+        }
         
         if (sub_state->tile != main_state->tile) {
           encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->y_recdata, sub_state, sub_state->tile->cur_pic->y_recdata, 1);
@@ -1189,7 +1319,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
       }
       encoder_state_encode(&main_state->children[i]);
-      //FIXME: substream_write_bitstream(subencoder, (main_state->children[i+1].encoder_control) != NULL);
+      if (main_state->children[i].is_leaf) {
+        encoder_state_write_bitstream_leaf(&main_state->children[i]);
+      }
       
       if (sub_state->tile != main_state->tile) {
         encoder_state_blit_pixels(main_state, main_state->tile->cur_pic->y_recdata, sub_state, sub_state->tile->cur_pic->y_recdata, 1);
@@ -1200,7 +1332,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
   } else {
     switch (main_state->type) {
       case ENCODER_STATE_TYPE_TILE:
-        encoder_state_encode_tile(main_state);
+      case ENCODER_STATE_TYPE_SLICE:
+      case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
+        encoder_state_encode_leaf(main_state);
         break;
       default:
         fprintf(stderr, "Unsupported leaf type %c!\n", main_state->type);
@@ -1235,8 +1369,14 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
     bitstream_clear(&main_state->stream);
   }
   
-  init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
-  
+  if (main_state->is_leaf) {
+    //Leaf states have cabac and context
+    cabac_start(&main_state->cabac);
+    init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
+
+    // Initialize lambda value(s) to use in search
+    encoder_state_init_lambda(main_state);
+  }
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     encoder_state_new_frame(&main_state->children[i]);
   }
@@ -1306,35 +1446,68 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   main_state->tile->cur_pic->poc = main_state->global->poc;
 }
 
-static void encoder_state_write_bitstream_tile(encoder_state * const encoder_state) {
+static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const picture* const cur_pic = encoder_state->tile->cur_pic;
-  const int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
-  int lcu_id;
-  vector2d lcu;
   
-  for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
-    lcu.x = lcu_id % cur_pic->width_in_lcu;
-    lcu.y = lcu_id / cur_pic->width_in_lcu;
-    
-    //Write bitstream
+  int i = 0;
+  
+  assert(encoder_state->is_leaf);
+  
+  if (encoder_state->type == ENCODER_STATE_TYPE_SLICE) {
+    encode_slice_header(encoder_state);
+    bitstream_align(&encoder_state->stream); 
+  }
+  
+  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
     if (encoder->sao_enable) {
-      encode_sao(encoder_state, lcu.x, lcu.y, &cur_pic->sao_luma[lcu.y * cur_pic->width_in_lcu + lcu.x], &cur_pic->sao_chroma[lcu.y * cur_pic->width_in_lcu + lcu.x]);
+      encode_sao(encoder_state, lcu->position.x, lcu->position.y, &cur_pic->sao_luma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x], &cur_pic->sao_chroma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x]);
     }
     
-    encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+    encode_coding_tree(encoder_state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
-    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && lcu_at_slice_end(encoder, lcu_id + encoder_state->tile->lcu_offset_in_ts)) ? 1 : 0);  // end_of_slice_segment_flag
+    if (i < encoder_state->lcu_order_count - 1) {
+      //Since we don't handle slice segments, end of slice segment == end of slice
+      //Always 0 since otherwise it would be split
+      cabac_encode_bin_trm(&encoder_state->cabac, 0);  // end_of_slice_segment_flag
+    }
+    
+    if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && i == 1) {
+      int j;
+      //Find next encoder (next row)
+      for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
+        if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
+          context_copy(&encoder_state->parent->children[j], encoder_state);
+        }
+      }
+    }
+    
   }
-  if (!lcu_at_slice_end(encoder, encoder_state->tile->lcu_offset_in_ts + cur_pic->width_in_lcu * cur_pic->height_in_lcu - 1)) {
+  //Last LCU
+  const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
+  const int lcu_addr_in_ts = lcu->id + encoder_state->tile->lcu_offset_in_ts;
+  const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
+  
+  cabac_encode_bin_trm(&encoder_state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
+  
+  if (!end_of_slice_segment_flag) {
+    assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->cur_pic->width_in_lcu - 1));
     cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
     cabac_flush(&encoder_state->cabac);
   } else {
     cabac_flush(&encoder_state->cabac);
     bitstream_align(&encoder_state->stream);
   }
-  //We do not handle tiles containing something for now
-  assert(!encoder_state->children[0].encoder_control);
+}
+
+static void encoder_state_write_bitstream_tile(encoder_state * const main_state) {
+  //If it's not a leaf, a tile is "nothing". We only have to write sub elements
+  int i;
+  for (i = 0; main_state->children[i].encoder_control; ++i) {
+    //Append bitstream to main stream
+    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+  }
 }
 
 static void encoder_state_write_bitstream_slice(encoder_state * const main_state) {
@@ -1351,24 +1524,26 @@ static void encoder_state_write_bitstream_slice(encoder_state * const main_state
 
 static void encoder_state_write_bitstream(encoder_state * const main_state) {
   int i;
-  for (i=0; main_state->children[i].encoder_control; ++i) {
-    encoder_state *sub_state = &(main_state->children[i]);
-    encoder_state_write_bitstream(sub_state);
-  }
-  
-  switch (main_state->type) {
-    case ENCODER_STATE_TYPE_MAIN:
-      encoder_state_write_bitstream_main(main_state);
-      break;
-    case ENCODER_STATE_TYPE_TILE:
-      encoder_state_write_bitstream_tile(main_state);
-      break;
-    case ENCODER_STATE_TYPE_SLICE:
-      encoder_state_write_bitstream_slice(main_state);
-      break;
-    default:
-      fprintf(stderr, "Unsupported leaf type %c!\n", main_state->type);
-      assert(0);
+  if (!main_state->is_leaf) {
+    for (i=0; main_state->children[i].encoder_control; ++i) {
+      encoder_state *sub_state = &(main_state->children[i]);
+      encoder_state_write_bitstream(sub_state);
+    }
+    
+    switch (main_state->type) {
+      case ENCODER_STATE_TYPE_MAIN:
+        encoder_state_write_bitstream_main(main_state);
+        break;
+      case ENCODER_STATE_TYPE_TILE:
+        encoder_state_write_bitstream_tile(main_state);
+        break;
+      case ENCODER_STATE_TYPE_SLICE:
+        encoder_state_write_bitstream_slice(main_state);
+        break;
+      default:
+        fprintf(stderr, "Unsupported node type %c!\n", main_state->type);
+        assert(0);
+    }
   }
 }
 
@@ -1580,7 +1755,8 @@ void encode_pic_parameter_set(encoder_state * const encoder_state)
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(stream, 0, 1, "transquant_bypass_enable_flag");
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
-  WRITE_U(stream, 0, 1, "entropy_coding_sync_enabled_flag");
+  //wavefronts
+  WRITE_U(stream, encoder->wpp, 1, "entropy_coding_sync_enabled_flag");
 
   if (encoder->tiles_enable) {
     WRITE_UE(stream, encoder->tiles_num_tile_columns - 1, "num_tile_columns_minus1");
@@ -1992,6 +2168,44 @@ void encoder_next_frame(encoder_state *encoder_state) {
   encoder_state->global->poc++;
 }
 
+static int encoder_state_get_entry_point_count(encoder_state * const encoder_state) {
+  int i;
+  int count = 0;
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+    if (encoder_state->children[i].is_leaf) {
+      ++count;
+    } else {
+      count += encoder_state_get_entry_point_count(&encoder_state->children[i]);
+    }
+  }
+  return count;
+}
+
+static int encoder_state_write_entry_points(bitstream * const stream, encoder_state * const encoder_state, const int offset, const int write_length) {
+  int i;
+  int position = 0;
+  if (encoder_state->is_leaf) {
+    if (offset > 0 && write_length > 0) {
+      WRITE_U(stream, offset - 1, write_length, "entry_point_offset-minus1");
+    }
+    return bitstream_tell(&encoder_state->stream)/8;
+  }
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+      position += encoder_state_write_entry_points(stream, &encoder_state->children[i], position, write_length);
+  }
+  return position;
+}
+
+static int num_bitcount(unsigned int n) {
+  int pos = 0;
+  if (n >= 1<<16) { n >>= 16; pos += 16; }
+  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
+  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
+  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
+  if (n >= 1<< 1) {           pos +=  1; }
+  return ((n == 0) ? (-1) : pos);
+}
+
 void encode_slice_header(encoder_state * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -2000,8 +2214,7 @@ void encode_slice_header(encoder_state * const encoder_state)
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
 #endif
-
-  WRITE_U(stream, 1, 1, "first_slice_segment_in_pic_flag");
+  WRITE_U(stream, (encoder_state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
 
   if (encoder_state->global->pictype >= NAL_BLA_W_LP
       && encoder_state->global->pictype <= NAL_RSV_IRAP_VCL23) {
@@ -2009,8 +2222,11 @@ void encode_slice_header(encoder_state * const encoder_state)
   }
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
-
-  //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
+  if (encoder_state->slice->start_in_rs > 0) {
+    //For now, we don't support dependent slice segments
+    //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
+    WRITE_UE(stream, encoder_state->slice->start_in_rs, "slice_segment_address");
+  }
 
   WRITE_UE(stream, encoder_state->global->slicetype, "slice_type");
 
@@ -2061,9 +2277,14 @@ void encode_slice_header(encoder_state * const encoder_state)
     WRITE_SE(stream, 0, "slice_qp_delta");
     //WRITE_U(stream, 1, 1, "alignment");
    
-  if (encoder->tiles_enable) {
-    //FIXME: use entry points
-    WRITE_UE(stream, 0, "num_entry_point_offsets");
+  if (encoder->tiles_enable || encoder->wpp) {
+    int entry_point_count = encoder_state_get_entry_point_count(encoder_state)-1;
+    int bitcount = num_bitcount(encoder_state_write_entry_points(stream, encoder_state, 0, 0));
+    WRITE_UE(stream, entry_point_count, "num_entry_point_offsets");
+    if (entry_point_count > 0) {
+      WRITE_UE(stream, bitcount-1, "offset_len_minus1");
+      encoder_state_write_entry_points(stream, encoder_state, 0, bitcount);
+    }
   }
 }
 

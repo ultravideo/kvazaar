@@ -273,6 +273,43 @@ void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
   }
 }
 
+void context_copy(encoder_state * const target_encoder_state, const encoder_state * const source_encoder_state) {
+  cabac_data * const target_cabac = &target_encoder_state->cabac;
+  const cabac_data * const source_cabac = &source_encoder_state->cabac;
+  int i;
+  
+  target_cabac->ctx_sao_merge_flag_model = source_cabac->ctx_sao_merge_flag_model;
+  target_cabac->ctx_sao_type_idx_model = source_cabac->ctx_sao_type_idx_model;
+  for (i=0; i<3; ++i) target_cabac->ctx_split_flag_model[i] = source_cabac->ctx_split_flag_model[i];
+  target_cabac->ctx_intra_mode_model = source_cabac->ctx_intra_mode_model;
+  for (i=0; i<2; ++i) target_cabac->ctx_chroma_pred_model[i] = source_cabac->ctx_chroma_pred_model[i];
+  for (i=0; i<3; ++i) target_cabac->ctx_trans_subdiv_model[i] = source_cabac->ctx_trans_subdiv_model[i];
+  for (i=0; i<3; ++i) target_cabac->ctx_qt_cbf_model_luma[i] = source_cabac->ctx_qt_cbf_model_luma[i];
+  for (i=0; i<3; ++i) target_cabac->ctx_qt_cbf_model_chroma[i] = source_cabac->ctx_qt_cbf_model_chroma[i];
+  for (i=0; i<4; ++i) target_cabac->ctx_part_size_model[i] = source_cabac->ctx_part_size_model[i];
+  for (i=0; i<4; ++i) target_cabac->ctx_cu_sig_coeff_group_model[i] = source_cabac->ctx_cu_sig_coeff_group_model[i];
+  for (i=0; i<27; ++i) target_cabac->ctx_cu_sig_model_luma[i] = source_cabac->ctx_cu_sig_model_luma[i];
+  for (i=0; i<15; ++i) target_cabac->ctx_cu_sig_model_chroma[i] = source_cabac->ctx_cu_sig_model_chroma[i];
+  for (i=0; i<15; ++i) target_cabac->ctx_cu_ctx_last_y_luma[i] = source_cabac->ctx_cu_ctx_last_y_luma[i];
+  for (i=0; i<15; ++i) target_cabac->ctx_cu_ctx_last_y_chroma[i] = source_cabac->ctx_cu_ctx_last_y_chroma[i];
+  for (i=0; i<15; ++i) target_cabac->ctx_cu_ctx_last_x_luma[i] = source_cabac->ctx_cu_ctx_last_x_luma[i];
+  for (i=0; i<15; ++i) target_cabac->ctx_cu_ctx_last_x_chroma[i] = source_cabac->ctx_cu_ctx_last_x_chroma[i];
+  for (i=0; i<16; ++i) target_cabac->ctx_cu_one_model_luma[i] = source_cabac->ctx_cu_one_model_luma[i];
+  for (i=0; i<8; ++i) target_cabac->ctx_cu_one_model_chroma[i] = source_cabac->ctx_cu_one_model_chroma[i];
+  for (i=0; i<4; ++i) target_cabac->ctx_cu_abs_model_luma[i] = source_cabac->ctx_cu_abs_model_luma[i];
+  for (i=0; i<2; ++i) target_cabac->ctx_cu_abs_model_chroma[i] = source_cabac->ctx_cu_abs_model_chroma[i];
+  target_cabac->ctx_cu_pred_mode_model = source_cabac->ctx_cu_pred_mode_model;
+  for (i=0; i<3; ++i) target_cabac->ctx_cu_skip_flag_model[i] = source_cabac->ctx_cu_skip_flag_model[i];
+  target_cabac->ctx_cu_merge_idx_ext_model = source_cabac->ctx_cu_merge_idx_ext_model;
+  target_cabac->ctx_cu_merge_flag_ext_model = source_cabac->ctx_cu_merge_flag_ext_model;
+  for (i=0; i<2; ++i) target_cabac->ctx_cu_mvd_model[i] = source_cabac->ctx_cu_mvd_model[i];
+  for (i=0; i<2; ++i) target_cabac->ctx_cu_ref_pic_model[i] = source_cabac->ctx_cu_ref_pic_model[i];
+  for (i=0; i<2; ++i) target_cabac->ctx_mvp_idx_model[i] = source_cabac->ctx_mvp_idx_model[i];
+  target_cabac->ctx_cu_qt_root_cbf_model = source_cabac->ctx_cu_qt_root_cbf_model;
+  target_cabac->ctx_transform_skip_model_luma = source_cabac->ctx_transform_skip_model_luma;
+  target_cabac->ctx_transform_skip_model_chroma = source_cabac->ctx_transform_skip_model_chroma;
+}
+
 
 uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
                                       uint32_t pos_x,
