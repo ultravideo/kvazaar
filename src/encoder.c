@@ -1154,6 +1154,16 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
       sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
       sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
     }
+    
+    if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && i == 1) {
+      int j;
+      //Find next encoder (next row)
+      for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
+        if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
+          context_copy(&encoder_state->parent->children[j], encoder_state);
+        }
+      }
+    }
   }
 
   if (encoder->sao_enable) {
@@ -1220,6 +1230,8 @@ static void encoder_state_encode(encoder_state * const main_state) {
   } else {
     switch (main_state->type) {
       case ENCODER_STATE_TYPE_TILE:
+      case ENCODER_STATE_TYPE_SLICE:
+      case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
         encoder_state_encode_leaf(main_state);
         break;
       default:
@@ -1339,6 +1351,11 @@ static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_sta
   int i = 0;
   
   assert(encoder_state->is_leaf);
+  
+  if (encoder_state->type == ENCODER_STATE_TYPE_SLICE) {
+    encode_slice_header(encoder_state);
+    bitstream_align(&encoder_state->stream); 
+  }
   
   for (i = 0; i < encoder_state->lcu_order_count; ++i) {
     const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
@@ -1615,7 +1632,8 @@ void encode_pic_parameter_set(encoder_state * const encoder_state)
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
   WRITE_U(stream, 0, 1, "transquant_bypass_enable_flag");
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
-  WRITE_U(stream, 0, 1, "entropy_coding_sync_enabled_flag");
+  //wavefronts
+  WRITE_U(stream, encoder->wpp, 1, "entropy_coding_sync_enabled_flag");
 
   if (encoder->tiles_enable) {
     WRITE_UE(stream, encoder->tiles_num_tile_columns - 1, "num_tile_columns_minus1");
@@ -2035,8 +2053,7 @@ void encode_slice_header(encoder_state * const encoder_state)
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
 #endif
-
-  WRITE_U(stream, 1, 1, "first_slice_segment_in_pic_flag");
+  WRITE_U(stream, (encoder_state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
 
   if (encoder_state->global->pictype >= NAL_BLA_W_LP
       && encoder_state->global->pictype <= NAL_RSV_IRAP_VCL23) {
@@ -2044,8 +2061,11 @@ void encode_slice_header(encoder_state * const encoder_state)
   }
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
-
-  //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
+  if (encoder_state->slice->start_in_rs > 0) {
+    //For now, we don't support dependent slice segments
+    //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
+    WRITE_UE(stream, encoder_state->slice->start_in_rs, "slice_segment_address");
+  }
 
   WRITE_UE(stream, encoder_state->global->slicetype, "slice_type");
 
