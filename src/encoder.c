@@ -1326,25 +1326,25 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   main_state->tile->cur_pic->poc = main_state->global->poc;
 }
 
-static void encoder_state_write_bitstream_tile(encoder_state * const encoder_state) {
+static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const picture* const cur_pic = encoder_state->tile->cur_pic;
-  const int lcu_count = cur_pic->width_in_lcu * cur_pic->height_in_lcu;
-  int lcu_id;
-  vector2d lcu;
   
-  for (lcu_id = 0; lcu_id < lcu_count; ++lcu_id) {
-    lcu.x = lcu_id % cur_pic->width_in_lcu;
-    lcu.y = lcu_id / cur_pic->width_in_lcu;
+  int i = 0;
+  
+  assert(encoder_state->is_leaf);
+  
+  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+    int at_slice_end = lcu_at_slice_end(encoder, lcu->id + encoder_state->tile->lcu_offset_in_ts);
     
-    //Write bitstream
     if (encoder->sao_enable) {
-      encode_sao(encoder_state, lcu.x, lcu.y, &cur_pic->sao_luma[lcu.y * cur_pic->width_in_lcu + lcu.x], &cur_pic->sao_chroma[lcu.y * cur_pic->width_in_lcu + lcu.x]);
+      encode_sao(encoder_state, lcu->position.x, lcu->position.y, &cur_pic->sao_luma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x], &cur_pic->sao_chroma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x]);
     }
     
-    encode_coding_tree(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0);
+    encode_coding_tree(encoder_state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
-    cabac_encode_bin_trm(&encoder_state->cabac, ((lcu_id == lcu_count - 1) && lcu_at_slice_end(encoder, lcu_id + encoder_state->tile->lcu_offset_in_ts)) ? 1 : 0);  // end_of_slice_segment_flag
+    cabac_encode_bin_trm(&encoder_state->cabac, ((i == encoder_state->lcu_order_count - 1) && at_slice_end) ? 1 : 0);  // end_of_slice_segment_flag
   }
   if (!lcu_at_slice_end(encoder, encoder_state->tile->lcu_offset_in_ts + cur_pic->width_in_lcu * cur_pic->height_in_lcu - 1)) {
     cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
@@ -1353,8 +1353,15 @@ static void encoder_state_write_bitstream_tile(encoder_state * const encoder_sta
     cabac_flush(&encoder_state->cabac);
     bitstream_align(&encoder_state->stream);
   }
-  //We do not handle tiles containing something for now
-  assert(!encoder_state->children[0].encoder_control);
+}
+
+static void encoder_state_write_bitstream_tile(encoder_state * const main_state) {
+  //If it's not a leaf, a tile is "nothing". We only have to write sub elements
+  int i;
+  for (i = 0; main_state->children[i].encoder_control; ++i) {
+    //Append bitstream to main stream
+    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+  }
 }
 
 static void encoder_state_write_bitstream_slice(encoder_state * const main_state) {
@@ -1371,24 +1378,28 @@ static void encoder_state_write_bitstream_slice(encoder_state * const main_state
 
 static void encoder_state_write_bitstream(encoder_state * const main_state) {
   int i;
-  for (i=0; main_state->children[i].encoder_control; ++i) {
-    encoder_state *sub_state = &(main_state->children[i]);
-    encoder_state_write_bitstream(sub_state);
-  }
-  
-  switch (main_state->type) {
-    case ENCODER_STATE_TYPE_MAIN:
-      encoder_state_write_bitstream_main(main_state);
-      break;
-    case ENCODER_STATE_TYPE_TILE:
-      encoder_state_write_bitstream_tile(main_state);
-      break;
-    case ENCODER_STATE_TYPE_SLICE:
-      encoder_state_write_bitstream_slice(main_state);
-      break;
-    default:
-      fprintf(stderr, "Unsupported leaf type %c!\n", main_state->type);
-      assert(0);
+  if (main_state->is_leaf) {
+    encoder_state_write_bitstream_leaf(main_state);
+  } else {
+    for (i=0; main_state->children[i].encoder_control; ++i) {
+      encoder_state *sub_state = &(main_state->children[i]);
+      encoder_state_write_bitstream(sub_state);
+    }
+    
+    switch (main_state->type) {
+      case ENCODER_STATE_TYPE_MAIN:
+        encoder_state_write_bitstream_main(main_state);
+        break;
+      case ENCODER_STATE_TYPE_TILE:
+        encoder_state_write_bitstream_tile(main_state);
+        break;
+      case ENCODER_STATE_TYPE_SLICE:
+        encoder_state_write_bitstream_slice(main_state);
+        break;
+      default:
+        fprintf(stderr, "Unsupported node type %c!\n", main_state->type);
+        assert(0);
+    }
   }
 }
 
