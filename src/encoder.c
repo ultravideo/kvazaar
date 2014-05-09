@@ -3172,7 +3172,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       for(y = 0; y < width_c; y++) {
         for(x = 0; x < width_c; x++) {
           pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
-          pred_v[x+y*(pred_stride>>1)]=recbase_v[x+y*(recbase_stride>>1)];
         }
       }
 
@@ -3183,6 +3182,28 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
           break;
         }
       }
+      // Copy coefficients, even if they are all zeroes.
+      {
+        int i = 0;
+        for (y = 0; y < width_c; y++) {
+          for (x = 0; x < width_c; x++) {
+            orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
+            i++;
+          }
+        }
+      }
+      if (cbf_is_set(cur_cu->cbf.u, depth)) {
+        reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
+                           coeff_u, recbase_u, pred_u, color_type_u,
+                           pre_quant_coeff, block);
+      }
+
+
+      for(y = 0; y < width_c; y++) {
+        for(x = 0; x < width_c; x++) {
+          pred_v[x+y*(pred_stride>>1)]=recbase_v[x+y*(recbase_stride>>1)];
+        }
+      }
       transform_chroma(encoder_state, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
       for (i = 0; i < width_c * width_c; i++) {
         if (coeff_v[i] != 0) {
@@ -3190,23 +3211,15 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
           break;
         }
       }
-
       // Copy coefficients, even if they are all zeroes.
       {
         int i = 0;
         for (y = 0; y < width_c; y++) {
           for (x = 0; x < width_c; x++) {
-            orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
             orig_coeff_v[x + y * (coeff_stride>>1)] = coeff_v[i];
             i++;
           }
         }
-      }
-
-      if (cbf_is_set(cur_cu->cbf.u, depth)) {
-        reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                           coeff_u, recbase_u, pred_u, color_type_u,
-                           pre_quant_coeff, block);
       }
       if (cbf_is_set(cur_cu->cbf.v, depth)) {
         reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
