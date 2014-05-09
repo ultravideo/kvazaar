@@ -25,6 +25,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "picture.h"
 
@@ -526,9 +527,7 @@ static void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
   // Handle right and bottom, taking care of non-LCU sized CUs.
   if (rec->y + block_width >= height) {
     br->y = 0;
-    if (rec->y + block_width >= height) {
-      block->y = height - rec->y;
-    }
+    block->y -= block_width + rec->y - height;
     if (a_ofs.y == 1 || b_ofs.y == 1) {
       block->y -= 1;
       br->y += 1;
@@ -536,9 +535,7 @@ static void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
   }
   if (rec->x + block_width >= width) {
     br->x = 0;
-    if (rec->x + block_width > width) {
-      block->x = width - rec->x;
-    }
+    block->x -= block_width + rec->x - width;
     if (a_ofs.x == 1 || b_ofs.x == 1) {
       block->x -= 1;
       br->x += 1;
@@ -586,7 +583,10 @@ void sao_reconstruct(const encoder_control * const encoder, picture * pic, const
   else {
     sao_calc_edge_block_dims(pic, color_i, sao, &ofs, &tl, &br, &block);
   }
-
+  
+  assert(ofs.x + tl.x + block.x + br.x <= pic->width);
+  assert(ofs.y + tl.y + block.y + br.y <= pic->height);
+  
   // Data to tmp buffer.
   picture_blit_pixels(&old_lcu_rec[ofs.y * pic_stride + ofs.x],
                       buf_rec,
