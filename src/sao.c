@@ -819,15 +819,15 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
     pixel *data = &pic->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
     pixel *recdata = &pic->recdata[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
     picture_blit_pixels(data, orig[color_i - 1], block_width, block_height,
-                        pic->width / 2, block_width / 2);
+                        pic->width / 2, block_width);
     picture_blit_pixels(recdata, rec[color_i - 1], block_width, block_height,
-                        pic->width / 2, block_width / 2);
+                        pic->width / 2, block_width);
     orig_list[color_i - 1] = &orig[color_i - 1][0];
     rec_list[color_i - 1] = &rec[color_i - 1][0];
   }
 
   // Calculate
-  sao_search_best_mode(encoder_state, orig_list, rec_list, block_width / 2, block_height / 2, 2, sao, sao_top, sao_left);
+  sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left);
 }
 
 void sao_search_luma(const encoder_state * const encoder_state, const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
