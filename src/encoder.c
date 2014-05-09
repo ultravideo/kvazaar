@@ -2171,32 +2171,35 @@ void encoder_next_frame(encoder_state *encoder_state) {
   encoder_state->global->poc++;
 }
 
-static int encoder_state_get_entry_point_count(encoder_state * const encoder_state) {
+static void encoder_state_entry_points_explore(const encoder_state * const encoder_state, int * const r_count, int * const r_max_length) {
   int i;
-  int count = 0;
   for (i = 0; encoder_state->children[i].encoder_control; ++i) {
     if (encoder_state->children[i].is_leaf) {
-      ++count;
+      const int my_length = bitstream_tell(&encoder_state->children[i].stream)/8;
+      ++(*r_count);
+      if (my_length > *r_max_length) {
+        *r_max_length = my_length;
+      }
     } else {
-      count += encoder_state_get_entry_point_count(&encoder_state->children[i]);
+      encoder_state_entry_points_explore(&encoder_state->children[i], r_count, r_max_length);
     }
   }
-  return count;
 }
 
-static int encoder_state_write_entry_points(bitstream * const stream, encoder_state * const encoder_state, const int offset, const int write_length) {
+static void encoder_state_entry_points_write(bitstream * const stream, const encoder_state * const encoder_state, const int num_entry_points, const int write_length, int * const r_count) {
   int i;
-  int position = 0;
-  if (encoder_state->is_leaf) {
-    if (offset > 0 && write_length > 0) {
-      WRITE_U(stream, offset - 1, write_length, "entry_point_offset-minus1");
-    }
-    return bitstream_tell(&encoder_state->stream)/8;
-  }
   for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-      position += encoder_state_write_entry_points(stream, &encoder_state->children[i], position, write_length);
+    if (encoder_state->children[i].is_leaf) {
+      const int my_length = bitstream_tell(&encoder_state->children[i].stream)/8;
+      ++(*r_count);
+      //Don't write the last one
+      if (*r_count < num_entry_points) {
+        WRITE_U(stream, my_length - 1, write_length, "entry_point_offset-minus1")
+      }
+    } else {
+      encoder_state_entry_points_write(stream, &encoder_state->children[i], num_entry_points, write_length, r_count);
+    }
   }
-  return position;
 }
 
 static int num_bitcount(unsigned int n) {
@@ -2281,12 +2284,17 @@ void encode_slice_header(encoder_state * const encoder_state)
     //WRITE_U(stream, 1, 1, "alignment");
    
   if (encoder->tiles_enable || encoder->wpp) {
-    int entry_point_count = encoder_state_get_entry_point_count(encoder_state)-1;
-    int bitcount = num_bitcount(encoder_state_write_entry_points(stream, encoder_state, 0, 0));
-    WRITE_UE(stream, entry_point_count, "num_entry_point_offsets");
-    if (entry_point_count > 0) {
-      WRITE_UE(stream, bitcount-1, "offset_len_minus1");
-      encoder_state_write_entry_points(stream, encoder_state, 0, bitcount);
+    int num_entry_points = 0;
+    int max_length_seen = 0;
+    
+    encoder_state_entry_points_explore(encoder_state, &num_entry_points, &max_length_seen);
+    
+    WRITE_UE(stream, num_entry_points - 1, "num_entry_point_offsets");
+    if (num_entry_points > 0) {
+      int entry_points_written = 0;
+      int offset_len = num_bitcount(max_length_seen) + 1;
+      WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
+      encoder_state_entry_points_write(stream, encoder_state, num_entry_points, offset_len, &entry_points_written); 
     }
   }
 }
@@ -2389,7 +2397,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
   uint16_t abs_x_ctb = x_ctb + (encoder_state->tile->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
   uint16_t abs_y_ctb = y_ctb + (encoder_state->tile->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
 
-  // Check for slice border
+  // Check for slice border FIXME
   uint8_t border_x = ((encoder_state->encoder_control->in.width) < (abs_x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
   uint8_t border_y = ((encoder_state->encoder_control->in.height) < (abs_y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
   uint8_t border_split_x = ((encoder_state->encoder_control->in.width)  < ((abs_x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
