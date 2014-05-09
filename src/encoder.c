@@ -2985,8 +2985,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     int32_t x_pu = x_local >> 2;
     int32_t y_pu = y_local >> 2;
 
-    int cbf_y;
-
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
     #endif
@@ -3029,15 +3027,12 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       }
     }
 
-
     // Copy Luma and Chroma to the pred-block
     for(y = 0; y < width; y++) {
       for(x = 0; x < width; x++) {
         pred_y[x+y*pred_stride]=recbase_y[x+y*recbase_stride];
       }
     }
-
-    // INTRA PREDICTION ENDS HERE
 
     // Get residual by subtracting prediction
     i = 0;
@@ -3132,11 +3127,9 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     }
 
     // Check for non-zero coeffs
-    cbf_y = 0;
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
-        cbf_y = 1;
         cbf_set(&cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
         break;
       }
@@ -3154,9 +3147,10 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       }
     }
 
-    if (cbf_y) {
+    if (cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu))) {
       // Combine inverese quantized coefficients with the prediction to get
       // reconstructed image.
+      //picture_set_block_residual(cur_pic,x_cu,y_cu,depth,1);
       int i;
 
       dequant(encoder_state, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
@@ -3188,7 +3182,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     // left PU because the coordinates are correct.
     if (depth <= MAX_DEPTH || (x_pu % 2 == 0 && y_pu % 2 == 0)) {
       int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
-      int chroma_size = LCU_CHROMA_SIZE >> (chroma_depth * 2);
 
       // These are some weird indices for quant and dequant and should be
       // replaced later with color_index.
@@ -3203,22 +3196,23 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       }
 
       transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
-      for (i = 0; i < chroma_size; i++) {
+      for (i = 0; i < width_c * width_c; i++) {
         if (coeff_u[i] != 0) {
           cbf_set(&cur_cu->cbf.u, depth);
           break;
         }
       }
       transform_chroma(encoder_state, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
-      for (i = 0; i < chroma_size; i++) {
+      for (i = 0; i < width_c * width_c; i++) {
         if (coeff_v[i] != 0) {
           cbf_set(&cur_cu->cbf.v, depth);
           break;
         }
       }
 
-      if (cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth)) {
-        i = 0;
+      // Copy coefficients, even if they are all zeroes.
+      {
+        int i = 0;
         for (y = 0; y < width_c; y++) {
           for (x = 0; x < width_c; x++) {
             orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
@@ -3240,8 +3234,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
     return;
   }
-
-  // end Residual Coding
 }
 
 static void encode_transform_unit(encoder_state * const encoder_state,
