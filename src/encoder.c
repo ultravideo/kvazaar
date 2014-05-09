@@ -2887,6 +2887,20 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
  * This function calculates the residual coefficients for a region of the LCU
  * (defined by x, y and depth) and updates the reconstruction with the
  * kvantized residual.
+ *
+ * It handles recursion for transform split, but that is currently only work
+ * for 64x64 inter to 32x32 transform blocks.
+ *
+ * Inputs are:
+ * - lcu->rec  pixels after prediction for the area
+ * - lcu->ref  reference pixels for the area
+ * - lcu->cu   for the area
+ *
+ * Outputs are:
+ * - lcu->rec  reconstruction after quantized residual
+ * - lcu->coeff  quantized coefficients for the area
+ * - lcu->cbf  coded block flags for the area
+ * - lcu->cu.intra[].tr_skip  for the area
  */
 void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
@@ -2902,17 +2916,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
   assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
-
-  // Clear coded block flag structures for depths lower than current depth.
-  // This should ensure that the CBF data doesn't get corrupted if this function
-  // is called more than once.
-  {
-    cbf_clear(&cur_cu->cbf.y, depth + PU_INDEX(x >> 2, y >> 2));
-    if (PU_INDEX(x >> 2, y >> 2) == 0) {
-      cbf_clear(&cur_cu->cbf.u, depth);
-      cbf_clear(&cur_cu->cbf.v, depth);
-    }
-  }
 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
@@ -2987,6 +2990,15 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
     #endif
+
+    // Clear coded block flag structures for depths lower than current depth.
+    // This should ensure that the CBF data doesn't get corrupted if this function
+    // is called more than once.
+    cbf_clear(&cur_cu->cbf.y, depth + PU_INDEX(x >> 2, y >> 2));
+    if (PU_INDEX(x >> 2, y >> 2) == 0) {
+      cbf_clear(&cur_cu->cbf.u, depth);
+      cbf_clear(&cur_cu->cbf.v, depth);
+    }
 
     // Pick coeff scan mode according to intra prediction mode.
     if (cur_cu->type == CU_INTRA) {
@@ -3130,17 +3142,22 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       }
     }
 
-    if (cbf_y) {
-      // Combine inverese quantized coefficients with the prediction to get
-      // reconstructed image.
-      //picture_set_block_residual(cur_pic,x_cu,y_cu,depth,1);
-      i = 0;
+    // Copy coefficients, even if they are all zeroes. This takes care of the
+    // case where the original coefficients aren't already zeroed.
+    {
+      int i = 0;
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
           orig_coeff_y[x + y * coeff_stride] = coeff_y[i];
           i++;
         }
       }
+    }
+
+    if (cbf_y) {
+      // Combine inverese quantized coefficients with the prediction to get
+      // reconstructed image.
+      int i;
 
       dequant(encoder_state, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
       if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
