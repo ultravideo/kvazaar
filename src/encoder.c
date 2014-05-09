@@ -2847,7 +2847,7 @@ static void transform_chroma(encoder_state * const encoder_state, cu_info *cur_c
 }
 
 static void reconstruct_chroma(const encoder_state * const encoder_state, cu_info *cur_cu,
-                               int depth, int has_coeffs, coefficient *coeff_u,
+                               int depth, coefficient *coeff_u,
                                pixel *recbase_u, pixel *pred_u, int color_type,
                                coefficient *pre_quant_coeff, coefficient *block)
 {
@@ -2857,28 +2857,16 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
 
   int i, y, x;
 
-  if (has_coeffs) {
-    // RECONSTRUCT for predictions
-    dequant(encoder_state, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
-    itransform2d(encoder_state->encoder_control, block, pre_quant_coeff, width_c, 65535);
+  dequant(encoder_state, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
+  itransform2d(encoder_state->encoder_control, block, pre_quant_coeff, width_c, 65535);
 
-    i = 0;
+  i = 0;
 
-    for (y = 0; y < width_c; y++) {
-      for (x = 0; x < width_c; x++) {
-        int16_t val = block[i++] + pred_u[x + y * (pred_stride >> 1)];
-        //TODO: support 10+bits
-        recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
-      }
-    }
-
-    // END RECONTRUCTION
-  } else {
-    // without coeffs, we only use the prediction
-    for (y = 0; y < width_c; y++) {
-      for (x = 0; x < width_c; x++) {
-        recbase_u[x + y * (recbase_stride >> 1)] = pred_u[x + y * (pred_stride >> 1)];
-      }
+  for (y = 0; y < width_c; y++) {
+    for (x = 0; x < width_c; x++) {
+      int16_t val = block[i++] + pred_u[x + y * (pred_stride >> 1)];
+      //TODO: support 10+bits
+      recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
     }
   }
 }
@@ -3169,13 +3157,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
           recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, val);
         }
       }
-    } else {
-      // Without coefficients, just copy the prediction as the reconstructed image.
-      for (y = 0; y < width; y++) {
-        for (x = 0; x < width; x++) {
-          recbase_y[x + y * recbase_stride] = pred_y[x + y * pred_stride];
-        }
-      }
     }
 
     // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
@@ -3222,14 +3203,16 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         }
       }
 
-      reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                         cbf_is_set(cur_cu->cbf.u, depth),
-                         coeff_u, recbase_u, pred_u, color_type_u,
-                         pre_quant_coeff, block);
-      reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                         cbf_is_set(cur_cu->cbf.v, depth),
-                         coeff_v, recbase_v, pred_v, color_type_v,
-                         pre_quant_coeff, block);
+      if (cbf_is_set(cur_cu->cbf.u, depth)) {
+        reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
+                           coeff_u, recbase_u, pred_u, color_type_u,
+                           pre_quant_coeff, block);
+      }
+      if (cbf_is_set(cur_cu->cbf.v, depth)) {
+        reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
+                           coeff_v, recbase_v, pred_v, color_type_v,
+                           pre_quant_coeff, block);
+      }
     }
 
     return;
