@@ -2846,6 +2846,7 @@ static void transform_chroma(encoder_state * const encoder_state, cu_info *cur_c
   }
 }
 
+
 static void reconstruct_chroma(const encoder_state * const encoder_state, cu_info *cur_cu,
                                int depth, coefficient *coeff_u,
                                pixel *recbase_u, pixel *pred_u, int color_type,
@@ -2871,23 +2872,83 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
   }
 }
 
-coeff_scan_order_t get_scan_order(int intra_mode, int depth)
-{
-  coeff_scan_order_t scan_idx = SCAN_DIAG;
 
+coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth)
+{
   // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
   // - angular 6-14 = vertical
   // - angular 22-30 = horizontal
-  if (depth >= 3) {
+  if (cu_type == CU_INTRA && depth >= 3) {
     if (intra_mode >= 6 && intra_mode <= 14) {
-      scan_idx = SCAN_VER;
+      return SCAN_VER;
     } else if (intra_mode >= 22 && intra_mode <= 30) {
-      scan_idx = SCAN_HOR;
+      return SCAN_HOR;
     }
   }
 
-  return scan_idx;
+  return SCAN_DIAG;
 }
+
+
+int quantize_residual_chroma(encoder_state * const encoder_state,
+                                     cu_info *cur_cu, int luma_depth, color_index color,
+                                     const pixel *base_u, pixel *recbase_u, coefficient *orig_coeff_u)
+{
+  pixel pred_u[LCU_WIDTH*LCU_WIDTH>>2];
+  coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
+
+  int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
+  int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+
+  const int chroma_depth = (luma_depth == MAX_PU_DEPTH ? luma_depth - 1 : luma_depth);
+  const int8_t width_c = LCU_WIDTH >> (chroma_depth + 1);
+  const int pred_stride = LCU_WIDTH;
+  const int recbase_stride = LCU_WIDTH;
+  const int32_t coeff_stride = LCU_WIDTH;
+
+  const coeff_scan_order_t scan_idx_chroma = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, luma_depth);
+
+  int has_coeffs = 0;
+
+  {
+    int y, x;
+    for(y = 0; y < width_c; y++) {
+      for(x = 0; x < width_c; x++) {
+        pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
+      }
+    }
+  }
+
+  transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
+  {
+    int i;
+    for (i = 0; i < width_c * width_c; i++) {
+      if (coeff_u[i] != 0) {
+        has_coeffs = 1;
+        break;
+      }
+    }
+  }
+  // Copy coefficients, even if they are all zeroes.
+  {
+    int i = 0;
+    int y, x;
+    for (y = 0; y < width_c; y++) {
+      for (x = 0; x < width_c; x++) {
+        orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
+        i++;
+      }
+    }
+  }
+  if (has_coeffs) {
+    reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
+                        coeff_u, recbase_u, pred_u, (color == COLOR_U ? 2 : 3),
+                        pre_quant_coeff, block);
+  }
+
+  return has_coeffs;
+}
+
 
 /**
  * This function calculates the residual coefficients for a region of the LCU
@@ -2965,14 +3026,10 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
     // Temporary buffers. Not really used for much. Possibly unnecessary.
     pixel pred_y[LCU_WIDTH*LCU_WIDTH];
-    pixel pred_u[LCU_WIDTH*LCU_WIDTH>>2];
-    pixel pred_v[LCU_WIDTH*LCU_WIDTH>>2];
     const int32_t pred_stride = LCU_WIDTH;
 
     // Buffers for coefficients.
     coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
-    coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
-    coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
 
     // Pointers to current location in arrays with kvantized coefficients.
     coefficient *orig_coeff_y = &lcu->coeff.y[x_local + y_local * LCU_WIDTH];
@@ -3010,8 +3067,8 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       if (chroma_mode == 36) {
         chroma_mode = cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode;
       }
-      scan_idx_luma = get_scan_order(cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
-      scan_idx_chroma = get_scan_order(chroma_mode, depth);
+      scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
+      scan_idx_chroma = get_scan_order(cur_cu->type, chroma_mode, depth);
     }
     
     // Copy Luma and Chroma to the pred-block
@@ -3161,73 +3218,16 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
     // left PU because the coordinates are correct.
     if (depth <= MAX_DEPTH || (x_pu % 2 == 0 && y_pu % 2 == 0)) {
-      int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
-
-      // These are some weird indices for quant and dequant and should be
-      // replaced later with color_index.
-      int color_type_u = 2;
-      int color_type_v = 3;
-
-      for(y = 0; y < width_c; y++) {
-        for(x = 0; x < width_c; x++) {
-          pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
-        }
+      if (cur_cu->intra[0].mode_chroma == 36) {
+        cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
       }
-
-      transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
-      for (i = 0; i < width_c * width_c; i++) {
-        if (coeff_u[i] != 0) {
-          cbf_set(&cur_cu->cbf.u, depth);
-          break;
-        }
+      if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_U, base_u, recbase_u, orig_coeff_u)) {
+        cbf_set(&cur_cu->cbf.u, depth);
       }
-      // Copy coefficients, even if they are all zeroes.
-      {
-        int i = 0;
-        for (y = 0; y < width_c; y++) {
-          for (x = 0; x < width_c; x++) {
-            orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
-            i++;
-          }
-        }
-      }
-      if (cbf_is_set(cur_cu->cbf.u, depth)) {
-        reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                           coeff_u, recbase_u, pred_u, color_type_u,
-                           pre_quant_coeff, block);
-      }
-
-
-      for(y = 0; y < width_c; y++) {
-        for(x = 0; x < width_c; x++) {
-          pred_v[x+y*(pred_stride>>1)]=recbase_v[x+y*(recbase_stride>>1)];
-        }
-      }
-      transform_chroma(encoder_state, cur_cu, chroma_depth, base_v, pred_v, coeff_v, scan_idx_chroma, pre_quant_coeff, block);
-      for (i = 0; i < width_c * width_c; i++) {
-        if (coeff_v[i] != 0) {
-          cbf_set(&cur_cu->cbf.v, depth);
-          break;
-        }
-      }
-      // Copy coefficients, even if they are all zeroes.
-      {
-        int i = 0;
-        for (y = 0; y < width_c; y++) {
-          for (x = 0; x < width_c; x++) {
-            orig_coeff_v[x + y * (coeff_stride>>1)] = coeff_v[i];
-            i++;
-          }
-        }
-      }
-      if (cbf_is_set(cur_cu->cbf.v, depth)) {
-        reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                           coeff_v, recbase_v, pred_v, color_type_v,
-                           pre_quant_coeff, block);
+      if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_V, base_v, recbase_v, orig_coeff_v)) {
+        cbf_set(&cur_cu->cbf.v, depth);
       }
     }
-
-    return;
   }
 }
 

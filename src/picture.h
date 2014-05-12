@@ -33,7 +33,7 @@ struct sao_info_struct;
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
-enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER };
+typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu_type_t;
 enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
 typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_index;
