@@ -2945,6 +2945,72 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
 }
 
 
+void decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t depth, int pu_index,
+                   int16_t *residual, uint32_t *ac_sum)
+{
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const coeff_scan_order_t scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
+  const int8_t width = LCU_WIDTH >> depth;
+
+  //int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
+  int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+
+  int i;
+  coefficient temp_block[16];  coefficient temp_coeff[16];
+  coefficient temp_block2[16]; coefficient temp_coeff2[16];
+  uint32_t cost = 0,cost2 = 0;
+  uint32_t coeffcost = 0,coeffcost2 = 0;
+
+  // Test for transform skip
+  transformskip(encoder, residual,pre_quant_coeff, width);
+  if (encoder->rdoq_enable) {
+    rdoq(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+  } else {
+    quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type);
+  }
+  dequant(encoder_state, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
+  itransformskip(encoder, temp_block,pre_quant_coeff,width);
+
+  transform2d(encoder, residual,pre_quant_coeff,width,0);
+  if (encoder->rdoq_enable) {
+    rdoq(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+  } else {
+    quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type);
+  }
+  dequant(encoder_state, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
+  itransform2d(encoder, temp_block2,pre_quant_coeff,width,0);
+
+  // SSD between original and reconstructed
+  for (i = 0; i < 16; i++) {
+    int diff = temp_block[i] - residual[i];
+    cost += diff*diff;
+
+    diff = temp_block2[i] - residual[i];
+    cost2 += diff*diff;
+  }
+
+  // Simple RDO
+  if(encoder->rdo == 1) {
+    // SSD between reconstruction and original + sum of coeffs
+    for (i = 0; i < 16; i++) {
+      coeffcost += abs((int)temp_coeff[i]);
+      coeffcost2 += abs((int)temp_coeff2[i]);
+    }
+    cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
+    cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
+    // Full RDO
+  } else if(encoder->rdo == 2) {
+    coeffcost = get_coeff_cost(encoder_state, temp_coeff, 4, 0, scan_idx_luma);
+    coeffcost2 = get_coeff_cost(encoder_state, temp_coeff2, 4, 0, scan_idx_luma);
+
+    cost  += coeffcost*((int)encoder_state->global->cur_lambda_cost+0.5);
+    cost2 += coeffcost2*((int)encoder_state->global->cur_lambda_cost+0.5);
+  }
+
+  cur_cu->intra[pu_index].tr_skip = (cost < cost2);
+}
+
+
 /**
  * This function calculates the residual coefficients for a region of the LCU
  * (defined by x, y and depth) and updates the reconstruction with the
@@ -3080,59 +3146,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
     // For 4x4 blocks, check for transform skip
     if(width == 4 && encoder->trskip_enable) {
-      int i;
-      coefficient temp_block[16];  coefficient temp_coeff[16];
-      coefficient temp_block2[16]; coefficient temp_coeff2[16];
-      uint32_t cost = 0,cost2 = 0;
-      uint32_t coeffcost = 0,coeffcost2 = 0;
-
-      // Test for transform skip
-      transformskip(encoder, block,pre_quant_coeff,width);
-      if (encoder->rdoq_enable) {
-        rdoq(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
-      } else {
-        quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
-      }
-      dequant(encoder_state, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
-      itransformskip(encoder, temp_block,pre_quant_coeff,width);
-
-      transform2d(encoder, block,pre_quant_coeff,width,0);
-      if (encoder->rdoq_enable) {
-        rdoq(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type,0);
-      } else {
-        quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, &ac_sum, 0, scan_idx_luma, cur_cu->type);
-      }
-      dequant(encoder_state, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
-      itransform2d(encoder, temp_block2,pre_quant_coeff,width,0);
-
-      // SSD between original and reconstructed
-      for (i = 0; i < 16; i++) {
-        int diff = temp_block[i]-block[i];
-        cost += diff*diff;
-
-        diff = temp_block2[i] - block[i];
-        cost2 += diff*diff;
-      }
-
-      // Simple RDO
-      if(encoder->rdo == 1) {
-        // SSD between reconstruction and original + sum of coeffs
-        for (i = 0; i < 16; i++) {
-          coeffcost += abs((int)temp_coeff[i]);
-          coeffcost2 += abs((int)temp_coeff2[i]);
-        }
-        cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
-        cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
-        // Full RDO
-      } else if(encoder->rdo == 2) {
-        coeffcost = get_coeff_cost(encoder_state, temp_coeff, 4, 0, scan_idx_luma);
-        coeffcost2 = get_coeff_cost(encoder_state, temp_coeff2, 4, 0, scan_idx_luma);
-
-        cost  += coeffcost*((int)encoder_state->global->cur_lambda_cost+0.5);
-        cost2 += coeffcost2*((int)encoder_state->global->cur_lambda_cost+0.5);
-      }
-
-      cur_cu->intra[pu_index].tr_skip = (cost < cost2);
+      decide_trskip(encoder_state, cur_cu, depth, pu_index, block, &ac_sum);
     }
 
     // Transform and quant residual to coeffs
