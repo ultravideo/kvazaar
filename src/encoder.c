@@ -2974,19 +2974,21 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   const encoder_control * const encoder = encoder_state->encoder_control;
   // we have 64>>depth transform size
   int x_local = (x&0x3f), y_local = (y&0x3f);
+  int32_t x_pu = x_local >> 2;
+  int32_t y_pu = y_local >> 2;
+  const vector2d lcu_px = {x & 0x3f, y & 0x3f};
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
-
-  int i;
   const int8_t width = LCU_WIDTH>>depth;
-  const int8_t width_c = (depth == MAX_DEPTH + 1 ? width : width  / 2);
-
+  
+  int i;
+  
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
   assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
-    int offset = width_c;
+    int offset = width / 2;
     encode_transform_tree(encoder_state, x,          y,          depth+1, lcu);
     encode_transform_tree(encoder_state, x + offset, y,          depth+1, lcu);
     encode_transform_tree(encoder_state, x,          y + offset, depth+1, lcu);
@@ -3012,30 +3014,24 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   }
 
   {
-    // Pointers to current location in arrays with prediction.
-    pixel *recbase_y = &lcu->rec.y[x_local + y_local * LCU_WIDTH];
-    pixel *recbase_u = &lcu->rec.u[x_local/2 + (y_local * LCU_WIDTH)/4];
-    pixel *recbase_v = &lcu->rec.v[x_local/2 + (y_local * LCU_WIDTH)/4];
-    const int32_t recbase_stride = LCU_WIDTH;
+    const int luma_offset = lcu_px.x + lcu_px.y * LCU_WIDTH;
 
-    // Pointers to current location in arrays with reference.
-    const pixel *base_y = &lcu->ref.y[x_local + y_local * LCU_WIDTH];
-    const pixel *base_u = &lcu->ref.u[x_local/2 + (y_local * LCU_WIDTH)/4];
-    const pixel *base_v = &lcu->ref.v[x_local/2 + (y_local * LCU_WIDTH)/4];
+    const int32_t recbase_stride = LCU_WIDTH;
     const int32_t base_stride = LCU_WIDTH;
+    const int32_t pred_stride = LCU_WIDTH;
+    const int32_t coeff_stride = LCU_WIDTH;
+
+    // Pointers to current location in arrays with prediction.
+    pixel *recbase_y = &lcu->rec.y[luma_offset];
+    // Pointers to current location in arrays with reference.
+    const pixel *base_y = &lcu->ref.y[luma_offset];
+    // Pointers to current location in arrays with kvantized coefficients.
+    coefficient *orig_coeff_y = &lcu->coeff.y[luma_offset];
 
     // Temporary buffers. Not really used for much. Possibly unnecessary.
     pixel pred_y[LCU_WIDTH*LCU_WIDTH];
-    const int32_t pred_stride = LCU_WIDTH;
-
     // Buffers for coefficients.
     coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
-
-    // Pointers to current location in arrays with kvantized coefficients.
-    coefficient *orig_coeff_y = &lcu->coeff.y[x_local + y_local * LCU_WIDTH];
-    coefficient *orig_coeff_u = &lcu->coeff.u[x_local/2 + (y_local * LCU_WIDTH)/4];
-    coefficient *orig_coeff_v = &lcu->coeff.v[x_local/2 + (y_local * LCU_WIDTH)/4];
-    const int32_t coeff_stride = LCU_WIDTH;
 
     // Temporary buffers for kvantization and transformation.
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
@@ -3043,10 +3039,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     
     uint32_t ac_sum = 0;
     uint8_t scan_idx_luma   = SCAN_DIAG;
-    uint8_t scan_idx_chroma = SCAN_DIAG;
-
-    int32_t x_pu = x_local >> 2;
-    int32_t y_pu = y_local >> 2;
 
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
@@ -3068,7 +3060,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         chroma_mode = cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode;
       }
       scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
-      scan_idx_chroma = get_scan_order(cur_cu->type, chroma_mode, depth);
     }
     
     // Copy Luma and Chroma to the pred-block
@@ -3214,19 +3205,27 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         }
       }
     }
+  }
 
-    // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
-    // left PU because the coordinates are correct.
-    if (depth <= MAX_DEPTH || (x_pu % 2 == 0 && y_pu % 2 == 0)) {
-      if (cur_cu->intra[0].mode_chroma == 36) {
-        cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
-      }
-      if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_U, base_u, recbase_u, orig_coeff_u)) {
-        cbf_set(&cur_cu->cbf.u, depth);
-      }
-      if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_V, base_v, recbase_v, orig_coeff_v)) {
-        cbf_set(&cur_cu->cbf.v, depth);
-      }
+  // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
+  // left PU because the coordinates are correct.
+  if (depth <= MAX_DEPTH || (x_pu % 2 == 0 && y_pu % 2 == 0)) {
+    const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH / 2;
+    pixel *recbase_u = &lcu->rec.u[chroma_offset];
+    pixel *recbase_v = &lcu->rec.v[chroma_offset];
+    const pixel *base_u = &lcu->ref.u[chroma_offset];
+    const pixel *base_v = &lcu->ref.v[chroma_offset];
+    coefficient *orig_coeff_u = &lcu->coeff.u[chroma_offset];
+    coefficient *orig_coeff_v = &lcu->coeff.v[chroma_offset];
+
+    if (cur_cu->intra[0].mode_chroma == 36) {
+      cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
+    }
+    if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_U, base_u, recbase_u, orig_coeff_u)) {
+      cbf_set(&cur_cu->cbf.u, depth);
+    }
+    if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_V, base_v, recbase_v, orig_coeff_v)) {
+      cbf_set(&cur_cu->cbf.v, depth);
     }
   }
 }
