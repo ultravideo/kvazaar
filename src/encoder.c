@@ -1200,7 +1200,11 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
     }
 
     search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, &hor_buf, ver_buf);
-
+  }
+  
+  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+    
     if (encoder->deblock_enable) {
       filter_deblock_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y);
     }
