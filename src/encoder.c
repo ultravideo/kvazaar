@@ -2853,8 +2853,6 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
                                coefficient *pre_quant_coeff, coefficient *block)
 {
   int8_t width_c = LCU_WIDTH >> (depth + 1);
-  const int pred_stride = LCU_WIDTH;
-  const int recbase_stride = LCU_WIDTH;
 
   int i, y, x;
 
@@ -2865,9 +2863,9 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
 
   for (y = 0; y < width_c; y++) {
     for (x = 0; x < width_c; x++) {
-      int16_t val = block[i++] + pred_u[x + y * (pred_stride >> 1)];
+      int16_t val = block[i++] + pred_u[x + y * LCU_WIDTH_C];
       //TODO: support 10+bits
-      recbase_u[x + y * (recbase_stride >> 1)] = (uint8_t)CLIP(0, 255, val);
+      recbase_u[x + y * LCU_WIDTH_C] = (uint8_t)CLIP(0, 255, val);
     }
   }
 }
@@ -2902,9 +2900,6 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
 
   const int chroma_depth = (luma_depth == MAX_PU_DEPTH ? luma_depth - 1 : luma_depth);
   const int8_t width_c = LCU_WIDTH >> (chroma_depth + 1);
-  const int pred_stride = LCU_WIDTH;
-  const int recbase_stride = LCU_WIDTH;
-  const int32_t coeff_stride = LCU_WIDTH;
 
   const coeff_scan_order_t scan_idx_chroma = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, luma_depth);
 
@@ -2912,9 +2907,9 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
 
   {
     int y, x;
-    for(y = 0; y < width_c; y++) {
-      for(x = 0; x < width_c; x++) {
-        pred_u[x+y*(pred_stride>>1)]=recbase_u[x+y*(recbase_stride>>1)];
+    for (y = 0; y < width_c; y++) {
+      for (x = 0; x < width_c; x++) {
+        pred_u[x + y * LCU_WIDTH_C] = recbase_u[x + y * LCU_WIDTH_C];
       }
     }
   }
@@ -2935,7 +2930,7 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
     int y, x;
     for (y = 0; y < width_c; y++) {
       for (x = 0; x < width_c; x++) {
-        orig_coeff_u[x + y * (coeff_stride>>1)] = coeff_u[i];
+        orig_coeff_u[x + y * LCU_WIDTH_C] = coeff_u[i];
         i++;
       }
     }
@@ -2973,11 +2968,9 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   // we have 64>>depth transform size
-  int x_local = (x&0x3f), y_local = (y&0x3f);
-  int32_t x_pu = x_local >> 2;
-  int32_t y_pu = y_local >> 2;
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+  const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH>>depth;
   
   int i;
@@ -2996,9 +2989,9 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth < MAX_DEPTH) {
-      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) +  (y_local>>3)        *LCU_T_CU_WIDTH];
-      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (x_local>>3)           + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
-      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((x_local + offset)>>3) + ((y_local+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
+      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
         cbf_set(&cur_cu->cbf.y, depth);
       }
@@ -3015,11 +3008,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
   {
     const int luma_offset = lcu_px.x + lcu_px.y * LCU_WIDTH;
-
-    const int32_t recbase_stride = LCU_WIDTH;
-    const int32_t base_stride = LCU_WIDTH;
-    const int32_t pred_stride = LCU_WIDTH;
-    const int32_t coeff_stride = LCU_WIDTH;
 
     // Pointers to current location in arrays with prediction.
     pixel *recbase_y = &lcu->rec.y[luma_offset];
@@ -3047,8 +3035,8 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     // Clear coded block flag structures for depths lower than current depth.
     // This should ensure that the CBF data doesn't get corrupted if this function
     // is called more than once.
-    cbf_clear(&cur_cu->cbf.y, depth + PU_INDEX(x >> 2, y >> 2));
-    if (PU_INDEX(x >> 2, y >> 2) == 0) {
+    cbf_clear(&cur_cu->cbf.y, depth + pu_index);
+    if (pu_index == 0) {
       cbf_clear(&cur_cu->cbf.u, depth);
       cbf_clear(&cur_cu->cbf.v, depth);
     }
@@ -3057,15 +3045,15 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     if (cur_cu->type == CU_INTRA) {
       int chroma_mode = cur_cu->intra[0].mode_chroma;
       if (chroma_mode == 36) {
-        chroma_mode = cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode;
+        chroma_mode = cur_cu->intra[pu_index].mode;
       }
-      scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
+      scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
     }
     
     // Copy Luma and Chroma to the pred-block
     for(y = 0; y < width; y++) {
       for(x = 0; x < width; x++) {
-        pred_y[x+y*pred_stride]=recbase_y[x+y*recbase_stride];
+        pred_y[x+y*LCU_WIDTH]=recbase_y[x+y*LCU_WIDTH];
       }
     }
 
@@ -3075,8 +3063,8 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
     for (y = 0; y < width; y++) {
       for (x = 0; x < width; x++) {
-        block[i] = ((int16_t)base_y[x + y * base_stride]) -
-                   pred_y[x + y * pred_stride];
+        block[i] = ((int16_t)base_y[x + y * LCU_WIDTH]) -
+                   pred_y[x + y * LCU_WIDTH];
         #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
         residual_sum += block[i];
         #endif
@@ -3144,11 +3132,11 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         cost2 += coeffcost2*((int)encoder_state->global->cur_lambda_cost+0.5);
       }
 
-      cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip = (cost < cost2);
+      cur_cu->intra[pu_index].tr_skip = (cost < cost2);
     }
 
     // Transform and quant residual to coeffs
-    if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
+    if(width == 4 && cur_cu->intra[pu_index].tr_skip) {
       transformskip(encoder, block,pre_quant_coeff,width);
     } else {
       transform2d(encoder, block,pre_quant_coeff,width,0);
@@ -3165,7 +3153,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     for (i = 0; i < width * width; i++) {
       if (coeff_y[i] != 0) {
         // Found one, we can break here
-        cbf_set(&cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
+        cbf_set(&cur_cu->cbf.y, depth + pu_index);
         break;
       }
     }
@@ -3176,20 +3164,20 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       int i = 0;
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
-          orig_coeff_y[x + y * coeff_stride] = coeff_y[i];
+          orig_coeff_y[x + y * LCU_WIDTH] = coeff_y[i];
           i++;
         }
       }
     }
 
-    if (cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu))) {
+    if (cbf_is_set(cur_cu->cbf.y, depth + pu_index)) {
       // Combine inverese quantized coefficients with the prediction to get
       // reconstructed image.
       //picture_set_block_residual(cur_pic,x_cu,y_cu,depth,1);
       int i;
 
       dequant(encoder_state, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
-      if(width == 4 && cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip) {
+      if(width == 4 && cur_cu->intra[pu_index].tr_skip) {
         itransformskip(encoder, block,pre_quant_coeff,width);
       } else {
         itransform2d(encoder, block,pre_quant_coeff,width,0);
@@ -3199,9 +3187,9 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
-          int val = block[i++] + pred_y[x + y * pred_stride];
+          int val = block[i++] + pred_y[x + y * LCU_WIDTH];
           //TODO: support 10+bits
-          recbase_y[x + y * recbase_stride] = (pixel)CLIP(0, 255, val);
+          recbase_y[x + y * LCU_WIDTH] = (pixel)CLIP(0, 255, val);
         }
       }
     }
@@ -3209,7 +3197,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
-  if (depth <= MAX_DEPTH || (x_pu % 2 == 0 && y_pu % 2 == 0)) {
+  if (depth <= MAX_DEPTH || pu_index == 0) {
     const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH / 2;
     pixel *recbase_u = &lcu->rec.u[chroma_offset];
     pixel *recbase_v = &lcu->rec.v[chroma_offset];

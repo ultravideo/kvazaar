@@ -80,8 +80,9 @@ typedef int16_t coefficient;
 
 /* END OF CONFIG VARIABLES */
 
-#define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE) /*!< pow(2, MIN_SIZE) */
-#define LCU_WIDTH (1 << (MAX_DEPTH + MIN_SIZE)) /*!< Largest Coding Unit, spec: CtbSizeY */
+#define CU_MIN_SIZE_PIXELS 8 /*!< pow(2, MIN_SIZE) */
+#define LCU_WIDTH 64 /*!< Largest Coding Unit, spec: CtbSizeY */
+#define LCU_WIDTH_C 32
 
 #if LCU_WIDTH != 64
   #error "Kvazaar only support LCU_WIDTH == 64"
