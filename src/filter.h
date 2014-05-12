@@ -40,7 +40,6 @@ void filter_deblock_edge_luma(encoder_state *encoder_state,
 void filter_deblock_edge_chroma(encoder_state *encoder_state,
                                 int32_t xpos, int32_t ypos,
                                 int8_t depth, int8_t dir);
-void filter_deblock(encoder_state *encoder_state);
 void filter_deblock_lcu(encoder_state *encoder_state, int x_px, int y_px);
 void filter_deblock_luma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc , int8_t sw,
                          int8_t part_p_nofilter, int8_t part_q_nofilter,
