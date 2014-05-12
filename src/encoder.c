@@ -1162,7 +1162,6 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
 #endif
   
-  yuv_t *hor_buf = yuv_t_alloc(encoder_state->tile->cur_pic->width);
   // Allocate 2 extra luma pixels so we get 1 extra chroma pixel for the
   // for the extra pixel on the top right.
   yuv_t *ver_buf = yuv_t_alloc(LCU_WIDTH + 2);
@@ -1173,71 +1172,34 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   assert(encoder_state->is_leaf);
   assert(encoder_state->lcu_order_count > 0);
   
-  //For wavefronts, we need to get initial data from the row above
-  if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->lcu_order[0].first_row) {
-    const lcu_order_element * const lcu = &encoder_state->lcu_order[0];
-    
-    picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_px.y - 1) * cur_pic->width + lcu->position_px.x],
-                    &hor_buf->y[lcu->position_px.x],
-                    lcu->size.x, 1, cur_pic->width, cur_pic->width);
-    
-    picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                        &hor_buf->u[lcu->position_px.x / 2],
-                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
-    
-    picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                        &hor_buf->v[lcu->position_px.x / 2],
-                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
-    
-    ver_buf->y[0] = hor_buf->y[lcu->position_next_px.x - 1];
-    ver_buf->u[0] = hor_buf->u[lcu->position_next_px.x / 2 - 1];
-    ver_buf->v[0] = hor_buf->v[lcu->position_next_px.x / 2 - 1];
-    
-    /*picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
-                        &ver_buf->y[1],
-                        1, lcu->size.y, cur_pic->width, 1);
-    picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                        &ver_buf->u[1],
-                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
-    picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                        &ver_buf->v[1],
-                        1, lcu->size.y / 2, cur_pic->width / 2, 1);*/
-
-  }
-  
   for (i = 0; i < encoder_state->lcu_order_count; ++i) {
     const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
-
-    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, hor_buf, ver_buf);
-
-    // Take the bottom right pixel from the LCU above and put it as the
-    // first pixel in this LCUs rightmost pixels.
+    yuv_t hor_buf;
+    
     if (lcu->position.y > 0) {
-      ver_buf->y[0] = hor_buf->y[lcu->position_next_px.x - 1];
-      ver_buf->u[0] = hor_buf->u[lcu->position_next_px.x / 2 - 1];
-      ver_buf->v[0] = hor_buf->v[lcu->position_next_px.x / 2 - 1];
+      hor_buf.size = encoder_state->tile->cur_pic->width;
+      hor_buf.y = &cur_pic->y_recdata[(lcu->position_px.y - 1) * cur_pic->width];
+      hor_buf.u = &cur_pic->u_recdata[(lcu->position_px.y/2 - 1) * cur_pic->width/2];
+      hor_buf.v = &cur_pic->v_recdata[(lcu->position_px.y/2 - 1) * cur_pic->width/2];
+    }
+    if (lcu->position.x > 0) {
+      if (lcu->position.y > 0) {
+        ver_buf->y[0] = hor_buf.y[lcu->position_px.x - 1];
+        ver_buf->u[0] = hor_buf.u[lcu->position_px.x/2 - 1];
+        ver_buf->v[0] = hor_buf.v[lcu->position_px.x/2 - 1];
+      }
+      picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_px.x - 1],
+                          &ver_buf->y[1],
+                          1, lcu->size.y, cur_pic->width, 1);
+      picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_px.x / 2) - 1],
+                          &ver_buf->u[1],
+                          1, lcu->size.y / 2, cur_pic->width / 2, 1);
+      picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_px.x / 2) - 1],
+                          &ver_buf->v[1],
+                          1, lcu->size.y / 2, cur_pic->width / 2, 1);
     }
 
-    // Take bottom and right pixels from this LCU to be used on the search of next LCU.
-    picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_next_px.y - 1) * cur_pic->width + lcu->position_px.x],
-                        &hor_buf->y[lcu->position_px.x],
-                        lcu->size.x, 1, cur_pic->width, cur_pic->width);
-    picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                        &hor_buf->u[lcu->position_px.x / 2],
-                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
-    picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                        &hor_buf->v[lcu->position_px.x / 2],
-                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
-
-    picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
-                        &ver_buf->y[1],
-                        1, lcu->size.y, cur_pic->width, 1);
-    picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                        &ver_buf->u[1],
-                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
-    picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                        &ver_buf->v[1],
-                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, &hor_buf, ver_buf);
 
     if (encoder->deblock_enable) {
       filter_deblock_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y);
@@ -1275,7 +1237,6 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   //We should not have written to bitstream!
   assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
 
-  yuv_t_free(hor_buf);
   yuv_t_free(ver_buf);
 }
 
