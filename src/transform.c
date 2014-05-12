@@ -802,65 +802,6 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
 }
 
 
-static void transform_chroma(encoder_state * const encoder_state, cu_info *cur_cu,
-                             int depth, const pixel *base_u, pixel *pred_u,
-                             coefficient *coeff_u, int8_t scan_idx_chroma,
-                             coefficient *pre_quant_coeff, coefficient *block)
-{
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  int base_stride = LCU_WIDTH;
-  int pred_stride = LCU_WIDTH;
-
-  int8_t width_c = LCU_WIDTH >> (depth + 1);
-
-  int i = 0;
-  unsigned ac_sum = 0;
-
-  int y, x;
-
-  for (y = 0; y < width_c; y++) {
-    for (x = 0; x < width_c; x++) {
-      block[i] = ((int16_t)base_u[x + y * (base_stride >> 1)]) -
-                  pred_u[x + y * (pred_stride >> 1)];
-      i++;
-    }
-  }
-
-  transform2d(encoder, block, pre_quant_coeff, width_c, 65535);
-  if (encoder->rdoq_enable) {
-    rdoq(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-         scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
-  } else {
-    quant(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-          scan_idx_chroma, cur_cu->type);
-  }
-}
-
-
-static void reconstruct_chroma(const encoder_state * const encoder_state, cu_info *cur_cu,
-                               int depth, coefficient *coeff_u,
-                               pixel *recbase_u, pixel *pred_u, int color_type,
-                               coefficient *pre_quant_coeff, coefficient *block)
-{
-  int8_t width_c = LCU_WIDTH >> (depth + 1);
-
-  int i, y, x;
-
-  dequant(encoder_state, coeff_u, pre_quant_coeff, width_c, width_c, (int8_t)color_type, cur_cu->type);
-  itransform2d(encoder_state->encoder_control, block, pre_quant_coeff, width_c, 65535);
-
-  i = 0;
-
-  for (y = 0; y < width_c; y++) {
-    for (x = 0; x < width_c; x++) {
-      int16_t val = block[i++] + pred_u[x + y * LCU_WIDTH_C];
-      //TODO: support 10+bits
-      recbase_u[x + y * LCU_WIDTH_C] = (uint8_t)CLIP(0, 255, val);
-    }
-  }
-}
-
-
 int quantize_residual_chroma(encoder_state * const encoder_state,
                              cu_info *cur_cu, int luma_depth, color_index color,
                              const pixel *base_u, pixel *recbase_u, coefficient *orig_coeff_u)
@@ -887,7 +828,33 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
     }
   }
 
-  transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
+  //transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
+  {
+    const encoder_control * const encoder = encoder_state->encoder_control;
+
+    unsigned ac_sum = 0;
+
+    {
+      int i = 0;
+      int y, x;
+      for (y = 0; y < width_c; y++) {
+        for (x = 0; x < width_c; x++) {
+          block[i] = (int16_t)base_u[x + y * LCU_WIDTH_C] - (int16_t)pred_u[x + y * LCU_WIDTH_C];
+          i++;
+        }
+      }
+    }
+    
+    transform2d(encoder, block, pre_quant_coeff, width_c, 65535);
+    if (encoder->rdoq_enable) {
+      rdoq(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+           scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+    } else {
+      quant(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
+            scan_idx_chroma, cur_cu->type);
+    }
+  }
+
   {
     int i;
     for (i = 0; i < width_c * width_c; i++) {
@@ -909,9 +876,23 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
     }
   }
   if (has_coeffs) {
-    reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-                        coeff_u, recbase_u, pred_u, (color == COLOR_U ? 2 : 3),
-                        pre_quant_coeff, block);
+    //reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
+    //                    coeff_u, recbase_u, pred_u, (color == COLOR_U ? 2 : 3),
+    //                    pre_quant_coeff, block);
+    int i, y, x;
+
+    dequant(encoder_state, coeff_u, pre_quant_coeff, width_c, width_c, (color == COLOR_U ? 2 : 3), cur_cu->type);
+    itransform2d(encoder_state->encoder_control, block, pre_quant_coeff, width_c, 65535);
+
+    i = 0;
+
+    for (y = 0; y < width_c; y++) {
+      for (x = 0; x < width_c; x++) {
+        int16_t val = block[i++] + pred_u[x + y * LCU_WIDTH_C];
+        //TODO: support 10+bits
+        recbase_u[x + y * LCU_WIDTH_C] = (uint8_t)CLIP(0, 255, val);
+      }
+    }
   }
 
   return has_coeffs;
@@ -943,6 +924,8 @@ void decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t 
   }
   dequant(encoder_state, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
   itransformskip(encoder, temp_block,pre_quant_coeff,width);
+
+
 
   transform2d(encoder, residual,pre_quant_coeff,width,0);
   if (encoder->rdoq_enable) {
