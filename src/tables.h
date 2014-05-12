@@ -84,12 +84,12 @@ static const uint32_t * const g_sig_last_scan_cg[4][3] = {
 };
 
 
-enum COEFF_SCAN_TYPE
+typedef enum
 {
   SCAN_DIAG = 0, // up-right diagonal scan
   SCAN_HOR,      // horizontal first scan
   SCAN_VER       // vertical first scan
-};
+} coeff_scan_order_t;
 
 
 /**

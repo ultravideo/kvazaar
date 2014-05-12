@@ -2871,6 +2871,24 @@ static void reconstruct_chroma(const encoder_state * const encoder_state, cu_inf
   }
 }
 
+coeff_scan_order_t get_scan_order(int intra_mode, int depth)
+{
+  coeff_scan_order_t scan_idx = SCAN_DIAG;
+
+  // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
+  // - angular 6-14 = vertical
+  // - angular 22-30 = horizontal
+  if (depth >= 3) {
+    if (intra_mode >= 6 && intra_mode <= 14) {
+      scan_idx = SCAN_VER;
+    } else if (intra_mode >= 22 && intra_mode <= 30) {
+      scan_idx = SCAN_HOR;
+    }
+  }
+
+  return scan_idx;
+}
+
 /**
  * This function calculates the residual coefficients for a region of the LCU
  * (defined by x, y and depth) and updates the reconstruction with the
@@ -2988,33 +3006,14 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
     // Pick coeff scan mode according to intra prediction mode.
     if (cur_cu->type == CU_INTRA) {
-      int pu_index = PU_INDEX(x_pu, y_pu);
-      int luma_mode = cur_cu->intra[pu_index].mode;
       int chroma_mode = cur_cu->intra[0].mode_chroma;
       if (chroma_mode == 36) {
-        chroma_mode = luma_mode;
+        chroma_mode = cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode;
       }
-      scan_idx_luma = SCAN_DIAG;
-      scan_idx_chroma = SCAN_DIAG;
-
-      // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
-      // - angular 6-14 = vertical
-      // - angular 22-30 = horizontal
-      if (width <= 8) {
-        if (luma_mode >= 6 && luma_mode <= 14) {
-          scan_idx_luma = SCAN_VER;
-        } else if (luma_mode >= 22 && luma_mode <= 30) {
-          scan_idx_luma = SCAN_HOR;
-        }
-
-        if (chroma_mode >= 6 && chroma_mode <= 14) {
-          scan_idx_chroma = SCAN_VER;
-        } else if (chroma_mode >= 22 && chroma_mode <= 30) {
-          scan_idx_chroma = SCAN_HOR;
-        }
-      }
+      scan_idx_luma = get_scan_order(cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
+      scan_idx_chroma = get_scan_order(chroma_mode, depth);
     }
-
+    
     // Copy Luma and Chroma to the pred-block
     for(y = 0; y < width; y++) {
       for(x = 0; x < width; x++) {
