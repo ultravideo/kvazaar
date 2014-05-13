@@ -802,95 +802,100 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
 }
 
 
-int quantize_residual_chroma(encoder_state * const encoder_state,
-                             cu_info *cur_cu, int luma_depth, color_index color,
-                             const pixel *base_u, pixel *recbase_u, coefficient *orig_coeff_u)
+int quantize_luma(encoder_state *const encoder_state,
+                  const cu_info *const cur_cu, const int width, const color_index color,
+                  const coeff_scan_order_t scan_idx_luma, const int tr_skip,
+                  const int stride,
+                  const pixel *const reference, const pixel *const prediction, 
+                  pixel *const reconstruction, coefficient *const coefficients)
 {
-  pixel pred_u[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  coefficient coeff_u[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  const encoder_control * const encoder = encoder_state->encoder_control;
 
-  int16_t block[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coefficient quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+  int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
   int16_t pre_quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
-  const int chroma_depth = (luma_depth == MAX_PU_DEPTH ? luma_depth - 1 : luma_depth);
-  const int8_t width_c = LCU_WIDTH >> (chroma_depth + 1);
-
-  const coeff_scan_order_t scan_idx_chroma = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, luma_depth);
+  int x, y, i;
+  uint32_t ac_sum = 0;
 
   int has_coeffs = 0;
 
-  {
-    int y, x;
-    for (y = 0; y < width_c; y++) {
-      for (x = 0; x < width_c; x++) {
-        pred_u[x + y * LCU_WIDTH_C] = recbase_u[x + y * LCU_WIDTH_C];
-      }
+  // Get residual by subtracting prediction
+  i = 0;
+  ac_sum = 0;
+
+  for (y = 0; y < width; y++) {
+    for (x = 0; x < width; x++) {
+      residual[i] = ((int16_t)reference[x + y * stride]) - prediction[x + y * stride];
+      #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
+      residual_sum += residual[i];
+      #endif
+      i++;
+    }
+  }
+  #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
+  #define RESIDUAL_THRESHOLD 500
+  if(residual_sum < RESIDUAL_THRESHOLD/(width)) {
+    memset(residual, 0, sizeof(int16_t)*(width)*(width));
+  }
+  #endif
+
+  // Transform and quant residual to coeffs
+  if(width == 4 && tr_skip) {
+    transformskip(encoder, residual,pre_quant_coeff,width);
+  } else {
+    transform2d(encoder, residual,pre_quant_coeff,width,0);
+  }
+
+  if (encoder->rdoq_enable) {
+    rdoq(encoder_state, pre_quant_coeff, quant_coeff, width, width, &ac_sum, 0,
+          scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+  } else {
+    quant(encoder_state, pre_quant_coeff, quant_coeff, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+  }
+
+  // Check for non-zero coeffs
+  for (i = 0; i < width * width; i++) {
+    if (quant_coeff[i] != 0) {
+      // Found one, we can break here
+      has_coeffs = 1;
+      break;
     }
   }
 
-  //transform_chroma(encoder_state, cur_cu, chroma_depth, base_u, pred_u, coeff_u, scan_idx_chroma, pre_quant_coeff, block);
-  {
-    const encoder_control * const encoder = encoder_state->encoder_control;
-
-    unsigned ac_sum = 0;
-
-    {
-      int i = 0;
-      int y, x;
-      for (y = 0; y < width_c; y++) {
-        for (x = 0; x < width_c; x++) {
-          block[i] = (int16_t)base_u[x + y * LCU_WIDTH_C] - (int16_t)pred_u[x + y * LCU_WIDTH_C];
-          i++;
-        }
-      }
-    }
-    
-    transform2d(encoder, block, pre_quant_coeff, width_c, 65535);
-    if (encoder->rdoq_enable) {
-      rdoq(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-           scan_idx_chroma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
-    } else {
-      quant(encoder_state, pre_quant_coeff, coeff_u, width_c, width_c, &ac_sum, 2,
-            scan_idx_chroma, cur_cu->type);
-    }
-  }
-
-  {
-    int i;
-    for (i = 0; i < width_c * width_c; i++) {
-      if (coeff_u[i] != 0) {
-        has_coeffs = 1;
-        break;
-      }
-    }
-  }
-  // Copy coefficients, even if they are all zeroes.
+  // Copy coefficients, even if they are all zeroes. This takes care of the
+  // case where the original coefficients aren't already zeroed.
   {
     int i = 0;
-    int y, x;
-    for (y = 0; y < width_c; y++) {
-      for (x = 0; x < width_c; x++) {
-        orig_coeff_u[x + y * LCU_WIDTH_C] = coeff_u[i];
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
+        coefficients[x + y * stride] = quant_coeff[i];
         i++;
       }
     }
   }
-  if (has_coeffs) {
-    //reconstruct_chroma(encoder_state, cur_cu, chroma_depth,
-    //                    coeff_u, recbase_u, pred_u, (color == COLOR_U ? 2 : 3),
-    //                    pre_quant_coeff, block);
-    int i, y, x;
 
-    dequant(encoder_state, coeff_u, pre_quant_coeff, width_c, width_c, (color == COLOR_U ? 2 : 3), cur_cu->type);
-    itransform2d(encoder_state->encoder_control, block, pre_quant_coeff, width_c, 65535);
+  if (has_coeffs) {
+    // Combine inverese quantized coefficients with the prediction to get
+    // reconstructed image.
+    //picture_set_residual_residual(cur_pic,x_cu,y_cu,depth,1);
+    int i;
+
+    dequant(encoder_state, quant_coeff, pre_quant_coeff, width, width, 0, cur_cu->type);
+    if(width == 4 && tr_skip) {
+      itransformskip(encoder, residual,pre_quant_coeff,width);
+    } else {
+      itransform2d(encoder, residual,pre_quant_coeff,width,0);
+    }
 
     i = 0;
 
-    for (y = 0; y < width_c; y++) {
-      for (x = 0; x < width_c; x++) {
-        int16_t val = block[i++] + pred_u[x + y * LCU_WIDTH_C];
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
+        int val = residual[i++] + prediction[x + y * stride];
         //TODO: support 10+bits
-        recbase_u[x + y * LCU_WIDTH_C] = (uint8_t)CLIP(0, 255, val);
+        reconstruction[x + y * stride] = (pixel)CLIP(0, 255, val);
       }
     }
   }
@@ -899,11 +904,88 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
 }
 
 
-void decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t depth, int pu_index,
-                   int16_t *residual, uint32_t *ac_sum)
+
+int quantize_residual(encoder_state *const encoder_state,
+                      const cu_info *const cur_cu, const int width, const color_index color,
+                      const coeff_scan_order_t scan_order, const int tr_skip, 
+                      const int stride,
+                      const pixel *const reference, const pixel *const prediction, 
+                      pixel *reconstruction, coefficient *coefficients)
+{
+  int16_t residual_tmp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+  coefficient quant_coeff_tmp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coefficient coeff_tmp[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+  int has_coeffs = 0;
+  uint32_t ac_sum = 0;
+
+  {
+    int i = 0;
+    int y, x;
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
+        residual_tmp[i] = (int16_t)reference[x + y * stride] - (int16_t)prediction[x + y * stride];
+        i++;
+      }
+    }
+  }
+  
+  transform2d(encoder_state->encoder_control, residual_tmp, coeff_tmp, width, (color == COLOR_Y ? 0 : 65535));
+
+  if (encoder_state->encoder_control->rdoq_enable) {
+    rdoq(encoder_state, coeff_tmp, quant_coeff_tmp, width, width, &ac_sum, (color == COLOR_Y ? 0 : 2),
+         scan_order, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+  } else {
+    quant(encoder_state, coeff_tmp, quant_coeff_tmp, width, width, &ac_sum, (color == COLOR_Y ? 0 : 2),
+          scan_order, cur_cu->type);
+  }
+
+  {
+    int i;
+    for (i = 0; i < width * width; i++) {
+      if (quant_coeff_tmp[i] != 0) {
+        has_coeffs = 1;
+        break;
+      }
+    }
+  }
+
+  {
+    int i = 0;
+    int y, x;
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
+        coefficients[x + y * stride] = quant_coeff_tmp[i];
+        i++;
+      }
+    }
+  }
+
+  if (has_coeffs) {
+    int i, y, x;
+
+    dequant(encoder_state, quant_coeff_tmp, coeff_tmp, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)), cur_cu->type);
+    itransform2d(encoder_state->encoder_control, residual_tmp, coeff_tmp, width, (color == COLOR_Y ? 0 : 65535));
+
+    i = 0;
+
+    for (y = 0; y < width; y++) {
+      for (x = 0; x < width; x++) {
+        int16_t val = residual_tmp[i++] + prediction[x + y * stride];
+        reconstruction[x + y * stride] = (uint8_t)CLIP(0, 255, val);
+      }
+    }
+  }
+
+  return has_coeffs;
+}
+
+
+int decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t depth, const coeff_scan_order_t scan_idx_luma, 
+                  int16_t *residual, uint32_t *ac_sum)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
-  const coeff_scan_order_t scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
   const int8_t width = LCU_WIDTH >> depth;
 
   //int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
@@ -963,7 +1045,7 @@ void decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t 
     cost2 += coeffcost2*((int)encoder_state->global->cur_lambda_cost+0.5);
   }
 
-  cur_cu->intra[pu_index].tr_skip = (cost < cost2);
+  return (cost < cost2);
 }
 
 
@@ -988,14 +1070,11 @@ void decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t 
  */
 void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
   // we have 64>>depth transform size
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};
   const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH>>depth;
-  
-  int i;
   
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
@@ -1038,17 +1117,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     // Pointers to current location in arrays with kvantized coefficients.
     coefficient *orig_coeff_y = &lcu->coeff.y[luma_offset];
 
-    // Temporary buffers. Not really used for much. Possibly unnecessary.
-    pixel pred_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
-    // Buffers for coefficients.
-    coefficient coeff_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
-
-    // Temporary buffers for kvantization and transformation.
-    int16_t block[TR_MAX_WIDTH * TR_MAX_WIDTH];
-    int16_t pre_quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-    
-    uint32_t ac_sum = 0;
-    uint8_t scan_idx_luma   = SCAN_DIAG;
+    coeff_scan_order_t scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
 
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
@@ -1064,105 +1133,31 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     }
 
     // Pick coeff scan mode according to intra prediction mode.
-    if (cur_cu->type == CU_INTRA) {
-      int chroma_mode = cur_cu->intra[0].mode_chroma;
-      if (chroma_mode == 36) {
-        chroma_mode = cur_cu->intra[pu_index].mode;
-      }
-      scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
-    }
     
-    // Copy Luma and Chroma to the pred-block
-    for(y = 0; y < width; y++) {
-      for(x = 0; x < width; x++) {
-        pred_y[x+y*TR_MAX_WIDTH]=recbase_y[x+y*LCU_WIDTH];
-      }
-    }
+    
+    
 
-    // Get residual by subtracting prediction
-    i = 0;
-    ac_sum = 0;
-
-    for (y = 0; y < width; y++) {
-      for (x = 0; x < width; x++) {
-        block[i] = ((int16_t)base_y[x + y * LCU_WIDTH]) -
-                   pred_y[x + y * TR_MAX_WIDTH];
-        #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
-        residual_sum += block[i];
-        #endif
-        i++;
-      }
+#if 0
+    assert(!encoder_state->encoder_control->trskip_enable);
+    if (quantize_residual(encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma, 0, LCU_WIDTH, base_y, recbase_y, recbase_y, orig_coeff_y)) {
+      cbf_set(&cur_cu->cbf.y, depth + pu_index);
     }
-    #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
-    #define RESIDUAL_THRESHOLD 500
-    if(residual_sum < RESIDUAL_THRESHOLD/(width)) {
-      memset(block, 0, sizeof(int16_t)*(width)*(width));
-    }
-    #endif
-
-    // For 4x4 blocks, check for transform skip
-    if(width == 4 && encoder->trskip_enable) {
-      decide_trskip(encoder_state, cur_cu, depth, pu_index, block, &ac_sum);
-    }
-
-    // Transform and quant residual to coeffs
-    if(width == 4 && cur_cu->intra[pu_index].tr_skip) {
-      transformskip(encoder, block,pre_quant_coeff,width);
-    } else {
-      transform2d(encoder, block,pre_quant_coeff,width,0);
-    }
-
-    if (encoder->rdoq_enable) {
-      rdoq(encoder_state, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0,
-           scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
-    } else {
-      quant(encoder_state, pre_quant_coeff, coeff_y, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
-    }
-
-    // Check for non-zero coeffs
-    for (i = 0; i < width * width; i++) {
-      if (coeff_y[i] != 0) {
-        // Found one, we can break here
-        cbf_set(&cur_cu->cbf.y, depth + pu_index);
-        break;
-      }
-    }
-
-    // Copy coefficients, even if they are all zeroes. This takes care of the
-    // case where the original coefficients aren't already zeroed.
-    {
-      int i = 0;
-      for (y = 0; y < width; y++) {
-        for (x = 0; x < width; x++) {
-          orig_coeff_y[x + y * LCU_WIDTH] = coeff_y[i];
-          i++;
+#else
+    if (width == 4 && encoder_state->encoder_control->trskip_enable) {
+      uint32_t ac_sum = 0;
+      int16_t residual[4*4];
+      int x, y;
+      for (y = 0; y < width; ++y) {
+        for (x = 0; x < width; ++x) {
+          residual[x+y*width] = (int16_t)base_y[x + y*LCU_WIDTH] - (int16_t)recbase_y[x + y*LCU_WIDTH];
         }
       }
+      cur_cu->intra[pu_index].tr_skip = decide_trskip(encoder_state, cur_cu, depth, scan_idx_luma, residual, &ac_sum);
     }
-
-    if (cbf_is_set(cur_cu->cbf.y, depth + pu_index)) {
-      // Combine inverese quantized coefficients with the prediction to get
-      // reconstructed image.
-      //picture_set_block_residual(cur_pic,x_cu,y_cu,depth,1);
-      int i;
-
-      dequant(encoder_state, coeff_y, pre_quant_coeff, width, width, 0, cur_cu->type);
-      if(width == 4 && cur_cu->intra[pu_index].tr_skip) {
-        itransformskip(encoder, block,pre_quant_coeff,width);
-      } else {
-        itransform2d(encoder, block,pre_quant_coeff,width,0);
-      }
-
-      i = 0;
-
-      for (y = 0; y < width; y++) {
-        for (x = 0; x < width; x++) {
-          int val = block[i++] + pred_y[x + y * TR_MAX_WIDTH];
-          //TODO: support 10+bits
-          recbase_y[x + y * LCU_WIDTH] = (pixel)CLIP(0, 255, val);
-        }
-      }
+    if (quantize_luma(    encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma, cur_cu->intra[pu_index].tr_skip, LCU_WIDTH, base_y, recbase_y, recbase_y, orig_coeff_y)) {
+      cbf_set(&cur_cu->cbf.y, depth + pu_index);
     }
+#endif
   }
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
@@ -1175,14 +1170,19 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     const pixel *base_v = &lcu->ref.v[chroma_offset];
     coefficient *orig_coeff_u = &lcu->coeff.u[chroma_offset];
     coefficient *orig_coeff_v = &lcu->coeff.v[chroma_offset];
+    coeff_scan_order_t scan_idx_chroma;
+    int tr_skip = 0;
+    int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
+    int chroma_width = LCU_WIDTH_C >> chroma_depth;
 
     if (cur_cu->intra[0].mode_chroma == 36) {
       cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
     }
-    if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_U, base_u, recbase_u, orig_coeff_u)) {
+    scan_idx_chroma = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
+    if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
       cbf_set(&cur_cu->cbf.u, depth);
     }
-    if (quantize_residual_chroma(encoder_state, cur_cu, depth, COLOR_V, base_v, recbase_v, orig_coeff_v)) {
+    if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
       cbf_set(&cur_cu->cbf.v, depth);
     }
   }
