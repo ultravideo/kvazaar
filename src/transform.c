@@ -821,7 +821,7 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
 int quantize_residual(encoder_state *const encoder_state,
                       const cu_info *const cur_cu, const int width, const color_index color,
                       const coeff_scan_order_t scan_order, const int use_trskip, 
-                      const int stride,
+                      const int in_stride, const int out_stride,
                       const pixel *const ref_in, const pixel *const pred_in, 
                       pixel *rec_out, coefficient *coeff_out)
 {
@@ -837,7 +837,7 @@ int quantize_residual(encoder_state *const encoder_state,
     int y, x;
     for (y = 0; y < width; ++y) {
       for (x = 0; x < width; ++x) {
-        residual[x + y * width] = (int16_t)(ref_in[x + y * stride] - pred_in[x + y * stride]);
+        residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
       }
     }
   }
@@ -870,7 +870,7 @@ int quantize_residual(encoder_state *const encoder_state,
   }
 
   // Copy coefficients to coeff_out.
-  picture_blit_coeffs(quant_coeff, coeff_out, width, width, width, stride);
+  picture_blit_coeffs(quant_coeff, coeff_out, width, width, width, out_stride);
 
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
@@ -888,8 +888,8 @@ int quantize_residual(encoder_state *const encoder_state,
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
     for (y = 0; y < width; ++y) {
       for (x = 0; x < width; ++x) {
-        int16_t val = residual[x + y * width] + pred_in[x + y * stride];
-        rec_out[x + y * stride] = (uint8_t)CLIP(0, 255, val);
+        int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
+        rec_out[x + y * out_stride] = (uint8_t)CLIP(0, 255, val);
       }
     }
   } else if (rec_out != pred_in) {
@@ -899,7 +899,7 @@ int quantize_residual(encoder_state *const encoder_state,
 
     for (y = 0; y < width; ++y) {
       for (x = 0; x < width; ++x) {
-        rec_out[x + y * stride] = pred_in[x + y * stride];
+        rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
       }
     }
   }
@@ -1058,6 +1058,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       cbf_clear(&cur_cu->cbf.v, depth);
     }
 
+#if 0
     if (width == 4 && encoder_state->encoder_control->trskip_enable) {
       int16_t residual[4*4];
       int x, y;
@@ -1067,17 +1068,73 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         }
       }
       cur_cu->intra[pu_index].tr_skip = decide_trskip(encoder_state, cur_cu, depth, scan_idx_luma, residual);
+    } else {
+      cur_cu->intra[pu_index].tr_skip = 0;
     }
     {
       int has_coeffs = quantize_residual(
           encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
-          cur_cu->intra[pu_index].tr_skip, LCU_WIDTH,
+          cur_cu->intra[pu_index].tr_skip, LCU_WIDTH, LCU_WIDTH,
           base_y, recbase_y, recbase_y, orig_coeff_y
       );
       if (has_coeffs) {
         cbf_set(&cur_cu->cbf.y, depth + pu_index);
       }
     }
+#else
+    if (width == 4 && encoder_state->encoder_control->trskip_enable) {
+      pixel no_trskip_rec[4*4];
+      pixel trskip_rec[4*4];
+      coefficient no_trskip_coeff[4*4];
+      coefficient trskip_coeff[4*4];
+      
+      unsigned no_trskip_cost = 0;
+      unsigned trskip_cost = 0;
+      int no_trskip_has_coeffs;
+      int trskip_has_coeffs;
+
+      no_trskip_has_coeffs = quantize_residual(
+          encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
+          0, LCU_WIDTH, 4,
+          base_y, recbase_y, no_trskip_rec, no_trskip_coeff
+      );
+      no_trskip_cost += calc_ssd(base_y, no_trskip_rec, LCU_WIDTH, 4, 4);
+      no_trskip_cost += get_coeff_cost(encoder_state, no_trskip_coeff, 4, 0, scan_idx_luma) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+
+      trskip_has_coeffs = quantize_residual(
+          encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
+          1, LCU_WIDTH, 4,
+          base_y, recbase_y, trskip_rec, trskip_coeff
+      );
+      trskip_cost += calc_ssd(base_y, trskip_rec, LCU_WIDTH, 4, 4);
+      trskip_cost += get_coeff_cost(encoder_state, trskip_coeff, 4, 0, scan_idx_luma) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+
+      if (no_trskip_cost <= trskip_cost) {
+        cur_cu->intra[pu_index].tr_skip = 0;
+        picture_blit_pixels(no_trskip_rec, recbase_y, width, width, 4, LCU_WIDTH);
+        picture_blit_coeffs(no_trskip_coeff, orig_coeff_y, width, width, 4, LCU_WIDTH);
+        if (no_trskip_has_coeffs) {
+          cbf_set(&cur_cu->cbf.y, depth + pu_index);
+        }
+      } else {
+        cur_cu->intra[pu_index].tr_skip = 1;
+        picture_blit_pixels(trskip_rec, recbase_y, width, width, 4, LCU_WIDTH);
+        picture_blit_coeffs(trskip_coeff, orig_coeff_y, width, width, 4, LCU_WIDTH);
+        if (trskip_has_coeffs) {
+          cbf_set(&cur_cu->cbf.y, depth + pu_index);
+        }
+      }
+    } else {
+      int has_coeffs = quantize_residual(
+          encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
+          0, LCU_WIDTH, LCU_WIDTH,
+          base_y, recbase_y, recbase_y, orig_coeff_y
+      );
+      if (has_coeffs) {
+        cbf_set(&cur_cu->cbf.y, depth + pu_index);
+      }
+    }
+#endif
   }
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
@@ -1099,10 +1156,10 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
     }
     scan_idx_chroma = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
-    if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
+    if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
       cbf_set(&cur_cu->cbf.u, depth);
     }
-    if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
+    if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
       cbf_set(&cur_cu->cbf.v, depth);
     }
   }

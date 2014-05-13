@@ -271,6 +271,10 @@ unsigned calc_sad(const picture *pic, const picture *ref,
                   int pic_x, int pic_y, int ref_x, int ref_y,
                   int block_width, int block_height);
 
+unsigned calc_ssd(const pixel *const ref, const pixel *const rec,
+                  const int ref_stride, const int rec_stride,
+                  const int width);
+
 double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y);
 
 

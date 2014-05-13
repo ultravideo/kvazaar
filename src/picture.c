@@ -949,3 +949,20 @@ unsigned calc_sad(const picture *pic, const picture *ref,
     return interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height);
   }
 }
+
+unsigned calc_ssd(const pixel *const ref, const pixel *const rec,
+                 const int ref_stride, const int rec_stride,
+                 const int width)
+{
+  int ssd = 0;
+  int y, x;
+
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
+      ssd += diff * diff;
+    }
+  }
+
+  return ssd;
+}

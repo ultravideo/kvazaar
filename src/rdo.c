@@ -121,6 +121,7 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     return cost;
 }
 
+
 /** Calculate actual (or really close to actual) bitcost for coding coefficients
  * \param coeff coefficient array
  * \param width coeff block width
