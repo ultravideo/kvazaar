@@ -908,72 +908,6 @@ int quantize_residual(encoder_state *const encoder_state,
 }
 
 
-int olddecide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t depth, const coeff_scan_order_t scan_idx_luma, 
-                  int16_t *residual)
-{
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  const int8_t width = LCU_WIDTH >> depth;
-
-  //int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
-  int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
-
-  int i;
-  coefficient temp_block[16];  coefficient temp_coeff[16];
-  coefficient temp_block2[16]; coefficient temp_coeff2[16];
-  uint32_t cost = 0,cost2 = 0;
-  uint32_t coeffcost = 0,coeffcost2 = 0;
-
-  // Test for transform skip
-  transformskip(encoder, residual,pre_quant_coeff, width);
-  if (encoder->rdoq_enable) {
-    rdoq(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, 0, scan_idx_luma, cur_cu->type,0);
-  } else {
-    quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, 0, scan_idx_luma, cur_cu->type);
-  }
-  dequant(encoder_state, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
-  itransformskip(encoder, temp_block,pre_quant_coeff,width);
-
-
-
-  transform2d(encoder, residual,pre_quant_coeff,width,0);
-  if (encoder->rdoq_enable) {
-    rdoq(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, 0, scan_idx_luma, cur_cu->type,0);
-  } else {
-    quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, 0, scan_idx_luma, cur_cu->type);
-  }
-  dequant(encoder_state, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
-  itransform2d(encoder, temp_block2,pre_quant_coeff,width,0);
-
-  // SSD between original and reconstructed
-  for (i = 0; i < 16; i++) {
-    int diff = temp_block[i] - residual[i];
-    cost += diff*diff;
-
-    diff = temp_block2[i] - residual[i];
-    cost2 += diff*diff;
-  }
-
-  // Simple RDO
-  if(encoder->rdo == 1) {
-    // SSD between reconstruction and original + sum of coeffs
-    for (i = 0; i < 16; i++) {
-      coeffcost += abs((int)temp_coeff[i]);
-      coeffcost2 += abs((int)temp_coeff2[i]);
-    }
-    cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
-    cost2 += (coeffcost2 + (coeffcost2>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
-    // Full RDO
-  } else if(encoder->rdo == 2) {
-    coeffcost = get_coeff_cost(encoder_state, temp_coeff, 4, 0, scan_idx_luma);
-    coeffcost2 = get_coeff_cost(encoder_state, temp_coeff2, 4, 0, scan_idx_luma);
-
-    cost  += coeffcost*((int)encoder_state->global->cur_lambda_cost+0.5);
-    cost2 += coeffcost2*((int)encoder_state->global->cur_lambda_cost+0.5);
-  }
-
-  return (cost < cost2);
-}
-
 /**
  * \brief Like quantize_residual except that this uses trskip if that is better.
  *
@@ -1000,54 +934,43 @@ int quantize_residual_trskip(
     const pixel *const ref_in, const pixel *const pred_in, 
     pixel *rec_out, coefficient *coeff_out)
 {
-  pixel no_trskip_rec[4*4];
-  pixel trskip_rec[4*4];
-  coefficient no_trskip_coeff[4*4];
-  coefficient trskip_coeff[4*4];
-      
-  unsigned no_trskip_cost = 0;
-  unsigned trskip_cost = 0;
-  int no_trskip_has_coeffs;
-  int trskip_has_coeffs;
-
-  int best_has_coeffs;
-  pixel *best_rec;
-  coefficient *best_coeff;
-
-  no_trskip_has_coeffs = quantize_residual(
+  struct {
+    pixel rec[4*4];
+    coefficient coeff[4*4];
+    unsigned cost;
+    int has_coeffs;
+  } skip, noskip, *best;
+  
+  noskip.has_coeffs = quantize_residual(
       encoder_state, cur_cu, width, color, scan_order,
       0, in_stride, 4,
-      ref_in, pred_in, no_trskip_rec, no_trskip_coeff
-  );
-  no_trskip_cost += calc_ssd(ref_in, no_trskip_rec, in_stride, 4, 4);
-  no_trskip_cost += get_coeff_cost(encoder_state, no_trskip_coeff, 4, 0, scan_order) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+      ref_in, pred_in, noskip.rec, noskip.coeff);
+  noskip.cost = calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
+  noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
 
-  trskip_has_coeffs = quantize_residual(
+  skip.has_coeffs = quantize_residual(
       encoder_state, cur_cu, width, color, scan_order,
       1, in_stride, 4,
-      ref_in, pred_in, trskip_rec, trskip_coeff
-  );
-  trskip_cost += calc_ssd(ref_in, trskip_rec, in_stride, 4, 4);
-  trskip_cost += get_coeff_cost(encoder_state, trskip_coeff, 4, 0, scan_order) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+      ref_in, pred_in, skip.rec, skip.coeff);
+  skip.cost = calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
+  skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
 
-  if (no_trskip_cost <= trskip_cost) {
+  if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
-    best_rec = no_trskip_rec;
-    best_coeff = no_trskip_coeff;
-    best_has_coeffs = no_trskip_has_coeffs;
+    best = &noskip;
   } else {
     *trskip_out = 1;
-    best_rec = trskip_rec;
-    best_coeff = trskip_coeff;
-    best_has_coeffs = trskip_has_coeffs;
+    best = &skip;
   }
 
-  if (best_has_coeffs || rec_out != pred_in) {
-    picture_blit_pixels(best_rec, rec_out, width, width, 4, out_stride);
+  if (best->has_coeffs || rec_out != pred_in) {
+    // If there is no residual and reconstruction is already in rec_out, 
+    // we can skip this.
+    picture_blit_pixels(best->rec, rec_out, width, width, 4, out_stride);
   }
-  picture_blit_coeffs(best_coeff, coeff_out, width, width, 4, out_stride);
+  picture_blit_coeffs(best->coeff, coeff_out, width, width, 4, out_stride);
 
-  return best_has_coeffs;
+  return best->has_coeffs;
 }
 
 
@@ -1134,32 +1057,8 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       cbf_clear(&cur_cu->cbf.v, depth);
     }
 
-#if 0
     if (width == 4 && encoder_state->encoder_control->trskip_enable) {
-      int16_t residual[4*4];
-      int x, y;
-      for (y = 0; y < width; ++y) {
-        for (x = 0; x < width; ++x) {
-          residual[x+y*width] = (int16_t)base_y[x + y*LCU_WIDTH] - (int16_t)recbase_y[x + y*LCU_WIDTH];
-        }
-      }
-      cur_cu->intra[pu_index].tr_skip = olddecide_trskip(encoder_state, cur_cu, depth, scan_idx_luma, residual);
-    } else {
-      cur_cu->intra[pu_index].tr_skip = 0;
-    }
-    {
-      int has_coeffs = quantize_residual(
-          encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
-          cur_cu->intra[pu_index].tr_skip, LCU_WIDTH, LCU_WIDTH,
-          base_y, recbase_y, recbase_y, orig_coeff_y
-      );
-      if (has_coeffs) {
-        cbf_set(&cur_cu->cbf.y, depth + pu_index);
-      }
-    }
-#else
-    if (width == 4 && encoder_state->encoder_control->trskip_enable) {
-      // Select between using trskip and not.
+      // Try quantization with trskip and use it if it's better.
       int has_coeffs = quantize_residual_trskip(
           encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
           &cur_cu->intra[pu_index].tr_skip,
@@ -1170,7 +1069,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         cbf_set(&cur_cu->cbf.y, depth + pu_index);
       }
     } else {
-      // Do quantization without trskip.
       int has_coeffs = quantize_residual(
           encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,
           0,
@@ -1181,7 +1079,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         cbf_set(&cur_cu->cbf.y, depth + pu_index);
       }
     }
-#endif
   }
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
