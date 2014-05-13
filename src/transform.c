@@ -865,11 +865,11 @@ int quantize_residual_chroma(encoder_state * const encoder_state,
                              cu_info *cur_cu, int luma_depth, color_index color,
                              const pixel *base_u, pixel *recbase_u, coefficient *orig_coeff_u)
 {
-  pixel pred_u[LCU_WIDTH*LCU_WIDTH>>2];
-  coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
+  pixel pred_u[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coefficient coeff_u[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
-  int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
-  int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+  int16_t block[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  int16_t pre_quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
   const int chroma_depth = (luma_depth == MAX_PU_DEPTH ? luma_depth - 1 : luma_depth);
   const int8_t width_c = LCU_WIDTH >> (chroma_depth + 1);
@@ -1056,13 +1056,13 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     coefficient *orig_coeff_y = &lcu->coeff.y[luma_offset];
 
     // Temporary buffers. Not really used for much. Possibly unnecessary.
-    pixel pred_y[LCU_WIDTH*LCU_WIDTH];
+    pixel pred_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
     // Buffers for coefficients.
-    coefficient coeff_y[LCU_WIDTH*LCU_WIDTH];
+    coefficient coeff_y[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
     // Temporary buffers for kvantization and transformation.
-    int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
-    int16_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    int16_t block[TR_MAX_WIDTH * TR_MAX_WIDTH];
+    int16_t pre_quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
     
     uint32_t ac_sum = 0;
     uint8_t scan_idx_luma   = SCAN_DIAG;
@@ -1092,7 +1092,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     // Copy Luma and Chroma to the pred-block
     for(y = 0; y < width; y++) {
       for(x = 0; x < width; x++) {
-        pred_y[x+y*LCU_WIDTH]=recbase_y[x+y*LCU_WIDTH];
+        pred_y[x+y*TR_MAX_WIDTH]=recbase_y[x+y*LCU_WIDTH];
       }
     }
 
@@ -1103,7 +1103,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     for (y = 0; y < width; y++) {
       for (x = 0; x < width; x++) {
         block[i] = ((int16_t)base_y[x + y * LCU_WIDTH]) -
-                   pred_y[x + y * LCU_WIDTH];
+                   pred_y[x + y * TR_MAX_WIDTH];
         #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
         residual_sum += block[i];
         #endif
@@ -1174,7 +1174,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
 
       for (y = 0; y < width; y++) {
         for (x = 0; x < width; x++) {
-          int val = block[i++] + pred_y[x + y * LCU_WIDTH];
+          int val = block[i++] + pred_y[x + y * TR_MAX_WIDTH];
           //TODO: support 10+bits
           recbase_y[x + y * LCU_WIDTH] = (pixel)CLIP(0, 255, val);
         }
@@ -1185,7 +1185,7 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
   if (depth <= MAX_DEPTH || pu_index == 0) {
-    const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH / 2;
+    const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH_C;
     pixel *recbase_u = &lcu->rec.u[chroma_offset];
     pixel *recbase_v = &lcu->rec.v[chroma_offset];
     const pixel *base_u = &lcu->ref.u[chroma_offset];

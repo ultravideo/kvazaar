@@ -86,7 +86,10 @@ typedef int16_t coefficient;
 
 #define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE) /*!< pow(2, MIN_SIZE) */
 #define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH)) /*!< spec: CtbSizeY */
-#define LCU_WIDTH_C (LCU_WIDTH / 2) /*!< CtbWidthC and CtbHeightC */
+#define LCU_WIDTH_C (LCU_WIDTH / 2) /*!< spec: CtbWidthC and CtbHeightC */
+
+#define TR_MAX_LOG2_SIZE 5 /*!< spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5) */
+#define TR_MAX_WIDTH (1 << 5) /*!< spec: Log2MaxTrafoSize */
 
 #if LCU_WIDTH != 64
   #error "Kvazaar only support LCU_WIDTH == 64"
