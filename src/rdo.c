@@ -70,7 +70,6 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
-    uint32_t ac_sum;
     uint32_t cost = 0;
     uint32_t coeffcost = 0;
     int8_t luma_scan_mode = SCAN_DIAG;
@@ -93,9 +92,9 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     }
     transform2d(encoder, block,pre_quant_coeff,width,0);
     if(encoder->rdoq_enable) {
-      rdoq(encoder_state, pre_quant_coeff, temp_coeff, width, width, &ac_sum, 0, luma_scan_mode, CU_INTRA,0);
+      rdoq(encoder_state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA,0);
     } else {
-      quant(encoder_state, pre_quant_coeff, temp_coeff, width, width, &ac_sum, 0, luma_scan_mode, CU_INTRA);
+      quant(encoder_state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA);
     }
     dequant(encoder_state, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
     itransform2d(encoder, temp_block,pre_quant_coeff,width,0);
@@ -391,7 +390,7 @@ static void calc_last_bits(encoder_state * const encoder_state, int32_t width, i
  * From HM 12.0
  */
 void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
-           int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
+           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   cabac_data * const cabac = &encoder_state->cabac;
@@ -403,6 +402,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
   int32_t qp_scaled = get_scaled_qp(type, encoder_state->global->QP, 0);
+  uint32_t abs_sum = 0;
 
   {
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
@@ -700,7 +700,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   for ( scanpos = 0; scanpos < best_last_idx_p1; scanpos++ ) {
     int32_t blkPos = scan[ scanpos ];
     int32_t level  = dest_coeff[ blkPos ];
-    *abs_sum += level;
+    abs_sum += level;
     dest_coeff[ blkPos ] = (coefficient)(( coef[ blkPos ] < 0 ) ? -level : level);
   }
 
@@ -709,7 +709,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
     dest_coeff[ scan[ scanpos ] ] = 0;
   }
 #if ENABLE_SIGN_HIDING == 1
-  if(*abs_sum >= 2) {
+  if(abs_sum >= 2) {
     int64_t rd_factor = (int64_t) (
                      g_inv_quant_scales[qp_scaled%6] * g_inv_quant_scales[qp_scaled%6] * (1<<(2*(qp_scaled/6)))
                    /  encoder_state->global->cur_lambda_cost / 16 / (1<<(2*(encoder->bitdepth-8)))

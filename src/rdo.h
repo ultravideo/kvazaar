@@ -43,7 +43,7 @@ extern const uint32_t g_go_rice_prefix_len[5];
 
 
 void  rdoq(encoder_state *encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
-           int32_t height, uint32_t *abs_sum, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
+           int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
 uint32_t rdo_cost_intra(encoder_state *encoder, pixel* pred, pixel* orig_block, int width, int8_t mode);
 

@@ -626,11 +626,12 @@ void itransform2d(const encoder_control * const encoder,int16_t *block,int16_t *
  *
  */
 void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
-           int32_t height, uint32_t *ac_sum, int8_t type, int8_t scan_idx, int8_t block_type )
+           int32_t height, int8_t type, int8_t scan_idx, int8_t block_type )
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   const uint32_t * const scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
+  uint32_t ac_sum = 0;
 
   #if ENABLE_SIGN_HIDING == 1
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
@@ -662,7 +663,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 
     #if ENABLE_SIGN_HIDING == 1
     delta_u[n] = (int32_t)( ((int64_t)abs(coef[n]) * quant_coeff[n] - (level<<q_bits) )>> q_bits8 );
-    *ac_sum += level;
+    ac_sum += level;
     #endif
 
     level *= sign;
@@ -670,7 +671,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
   }
 
   #if ENABLE_SIGN_HIDING == 1
-  if(*ac_sum >= 2) {
+  if(ac_sum >= 2) {
     #define SCAN_SET_SIZE 16
     #define LOG2_SCAN_SET_SIZE 4
     int32_t n,last_cg = -1, abssum = 0, subset, subpos;
@@ -849,10 +850,10 @@ int quantize_luma(encoder_state *const encoder_state,
   }
 
   if (encoder->rdoq_enable) {
-    rdoq(encoder_state, pre_quant_coeff, quant_coeff, width, width, &ac_sum, 0,
+    rdoq(encoder_state, pre_quant_coeff, quant_coeff, width, width, 0,
           scan_idx_luma, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
   } else {
-    quant(encoder_state, pre_quant_coeff, quant_coeff, width, width, &ac_sum, 0, scan_idx_luma, cur_cu->type);
+    quant(encoder_state, pre_quant_coeff, quant_coeff, width, width, 0, scan_idx_luma, cur_cu->type);
   }
 
   // Check for non-zero coeffs
@@ -934,10 +935,10 @@ int quantize_residual(encoder_state *const encoder_state,
   transform2d(encoder_state->encoder_control, residual_tmp, coeff_tmp, width, (color == COLOR_Y ? 0 : 65535));
 
   if (encoder_state->encoder_control->rdoq_enable) {
-    rdoq(encoder_state, coeff_tmp, quant_coeff_tmp, width, width, &ac_sum, (color == COLOR_Y ? 0 : 2),
+    rdoq(encoder_state, coeff_tmp, quant_coeff_tmp, width, width, (color == COLOR_Y ? 0 : 2),
          scan_order, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
   } else {
-    quant(encoder_state, coeff_tmp, quant_coeff_tmp, width, width, &ac_sum, (color == COLOR_Y ? 0 : 2),
+    quant(encoder_state, coeff_tmp, quant_coeff_tmp, width, width, (color == COLOR_Y ? 0 : 2),
           scan_order, cur_cu->type);
   }
 
@@ -983,7 +984,7 @@ int quantize_residual(encoder_state *const encoder_state,
 
 
 int decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t depth, const coeff_scan_order_t scan_idx_luma, 
-                  int16_t *residual, uint32_t *ac_sum)
+                  int16_t *residual)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const int8_t width = LCU_WIDTH >> depth;
@@ -1000,9 +1001,9 @@ int decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t d
   // Test for transform skip
   transformskip(encoder, residual,pre_quant_coeff, width);
   if (encoder->rdoq_enable) {
-    rdoq(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+    rdoq(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, 0, scan_idx_luma, cur_cu->type,0);
   } else {
-    quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type);
+    quant(encoder_state, pre_quant_coeff, temp_coeff, 4, 4, 0, scan_idx_luma, cur_cu->type);
   }
   dequant(encoder_state, temp_coeff, pre_quant_coeff, 4, 4, 0, cur_cu->type);
   itransformskip(encoder, temp_block,pre_quant_coeff,width);
@@ -1011,9 +1012,9 @@ int decide_trskip(encoder_state * const encoder_state, cu_info *cur_cu, int8_t d
 
   transform2d(encoder, residual,pre_quant_coeff,width,0);
   if (encoder->rdoq_enable) {
-    rdoq(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type,0);
+    rdoq(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, 0, scan_idx_luma, cur_cu->type,0);
   } else {
-    quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, ac_sum, 0, scan_idx_luma, cur_cu->type);
+    quant(encoder_state, pre_quant_coeff, temp_coeff2, 4, 4, 0, scan_idx_luma, cur_cu->type);
   }
   dequant(encoder_state, temp_coeff2, pre_quant_coeff, 4, 4, 0, cur_cu->type);
   itransform2d(encoder, temp_block2,pre_quant_coeff,width,0);
