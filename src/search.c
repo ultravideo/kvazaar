@@ -35,6 +35,7 @@
 #include "inter.h"
 #include "filter.h"
 #include "rdo.h"
+#include "transform.h"
 
 // Temporarily for debugging.
 #define SEARCH_MV_FULL_RADIUS 0
