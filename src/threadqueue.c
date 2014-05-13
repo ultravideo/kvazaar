@@ -234,8 +234,6 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
   return 1;
 }
 
-
-
 int threadqueue_flush(threadqueue_queue * const threadqueue) {
   int notdone = 1;
   int i;
@@ -273,12 +271,13 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
     }
   } while (notdone > 0);
   
-  if (0) { //technically not needed
-    for (i=0; i < threadqueue->queue_count; ++i) {
-      FREE_POINTER(threadqueue->queue[i]);
-    }
-    threadqueue->queue_count = 0;
+#if 1
+  //technically not needed, but spares memory. On the other hand, it makes debugging harder.
+  for (i=0; i < threadqueue->queue_count; ++i) {
+    FREE_POINTER(threadqueue->queue[i]);
   }
+  threadqueue->queue_count = 0;
+#endif
   assert(threadqueue->queue_waiting == 0);
 
   PTHREAD_UNLOCK(&threadqueue->lock);
