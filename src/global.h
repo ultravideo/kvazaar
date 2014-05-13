@@ -64,10 +64,14 @@ typedef int16_t coefficient;
 #define MAX_INTRA_SEARCH_DEPTH 4
 #define MIN_INTRA_SEARCH_DEPTH 1
 
+// Maximum CU depth when descending form LCU level.
 #define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */
+// Minimum log2 size of CUs.
 #define MIN_SIZE 3   /*!< spec: MinCbLog2SizeY */
+// Minimum log2 size of PUs.
 #define MAX_PU_DEPTH 4 /*!< Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu() */
 
+// Minimum log2 transform sizes.
 #define TR_DEPTH_INTRA 2 /*!< spec: max_transform_hierarchy_depth_intra */
 #define TR_DEPTH_INTER 2 /*!< spec: max_transform_hierarchy_depth_inter */
 
@@ -80,9 +84,9 @@ typedef int16_t coefficient;
 
 /* END OF CONFIG VARIABLES */
 
-#define CU_MIN_SIZE_PIXELS 8 /*!< pow(2, MIN_SIZE) */
-#define LCU_WIDTH 64 /*!< Largest Coding Unit, spec: CtbSizeY */
-#define LCU_WIDTH_C 32
+#define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE) /*!< pow(2, MIN_SIZE) */
+#define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH)) /*!< spec: CtbSizeY */
+#define LCU_WIDTH_C (LCU_WIDTH / 2) /*!< CtbWidthC and CtbHeightC */
 
 #if LCU_WIDTH != 64
   #error "Kvazaar only support LCU_WIDTH == 64"
