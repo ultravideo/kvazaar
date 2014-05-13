@@ -1288,7 +1288,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
     for (i=0; main_state->children[i].encoder_control; ++i);
     max_i = i;
     if (max_i > 1) {
-#pragma omp parallel for
+//#pragma omp parallel for
       for (i=0; i < max_i; ++i) {
         encoder_state *sub_state = &(main_state->children[i]);
         

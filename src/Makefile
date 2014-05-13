@@ -44,10 +44,10 @@ else
   endif
 endif
 
-CC = gcc -fopenmp
+CC = gcc
 CCFLAGS = $(DFLAGS) -I. -Wall -Wtype-limits
 LDFLAGS += -lm
-LD = gcc -fopenmp
+LD = gcc
 YASM = yasm
 ASMOBJS = cpu.o
 OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o transform.o
