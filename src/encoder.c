@@ -1185,6 +1185,8 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   picture* const cur_pic = encoder_state->tile->cur_pic;
   int i = 0;
   
+  //FIXME: if we have a WAVEFRONT_ROW part which is the only child of the parent, than we should not use parallelism
+  
   assert(encoder_state->is_leaf);
   assert(encoder_state->lcu_order_count > 0);
   
@@ -1270,10 +1272,19 @@ static void worker_encoder_state_encode_children(void * opaque) {
   }
 }
 
+static int tree_is_a_chain(const encoder_state * const encoder_state) {
+  if (!encoder_state->children[0].encoder_control) return 1;
+  if (encoder_state->children[1].encoder_control) return 0;
+  return tree_is_a_chain(&encoder_state->children[0]);
+}
+
 static void encoder_state_encode(encoder_state * const main_state) {
   //If we have children, encode at child level
   if (main_state->children[0].encoder_control) {
     int i=0;
+    //If we have only one child, than it cannot be the last split in tree
+    int node_is_the_last_split_in_tree = (main_state->children[1].encoder_control != 0);
+    
     for (i=0; main_state->children[i].encoder_control; ++i) {
       encoder_state *sub_state = &(main_state->children[i]);
       
@@ -1282,15 +1293,26 @@ static void encoder_state_encode(encoder_state * const main_state) {
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->u_data, main_state, main_state->tile->cur_pic->u_data, 0);
         encoder_state_blit_pixels(sub_state, sub_state->tile->cur_pic->v_data, main_state, main_state->tile->cur_pic->v_data, 0);
       }
+      
+      //To be the last split, we require that every child is a chain
+      node_is_the_last_split_in_tree = node_is_the_last_split_in_tree && tree_is_a_chain(&main_state->children[i]);
     }
-    //More than one child, use threads...
-    if (main_state->children[1].encoder_control) {
+    //If it's the latest split point
+    if (node_is_the_last_split_in_tree) {
       for (i=0; main_state->children[i].encoder_control; ++i) {
-        threadqueue_submit(main_state->encoder_control->threadqueue, worker_encoder_state_encode_children, &(main_state->children[i]));
+        //If we don't have wavefronts, parallelize encoding of children.
+        if (main_state->children[i].type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+          threadqueue_submit(main_state->encoder_control->threadqueue, worker_encoder_state_encode_children, &(main_state->children[i]));
+        } else {
+          //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
+          worker_encoder_state_encode_children(&(main_state->children[i]));
+        }
       }
       threadqueue_flush(main_state->encoder_control->threadqueue);
     } else {
-      worker_encoder_state_encode_children(&(main_state->children[0]));
+      for (i=0; main_state->children[i].encoder_control; ++i) {
+        worker_encoder_state_encode_children(&(main_state->children[i]));
+      }
     }
     
     for (i=0; main_state->children[i].encoder_control; ++i) {
