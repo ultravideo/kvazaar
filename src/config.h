@@ -74,6 +74,8 @@ typedef struct
   
   int32_t slice_count;
   int32_t* slice_addresses_in_ts;
+  
+  int32_t threads;
 } config;
 
 /* Function definitions */
