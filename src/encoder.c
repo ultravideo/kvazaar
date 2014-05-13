@@ -200,6 +200,14 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     return 0;
   }
   
+  encoder->threadqueue = MALLOC(threadqueue_queue, 1);
+    
+  //Init threadqueue
+  if (!encoder->threadqueue || !threadqueue_init(encoder->threadqueue, 0)) {
+    fprintf(stderr, "Could not initialize threadqueue");
+    return 0;
+  }
+  
   // Config pointer to config struct
   encoder->cfg = cfg;
   encoder->bitdepth = 8;
@@ -451,6 +459,14 @@ int encoder_control_finalize(encoder_control * const encoder) {
   
   FREE_POINTER(encoder->tiles_tile_id);
   scalinglist_destroy(&encoder->scaling_list);
+  
+  if (!threadqueue_finalize(encoder->threadqueue)) {
+    fprintf(stderr, "Could not initialize threadqueue");
+    return 0;
+  }
+  
+  FREE_POINTER(encoder->threadqueue);
+
   
   return 1;
 }

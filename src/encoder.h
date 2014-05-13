@@ -32,6 +32,7 @@
 #include "config.h"
 #include "tables.h"
 #include "scalinglist.h"
+#include "threadqueue.h"
 
 
 /* TODO: add ME data */
@@ -126,6 +127,8 @@ typedef struct
   //Slices
   int slice_count;
   const int* slice_addresses_in_ts;
+  
+  threadqueue_queue *threadqueue;
   
 } encoder_control;
 
