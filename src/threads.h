@@ -20,9 +20,9 @@
  ****************************************************************************/
 
 #include <pthread.h>
-#include <unistd.h>
 
 #ifdef __GNUC__
+#include <unistd.h>
 
 #define ATOMIC_INC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, 1)
 #define ATOMIC_DEC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, -1)

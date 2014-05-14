@@ -75,21 +75,37 @@
     <YASM>
       <Defines>ARCH_X86_64=1</Defines>
     </YASM>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
     </YASM>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <YASM>
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
     </YASM>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <YASM>
       <Defines>ARCH_X86_64=1</Defines>
     </YASM>
+    <Lib>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\bitstream.c" />
@@ -110,6 +126,7 @@
     <ClCompile Include="..\..\src\search.c" />
     <ClCompile Include="..\..\src\strategyselector.c" />
     <ClCompile Include="..\..\src\tables.c" />
+    <ClCompile Include="..\..\src\threadqueue.c" />
     <ClCompile Include="..\..\src\transform.c" />
   </ItemGroup>
   <ItemGroup>
@@ -130,6 +147,7 @@
     <ClInclude Include="..\..\src\scalinglist.h" />
     <ClInclude Include="..\..\src\search.h" />
     <ClInclude Include="..\..\src\tables.h" />
+    <ClInclude Include="..\..\src\threadqueue.h" />
     <ClInclude Include="..\..\src\threads.h" />
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\x86\cpu.h" />
