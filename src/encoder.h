@@ -179,6 +179,9 @@ typedef struct {
   yuv_t *hor_buf_search;
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
   yuv_t *ver_buf_search;
+  
+  //Job pointers for wavefronts
+  threadqueue_job **wf_jobs;
 } encoder_state_config_tile;
 
 typedef struct {

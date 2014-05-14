@@ -561,6 +561,16 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
   encoder_state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->height_in_lcu * encoder_state->tile->cur_pic->width_in_lcu);
   
+  if (encoder->wpp) {
+    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job*, encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
+    if (!encoder_state->tile->wf_jobs) {
+      printf("Error allocating wf_jobs array!\n");
+      return 0;
+    }
+  } else {
+    encoder_state->tile->wf_jobs = NULL;
+  }
+  
   encoder_state->tile->id = encoder->tiles_tile_id[encoder_state->tile->lcu_offset_in_ts];
   return 1;
 }
@@ -572,6 +582,8 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
   
   picture_free(encoder_state->tile->cur_pic);
   encoder_state->tile->cur_pic = NULL;
+  
+  FREE_POINTER(encoder_state->tile->wf_jobs);
 }
 
 static int encoder_state_config_slice_init(encoder_state * const encoder_state, 
@@ -1274,7 +1286,20 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
     }
   } else {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-      worker_encoder_state_search_lcu(&encoder_state->lcu_order[i]);
+      const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+      encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, worker_encoder_state_search_lcu, (void*)lcu, 1);
+      if (encoder_state->tile->wf_jobs[lcu->id]) {
+        if (lcu->position.x > 0) {
+          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - 1]);
+        }
+        if (lcu->position.y > 0) {
+          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - encoder_state->tile->cur_pic->width_in_lcu]);
+        }
+        if (lcu->position.y > 0 && lcu->position.x < encoder_state->tile->cur_pic->width_in_lcu - 1) {
+          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - encoder_state->tile->cur_pic->width_in_lcu + 1]);
+        }
+        threadqueue_job_unwait_job(encoder_state->encoder_control->threadqueue, encoder_state->tile->wf_jobs[lcu->id]);
+      }
     }
   }
 
@@ -1289,7 +1314,7 @@ static void encoder_state_encode(encoder_state * const main_state);
 static void worker_encoder_state_encode_children(void * opaque) {
   encoder_state *sub_state = opaque;
   encoder_state_encode(sub_state);
-  if (sub_state->is_leaf) {
+  if (sub_state->is_leaf && sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
     encoder_state_write_bitstream_leaf(sub_state);
   }
 }
@@ -1570,6 +1595,9 @@ static void encoder_state_write_bitstream(encoder_state * const main_state) {
         fprintf(stderr, "Unsupported node type %c!\n", main_state->type);
         assert(0);
     }
+  } else if (main_state->is_leaf && main_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+    //Wavefront should be written now
+    encoder_state_write_bitstream_leaf(main_state);
   }
 }
 
