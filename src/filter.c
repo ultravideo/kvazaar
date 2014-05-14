@@ -427,39 +427,6 @@ void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y
   filter_deblock_edge_chroma(encoder_state, x*(LCU_WIDTH >> (MAX_DEPTH + 1)), y*(LCU_WIDTH >> (MAX_DEPTH + 1)), depth, edge);
 }
 
-/**
- * \brief Main function for Deblocking filtering
- * \param encoder the encoder info structure
- *
- * This is the main function for deblocking filter, it will loop through all
- * the Largest Coding Units (LCU) and call filter_deblock_cu with absolute
- * X and Y coordinates of the LCU.
- */
-void filter_deblock(encoder_state * const encoder_state)
-{
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
-  int16_t x, y;
-
-  // TODO: Optimization: add thread for each LCU
-  // Filter vertically.
-  for (y = 0; y < cur_pic->height_in_lcu; y++)
-  {
-    for (x = 0; x < cur_pic->width_in_lcu; x++)
-    {
-      filter_deblock_cu(encoder_state, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_VER);
-    }
-  }
-
-  // Filter horizontally.
-  for (y = 0; y < cur_pic->height_in_lcu; y++)
-  {
-    for (x = 0; x < cur_pic->width_in_lcu; x++)
-    {
-      filter_deblock_cu(encoder_state, x << MAX_DEPTH, y << MAX_DEPTH, 0, EDGE_HOR);
-    }
-  }
-}
-
 
 /**
  * \brief Deblock a single LCU without using data from right or down.

@@ -68,17 +68,18 @@ if 'MSVS' in env_x86:
     # /GL = enable whole program optimization
     # /LTCG = link time code generation
     # /arch:SSE2 = use SSE2 (x86 only)
+    # win32-pthreads is assumed to be in same level as kvazaar in dir pthreads
     env_x86.Append(
-            CCFLAGS='/MD /Ox /GL /arch:SSE2',
-            LINKFLAGS='/LTCG')
+            CCFLAGS=r'/MD /Ox /GL /arch:SSE2 /I"..\..\pthreads\include"',
+            LINKFLAGS=r'/LTCG /LIBPATH:"..\..\pthreads\x86" "pthreadVC2.lib"')
     env_x64.Append(
-            CCFLAGS='/MD /Ox /GL /openmp',
-            LINKFLAGS='/LTCG')
+            CCFLAGS=r'/MD /Ox /GL /I"..\..\pthreads\include"',
+            LINKFLAGS=r'/LTCG /LIBPATH:"..\pthreads\x64" "pthreadVC2.lib"')
 else:
     # GCC flags
     # -m for arch, -O2 for optimization, -lm for math lib
-    env_x86.MergeFlags('-m32 -O2 -lm -march=native -fopenmp')
-    env_x64.MergeFlags('-m64 -O2 -lm -march=native -fopenmp')
+    env_x86.MergeFlags('-m32 -O2 -lm -march=native -pthread')
+    env_x64.MergeFlags('-m64 -O2 -lm -march=native -pthread')
 
 # VS2010 linker and mingw64 need TMP.
 if 'TMP' in os.environ:

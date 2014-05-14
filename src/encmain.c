@@ -115,6 +115,8 @@ int main(int argc, char *argv[])
             "                                     2: full RDO\n"
             "          --no-transform-skip    : Disable transform skip\n"
             "          --aud                  : Use access unit delimiters\n"
+            "          --threads <integer>    : Maximum number of threads to use.\n"
+            "                                   Disable threads if set to 0.\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
             "          --debug <string>       : Output encoders reconstruction.\n"
             "\n"

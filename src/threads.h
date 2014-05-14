@@ -22,9 +22,11 @@
 #include <pthread.h>
 
 #ifdef __GNUC__
+#include <unistd.h>
 
 #define ATOMIC_INC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, 1)
 #define ATOMIC_DEC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, -1)
+#define SLEEP()                             usleep(0)
 
 #else //__GNUC__
 //TODO: we assume !GCC => Windows... this may be bad
@@ -32,6 +34,8 @@
 
 #define ATOMIC_INC(ptr)                     InterlockedIncrement((volatile LONG*)ptr)
 #define ATOMIC_DEC(ptr)                     InterlockedDecrement((volatile LONG*)ptr)
+#define SLEEP()                             Sleep(0)
+
 
 #endif //__GNUC__
 
