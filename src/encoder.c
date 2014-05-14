@@ -1186,24 +1186,24 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
   
   //Copy the bottom row of this LCU to the horizontal buffer
   picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_next_px.y - 1) * cur_pic->width + lcu->position_px.x],
-                      &hor_buf->y[lcu->position_px.x + lcu->position.y * LCU_WIDTH * cur_pic->width_in_lcu],
+                      &hor_buf->y[lcu->position_px.x + lcu->position.y * cur_pic->width],
                       lcu->size.x, 1, cur_pic->width, cur_pic->width);
   picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                      &hor_buf->u[lcu->position_px.x / 2 + lcu->position.y * LCU_WIDTH_C * cur_pic->width_in_lcu],
+                      &hor_buf->u[lcu->position_px.x / 2 + lcu->position.y * cur_pic->width / 2],
                       lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
   picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                      &hor_buf->v[lcu->position_px.x / 2 + lcu->position.y * LCU_WIDTH_C * cur_pic->width_in_lcu],
+                      &hor_buf->v[lcu->position_px.x / 2 + lcu->position.y * cur_pic->width / 2],
                       lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
   
   //Copy the right row of this LCU to the vertical buffer.
   picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
-                      &ver_buf->y[lcu->position_px.y + lcu->position.x * LCU_WIDTH * cur_pic->height_in_lcu],
+                      &ver_buf->y[lcu->position_px.y + lcu->position.x * cur_pic->height],
                       1, lcu->size.y, cur_pic->width, 1);
   picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                      &ver_buf->u[lcu->position_px.y / 2 + lcu->position.x * LCU_WIDTH_C * cur_pic->height_in_lcu],
+                      &ver_buf->u[lcu->position_px.y / 2 + lcu->position.x * cur_pic->height / 2],
                       1, lcu->size.y / 2, cur_pic->width / 2, 1);
   picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                      &ver_buf->v[lcu->position_px.y / 2 + lcu->position.x * LCU_WIDTH_C * cur_pic->height_in_lcu],
+                      &ver_buf->v[lcu->position_px.y / 2 + lcu->position.x * cur_pic->height / 2],
                       1, lcu->size.y / 2, cur_pic->width / 2, 1);
   
 }
