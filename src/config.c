@@ -91,6 +91,7 @@ int config_init(config *cfg)
   cfg->slice_addresses_in_ts = MALLOC(int32_t, 1);
   cfg->slice_addresses_in_ts[0] = 0;
   
+  cfg->threads = 0;
 
   return 1;
 }
@@ -413,6 +414,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->wpp = atobool(value);
   else if OPT("slice-addresses")
     error = !parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
+  else if OPT("threads")
+    cfg->threads = atoi(value);
   else
     return 0;
 #undef OPT
@@ -463,6 +466,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "tiles-height-split", required_argument, NULL, 0 },
     { "wpp",                      no_argument, NULL, 0 },
     { "slice-addresses",    required_argument, NULL, 0 },
+    { "threads",            required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 
