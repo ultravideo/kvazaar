@@ -173,6 +173,12 @@ typedef struct {
   
   //Position of the first element in tile scan in global coordinates
   int32_t lcu_offset_in_ts;
+  
+  //Buffer for search
+  //order by row of (LCU_WIDTH * cur_pic->width_in_lcu) pixels
+  yuv_t *hor_buf_search;
+  //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
+  yuv_t *ver_buf_search;
 } encoder_state_config_tile;
 
 typedef struct {
@@ -276,10 +282,13 @@ static const uint8_t g_min_in_group[10] = {
 #define C1FLAG_NUMBER 8 // maximum number of largerThan1 flag coded in one chunk
 #define C2FLAG_NUMBER 1 // maximum number of largerThan2 flag coded in one chunk
 
-#define OFFSET_VER_BUF(position_x, position_y, cur_pic, i) ((position_y) + i + ((position_x)/LCU_WIDTH - 1) * LCU_WIDTH * (cur_pic)->height_in_lcu)
-#define OFFSET_VER_BUF_C(position_x, position_y, cur_pic, i) ((position_y/2) + i + ((position_x)/LCU_WIDTH - 1) * LCU_WIDTH_C * (cur_pic)->height_in_lcu)
+//Get the data for vertical buffer position at the left of LCU identified by the position in pixel
+#define OFFSET_VER_BUF(position_x, position_y, cur_pic, i) ((position_y) + i + ((position_x)/LCU_WIDTH - 1) * (cur_pic)->height)
+#define OFFSET_VER_BUF_C(position_x, position_y, cur_pic, i) ((position_y/2) + i + ((position_x)/LCU_WIDTH - 1) * (cur_pic)->height / 2)
+
+//Get the data for horizontal buffer position at the top of LCU identified by the position in pixel
+#define OFFSET_HOR_BUF(position_x, position_y, cur_pic, i) ((position_x) + i + ((position_y)/LCU_WIDTH - 1) * (cur_pic)->width)
+#define OFFSET_HOR_BUF_C(position_x, position_y, cur_pic, i) ((position_x/2) + i + ((position_y)/LCU_WIDTH - 1) * (cur_pic)->width / 2)
   
-#define OFFSET_HOR_BUF(position_x, position_y, cur_pic, i) ((position_x) + i + ((position_y)/LCU_WIDTH - 1) * LCU_WIDTH * (cur_pic)->width_in_lcu)
-#define OFFSET_HOR_BUF_C(position_x, position_y, cur_pic, i) ((position_x/2) + i + ((position_y)/LCU_WIDTH - 1) * LCU_WIDTH_C * (cur_pic)->width_in_lcu)
 
 #endif

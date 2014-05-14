@@ -555,11 +555,21 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   
   encoder_state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
   
+  //Allocate buffers
+  //order by row of (LCU_WIDTH * cur_pic->width_in_lcu) pixels
+  encoder_state->tile->hor_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
+  //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
+  encoder_state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->height_in_lcu * encoder_state->tile->cur_pic->width_in_lcu);
+  
   encoder_state->tile->id = encoder->tiles_tile_id[encoder_state->tile->lcu_offset_in_ts];
   return 1;
 }
 
 static void encoder_state_config_tile_finalize(encoder_state * const encoder_state) {
+  
+  yuv_t_free(encoder_state->tile->hor_buf_search);
+  yuv_t_free(encoder_state->tile->ver_buf_search);
+  
   picture_free(encoder_state->tile->cur_pic);
   encoder_state->tile->cur_pic = NULL;
 }
@@ -1208,12 +1218,6 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   picture* const cur_pic = encoder_state->tile->cur_pic;
   int i = 0;
   
-  //Allocate buffers
-  //order by row of (LCU_WIDTH * cur_pic->width_in_lcu) pixels
-  yuv_t *hor_buf_search = yuv_t_alloc(LCU_WIDTH * cur_pic->width_in_lcu * cur_pic->height_in_lcu);
-  //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
-  yuv_t *ver_buf_search = yuv_t_alloc(LCU_WIDTH * cur_pic->height_in_lcu * cur_pic->width_in_lcu);
-  
   //FIXME: if we have a WAVEFRONT_ROW part which is the only child of the parent, than we should not use parallelism
   
   assert(encoder_state->is_leaf);
@@ -1222,9 +1226,9 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   for (i = 0; i < encoder_state->lcu_order_count; ++i) {
     const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
 
-    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, hor_buf_search, ver_buf_search);
+    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
     
-    encoder_state_recdata_to_bufs(encoder_state, lcu, hor_buf_search, ver_buf_search);
+    encoder_state_recdata_to_bufs(encoder_state, lcu, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
 
   }
   
@@ -1266,9 +1270,6 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   
   //We should not have written to bitstream!
   assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
-
-  yuv_t_free(hor_buf_search);
-  yuv_t_free(ver_buf_search);
 }
 
 static void encoder_state_encode(encoder_state * const main_state);
