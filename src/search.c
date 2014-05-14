@@ -913,7 +913,8 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
       inter_recon_lcu(encoder_state, encoder_state->global->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
-      encode_transform_tree(encoder_state, x, y, depth, &work_tree[depth]);
+      quantize_lcu_luma_residual(encoder_state, x, y, depth, &work_tree[depth]);
+      quantize_lcu_chroma_residual(encoder_state, x, y, depth, &work_tree[depth]);
 
       cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 

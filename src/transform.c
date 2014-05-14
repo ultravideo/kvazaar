@@ -993,7 +993,7 @@ int quantize_residual_trskip(
  * - lcu->cbf  coded block flags for the area
  * - lcu->cu.intra[].tr_skip  for the area
  */
-void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
+void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};
@@ -1008,10 +1008,10 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
-    encode_transform_tree(encoder_state, x,          y,          depth+1, lcu);
-    encode_transform_tree(encoder_state, x + offset, y,          depth+1, lcu);
-    encode_transform_tree(encoder_state, x,          y + offset, depth+1, lcu);
-    encode_transform_tree(encoder_state, x + offset, y + offset, depth+1, lcu);
+    quantize_lcu_luma_residual(encoder_state, x,          y,          depth+1, lcu);
+    quantize_lcu_luma_residual(encoder_state, x + offset, y,          depth+1, lcu);
+    quantize_lcu_luma_residual(encoder_state, x,          y + offset, depth+1, lcu);
+    quantize_lcu_luma_residual(encoder_state, x + offset, y + offset, depth+1, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth < MAX_DEPTH) {
@@ -1020,12 +1020,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
       cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
         cbf_set(&cur_cu->cbf.y, depth);
-      }
-      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
-        cbf_set(&cur_cu->cbf.u, depth);
-      }
-      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
-        cbf_set(&cur_cu->cbf.v, depth);
       }
     }
 
@@ -1052,10 +1046,6 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
     // This should ensure that the CBF data doesn't get corrupted if this function
     // is called more than once.
     cbf_clear(&cur_cu->cbf.y, depth + pu_index);
-    if (pu_index == 0) {
-      cbf_clear(&cur_cu->cbf.u, depth);
-      cbf_clear(&cur_cu->cbf.v, depth);
-    }
 
     if (width == 4 && encoder_state->encoder_control->trskip_enable) {
       // Try quantization with trskip and use it if it's better.
@@ -1079,6 +1069,44 @@ void encode_transform_tree(encoder_state * const encoder_state, int32_t x, int32
         cbf_set(&cur_cu->cbf.y, depth + pu_index);
       }
     }
+  }
+}
+
+
+void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
+{
+  // we have 64>>depth transform size
+  const vector2d lcu_px = {x & 0x3f, y & 0x3f};
+  const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
+  const int8_t width = LCU_WIDTH>>depth;
+  
+  // Tell clang-analyzer what is up. For some reason it can't figure out from
+  // asserting just depth.
+  assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
+
+  // Split transform and increase depth
+  if (depth == 0 || cur_cu->tr_depth > depth) {
+    int offset = width / 2;
+    quantize_lcu_chroma_residual(encoder_state, x,          y,          depth+1, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x + offset, y,          depth+1, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x,          y + offset, depth+1, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x + offset, y + offset, depth+1, lcu);
+
+    // Propagate coded block flags from child CUs to parent CU.
+    if (depth < MAX_DEPTH) {
+      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
+      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
+        cbf_set(&cur_cu->cbf.u, depth);
+      }
+      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
+        cbf_set(&cur_cu->cbf.v, depth);
+      }
+    }
+
+    return;
   }
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top

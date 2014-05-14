@@ -892,5 +892,6 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
                             rec_stride, width, width);
   }
 
-  encode_transform_tree(encoder_state, x, y, depth, lcu);
+  quantize_lcu_luma_residual(encoder_state, x, y, depth, lcu);
+  quantize_lcu_chroma_residual(encoder_state, x, y, depth, lcu);
 }
