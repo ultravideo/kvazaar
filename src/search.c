@@ -1130,7 +1130,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void search_lcu(encoder_state * const encoder_state, int x, int y, yuv_t* hor_buf, yuv_t* ver_buf)
+void search_lcu(encoder_state * const encoder_state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;
