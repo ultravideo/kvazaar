@@ -45,7 +45,7 @@ else
 endif
 
 CC = gcc -fopenmp
-CCFLAGS = $(DFLAGS) -I. -Wall -Wtype-limits
+CCFLAGS = $(DFLAGS) -I. -Wall -Wtype-limits -Wvla -Wdeclaration-after-statement
 LDFLAGS += -lm
 LD = gcc -fopenmp
 YASM = yasm

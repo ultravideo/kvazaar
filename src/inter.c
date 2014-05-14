@@ -70,11 +70,8 @@ void extend_borders(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y
   int16_t mv[2] = {mv_x, mv_y};
   int halfFilterSize = filterSize>>1;
 
-  int dst_y; int y; int dst_x; int x; int coord_x; int coord_y; int ref_width_c;
+  int dst_y; int y; int dst_x; int x; int coord_x; int coord_y;
   int8_t overflow_neg_y_temp,overflow_pos_y_temp,overflow_neg_x_temp,overflow_pos_x_temp;
-
-  ref_width_c = ref_width;
-  //width = LCU_WIDTH>>depth;
 
   for (dst_y = 0, y = ypos - halfFilterSize; y < ((ypos + height)) + halfFilterSize; dst_y++, y++) {
 
@@ -86,16 +83,16 @@ void extend_borders(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y
     overflow_pos_y_temp = (coord_y >= ref_height) ? 1 : 0;
     if (overflow_neg_y_temp)      coord_y = 0;
     else if (overflow_pos_y_temp) coord_y = (ref_height) - 1;
-    coord_y *= ref_width_c;
+    coord_y *= ref_width;
 
     for (dst_x = 0, x = (xpos) - halfFilterSize; x < ((xpos + width)) + halfFilterSize; dst_x++, x++) {
       coord_x = x + off_x + mv[0];
 
       // On x-overflow set coord_x accordingly
       overflow_neg_x_temp = (coord_x < 0) ? 1 : 0;
-      overflow_pos_x_temp = (coord_x >= ref_width_c) ? 1 : 0;
+      overflow_pos_x_temp = (coord_x >= ref_width) ? 1 : 0;
       if (overflow_neg_x_temp)      coord_x = 0;
-      else if (overflow_pos_x_temp) coord_x = ref_width_c - 1;
+      else if (overflow_pos_x_temp) coord_x = ref_width - 1;
 
       // Store source block data (with extended borders)
       dst[dst_y*(width+filterSize) + dst_x] = ref[coord_y + coord_x];
@@ -140,7 +137,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
   int16_t halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
 
   // Luma quarter-pel
-    int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // 2 lowest bits of mv set -> mv is fractional
+    int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
 
     if(fractional_mv) {
       int y_off_x = (mv[0]&3);
@@ -151,11 +148,8 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
 
       int y,x;
 
-      #define FILTER_SIZE_Y 8
-      #define FILTER_SIZE_C 4
-
-      //vector2d orig = {xpos, ypos};
-      //vector2d orig_c = {xpos>>1, ypos>>1};
+      #define FILTER_SIZE_Y 8 //Luma filter size
+      #define FILTER_SIZE_C 4 //Chroma filter size
 
       // Fractional luma 1/4-pel
       int16_t qpel_src_y[(LCU_WIDTH+FILTER_SIZE_Y) * (LCU_WIDTH+FILTER_SIZE_Y)];
@@ -200,9 +194,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
         for(x = 0; x < width; ++x) {
           int x_in_lcu = ((x+xpos) & ((LCU_WIDTH)-1));
           int qpel_x = x*4+y_off_x;
-          //printf("x: %d, y: %d\n", off_x, off_y);
           lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (uint8_t)qpel_dst_y[qpel_y*(width*4)+qpel_x];
-          //printf("i: %d", qpel_y*(width*4)+qpel_x);
         }
       }
       //Chroma

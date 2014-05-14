@@ -379,6 +379,20 @@ static unsigned search_mv_full(unsigned depth,
 }
 #endif
 
+/**
+ * \brief Do fractional motion estimation
+ *
+ * \param depth      log2 depth of the search
+ * \param pic        Picture motion vector is searched for.
+ * \param ref        Picture motion vector is searched from.
+ * \param orig       Top left corner of the searched for block.
+ * \param mv_in_out  Predicted mv in and best out. Quarter pixel precision.
+ *
+ * \returns  Cost of the motion vector.
+ *
+ * Algoritm first searches 1/2-pel positions around integer mv and after best match is found,
+ * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
+ */
 static unsigned search_frac( const encoder_state * const encoder_state,
         unsigned depth,
         const picture *pic, const picture *ref,
