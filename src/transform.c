@@ -1146,9 +1146,6 @@ void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x
     int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
     int chroma_width = LCU_WIDTH_C >> chroma_depth;
 
-    if (cur_cu->intra[0].mode_chroma == 36) {
-      cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
-    }
     scan_idx_chroma = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
     if (quantize_residual(encoder_state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
       cbf_set(&cur_cu->cbf.u, depth);

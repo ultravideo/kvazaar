@@ -853,8 +853,6 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
 
   int i = PU_INDEX(x >> 2, y >> 2);
 
-  cur_cu->intra[0].mode_chroma = 36; // TODO: Chroma intra prediction
-
   // Reconstruct chroma.
   if (!(x & 4 || y & 4)) {
     pixel *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
@@ -866,7 +864,7 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
                 width_c,
                 recbase_u,
                 rec_stride >> 1,
-                cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+                cur_cu->intra[0].mode_chroma,
                 1);
 
     intra_build_reference_border(encoder, x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
@@ -877,7 +875,7 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
                 width_c,
                 recbase_v,
                 rec_stride >> 1,
-                cur_cu->intra[0].mode_chroma != 36 ? cur_cu->intra[0].mode_chroma : cur_cu->intra[0].mode,
+                cur_cu->intra[0].mode_chroma,
                 2);
   }
 

@@ -2698,7 +2698,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
     uint8_t intra_pred_mode[4] = {
       cur_cu->intra[0].mode, cur_cu->intra[1].mode,
       cur_cu->intra[2].mode, cur_cu->intra[3].mode };
-    uint8_t intra_pred_mode_chroma = 36; // 36 = Chroma derived from luma
+      uint8_t intra_pred_mode_chroma = cur_cu->intra[0].mode_chroma;
     int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
     int8_t mpm_preds[4] = {-1, -1, -1, -1};
     int i, j;
@@ -2776,7 +2776,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
       unsigned pred_mode = 5;
       unsigned chroma_pred_modes[4] = {0, 26, 10, 1};
 
-      if (intra_pred_mode_chroma == 36) {
+      if (intra_pred_mode_chroma == intra_pred_mode[0]) {
         pred_mode = 4;
       } else if (intra_pred_mode_chroma == 34) {
         // Angular 34 mode is possible only if intra pred mode is one of the
@@ -2790,6 +2790,10 @@ void encode_coding_tree(encoder_state * const encoder_state,
           if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
         }
       }
+
+      // pred_mode == 5 mean intra_pred_mode_chroma is something that can't
+      // be coded.
+      assert(pred_mode != 5);
 
       /**
        * Table 9-35 - Binarization for intra_chroma_pred_mode
@@ -2991,11 +2995,6 @@ static void encode_transform_unit(encoder_state * const encoder_state,
       // Chroma scanmode
       ctx_idx++;
       dir_mode = cur_cu->intra[0].mode_chroma;
-
-      if (dir_mode == 36) {
-        // TODO: support NxN
-        dir_mode = cur_cu->intra[0].mode;
-      }
 
       scan_idx = SCAN_DIAG;
 

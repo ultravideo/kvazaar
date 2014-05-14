@@ -718,6 +718,8 @@ static int search_cu_intra(encoder_state * const encoder_state,
     cur_cu->intra[pu_index].mode = (int8_t)mode;
     cur_cu->intra[pu_index].cost = cost;
     cur_cu->intra[pu_index].bitcost = bitcost;
+
+    cur_cu->intra[0].mode = cur_cu->intra[pu_index].mode;
   }
 
   return cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].cost;
