@@ -1171,6 +1171,32 @@ static void write_aud(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
+static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, const lcu_order_element * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
+  picture* const cur_pic = encoder_state->tile->cur_pic;
+  
+  //Copy the bottom row of this LCU to the horizontal buffer
+  picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_next_px.y - 1) * cur_pic->width + lcu->position_px.x],
+                      &hor_buf->y[lcu->position_px.x + lcu->position.y * LCU_WIDTH * cur_pic->width_in_lcu],
+                      lcu->size.x, 1, cur_pic->width, cur_pic->width);
+  picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                      &hor_buf->u[lcu->position_px.x / 2 + lcu->position.y * LCU_WIDTH_C * cur_pic->width_in_lcu],
+                      lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+  picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
+                      &hor_buf->v[lcu->position_px.x / 2 + lcu->position.y * LCU_WIDTH_C * cur_pic->width_in_lcu],
+                      lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+  
+  //Copy the right row of this LCU to the vertical buffer.
+  picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
+                      &ver_buf->y[lcu->position_px.y + lcu->position.x * LCU_WIDTH * cur_pic->height_in_lcu],
+                      1, lcu->size.y, cur_pic->width, 1);
+  picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                      &ver_buf->u[lcu->position_px.y / 2 + lcu->position.x * LCU_WIDTH_C * cur_pic->height_in_lcu],
+                      1, lcu->size.y / 2, cur_pic->width / 2, 1);
+  picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
+                      &ver_buf->v[lcu->position_px.y / 2 + lcu->position.x * LCU_WIDTH_C * cur_pic->height_in_lcu],
+                      1, lcu->size.y / 2, cur_pic->width / 2, 1);
+  
+}
 
 static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -1184,6 +1210,12 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   //Picture
   picture* const cur_pic = encoder_state->tile->cur_pic;
   int i = 0;
+  
+  //Allocate buffers
+  //order by row of (LCU_WIDTH * cur_pic->width_in_lcu) pixels
+  yuv_t *hor_buf_search = yuv_t_alloc(LCU_WIDTH * cur_pic->width_in_lcu * cur_pic->height_in_lcu);
+  //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
+  yuv_t *ver_buf_search = yuv_t_alloc(LCU_WIDTH * cur_pic->height_in_lcu * cur_pic->width_in_lcu);
   
   //FIXME: if we have a WAVEFRONT_ROW part which is the only child of the parent, than we should not use parallelism
   
@@ -1218,6 +1250,9 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
     }
 
     search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, &hor_buf, ver_buf);
+    
+    encoder_state_recdata_to_bufs(encoder_state, lcu, hor_buf_search, ver_buf_search);
+
   }
   
   for (i = 0; i < encoder_state->lcu_order_count; ++i) {
@@ -1260,6 +1295,9 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
 
   yuv_t_free(ver_buf);
+  
+  yuv_t_free(hor_buf_search);
+  yuv_t_free(ver_buf_search);
 }
 
 static void encoder_state_encode(encoder_state * const main_state);

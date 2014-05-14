@@ -273,11 +273,13 @@ static const uint8_t g_min_in_group[10] = {
   0, 1, 2, 3, 4, 6, 8, 12, 16, 24 };
 
 
-
-
 #define C1FLAG_NUMBER 8 // maximum number of largerThan1 flag coded in one chunk
 #define C2FLAG_NUMBER 1 // maximum number of largerThan2 flag coded in one chunk
 
-
+#define OFFSET_VER_BUF(position_x, position_y, cur_pic, i) ((position_y) + i + ((position_x)/LCU_WIDTH - 1) * LCU_WIDTH * (cur_pic)->height_in_lcu)
+#define OFFSET_VER_BUF_C(position_x, position_y, cur_pic, i) ((position_y/2) + i + ((position_x)/LCU_WIDTH - 1) * LCU_WIDTH_C * (cur_pic)->height_in_lcu)
+  
+#define OFFSET_HOR_BUF(position_x, position_y, cur_pic, i) ((position_x) + i + ((position_y)/LCU_WIDTH - 1) * LCU_WIDTH * (cur_pic)->width_in_lcu)
+#define OFFSET_HOR_BUF_C(position_x, position_y, cur_pic, i) ((position_x/2) + i + ((position_y)/LCU_WIDTH - 1) * LCU_WIDTH_C * (cur_pic)->width_in_lcu)
 
 #endif
