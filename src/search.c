@@ -1026,26 +1026,17 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
       // hor_buf is of size pic_width so there might not be LCU_REF_PX_WIDTH
       // number of allocated pixels left.
       int x_max = MIN(LCU_REF_PX_WIDTH, pic_width - x);
-      memcpy(&lcu->top_ref.y[1], &hor_buf->y[OFFSET_HOR_BUF(x, y, cur_pic, 0)], x_max);
-      memcpy(&lcu->top_ref.u[1], &hor_buf->u[OFFSET_HOR_BUF_C(x, y, cur_pic, 0)], x_max / 2);
-      memcpy(&lcu->top_ref.v[1], &hor_buf->v[OFFSET_HOR_BUF_C(x, y, cur_pic, 0)], x_max / 2);
+      int x_min_in_lcu = (x>0) ? 0 : 1;
+      memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[OFFSET_HOR_BUF(x, y, cur_pic, x_min_in_lcu-1)], x_max + (1-x_min_in_lcu));
+      memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[OFFSET_HOR_BUF_C(x, y, cur_pic, x_min_in_lcu-1)], x_max / 2 + (1-x_min_in_lcu));
+      memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[OFFSET_HOR_BUF_C(x, y, cur_pic, x_min_in_lcu-1)], x_max / 2 + (1-x_min_in_lcu));
     }
     // Copy left reference pixels.
     if (x > 0) {
-      memcpy(&lcu->left_ref.y[1], &ver_buf->y[OFFSET_VER_BUF(x, y, cur_pic, 0)], LCU_WIDTH);
-      memcpy(&lcu->left_ref.u[1], &ver_buf->u[OFFSET_VER_BUF_C(x, y, cur_pic, 0)], LCU_WIDTH / 2);
-      memcpy(&lcu->left_ref.v[1], &ver_buf->v[OFFSET_VER_BUF_C(x, y, cur_pic, 0)], LCU_WIDTH / 2);
-    }
-    // Copy top-left reference pixel.
-    if (x > 0 && y > 0) {
-      lcu->top_ref.y[0] = ver_buf->y[OFFSET_VER_BUF(x, y, cur_pic, -1)];
-      lcu->left_ref.y[0] = ver_buf->y[OFFSET_VER_BUF(x, y, cur_pic, -1)];
-
-      lcu->top_ref.u[0] = ver_buf->u[OFFSET_VER_BUF(x, y, cur_pic, -1)];
-      lcu->left_ref.u[0] = ver_buf->u[OFFSET_VER_BUF(x, y, cur_pic, -1)];
-
-      lcu->top_ref.v[0] = ver_buf->v[OFFSET_VER_BUF(x, y, cur_pic, -1)];
-      lcu->left_ref.v[0] = ver_buf->v[OFFSET_VER_BUF(x, y, cur_pic, -1)];
+      int y_min_in_lcu = (y>0) ? 0 : 1;
+      memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[OFFSET_VER_BUF(x, y, cur_pic, y_min_in_lcu-1)], LCU_WIDTH + (1-y_min_in_lcu));
+      memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[OFFSET_VER_BUF_C(x, y, cur_pic, y_min_in_lcu-1)], LCU_WIDTH / 2 + (1-y_min_in_lcu));
+      memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[OFFSET_VER_BUF_C(x, y, cur_pic, y_min_in_lcu-1)], LCU_WIDTH / 2 + (1-y_min_in_lcu));
     }
   }
 
