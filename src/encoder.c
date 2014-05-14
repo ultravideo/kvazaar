@@ -927,6 +927,9 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
             for (j = 0; child_state->children[i].children[j].encoder_control; ++j) {
               child_state->children[i].children[j].parent = &child_state->children[i];
             }
+            for (j = 0; j < child_state->children[i].lcu_order_count; ++j) {
+              child_state->children[i].lcu_order[j].encoder_state = &child_state->children[i];
+            }
             child_state->children[i].cabac.stream = &child_state->children[i].stream;
           }
         }
@@ -1026,6 +1029,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       for (i = 0; i < child_state->lcu_order_count; ++i) {
         lcu_id = lcu_start + i;
+        child_state->lcu_order[i].encoder_state = child_state;
         child_state->lcu_order[i].id = lcu_id;
         child_state->lcu_order[i].position.x = lcu_id % child_state->tile->cur_pic->width_in_lcu;
         child_state->lcu_order[i].position.y = lcu_id / child_state->tile->cur_pic->width_in_lcu;
@@ -1208,65 +1212,73 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
   
 }
 
+
+static void worker_encoder_state_search_lcu(void * opaque) {
+  const lcu_order_element * const lcu = opaque;
+  encoder_state *encoder_state = lcu->encoder_state;
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  picture* const cur_pic = encoder_state->tile->cur_pic;
+  
+  search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
+    
+  encoder_state_recdata_to_bufs(encoder_state, lcu, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
+
+  if (encoder->deblock_enable) {
+    filter_deblock_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y);
+  }
+
+  if (encoder->sao_enable) {
+    const int stride = cur_pic->width_in_lcu;
+    sao_info *sao_luma = &cur_pic->sao_luma[lcu->position.y * stride + lcu->position.x];
+    sao_info *sao_chroma = &cur_pic->sao_chroma[lcu->position.y * stride + lcu->position.x];
+    init_sao_info(sao_luma);
+    init_sao_info(sao_chroma);
+
+    {
+      sao_info *sao_top =  lcu->position.y != 0 ? &cur_pic->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+      sao_info *sao_left = lcu->position.x != 0 ? &cur_pic->sao_luma[lcu->position.y * stride + lcu->position.x -1] : NULL;
+      sao_search_luma(encoder_state, cur_pic, lcu->position.x, lcu->position.y, sao_luma, sao_top, sao_left);
+    }
+
+    {
+      sao_info *sao_top =  lcu->position.y != 0 ? &cur_pic->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+      sao_info *sao_left = lcu->position.x != 0 ? &cur_pic->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
+      sao_search_chroma(encoder_state, cur_pic, lcu->position.x, lcu->position.y, sao_chroma, sao_top, sao_left);
+    }
+
+    // Merge only if both luma and chroma can be merged
+    sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
+    sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+  }
+}
+
 static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
 #ifndef NDEBUG
   const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
 #endif
   
-  //Picture
-  picture* const cur_pic = encoder_state->tile->cur_pic;
   int i = 0;
-  
-  //FIXME: if we have a WAVEFRONT_ROW part which is the only child of the parent, than we should not use parallelism
   
   assert(encoder_state->is_leaf);
   assert(encoder_state->lcu_order_count > 0);
   
-  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
-
-    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
-    
-    encoder_state_recdata_to_bufs(encoder_state, lcu, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
-
-  }
-  
-  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
-    
-    if (encoder->deblock_enable) {
-      filter_deblock_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y);
+  //If we're not using wavefronts, or we have a WAVEFRONT_ROW which is the single child of its parent, than we should not use parallelism
+  if (encoder_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->parent->children[1].encoder_control)) {
+    for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+      worker_encoder_state_search_lcu(&encoder_state->lcu_order[i]);
     }
-
+    
     if (encoder->sao_enable) {
-      const int stride = cur_pic->width_in_lcu;
-      sao_info *sao_luma = &cur_pic->sao_luma[lcu->position.y * stride + lcu->position.x];
-      sao_info *sao_chroma = &cur_pic->sao_chroma[lcu->position.y * stride + lcu->position.x];
-      init_sao_info(sao_luma);
-      init_sao_info(sao_chroma);
-
-      {
-        sao_info *sao_top =  lcu->position.y != 0 ? &cur_pic->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-        sao_info *sao_left = lcu->position.x != 0 ? &cur_pic->sao_luma[lcu->position.y * stride + lcu->position.x -1] : NULL;
-        sao_search_luma(encoder_state, cur_pic, lcu->position.x, lcu->position.y, sao_luma, sao_top, sao_left);
-      }
-
-      {
-        sao_info *sao_top =  lcu->position.y != 0 ? &cur_pic->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-        sao_info *sao_left = lcu->position.x != 0 ? &cur_pic->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
-        sao_search_chroma(encoder_state, cur_pic, lcu->position.x, lcu->position.y, sao_chroma, sao_top, sao_left);
-      }
-
-      // Merge only if both luma and chroma can be merged
-      sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
-      sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+      sao_reconstruct_frame(encoder_state);
+    }
+  } else {
+    for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+      worker_encoder_state_search_lcu(&encoder_state->lcu_order[i]);
     }
   }
 
-  if (encoder->sao_enable) {
-    sao_reconstruct_frame(encoder_state);
-  }
+
   
   //We should not have written to bitstream!
   assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
@@ -1315,10 +1327,17 @@ static void encoder_state_encode(encoder_state * const main_state) {
           threadqueue_submit(main_state->encoder_control->threadqueue, worker_encoder_state_encode_children, &(main_state->children[i]));
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
+          //FIXME: add an assert: we can only have wavefront children
           worker_encoder_state_encode_children(&(main_state->children[i]));
         }
       }
       threadqueue_flush(main_state->encoder_control->threadqueue);
+      
+      //If children are wavefront, we need to reconstruct SAO
+      if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+        sao_reconstruct_frame(main_state);
+      }
+      
     } else {
       for (i=0; main_state->children[i].encoder_control; ++i) {
         worker_encoder_state_encode_children(&(main_state->children[i]));
