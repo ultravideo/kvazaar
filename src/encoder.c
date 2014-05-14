@@ -1249,7 +1249,7 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
                           1, lcu->size.y / 2, cur_pic->width / 2, 1);
     }
 
-    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, &hor_buf, ver_buf);
+    search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, hor_buf_search, ver_buf_search);
     
     encoder_state_recdata_to_bufs(encoder_state, lcu, hor_buf_search, ver_buf_search);
 
