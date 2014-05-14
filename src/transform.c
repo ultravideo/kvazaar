@@ -937,23 +937,43 @@ int quantize_residual_trskip(
   struct {
     pixel rec[4*4];
     coefficient coeff[4*4];
-    unsigned cost;
+    uint32_t cost;
     int has_coeffs;
   } skip, noskip, *best;
+
+  const int bit_cost = (int)(encoder_state->global->cur_lambda_cost+0.5);
   
   noskip.has_coeffs = quantize_residual(
       encoder_state, cur_cu, width, color, scan_order,
       0, in_stride, 4,
       ref_in, pred_in, noskip.rec, noskip.coeff);
   noskip.cost = calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
-  noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+  if (encoder_state->encoder_control->rdo == 1) {
+    // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum).
+    unsigned abs_coeffs = calc_abs_coeff(noskip.coeff, 4, 4);
+    noskip.cost += (abs_coeffs + (abs_coeffs / 2)) * bit_cost;
+  } else if (encoder_state->encoder_control->rdo == 2) {
+    noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
+  }
 
-  skip.has_coeffs = quantize_residual(
-      encoder_state, cur_cu, width, color, scan_order,
-      1, in_stride, 4,
-      ref_in, pred_in, skip.rec, skip.coeff);
-  skip.cost = calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
-  skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+  if (encoder_state->encoder_control->rdo == 0) {
+    // Evaluating whether to use transform skip or not requires doing the
+    // transform. So if rdo is off, it's probably better to not use trskip.
+    skip.cost = UINT32_MAX;
+  } else {
+    skip.has_coeffs = quantize_residual(
+        encoder_state, cur_cu, width, color, scan_order,
+        1, in_stride, 4,
+        ref_in, pred_in, skip.rec, skip.coeff);
+    skip.cost = calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
+    if (encoder_state->encoder_control->rdo == 1) {
+      // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum + 1).
+      unsigned abs_coeffs = calc_abs_coeff(skip.coeff, 4, 4);
+      skip.cost += (1 + abs_coeffs + (abs_coeffs / 2)) * bit_cost;
+    } else if (encoder_state->encoder_control->rdo == 2) {
+      skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
+    }
+  }
 
   if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
@@ -1047,7 +1067,9 @@ void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, 
     // is called more than once.
     cbf_clear(&cur_cu->cbf.y, depth + pu_index);
 
-    if (width == 4 && encoder_state->encoder_control->trskip_enable) {
+    if (width == 4 && 
+        encoder_state->encoder_control->trskip_enable)
+    {
       // Try quantization with trskip and use it if it's better.
       int has_coeffs = quantize_residual_trskip(
           encoder_state, cur_cu, width, COLOR_Y, scan_idx_luma,

@@ -966,3 +966,18 @@ unsigned calc_ssd(const pixel *const ref, const pixel *const rec,
 
   return ssd;
 }
+
+unsigned calc_abs_coeff(const coefficient *const buf, const int buf_stride,
+                        const int width)
+{
+  int sum = 0;
+  int y, x;
+
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      sum += abs(buf[x + y * buf_stride]);
+    }
+  }
+
+  return sum;
+}

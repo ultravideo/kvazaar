@@ -274,6 +274,8 @@ unsigned calc_sad(const picture *pic, const picture *ref,
 unsigned calc_ssd(const pixel *const ref, const pixel *const rec,
                   const int ref_stride, const int rec_stride,
                   const int width);
+unsigned calc_abs_coeff(const coefficient *const buf, const int buf_stride,
+                        const int width);
 
 double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y);
 
