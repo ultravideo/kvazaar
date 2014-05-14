@@ -66,8 +66,10 @@ typedef struct {
 //Init a threadqueue
 int threadqueue_init(threadqueue_queue * threadqueue, int thread_count);
 
-//Add a job to the queue, and returs a threadqueue_job handle
-threadqueue_job * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg);
+//Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run threadqueue_job_unwait_job in order to have it run
+threadqueue_job * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg, int wait);
+
+int threadqueue_job_unwait_job(threadqueue_queue * threadqueue, threadqueue_job *job);
 
 //Add a dependency between two jobs.
 int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on);

@@ -285,13 +285,15 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
   return 1;
 }
 
-threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void (*fptr)(void *arg), void *arg) {
+threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void (*fptr)(void *arg), void *arg, int wait) {
   threadqueue_job *job;
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
     fptr(arg);
     return NULL;
   }
+  
+  assert(wait == 0 || wait == 1);
   
   job = MALLOC(threadqueue_job, 1);
   
@@ -308,7 +310,7 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
     assert(0);
     return NULL;
   }
-  job->ndepends = 0;
+  job->ndepends = wait;
   job->rdepends = NULL;
   job->rdepends_count = 0;
   job->rdepends_size = 0;
@@ -365,6 +367,23 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
   
   PTHREAD_UNLOCK(&depends_on->lock);
   PTHREAD_UNLOCK(&job->lock);
+  
+  return 1;
+}
+
+int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueue_job *job) {
+  PTHREAD_LOCK(&job->lock);
+  job->ndepends--;
+  PTHREAD_UNLOCK(&job->lock);
+  
+  PTHREAD_LOCK(&threadqueue->lock);
+  //Hope a thread can do it...
+  if(pthread_cond_signal(&(threadqueue->cond)) != 0) {
+      fprintf(stderr, "pthread_cond_signal failed!\n");
+      assert(0);
+      return 0;
+  }
+  PTHREAD_UNLOCK(&threadqueue->lock);
   
   return 1;
 }
