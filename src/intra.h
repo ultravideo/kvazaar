@@ -49,6 +49,6 @@ void intra_get_angular_pred(const encoder_control *encoder, pixel* src, int32_t 
 
 void intra_recon(const encoder_control *encoder, pixel* rec, int32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
-void intra_recon_lcu(encoder_state *encoder_state, int x, int y, int depth, lcu_t *lcu, uint32_t pic_width, uint32_t pic_height);
+void intra_recon_lcu(encoder_state *encoder_state, int x, int y, int depth, lcu_t *lcu);
 
 #endif

@@ -890,7 +890,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, cur_cu->part_size);
-      intra_recon_lcu(encoder_state, x, y, depth,&work_tree[depth], cur_pic->width, cur_pic->height);
+      intra_recon_lcu(encoder_state, x, y, depth, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
       inter_recon_lcu(encoder_state, encoder_state->global->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
