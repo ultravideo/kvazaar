@@ -480,3 +480,38 @@ int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueu
   
   return 1;
 }
+
+#ifdef _DEBUG
+int threadqueue_log(threadqueue_queue * threadqueue, const struct timespec *start, const struct timespec *stop, const char* debug_description) {
+  int i, thread_id = -1;
+  
+  assert(start);
+  
+  //We need to lock to output safely
+  PTHREAD_LOCK(&threadqueue->lock);
+  
+  //Find the thread
+  for(i = 0; i < threadqueue->threads_count; i++) {
+    if(pthread_equal(threadqueue->threads[i], pthread_self()) != 0) {
+      thread_id = i;
+      break;
+    }
+  }
+  
+  if (thread_id >= 0) {
+    if (stop) {
+      fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\t%s\n", thread_id, TIMESPEC_AS_DOUBLE(*start), TIMESPEC_DIFF(*start, *stop), debug_description);
+    } else {
+      fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t-\t-\t%s\n", thread_id, TIMESPEC_AS_DOUBLE(*start), debug_description);
+    }
+  } else {
+    if (stop) {
+      fprintf(threadqueue->debug_log, "\t\t-\t%lf\t+%lf\t-\t%s\n", TIMESPEC_AS_DOUBLE(*start), TIMESPEC_DIFF(*start, *stop), debug_description);
+    } else {
+      fprintf(threadqueue->debug_log, "\t\t-\t%lf\t-\t-\t%s\n", TIMESPEC_AS_DOUBLE(*start), debug_description);
+    }
+  }
+  PTHREAD_UNLOCK(&threadqueue->lock);
+  return 1;
+}
+#endif //_DEBUG

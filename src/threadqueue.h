@@ -107,6 +107,17 @@ int threadqueue_flush(threadqueue_queue * threadqueue);
 //Free ressources in a threadqueue
 int threadqueue_finalize(threadqueue_queue * threadqueue);
 
+#ifdef _DEBUG
+int threadqueue_log(threadqueue_queue * threadqueue, const struct timespec *start, const struct timespec *stop, const char* debug_description);
+
+//This macro HAS TO BE at the beginning of a block
+#define PERFORMANCE_MEASURE_START() struct timespec start, stop; clock_gettime(CLOCK_MONOTONIC, &start)
+#define PERFORMANCE_MEASURE_END(threadqueue, str, ...) do {clock_gettime(CLOCK_MONOTONIC, &stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description); }} while (0)
+#else
+#define PERFORMANCE_MEASURE_START() do {} while (0)
+#define PERFORMANCE_MEASURE_END(threadqueue, str, ...) do {} while (0)
+#endif
+
 /* Constraints: 
  * 
  * - Always first lock threadqueue, than a job inside it

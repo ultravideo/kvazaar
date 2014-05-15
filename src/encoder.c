@@ -1278,18 +1278,29 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   //If we're not using wavefronts, or we have a WAVEFRONT_ROW which is the single child of its parent, than we should not use parallelism
   if (encoder_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->parent->children[1].encoder_control)) {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+      PERFORMANCE_MEASURE_START();
+
       worker_encoder_state_search_lcu(&encoder_state->lcu_order[i]);
+
+#ifdef _DEBUG
+      {
+        const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+        PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=search_lcu,frame=%d,tile=%d,slice=%d,position_x=%d,position_y=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position.x + encoder_state->tile->lcu_offset_x, lcu->position.y + encoder_state->tile->lcu_offset_y);
+      }
+#endif //_DEBUG
     }
     
     if (encoder->sao_enable) {
+      PERFORMANCE_MEASURE_START();
       sao_reconstruct_frame(encoder_state);
+      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id);
     }
   } else {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
       const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
 #ifdef _DEBUG
       char job_description[256];
-      sprintf(job_description, "frame=%d,tile=%d,slice=%d,row=%d,position_x=%d,position_y=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->wfrow->lcu_offset_y, lcu->position.x + encoder_state->tile->lcu_offset_x, lcu->position.y + encoder_state->tile->lcu_offset_y);
+      sprintf(job_description, "type=search_lcu,frame=%d,tile=%d,slice=%d,row=%d,position_x=%d,position_y=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->wfrow->lcu_offset_y, lcu->position.x + encoder_state->tile->lcu_offset_x, lcu->position.y + encoder_state->tile->lcu_offset_y);
 #else
       char* job_description = NULL;
 #endif
@@ -1382,7 +1393,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
       
       //If children are wavefront, we need to reconstruct SAO
       if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+        PERFORMANCE_MEASURE_START();
         sao_reconstruct_frame(main_state);
+        PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d", main_state->global->frame, main_state->tile->id, main_state->slice->id);
       }
       
     } else {
@@ -1619,7 +1632,10 @@ static void encoder_state_write_bitstream(encoder_state * const main_state) {
     }
   } else if (main_state->is_leaf && main_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
     //Wavefront should be written now
+    PERFORMANCE_MEASURE_START();
     encoder_state_write_bitstream_leaf(main_state);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", main_state->global->frame, main_state->tile->id, main_state->slice->id, main_state->wfrow->lcu_offset_y);
+    
   }
 }
 
