@@ -20,6 +20,9 @@
  ****************************************************************************/
 
 #include <pthread.h>
+#ifdef _DEBUG
+#include <time.h>
+#endif
 
 typedef enum {
   THREADQUEUE_JOB_STATE_QUEUED = 0,
@@ -41,6 +44,17 @@ typedef struct threadqueue_job {
   //Job function and state to use
   void (*fptr)(void *arg);
   void *arg;
+  
+#ifdef _DEBUG
+  const char* debug_description;
+  
+  int debug_worker_id;
+  
+  struct timespec debug_clock_enqueue;
+  struct timespec debug_clock_start;
+  struct timespec debug_clock_stop;
+  struct timespec debug_clock_dequeue;
+#endif
 } threadqueue_job;
 
 
@@ -61,13 +75,26 @@ typedef struct {
   unsigned int queue_count;
   unsigned int queue_size;
   unsigned int queue_waiting;
+  
+#ifdef _DEBUG
+  //Format: pointer <tab> worker id <tab> time enqueued <tab> time started <tab> time stopped <tab> time dequeued <tab> job description
+  //For threads, pointer = "" and job description == "thread", time enqueued and time dequeued are equal to "-"
+  //For flush, pointer = "" and job description == "FLUSH", time enqueued, time dequeued and time started are equal to "-" 
+  //Each time field, except the first one in the line be expressed in a relative way, by prepending the number of seconds by +.
+  //Dependencies: pointer -> pointer
+
+  FILE *debug_log;
+  
+  struct timespec *debug_clock_thread_start;
+  struct timespec *debug_clock_thread_end;
+#endif
 } threadqueue_queue;
 
 //Init a threadqueue
 int threadqueue_init(threadqueue_queue * threadqueue, int thread_count);
 
 //Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run threadqueue_job_unwait_job in order to have it run
-threadqueue_job * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg, int wait);
+threadqueue_job * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
 
 int threadqueue_job_unwait_job(threadqueue_queue * threadqueue, threadqueue_job *job);
 
