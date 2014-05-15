@@ -576,7 +576,7 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
 }
 
 
-static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pred_mode, int part_mode)
+static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth, int pred_mode, int part_mode)
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
   const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
@@ -591,7 +591,7 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
     cu->type = CU_INTRA;
     // It is assumed that cu->intra[].mode's are already set.
     cu->part_size = part_mode;
-    cu->tr_depth = depth;
+    cu->tr_depth = tr_depth;
     return;
   }
 
@@ -606,7 +606,7 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
       cu->intra[2].mode = pred_mode;
       cu->intra[3].mode = pred_mode;
       cu->part_size = part_mode;
-      cu->tr_depth = depth;
+      cu->tr_depth = tr_depth;
       cu->coded = 1;
     }
   }
@@ -889,7 +889,9 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
-      lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, cur_cu->part_size);
+      lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->tr_depth,
+                         cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode,
+                         cur_cu->part_size);
       intra_recon_lcu(encoder_state, x, y, depth, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
