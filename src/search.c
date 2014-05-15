@@ -459,8 +459,6 @@ static unsigned search_frac( const encoder_state * const encoder_state,
 
     cost = satd(tmp_pic,tmp_filtered);
 
-    cost = cost>>1;
-
     cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -500,8 +498,6 @@ static unsigned search_frac( const encoder_state * const encoder_state,
     }
 
     cost = satd(tmp_pic,tmp_filtered);
-
-    cost = cost>>1;
 
     cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
