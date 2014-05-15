@@ -36,6 +36,7 @@
 #include "filter.h"
 #include "rdo.h"
 #include "transform.h"
+#include "encoder.h"
 
 // Temporarily for debugging.
 #define SEARCH_MV_FULL_RADIUS 0
@@ -789,36 +790,14 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
     coefficient coeff_temp_v[16*16];
     int i;
     int blocks = (width == 64)?4:1;
-    int8_t luma_scan_mode = SCAN_DIAG;
-    int8_t chroma_scan_mode = SCAN_DIAG;
+    int8_t luma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
+    int8_t chroma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
 
     for(i = 0; i < blocks; i++) {
       // For 64x64 blocks we need to do transform split to 32x32
       int blk_y = i&2 ? 32:0 + y_local;
       int blk_x = i&1 ? 32:0 + x_local;
       int blockwidth = (width == 64)?32:width;
-
-      if (cur_cu->type == CU_INTRA) {
-        // Scan mode is diagonal, except for 4x4 and 8x8, where:
-        // - angular 6-14 = vertical
-        // - angular 22-30 = horizontal
-        int luma_mode = cur_cu->intra[i].mode;
-        int chroma_mode = cur_cu->intra[0].mode_chroma;
-
-        if (width <= 8) {
-          if (luma_mode >= 6 && luma_mode <= 14) {
-            luma_scan_mode = SCAN_VER;
-          } else if (luma_mode >= 22 && luma_mode <= 30) {
-            luma_scan_mode = SCAN_HOR;
-          }
-
-          if (chroma_mode >= 6 && chroma_mode <= 14) {
-            chroma_scan_mode = SCAN_VER;
-          } else if (chroma_mode >= 22 && chroma_mode <= 30) {
-            chroma_scan_mode = SCAN_HOR;
-          }
-        }
-      }
 
       // Calculate luma coeff bit count
       picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
