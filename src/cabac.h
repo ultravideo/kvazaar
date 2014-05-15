@@ -116,20 +116,20 @@ void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned int symbol, unsi
   #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
     cabac_encode_bin(data, value); \
-    printf("%s = %d prev_state=%d state=%d\n", \
-           name, value, prev_state, (data)->ctx->uc_state); }
+    printf("%s = %u, state = %u -> %u\n", \
+           name, (uint32_t)value, (uint32_t)prev_state, (data)->ctx->uc_state); }
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
     cabac_encode_bins_ep(data, value, bins); \
-    printf("%s = %d prev_state=%d state=%d\n", \
-           name, value, prev_state, (data)->ctx->uc_state); }
+    printf("%s = %u(%u bins), state = %u -> %u\n", \
+           name, (uint32_t)value, (uint32_t)bins, prev_state, (data)->ctx->uc_state); }
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
     cabac_encode_bin_ep(data, value); \
-    printf("%s = %d prev_state=%d state=%d\n", \
-           name, value, prev_state, (data)->ctx->uc_state); }
+    printf("%s = %u, state = %u -> %u\n", \
+           name, (uint32_t)value, (uint32_t)prev_state, (data)->ctx->uc_state); }
 #else
   #define CABAC_BIN(data, value, name) \
     cabac_encode_bin(data, value);
