@@ -3205,7 +3205,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
       uint32_t ctx_sig  = context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                       cg_pos_y, width);
       cabac->ctx = &base_coeff_group_ctx[ctx_sig];
-      CABAC_BIN(cabac, sig_coeff_group, "significant_coeff_group");
+      CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
     }
 
     if (sig_coeffgroup_flag[cg_blk_pos]) {
@@ -3222,7 +3222,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
           ctx_sig  = context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                              log2_block_size, type);
           cabac->ctx = &baseCtx[ctx_sig];
-          CABAC_BIN(cabac, sig, "significant_coeff_flag");
+          CABAC_BIN(cabac, sig, "sig_coeff_flag");
         }
 
         if (sig) {
@@ -3262,7 +3262,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
       for (idx = 0; idx < num_c1_flag; idx++) {
         uint32_t symbol = (abs_coeff[idx] > 1) ? 1 : 0;
         cabac->ctx = &base_ctx_mod[c1];
-        CABAC_BIN(cabac, symbol, "significant_coeff2_flag");
+        CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
 
         if (symbol) {
           c1 = 0;
@@ -3282,14 +3282,14 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
         if (first_c2_flag_idx != -1) {
           uint8_t symbol = (abs_coeff[first_c2_flag_idx] > 2) ? 1 : 0;
           cabac->ctx      = &base_ctx_mod[0];
-          CABAC_BIN(cabac,symbol,"first_c2_flag");
+          CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
         }
       }
 
       if (be_valid && sign_hidden) {
-        CABAC_BINS_EP(cabac, (coeff_signs >> 1), (num_non_zero - 1), "");
+        CABAC_BINS_EP(cabac, (coeff_signs >> 1), (num_non_zero - 1), "coeff_sign_flag");
       } else {
-        CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "");
+        CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "coeff_sign_flag");
       }
 
       if (c1 == 0 || num_non_zero > C1FLAG_NUMBER) {
@@ -3350,23 +3350,23 @@ void encode_last_significant_xy(encoder_state * const encoder_state,
   // Last X binarization
   for (last_x = 0; last_x < group_idx_x ; last_x++) {
     cabac->ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
-    CABAC_BIN(cabac,1,"LastSignificantX");
+    CABAC_BIN(cabac,1,"last_sig_coeff_x_prefix");
   }
 
   if (group_idx_x < g_group_idx[width - 1]) {
     cabac->ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
-    CABAC_BIN(cabac,0,"LastSignificantX");
+    CABAC_BIN(cabac,0,"last_sig_coeff_x_prefix");
   }
 
   // Last Y binarization
   for (last_y = 0; last_y < group_idx_y ; last_y++) {
     cabac->ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
-    CABAC_BIN(cabac,1,"LastSignificantY");
+    CABAC_BIN(cabac,1,"last_sig_coeff_y_prefix");
   }
 
   if (group_idx_y < g_group_idx[height - 1]) {
     cabac->ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
-    CABAC_BIN(cabac,0,"LastSignificantY");
+    CABAC_BIN(cabac,0,"last_sig_coeff_y_prefix");
   }
 
   // Last X
@@ -3374,7 +3374,7 @@ void encode_last_significant_xy(encoder_state * const encoder_state,
     lastpos_x -= g_min_in_group[group_idx_x];
 
     for (i = ((group_idx_x - 2) >> 1) - 1; i >= 0; i--) {
-      CABAC_BIN_EP(cabac,(lastpos_x>>i) & 1,"LastSignificantX");
+      CABAC_BIN_EP(cabac,(lastpos_x>>i) & 1,"last_sig_coeff_x_suffix");
     }
   }
 
@@ -3383,7 +3383,7 @@ void encode_last_significant_xy(encoder_state * const encoder_state,
     lastpos_y -= g_min_in_group[group_idx_y];
 
     for (i = ((group_idx_y - 2) >> 1) - 1; i >= 0; i--) {
-      CABAC_BIN_EP(cabac,(lastpos_y>>i) & 1,"LastSignificantY");
+      CABAC_BIN_EP(cabac,(lastpos_y>>i) & 1,"last_sig_coeff_y_suffix");
     }
   }
 

@@ -282,8 +282,8 @@ void cabac_write_coeff_remain(cabac_data * const cabac, const uint32_t symbol, c
   uint32_t length;
   if (code_number < (3 << r_param)) {
     length = code_number >> r_param;
-    cabac_encode_bins_ep(cabac, (1 << (length + 1)) - 2 , length + 1);
-    cabac_encode_bins_ep(cabac, (code_number % (1 << r_param)), r_param);
+    CABAC_BINS_EP(cabac, (1 << (length + 1)) - 2 , length + 1, "coeff_abs_level_remaining");
+    CABAC_BINS_EP(cabac, (code_number % (1 << r_param)), r_param, "coeff_abs_level_remaining");
   } else {
     length = r_param;
     code_number = code_number - (3 << r_param);
@@ -291,8 +291,8 @@ void cabac_write_coeff_remain(cabac_data * const cabac, const uint32_t symbol, c
       code_number -= 1 << length;
       ++length;
     }
-    cabac_encode_bins_ep(cabac, (1 << (3 + length + 1 - r_param)) - 2, 3 + length + 1 - r_param);
-    cabac_encode_bins_ep(cabac, code_number, length);
+    CABAC_BINS_EP(cabac, (1 << (3 + length + 1 - r_param)) - 2, 3 + length + 1 - r_param, "coeff_abs_level_remaining");
+    CABAC_BINS_EP(cabac, code_number, length, "coeff_abs_level_remaining");
   }
 }
 
