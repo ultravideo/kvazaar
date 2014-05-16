@@ -392,6 +392,7 @@ void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y
   const picture * const cur_pic = encoder_state->tile->cur_pic;
   cu_info *cur_cu = &cur_pic->cu_array[x + y*(cur_pic->width_in_lcu << MAX_DEPTH)];
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
+  uint8_t tr_split = (cur_cu->tr_depth > depth) ? 1 : 0;
   uint8_t border_x = (cur_pic->width  < x*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;
   uint8_t border_y = (cur_pic->height < y*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;
   uint8_t border_split_x = (cur_pic->width  < ((x + 1) * (LCU_WIDTH >> MAX_DEPTH)) + (LCU_WIDTH >> (depth + 1))) ? 0 : 1;
@@ -400,7 +401,7 @@ void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y
   uint8_t border = border_x | border_y; // are we in any border CU?
 
   // split 64x64, on split flag and on border
-  if (depth == 0 || split_flag || border) {
+  if (depth == 0 || split_flag || border || tr_split) {
     // Split the four sub-blocks of this block recursively.
     uint8_t change;
     assert(depth >= 0 && depth < MAX_DEPTH);  // for clang-analyzer
