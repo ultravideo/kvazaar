@@ -1338,13 +1338,14 @@ static void worker_encoder_state_encode_children(void * opaque) {
       encoder_state_write_bitstream_leaf(sub_state);
       PERFORMANCE_MEASURE_END(sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->wfrow->lcu_offset_y);
     } else {
+      threadqueue_job *job;
 #ifdef _DEBUG
       char job_description[256];
       sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->wfrow->lcu_offset_y);
 #else
       char* job_description = NULL;
 #endif
-      threadqueue_job *job = threadqueue_submit(sub_state->encoder_control->threadqueue, worker_encoder_state_write_bitstream_leaf, sub_state, 1, job_description);
+      job = threadqueue_submit(sub_state->encoder_control->threadqueue, worker_encoder_state_write_bitstream_leaf, sub_state, 1, job_description);
       threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->cur_pic->width_in_lcu + sub_state->lcu_order_count - 1]);
       threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
       return;
