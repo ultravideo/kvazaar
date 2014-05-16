@@ -40,10 +40,18 @@
 //TODO: we assume !GCC => Windows... this may be bad
 #include <Windows.h>
 
+#ifdef _DEBUG
+#define CLOCK_T struct _FILETIME
+#define GET_TIME(clock_t) GetSystemTimeAsFileTime(clock_t)
+// _FILETIME has 32bit low and high part of 64bit 100ns resolution timestamp (since 12:00 AM January 1, 1601)
+#define CLOCK_T_AS_DOUBLE(ts) ((double)(((uint64_t)(ts).dwHighDateTime)<<32 | (uint64_t)(ts).dwLowDateTime) / (double)10000000L)
+#define CLOCK_T_DIFF(start, stop) ((double)((((uint64_t)(stop).dwHighDateTime)<<32 | (uint64_t)(stop).dwLowDateTime) - \
+                                  (((uint64_t)(start).dwHighDateTime)<<32 | (uint64_t)(start).dwLowDateTime)) / (double)10000000L)
+#endif
+
 #define ATOMIC_INC(ptr)                     InterlockedIncrement((volatile LONG*)ptr)
 #define ATOMIC_DEC(ptr)                     InterlockedDecrement((volatile LONG*)ptr)
 #define SLEEP()                             Sleep(0)
-
 
 #endif //__GNUC__
 
