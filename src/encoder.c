@@ -2939,7 +2939,7 @@ coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth)
 
 
 static void encode_transform_unit(encoder_state * const encoder_state,
-                                  int x_pu, int y_pu, int depth, int tr_depth)
+                                  int x_pu, int y_pu, int depth)
 {
   const picture * const cur_pic = encoder_state->tile->cur_pic;
   uint8_t width = LCU_WIDTH >> depth;
@@ -2954,9 +2954,7 @@ static void encode_transform_unit(encoder_state * const encoder_state,
   coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
   int32_t coeff_stride = cur_pic->width;
 
-  uint32_t ctx_idx;
-  int8_t scan_idx = SCAN_DIAG;
-  uint32_t dir_mode;
+  int8_t scan_idx = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
 
   int cbf_y = cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
 
@@ -2972,43 +2970,9 @@ static void encode_transform_unit(encoder_state * const encoder_state,
     }
   }
 
-  switch (width) {
-    case  2: ctx_idx = 6; break;
-    case  4: ctx_idx = 5; break;
-    case  8: ctx_idx = 4; break;
-    case 16: ctx_idx = 3; break;
-    case 32: ctx_idx = 2; break;
-    case 64: ctx_idx = 1; break;
-    default: ctx_idx = 0; break;
-  }
-
-  ctx_idx -= tr_depth;
-
   // CoeffNxN
   // Residual Coding
   if (cbf_y) {
-    scan_idx = SCAN_DIAG;
-    if (cur_cu->type == CU_INTRA) {
-      // Luma (Intra) scanmode
-      if (depth <= MAX_DEPTH) {
-        dir_mode = cur_cu->intra[0].mode;
-      } else {
-        int pu_index = x_pu % 2 + 2 * (y_pu % 2);
-        dir_mode = cur_cu->intra[pu_index].mode;
-      }
-
-      // Scan mode is diagonal, except for 4x4 and 8x8, where:
-      // - angular 6-14 = vertical
-      // - angular 22-30 = horizontal
-      if (width <= 8) {
-        if (dir_mode >= 6 && dir_mode <= 14) {
-          scan_idx = SCAN_VER;
-        } else if (dir_mode >= 22 && dir_mode <= 30) {
-          scan_idx = SCAN_HOR;
-        }
-      }
-    }
-
     encode_coeff_nxn(encoder_state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
   }
 
@@ -3042,22 +3006,7 @@ static void encode_transform_unit(encoder_state * const encoder_state,
       orig_pos_v += coeff_stride>>1;
     }
 
-    if(cur_cu->type == CU_INTER) {
-      scan_idx = SCAN_DIAG;
-    } else {
-      // Chroma scanmode
-      ctx_idx++;
-      dir_mode = cur_cu->intra[0].mode_chroma;
-
-      scan_idx = SCAN_DIAG;
-
-      if (ctx_idx > 4 && ctx_idx < 7) { // if multiple scans supported for transform size
-        // mode is diagonal, except for 4x4 and 8x8, where:
-        // - angular 6-14 = vertical
-        // - angular 22-30 = horizontal
-        scan_idx = abs((int32_t) dir_mode - 26) < 5 ? 1 : (abs((int32_t)dir_mode - 10) < 5 ? 2 : 0);
-      }
-    }
+    scan_idx = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
 
     if (cbf_is_set(cur_cu->cbf.u, depth)) {
       encode_coeff_nxn(encoder_state, coeff_u, width_c, 2, scan_idx, 0);
@@ -3150,7 +3099,7 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
-    encode_transform_unit(encoder_state, x_pu, y_pu, depth, tr_depth);
+    encode_transform_unit(encoder_state, x_pu, y_pu, depth);
   }
 }
 
