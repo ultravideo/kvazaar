@@ -132,6 +132,8 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   
   PTHREAD_UNLOCK(&threadqueue->lock);
   
+  free(threadqueue_worker_spec_opaque);
+  
   pthread_exit(NULL);
   
   return NULL;
@@ -214,6 +216,7 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
       fprintf(threadqueue->debug_log, "%p->%p\n", threadqueue->queue[i], threadqueue->queue[i]->rdepends[j]);
     }
     
+    FREE_POINTER(threadqueue->queue[i]->rdepends);
     FREE_POINTER(threadqueue->queue[i]->debug_description);
 #endif
     FREE_POINTER(threadqueue->queue[i]);
@@ -276,6 +279,8 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
   }
   
 #ifdef _DEBUG
+  FREE_POINTER(threadqueue->debug_clock_thread_start);
+  FREE_POINTER(threadqueue->debug_clock_thread_end);
   fclose(threadqueue->debug_log);
 #endif
   

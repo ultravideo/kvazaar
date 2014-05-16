@@ -1294,7 +1294,7 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
     if (encoder->sao_enable) {
       PERFORMANCE_MEASURE_START();
       sao_reconstruct_frame(encoder_state);
-      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id);
+      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->lcu_order[0].position.y + encoder_state->tile->lcu_offset_y, encoder_state->lcu_order[encoder_state->lcu_order_count-1].position.y + encoder_state->tile->lcu_offset_y);
     }
   } else {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
@@ -1336,7 +1336,7 @@ static void worker_encoder_state_encode_children(void * opaque) {
     if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
       PERFORMANCE_MEASURE_START();
       encoder_state_write_bitstream_leaf(sub_state);
-      PERFORMANCE_MEASURE_END(sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->wfrow->lcu_offset_y);
+      PERFORMANCE_MEASURE_END(sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position.y + sub_state->tile->lcu_offset_y, sub_state->lcu_order[sub_state->lcu_order_count-1].position.y + sub_state->tile->lcu_offset_y);
     } else {
       threadqueue_job *job;
 #ifdef _DEBUG
@@ -1387,7 +1387,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
           char job_description[256];
           switch (main_state->children[i].type) {
             case ENCODER_STATE_TYPE_TILE: 
-              sprintf(job_description, "frame=%d,tile=%d,position_x=%d,position_y=%d", main_state->children[i].global->frame, main_state->children[i].tile->id, main_state->children[i].tile->lcu_offset_x, main_state->children[i].tile->lcu_offset_y);
+              sprintf(job_description, "frame=%d,tile=%d,row=%d-%d,position_x=%d,position_y=%d", main_state->children[i].global->frame, main_state->children[i].tile->id, main_state->children[i].lcu_order[0].position.y + main_state->children[i].tile->lcu_offset_y, main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].position.y + main_state->children[i].tile->lcu_offset_y, main_state->children[i].tile->lcu_offset_x, main_state->children[i].tile->lcu_offset_y);
               break;
             case ENCODER_STATE_TYPE_SLICE:
               sprintf(job_description, "frame=%d,slice=%d,start_in_ts=%d", main_state->children[i].global->frame, main_state->children[i].slice->id, main_state->children[i].slice->start_in_ts);
@@ -1412,7 +1412,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
       if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
         PERFORMANCE_MEASURE_START();
         sao_reconstruct_frame(main_state);
-        PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d", main_state->global->frame, main_state->tile->id, main_state->slice->id);
+        PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d", main_state->global->frame, main_state->tile->id, main_state->slice->id,0,main_state->encoder_control->in.height_in_lcu - 1);
       }
       
     } else {

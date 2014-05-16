@@ -34,12 +34,42 @@ class LogJob:
   def _get_properties(self):
     return dict([x.split('=',1) for x in self._description.split(',')])
 
+  def _position_from_str(self, s):
+    if re.match('^[0-9]+$', s):
+      return int(s)
+    else:
+      v = [float(x) for x in s.split('-', 1)]
+      return (v[0] + v[1]) / 2
+
+  def _height_from_str(self, s):
+    if self._is_thread_job:
+      diff = 0.2
+    else:
+      diff = 0.4
+    if re.match('^[0-9]+$', s):
+      return 1.0 - diff
+    else:
+      v = [float(x) for x in s.split('-', 1)]
+      return (max(v) - min(v) + 1) - diff
+
+  def height(self):
+    desc = self._get_properties()
+    if 'row' in desc:
+      return self._height_from_str(desc['row'])
+    elif 'position_y' in desc:
+      return self._height_from_str(desc['position_y'])
+    else:
+      if self._is_thread_job:
+        return 0.8
+      else:
+        return 0.6
+
   def position_y(self):
     desc = self._get_properties()
-    if 'position_y' in desc:
-      return int(desc['position_y'])
-    elif 'row' in desc:
-      return int(desc['row'])
+    if 'row' in desc:
+      return self._position_from_str(desc['row'])
+    elif 'position_y' in desc:
+      return self._position_from_str(desc['position_y'])
     else:
       return -1
 
@@ -206,15 +236,19 @@ class LogParser:
     for o in self._objects:
       if isinstance(o, LogJob) and o._is_thread_job:
         y = o.position_y()
-        ax.barh(-y, o._stop - o._start, left=o._start, height=0.8, align='center', color=self.get_color(o._worker_id))
-        yticks[-y]=y
+        height = o.height()
+        ax.barh(-y, o._stop - o._start, left=o._start, height=height, align='center', color=self.get_color(o._worker_id))
+        if y % 1 <= 0.0001:
+          yticks[int(-y)]= int(y)
 
     #then jobs
     for o in self._objects:
       if isinstance(o, LogJob) and not o._is_thread_job:
         y = o.position_y()
-        ax.barh(-y, o._stop - o._start, left=o._start, height=0.8, align='center', color=self.get_color(o._worker_id, False))
-        yticks[-y]=y
+        height = o.height()
+        ax.barh(-y, o._stop - o._start, left=o._start, height=height, align='center', color=self.get_color(o._worker_id, False))
+        if y % 1 <= 0.0001:
+          yticks[int(-y)]= int(y)
 
     for o in self._objects:
       if isinstance(o, LogJob):
@@ -222,9 +256,9 @@ class LogParser:
           ax.plot([o2._stop, o._start], [-int(o2.position_y()), -int(o.position_y())] , linewidth=1, color='k')
 
     for y in yticks.keys():
-      ax.axhline(y+0.5)
+      ax.axhline(y+0.5, color='k')
       if y - 1 not in yticks.keys():
-        ax.axhline(y-0.5)
+        ax.axhline(y-0.5, color='k')
       if y == 1:
         yticks[y] = "None"
 
