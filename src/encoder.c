@@ -51,6 +51,7 @@ static void encode_sao(encoder_state *encoder,
                        sao_info *sao_luma, sao_info *sao_chroma);
 
 static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state);
+static void worker_encoder_state_write_bitstream_leaf(void * opaque);
 
 /*!
   \brief Initializes lambda-value for current QP
@@ -1331,8 +1332,23 @@ static void encoder_state_encode(encoder_state * const main_state);
 static void worker_encoder_state_encode_children(void * opaque) {
   encoder_state *sub_state = opaque;
   encoder_state_encode(sub_state);
-  if (sub_state->is_leaf && sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-    encoder_state_write_bitstream_leaf(sub_state);
+  if (sub_state->is_leaf) {
+    if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+      PERFORMANCE_MEASURE_START();
+      encoder_state_write_bitstream_leaf(sub_state);
+      PERFORMANCE_MEASURE_END(sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->wfrow->lcu_offset_y);
+    } else {
+#ifdef _DEBUG
+      char job_description[256];
+      sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->wfrow->lcu_offset_y);
+#else
+      char* job_description = NULL;
+#endif
+      threadqueue_job *job = threadqueue_submit(sub_state->encoder_control->threadqueue, worker_encoder_state_write_bitstream_leaf, sub_state, 1, job_description);
+      threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->cur_pic->width_in_lcu + sub_state->lcu_order_count - 1]);
+      threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
+      return;
+    }
   }
 }
 
@@ -1529,6 +1545,10 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   main_state->tile->cur_pic->poc = main_state->global->poc;
 }
 
+static void worker_encoder_state_write_bitstream_leaf(void * opaque) {
+  encoder_state_write_bitstream_leaf((encoder_state *) opaque);
+}
+
 static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const picture* const cur_pic = encoder_state->tile->cur_pic;
@@ -1630,12 +1650,6 @@ static void encoder_state_write_bitstream(encoder_state * const main_state) {
         fprintf(stderr, "Unsupported node type %c!\n", main_state->type);
         assert(0);
     }
-  } else if (main_state->is_leaf && main_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-    //Wavefront should be written now
-    PERFORMANCE_MEASURE_START();
-    encoder_state_write_bitstream_leaf(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", main_state->global->frame, main_state->tile->id, main_state->slice->id, main_state->wfrow->lcu_offset_y);
-    
   }
 }
 
