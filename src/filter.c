@@ -401,10 +401,10 @@ void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y
   uint8_t border = border_x | border_y; // are we in any border CU?
 
   // split 64x64, on split flag and on border
-  if (depth == 0 || split_flag || border || tr_split) {
+  if (depth < MAX_DEPTH && (depth == 0 || split_flag || border || tr_split)) {
     // Split the four sub-blocks of this block recursively.
     uint8_t change;
-    assert(depth >= 0 && depth < MAX_DEPTH);  // for clang-analyzer
+    assert(depth >= 0);  // for clang-analyzer
     change = 1 << (MAX_DEPTH - 1 - depth);
 
     filter_deblock_cu(encoder_state, x, y, depth + 1, edge);
