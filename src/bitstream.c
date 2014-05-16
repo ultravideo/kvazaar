@@ -30,12 +30,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <assert.h>
-//for hton
-#ifdef _WIN32
-#include <Winsock2.h>
-#else
-#include <arpa/inet.h>
-#endif
 
 const uint32_t bit_set_mask[] =
 {
