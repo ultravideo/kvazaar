@@ -360,7 +360,10 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
   threadqueue_job *job;
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
+    //FIXME: This should be improved in order to handle dependencies
+    PERFORMANCE_MEASURE_START();
     fptr(arg);
+    PERFORMANCE_MEASURE_END(threadqueue, "%s", debug_description);
     return NULL;
   }
   
@@ -438,6 +441,8 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
 }
 
 int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
+  //If we are not using threads, job are NULL pointers, so we can skip that
+  if (!job && !depends_on) return 1;
   //Lock first the job, and then the dependency
   PTHREAD_LOCK(&job->lock);
   PTHREAD_LOCK(&depends_on->lock);
@@ -465,6 +470,8 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
 }
 
 int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueue_job *job) {
+  //NULL job =>  no threads, nothing to do
+  if (!job) return 1;
   PTHREAD_LOCK(&job->lock);
   job->ndepends--;
   PTHREAD_UNLOCK(&job->lock);
