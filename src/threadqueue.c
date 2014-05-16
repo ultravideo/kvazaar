@@ -2,12 +2,9 @@
 #include <assert.h>
 #include <pthread.h>
 #include <stdlib.h>
+
 #ifdef _DEBUG
 #include <string.h>
-
-#define TIMESPEC_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / (double)1000000000L)
-#define TIMESPEC_DIFF(start, stop) ((double)((stop).tv_sec - (start).tv_sec) + (double)((stop).tv_nsec - (start).tv_nsec) / (double)1000000000L)
-
 #endif //_DEBUG
 
 #include "global.h"
@@ -32,7 +29,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   threadqueue_queue * const threadqueue = threadqueue_worker_spec->threadqueue;
   
 #ifdef _DEBUG
-  clock_gettime(CLOCK_MONOTONIC, &threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]);
+  GET_TIME(&threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]);
 #endif //_DEBUG
 
   for(;;) {
@@ -83,14 +80,14 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       
 #ifdef _DEBUG
       job->debug_worker_id = threadqueue_worker_spec->worker_id;
-      clock_gettime(CLOCK_MONOTONIC, &job->debug_clock_start);
+      GET_TIME(&job->debug_clock_start);
 #endif //_DEBUG
       
       job->fptr(job->arg);
       
 #ifdef _DEBUG
       job->debug_worker_id = threadqueue_worker_spec->worker_id;
-      clock_gettime(CLOCK_MONOTONIC, &job->debug_clock_stop);
+      GET_TIME(&job->debug_clock_stop);
 #endif //_DEBUG
       
       //Re-lock the job to update its status and treat its dependencies
@@ -128,9 +125,9 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   --threadqueue->threads_running;
   
 #ifdef _DEBUG
-  clock_gettime(CLOCK_MONOTONIC, &threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]);
+  GET_TIME(&threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]);
   
-  fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\tthread\n", threadqueue_worker_spec->worker_id, TIMESPEC_AS_DOUBLE(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]), TIMESPEC_DIFF(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id], threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]));
+  fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\tthread\n", threadqueue_worker_spec->worker_id, CLOCK_T_AS_DOUBLE(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]), CLOCK_T_DIFF(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id], threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]));
 #endif //_DEBUG
   
   PTHREAD_UNLOCK(&threadqueue->lock);
@@ -168,9 +165,9 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
     return 0;
   }
 #ifdef _DEBUG
-  threadqueue->debug_clock_thread_start = MALLOC(struct timespec, thread_count);
+  threadqueue->debug_clock_thread_start = MALLOC(CLOCK_T, thread_count);
   assert(threadqueue->debug_clock_thread_start);
-  threadqueue->debug_clock_thread_end = MALLOC(struct timespec, thread_count);
+  threadqueue->debug_clock_thread_end = MALLOC(CLOCK_T, thread_count);
   assert(threadqueue->debug_clock_thread_end);
   threadqueue->debug_log = fopen("threadqueue.log", "w");
 #endif //_DEBUG
@@ -210,8 +207,8 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
   for (i=0; i < threadqueue->queue_count; ++i) {
 #ifdef _DEBUG
     int j;
-    clock_gettime(CLOCK_MONOTONIC, &threadqueue->queue[i]->debug_clock_dequeue);
-    fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, TIMESPEC_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), TIMESPEC_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), TIMESPEC_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), TIMESPEC_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
+    GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
+    fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
     
     for (j = 0; j < threadqueue->queue[i]->rdepends_count; ++j) {
       fprintf(threadqueue->debug_log, "%p->%p\n", threadqueue->queue[i], threadqueue->queue[i]->rdepends[j]);
@@ -224,10 +221,10 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
   threadqueue->queue_count = 0;
 #ifdef _DEBUG
   {
-    struct timespec time;
-    clock_gettime(CLOCK_MONOTONIC, &time);
+    CLOCK_T time;
+    GET_TIME(&time);
    
-    fprintf(threadqueue->debug_log, "\t\t-\t-\t%lf\t-\tFLUSH\n", TIMESPEC_AS_DOUBLE(time));
+    fprintf(threadqueue->debug_log, "\t\t-\t-\t%lf\t-\tFLUSH\n", CLOCK_T_AS_DOUBLE(time));
   }
 #endif
 }
@@ -390,7 +387,7 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
     
     job->debug_description = desc;
   }
-  clock_gettime(CLOCK_MONOTONIC, &job->debug_clock_enqueue);
+  GET_TIME(&job->debug_clock_enqueue);
 #endif //_DEBUG
   
   if (!job) {
@@ -489,7 +486,7 @@ int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueu
 }
 
 #ifdef _DEBUG
-int threadqueue_log(threadqueue_queue * threadqueue, const struct timespec *start, const struct timespec *stop, const char* debug_description) {
+int threadqueue_log(threadqueue_queue * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description) {
   int i, thread_id = -1;
   
   assert(start);
@@ -507,15 +504,15 @@ int threadqueue_log(threadqueue_queue * threadqueue, const struct timespec *star
   
   if (thread_id >= 0) {
     if (stop) {
-      fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\t%s\n", thread_id, TIMESPEC_AS_DOUBLE(*start), TIMESPEC_DIFF(*start, *stop), debug_description);
+      fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\t%s\n", thread_id, CLOCK_T_AS_DOUBLE(*start), CLOCK_T_DIFF(*start, *stop), debug_description);
     } else {
-      fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t-\t-\t%s\n", thread_id, TIMESPEC_AS_DOUBLE(*start), debug_description);
+      fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t-\t-\t%s\n", thread_id, CLOCK_T_AS_DOUBLE(*start), debug_description);
     }
   } else {
     if (stop) {
-      fprintf(threadqueue->debug_log, "\t\t-\t%lf\t+%lf\t-\t%s\n", TIMESPEC_AS_DOUBLE(*start), TIMESPEC_DIFF(*start, *stop), debug_description);
+      fprintf(threadqueue->debug_log, "\t\t-\t%lf\t+%lf\t-\t%s\n", CLOCK_T_AS_DOUBLE(*start), CLOCK_T_DIFF(*start, *stop), debug_description);
     } else {
-      fprintf(threadqueue->debug_log, "\t\t-\t%lf\t-\t-\t%s\n", TIMESPEC_AS_DOUBLE(*start), debug_description);
+      fprintf(threadqueue->debug_log, "\t\t-\t%lf\t-\t-\t%s\n", CLOCK_T_AS_DOUBLE(*start), debug_description);
     }
   }
   PTHREAD_UNLOCK(&threadqueue->lock);

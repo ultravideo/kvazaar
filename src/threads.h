@@ -24,6 +24,14 @@
 #ifdef __GNUC__
 #include <unistd.h>
 
+#ifdef _DEBUG
+#include <time.h>
+#define CLOCK_T struct timespec
+#define GET_TIME(clock_t) clock_gettime(CLOCK_MONOTONIC, (clock_t))
+#define CLOCK_T_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / (double)1000000000L)
+#define CLOCK_T_DIFF(start, stop) ((double)((stop).tv_sec - (start).tv_sec) + (double)((stop).tv_nsec - (start).tv_nsec) / (double)1000000000L)
+#endif
+
 #define ATOMIC_INC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, 1)
 #define ATOMIC_DEC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, -1)
 #define SLEEP()                             usleep(0)

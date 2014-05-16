@@ -20,9 +20,7 @@
  ****************************************************************************/
 
 #include <pthread.h>
-#ifdef _DEBUG
-#include <time.h>
-#endif
+#include "threads.h"
 
 typedef enum {
   THREADQUEUE_JOB_STATE_QUEUED = 0,
@@ -35,7 +33,7 @@ typedef struct threadqueue_job {
   
   threadqueue_job_state state;
   
-  unsigned int ndepends; //Number of job on which this job depends
+  unsigned int ndepends; //Number of active dependencies that this job wait for
   
   struct threadqueue_job **rdepends; //array of pointer to jobs that depend on this one. They have to exist when the thread finishes, because they cannot be run before.
   unsigned int rdepends_count; //number of rdepends
@@ -50,10 +48,10 @@ typedef struct threadqueue_job {
   
   int debug_worker_id;
   
-  struct timespec debug_clock_enqueue;
-  struct timespec debug_clock_start;
-  struct timespec debug_clock_stop;
-  struct timespec debug_clock_dequeue;
+  CLOCK_T debug_clock_enqueue;
+  CLOCK_T debug_clock_start;
+  CLOCK_T debug_clock_stop;
+  CLOCK_T debug_clock_dequeue;
 #endif
 } threadqueue_job;
 
@@ -85,8 +83,8 @@ typedef struct {
 
   FILE *debug_log;
   
-  struct timespec *debug_clock_thread_start;
-  struct timespec *debug_clock_thread_end;
+  CLOCK_T *debug_clock_thread_start;
+  CLOCK_T *debug_clock_thread_end;
 #endif
 } threadqueue_queue;
 
@@ -108,11 +106,11 @@ int threadqueue_flush(threadqueue_queue * threadqueue);
 int threadqueue_finalize(threadqueue_queue * threadqueue);
 
 #ifdef _DEBUG
-int threadqueue_log(threadqueue_queue * threadqueue, const struct timespec *start, const struct timespec *stop, const char* debug_description);
+int threadqueue_log(threadqueue_queue * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
 
 //This macro HAS TO BE at the beginning of a block
-#define PERFORMANCE_MEASURE_START() struct timespec start, stop; clock_gettime(CLOCK_MONOTONIC, &start)
-#define PERFORMANCE_MEASURE_END(threadqueue, str, ...) do {clock_gettime(CLOCK_MONOTONIC, &stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description); }} while (0)
+#define PERFORMANCE_MEASURE_START() CLOCK_T start, stop; GET_TIME(&start)
+#define PERFORMANCE_MEASURE_END(threadqueue, str, ...) do {GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description); }} while (0)
 #else
 #define PERFORMANCE_MEASURE_START() do {} while (0)
 #define PERFORMANCE_MEASURE_END(threadqueue, str, ...) do {} while (0)
