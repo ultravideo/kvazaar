@@ -248,6 +248,10 @@ void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int re
     for (i = 0; i < width * width; i++) {
       dst[i] = val;
     }
+    // Do extra post filtering for edge pixels of luma DC mode.
+    if (!is_chroma && width < 32) {
+      intra_dc_pred_filtering(ref_pixels, recstride, dst, width, width, width);
+    }
   } else {
     int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
@@ -737,12 +741,6 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
                                  pic_width, pic_height, lcu);
     intra_recon(encoder, rec_shift, width * 2 + 8,
                 width, recbase_y, rec_stride, cur_cu->intra[pu_index].mode, 0);
-
-    // Filter DC-prediction
-    if (cur_cu->intra[pu_index].mode == 1 && width < 32) {
-      intra_dc_pred_filtering(rec_shift, width * 2 + 8, recbase_y,
-                              rec_stride, width, width);
-    }
 
     quantize_lcu_luma_residual(encoder_state, x, y, depth, lcu);
     quantize_lcu_chroma_residual(encoder_state, x, y, depth, lcu);
