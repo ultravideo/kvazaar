@@ -673,9 +673,9 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
  * coding (bitcost * lambda) and cost for coding coefficients (estimated
  * here as (coefficient_sum * 1.5) * lambda)
  */
-static int lcu_get_final_cost(const encoder_state * const encoder_state,
-                              const int x_px, const int y_px,
-                              const int depth, lcu_t *lcu)
+static int lcu_get_final_cost_luma(const encoder_state * const encoder_state,
+                                   const int x_px, const int y_px,
+                                   const int depth, lcu_t *lcu)
 {
   cu_info *cur_cu;
   int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
@@ -694,6 +694,56 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
       cost += diff*diff;
     }
   }
+
+  if(rdo == 1) {
+    // sum of coeffs
+    for (y = y_local; y < y_local+width; ++y) {
+      for (x = x_local; x < x_local+width; ++x) {
+        coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
+      }
+    }
+    // Coefficient costs
+    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+
+  // Calculate actual bit costs for coding the coeffs
+  // RDO
+  } else if (rdo == 2) {
+    coefficient coeff_temp[32*32];
+    int i;
+    int blocks = (width == 64)?4:1;
+    int8_t luma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
+
+    for(i = 0; i < blocks; i++) {
+      // For 64x64 blocks we need to do transform split to 32x32
+      int blk_y = i&2 ? 32:0 + y_local;
+      int blk_x = i&1 ? 32:0 + x_local;
+      int blockwidth = (width == 64)?32:width;
+
+      // Calculate luma coeff bit count
+      picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
+      coeff_cost += get_coeff_cost(encoder_state, coeff_temp, blockwidth, 0, luma_scan_mode);
+    }
+    // Multiply bit count with lambda to get RD-cost
+    cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+  }
+
+  return cost;
+}
+
+static int lcu_get_final_cost_chroma(const encoder_state * const encoder_state,
+                                     const int x_px, const int y_px,
+                                     const int depth, lcu_t *lcu)
+{
+  cu_info *cur_cu;
+  int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
+  int cost = 0;
+  int coeff_cost = 0;
+  const int rdo = encoder_state->encoder_control->rdo;
+
+  int width = LCU_WIDTH>>depth;
+  int x,y;
+  cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+
   // Chroma SSD
   for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
     for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
@@ -705,12 +755,6 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
   }
 
   if(rdo == 1) {
-    // sum of coeffs
-    for (y = y_local; y < y_local+width; ++y) {
-      for (x = x_local; x < x_local+width; ++x) {
-        coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
-      }
-    }
     // Chroma sum of coeffs
     for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
       for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
@@ -724,12 +768,10 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
   // Calculate actual bit costs for coding the coeffs
   // RDO
   } else if (rdo == 2) {
-    coefficient coeff_temp[32*32];
     coefficient coeff_temp_u[16*16];
     coefficient coeff_temp_v[16*16];
     int i;
     int blocks = (width == 64)?4:1;
-    int8_t luma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
     int8_t chroma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
 
     for(i = 0; i < blocks; i++) {
@@ -737,10 +779,6 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
       int blk_y = i&2 ? 32:0 + y_local;
       int blk_x = i&1 ? 32:0 + x_local;
       int blockwidth = (width == 64)?32:width;
-
-      // Calculate luma coeff bit count
-      picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
-      coeff_cost += get_coeff_cost(encoder_state, coeff_temp, blockwidth, 0, luma_scan_mode);
 
       blk_y >>= 1;
       blk_x >>= 1;
@@ -762,11 +800,9 @@ static int lcu_get_final_cost(const encoder_state * const encoder_state,
     cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
   }
 
-  // Bitcost
-  cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].bitcost)*(int32_t)(encoder_state->global->cur_lambda_cost+0.5);
-
   return cost;
 }
+
 
 /**
  * \brief Function to test best intra prediction mode
@@ -1039,7 +1075,11 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = lcu_get_final_cost(encoder_state, x, y, depth, &work_tree[depth]);
+    cost = lcu_get_final_cost_luma(encoder_state, x, y, depth, &work_tree[depth]);
+    cost += lcu_get_final_cost_chroma(encoder_state, x, y, depth, &work_tree[depth]);
+    
+    // Bitcost
+    cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
   }
 
   // Recursively split all the way to max search depth.
