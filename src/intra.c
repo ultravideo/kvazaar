@@ -663,22 +663,21 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
   }
 }
 
-void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
+void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH >> depth;
-  const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
   const int pu_index = PU_INDEX(x >> 2, y >> 2);
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu(encoder_state, x,          y,          depth+1, lcu);
-    intra_recon_lcu(encoder_state, x + offset, y,          depth+1, lcu);
-    intra_recon_lcu(encoder_state, x,          y + offset, depth+1, lcu);
-    intra_recon_lcu(encoder_state, x + offset, y + offset, depth+1, lcu);
+    intra_recon_lcu_luma(encoder_state, x,          y,          depth+1, lcu);
+    intra_recon_lcu_luma(encoder_state, x + offset, y,          depth+1, lcu);
+    intra_recon_lcu_luma(encoder_state, x,          y + offset, depth+1, lcu);
+    intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, lcu);
 
     if (depth < MAX_DEPTH) {
       cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
@@ -686,12 +685,6 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
       cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
         cbf_set(&cur_cu->cbf.y, depth);
-      }
-      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
-        cbf_set(&cur_cu->cbf.u, depth);
-      }
-      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
-        cbf_set(&cur_cu->cbf.v, depth);
       }
     }
 
@@ -703,11 +696,62 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
 
     // Pointers to reconstruction arrays
     pixel *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+
+    pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    pixel *rec_shift  = &rec[width * 2 + 8 + 1];
+
+    int32_t rec_stride = LCU_WIDTH;
+
+    intra_build_reference_border(encoder, x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
+                                 pic_width, pic_height, lcu);
+    intra_recon(encoder, rec_shift, width * 2 + 8,
+                width, recbase_y, rec_stride, cur_cu->intra[pu_index].mode, 0);
+
+    quantize_lcu_luma_residual(encoder_state, x, y, depth, lcu);
+  }
+}
+
+void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
+{
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
+  const int8_t width = LCU_WIDTH >> depth;
+  const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
+  const int pu_index = PU_INDEX(x >> 2, y >> 2);
+
+  if (depth == 0 || cur_cu->tr_depth > depth) {
+    int offset = width / 2;
+
+    intra_recon_lcu_chroma(encoder_state, x,          y,          depth+1, lcu);
+    intra_recon_lcu_chroma(encoder_state, x + offset, y,          depth+1, lcu);
+    intra_recon_lcu_chroma(encoder_state, x,          y + offset, depth+1, lcu);
+    intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, lcu);
+
+    if (depth < MAX_DEPTH) {
+      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
+      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
+        cbf_set(&cur_cu->cbf.u, depth);
+      }
+      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
+        cbf_set(&cur_cu->cbf.v, depth);
+      }
+    }
+
+    return;
+  }
+
+  {
+    const uint32_t pic_width = encoder_state->tile->cur_pic->width;
+    const uint32_t pic_height = encoder_state->tile->cur_pic->height;
+
+    // Pointers to reconstruction arrays
     pixel *recbase_u = &lcu->rec.u[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
     pixel *recbase_v = &lcu->rec.v[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
 
     pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
-    pixel *rec_shift  = &rec[width * 2 + 8 + 1];
 
     int32_t rec_stride = LCU_WIDTH;
 
@@ -737,12 +781,6 @@ void intra_recon_lcu(encoder_state * const encoder_state, int x, int y, int dept
                   2);
     }
 
-    intra_build_reference_border(encoder, x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
-                                 pic_width, pic_height, lcu);
-    intra_recon(encoder, rec_shift, width * 2 + 8,
-                width, recbase_y, rec_stride, cur_cu->intra[pu_index].mode, 0);
-
-    quantize_lcu_luma_residual(encoder_state, x, y, depth, lcu);
     quantize_lcu_chroma_residual(encoder_state, x, y, depth, lcu);
   }
 }
