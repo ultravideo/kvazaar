@@ -39,9 +39,7 @@ void intra_build_reference_border(const encoder_control *encoder, int32_t x_luma
 void intra_filter(pixel* ref, int32_t stride, int32_t width, int8_t mode);
 
 /* Predictions */
-int16_t intra_prediction(encoder_state *encoder_state, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
-                         uint8_t width, uint32_t *sad_out,
-                         int8_t *intra_preds, uint32_t *bitcost_out);
+void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma);
 
 pixel intra_get_dc_pred(pixel* pic, uint16_t pic_width, uint8_t width);
 void intra_get_planar_pred(pixel* src,int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride);

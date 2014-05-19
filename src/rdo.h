@@ -41,6 +41,8 @@ typedef struct
 extern const uint32_t g_go_rice_range[5];
 extern const uint32_t g_go_rice_prefix_len[5];
 
+uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds);
+int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost);
 
 void  rdoq(encoder_state *encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);

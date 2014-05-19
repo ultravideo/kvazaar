@@ -57,6 +57,63 @@ const uint32_t entropy_bits[128] =
   0x0050e, 0x29af6, 0x004cc, 0x2a497, 0x0048d, 0x2ae35, 0x00451, 0x2b7d6, 0x00418, 0x2c176, 0x003e2, 0x2cb15, 0x003af, 0x2d4b5, 0x0037f, 0x2de55
 };
 
+
+/**
+ * \brief Helper function to find intra merge costs
+ * \returns intra mode coding cost in bits
+ */
+uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
+{
+   // merge mode -1 means they are not used -> cost 0
+   if(intra_preds[0] == -1) return 0;
+
+   // First candidate needs only one bit and two other need two
+   if(intra_preds[0] == mode) {
+     return 1;
+   } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
+     return 2;
+   }
+   // Without merging the cost is 5 bits
+   return 5;
+}
+
+
+/**
+ * \brief Function to compare RDO costs
+ * \param rdo_costs array of current costs
+ * \param cost new cost to check
+ * \returns -1 if cost is worse than the one in the array or array position for worst cost
+
+ This function derives the prediction samples for planar mode (intra coding).
+*/
+int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost)
+{
+  int i;
+  int found = 0;
+
+  for(i = 0; i < rdo_modes_to_check; i++) {
+    if(rdo_costs[i] > cost) {
+      found = 1;
+      break;
+    }
+  }
+  // Search for worst cost
+  if(found) {
+    uint32_t worst_cost = 0;
+    int worst_mode = -1;
+    for(i = 0; i < rdo_modes_to_check; i++) {
+      if(rdo_costs[i] > worst_cost) {
+        worst_cost = rdo_costs[i];
+        worst_mode = i;
+      }
+    }
+    return worst_mode;
+  }
+
+  return -1;
+}
+
+
 /**
  * \brief RDO function to calculate cost for intra
  * \returns cost to code pred block

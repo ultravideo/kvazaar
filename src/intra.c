@@ -216,67 +216,13 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
   #undef FWIDTH
 }
 
-/**
- * \brief Helper function to find intra merge costs
- * \returns intra mode coding cost in bits
- */
-static uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
-{
-   // merge mode -1 means they are not used -> cost 0
-   if(intra_preds[0] == -1) return 0;
-
-   // First candidate needs only one bit and two other need two
-   if(intra_preds[0] == mode) {
-     return 1;
-   } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
-     return 2;
-   }
-   // Without merging the cost is 5 bits
-   return 5;
-}
-
-
-/**
- * \brief Function to compare RDO costs
- * \param rdo_costs array of current costs
- * \param cost new cost to check
- * \returns -1 if cost is worse than the one in the array or array position for worst cost
-
- This function derives the prediction samples for planar mode (intra coding).
-*/
-static int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost)
-{
-  int i;
-  int found = 0;
-
-  for(i = 0; i < rdo_modes_to_check; i++) {
-    if(rdo_costs[i] > cost) {
-      found = 1;
-      break;
-    }
-  }
-  // Search for worst cost
-  if(found) {
-    uint32_t worst_cost = 0;
-    int worst_mode = -1;
-    for(i = 0; i < rdo_modes_to_check; i++) {
-      if(rdo_costs[i] > worst_cost) {
-        worst_cost = rdo_costs[i];
-        worst_mode = i;
-      }
-    }
-    return worst_mode;
-  }
-
-  return -1;
-}
 
 /**
  * \param rec  Reference pixel. 0 points to unfiltered and 1 to filtered.
  * \param recstride  Stride for rec pixel arrays.
  * \param dst
  */
-static void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
+void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
 {
   pixel *ref_pixels = rec[0];
   if (is_chroma || mode == 1 || width == 4) {
@@ -315,126 +261,6 @@ static void intra_get_pred(const encoder_control * const encoder, pixel *rec[2],
 }
 
 
-/**
- * \brief Function to test best intra prediction mode
- * \param orig original picture data
- * \param origstride original picture stride
- * \param rec reconstructed picture data
- * \param recstride reconstructed picture stride
- * \param xpos source x-position
- * \param ypos source y-position
- * \param width block size to predict
- * \param sad_out sad value of best mode
- * \returns best intra mode
-*/
-int16_t intra_prediction(encoder_state * const encoder_state, pixel *orig, int32_t origstride, pixel *rec, int16_t recstride,
-                         uint8_t width, uint32_t *sad_out,
-                         int8_t *intra_preds, uint32_t *bitcost_out)
-{
-  uint32_t best_sad = 0xffffffff;
-  uint32_t sad = 0;
-  int16_t best_mode = 1;
-  uint32_t best_bitcost = 0;
-  int16_t mode;
-  int8_t rdo = encoder_state->encoder_control->rdo;
-
-  // Check 8 modes for 4x4 and 8x8, 3 for others
-  int8_t   rdo_modes_to_check = (width == 4 || width == 8)? 8 : 3;
-  int8_t   rdo_modes[11] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
-  uint32_t rdo_costs[11] = {UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX,
-                            UINT_MAX, UINT_MAX, UINT_MAX, UINT_MAX,
-                            UINT_MAX, UINT_MAX, UINT_MAX};
-
-  cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
-
-  // Temporary block arrays
-  pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
-  pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
-  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-
-  pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
-
-  // Store original block for SAD computation
-  picture_blit_pixels(orig, orig_block, width, width, origstride, width);
-
-  // Generate filtered reference pixels.
-  {
-    int16_t x, y;
-    for (y = -1; y < recstride; y++) {
-      ref[1][y*recstride - 1] = rec[y*recstride - 1];
-                                                }
-    for (x = 0; x < recstride; x++) {
-      ref[1][x - recstride] = rec[x - recstride];
-    }
-    intra_filter(ref[1], recstride, width, 0);
-  }
-
-  // Try all modes and select the best one.
-  for (mode = 0; mode < 35; mode++) {
-    uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-
-    sad = cost_func(pred, orig_block);
-    sad += mode_cost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
-    // When rdo == 2, store best costs to an array and do full RDO later
-    if(rdo == 2) {
-      int rdo_mode = intra_rdo_cost_compare(rdo_costs, rdo_modes_to_check, sad);
-      if(rdo_mode != -1) {
-        rdo_modes[rdo_mode] = mode; rdo_costs[rdo_mode] = sad;
-      }
-    // Without rdo compare costs
-    } else if (sad < best_sad) {
-      best_bitcost = mode_cost;
-      best_sad = sad;
-      best_mode = mode;
-    }
-  }
-
-  // Select from three best modes if using RDO
-  if(rdo == 2) {
-    int rdo_mode;
-    int pred_mode;
-    // Check that the predicted modes are in the RDO mode list
-    for(pred_mode = 0; pred_mode < 3; pred_mode++) {
-      int mode_found = 0;
-      for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
-        if(intra_preds[pred_mode] == rdo_modes[rdo_mode]) {
-          mode_found = 1;
-          break;
-        }
-      }
-      // Add this prediction mode to RDO checking
-      if(!mode_found) {
-        rdo_modes[rdo_modes_to_check] = intra_preds[pred_mode];
-        rdo_modes_to_check++;
-      }
-    }
-
-    best_sad = UINT_MAX;
-    for(rdo_mode = 0; rdo_mode < rdo_modes_to_check; rdo_mode ++) {
-      int rdo_bitcost;
-      // The reconstruction is calculated again here, it could be saved from before..
-      intra_recon(encoder_state->encoder_control, rec, recstride, width, pred, width, rdo_modes[rdo_mode], 0);
-      rdo_costs[rdo_mode] = rdo_cost_intra(encoder_state,pred,orig_block,width,rdo_modes[rdo_mode]);
-      // Bitcost also calculated again for this mode
-      rdo_bitcost = intra_pred_ratecost(rdo_modes[rdo_mode],intra_preds);
-      // Add bitcost * lambda
-      rdo_costs[rdo_mode] += rdo_bitcost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
-
-      if(rdo_costs[rdo_mode] < best_sad) {
-        best_sad = rdo_costs[rdo_mode];
-        best_bitcost = rdo_bitcost;
-        best_mode = rdo_modes[rdo_mode];
-      }
-    }
-  }
-
-  // assign final sad to output
-  *sad_out     = best_sad;
-  *bitcost_out = best_bitcost;
-
-  return best_mode;
-}
 
 /**
  * \brief Reconstruct intra block according to prediction
