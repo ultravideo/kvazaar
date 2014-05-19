@@ -19,6 +19,8 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#include "global.h"
+
 #include <pthread.h>
 
 #ifdef __GNUC__
