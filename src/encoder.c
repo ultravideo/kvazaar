@@ -1228,11 +1228,13 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
 }
 
 
-static void worker_encoder_state_search_lcu(void * opaque) {
+static void worker_encoder_state_encode_lcu(void * opaque) {
   const lcu_order_element * const lcu = opaque;
   encoder_state *encoder_state = lcu->encoder_state;
   const encoder_control * const encoder = encoder_state->encoder_control;
   picture* const cur_pic = encoder_state->tile->cur_pic;
+  
+  //This part doesn't write to bitstream, it's only search, deblock and sao
   
   search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
     
@@ -1265,12 +1267,50 @@ static void worker_encoder_state_search_lcu(void * opaque) {
     sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
     sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
   }
+  
+  
+  //Now write data to bitstream (required to have a correct CABAC state)
+  
+  //First LCU, and we are in a slice. We need a slice header
+  if (encoder_state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
+    encode_slice_header(encoder_state);
+    bitstream_align(&encoder_state->stream); 
+  }
+  
+  //Encode SAO
+  if (encoder->sao_enable) {
+    encode_sao(encoder_state, lcu->position.x, lcu->position.y, &cur_pic->sao_luma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x], &cur_pic->sao_chroma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x]);
+  }
+  
+  //Encode coding tree
+  encode_coding_tree(encoder_state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
+
+  //Terminator
+  if (lcu->index < encoder_state->lcu_order_count - 1) {
+    //Since we don't handle slice segments, end of slice segment == end of slice
+    //Always 0 since otherwise it would be split
+    cabac_encode_bin_trm(&encoder_state->cabac, 0);  // end_of_slice_segment_flag
+  }
+  
+  //Wavefronts need the context to be copied to the next row
+  if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
+    int j;
+    //Find next encoder (next row)
+    for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
+      if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
+        //And copy context
+        context_copy(&encoder_state->parent->children[j], encoder_state);
+      }
+    }
+  }
+  
+  
 }
 
 static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
 #ifndef NDEBUG
-  const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
+//  const unsigned long long int debug_bitstream_position = bitstream_tell(&(encoder_state->stream));
 #endif
   
   int i = 0;
@@ -1283,7 +1323,7 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
       PERFORMANCE_MEASURE_START();
 
-      worker_encoder_state_search_lcu(&encoder_state->lcu_order[i]);
+      worker_encoder_state_encode_lcu(&encoder_state->lcu_order[i]);
 
 #ifdef _DEBUG
       {
@@ -1307,7 +1347,7 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
 #else
       char* job_description = NULL;
 #endif
-      encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, worker_encoder_state_search_lcu, (void*)lcu, 1, job_description);
+      encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, worker_encoder_state_encode_lcu, (void*)lcu, 1, job_description);
       if (encoder_state->tile->wf_jobs[lcu->id]) {
         if (lcu->position.x > 0) {
           threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - 1]);
@@ -1326,7 +1366,7 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
 
   
   //We should not have written to bitstream!
-  assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
+//  assert(debug_bitstream_position == bitstream_tell(&(encoder_state->stream)));
 }
 
 static void encoder_state_encode(encoder_state * const main_state);
@@ -1554,43 +1594,9 @@ static void worker_encoder_state_write_bitstream_leaf(void * opaque) {
 
 static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
-  const picture* const cur_pic = encoder_state->tile->cur_pic;
-  
-  int i = 0;
-  
+  //Write terminator of the leaf
   assert(encoder_state->is_leaf);
   
-  if (encoder_state->type == ENCODER_STATE_TYPE_SLICE) {
-    encode_slice_header(encoder_state);
-    bitstream_align(&encoder_state->stream); 
-  }
-  
-  for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-    const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
-    if (encoder->sao_enable) {
-      encode_sao(encoder_state, lcu->position.x, lcu->position.y, &cur_pic->sao_luma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x], &cur_pic->sao_chroma[lcu->position.y * cur_pic->width_in_lcu + lcu->position.x]);
-    }
-    
-    encode_coding_tree(encoder_state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
-
-    if (i < encoder_state->lcu_order_count - 1) {
-      //Since we don't handle slice segments, end of slice segment == end of slice
-      //Always 0 since otherwise it would be split
-      cabac_encode_bin_trm(&encoder_state->cabac, 0);  // end_of_slice_segment_flag
-    }
-    
-    if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && i == 1) {
-      int j;
-      //Find next encoder (next row)
-      for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
-        if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
-          context_copy(&encoder_state->parent->children[j], encoder_state);
-        }
-      }
-    }
-    
-  }
-
   //Last LCU
   {
     const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
