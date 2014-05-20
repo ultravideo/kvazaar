@@ -1002,7 +1002,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         new_child->slice = child_state->slice;
         new_child->wfrow = MALLOC(encoder_state_config_wfrow, 1);
         
-        if (!new_child->wfrow || !encoder_state_config_wfrow_init(new_child, i + first_row)) {
+        if (!new_child->wfrow || !encoder_state_config_wfrow_init(new_child, i)) {
           fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
           return 0;
         }
@@ -1033,17 +1033,19 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       //Restrict to the current wavefront row if needed
       if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-        lcu_start = MAX(lcu_start, (child_state->wfrow->lcu_offset_y - child_state->tile->lcu_offset_y) * child_state->tile->cur_pic->width_in_lcu);
-        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y - child_state->tile->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu);
+        lcu_start = MAX(lcu_start, (child_state->wfrow->lcu_offset_y) * child_state->tile->cur_pic->width_in_lcu);
+        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu);
       }
       
       child_state->lcu_order_count = lcu_end - lcu_start;
       child_state->lcu_order = MALLOC(lcu_order_element, child_state->lcu_order_count);
+      assert(child_state->lcu_order);
       
       for (i = 0; i < child_state->lcu_order_count; ++i) {
         lcu_id = lcu_start + i;
         child_state->lcu_order[i].encoder_state = child_state;
         child_state->lcu_order[i].id = lcu_id;
+        child_state->lcu_order[i].index = i;
         child_state->lcu_order[i].position.x = lcu_id % child_state->tile->cur_pic->width_in_lcu;
         child_state->lcu_order[i].position.y = lcu_id / child_state->tile->cur_pic->width_in_lcu;
         child_state->lcu_order[i].position_px.x = child_state->lcu_order[i].position.x * LCU_WIDTH;
