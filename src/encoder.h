@@ -197,13 +197,14 @@ typedef struct {
 } encoder_state_config_slice;
 
 typedef struct {
-  //Row in image coordinates of the wavefront
+  //Row in tile coordinates of the wavefront
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow;
 
 typedef struct {
   //This it used for leaf of the encoding tree. All is relative to the tile.
   int id;
+  int index;
   struct encoder_state *encoder_state;
   vector2d position;
   vector2d position_px; //Top-left
