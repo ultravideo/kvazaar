@@ -1073,7 +1073,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
           //Find LCU above
           if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
             int j;
-            for (j=0; child_state->parent->children[j].encoder_control; ++j) {
+            //For all previous wavefront rows
+            for (j=0; &child_state->parent->children[j] != child_state && child_state->parent->children[j].encoder_control; ++j) {
               if (child_state->parent->children[j].wfrow->lcu_offset_y == child_state->wfrow->lcu_offset_y - 1) {
                 int k;
                 for (k=0; k < child_state->parent->children[j].lcu_order_count; ++k) {
