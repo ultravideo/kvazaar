@@ -51,7 +51,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
     
     //Find a task (should be fast enough)
     task_id = -1;
-    for (i = 0; i < threadqueue->queue_count; ++i) {
+    for (i = threadqueue->queue_start; i < threadqueue->queue_count; ++i) {
       threadqueue_job * const job = threadqueue->queue[i];
       PTHREAD_LOCK(&job->lock);
       
@@ -70,6 +70,9 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
 
       assert(job->state == THREADQUEUE_JOB_STATE_QUEUED);
       job->state = THREADQUEUE_JOB_STATE_RUNNING;
+      
+      //Move the queue_start "pointer" if needed
+      while (threadqueue->queue_start < threadqueue->queue_count && threadqueue->queue[threadqueue->queue_start]->state != THREADQUEUE_JOB_STATE_QUEUED) threadqueue->queue_start++;
       
       --threadqueue->queue_waiting;
       
@@ -177,6 +180,7 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
   threadqueue->queue = NULL;
   threadqueue->queue_size = 0;
   threadqueue->queue_count = 0;
+  threadqueue->queue_start = 0;
   threadqueue->queue_waiting = 0;
   
   //Lock the queue before creating threads, to ensure they all have correct information
@@ -222,6 +226,7 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
     FREE_POINTER(threadqueue->queue[i]);
   }
   threadqueue->queue_count = 0;
+  threadqueue->queue_start = 0;
 #ifdef _DEBUG
   {
     CLOCK_T time;
@@ -288,6 +293,7 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
   FREE_POINTER(threadqueue->queue);
   threadqueue->queue_count = 0;
   threadqueue->queue_size = 0;
+  threadqueue->queue_start = 0;
   
   FREE_POINTER(threadqueue->threads);
   threadqueue->threads_count = 0;

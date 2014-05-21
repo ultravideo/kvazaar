@@ -72,6 +72,7 @@ typedef struct {
   int stop; //=>1: threads should stop asap
   
   threadqueue_job **queue;
+  unsigned int queue_start;
   unsigned int queue_count;
   unsigned int queue_size;
   unsigned int queue_waiting;
