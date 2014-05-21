@@ -562,6 +562,12 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
   encoder_state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->height_in_lcu * encoder_state->tile->cur_pic->width_in_lcu);
   
+  if (encoder->sao_enable) {
+    encoder_state->tile->hor_buf_before_sao = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
+  } else {
+    encoder_state->tile->hor_buf_before_sao = NULL;
+  }
+  
   if (encoder->wpp) {
     encoder_state->tile->wf_jobs = MALLOC(threadqueue_job*, encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
     if (!encoder_state->tile->wf_jobs) {
@@ -577,6 +583,7 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
 }
 
 static void encoder_state_config_tile_finalize(encoder_state * const encoder_state) {
+  if (encoder_state->tile->hor_buf_before_sao) yuv_t_free(encoder_state->tile->hor_buf_before_sao);
   
   yuv_t_free(encoder_state->tile->hor_buf_search);
   yuv_t_free(encoder_state->tile->ver_buf_search);
@@ -1052,12 +1059,43 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
         child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
         child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
-        child_state->lcu_order[i].position_next_px.x = child_state->lcu_order[i].position_px.x + child_state->lcu_order[i].size.x;
-        child_state->lcu_order[i].position_next_px.y = child_state->lcu_order[i].position_px.y + child_state->lcu_order[i].size.y;
         child_state->lcu_order[i].first_row = lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         child_state->lcu_order[i].last_row = lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         child_state->lcu_order[i].first_column = lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         child_state->lcu_order[i].last_column = lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        
+        child_state->lcu_order[i].above = NULL;
+        child_state->lcu_order[i].below = NULL;
+        child_state->lcu_order[i].left = NULL;
+        child_state->lcu_order[i].right = NULL;
+        
+        if (!child_state->lcu_order[i].first_row) {
+          //Find LCU above
+          if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+            int j;
+            //For all previous wavefront rows
+            for (j=0; &child_state->parent->children[j] != child_state && child_state->parent->children[j].encoder_control; ++j) {
+              if (child_state->parent->children[j].wfrow->lcu_offset_y == child_state->wfrow->lcu_offset_y - 1) {
+                int k;
+                for (k=0; k < child_state->parent->children[j].lcu_order_count; ++k) {
+                  if (child_state->parent->children[j].lcu_order[k].position.x == child_state->lcu_order[i].position.x) {
+                    assert(child_state->parent->children[j].lcu_order[k].position.y == child_state->lcu_order[i].position.y - 1);
+                    child_state->lcu_order[i].above = &child_state->parent->children[j].lcu_order[k];
+                  }
+                }
+              }
+            }
+          } else {
+            child_state->lcu_order[i].above = &child_state->lcu_order[i-child_state->tile->cur_pic->width_in_lcu];
+          }
+          assert(child_state->lcu_order[i].above);
+          child_state->lcu_order[i].above->below = &child_state->lcu_order[i];
+        }
+        if (!child_state->lcu_order[i].first_column) {
+          child_state->lcu_order[i].left = &child_state->lcu_order[i-1];
+          assert(child_state->lcu_order[i].left->position.x == child_state->lcu_order[i].position.x - 1);
+          child_state->lcu_order[i].left->right = &child_state->lcu_order[i];
+        }
       }
     } else {
       child_state->lcu_order_count = 0;
@@ -1203,27 +1241,40 @@ static void write_aud(encoder_state * const encoder_state)
 static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, const lcu_order_element * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
   picture* const cur_pic = encoder_state->tile->cur_pic;
   
-  //Copy the bottom row of this LCU to the horizontal buffer
-  picture_blit_pixels(&cur_pic->y_recdata[(lcu->position_next_px.y - 1) * cur_pic->width + lcu->position_px.x],
-                      &hor_buf->y[lcu->position_px.x + lcu->position.y * cur_pic->width],
-                      lcu->size.x, 1, cur_pic->width, cur_pic->width);
-  picture_blit_pixels(&cur_pic->u_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                      &hor_buf->u[lcu->position_px.x / 2 + lcu->position.y * cur_pic->width / 2],
-                      lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
-  picture_blit_pixels(&cur_pic->v_recdata[(lcu->position_next_px.y / 2 - 1) * cur_pic->width / 2 + lcu->position_px.x / 2],
-                      &hor_buf->v[lcu->position_px.x / 2 + lcu->position.y * cur_pic->width / 2],
-                      lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+  if (hor_buf) {
+    const int rdpx = lcu->position_px.x;
+    const int rdpy = lcu->position_px.y + lcu->size.y - 1;
+    const int by = lcu->position.y;
+    
+    //Copy the bottom row of this LCU to the horizontal buffer
+    picture_blit_pixels(&cur_pic->y_recdata[rdpy * cur_pic->width + rdpx],
+                        &hor_buf->y[lcu->position_px.x + by * cur_pic->width],
+                        lcu->size.x, 1, cur_pic->width, cur_pic->width);
+    picture_blit_pixels(&cur_pic->u_recdata[(rdpy/2) * cur_pic->width/2 + (rdpx/2)],
+                        &hor_buf->u[lcu->position_px.x / 2 + by * cur_pic->width / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+    picture_blit_pixels(&cur_pic->v_recdata[(rdpy/2) * cur_pic->width/2 + (rdpx/2)],
+                        &hor_buf->v[lcu->position_px.x / 2 + by * cur_pic->width / 2],
+                        lcu->size.x / 2, 1, cur_pic->width / 2, cur_pic->width / 2);
+  }
   
-  //Copy the right row of this LCU to the vertical buffer.
-  picture_blit_pixels(&cur_pic->y_recdata[lcu->position_px.y * cur_pic->width + lcu->position_next_px.x - 1],
-                      &ver_buf->y[lcu->position_px.y + lcu->position.x * cur_pic->height],
-                      1, lcu->size.y, cur_pic->width, 1);
-  picture_blit_pixels(&cur_pic->u_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                      &ver_buf->u[lcu->position_px.y / 2 + lcu->position.x * cur_pic->height / 2],
-                      1, lcu->size.y / 2, cur_pic->width / 2, 1);
-  picture_blit_pixels(&cur_pic->v_recdata[lcu->position_px.y * cur_pic->width / 4 + (lcu->position_next_px.x / 2) - 1],
-                      &ver_buf->v[lcu->position_px.y / 2 + lcu->position.x * cur_pic->height / 2],
-                      1, lcu->size.y / 2, cur_pic->width / 2, 1);
+  if (ver_buf) {
+    const int rdpx = lcu->position_px.x + lcu->size.x - 1;
+    const int rdpy = lcu->position_px.y;
+    const int bx = lcu->position.x;
+    
+    
+    //Copy the right row of this LCU to the vertical buffer.
+    picture_blit_pixels(&cur_pic->y_recdata[rdpy * cur_pic->width + rdpx],
+                        &ver_buf->y[lcu->position_px.y + bx * cur_pic->height],
+                        1, lcu->size.y, cur_pic->width, 1);
+    picture_blit_pixels(&cur_pic->u_recdata[(rdpy/2) * cur_pic->width/2 + (rdpx/2)],
+                        &ver_buf->u[lcu->position_px.y / 2 + bx * cur_pic->height / 2],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+    picture_blit_pixels(&cur_pic->v_recdata[(rdpy/2) * cur_pic->width/2 + (rdpx/2)],
+                        &ver_buf->v[lcu->position_px.y / 2 + bx * cur_pic->height / 2],
+                        1, lcu->size.y / 2, cur_pic->width / 2, 1);
+  }
   
 }
 
@@ -1304,7 +1355,16 @@ static void worker_encoder_state_encode_lcu(void * opaque) {
     }
   }
   
-  
+  if (encoder->sao_enable && lcu->above) {
+    //If we're not the first in the row
+    if (lcu->above->left) {
+      encoder_state_recdata_to_bufs(encoder_state, lcu->above->left, encoder_state->tile->hor_buf_before_sao, NULL);
+    }
+    //Latest LCU in the row, copy the data from the one above also
+    if (!lcu->right) {
+      encoder_state_recdata_to_bufs(encoder_state, lcu->above, encoder_state->tile->hor_buf_before_sao, NULL);
+    }
+  }
 }
 
 static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
@@ -1399,6 +1459,66 @@ static void worker_encoder_state_encode_children(void * opaque) {
   }
 }
 
+typedef struct {
+  int y;
+  const encoder_state * encoder_state;
+} worker_sao_reconstruct_lcu_data;
+
+// ./kvazaar -i /scratch/h265-encode/pedestrian_area_1080p25.yuv  --input-res 1920x1080 -o /tmp/out.h265 --qp 23 -p 60  --frames 10
+// Processed 10 frames,    5063552 bits AVG PSNR: 42.9771 46.0609 48.0985
+// Total time: 19.440 s.
+void worker_sao_reconstruct_lcu(void *opaque) {
+  worker_sao_reconstruct_lcu_data *data = opaque;
+  picture * const cur_pic = data->encoder_state->tile->cur_pic;
+  unsigned stride = cur_pic->width_in_lcu;
+  int x;
+  
+  //TODO: copy only needed data
+  pixel *new_y_data = MALLOC(pixel, cur_pic->width * cur_pic->height);
+  pixel *new_u_data = MALLOC(pixel, (cur_pic->width * cur_pic->height) >> 2);
+  pixel *new_v_data = MALLOC(pixel, (cur_pic->width * cur_pic->height) >> 2);
+  
+  const int offset = cur_pic->width * (data->y*LCU_WIDTH);
+  const int offset_c = cur_pic->width/2 * (data->y*LCU_WIDTH_C);
+  int num_pixels = cur_pic->width * (LCU_WIDTH + 2);
+  
+  if (num_pixels + offset > cur_pic->width * cur_pic->height) {
+    num_pixels = cur_pic->width * cur_pic->height - offset;
+  }
+  
+  memcpy(&new_y_data[offset], &cur_pic->y_recdata[offset], sizeof(pixel) * num_pixels);
+  memcpy(&new_u_data[offset_c], &cur_pic->u_recdata[offset_c], sizeof(pixel) * num_pixels >> 2);
+  memcpy(&new_v_data[offset_c], &cur_pic->v_recdata[offset_c], sizeof(pixel) * num_pixels >> 2);
+  
+  if (data->y>0) {
+    //copy first row from buffer
+    memcpy(&new_y_data[cur_pic->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[cur_pic->width * (data->y-1)], cur_pic->width * sizeof(pixel));
+    memcpy(&new_u_data[cur_pic->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[cur_pic->width/2 * (data->y-1)], cur_pic->width/2 * sizeof(pixel));
+    memcpy(&new_v_data[cur_pic->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[cur_pic->width/2 * (data->y-1)], cur_pic->width/2 * sizeof(pixel));
+  }
+  //assertions to be sure everything's ok for the next line (don't bother with last one)
+  /*  These assertions may not be true if the row are not processed in order. To avoid having an artificial dependency between rows, it's better to remove them.
+  assert((data->y >= cur_pic->height_in_lcu - 1) || memcmp(&data->encoder_state->tile->hor_buf_before_sao->y[cur_pic->width * (data->y)], &cur_pic->y_recdata[cur_pic->width * ((data->y + 1)*LCU_WIDTH-1)], cur_pic->width * sizeof(pixel))==0);
+  assert((data->y >= cur_pic->height_in_lcu - 1) || memcmp(&data->encoder_state->tile->hor_buf_before_sao->u[cur_pic->width/2 * (data->y)], &cur_pic->u_recdata[cur_pic->width/2 * ((data->y + 1)*LCU_WIDTH_C-1)], cur_pic->width/2 * sizeof(pixel))==0);
+  assert((data->y >= cur_pic->height_in_lcu - 1) || memcmp(&data->encoder_state->tile->hor_buf_before_sao->v[cur_pic->width/2 * (data->y)], &cur_pic->v_recdata[cur_pic->width/2 * ((data->y + 1)*LCU_WIDTH_C-1)], cur_pic->width/2 * sizeof(pixel))==0);*/
+
+  for (x = 0; x < cur_pic->width_in_lcu; x++) {
+  // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
+    sao_info *sao_luma = &cur_pic->sao_luma[data->y * stride + x];
+    sao_info *sao_chroma = &cur_pic->sao_chroma[data->y * stride + x];
+    sao_reconstruct(data->encoder_state->encoder_control, cur_pic, new_y_data, x, data->y, sao_luma, COLOR_Y);
+    sao_reconstruct(data->encoder_state->encoder_control, cur_pic, new_u_data, x, data->y, sao_chroma, COLOR_U);
+    sao_reconstruct(data->encoder_state->encoder_control, cur_pic, new_v_data, x, data->y, sao_chroma, COLOR_V);
+  }
+  
+  free(new_y_data);
+  free(new_u_data);
+  free(new_v_data);
+
+  free(opaque);
+}
+
+
 static int tree_is_a_chain(const encoder_state * const encoder_state) {
   if (!encoder_state->children[0].encoder_control) return 1;
   if (encoder_state->children[1].encoder_control) return 0;
@@ -1452,15 +1572,44 @@ static void encoder_state_encode(encoder_state * const main_state) {
           worker_encoder_state_encode_children(&(main_state->children[i]));
         }
       }
-      threadqueue_flush(main_state->encoder_control->threadqueue);
       
       //If children are wavefront, we need to reconstruct SAO
       if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-        PERFORMANCE_MEASURE_START();
-        sao_reconstruct_frame(main_state);
-        PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d", main_state->global->frame, main_state->tile->id, main_state->slice->id,0,main_state->encoder_control->in.height_in_lcu - 1);
+        int y;
+        picture * const cur_pic = main_state->tile->cur_pic;
+        threadqueue_job *previous_job = NULL;
+        
+        for (y = 0; y < cur_pic->height_in_lcu; ++y) {
+          worker_sao_reconstruct_lcu_data *data = MALLOC(worker_sao_reconstruct_lcu_data, 1);
+          threadqueue_job *job;
+#ifdef _DEBUG
+          char job_description[256];
+          sprintf(job_description, "frame=%d,tile=%d,position_y=%d", main_state->global->frame, main_state->tile->id, y + main_state->tile->lcu_offset_y);
+#else
+          char* job_description = NULL;
+#endif
+          data->y = y;
+          data->encoder_state = main_state;
+          
+          job = threadqueue_submit(main_state->encoder_control->threadqueue, worker_sao_reconstruct_lcu, data, 1, job_description);
+          
+          if (previous_job) {
+            threadqueue_job_dep_add(job, previous_job);
+          }
+          previous_job = job;
+          
+          if (y < cur_pic->height_in_lcu - 1) {
+            //Not last row: depend on the last LCU of the row below
+            threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 1) * cur_pic->width_in_lcu + cur_pic->width_in_lcu - 1]);
+          } else {
+            //Last row: depend on the last LCU of the row
+            threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 0) * cur_pic->width_in_lcu + cur_pic->width_in_lcu - 1]);
+          }
+          threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
+          
+        }
       }
-      
+      threadqueue_flush(main_state->encoder_control->threadqueue);
     } else {
       for (i=0; main_state->children[i].encoder_control; ++i) {
         worker_encoder_state_encode_children(&(main_state->children[i]));
