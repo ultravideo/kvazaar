@@ -180,6 +180,9 @@ typedef struct {
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
   yuv_t *ver_buf_search;
   
+  yuv_t *hor_buf_before_sao;
+  yuv_t *ver_buf_before_sao;
+  
   //Job pointers for wavefronts
   threadqueue_job **wf_jobs;
 } encoder_state_config_tile;
@@ -208,7 +211,6 @@ typedef struct lcu_order_element {
   struct encoder_state *encoder_state;
   vector2d position;
   vector2d position_px; //Top-left
-  vector2d position_next_px; //Right-bottom
   vector2d size;
   int first_column;
   int first_row;
