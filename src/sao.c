@@ -217,7 +217,7 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
 }
 
 
-static int sao_mode_bits_band(int band_position, int offsets[4],
+static int sao_mode_bits_band(int band_position, int offsets[5],
                               sao_info *sao_top, sao_info *sao_left)
 {
   int mode_bits = 0;
@@ -243,7 +243,7 @@ static int sao_mode_bits_band(int band_position, int offsets[4],
   {
     int i;
     for (i = 0; i < 4; ++i) {
-      int abs_offset = abs(offsets[i]);
+      int abs_offset = abs(offsets[i+1]);
       if (abs_offset == 0) {
         mode_bits += abs_offset + 1;
       } else if (abs_offset == SAO_ABS_OFFSET_MAX) {
@@ -698,7 +698,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
   // Band offset
   {
     int sao_bands[2][32];
-    int temp_offsets[4];
+    int temp_offsets[5];
     int ddistortion;
     int temp_rate = 0;
 
@@ -708,7 +708,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
                      block_height,sao_bands);
     }
 
-    ddistortion = calc_sao_band_offsets(sao_bands, temp_offsets, &sao_out->band_position);
+    ddistortion = calc_sao_band_offsets(sao_bands, &temp_offsets[1], &sao_out->band_position);
 
     temp_rate = sao_mode_bits_band(sao_out->band_position, temp_offsets, sao_top, sao_left);
     ddistortion += (int)((double)temp_rate*(encoder_state->global->cur_lambda_cost+0.5));
@@ -717,7 +717,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
     if (ddistortion < sao_out->ddistortion) {
       sao_out->type = SAO_TYPE_BAND;
       sao_out->ddistortion = ddistortion;
-      memcpy(&sao_out->offsets[1], temp_offsets, sizeof(int) * 4);
+      memcpy(&sao_out->offsets[1], &temp_offsets[1], sizeof(int) * 4);
     }
   }
 }
@@ -758,7 +758,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   }
 
   {
-    int mode_bits = sao_mode_bits_band(band_sao.band_position, &band_sao.offsets[1], sao_top, sao_left);
+    int mode_bits = sao_mode_bits_band(band_sao.band_position, band_sao.offsets, sao_top, sao_left);
     int ddistortion = mode_bits * (int)(encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
