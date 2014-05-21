@@ -201,7 +201,7 @@ typedef struct {
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow;
 
-typedef struct {
+typedef struct lcu_order_element {
   //This it used for leaf of the encoding tree. All is relative to the tile.
   int id;
   int index;
@@ -214,6 +214,11 @@ typedef struct {
   int first_row;
   int last_column;
   int last_row;
+  
+  struct lcu_order_element *above;
+  struct lcu_order_element *below;
+  struct lcu_order_element *left;
+  struct lcu_order_element *right;
 } lcu_order_element;
 
 typedef struct encoder_state {

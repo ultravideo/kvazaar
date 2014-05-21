@@ -1052,12 +1052,42 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
         child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
         child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
-        child_state->lcu_order[i].position_next_px.x = child_state->lcu_order[i].position_px.x + child_state->lcu_order[i].size.x;
-        child_state->lcu_order[i].position_next_px.y = child_state->lcu_order[i].position_px.y + child_state->lcu_order[i].size.y;
         child_state->lcu_order[i].first_row = lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         child_state->lcu_order[i].last_row = lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         child_state->lcu_order[i].first_column = lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         child_state->lcu_order[i].last_column = lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        
+        child_state->lcu_order[i].above = NULL;
+        child_state->lcu_order[i].below = NULL;
+        child_state->lcu_order[i].left = NULL;
+        child_state->lcu_order[i].right = NULL;
+        
+        if (!child_state->lcu_order[i].first_row) {
+          //Find LCU above
+          if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+            int j;
+            for (j=0; child_state->parent->children[j].encoder_control; ++j) {
+              if (child_state->parent->children[j].wfrow->lcu_offset_y == child_state->wfrow->lcu_offset_y - 1) {
+                int k;
+                for (k=0; k < child_state->parent->children[j].lcu_order_count; ++k) {
+                  if (child_state->parent->children[j].lcu_order[k].position.x == child_state->lcu_order[i].position.x) {
+                    assert(child_state->parent->children[j].lcu_order[k].position.y == child_state->lcu_order[i].position.y - 1);
+                    child_state->lcu_order[i].above = &child_state->parent->children[j].lcu_order[k];
+                  }
+                }
+              }
+            }
+          } else {
+            child_state->lcu_order[i].above = &child_state->lcu_order[i-child_state->tile->cur_pic->width_in_lcu];
+          }
+          assert(child_state->lcu_order[i].above);
+          child_state->lcu_order[i].above->below = &child_state->lcu_order[i];
+        }
+        if (!child_state->lcu_order[i].first_column) {
+          child_state->lcu_order[i].left = &child_state->lcu_order[i-1];
+          assert(child_state->lcu_order[i].left->position.x == child_state->lcu_order[i].position.x - 1);
+          child_state->lcu_order[i].left->right = &child_state->lcu_order[i];
+        }
       }
     } else {
       child_state->lcu_order_count = 0;
