@@ -1576,6 +1576,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
       if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
         int y;
         picture * const cur_pic = main_state->tile->cur_pic;
+        threadqueue_job *previous_job = NULL;
         
         for (y = 0; y < cur_pic->height_in_lcu; ++y) {
           worker_sao_reconstruct_lcu_data *data = MALLOC(worker_sao_reconstruct_lcu_data, 1);
@@ -1590,6 +1591,11 @@ static void encoder_state_encode(encoder_state * const main_state) {
           data->encoder_state = main_state;
           
           job = threadqueue_submit(main_state->encoder_control->threadqueue, worker_sao_reconstruct_lcu, data, 1, job_description);
+          
+          if (previous_job) {
+            threadqueue_job_dep_add(job, previous_job);
+          }
+          previous_job = job;
           
           if (y < cur_pic->height_in_lcu - 1) {
             //Not last row: depend on the last LCU of the row below
