@@ -880,6 +880,21 @@ static void search_intra_rdo(encoder_state * const encoder_state,
   int rdo_mode;
   int pred_mode;
 
+  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
+
+  // Generate filtered reference pixels.
+  {
+    int x, y;
+    for (y = -1; y < recstride; y++) {
+      ref[1][y*recstride - 1] = rec[y*recstride - 1];
+    }
+    for (x = 0; x < recstride; x++) {
+      ref[1][x - recstride] = rec[x - recstride];
+    }
+    intra_filter(ref[1], recstride, width, 0);
+  }
+
   picture_blit_pixels(orig, orig_block, width, width, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
@@ -901,7 +916,8 @@ static void search_intra_rdo(encoder_state * const encoder_state,
   for(rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost;
     // The reconstruction is calculated again here, it could be saved from before..
-    intra_recon(encoder_state->encoder_control, rec, recstride, width, pred, width, modes[rdo_mode], 0);
+    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[rdo_mode], 0);
+
     costs[rdo_mode] = rdo_cost_intra(encoder_state,pred,orig_block,width,modes[rdo_mode]);
     // Bitcost also calculated again for this mode
     rdo_bitcost = intra_pred_ratecost(modes[rdo_mode],intra_preds);
