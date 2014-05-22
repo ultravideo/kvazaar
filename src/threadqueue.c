@@ -220,9 +220,9 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
       fprintf(threadqueue->debug_log, "%p->%p\n", threadqueue->queue[i], threadqueue->queue[i]->rdepends[j]);
     }
     
-    FREE_POINTER(threadqueue->queue[i]->rdepends);
     FREE_POINTER(threadqueue->queue[i]->debug_description);
 #endif
+    FREE_POINTER(threadqueue->queue[i]->rdepends);
     FREE_POINTER(threadqueue->queue[i]);
   }
   threadqueue->queue_count = 0;
