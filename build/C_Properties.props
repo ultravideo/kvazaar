@@ -16,7 +16,7 @@
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4244;4204;4206;4028</DisableSpecificWarnings>
       <OpenMPSupport>false</OpenMPSupport>
-      <TreatSpecificWarningsAsErrors>4013</TreatSpecificWarningsAsErrors>
+      <TreatSpecificWarningsAsErrors>4013;4029</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
