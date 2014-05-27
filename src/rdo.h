@@ -47,7 +47,7 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 void  rdoq(encoder_state *encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
 
-uint32_t rdo_cost_intra(encoder_state *encoder, pixel* pred, pixel* orig_block, int width, int8_t mode);
+uint32_t rdo_cost_intra(encoder_state *encoder, pixel* pred, pixel* orig_block, int width, int8_t mode, int tr_depth);
 
 int32_t get_coeff_cost(const encoder_state *encoder_state, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode);
 

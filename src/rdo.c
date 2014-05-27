@@ -120,7 +120,7 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 
  ** Only for luma
  */
-uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode)
+uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
 {
     const encoder_control * const encoder = encoder_state->encoder_control;
     coefficient pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
@@ -149,7 +149,7 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     }
     transform2d(encoder, block,pre_quant_coeff,width,0);
     if(encoder->rdoq_enable) {
-      rdoq(encoder_state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA,0);
+      rdoq(encoder_state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA, tr_depth);
     } else {
       quant(encoder_state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA);
     }
