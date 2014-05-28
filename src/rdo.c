@@ -194,7 +194,7 @@ int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coeffi
 
   // Make sure there are coeffs present
   for(i = 0; i < width*width; i++) {
-    if(coeff != 0) {
+    if (coeff[i] != 0) {
       found = 1;
       break;
     }

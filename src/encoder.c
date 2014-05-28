@@ -3298,17 +3298,20 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
                                  &(cabac->ctx_cu_sig_model_chroma[0]);
   memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
 
-  // transform skip flag
-  if(width == 4 && encoder->trskip_enable) {
-    cabac->ctx = (type == 0) ? &(cabac->ctx_transform_skip_model_luma) : &(cabac->ctx_transform_skip_model_chroma);
-    CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
-  }
-
   // Count non-zero coeffs
   for (i = 0; i < width * width; i++) {
     if (coeff[i] != 0) {
       num_nonzero++;
     }
+  }
+
+  // Transforms with no non-zero coefficients are indicated with CBFs.
+  assert(num_nonzero != 0);
+
+  // transform skip flag
+  if(width == 4 && encoder->trskip_enable) {
+    cabac->ctx = (type == 0) ? &(cabac->ctx_transform_skip_model_luma) : &(cabac->ctx_transform_skip_model_chroma);
+    CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
 
   scan_pos_last = -1;
