@@ -718,7 +718,6 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
-  const int pu_index = PU_INDEX(x >> 2, y >> 2);
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
