@@ -106,7 +106,7 @@ class LogParser:
     else:
       return float(value)
 
-  def __init__(self):
+  def __init__(self, filename):
     re_thread = re.compile(r'^\t([0-9]+)\t-\t([0-9\.]+)\t(\+?)([0-9\.]+)\t-\tthread$')
     re_job = re.compile(r'^([^\t]+)\t([0-9]+)\t([0-9\.]+)\t(\+?)([0-9\.]+)\t(\+?)([0-9\.]+)\t(\+?)([0-9\.]+)\t(.*)$')
     re_dep = re.compile(r'^(.+)->(.+)$')
@@ -118,7 +118,7 @@ class LogParser:
     objects = []
     threads = {}
 
-    for line in open('threadqueue.log','r').readlines():
+    for line in open(filename,'r').readlines():
       m = re_thread.match(line)
       if m:
         g = m.groups()
@@ -281,6 +281,10 @@ class LogParser:
 
 
 if __name__ == '__main__':
-  l = LogParser()
+  import sys
+  if len(sys.argv) > 1:
+    l = LogParser(sys.argv[1])
+  else:
+    l = LogParser('threadqueue.log')
   l.plot_picture_wise_wpp()
   #l.plot_threads()
