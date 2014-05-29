@@ -158,19 +158,22 @@ static void* strategyselector_choose_for(const strategy_list * const strategies,
 
 #if defined(__GNUC__)
 #include <cpuid.h>
+INLINE int get_cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx) {
+  return __get_cpuid(level, eax, ebx, ecx, edx);
+}
 #else
 #include <intrin.h>
 //Adapter from __cpuid (VS) to __get_cpuid (GNU C).
-__inline int __get_cpuid(unsigned int __level, unsigned int *__eax, unsigned int *__ebx, unsigned int *__ecx, unsigned int *__edx) {
-  int CPUInfo[4] = {*__eax, *__ebx, *__ecx, *__edx};
+INLINE int get_cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx) {
+  int CPUInfo[4] = {*eax, *ebx, *ecx, *edx};
   __cpuid(CPUInfo, 0);
   // check if the CPU supports the cpuid instruction.
   if (CPUInfo[0] != 0) {
-    __cpuid(CPUInfo, __level);
-    *__eax = CPUInfo[0];
-    *__ebx = CPUInfo[1];
-    *__ecx = CPUInfo[2];
-    *__edx = CPUInfo[3];
+    __cpuid(CPUInfo, level);
+    *eax = CPUInfo[0];
+    *ebx = CPUInfo[1];
+    *ecx = CPUInfo[2];
+    *edx = CPUInfo[3];
     return 1;
   }
   return 0;
@@ -193,7 +196,7 @@ static void set_hardware_flags() {
     enum { BIT_SSE3 = 0,BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26, BIT_AVX = 28};
 
     // Dig CPU features with cpuid
-    __get_cpuid(1, &eax, &ebx, &ecx, &edx);
+    get_cpuid(1, &eax, &ebx, &ecx, &edx);
     
     // EDX
     if (edx & (1<<BIT_MMX))   g_hardware_flags.intel_flags.mmx = 1;
