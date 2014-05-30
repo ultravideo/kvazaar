@@ -159,8 +159,9 @@ static void* strategyselector_choose_for(const strategy_list * const strategies,
 #if defined(__GNUC__)
 #include <cpuid.h>
 #else
+#include <intrin.h>
 //Adapter from __cpuid (VS) to __get_cpuid (GNU C).
-inline int __get_cpuid(unsigned int __level, unsigned int *__eax, unsigned int *__ebx, unsigned int *__ecx, unsigned int *__edx) {
+__inline int __get_cpuid(unsigned int __level, unsigned int *__eax, unsigned int *__ebx, unsigned int *__ecx, unsigned int *__edx) {
   int CPUInfo[4] = {*__eax, *__ebx, *__ecx, *__edx};
   __cpuid(CPUInfo, 0);
   // check if the CPU supports the cpuid instruction.
@@ -172,6 +173,7 @@ inline int __get_cpuid(unsigned int __level, unsigned int *__eax, unsigned int *
     *__edx = CPUInfo[3];
     return 1;
   }
+  return 0;
 }
 #endif //defined(__GNUC__)
 
