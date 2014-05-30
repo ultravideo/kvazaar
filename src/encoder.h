@@ -72,6 +72,7 @@ typedef struct encoder_control
   encoder_me me;
   
   int8_t bitdepth;
+  int8_t tr_depth_intra;
 
   /* Filtering */
   int8_t deblock_enable; // \brief Flag to enable deblocking filter

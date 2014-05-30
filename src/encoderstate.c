@@ -1467,7 +1467,8 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
   int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
-  int max_tr_depth = (cur_cu->type == CU_INTRA ? TR_DEPTH_INTRA + intra_split_flag : TR_DEPTH_INTER);
+  int tr_depth_intra = encoder_state->encoder_control->tr_depth_intra;
+  int max_tr_depth = (cur_cu->type == CU_INTRA ? tr_depth_intra + intra_split_flag : TR_DEPTH_INTER);
 
   int8_t split = (cur_cu->tr_depth > depth);
 

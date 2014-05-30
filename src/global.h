@@ -74,7 +74,6 @@ typedef int16_t coefficient;
 #define MAX_PU_DEPTH 4 /*!< Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu() */
 
 // Minimum log2 transform sizes.
-#define TR_DEPTH_INTRA 2 /*!< spec: max_transform_hierarchy_depth_intra */
 #define TR_DEPTH_INTER 2 /*!< spec: max_transform_hierarchy_depth_inter */
 
 #define ENABLE_PCM 0 /*!< spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */

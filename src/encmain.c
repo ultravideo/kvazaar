@@ -260,6 +260,7 @@ int main(int argc, char *argv[])
   encoder.full_intra_search = (int8_t)encoder.cfg->full_intra_search;
   // TR SKIP
   encoder.trskip_enable = (int8_t)encoder.cfg->trskip_enable;
+  encoder.tr_depth_intra = (int8_t)encoder.cfg->tr_depth_intra;
   // VUI
   encoder.vui.sar_width   = (int16_t)encoder.cfg->vui.sar_width;
   encoder.vui.sar_height  = (int16_t)encoder.cfg->vui.sar_height;

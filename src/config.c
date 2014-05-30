@@ -68,6 +68,7 @@ int config_init(config *cfg)
   cfg->rdo             = 1;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 1;
+  cfg->tr_depth_intra  = 0;
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
   cfg->vui.overscan    = 0; /* undef */
@@ -378,6 +379,15 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
+  else if OPT("tr-depth-intra") {
+    cfg->tr_depth_intra = atoi(value);
+    if (cfg->tr_depth_intra == 0 && strcmp(value, "0")) {
+      error = 1;
+    } else if (cfg->tr_depth_intra < 0 || cfg->tr_depth_intra > 4) {
+      // range is 0 .. CtbLog2SizeY - Log2MinTrafoSize
+      error = 1;
+    }
+  }
   else if OPT("sar") {
       int sar_width, sar_height;
       if (2 == sscanf(value, "%d:%d", &sar_width, &sar_height)) {
@@ -464,6 +474,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "rd",                 required_argument, NULL, 0 },
     { "full-intra-search",        no_argument, NULL, 0 },
     { "no-transform-skip",        no_argument, NULL, 0 },
+    { "tr-depth-intra",     required_argument, NULL, 0 },
     { "sar",                required_argument, NULL, 0 },
     { "overscan",           required_argument, NULL, 0 },
     { "videoformat",        required_argument, NULL, 0 },
