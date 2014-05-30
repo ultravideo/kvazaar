@@ -9,14 +9,19 @@ DFLAGS = -O2 -g -Werror -march=native
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
-    ASMFLAGS += -DARCH_X86_64=1
-    DFLAGS += -m64
-    LDFLAGS += -m64
+    TARGET_CPU_BITS := 64
+    TARGET_CPU_ARCH := x86
+else ifeq ($(ARCH), ppc64)
+    TARGET_CPU_BITS := 64
+    TARGET_CPU_ARCH := ppc
 else
-    ASMFLAGS += -DARCH_X86_64=0
-    DFLAGS += -m32
-    LDFLAGS += -m32
+    #safe (?) defaults
+    TARGET_CPU_BITS := 32
+    TARGET_CPU_ARCH := x86
 endif
+
+DFLAGS += -m$(TARGET_CPU_BITS)
+LDFLAGS += -m$(TARGET_CPU_BITS)
 
 # Windows (cygwin/mingw) specific flags
 ifneq ( ,$(findstring Windows, $(OS)))
@@ -48,8 +53,6 @@ CC = gcc
 CCFLAGS = $(DFLAGS) -I. -Wall -Wtype-limits
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
-YASM = yasm
-ASMOBJS = cpu.o
 OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
@@ -62,9 +65,6 @@ all: $(PROGS)
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
-cpu.o: x86/cpu.asm
-	$(YASM) $(ASMFLAGS) x86/cpu.asm -o cpu.o
-
 %.o: %.c Makefile
 	$(CC) $(CCFLAGS) -c $< -o $@
 
@@ -73,6 +73,7 @@ cpu.o: x86/cpu.asm
 
 
 clean:
+	echo $(ARCH)
 	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)
 
 -include $(DEPS)

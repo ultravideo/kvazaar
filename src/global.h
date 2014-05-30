@@ -135,7 +135,7 @@ typedef int16_t coefficient;
 #define SIZE_NxN   3
 #define SIZE_NONE  15
 
-#define MAX_TILES_PER_DIM 16
+#define MAX_TILES_PER_DIM 48
 #define MAX_SLICES 16
 
 /* Inlining functions */
