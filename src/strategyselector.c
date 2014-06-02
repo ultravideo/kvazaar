@@ -33,6 +33,7 @@ static void* strategyselector_choose_for(const strategy_list * const strategies,
 
 //Strategies to include (add new file here)
 #include "strategies/picture.c"
+#include "strategies/nal.c"
 
 //Returns 1 if successful
 int strategyselector_init() {
@@ -48,6 +49,11 @@ int strategyselector_init() {
   //Add new register function here
   if (!strategy_register_picture(&strategies)) {
     fprintf(stderr, "strategy_register_picture failed!\n");
+    return 0;
+  }
+  
+  if (!strategy_register_nal(&strategies)) {
+    fprintf(stderr, "strategy_register_nal failed!\n");
     return 0;
   }
   
