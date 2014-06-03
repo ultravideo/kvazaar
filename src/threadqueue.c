@@ -34,6 +34,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
 
   for(;;) {
     int task_id = -1, i = 0;
+    int signal_count = 0;
     
     PTHREAD_LOCK(&threadqueue->lock);
 
@@ -99,6 +100,8 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       
       job->state = THREADQUEUE_JOB_STATE_DONE;
       
+      signal_count = 0;
+      
       //Decrease counter of dependencies
       for (i = 0; i < job->rdepends_count; ++i) {
         threadqueue_job * const depjob = job->rdepends[i];
@@ -109,6 +112,10 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
         assert(depjob->ndepends > 0);
         --depjob->ndepends;
         
+        if (depjob->ndepends == 0) {
+          ++signal_count;
+        }
+        
         PTHREAD_UNLOCK(&depjob->lock);
       }
       //Unlock the job
@@ -116,7 +123,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       
       //Signal the queue that we've done a job
       PTHREAD_LOCK(&threadqueue->lock);
-      pthread_cond_broadcast(&threadqueue->cb_cond);
+      pthread_cond_signal(&threadqueue->cb_cond);
       PTHREAD_UNLOCK(&threadqueue->lock);
     } else {
       PTHREAD_UNLOCK(&threadqueue->lock);
@@ -436,11 +443,14 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
   
   ++threadqueue->queue_waiting;
   
-  //Hope a thread can do it...
-  if(pthread_cond_signal(&(threadqueue->cond)) != 0) {
-      fprintf(stderr, "pthread_cond_signal failed!\n");
-      assert(0);
-      return NULL;
+  if (job->ndepends == 0) {
+    //Hope a thread can do it...
+    fprintf(stderr, "Sent signal from submit\n");
+    if(pthread_cond_signal(&(threadqueue->cond)) != 0) {
+        fprintf(stderr, "pthread_cond_signal failed!\n");
+        assert(0);
+        return NULL;
+    }
   }
   
   PTHREAD_UNLOCK(&threadqueue->lock);
@@ -478,20 +488,25 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
 }
 
 int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueue_job *job) {
+  int ndepends = 0;
+  
   //NULL job =>  no threads, nothing to do
   if (!job) return 1;
   PTHREAD_LOCK(&job->lock);
   job->ndepends--;
+  ndepends = job->ndepends;
   PTHREAD_UNLOCK(&job->lock);
   
-  PTHREAD_LOCK(&threadqueue->lock);
-  //Hope a thread can do it...
-  if(pthread_cond_signal(&(threadqueue->cond)) != 0) {
-      fprintf(stderr, "pthread_cond_signal failed!\n");
-      assert(0);
-      return 0;
+  if (ndepends == 0) {
+    PTHREAD_LOCK(&threadqueue->lock);
+    //Hope a thread can do it...
+    if(pthread_cond_signal(&(threadqueue->cond)) != 0) {
+        fprintf(stderr, "pthread_cond_signal failed!\n");
+        assert(0);
+        return 0;
+    }
+    PTHREAD_UNLOCK(&threadqueue->lock);
   }
-  PTHREAD_UNLOCK(&threadqueue->lock);
   
   return 1;
 }
