@@ -188,6 +188,43 @@ INLINE int get_cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, u
 
 #endif
 
+#if COMPILE_POWERPC
+#include <unistd.h>
+#include <fcntl.h>
+#include <linux/auxvec.h>
+#include <asm/cputable.h>
+
+//Source: http://freevec.org/function/altivec_runtime_detection_linux
+static int altivec_available(void)
+{
+    int result = 0;
+    unsigned long buf[64];
+    ssize_t count;
+    int fd, i;
+ 
+    fd = open("/proc/self/auxv", O_RDONLY);
+    if (fd < 0) {
+        return 0;
+    }
+    // loop on reading
+    do {
+        count = read(fd, buf, sizeof(buf));
+        if (count < 0)
+            break;
+        for (i=0; i < (count / sizeof(unsigned long)); i += 2) {
+            if (buf[i] == AT_HWCAP) {
+                result = !!(buf[i+1] & PPC_FEATURE_HAS_ALTIVEC);
+                goto out_close;
+            } else if (buf[i] == AT_NULL)
+                goto out_close;
+        }
+    } while (count == sizeof(buf));
+out_close:
+    close(fd);
+    return result;
+}
+#endif //COMPILE_POWERPC
+
 static void set_hardware_flags() {
   memset(&g_hardware_flags, 0, sizeof(g_hardware_flags));
   
@@ -252,4 +289,17 @@ static void set_hardware_flags() {
     fprintf(stderr, "\n");
   }
 #endif //COMPILE_INTEL
+
+#if COMPILE_POWERPC
+  g_hardware_flags.powerpc_flags.altivec = altivec_available();
+  
+  fprintf(stderr, "Compiled: PowerPC, flags:");
+#if COMPILE_POWERPC_ALTIVEC
+  fprintf(stderr, " AltiVec");
+#endif
+  fprintf(stderr, "\nRun on  : PowerPC, flags:");
+  if (g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
+  fprintf(stderr, "\n");
+#endif
+  
 }
