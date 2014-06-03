@@ -44,6 +44,26 @@
 #include "rdo.h"
 
 /* Local functions. */
+static int lcu_at_slice_start(const encoder_control * const encoder, int lcu_addr_in_ts) {
+  int i;
+  assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
+  if (lcu_addr_in_ts == 0) return 1;
+  for (i = 0; i < encoder->slice_count; ++i) {
+    if (encoder->slice_addresses_in_ts[i] == lcu_addr_in_ts) return 1;
+  }
+  return 0;
+}
+
+static int lcu_at_slice_end(const encoder_control * const encoder, int lcu_addr_in_ts) {
+  int i;
+  assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
+  if (lcu_addr_in_ts == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
+  for (i = 0; i < encoder->slice_count; ++i) {
+    if (encoder->slice_addresses_in_ts[i] == lcu_addr_in_ts + 1) return 1;
+  }
+  return 0;
+}
+
 
 int encoder_control_init(encoder_control * const encoder, const config * const cfg) {
   if (!cfg) {
