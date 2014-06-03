@@ -1685,7 +1685,6 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
 
   int i;
 
-
   if (main_state->global->is_radl_frame) {
     // Access Unit Delimiter (AUD)
     if (encoder->aud_enable)
@@ -1726,17 +1725,24 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     nal_write(stream,
               main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
-  
+  {
+    PERFORMANCE_MEASURE_START();
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     //Append bitstream to main stream
     bitstream_append(&main_state->stream, &main_state->children[i].stream);
     //FIXME: Move this...
     bitstream_clear(&main_state->children[i].stream);
   }
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,type=%c", main_state->global->frame, main_state->type);
+  }
   
-  // Calculate checksum
-  add_checksum(main_state);
-
+  {
+    PERFORMANCE_MEASURE_START();
+    // Calculate checksum
+    add_checksum(main_state);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,type=%c", main_state->global->frame, main_state->type);
+  }
+  
   //FIXME: Why is this needed?
   main_state->tile->cur_pic->poc = main_state->global->poc;
 }
@@ -1817,9 +1823,19 @@ static void encoder_state_write_bitstream(encoder_state * const main_state) {
 
 void encode_one_frame(encoder_state * const main_state)
 {
-  encoder_state_new_frame(main_state);
-  encoder_state_encode(main_state);
-  encoder_state_write_bitstream(main_state);
+  {
+    PERFORMANCE_MEASURE_START();
+    encoder_state_new_frame(main_state);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=new_frame,frame=%d", main_state->global->frame);
+  }
+  {
+    PERFORMANCE_MEASURE_START();
+    encoder_state_encode(main_state);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=encode,frame=%d", main_state->global->frame);
+  }
+  {
+    encoder_state_write_bitstream(main_state);
+  }
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
