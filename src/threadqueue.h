@@ -75,7 +75,8 @@ typedef struct {
   unsigned int queue_start;
   unsigned int queue_count;
   unsigned int queue_size;
-  unsigned int queue_waiting;
+  unsigned int queue_waiting_execution; //Number of jobs without any dependency which could be run
+  unsigned int queue_waiting_dependency; //Number of jobs waiting for a dependency to complete
   
 #ifdef _DEBUG
   //Format: pointer <tab> worker id <tab> time enqueued <tab> time started <tab> time stopped <tab> time dequeued <tab> job description
