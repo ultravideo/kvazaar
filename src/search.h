@@ -27,6 +27,7 @@
 #include "global.h"
 
 #include "encoder.h"
+#include "encoderstate.h"
 #include "picture.h"
 
 

@@ -27,6 +27,7 @@
 #include "global.h"
 #include "picture.h"
 #include "encoder.h"
+#include "encoderstate.h"
 #include "math.h"
 
 typedef enum { SAO_TYPE_NONE = 0, SAO_TYPE_BAND, SAO_TYPE_EDGE } sao_type;

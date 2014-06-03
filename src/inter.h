@@ -28,6 +28,7 @@
 
 #include "picture.h"
 #include "encoder.h"
+#include "encoderstate.h"
 
 
 void inter_set_block(picture* pic,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
