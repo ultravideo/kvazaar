@@ -331,6 +331,9 @@ class LogParser:
     vx,vy = itc.get_values_uniform_xy(0.01,10)
     ax.plot(vx, [y+1.5 for y in vy], 'r')
     
+    for y in set(itc.get_values_y()):
+      yticks[y+1.5] = '{0}'.format(y)
+    
     
 
     #first draw threads
@@ -357,9 +360,12 @@ class LogParser:
           ax.plot([o2._stop, o._start], [-int(o2.position_y()), -int(o.position_y())] , linewidth=1, color='k')
 
     for y in yticks.keys():
-      ax.axhline(y+0.5, color='k')
-      if y - 1 not in yticks.keys():
-        ax.axhline(y-0.5, color='k')
+      if y<1.5:
+        ax.axhline(y+0.5, color='k')
+        if y - 1 not in yticks.keys():
+          ax.axhline(y-0.5, color='k')
+      else:
+        ax.axhline(y, color='k', linestyle='dotted')
       if y == 1:
         yticks[y] = "None"
 
