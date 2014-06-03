@@ -157,12 +157,7 @@ int read_one_frame(FILE* file, const encoder_state *encoder);
 
 void encoder_next_frame(encoder_state *encoder_state);
 
-void encode_seq_parameter_set(encoder_state *encoder);
-void encode_pic_parameter_set(encoder_state *encoder);
-void encode_vid_parameter_set(encoder_state *encoder);
-void encode_slice_header(encoder_state * encoder);
-void encode_access_unit_delimiter(encoder_state *encoder);
-void encode_prefix_sei_version(encoder_state *encoder);
+
 void encode_coding_tree(encoder_state *encoder, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
