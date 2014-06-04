@@ -62,6 +62,11 @@
 
 #if defined (_M_PPC) || defined(__powerpc64__) || defined(__powerpc__)
 #define COMPILE_POWERPC 1
+#ifdef __ALTIVEC__
+#define COMPILE_POWERPC_ALTIVEC 1
+#else
+#define COMPILE_POWERPC_ALTIVEC 0
+#endif
 #else
 #define COMPILE_POWERPC 0
 #endif
@@ -127,9 +132,11 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 
 
 //Strategy to include
+#include "strategies/nal.h"
 #include "strategies/picture.h"
 
 static const strategy_to_select strategies_to_select[] = {
+  STRATEGIES_NAL_EXPORTS,
   STRATEGIES_PICTURE_EXPORTS,
   {NULL, NULL},
 };

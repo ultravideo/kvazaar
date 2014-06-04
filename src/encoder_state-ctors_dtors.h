@@ -1,5 +1,5 @@
-#ifndef SEARCH_H_
-#define SEARCH_H_
+#ifndef ENCODER_STATE_CTORS_DTORS_H_
+#define ENCODER_STATE_CTORS_DTORS_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -21,16 +21,19 @@
 
 /*
  * \file
- * \brief Searching of parameters for intra and inter frames.
  */
 
 #include "global.h"
 
-#include "encoder.h"
-#include "encoderstate.h"
-#include "picture.h"
+
+// Forward declare because including the header would lead  to a cyclic
+// dependency.
+struct encoder_state;
 
 
-void search_lcu(encoder_state *encoder_state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
+int encoder_state_init(struct encoder_state * child_state, struct encoder_state * parent_state);
+void encoder_state_finalize(struct encoder_state *encoder_state);
+void encoder_state_init_lambda(struct encoder_state *encoder_state);
 
-#endif
+
+#endif // ENCODER_STATE_CTORS_DTORS_H_

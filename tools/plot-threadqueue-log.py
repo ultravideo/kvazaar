@@ -98,6 +98,94 @@ class LogThread:
 
   def plot(self, ax, i):
     ax.barh(i, self._stop - self._start, left=self._start, height=0.9, align='center',label="test", color='yellow')
+    
+class IntervalThreadCounter:
+  def __init__(self):
+    self.interval_starts = []
+    self.interval_stops = []
+    
+  def add_interval(self, start, stop):
+    self.interval_starts.append(start)
+    self.interval_stops.append(stop)
+    self.interval_starts.sort()
+    self.interval_stops.sort()
+    
+  def get_values_xd(self):
+    #Double the first and the last items
+    xds = sorted([(x,'+') for x in self.interval_starts] + [(x,'-') for x in self.interval_stops])
+    return xds
+    
+  def get_values_x(self):
+    xs = []
+    for x in self.get_values_xd():
+      xs.append(x[0])
+      xs.append(x[0])
+    return xs
+  
+  def get_values_y(self):
+    xds = self.get_values_xd()
+    ys = []
+    counter = 0
+    for xd in xds:
+      ys.append(counter)
+      
+      if xd[1] == '+':
+        counter += 1
+      elif xd[1] == '-':
+        counter -= 1
+      else:
+        assert False
+      
+      ys.append(counter)
+      
+    return ys
+    
+  def clamp(self, v, minval, maxval):
+    if v < minval:
+      return minval
+    if v > maxval:
+      return maxval
+    return v
+    
+  def get_values_uniform_xy(self, kernel_size, steps):
+    kernel_size=float(kernel_size)
+    xchs = self.get_values_x()
+    ychs = self.get_values_y()
+    
+    minval = xchs[0] - kernel_size
+    maxval = xchs[-1] + kernel_size
+    
+    pos = minval
+    
+    xvalues = []
+    yvalues = []
+
+    while pos < maxval:
+      value = 0
+      for i in range(1,len(xchs)-1):
+        if xchs[i] < pos - kernel_size:
+          continue
+          
+        v1 = self.clamp(xchs[i-1], pos - kernel_size/2., pos+kernel_size/2.)
+        v2 = self.clamp(xchs[i], pos - kernel_size/2., pos+kernel_size/2.)
+        
+        diff=v2-v1
+        
+        value += diff*ychs[i]/kernel_size
+        
+        if xchs[i] > pos + kernel_size:
+          break
+          
+      xvalues.append(pos)
+      yvalues.append(value)
+      
+      pos += kernel_size/steps
+      
+    return xvalues, yvalues
+    
+      
+    
+    
 
 class LogParser:
   def _parse_time(self, base, sign, value):
@@ -231,6 +319,22 @@ class LogParser:
     ax=fig.gca()
 
     yticks = {}
+    
+    #first draw usage
+    itc = IntervalThreadCounter()
+    for o in self._objects:
+      if isinstance(o, LogJob) and o._is_thread_job:
+        itc.add_interval(o._start, o._stop)
+    
+    #exact plot
+    ax.plot(itc.get_values_x(), [y+1.5 for y in itc.get_values_y()])
+    vx,vy = itc.get_values_uniform_xy(0.01,10)
+    ax.plot(vx, [y+1.5 for y in vy], 'r')
+    
+    for y in set(itc.get_values_y()):
+      yticks[y+1.5] = '{0}'.format(y)
+    
+    
 
     #first draw threads
     for o in self._objects:
@@ -256,9 +360,12 @@ class LogParser:
           ax.plot([o2._stop, o._start], [-int(o2.position_y()), -int(o.position_y())] , linewidth=1, color='k')
 
     for y in yticks.keys():
-      ax.axhline(y+0.5, color='k')
-      if y - 1 not in yticks.keys():
-        ax.axhline(y-0.5, color='k')
+      if y<1.5:
+        ax.axhline(y+0.5, color='k')
+        if y - 1 not in yticks.keys():
+          ax.axhline(y-0.5, color='k')
+      else:
+        ax.axhline(y, color='k', linestyle='dotted')
       if y == 1:
         yticks[y] = "None"
 

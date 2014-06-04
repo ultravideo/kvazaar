@@ -22,6 +22,7 @@
  */
 
 #include "nal.h"
+#include "strategyselector.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -63,40 +64,6 @@ void nal_write(bitstream * const bitstream, const uint8_t nal_type,
   byte = (temporal_id + 1) & 7;
   bitstream_writebyte(bitstream, byte);
 }
-
-
-/**
- * \brief Calculate checksum for one color of the picture.
- * \param data Beginning of the pixel data for the picture.
- * \param height Height of the picture.
- * \param width Width of the picture.
- * \param stride Width of one row in the pixel array.
- */
-static void array_checksum(const pixel* data,
-                           const int height, const int width,
-                           const int stride,
-                           unsigned char checksum_out[SEI_HASH_MAX_LENGTH])
-{
-  uint8_t mask;
-  uint32_t checksum = 0;
-  int y, x;
-
-  assert(SEI_HASH_MAX_LENGTH >= 4);
-
-  for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
-      mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
-      checksum += (data[(y * stride) + x] & 0xff) ^ mask;
-    }
-  }
-
-  // Unpack uint into byte-array.
-  checksum_out[0] = (checksum >> 24) & 0xff;
-  checksum_out[1] = (checksum >> 16) & 0xff;
-  checksum_out[2] = (checksum >> 8) & 0xff;
-  checksum_out[3] = (checksum) & 0xff;
-}
-
 
 /*!
  \brief Calculate checksums for all colors of the picture.

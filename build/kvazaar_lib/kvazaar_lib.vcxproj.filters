@@ -19,6 +19,9 @@
     <Filter Include="Header Files\x86">
       <UniqueIdentifier>{d1533c70-cb9a-419d-9a38-5161894ec359}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\strategies">
+      <UniqueIdentifier>{84b28f88-c0de-4ee8-8566-c2c56d2b0f6e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\encmain.c">
@@ -79,6 +82,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\threadqueue.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\encoder_state-bitstream.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\encoder_state-ctors_dtors.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\encoder_state-geometry.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\encoderstate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -144,6 +159,39 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\threadqueue.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\picture.h">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\encoderstate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\picture-sse41.c">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\picture-sse2.c">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\picture-generic.c">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\nal.c">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\nal-generic.c">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\picture.c">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\encoder_state-bitstream.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\encoder_state-geometry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

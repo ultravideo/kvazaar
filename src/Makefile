@@ -53,7 +53,7 @@ CC = gcc
 CCFLAGS = $(DFLAGS) -I. -Wall -Wtype-limits
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
-OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o
+OBJS = interface_main.o encmain.o bitstream.o cabac.o config.o context.o encoder.o encoderstate.o filter.o inter.o intra.o nal.o picture.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o encoder_state-bitstream.o encoder_state-ctors_dtors.o encoder_state-geometry.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 

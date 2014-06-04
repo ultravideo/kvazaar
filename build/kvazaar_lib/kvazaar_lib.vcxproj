@@ -79,6 +79,10 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
+    <ClCompile>
+      <DisableSpecificWarnings>
+      </DisableSpecificWarnings>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>
@@ -114,6 +118,10 @@
     <ClCompile Include="..\..\src\context.c" />
     <ClCompile Include="..\..\src\encmain.c" />
     <ClCompile Include="..\..\src\encoder.c" />
+    <ClCompile Include="..\..\src\encoderstate.c" />
+    <ClCompile Include="..\..\src\encoder_state-bitstream.c" />
+    <ClCompile Include="..\..\src\encoder_state-ctors_dtors.c" />
+    <ClCompile Include="..\..\src\encoder_state-geometry.c" />
     <ClCompile Include="..\..\src\extras\getopt.c" />
     <ClCompile Include="..\..\src\filter.c" />
     <ClCompile Include="..\..\src\inter.c" />
@@ -124,6 +132,15 @@
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
+    <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h" />
+    <ClInclude Include="..\..\src\encoder_state-geometry.h" />
+    <ClInclude Include="..\..\src\strategies\nal-generic.c" />
+    <ClInclude Include="..\..\src\strategies\nal.c" />
+    <ClInclude Include="..\..\src\strategies\picture-generic.c" />
+    <ClInclude Include="..\..\src\strategies\picture-sse2.c" />
+    <ClInclude Include="..\..\src\strategies\picture-sse41.c" />
+    <ClInclude Include="..\..\src\strategies\picture.c" />
     <ClCompile Include="..\..\src\strategyselector.c" />
     <ClCompile Include="..\..\src\tables.c" />
     <ClCompile Include="..\..\src\threadqueue.c" />
@@ -135,6 +152,7 @@
     <ClInclude Include="..\..\src\config.h" />
     <ClInclude Include="..\..\src\context.h" />
     <ClInclude Include="..\..\src\encoder.h" />
+    <ClInclude Include="..\..\src\encoderstate.h" />
     <ClInclude Include="..\..\src\extras\getopt.h" />
     <ClInclude Include="..\..\src\filter.h" />
     <ClInclude Include="..\..\src\global.h" />
@@ -146,6 +164,7 @@
     <ClInclude Include="..\..\src\sao.h" />
     <ClInclude Include="..\..\src\scalinglist.h" />
     <ClInclude Include="..\..\src\search.h" />
+    <ClInclude Include="..\..\src\strategies\picture.h" />
     <ClInclude Include="..\..\src\tables.h" />
     <ClInclude Include="..\..\src\threadqueue.h" />
     <ClInclude Include="..\..\src\threads.h" />

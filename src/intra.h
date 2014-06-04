@@ -28,6 +28,7 @@
 
 #include "picture.h"
 #include "encoder.h"
+#include "encoderstate.h"
 
 void intra_set_block_mode(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
 
