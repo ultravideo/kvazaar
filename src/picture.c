@@ -369,7 +369,7 @@ double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
  * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
  * From HM 13.0
  */
-static unsigned satd_16bit_4x4(pixel *piOrg,pixel *piCur)
+static unsigned satd_16bit_4x4(const pixel *piOrg, const pixel *piCur)
 {
   int32_t k, satd = 0, diff[16], m[16], d[16];
   int32_t iStrideOrg = 4, iStrideCur = 4;
@@ -463,8 +463,8 @@ static unsigned satd_16bit_4x4(pixel *piOrg,pixel *piCur)
 /**
  * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
  */
-static unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg,
-                                       pixel *piCur, int32_t iStrideCur)
+static unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrideOrg,
+                                       const pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
@@ -560,9 +560,9 @@ static unsigned satd_16bit_8x8_general(pixel *piOrg, int32_t iStrideOrg,
 // multiples of 8x8 with the 8x8 hadamard function.
 #define SATD_NXN(n, pixel_type, suffix) \
   static unsigned satd_ ## suffix ## _ ## n ## x ## n( \
-                  pixel_type *block1, pixel_type *block2) \
+                  const pixel_type * const block1, const pixel_type * const block2) \
   { \
-    unsigned y, x; \
+    unsigned x, y; \
     unsigned sum = 0; \
     for (y = 0; y < (n); y += 8) { \
       unsigned row = y * (n); \
@@ -583,15 +583,12 @@ SATD_NXN(64, pixel, 16bit)
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type, suffix) \
   static unsigned sad_ ## suffix ## _ ##  n ## x ## n( \
-                  pixel_type *block1, pixel_type *block2) \
+                  const pixel_type * const block1, const pixel_type * const block2) \
   { \
-    unsigned x, y, row; \
+    unsigned i; \
     unsigned sum = 0; \
-    for(y = 0; y < (n); y++) { \
-      row = y * (n); \
-      for (x = 0; x < (n); ++x) { \
-        sum += abs(block1[row + x] - block2[row + x]); \
-      } \
+    for (i = 0; i < (n)*(n); ++i) { \
+      sum += abs(block1[i] - block2[i]); \
     } \
     return sum; \
   }

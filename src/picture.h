@@ -258,7 +258,7 @@ int picture_list_destroy(picture_list *list);
 int picture_list_add(picture_list *list, picture *pic);
 int picture_list_rem(picture_list *list, unsigned n);
 
-typedef unsigned (*cost_16bit_nxn_func)(pixel *block1, pixel *block2);
+typedef unsigned (*cost_16bit_nxn_func)(const pixel *block1, const pixel *block2);
 
 
 cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n);
