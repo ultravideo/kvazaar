@@ -19,6 +19,8 @@
 
 #include "encoder_state-bitstream.h"
 
+#include <string.h>
+
 #include "encoderstate.h"
 #include "nal.h"
 
