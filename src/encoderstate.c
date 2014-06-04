@@ -43,14 +43,6 @@
 #include "sao.h"
 #include "rdo.h"
 
-/* Local functions. */
-static void add_checksum(encoder_state *encoder);
-static void encode_sao(encoder_state *encoder,
-                       unsigned x_lcu, uint16_t y_lcu,
-                       sao_info *sao_luma, sao_info *sao_chroma);
-
-static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state);
-static void encoder_state_worker_write_bitstream_leaf(void * opaque);
 
 /*!
   \brief Initializes lambda-value for current QP
@@ -80,15 +72,6 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
 
   encoder_state->global->cur_lambda_cost = lambda;
 }
-
-//Functions to obtain geometry information from LCU
-#include "_encoderstategeometry.c"
-
-//Constructors/destructors
-#include "_encoderstatectorsdtors.c"
-
-//Functions writing bitstream parts
-#include "_encoderstatebitstream.c"
 
 static void encoder_state_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
   const int source_offset_x = source_enc->tile->lcu_offset_x * LCU_WIDTH;
@@ -180,6 +163,91 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
                         1, lcu->size.y / 2, cur_pic->width / 2, 1);
   }
   
+}
+
+
+static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
+                             color_index color_i)
+{
+  cabac_data * const cabac = &encoder_state->cabac;
+  sao_eo_cat i;
+
+  // Skip colors with no SAO.
+  //FIXME: for now, we always have SAO for all channels
+  if (color_i == COLOR_Y && 0) return;
+  if (color_i != COLOR_Y && 0) return;
+
+  /// sao_type_idx_luma:   TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
+  /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
+  // Encode sao_type_idx for Y and U+V.
+  if (color_i != COLOR_V) {
+    cabac->ctx = &(cabac->ctx_sao_type_idx_model);;
+    CABAC_BIN(cabac, sao->type != SAO_TYPE_NONE, "sao_type_idx");
+    if (sao->type == SAO_TYPE_BAND) {
+      CABAC_BIN_EP(cabac, 0, "sao_type_idx_ep");
+    } else if (sao->type == SAO_TYPE_EDGE) {
+      CABAC_BIN_EP(cabac, 1, "sao_type_idx_ep");
+    }
+  }
+
+  if (sao->type == SAO_TYPE_NONE) return;
+
+  /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
+  ///                         cRiceParam = 0, bins = {bypass x N}
+  for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
+    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i]), SAO_ABS_OFFSET_MAX);
+  }
+
+  /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
+  /// sao_band_position[][][]: FL, cMax = 31, bins = {bypass x N}
+  /// sao_eo_class_luma:       FL, cMax = 3, bins = {bypass x 3}
+  /// sao_eo_class_chroma:     FL, cMax = 3, bins = {bypass x 3}
+  if (sao->type == SAO_TYPE_BAND) {
+    for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
+      // Positive sign is coded as 0.
+      if(sao->offsets[i] != 0) {
+        CABAC_BIN_EP(cabac, sao->offsets[i] < 0 ? 1 : 0, "sao_offset_sign");
+      }
+    }
+    // TODO: sao_band_position
+    // FL cMax=31 (5 bits)
+    CABAC_BINS_EP(cabac, sao->band_position, 5, "sao_band_position");
+  } else if (color_i != COLOR_V) {
+    CABAC_BINS_EP(cabac, sao->eo_class, 2, "sao_eo_class");
+  }
+}
+
+static void encode_sao_merge_flags(encoder_state * const encoder_state, sao_info *sao, unsigned x_ctb, unsigned y_ctb)
+{
+  cabac_data * const cabac = &encoder_state->cabac;
+  // SAO merge flags are not present for the first row and column.
+  if (x_ctb > 0) {
+    cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
+    CABAC_BIN(cabac, sao->merge_left_flag, "sao_merge_left_flag");
+  }
+  if (y_ctb > 0 && !sao->merge_left_flag) {
+    cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
+    CABAC_BIN(cabac, sao->merge_up_flag, "sao_merge_up_flag");
+  }
+}
+
+
+/**
+ * \brief Encode SAO information.
+ */
+static void encode_sao(encoder_state * const encoder_state,
+                       unsigned x_lcu, uint16_t y_lcu,
+                       sao_info *sao_luma, sao_info *sao_chroma)
+{
+  // TODO: transmit merge flags outside sao_info
+  encode_sao_merge_flags(encoder_state, sao_luma, x_lcu, y_lcu);
+
+  // If SAO is merged, nothing else needs to be coded.
+  if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
+    encode_sao_color(encoder_state, sao_luma, COLOR_Y);
+    encode_sao_color(encoder_state, sao_chroma, COLOR_U);
+    encode_sao_color(encoder_state, sao_chroma, COLOR_V);
+  }
 }
 
 
@@ -674,39 +742,6 @@ int read_one_frame(FILE* file, const encoder_state * const encoder_state)
   return 1;
 }
 
-/**
- * \brief Add a checksum SEI message to the bitstream.
- * \param encoder The encoder.
- * \returns Void
- */
-static void add_checksum(encoder_state * const encoder_state)
-{
-  bitstream * const stream = &encoder_state->stream;
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
-  unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
-  uint32_t checksum_val;
-  unsigned int i;
-
-  nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
-
-  picture_checksum(cur_pic, checksum);
-
-  WRITE_U(stream, 132, 8, "sei_type");
-  WRITE_U(stream, 13, 8, "size");
-  WRITE_U(stream, 2, 8, "hash_type"); // 2 = checksum
-
-  for (i = 0; i < 3; ++i) {
-    // Pack bits into a single 32 bit uint instead of pushing them one byte
-    // at a time.
-    checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) +
-                   (checksum[i][2] << 8) + (checksum[i][3]);
-    WRITE_U(stream, checksum_val, 32, "picture_checksum");
-  }
-
-  bitstream_align(stream);
-}
-
-
 
 void encoder_next_frame(encoder_state *encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -733,94 +768,6 @@ void encoder_next_frame(encoder_state *encoder_state) {
 
   encoder_state->global->frame++;
   encoder_state->global->poc++;
-}
-
-
-
-
-
-
-static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
-                             color_index color_i)
-{
-  cabac_data * const cabac = &encoder_state->cabac;
-  sao_eo_cat i;
-
-  // Skip colors with no SAO.
-  //FIXME: for now, we always have SAO for all channels
-  if (color_i == COLOR_Y && 0) return;
-  if (color_i != COLOR_Y && 0) return;
-
-  /// sao_type_idx_luma:   TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
-  /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
-  // Encode sao_type_idx for Y and U+V.
-  if (color_i != COLOR_V) {
-    cabac->ctx = &(cabac->ctx_sao_type_idx_model);;
-    CABAC_BIN(cabac, sao->type != SAO_TYPE_NONE, "sao_type_idx");
-    if (sao->type == SAO_TYPE_BAND) {
-      CABAC_BIN_EP(cabac, 0, "sao_type_idx_ep");
-    } else if (sao->type == SAO_TYPE_EDGE) {
-      CABAC_BIN_EP(cabac, 1, "sao_type_idx_ep");
-    }
-  }
-
-  if (sao->type == SAO_TYPE_NONE) return;
-
-  /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
-  ///                         cRiceParam = 0, bins = {bypass x N}
-  for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i]), SAO_ABS_OFFSET_MAX);
-  }
-
-  /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
-  /// sao_band_position[][][]: FL, cMax = 31, bins = {bypass x N}
-  /// sao_eo_class_luma:       FL, cMax = 3, bins = {bypass x 3}
-  /// sao_eo_class_chroma:     FL, cMax = 3, bins = {bypass x 3}
-  if (sao->type == SAO_TYPE_BAND) {
-    for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-      // Positive sign is coded as 0.
-      if(sao->offsets[i] != 0) {
-        CABAC_BIN_EP(cabac, sao->offsets[i] < 0 ? 1 : 0, "sao_offset_sign");
-      }
-    }
-    // TODO: sao_band_position
-    // FL cMax=31 (5 bits)
-    CABAC_BINS_EP(cabac, sao->band_position, 5, "sao_band_position");
-  } else if (color_i != COLOR_V) {
-    CABAC_BINS_EP(cabac, sao->eo_class, 2, "sao_eo_class");
-  }
-}
-
-static void encode_sao_merge_flags(encoder_state * const encoder_state, sao_info *sao, unsigned x_ctb, unsigned y_ctb)
-{
-  cabac_data * const cabac = &encoder_state->cabac;
-  // SAO merge flags are not present for the first row and column.
-  if (x_ctb > 0) {
-    cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
-    CABAC_BIN(cabac, sao->merge_left_flag, "sao_merge_left_flag");
-  }
-  if (y_ctb > 0 && !sao->merge_left_flag) {
-    cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
-    CABAC_BIN(cabac, sao->merge_up_flag, "sao_merge_up_flag");
-  }
-}
-
-/**
- * \brief Encode SAO information.
- */
-static void encode_sao(encoder_state * const encoder_state,
-                       unsigned x_lcu, uint16_t y_lcu,
-                       sao_info *sao_luma, sao_info *sao_chroma)
-{
-  // TODO: transmit merge flags outside sao_info
-  encode_sao_merge_flags(encoder_state, sao_luma, x_lcu, y_lcu);
-
-  // If SAO is merged, nothing else needs to be coded.
-  if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
-    encode_sao_color(encoder_state, sao_luma, COLOR_Y);
-    encode_sao_color(encoder_state, sao_chroma, COLOR_U);
-    encode_sao_color(encoder_state, sao_chroma, COLOR_V);
-  }
 }
 
 

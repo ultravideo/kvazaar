@@ -46,7 +46,7 @@ typedef struct
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 
 /* Encoder control options, the main struct */
-typedef struct
+typedef struct encoder_control
 {
   /* Configuration */
   const config *cfg;

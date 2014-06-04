@@ -28,6 +28,7 @@
  * so that any file can refer to integer types with exact widths.
  */
 
+#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <limits.h>

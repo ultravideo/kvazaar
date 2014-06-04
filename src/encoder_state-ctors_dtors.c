@@ -17,7 +17,12 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-//This file MUST NOT BE COMPILED directly. It's included in encoderstate.c
+#include "encoder_state-ctors_dtors.h"
+
+#include <stdlib.h>
+
+#include "encoderstate.h"
+
 
 static int encoder_state_config_global_init(encoder_state * const encoder_state) {
   encoder_state->global->ref = picture_list_init(MAX_REF_PIC_COUNT);

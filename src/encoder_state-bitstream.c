@@ -17,7 +17,11 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-//This file MUST NOT BE COMPILED directly. It's included in encoderstate.c
+#include "encoder_state-bitstream.h"
+
+#include "encoderstate.h"
+#include "nal.h"
+
 
 static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state * const encoder_state)
 {
@@ -632,6 +636,39 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
   }
 }
 
+
+/**
+ * \brief Add a checksum SEI message to the bitstream.
+ * \param encoder The encoder.
+ * \returns Void
+ */
+static void add_checksum(encoder_state * const encoder_state)
+{
+  bitstream * const stream = &encoder_state->stream;
+  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
+  uint32_t checksum_val;
+  unsigned int i;
+
+  nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
+
+  picture_checksum(cur_pic, checksum);
+
+  WRITE_U(stream, 132, 8, "sei_type");
+  WRITE_U(stream, 13, 8, "size");
+  WRITE_U(stream, 2, 8, "hash_type"); // 2 = checksum
+
+  for (i = 0; i < 3; ++i) {
+    // Pack bits into a single 32 bit uint instead of pushing them one byte
+    // at a time.
+    checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) +
+                   (checksum[i][2] << 8) + (checksum[i][3]);
+    WRITE_U(stream, checksum_val, 32, "picture_checksum");
+  }
+
+  bitstream_align(stream);
+}
+
 static void encoder_state_write_bitstream_main(encoder_state * const main_state) {
   const encoder_control * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
@@ -700,11 +737,7 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   main_state->tile->cur_pic->poc = main_state->global->poc;
 }
 
-static void encoder_state_worker_write_bitstream_leaf(void * opaque) {
-  encoder_state_write_bitstream_leaf((encoder_state *) opaque);
-}
-
-static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
+void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   //Write terminator of the leaf
   assert(encoder_state->is_leaf);
@@ -728,6 +761,11 @@ static void encoder_state_write_bitstream_leaf(encoder_state * const encoder_sta
   }
 }
 
+
+void encoder_state_worker_write_bitstream_leaf(void * opaque) {
+  encoder_state_write_bitstream_leaf((encoder_state *) opaque);
+}
+
 static void encoder_state_write_bitstream_tile(encoder_state * const main_state) {
   //If it's not a leaf, a tile is "nothing". We only have to write sub elements
   int i;
@@ -749,7 +787,7 @@ static void encoder_state_write_bitstream_slice(encoder_state * const main_state
 }
 
 
-static void encoder_state_write_bitstream(encoder_state * const main_state) {
+void encoder_state_write_bitstream(encoder_state * const main_state) {
   int i;
   if (!main_state->is_leaf) {
     for (i=0; main_state->children[i].encoder_control; ++i) {

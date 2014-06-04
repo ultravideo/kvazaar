@@ -35,6 +35,16 @@
 #include "scalinglist.h"
 #include "threadqueue.h"
 
+
+// Submodules
+// Functions to obtain geometry information from LCU
+#include "encoder_state-geometry.h"
+// Constructors/destructors
+#include "encoder_state-ctors_dtors.h"
+// Functions writing bitstream parts
+#include "encoder_state-bitstream.h"
+
+
 typedef enum {
   ENCODER_STATE_TYPE_INVALID = 'i',
   ENCODER_STATE_TYPE_MAIN = 'M',
@@ -148,9 +158,7 @@ typedef struct encoder_state {
   cabac_data cabac;
 } encoder_state;
 
-int encoder_state_init(encoder_state * child_state, encoder_state * parent_state);
-void encoder_state_finalize(encoder_state *encoder_state);
-void encoder_state_init_lambda(encoder_state *encoder_state);
+
 
 void encode_one_frame(encoder_state *encoder_state);
 int read_one_frame(FILE* file, const encoder_state *encoder);
