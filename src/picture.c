@@ -74,38 +74,28 @@ void yuv_t_free(yuv_t * yuv)
  * This should be inlined, but it's defined here for now to see if Visual
  * Studios LTCG will inline it.
  */
-void picture_blit_pixels(const pixel *orig, pixel *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride)
+void picture_blit_pixels(const pixel * const orig, pixel * const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride)
 {
-  unsigned y, x;
+  unsigned y;
   //There is absolutely no reason to have a width greater than the source or the destination stride.
   assert(width <= orig_stride);
   assert(width <= dst_stride);
 
   for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
-      dst[x] = orig[x];
-    }
-    // Move pointers to the next row.
-    orig += orig_stride;
-    dst += dst_stride;
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel));
   }
 }
 
-void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride)
+void picture_blit_coeffs(const coefficient * const orig, coefficient * const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride)
 {
-  unsigned y, x;
+  unsigned y;
 
   for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
-      dst[x] = orig[x];
-    }
-    // Move pointers to the next row.
-    orig += orig_stride;
-    dst += dst_stride;
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coefficient));
   }
 }
 
@@ -372,15 +362,8 @@ double image_psnr(pixel *frame1, pixel *frame2, int32_t x, int32_t y)
 static unsigned satd_16bit_4x4(const pixel *piOrg, const pixel *piCur)
 {
   int32_t k, satd = 0, diff[16], m[16], d[16];
-  int32_t iStrideOrg = 4, iStrideCur = 4;
-  for( k = 0; k < 16; k+=4 ) {
-    diff[k+0] = piOrg[0] - piCur[0];
-    diff[k+1] = piOrg[1] - piCur[1];
-    diff[k+2] = piOrg[2] - piCur[2];
-    diff[k+3] = piOrg[3] - piCur[3];
-
-    piCur += iStrideCur;
-    piOrg += iStrideOrg;
+  for( k = 0; k < 16; ++k ) {
+    diff[k] = piOrg[k] - piCur[k];
   }
 
   /*===== hadamard transform =====*/
@@ -463,7 +446,7 @@ static unsigned satd_16bit_4x4(const pixel *piOrg, const pixel *piCur)
 /**
  * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
  */
-static unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrideOrg,
+unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrideOrg,
                                        const pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad=0;
@@ -544,10 +527,8 @@ static unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrid
     m2[7][i] = m1[6][i] - m1[7][i];
   }
 
-  for (i = 0; i < 8; ++i) {
-    for (j = 0; j < 8; ++j) {
-      sad += abs(m2[i][j]);
-    }
+  for (i = 0; i < 64; ++i) {
+    sad += abs(((int*)m2)[i]);
   }
 
   sad = (sad + 2) >> 2;
