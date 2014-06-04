@@ -18,8 +18,8 @@ meant to be user configurable later.
 
     Optional parameters:
           -n, --frames <integer>     : Number of frames to code [all]
-          --seek                     : First frame to code [0]
-		  --input-res <int>x<int>    : Input resolution (width x height)
+          --seek <integer>           : First frame to code [0]
+          --input-res <int>x<int>    : Input resolution (width x height)
           -q, --qp <integer>         : Quantization Parameter [32]
           -p, --period <integer>     : Period of intra pictures [0]
                                          0: only first picture is intra
@@ -31,10 +31,10 @@ meant to be user configurable later.
                                        beta and tc range is -6..6 [0:0]
               --no-sao               : Disable sample adaptive offset
               --no-rdoq              : Disable RDO quantization
-              --rd <integer>         : Rate-Distortion Optimization level [1]\n"
-                                         0: no RDO\n"
-                                         1: estimated RDO\n"
-                                         2: full RDO\n"
+              --rd <integer>         : Rate-Distortion Optimization level [1]
+                                         0: no RDO
+                                         1: estimated RDO
+                                         2: full RDO
               --no-transform-skip    : Disable transform skip
               --aud                  : Use access unit delimiters
               --cqmfile <string>     : Custom Quantization Matrices from a file
@@ -60,6 +60,37 @@ meant to be user configurable later.
                                          - undef, bt709, fcc, bt470bg, smpte170m,
                                            smpte240m, GBR, YCgCo, bt2020nc, bt2020c
               --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
+      
+      Parallel processing:
+              --threads <integer>    : Maximum number of threads to use.
+                                       Disable threads if set to 0.
+      
+      Tiles:
+              --tiles-width-split <string>|u<int>: 
+                                       Specifies a comma separated list of pixel
+                                       positions of tiles columns separation coordinates.
+                                       Can also be u followed by and a single int n,
+                                       in which case it produces columns of uniform width.
+              --tiles-height-split <string>|u<int>: 
+                                       Specifies a comma separated list of pixel
+                                       positions of tiles rows separation coordinates.
+                                       Can also be u followed by and a single int n,
+                                       in which case it produces rows of uniform height.
+
+      Wpp:
+              --wpp:                   Enable wavefront parallel processing
+
+      Slices:
+              --slice-addresses <string>|u<int>: 
+                                       Specifies a comma separated list of LCU
+                                       positions in tile scan order of tile separations.
+                                       Can also be u followed by and a single int n,
+                                       in which case it produces uniform slice length.
+
+      Deprecated parameters: (might be removed at some point)
+         Use --input-res:
+           -w, --width               : Width of input in pixels
+           -h, --height              : Height of input in pixels
 
 Example:
 
