@@ -103,7 +103,7 @@ typedef struct
 /**
  * \brief Struct which contains all picture data
  */
-typedef struct picture_struct
+typedef struct picture
 {
   pixel* y_data;        //!< \brief Pointer to luma pixel array.
   pixel* u_data;        //!< \brief Pointer to chroma U pixel array.
@@ -130,17 +130,6 @@ typedef struct picture_struct
   struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count
 } picture;
-
-/**
- * \brief Struct which contains array of picture structs
- */
-typedef struct
-{
-  picture** pics;          //!< \brief Pointer to array of picture pointers.
-  uint32_t size;       //!< \brief Array size.
-  uint32_t used_size;
-} picture_list;
-
 
 
 #define SUB_SCU_BIT_MASK (64 - 1)
@@ -252,11 +241,6 @@ void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
-picture_list * picture_list_init(int size);
-int picture_list_resize(picture_list *list, unsigned size);
-int picture_list_destroy(picture_list *list);
-int picture_list_add(picture_list *list, picture *pic);
-int picture_list_rem(picture_list *list, unsigned n);
 
 typedef unsigned (*cost_16bit_nxn_func)(const pixel *block1, const pixel *block2);
 

@@ -34,6 +34,7 @@
 #include "tables.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
+#include "picturelist.h"
 
 
 // Submodules
