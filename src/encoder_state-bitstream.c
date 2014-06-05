@@ -280,8 +280,7 @@ static void encoder_state_write_bitstream_VUI(encoder_state * const encoder_stat
 static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
-  //FIXME: use encoder_control instead of cur_pic
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  const encoder_control * encoder = encoder_state->encoder_control;
 
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
@@ -302,21 +301,21 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
-  WRITE_UE(stream, cur_pic->width, "pic_width_in_luma_samples");
-  WRITE_UE(stream, cur_pic->height, "pic_height_in_luma_samples");
+  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
+  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  if (cur_pic->width != encoder_state->encoder_control->in.real_width || cur_pic->height != encoder_state->encoder_control->in.real_height) {
+  if (encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height) {
     // The standard does not seem to allow setting conf_win values such that
     // the number of luma samples is not a multiple of 2. Options are to either
     // hide one line or show an extra line of non-video. Neither seems like a
     // very good option, so let's not even try.
-    assert(!(cur_pic->width % 2));
+    assert(!(encoder->in.width % 2));
     WRITE_U(stream, 1, 1, "conformance_window_flag");
     WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (cur_pic->width - encoder_state->encoder_control->in.real_width) >> 1,
+    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
              "conf_win_right_offset");
     WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (cur_pic->height - encoder_state->encoder_control->in.real_height) >> 1,
+    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
              "conf_win_bottom_offset");
   } else {
     WRITE_U(stream, 0, 1, "conformance_window_flag");
@@ -325,8 +324,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   //IF window flag
   //END IF
 
-  WRITE_UE(stream, encoder_state->encoder_control->bitdepth-8, "bit_depth_luma_minus8");
-  WRITE_UE(stream, encoder_state->encoder_control->bitdepth-8, "bit_depth_chroma_minus8");
+  WRITE_UE(stream, encoder->in.bitdepth-8, "bit_depth_luma_minus8");
+  WRITE_UE(stream, encoder->in.bitdepth-8, "bit_depth_chroma_minus8");
   WRITE_UE(stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
@@ -647,14 +646,14 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
 static void add_checksum(encoder_state * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  const videoframe * const frame = encoder_state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
   unsigned int i;
 
   nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
 
-  picture_checksum(cur_pic, checksum);
+  image_checksum(frame->rec, checksum);
 
   WRITE_U(stream, 132, 8, "sei_type");
   WRITE_U(stream, 13, 8, "size");
@@ -736,7 +735,8 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   }
   
   //FIXME: Why is this needed?
-  main_state->tile->cur_pic->poc = main_state->global->poc;
+//  assert(main_state->tile->frame->poc == main_state->global->poc);
+  main_state->tile->frame->poc = main_state->global->poc;
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
@@ -753,7 +753,7 @@ void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
     cabac_encode_bin_trm(&encoder_state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
   
     if (!end_of_slice_segment_flag) {
-      assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->cur_pic->width_in_lcu - 1));
+      assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->frame->width_in_lcu - 1));
       cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
       cabac_flush(&encoder_state->cabac);
     } else {

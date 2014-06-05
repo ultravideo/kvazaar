@@ -26,7 +26,7 @@
 
 #include "global.h"
 
-#include "picture.h"
+#include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "config.h"

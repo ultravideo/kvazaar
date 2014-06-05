@@ -1,5 +1,5 @@
-#ifndef STRATEGIES_PICTURE_H_
-#define STRATEGIES_PICTURE_H_
+#ifndef PICTURE_LIST_H_
+#define PICTURE_LIST_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -19,12 +19,31 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "../image.h"
+/*
+ * \file
+ * \brief List of images (for reference pictures)
+ */
 
-//Function pointer to reg_sad
-extern unsigned (*reg_sad)(const pixel * const data1, const pixel * const data2,
-                           const int width, const int height, const unsigned stride1, const unsigned stride2);
+#include "image.h"
+#include "cu.h"
 
-#define STRATEGIES_PICTURE_EXPORTS {"reg_sad", (void**) &reg_sad}
+/**
+ * \brief Struct which contains array of picture structs
+ */
+typedef struct
+{
+  struct image** images;          //!< \brief Pointer to array of picture pointers.
+  cu_info** cu_arrays;
+  uint32_t size;       //!< \brief Array size.
+  uint32_t used_size;
+} image_list;
 
-#endif //STRATEGIES_PICTURE_H_
+image_list * image_list_alloc(int size);
+int image_list_resize(image_list *list, unsigned size);
+int image_list_destroy(image_list *list);
+int image_list_add(image_list *list, image *im, cu_info* cu_array);
+int image_list_rem(image_list *list, unsigned n);
+
+enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
+
+#endif //PICTURE_LIST_H_

@@ -26,11 +26,11 @@
 
 #include "global.h"
 
-#include "picture.h"
+#include "image.h"
 #include "encoder.h"
 #include "encoderstate.h"
 
-void intra_set_block_mode(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
+//void intra_set_block_mode(image* im,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
 
 int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
                                     const cu_info* cur_cu, const cu_info* left_cu, const cu_info* above_cu);

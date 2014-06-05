@@ -26,15 +26,16 @@
 
 #include "global.h"
 
+#include "videoframe.h"
 #include "encoder.h"
-#include "picture.h"
+#include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "config.h"
 #include "tables.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
-#include "picturelist.h"
+#include "imagelist.h"
 
 
 // Submodules
@@ -65,7 +66,7 @@ typedef struct {
   int8_t QP;   //!< \brief Quantization parameter
   
   //Current picture available references
-  picture_list *ref;
+  image_list *ref;
   int8_t ref_list;
   //int8_t ref_idx_num[2];
   
@@ -76,8 +77,8 @@ typedef struct {
 } encoder_state_config_global;
 
 typedef struct {
-  //Current picture to encode
-  picture *cur_pic;
+  //Current sub-frame
+  videoframe *frame;
   
   int32_t id;
   

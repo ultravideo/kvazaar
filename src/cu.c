@@ -1,5 +1,3 @@
-#ifndef PICTURE_LIST_H_
-#define PICTURE_LIST_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -21,25 +19,36 @@
 
 /*
  * \file
- * \brief Coding Unit (CU) and picture data related functions.
  */
 
-#include "picture.h"
+#include <string.h>
+#include <stdlib.h>
 
-/**
- * \brief Struct which contains array of picture structs
- */
-typedef struct
+#include "cu.h"
+
+
+void coefficients_blit(const coefficient * const orig, coefficient * const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride)
 {
-  struct picture** pics;          //!< \brief Pointer to array of picture pointers.
-  uint32_t size;       //!< \brief Array size.
-  uint32_t used_size;
-} picture_list;
+  unsigned y;
 
-picture_list * picture_list_init(int size);
-int picture_list_resize(picture_list *list, unsigned size);
-int picture_list_destroy(picture_list *list);
-int picture_list_add(picture_list *list, picture *pic);
-int picture_list_rem(picture_list *list, unsigned n);
+  for (y = 0; y < height; ++y) {
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coefficient));
+  }
+}
 
-#endif //PICTURE_LIST_H_
+unsigned coefficients_calc_abs(const coefficient *const buf, const int buf_stride,
+                        const int width)
+{
+  int sum = 0;
+  int y, x;
+
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      sum += abs(buf[x + y * buf_stride]);
+    }
+  }
+
+  return sum;
+}

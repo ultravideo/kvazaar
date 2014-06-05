@@ -39,7 +39,7 @@
  * \param cur_cu CU to take the settings from
  * \returns Void
 */
-void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info* cur_cu)
+void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info* cur_cu)
 {
   uint32_t x, y;
   // Width in smallest CU
@@ -48,7 +48,7 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
   // Loop through all the block in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info * const cu = picture_get_cu(pic, x, y);
+      cu_info * const cu = videoframe_get_cu(frame, x, y);
       // Set all SCU's to this blocks values at the bottom most depth.
       cu->depth = depth;
       cu->type  = CU_INTER;
@@ -73,7 +73,7 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state * const encoder_state, const picture * const ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_state * const encoder_state, const image * const ref,int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -132,8 +132,8 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
         else if (overflow_pos_x_temp) coord_x = ref_width_c - 1;
 
         // Store source block data (with extended borders)
-        halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->u_recdata[coord_y + coord_x];
-        halfpel_src_v[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->v_recdata[coord_y + coord_x];
+        halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->u[coord_y + coord_x];
+        halfpel_src_v[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->v[coord_y + coord_x];
       }
     }
 
@@ -183,7 +183,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
         }
 
         // set destination to (corrected) pixel value from the reference
-        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y_recdata[coord_y*ref->width + coord_x];
+        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y[coord_y*ref->width + coord_x];
       }
     }
 
@@ -219,8 +219,8 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
           }
 
           // set destinations to (corrected) pixel value from the reference
-          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u_recdata[coord_y * ref_width_c + coord_x];
-          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v_recdata[coord_y * ref_width_c + coord_x];
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u[coord_y * ref_width_c + coord_x];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v[coord_y * ref_width_c + coord_x];
         }
       }
     }
@@ -232,7 +232,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
       for (x = xpos; x < xpos + width; x++) {
         int x_in_lcu = (x & ((LCU_WIDTH)-1));
 
-        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y_recdata[coord_y + (x + encoder_state->tile->lcu_offset_x * LCU_WIDTH) + mv[0]];
+        lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y[coord_y + (x + encoder_state->tile->lcu_offset_x * LCU_WIDTH) + mv[0]];
       }
     }
 
@@ -244,8 +244,8 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const picture * 
         coord_y = ((y + encoder_state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1)) * ref_width_c; // pre-calculate
         for (x = xpos>>1; x < (xpos + width)>>1; x++) {
           int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
-          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u_recdata[coord_y + (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
-          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v_recdata[coord_y + (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u[coord_y + (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v[coord_y + (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
         }
       }
     }
@@ -331,8 +331,8 @@ void inter_get_mv_cand(const encoder_state * const encoder_state, int32_t x, int
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand) {int td = encoder_state->global->poc - encoder_state->global->ref->pics[(cu)->inter.mv_ref]->poc;\
-                                   int tb = encoder_state->global->poc - encoder_state->global->ref->pics[cur_cu->inter.mv_ref]->poc;\
+#define APPLY_MV_SCALING(cu, cand) {int td = encoder_state->global->poc - encoder_state->global->ref->images[(cu)->inter.mv_ref]->poc;\
+                                   int tb = encoder_state->global->poc - encoder_state->global->ref->images[cur_cu->inter.mv_ref]->poc;\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[0] + 127 + (scale * (cu)->inter.mv[0] < 0)) >> 8 ); \

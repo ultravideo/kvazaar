@@ -178,4 +178,8 @@ typedef int16_t coefficient;
 
 #define MAX_TR_DYNAMIC_RANGE 15
 
+//Constants
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_index;
+enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
+
 #endif

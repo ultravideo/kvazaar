@@ -34,7 +34,7 @@
  * \param pic picture pointer
  * \return picture pointer
  */
-videoframe *videoframe_alloc(const int32_t width, const int32_t height) {
+videoframe *videoframe_alloc(const int32_t width, const int32_t height, const int32_t poc) {
   videoframe *frame = MALLOC(videoframe, 1);
 
   if (!frame) return 0;
@@ -49,8 +49,8 @@ videoframe *videoframe_alloc(const int32_t width, const int32_t height) {
   if (frame->height_in_lcu * LCU_WIDTH < frame->height) frame->height_in_lcu++;
   
   //Allocate images
-  frame->source = image_alloc(frame->width, frame->height);
-  frame->rec = image_alloc(frame->width, frame->height);
+  frame->source = image_alloc(frame->width, frame->height, poc);
+  frame->rec = image_alloc(frame->width, frame->height, poc);
 
   {
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
@@ -118,14 +118,18 @@ void videoframe_compute_psnr(const videoframe * const frame, double psnr[NUM_COL
   int32_t i, c;
   
   for (c = 0; c < NUM_COLORS; ++c) {
+    int32_t num_pixels = pixels;
+    if (c != COLOR_Y) {
+      num_pixels >>= 2;
+    }
     psnr[c] = 0;
-    for (i = 0; i < pixels; ++i) {
+    for (i = 0; i < num_pixels; ++i) {
       const int32_t error = frame->source->data[c][i] - frame->rec->data[c][i];
       psnr[c] += error * error;
     }
     
     // Avoid division by zero
     if (psnr[c] == 0) psnr[c] = 99.0;
-    psnr[c] = 10 * log10((pixels * PSNRMAX) / ((double)psnr[c]));;
+    psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;
   }
 }

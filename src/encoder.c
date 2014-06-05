@@ -32,7 +32,7 @@
 #include "tables.h"
 #include "config.h"
 #include "cabac.h"
-#include "picture.h"
+#include "image.h"
 #include "nal.h"
 #include "context.h"
 #include "transform.h"
@@ -330,6 +330,7 @@ void encoder_control_input_init(encoder_control * const encoder,
   encoder->in.height = height;
   encoder->in.real_width = width;
   encoder->in.real_height = height;
+  encoder->in.bitdepth = encoder->bitdepth;
 
   // If input dimensions are not divisible by the smallest block size, add
   // pixels to the dimensions, so that they are. These extra pixels will be

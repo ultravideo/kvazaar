@@ -870,7 +870,7 @@ int quantize_residual(encoder_state *const encoder_state,
   }
 
   // Copy coefficients to coeff_out.
-  picture_blit_coeffs(quant_coeff, coeff_out, width, width, width, out_stride);
+  coefficients_blit(quant_coeff, coeff_out, width, width, width, out_stride);
 
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
@@ -947,10 +947,10 @@ int quantize_residual_trskip(
       encoder_state, cur_cu, width, color, scan_order,
       0, in_stride, 4,
       ref_in, pred_in, noskip.rec, noskip.coeff);
-  noskip.cost = calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
+  noskip.cost = pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
   if (encoder_state->encoder_control->rdo == 1) {
     // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum).
-    unsigned abs_coeffs = calc_abs_coeff(noskip.coeff, 4, 4);
+    unsigned abs_coeffs = coefficients_calc_abs(noskip.coeff, 4, 4);
     noskip.cost += (abs_coeffs + (abs_coeffs / 2)) * bit_cost;
   } else if (encoder_state->encoder_control->rdo == 2) {
     noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
@@ -965,10 +965,10 @@ int quantize_residual_trskip(
         encoder_state, cur_cu, width, color, scan_order,
         1, in_stride, 4,
         ref_in, pred_in, skip.rec, skip.coeff);
-    skip.cost = calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
+    skip.cost = pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
     if (encoder_state->encoder_control->rdo == 1) {
       // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum + 1).
-      unsigned abs_coeffs = calc_abs_coeff(skip.coeff, 4, 4);
+      unsigned abs_coeffs = coefficients_calc_abs(skip.coeff, 4, 4);
       skip.cost += (1 + abs_coeffs + (abs_coeffs / 2)) * bit_cost;
     } else if (encoder_state->encoder_control->rdo == 2) {
       skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
@@ -986,9 +986,9 @@ int quantize_residual_trskip(
   if (best->has_coeffs || rec_out != pred_in) {
     // If there is no residual and reconstruction is already in rec_out, 
     // we can skip this.
-    picture_blit_pixels(best->rec, rec_out, width, width, 4, out_stride);
+    pixels_blit(best->rec, rec_out, width, width, 4, out_stride);
   }
-  picture_blit_coeffs(best->coeff, coeff_out, width, width, 4, out_stride);
+  coefficients_blit(best->coeff, coeff_out, width, width, 4, out_stride);
 
   return best->has_coeffs;
 }

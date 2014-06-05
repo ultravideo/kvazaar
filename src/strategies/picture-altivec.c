@@ -21,7 +21,7 @@
  * \file
  */
 #include "../strategyselector.h"
-#include "../picture.h"
+#include "../image.h"
 #include <altivec.h>
 #include <assert.h>
 

@@ -30,7 +30,7 @@
 
 #include "config.h"
 #include "bitstream.h"
-#include "picture.h"
+#include "image.h"
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"
@@ -186,7 +186,7 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
  * points like 0,0 might be used, such as vectors from top or left.
  */
 static unsigned hexagon_search(const encoder_state * const encoder_state, unsigned depth,
-                               const picture *pic, const picture *ref,
+                               const image *pic, const image *ref,
                                const vector2d *orig, vector2d *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
@@ -202,7 +202,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   // Search the initial 7 points of the hexagon.
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = &large_hexbs[i];
-    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              block_width, block_width);
@@ -217,7 +217,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
 
   // Try the 0,0 vector.
   if (!(mv.x == 0 && mv.y == 0)) {
-    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
                              block_width, block_width);
@@ -233,7 +233,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
 
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = &large_hexbs[i];
-        unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+        unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                                  (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
                                  (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
                                  block_width, block_width);
@@ -268,7 +268,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = &large_hexbs[start + i];
-      unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+      unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                                (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                block_width, block_width);
@@ -291,7 +291,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
     const vector2d *offset = &small_hexbs[i];
-    unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
+    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              block_width, block_width);
@@ -376,7 +376,7 @@ static unsigned search_mv_full(unsigned depth,
  */
 static int search_cu_inter(const encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
 {
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  const videoframe * const frame = encoder_state->tile->frame;
   uint32_t ref_idx = 0;
   int x_local = (x&0x3f), y_local = (y&0x3f);
   int x_cu = x>>3;
@@ -397,8 +397,8 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
   cur_cu->inter.cost = UINT_MAX;
 
   for (ref_idx = 0; ref_idx < encoder_state->global->ref->used_size; ref_idx++) {
-    picture *ref_pic = encoder_state->global->ref->pics[ref_idx];
-    const cu_info *ref_cu = picture_get_cu_const(ref_pic, x_cu, y_cu);
+    image *ref_image = encoder_state->global->ref->images[ref_idx];
+    const cu_info *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx][x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;
@@ -420,9 +420,9 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
     cur_cu->inter.mv_ref = temp_ref_idx;
 
 #if SEARCH_MV_FULL_RADIUS
-    temp_cost += search_mv_full(depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
-    temp_cost += hexagon_search(encoder_state, depth, cur_pic, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost += hexagon_search(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
 
     merged = 0;
@@ -510,20 +510,20 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
     const lcu_coeff_t *from_coeff = &work_tree[depth + 1].coeff;
     lcu_coeff_t *to_coeff = &work_tree[depth].coeff;
 
-    picture_blit_pixels(&from->y[luma_index], &to->y[luma_index],
+    pixels_blit(&from->y[luma_index], &to->y[luma_index],
                         width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    picture_blit_pixels(&from->u[chroma_index], &to->u[chroma_index],
+    pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    picture_blit_pixels(&from->v[chroma_index], &to->v[chroma_index],
+    pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
 
     // Copy coefficients up. They do not have to be copied down because they
     // are not used for the search.
-    picture_blit_coeffs(&from_coeff->y[luma_index], &to_coeff->y[luma_index],
+    coefficients_blit(&from_coeff->y[luma_index], &to_coeff->y[luma_index],
                         width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    picture_blit_coeffs(&from_coeff->u[chroma_index], &to_coeff->u[chroma_index],
+    coefficients_blit(&from_coeff->u[chroma_index], &to_coeff->u[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    picture_blit_coeffs(&from_coeff->v[chroma_index], &to_coeff->v[chroma_index],
+    coefficients_blit(&from_coeff->v[chroma_index], &to_coeff->v[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
   }
 }
@@ -565,11 +565,11 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
     lcu_yuv_t *from = &work_tree[depth].rec;
     lcu_yuv_t *to = &work_tree[d].rec;
 
-    picture_blit_pixels(&from->y[luma_index], &to->y[luma_index],
+    pixels_blit(&from->y[luma_index], &to->y[luma_index],
                         width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    picture_blit_pixels(&from->u[chroma_index], &to->u[chroma_index],
+    pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    picture_blit_pixels(&from->v[chroma_index], &to->v[chroma_index],
+    pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
                         width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
   }
 }
@@ -719,7 +719,7 @@ static int lcu_get_final_cost_luma(const encoder_state * const encoder_state,
       int blockwidth = (width == 64)?32:width;
 
       // Calculate luma coeff bit count
-      picture_blit_coeffs(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
+      coefficients_blit(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
       coeff_cost += get_coeff_cost(encoder_state, coeff_temp, blockwidth, 0, luma_scan_mode);
     }
     // Multiply bit count with lambda to get RD-cost
@@ -789,8 +789,8 @@ static int lcu_get_final_cost_chroma(const encoder_state * const encoder_state,
         break;
       }
 
-      picture_blit_coeffs(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
-      picture_blit_coeffs(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
+      coefficients_blit(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
+      coefficients_blit(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
 
       coeff_cost += get_coeff_cost(encoder_state, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
       coeff_cost += get_coeff_cost(encoder_state, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
@@ -837,7 +837,7 @@ static void search_intra_rough(encoder_state * const encoder_state,
   assert(width == 4 || width == 8 || width == 16 || width == 32);
 
   // Store original block for SAD computation
-  picture_blit_pixels(orig, orig_block, width, width, origstride, width);
+  pixels_blit(orig, orig_block, width, width, origstride, width);
 
   // Generate filtered reference pixels.
   {
@@ -894,7 +894,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     intra_filter(ref[1], recstride, width, 0);
   }
 
-  picture_blit_pixels(orig, orig_block, width, width, origstride, width);
+  pixels_blit(orig, orig_block, width, width, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
   for(pred_mode = 0; pred_mode < 3; pred_mode++) {
@@ -936,7 +936,7 @@ static int search_cu_intra(encoder_state * const encoder_state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  const videoframe * const frame = encoder_state->tile->frame;
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
@@ -966,8 +966,8 @@ static int search_cu_intra(encoder_state * const encoder_state,
   // Build reconstructed block to use in prediction with extrapolated borders
   intra_build_reference_border(encoder_state->encoder_control, x_px, y_px, cu_width * 2 + 8,
                                rec_buffer, cu_width * 2 + 8, 0,
-                               cur_pic->width,
-                               cur_pic->height,
+                               frame->width,
+                               frame->height,
                                lcu);
 
   // Find best intra mode for 2Nx2N.
@@ -1016,14 +1016,14 @@ static int search_cu_intra(encoder_state * const encoder_state,
  */
 static int search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  const videoframe * const frame = encoder_state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
   int cost = MAX_INT;
   cu_info *cur_cu;
   int x_local = (x&0x3f), y_local = (y&0x3f);
 
   // Stop recursion if the CU is completely outside the frame.
-  if (x >= cur_pic->width || y >= cur_pic->height) {
+  if (x >= frame->width || y >= frame->height) {
     // Return zero cost because this CU does not have to be coded.
     return 0;
   }
@@ -1036,8 +1036,8 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
   cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
-  if (x + cu_width <= cur_pic->width &&
-      y + cu_width <= cur_pic->height)
+  if (x + cu_width <= frame->width &&
+      y + cu_width <= frame->height)
   {
 
     if (encoder_state->global->slicetype != SLICE_I &&
@@ -1072,7 +1072,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       intra_recon_lcu_chroma(encoder_state, x, y, depth, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
-      inter_recon_lcu(encoder_state, encoder_state->global->ref->pics[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      inter_recon_lcu(encoder_state, encoder_state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
       quantize_lcu_luma_residual(encoder_state, x, y, depth, &work_tree[depth]);
       quantize_lcu_chroma_residual(encoder_state, x, y, depth, &work_tree[depth]);
 
@@ -1136,7 +1136,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
  */
 static void init_lcu_t(const encoder_state * const encoder_state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
-  const picture * const cur_pic = encoder_state->tile->cur_pic;
+  const videoframe * const frame = encoder_state->tile->frame;
   
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -1151,7 +1151,7 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
     if (y_cu > 0) {
       int i;
       for (i = 0; i < LCU_CU_WIDTH; ++i) {
-        const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu + i, y_cu - 1);
+        const cu_info *from_cu = videoframe_get_cu_const(frame, x_cu + i, y_cu - 1);
         cu_info *to_cu = &lcu_cu[i - LCU_T_CU_WIDTH];
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
@@ -1160,21 +1160,21 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
     if (x_cu > 0) {
       int i;
       for (i = 0; i < LCU_CU_WIDTH; ++i) {
-        const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu - 1, y_cu + i);
+        const cu_info *from_cu = videoframe_get_cu_const(frame, x_cu - 1, y_cu + i);
         cu_info *to_cu = &lcu_cu[-1 + i * LCU_T_CU_WIDTH];
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
     // Copy top-left CU.
     if (x_cu > 0 && y_cu > 0) {
-      const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu - 1, y_cu - 1);
+      const cu_info *from_cu = videoframe_get_cu_const(frame, x_cu - 1, y_cu - 1);
       cu_info *to_cu = &lcu_cu[-1 - LCU_T_CU_WIDTH];
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
 
     // Copy top-right CU.
-    if (y_cu > 0 && x + LCU_WIDTH < cur_pic->width) {
-      const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu + LCU_CU_WIDTH, y_cu - 1);
+    if (y_cu > 0 && x + LCU_WIDTH < frame->width) {
+      const cu_info *from_cu = videoframe_get_cu_const(frame, x_cu + LCU_CU_WIDTH, y_cu - 1);
       cu_info *to_cu = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
@@ -1182,32 +1182,32 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
 
   // Copy reference pixels.
   {
-    const int pic_width = cur_pic->width;
+    const int pic_width = frame->width;
     // Copy top reference pixels.
     if (y > 0) {
       // hor_buf is of size pic_width so there might not be LCU_REF_PX_WIDTH
       // number of allocated pixels left.
       int x_max = MIN(LCU_REF_PX_WIDTH, pic_width - x);
       int x_min_in_lcu = (x>0) ? 0 : 1;
-      memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[OFFSET_HOR_BUF(x, y, cur_pic, x_min_in_lcu-1)], x_max + (1-x_min_in_lcu));
-      memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[OFFSET_HOR_BUF_C(x, y, cur_pic, x_min_in_lcu-1)], x_max / 2 + (1-x_min_in_lcu));
-      memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[OFFSET_HOR_BUF_C(x, y, cur_pic, x_min_in_lcu-1)], x_max / 2 + (1-x_min_in_lcu));
+      memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[OFFSET_HOR_BUF(x, y, frame, x_min_in_lcu-1)], x_max + (1-x_min_in_lcu));
+      memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[OFFSET_HOR_BUF_C(x, y, frame, x_min_in_lcu-1)], x_max / 2 + (1-x_min_in_lcu));
+      memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[OFFSET_HOR_BUF_C(x, y, frame, x_min_in_lcu-1)], x_max / 2 + (1-x_min_in_lcu));
     }
     // Copy left reference pixels.
     if (x > 0) {
       int y_min_in_lcu = (y>0) ? 0 : 1;
-      memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[OFFSET_VER_BUF(x, y, cur_pic, y_min_in_lcu-1)], LCU_WIDTH + (1-y_min_in_lcu));
-      memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[OFFSET_VER_BUF_C(x, y, cur_pic, y_min_in_lcu-1)], LCU_WIDTH / 2 + (1-y_min_in_lcu));
-      memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[OFFSET_VER_BUF_C(x, y, cur_pic, y_min_in_lcu-1)], LCU_WIDTH / 2 + (1-y_min_in_lcu));
+      memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[OFFSET_VER_BUF(x, y, frame, y_min_in_lcu-1)], LCU_WIDTH + (1-y_min_in_lcu));
+      memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu-1)], LCU_WIDTH / 2 + (1-y_min_in_lcu));
+      memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu-1)], LCU_WIDTH / 2 + (1-y_min_in_lcu));
     }
   }
 
   // Copy LCU pixels.
   {
-    const picture * const pic = encoder_state->tile->cur_pic;
-    int pic_width = cur_pic->width;
+    const videoframe * const frame = encoder_state->tile->frame;
+    int pic_width = frame->width;
     int x_max = MIN(x + LCU_WIDTH, pic_width) - x;
-    int y_max = MIN(y + LCU_WIDTH, cur_pic->height) - y;
+    int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
 
     int x_c = x / 2;
     int y_c = y / 2;
@@ -1215,11 +1215,11 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
     int x_max_c = x_max / 2;
     int y_max_c = y_max / 2;
 
-    picture_blit_pixels(&pic->y_data[x + y * pic_width], lcu->ref.y,
+    pixels_blit(&frame->source->y[x + y * pic_width], lcu->ref.y,
                         x_max, y_max, pic_width, LCU_WIDTH);
-    picture_blit_pixels(&pic->u_data[x_c + y_c * pic_width_c], lcu->ref.u,
+    pixels_blit(&frame->source->u[x_c + y_c * pic_width_c], lcu->ref.u,
                         x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
-    picture_blit_pixels(&pic->v_data[x_c + y_c * pic_width_c], lcu->ref.v,
+    pixels_blit(&frame->source->v[x_c + y_c * pic_width_c], lcu->ref.v,
                         x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
   }
 }
@@ -1234,7 +1234,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
   {
     const int x_cu = x_px >> MAX_DEPTH;
     const int y_cu = y_px >> MAX_DEPTH;
-    picture * const cur_pic = encoder_state->tile->cur_pic;
+    videoframe * const frame = encoder_state->tile->frame;
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
@@ -1244,7 +1244,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
     for (y = 0; y < LCU_CU_WIDTH; ++y) {
       for (x = 0; x < LCU_CU_WIDTH; ++x) {
         const cu_info *from_cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
-        cu_info *to_cu = picture_get_cu(cur_pic, x_cu + x, y_cu + y);
+        cu_info *to_cu = videoframe_get_cu(frame, x_cu + x, y_cu + y);
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -1252,25 +1252,25 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
 
   // Copy pixels to picture.
   {
-    picture * const pic = encoder_state->tile->cur_pic;
+    videoframe * const pic = encoder_state->tile->frame;
     const int pic_width = pic->width;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
     const int luma_index = x_px + y_px * pic_width;
     const int chroma_index = (x_px / 2) + (y_px / 2) * (pic_width / 2);
 
-    picture_blit_pixels(lcu->rec.y, &pic->y_recdata[luma_index],
+    pixels_blit(lcu->rec.y, &pic->rec->y[luma_index],
                         x_max, y_max, LCU_WIDTH, pic_width);
-    picture_blit_coeffs(lcu->coeff.y, &pic->coeff_y[luma_index],
+    coefficients_blit(lcu->coeff.y, &pic->coeff_y[luma_index],
                         x_max, y_max, LCU_WIDTH, pic_width);
 
-    picture_blit_pixels(lcu->rec.u, &pic->u_recdata[chroma_index],
+    pixels_blit(lcu->rec.u, &pic->rec->u[chroma_index],
                         x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-    picture_blit_pixels(lcu->rec.v, &pic->v_recdata[chroma_index],
+    pixels_blit(lcu->rec.v, &pic->rec->v[chroma_index],
                         x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-    picture_blit_coeffs(lcu->coeff.u, &pic->coeff_u[chroma_index],
+    coefficients_blit(lcu->coeff.u, &pic->coeff_u[chroma_index],
                         x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-    picture_blit_coeffs(lcu->coeff.v, &pic->coeff_v[chroma_index],
+    coefficients_blit(lcu->coeff.v, &pic->coeff_v[chroma_index],
                         x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
   }
 }

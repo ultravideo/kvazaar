@@ -27,8 +27,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "picture.h"
-
 // Offsets of a and b in relation to c.
 // dir_offset[dir][a or b]
 // |       |   a   | a     |     a |
@@ -441,12 +439,12 @@ static void sao_reconstruct_color(const encoder_control * const encoder,
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU
  */
-static void sao_calc_band_block_dims(const picture *pic, color_index color_i,
+static void sao_calc_band_block_dims(const videoframe *frame, color_index color_i,
                                      vector2d *rec, vector2d *block)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  int width = pic->width >> is_chroma;
-  int height = pic->height >> is_chroma;
+  int width = frame->width >> is_chroma;
+  int height = frame->height >> is_chroma;
   int block_width = LCU_WIDTH >> is_chroma;
 
 
@@ -496,7 +494,7 @@ static void sao_calc_band_block_dims(const picture *pic, color_index color_i,
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU, modified to be top-left corner of
  */
-static void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
+static void sao_calc_edge_block_dims(const videoframe * const frame, color_index color_i,
                                      const sao_info *sao, vector2d *rec,
                                      vector2d *tl, vector2d *br,
                                      vector2d *block)
@@ -504,8 +502,8 @@ static void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
   vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
   vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  int width = pic->width >> is_chroma;
-  int height = pic->height >> is_chroma;
+  int width = frame->width >> is_chroma;
+  int height = frame->height >> is_chroma;
   int block_width = LCU_WIDTH >> is_chroma;
 
   // Handle top and left.
@@ -546,16 +544,16 @@ static void sao_calc_edge_block_dims(const picture *pic, color_index color_i,
   rec->x = (rec->x == 0 ? 0 : -1);
 }
 
-void sao_reconstruct(const encoder_control * const encoder, picture * pic, const pixel *old_rec,
+void sao_reconstruct(const encoder_control * const encoder, videoframe * frame, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  const int pic_stride = pic->width >> is_chroma;
+  const int pic_stride = frame->width >> is_chroma;
   const int lcu_stride = LCU_WIDTH >> is_chroma;
   const int buf_stride = lcu_stride + 2;
 
-  pixel *recdata = pic->recdata[color_i];
+  pixel *recdata = frame->rec->data[color_i];
   pixel buf_rec[(LCU_WIDTH + 2) * (LCU_WIDTH + 2)];
   pixel new_rec[LCU_WIDTH * LCU_WIDTH];
   // Calling CU_TO_PIXEL with depth 1 is the same as using block size of 32.
@@ -578,17 +576,17 @@ void sao_reconstruct(const encoder_control * const encoder, picture * pic, const
   if (sao->type == SAO_TYPE_BAND) {
     tl.x = 0; tl.y = 0;
     br.x = 0; br.y = 0;
-    sao_calc_band_block_dims(pic, color_i, &ofs, &block);
+    sao_calc_band_block_dims(frame, color_i, &ofs, &block);
   }
   else {
-    sao_calc_edge_block_dims(pic, color_i, sao, &ofs, &tl, &br, &block);
+    sao_calc_edge_block_dims(frame, color_i, sao, &ofs, &tl, &br, &block);
   }
   
-  assert(ofs.x + tl.x + block.x + br.x <= pic->width);
-  assert(ofs.y + tl.y + block.y + br.y <= pic->height);
+  assert(ofs.x + tl.x + block.x + br.x <= frame->width);
+  assert(ofs.y + tl.y + block.y + br.y <= frame->height);
   
   // Data to tmp buffer.
-  picture_blit_pixels(&old_lcu_rec[ofs.y * pic_stride + ofs.x],
+  pixels_blit(&old_lcu_rec[ofs.y * pic_stride + ofs.x],
                       buf_rec,
                       tl.x + block.x + br.x,
                       tl.y + block.y + br.y,
@@ -601,7 +599,7 @@ void sao_reconstruct(const encoder_control * const encoder, picture * pic, const
                         block.x, block.y);
 
   // Copy reconstructed block from tmp buffer to rec image.
-  picture_blit_pixels(&new_rec[(tl.y + ofs.y) * lcu_stride + (tl.x + ofs.x)],
+  pixels_blit(&new_rec[(tl.y + ofs.y) * lcu_stride + (tl.x + ofs.x)],
                       &lcu_rec[(tl.y + ofs.y) * pic_stride + (tl.x + ofs.x)],
                       block.x, block.y, lcu_stride, pic_stride);
 }
@@ -794,7 +792,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   return;
 }
 
- void sao_search_chroma(const encoder_state * const encoder_state, const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
+ void sao_search_chroma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -805,23 +803,23 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   color_index color_i;
 
   // Check for right and bottom boundaries.
-  if (x_ctb * (LCU_WIDTH / 2) + (LCU_WIDTH / 2) >= (unsigned)pic->width / 2) {
-    block_width = (pic->width - x_ctb * LCU_WIDTH) / 2;
+  if (x_ctb * (LCU_WIDTH / 2) + (LCU_WIDTH / 2) >= (unsigned)frame->width / 2) {
+    block_width = (frame->width - x_ctb * LCU_WIDTH) / 2;
   }
-  if (y_ctb * (LCU_WIDTH / 2) + (LCU_WIDTH / 2) >= (unsigned)pic->height / 2) {
-    block_height = (pic->height - y_ctb * LCU_WIDTH) / 2;
+  if (y_ctb * (LCU_WIDTH / 2) + (LCU_WIDTH / 2) >= (unsigned)frame->height / 2) {
+    block_height = (frame->height - y_ctb * LCU_WIDTH) / 2;
   }
 
   sao->type = SAO_TYPE_EDGE;
 
   // Copy data to temporary buffers and init orig and rec lists to point to those buffers.
   for (color_i = COLOR_U; color_i <= COLOR_V; ++color_i) {
-    pixel *data = &pic->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
-    pixel *recdata = &pic->recdata[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, pic->width / 2)];
-    picture_blit_pixels(data, orig[color_i - 1], block_width, block_height,
-                        pic->width / 2, block_width);
-    picture_blit_pixels(recdata, rec[color_i - 1], block_width, block_height,
-                        pic->width / 2, block_width);
+    pixel *data = &frame->source->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->width / 2)];
+    pixel *recdata = &frame->rec->data[color_i][CU_TO_PIXEL(x_ctb, y_ctb, 1, frame->width / 2)];
+    pixels_blit(data, orig[color_i - 1], block_width, block_height,
+                        frame->width / 2, block_width);
+    pixels_blit(recdata, rec[color_i - 1], block_width, block_height,
+                        frame->width / 2, block_width);
     orig_list[color_i - 1] = &orig[color_i - 1][0];
     rec_list[color_i - 1] = &rec[color_i - 1][0];
   }
@@ -830,30 +828,30 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left);
 }
 
-void sao_search_luma(const encoder_state * const encoder_state, const picture *pic, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
+void sao_search_luma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
   const pixel * orig_list[1] = { NULL };
   const pixel * rec_list[1] = { NULL };
-  pixel *data = &pic->y_data[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
-  pixel *recdata = &pic->y_recdata[CU_TO_PIXEL(x_ctb, y_ctb, 0, pic->width)];
+  pixel *data = &frame->source->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->width)];
+  pixel *recdata = &frame->rec->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->width)];
   int block_width = LCU_WIDTH;
   int block_height = LCU_WIDTH;
 
   // Check for right and bottom boundaries.
-  if (x_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)pic->width) {
-    block_width = pic->width - x_ctb * LCU_WIDTH;
+  if (x_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)frame->width) {
+    block_width = frame->width - x_ctb * LCU_WIDTH;
   }
-  if (y_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)pic->height) {
-    block_height = pic->height - y_ctb * LCU_WIDTH;
+  if (y_ctb * LCU_WIDTH + LCU_WIDTH >= (unsigned)frame->height) {
+    block_height = frame->height - y_ctb * LCU_WIDTH;
   }
 
   sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
-  picture_blit_pixels(data, orig, block_width, block_height, pic->width, block_width);
-  picture_blit_pixels(recdata, rec, block_width, block_height, pic->width, block_width);
+  pixels_blit(data, orig, block_width, block_height, frame->width, block_width);
+  pixels_blit(recdata, rec, block_width, block_height, frame->width, block_width);
 
   orig_list[0] = orig;
   rec_list[0] = rec;
@@ -863,28 +861,28 @@ void sao_search_luma(const encoder_state * const encoder_state, const picture *p
 void sao_reconstruct_frame(encoder_state * const encoder_state)
 {
   vector2d lcu;
-  picture * const cur_pic = encoder_state->tile->cur_pic;
+  videoframe * const frame = encoder_state->tile->frame;
 
   // These are needed because SAO needs the pre-SAO pixels form left and
   // top LCUs. Single pixel wide buffers, like what search_lcu takes, would
   // be enough though.
-  pixel *new_y_data = MALLOC(pixel, cur_pic->width * cur_pic->height);
-  pixel *new_u_data = MALLOC(pixel, (cur_pic->width * cur_pic->height) >> 2);
-  pixel *new_v_data = MALLOC(pixel, (cur_pic->width * cur_pic->height) >> 2);
-  memcpy(new_y_data, cur_pic->y_recdata, sizeof(pixel) * cur_pic->width * cur_pic->height);
-  memcpy(new_u_data, cur_pic->u_recdata, sizeof(pixel) * (cur_pic->width * cur_pic->height) >> 2);
-  memcpy(new_v_data, cur_pic->v_recdata, sizeof(pixel) * (cur_pic->width * cur_pic->height) >> 2);
+  pixel *new_y_data = MALLOC(pixel, frame->width * frame->height);
+  pixel *new_u_data = MALLOC(pixel, (frame->width * frame->height) >> 2);
+  pixel *new_v_data = MALLOC(pixel, (frame->width * frame->height) >> 2);
+  memcpy(new_y_data, frame->rec->y, sizeof(pixel) * frame->width * frame->height);
+  memcpy(new_u_data, frame->rec->u, sizeof(pixel) * (frame->width * frame->height) >> 2);
+  memcpy(new_v_data, frame->rec->v, sizeof(pixel) * (frame->width * frame->height) >> 2);
 
-  for (lcu.y = 0; lcu.y < cur_pic->height_in_lcu; lcu.y++) {
-    for (lcu.x = 0; lcu.x < cur_pic->width_in_lcu; lcu.x++) {
-      unsigned stride = cur_pic->width_in_lcu;
-      sao_info *sao_luma = &cur_pic->sao_luma[lcu.y * stride + lcu.x];
-      sao_info *sao_chroma = &cur_pic->sao_chroma[lcu.y * stride + lcu.x];
+  for (lcu.y = 0; lcu.y < frame->height_in_lcu; lcu.y++) {
+    for (lcu.x = 0; lcu.x < frame->width_in_lcu; lcu.x++) {
+      unsigned stride = frame->width_in_lcu;
+      sao_info *sao_luma = &frame->sao_luma[lcu.y * stride + lcu.x];
+      sao_info *sao_chroma = &frame->sao_chroma[lcu.y * stride + lcu.x];
 
       // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
-      sao_reconstruct(encoder_state->encoder_control, cur_pic, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
-      sao_reconstruct(encoder_state->encoder_control, cur_pic, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
-      sao_reconstruct(encoder_state->encoder_control, cur_pic, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
+      sao_reconstruct(encoder_state->encoder_control, frame, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
+      sao_reconstruct(encoder_state->encoder_control, frame, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
+      sao_reconstruct(encoder_state->encoder_control, frame, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
     }
   }
 

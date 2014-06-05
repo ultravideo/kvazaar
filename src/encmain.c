@@ -39,7 +39,7 @@
 #include "config.h"
 #include "encoder.h"
 #include "cabac.h"
-#include "picture.h"
+#include "image.h"
 #include "transform.h"
 #include "scalinglist.h"
 #include "strategyselector.h"
@@ -56,8 +56,6 @@ int main(int argc, char *argv[])
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   encoder_control encoder;
-  //encoder_state encoder_state;
-  picture *cur_pic;
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint64_t curpos  = 0;
   uint64_t lastpos = 0;
@@ -341,18 +339,19 @@ int main(int argc, char *argv[])
       // The actual coding happens here, after this function we have a coded frame
       encode_one_frame(&encoder_states[current_encoder_state]);
       
-      cur_pic = encoder_states[current_encoder_state].tile->cur_pic;
+      
 
       if (cfg->debug != NULL) {
+        const videoframe * const frame = encoder_states[current_encoder_state].tile->frame;
         // Write reconstructed frame out.
         // Use conformance-window dimensions instead of internal ones.
-        const int width = cur_pic->width;
+        const int width = frame->width;
         const int out_width = encoder.in.real_width;
         const int out_height = encoder.in.real_height;
         int y;
-        const pixel *y_rec = cur_pic->y_recdata;
-        const pixel *u_rec = cur_pic->u_recdata;
-        const pixel *v_rec = cur_pic->v_recdata;
+        const pixel *y_rec = frame->rec->y;
+        const pixel *u_rec = frame->rec->u;
+        const pixel *v_rec = frame->rec->v;
 
         for (y = 0; y < out_height; ++y) {
           fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
@@ -371,10 +370,8 @@ int main(int argc, char *argv[])
       lastpos = curpos;
 
       // PSNR calculations
-      temp_psnr[0] = image_psnr(cur_pic->y_data, cur_pic->y_recdata, cfg->width, cfg->height);
-      temp_psnr[1] = image_psnr(cur_pic->u_data, cur_pic->u_recdata, cfg->width>>1, cfg->height>>1);
-      temp_psnr[2] = image_psnr(cur_pic->v_data, cur_pic->v_recdata, cfg->width>>1, cfg->height>>1);
-
+      videoframe_compute_psnr(encoder_states[current_encoder_state].tile->frame, temp_psnr);
+      
       fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_states[current_encoder_state].global->frame,
             "BPI"[encoder_states[current_encoder_state].global->slicetype%3], diff<<3,
             temp_psnr[0], temp_psnr[1], temp_psnr[2]);
