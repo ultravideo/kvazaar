@@ -241,6 +241,9 @@ void picture_blit_coeffs(const coefficient *orig, coefficient *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
+cu_info* picture_get_cu(picture * pic, unsigned int x_in_scu, unsigned int y_in_scu);
+const cu_info* picture_get_cu_const(const picture * pic, unsigned int x_in_scu, unsigned int y_in_scu);
+
 
 typedef unsigned (*cost_16bit_nxn_func)(const pixel *block1, const pixel *block2);
 

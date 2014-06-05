@@ -43,23 +43,22 @@ void inter_set_block(picture* pic, uint32_t x_cu, uint32_t y_cu, uint8_t depth, 
 {
   uint32_t x, y;
   // Width in smallest CU
-  int width_in_scu = pic->width_in_lcu<<MAX_DEPTH;
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
   int tr_depth = (depth == 0 ? 1 : depth);
   // Loop through all the block in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
-    int cu_pos = y * width_in_scu; //!< calculate y-position once, use with every x
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
+      cu_info * const cu = picture_get_cu(pic, x, y);
       // Set all SCU's to this blocks values at the bottom most depth.
-      pic->cu_array[cu_pos + x].depth = depth;
-      pic->cu_array[cu_pos + x].type  = CU_INTER;
-      pic->cu_array[cu_pos + x].part_size = SIZE_2Nx2N;
-      pic->cu_array[cu_pos + x].inter.mode   = cur_cu->inter.mode;
-      pic->cu_array[cu_pos + x].inter.mv[0]  = cur_cu->inter.mv[0];
-      pic->cu_array[cu_pos + x].inter.mv[1]  = cur_cu->inter.mv[1];
-      pic->cu_array[cu_pos + x].inter.mv_dir = cur_cu->inter.mv_dir;
-      pic->cu_array[cu_pos + x].inter.mv_ref = cur_cu->inter.mv_ref;
-      pic->cu_array[cu_pos + x].tr_depth = tr_depth;
+      cu->depth = depth;
+      cu->type  = CU_INTER;
+      cu->part_size = SIZE_2Nx2N;
+      cu->inter.mode   = cur_cu->inter.mode;
+      cu->inter.mv[0]  = cur_cu->inter.mv[0];
+      cu->inter.mv[1]  = cur_cu->inter.mv[1];
+      cu->inter.mv_dir = cur_cu->inter.mv_dir;
+      cu->inter.mv_ref = cur_cu->inter.mv_ref;
+      cu->tr_depth = tr_depth;
     }
   }
 }

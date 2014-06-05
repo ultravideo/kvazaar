@@ -398,8 +398,7 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 
   for (ref_idx = 0; ref_idx < encoder_state->global->ref->used_size; ref_idx++) {
     picture *ref_pic = encoder_state->global->ref->pics[ref_idx];
-    unsigned width_in_scu = NO_SCU_IN_LCU(ref_pic->width_in_lcu);
-    cu_info *ref_cu = &ref_pic->cu_array[y_cu * width_in_scu + x_cu];
+    const cu_info *ref_cu = picture_get_cu_const(ref_pic, x_cu, y_cu);
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;
@@ -1143,8 +1142,6 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
   {
     const int x_cu = x >> MAX_DEPTH;
     const int y_cu = y >> MAX_DEPTH;
-    const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
-    cu_info *const cu_array = cur_pic->cu_array;
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
@@ -1154,7 +1151,7 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
     if (y_cu > 0) {
       int i;
       for (i = 0; i < LCU_CU_WIDTH; ++i) {
-        const cu_info *from_cu = &cu_array[(x_cu + i) + (y_cu - 1) * cu_array_width];
+        const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu + i, y_cu - 1);
         cu_info *to_cu = &lcu_cu[i - LCU_T_CU_WIDTH];
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
@@ -1163,21 +1160,21 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
     if (x_cu > 0) {
       int i;
       for (i = 0; i < LCU_CU_WIDTH; ++i) {
-        const cu_info *from_cu = &cu_array[(x_cu - 1) + (y_cu + i) * cu_array_width];
+        const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu - 1, y_cu + i);
         cu_info *to_cu = &lcu_cu[-1 + i * LCU_T_CU_WIDTH];
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
     // Copy top-left CU.
     if (x_cu > 0 && y_cu > 0) {
-      const cu_info *from_cu = &cu_array[(x_cu - 1) + (y_cu - 1) * cu_array_width];
+      const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu - 1, y_cu - 1);
       cu_info *to_cu = &lcu_cu[-1 - LCU_T_CU_WIDTH];
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
 
     // Copy top-right CU.
     if (y_cu > 0 && x + LCU_WIDTH < cur_pic->width) {
-      const cu_info *from_cu = &cu_array[(x_cu + LCU_CU_WIDTH) + (y_cu - 1) * cu_array_width];
+      const cu_info *from_cu = picture_get_cu_const(cur_pic, x_cu + LCU_CU_WIDTH, y_cu - 1);
       cu_info *to_cu = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
@@ -1237,9 +1234,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
   {
     const int x_cu = x_px >> MAX_DEPTH;
     const int y_cu = y_px >> MAX_DEPTH;
-    const picture * const cur_pic = encoder_state->tile->cur_pic;
-    const int cu_array_width = cur_pic->width_in_lcu << MAX_DEPTH;
-    cu_info *const cu_array = cur_pic->cu_array;
+    picture * const cur_pic = encoder_state->tile->cur_pic;
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
@@ -1249,7 +1244,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
     for (y = 0; y < LCU_CU_WIDTH; ++y) {
       for (x = 0; x < LCU_CU_WIDTH; ++x) {
         const cu_info *from_cu = &lcu_cu[x + y * LCU_T_CU_WIDTH];
-        cu_info *to_cu = &cu_array[(x_cu + x) + (y_cu + y) * cu_array_width];
+        cu_info *to_cu = picture_get_cu(cur_pic, x_cu + x, y_cu + y);
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }

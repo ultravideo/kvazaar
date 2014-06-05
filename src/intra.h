@@ -33,7 +33,7 @@
 void intra_set_block_mode(picture* pic,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
 
 int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
-                                    cu_info* cur_cu, cu_info* left_cu, cu_info* above_cu);
+                                    const cu_info* cur_cu, const cu_info* left_cu, const cu_info* above_cu);
 void intra_dc_pred_filtering(pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t height );
 
 void intra_build_reference_border(const encoder_control *encoder, int32_t x_luma, int32_t y_luma, int16_t out_width, pixel *dst, int32_t dst_stride, int8_t chroma, int32_t pic_width, int32_t pic_height, lcu_t *lcu);

@@ -787,7 +787,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
 {
   cabac_data * const cabac = &encoder_state->cabac;
   const picture * const cur_pic = encoder_state->tile->cur_pic;
-  cu_info *cur_cu = &cur_pic->cu_array[x_ctb + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
+  const cu_info *cur_cu = picture_get_cu_const(cur_pic, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
   
@@ -807,11 +807,11 @@ void encode_coding_tree(encoder_state * const encoder_state,
     // Implisit split flag when on border
     if (!border) {
       // Get left and top block split_flags and if they are present and true, increase model number
-      if (x_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[x_ctb - 1 + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)]), depth) == 1) {
+      if (x_ctb > 0 && GET_SPLITDATA(picture_get_cu_const(cur_pic, x_ctb - 1, y_ctb), depth) == 1) {
         split_model++;
       }
 
-      if (y_ctb > 0 && GET_SPLITDATA(&(cur_pic->cu_array[x_ctb + (y_ctb - 1) * (cur_pic->width_in_lcu << MAX_DEPTH)]), depth) == 1) {
+      if (y_ctb > 0 && GET_SPLITDATA(picture_get_cu_const(cur_pic, x_ctb, y_ctb - 1), depth) == 1) {
         split_model++;
       }
 
@@ -846,11 +846,11 @@ void encode_coding_tree(encoder_state * const encoder_state,
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
     // Get left and top skipped flags and if they are present and true, increase context number
-    if (x_ctb > 0 && (&cur_pic->cu_array[x_ctb - 1 + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)])->skipped) {
+    if (x_ctb > 0 && (picture_get_cu_const(cur_pic, x_ctb - 1, y_ctb))->skipped) {
       ctx_skip++;
     }
 
-    if (y_ctb > 0 && (&cur_pic->cu_array[x_ctb + (y_ctb - 1) * (cur_pic->width_in_lcu << MAX_DEPTH)])->skipped) {
+    if (y_ctb > 0 && (picture_get_cu_const(cur_pic, x_ctb, y_ctb - 1))->skipped) {
       ctx_skip++;
     }
 
@@ -1063,15 +1063,15 @@ void encode_coding_tree(encoder_state * const encoder_state,
     // 5 EP bins with the full predmode
     for (j = 0; j < num_pred_units; ++j) {
       static const vector2d offset[4] = {{0,0},{1,0},{0,1},{1,1}};
-      cu_info *left_cu = 0;
-      cu_info *above_cu = 0;
+      const cu_info *left_cu = NULL;
+      const cu_info *above_cu = NULL;
 
       if (x_ctb > 0) {
-        left_cu = &cur_pic->cu_array[x_ctb - 1 + y_ctb * (cur_pic->width_in_lcu << MAX_DEPTH)];
+        left_cu = picture_get_cu_const(cur_pic, x_ctb - 1, y_ctb);
       }
       // Don't take the above CU across the LCU boundary.
       if (y_ctb > 0 && (y_ctb & 7) != 0) {
-        above_cu = &cur_pic->cu_array[x_ctb + (y_ctb - 1) * (cur_pic->width_in_lcu << MAX_DEPTH)];
+        above_cu = picture_get_cu_const(cur_pic, x_ctb, y_ctb - 1);
       }
 
       intra_get_dir_luma_predictor((x_ctb<<3) + (offset[j].x<<2),
@@ -1241,7 +1241,7 @@ static void encode_transform_unit(encoder_state * const encoder_state,
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
-  cu_info *cur_cu = &cur_pic->cu_array[x_cu + y_cu * (cur_pic->width_in_lcu << MAX_DEPTH)];
+  const cu_info *cur_cu = picture_get_cu_const(cur_pic, x_cu, y_cu);
 
   coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];
   coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
@@ -1328,7 +1328,7 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   const picture * const cur_pic = encoder_state->tile->cur_pic;
-  cu_info *cur_cu = &cur_pic->cu_array[x_cu + y_cu * (cur_pic->width_in_lcu << MAX_DEPTH)];
+  const cu_info *cur_cu = picture_get_cu_const(cur_pic, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when

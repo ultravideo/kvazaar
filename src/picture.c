@@ -194,6 +194,20 @@ int picture_free(picture * const pic)
   return 1;
 }
 
+const cu_info* picture_get_cu_const(const picture * const pic, unsigned int x_in_scu, unsigned int y_in_scu) {
+  assert(x_in_scu < (pic->width_in_lcu << MAX_DEPTH));
+  assert(y_in_scu < (pic->height_in_lcu << MAX_DEPTH));
+  
+  return &pic->cu_array[x_in_scu + y_in_scu * (pic->width_in_lcu << MAX_DEPTH)];
+}
+
+cu_info* picture_get_cu(picture * const pic, const unsigned int x_in_scu, const unsigned int y_in_scu) {
+  assert(x_in_scu < (pic->width_in_lcu << MAX_DEPTH));
+  assert(y_in_scu < (pic->height_in_lcu << MAX_DEPTH));
+  
+  return &pic->cu_array[x_in_scu + y_in_scu * (pic->width_in_lcu << MAX_DEPTH)];
+}
+
 /**
  * \brief Calculates image PSNR value
  */
