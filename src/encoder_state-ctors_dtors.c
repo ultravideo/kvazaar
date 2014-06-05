@@ -633,7 +633,6 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
     }
   }
   
-  
 #ifdef _DEBUG
   if (!parent_state) encoder_state_dump_graphviz(child_state);
 #endif //_DEBUG

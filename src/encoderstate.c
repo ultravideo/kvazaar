@@ -73,6 +73,17 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
   encoder_state->global->cur_lambda_cost = lambda;
 }
 
+int encoder_state_match_children_of_previous_frame(encoder_state * const encoder_state) {
+  int i;
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+    //Child should also exist for previous encoder
+    assert(encoder_state->previous_encoder_state->children[i].encoder_control);
+    encoder_state->children[i].previous_encoder_state = &encoder_state->previous_encoder_state->children[i];
+    encoder_state_match_children_of_previous_frame(&encoder_state->children[i]);
+  }
+  return 1;
+}
+
 static void encoder_state_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
   const int source_offset_x = source_enc->tile->lcu_offset_x * LCU_WIDTH;
   const int source_offset_y = source_enc->tile->lcu_offset_y * LCU_WIDTH;

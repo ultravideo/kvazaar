@@ -253,6 +253,8 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     }
     
     encoder->wpp = encoder->cfg->wpp;
+    
+    encoder->owf = 0;
 
 #ifdef _DEBUG
     printf("Tiles columns width:");

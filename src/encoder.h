@@ -124,6 +124,9 @@ typedef struct encoder_control
   //WPP
   int wpp;
   
+  //OWF 0 = no owf, 1 = 1 frame, 2 = 2 frames, etc.
+  int owf;
+  
   //Slices
   int slice_count;
   const int* slice_addresses_in_ts;

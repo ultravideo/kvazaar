@@ -106,6 +106,9 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on);
 //Blocking call until the queue is empty. Previously set threadqueue_job handles should not be used anymore
 int threadqueue_flush(threadqueue_queue * threadqueue);
 
+//Blocking call until job is executed. Job handles submitted before job should not be used any more.
+int threadqueue_waitfor(threadqueue_queue * threadqueue, threadqueue_job * job);
+
 //Free ressources in a threadqueue
 int threadqueue_finalize(threadqueue_queue * threadqueue);
 
@@ -124,6 +127,7 @@ int threadqueue_log(threadqueue_queue * threadqueue, const CLOCK_T *start, const
  * 
  * - Always first lock threadqueue, than a job inside it
  * - When job A depends on job B, always lock first job B and then job A
+ * - Jobs should be submitted in an order which is compatible with serial execution.
  * 
  * */
 
