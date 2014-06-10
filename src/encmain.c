@@ -273,7 +273,12 @@ int main(int argc, char *argv[])
   
   //Now, do the real stuff
   {
-    encoder_state encoder_states[encoder.owf + 1];
+    encoder_state *encoder_states = malloc((encoder.owf + 1) * sizeof(encoder_state));
+    if (encoder_states == NULL) {
+      fprintf(stderr, "Failed to allocate memory.");
+      goto exit_failure;
+    }
+
     int i;
     int current_encoder_state = 0;
     for (i = 0; i <= encoder.owf; ++i) {
@@ -406,6 +411,8 @@ int main(int argc, char *argv[])
     for (i = 0; i <= encoder.owf; ++i) {
       encoder_state_finalize(&encoder_states[i]);
     }
+
+    free(encoder_states);
   }
 
   // Deallocating
