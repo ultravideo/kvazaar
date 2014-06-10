@@ -27,18 +27,22 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -116,6 +120,7 @@
     <ClCompile Include="..\..\src\cabac.c" />
     <ClCompile Include="..\..\src\config.c" />
     <ClCompile Include="..\..\src\context.c" />
+    <ClCompile Include="..\..\src\cu.c" />
     <ClCompile Include="..\..\src\encmain.c" />
     <ClCompile Include="..\..\src\encoder.c" />
     <ClCompile Include="..\..\src\encoderstate.c" />
@@ -124,19 +129,23 @@
     <ClCompile Include="..\..\src\encoder_state-geometry.c" />
     <ClCompile Include="..\..\src\extras\getopt.c" />
     <ClCompile Include="..\..\src\filter.c" />
+    <ClCompile Include="..\..\src\image.c" />
+    <ClCompile Include="..\..\src\imagelist.c" />
     <ClCompile Include="..\..\src\inter.c" />
     <ClCompile Include="..\..\src\intra.c" />
     <ClCompile Include="..\..\src\nal.c" />
-    <ClCompile Include="..\..\src\picture.c" />
     <ClCompile Include="..\..\src\rdo.c" />
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClInclude Include="..\..\src\strategies\picture-altivec.c" />
+    <ClCompile Include="..\..\src\videoframe.c" />
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
     <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h" />
     <ClInclude Include="..\..\src\encoder_state-geometry.h" />
     <ClInclude Include="..\..\src\strategies\nal-generic.c" />
     <ClInclude Include="..\..\src\strategies\nal.c" />
+    <ClInclude Include="..\..\src\strategies\nal.h" />
     <ClInclude Include="..\..\src\strategies\picture-generic.c" />
     <ClInclude Include="..\..\src\strategies\picture-sse2.c" />
     <ClInclude Include="..\..\src\strategies\picture-sse41.c" />
@@ -159,7 +168,6 @@
     <ClInclude Include="..\..\src\inter.h" />
     <ClInclude Include="..\..\src\intra.h" />
     <ClInclude Include="..\..\src\nal.h" />
-    <ClInclude Include="..\..\src\picture.h" />
     <ClInclude Include="..\..\src\rdo.h" />
     <ClInclude Include="..\..\src\sao.h" />
     <ClInclude Include="..\..\src\scalinglist.h" />
