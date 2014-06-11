@@ -35,6 +35,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "checkpoint.h"
 #include "global.h"
 #include "config.h"
 #include "encoder.h"
@@ -69,6 +70,8 @@ int main(int argc, char *argv[])
       _setmode( _fileno( stdout ), _O_BINARY );
       _setmode( _fileno( stderr ), _O_TEXT );
   #endif
+      
+  CHECKPOINTS_INIT();
 
   //Initialize strategies
   if (!strategyselector_init()) {
@@ -328,6 +331,8 @@ int main(int argc, char *argv[])
           break;
         }
       }
+      
+      CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
       // Read one frame from the input
       if (!read_one_frame(input, &encoder_states[current_encoder_state])) {
@@ -410,6 +415,8 @@ int main(int argc, char *argv[])
   free_exp_golomb();
   
   strategyselector_free();
+  
+  CHECKPOINTS_FINALIZE();
 
   return EXIT_SUCCESS;
 
@@ -419,5 +426,6 @@ exit_failure:
   if (output) fclose(output);
   if (recout) fclose(recout);
   strategyselector_free();
+  CHECKPOINTS_FINALIZE();
   return EXIT_FAILURE;
 }
