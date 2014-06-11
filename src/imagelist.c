@@ -105,8 +105,9 @@ int image_list_destroy(image_list *list)
   if (list->used_size > 0) {
     for (i = 0; i < list->used_size; ++i) {
       image_free(list->images[i]);
-      free(list->cu_arrays[i]);
       list->images[i] = NULL;
+      free(list->cu_arrays[i]);
+      list->cu_arrays[i] = NULL;
     }
   }
 
@@ -185,14 +186,17 @@ int image_list_rem(image_list * const list, const unsigned n)
   // The last item is easy to remove
   if (n == list->used_size - 1) {
     list->images[n] = NULL;
+    list->cu_arrays[n] = NULL;
     list->used_size--;
   } else {
     int i = n;
     // Shift all following pics one backward in the list
     for (i = n; i < list->used_size - 1; ++i) {
       list->images[i] = list->images[i + 1];
+      list->cu_arrays[i] = list->cu_arrays[i + 1];
     }
     list->images[list->used_size - 1] = NULL;
+    list->cu_arrays[list->used_size - 1] = NULL;
     list->used_size--;
   }
 
