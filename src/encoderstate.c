@@ -605,13 +605,19 @@ static void encoder_state_encode(encoder_state * const main_state) {
   }
 }
 
-static void encoder_state_clear_refs(encoder_state *encoder_state) {
-  //FIXME: Do we need to handle children? At present they all share the same global
-  while (encoder_state->global->ref->used_size) {
-    image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size - 1);
+static void encoder_state_clear_refs(encoder_state *main_state) {
+  int i;
+  while (main_state->global->ref->used_size) {
+    image_list_rem(main_state->global->ref, main_state->global->ref->used_size - 1);
   }
 
-  encoder_state->global->poc = 0;
+  main_state->global->poc = 0;
+  videoframe_set_poc(main_state->tile->frame, 0);
+  
+  for (i=0; main_state->children[i].encoder_control; ++i) {
+    encoder_state *sub_state = &(main_state->children[i]);
+    encoder_state_clear_refs(sub_state);
+  }
 }
 
 static void encoder_state_new_frame(encoder_state * const main_state) {
@@ -771,6 +777,7 @@ void encoder_next_frame(encoder_state *encoder_state) {
   encoder_state->global->poc++;
   
   encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+  videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
 }
 
 

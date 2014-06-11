@@ -57,7 +57,7 @@ typedef struct videoframe
 videoframe *videoframe_alloc(int32_t width, int32_t height, int32_t poc);
 int videoframe_free(videoframe * const frame);
 
-//void videoframe_set_poc(videoframe * frame, int32_t poc);
+void videoframe_set_poc(videoframe * frame, int32_t poc);
 
 const cu_info* videoframe_get_cu_const(const videoframe * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
 cu_info* videoframe_get_cu(videoframe * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);

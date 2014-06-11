@@ -93,6 +93,12 @@ int videoframe_free(videoframe * const frame)
   return 1;
 }
 
+void videoframe_set_poc(videoframe * const frame, const int32_t poc) {
+  frame->source->poc = poc;
+  frame->rec->poc = poc;
+  frame->poc = poc;
+}
+
 const cu_info* videoframe_get_cu_const(const videoframe * const frame, unsigned int x_in_scu, unsigned int y_in_scu) {
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
