@@ -26,9 +26,7 @@
 
 #include "global.h"
 
-#include "encoder.h"
 #include "encoderstate.h"
-#include "picture.h"
 
 
 void search_lcu(encoder_state *encoder_state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);

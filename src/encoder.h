@@ -26,7 +26,7 @@
 
 #include "global.h"
 
-#include "picture.h"
+#include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "config.h"
@@ -123,6 +123,9 @@ typedef struct encoder_control
   
   //WPP
   int wpp;
+  
+  //OWF 0 = no owf, 1 = 1 frame, 2 = 2 frames, etc.
+  int owf;
   
   //Slices
   int slice_count;

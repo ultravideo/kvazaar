@@ -85,7 +85,7 @@ int lcu_in_first_row(const encoder_state * const encoder_state, int lcu_addr_in_
 int lcu_in_last_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
-  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y + encoder_state->tile->cur_pic->height_in_lcu - 1) {
+  if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y + encoder_state->tile->frame->height_in_lcu - 1) {
     return 1;
   }
 
@@ -124,7 +124,7 @@ int lcu_in_last_column(const encoder_state * const encoder_state, int lcu_addr_i
   const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   //First column of tile?
-  if (lcu_addr_in_rs % encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_x + encoder_state->tile->cur_pic->width_in_lcu - 1) {
+  if (lcu_addr_in_rs % encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_x + encoder_state->tile->frame->width_in_lcu - 1) {
     return 1;
   }
 

@@ -67,15 +67,15 @@ void nal_write(bitstream * const bitstream, const uint8_t nal_type,
 
 /*!
  \brief Calculate checksums for all colors of the picture.
- \param pic The picture that checksum is calculated for.
+ \param im The image that checksum is calculated for.
  \param checksum_out Result of the calculation.
  \returns Void
 */
-void picture_checksum(const picture* pic, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
+void image_checksum(const image* im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
 {
-  array_checksum(pic->y_recdata, pic->height, pic->width, pic->width, checksum_out[0]);
+  array_checksum(im->y, im->height, im->width, im->width, checksum_out[0]);
 
   /* The number of chroma pixels is half that of luma. */
-  array_checksum(pic->u_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[1]);
-  array_checksum(pic->v_recdata, pic->height >> 1, pic->width >> 1, pic->width >> 1, checksum_out[2]);
+  array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1]);
+  array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2]);
 }

@@ -47,14 +47,13 @@ const uint8_t intra_hor_ver_dist_thres[5] = {0,7,1,0,0};
  * \param mode mode to set
  * \returns Void
  */
-void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
+void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
 {
   uint32_t x, y;
-  int width_in_scu = pic->width_in_lcu<<MAX_DEPTH; //!< Width in smallest CU
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
 
   if (part_mode == SIZE_NxN) {
-    cu_info *cur_cu = &pic->cu_array[x_cu + y_cu * width_in_scu];
+    cu_info *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
     // Modes are already set.
     cur_cu->depth = depth;
     cur_cu->type = CU_INTRA;
@@ -65,7 +64,7 @@ void intra_set_block_mode(picture *pic,uint32_t x_cu, uint32_t y_cu, uint8_t dep
   // Loop through all the blocks in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info *cur_cu = &pic->cu_array[x + y * width_in_scu];
+      cu_info *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
       cur_cu->depth = depth;
       cur_cu->type = CU_INTRA;
       cur_cu->intra[0].mode = mode;
@@ -111,8 +110,8 @@ pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
  * \param preds output buffer for 3 predictions
  * \returns (predictions are found)?1:0
  */
-int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
-                                    cu_info* cur_cu, cu_info* left_cu, cu_info* above_cu)
+int8_t intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8_t* preds,
+                                    const cu_info * const cur_cu, const cu_info * const left_cu, const cu_info * const above_cu)
 {
   int y_cu = y>>3;
 
@@ -297,7 +296,7 @@ void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recs
 
   intra_get_pred(encoder, ref, recstride, pred, width, mode, chroma);
 
-  picture_blit_pixels(pred, dst, width, width, width, dststride);
+  pixels_blit(pred, dst, width, width, width, dststride);
 }
 
 /**
@@ -691,8 +690,8 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
     return;
   }
   {
-    const uint32_t pic_width = encoder_state->tile->cur_pic->width;
-    const uint32_t pic_height = encoder_state->tile->cur_pic->height;
+    const uint32_t pic_width = encoder_state->tile->frame->width;
+    const uint32_t pic_height = encoder_state->tile->frame->height;
 
     // Pointers to reconstruction arrays
     pixel *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
@@ -743,8 +742,8 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
   }
 
   {
-    const uint32_t pic_width = encoder_state->tile->cur_pic->width;
-    const uint32_t pic_height = encoder_state->tile->cur_pic->height;
+    const uint32_t pic_width = encoder_state->tile->frame->width;
+    const uint32_t pic_height = encoder_state->tile->frame->height;
 
     // Pointers to reconstruction arrays
     pixel *recbase_u = &lcu->rec.u[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];

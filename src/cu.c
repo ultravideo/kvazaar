@@ -1,5 +1,3 @@
-#ifndef STRATEGIES_PICTURE_H_
-#define STRATEGIES_PICTURE_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -19,12 +17,38 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "../image.h"
+/*
+ * \file
+ */
 
-//Function pointer to reg_sad
-extern unsigned (*reg_sad)(const pixel * const data1, const pixel * const data2,
-                           const int width, const int height, const unsigned stride1, const unsigned stride2);
+#include <string.h>
+#include <stdlib.h>
 
-#define STRATEGIES_PICTURE_EXPORTS {"reg_sad", (void**) &reg_sad}
+#include "cu.h"
 
-#endif //STRATEGIES_PICTURE_H_
+
+void coefficients_blit(const coefficient * const orig, coefficient * const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride)
+{
+  unsigned y;
+
+  for (y = 0; y < height; ++y) {
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coefficient));
+  }
+}
+
+unsigned coefficients_calc_abs(const coefficient *const buf, const int buf_stride,
+                        const int width)
+{
+  int sum = 0;
+  int y, x;
+
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      sum += abs(buf[x + y * buf_stride]);
+    }
+  }
+
+  return sum;
+}

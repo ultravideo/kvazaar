@@ -25,7 +25,7 @@
 
 
 static int encoder_state_config_global_init(encoder_state * const encoder_state) {
-  encoder_state->global->ref = picture_list_init(MAX_REF_PIC_COUNT);
+  encoder_state->global->ref = image_list_alloc(MAX_REF_PIC_COUNT);
   if(!encoder_state->global->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
     return 0;
@@ -37,7 +37,7 @@ static int encoder_state_config_global_init(encoder_state * const encoder_state)
 }
 
 static void encoder_state_config_global_finalize(encoder_state * const encoder_state) {
-  picture_list_destroy(encoder_state->global->ref);
+  image_list_destroy(encoder_state->global->ref);
 }
 
 static int encoder_state_config_tile_init(encoder_state * const encoder_state, 
@@ -45,18 +45,18 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
   const encoder_control * const encoder = encoder_state->encoder_control;
-  encoder_state->tile->cur_pic = picture_alloc(width, height, width_in_lcu, height_in_lcu);
+  encoder_state->tile->frame = videoframe_alloc(width, height, 0);
 
-  if (!encoder_state->tile->cur_pic) {
-    printf("Error allocating picture!\r\n");
+  if (!encoder_state->tile->frame) {
+    printf("Error allocating videoframe!\r\n");
     return 0;
   }
   
   // Init coeff data table
   //FIXME: move them
-  encoder_state->tile->cur_pic->coeff_y = MALLOC(coefficient, width * height);
-  encoder_state->tile->cur_pic->coeff_u = MALLOC(coefficient, (width * height) >> 2);
-  encoder_state->tile->cur_pic->coeff_v = MALLOC(coefficient, (width * height) >> 2);
+  encoder_state->tile->frame->coeff_y = MALLOC(coefficient, width * height);
+  encoder_state->tile->frame->coeff_u = MALLOC(coefficient, (width * height) >> 2);
+  encoder_state->tile->frame->coeff_v = MALLOC(coefficient, (width * height) >> 2);
   
   encoder_state->tile->lcu_offset_x = lcu_offset_x;
   encoder_state->tile->lcu_offset_y = lcu_offset_y;
@@ -64,19 +64,19 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   encoder_state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
   
   //Allocate buffers
-  //order by row of (LCU_WIDTH * cur_pic->width_in_lcu) pixels
-  encoder_state->tile->hor_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
+  //order by row of (LCU_WIDTH * frame->width_in_lcu) pixels
+  encoder_state->tile->hor_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
-  encoder_state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->height_in_lcu * encoder_state->tile->cur_pic->width_in_lcu);
+  encoder_state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->frame->height_in_lcu * encoder_state->tile->frame->width_in_lcu);
   
   if (encoder->sao_enable) {
-    encoder_state->tile->hor_buf_before_sao = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
+    encoder_state->tile->hor_buf_before_sao = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
   } else {
     encoder_state->tile->hor_buf_before_sao = NULL;
   }
   
   if (encoder->wpp) {
-    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job*, encoder_state->tile->cur_pic->width_in_lcu * encoder_state->tile->cur_pic->height_in_lcu);
+    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job*, encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
     if (!encoder_state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
       return 0;
@@ -95,8 +95,8 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
   yuv_t_free(encoder_state->tile->hor_buf_search);
   yuv_t_free(encoder_state->tile->ver_buf_search);
   
-  picture_free(encoder_state->tile->cur_pic);
-  encoder_state->tile->cur_pic = NULL;
+  videoframe_free(encoder_state->tile->frame);
+  encoder_state->tile->frame = NULL;
   
   FREE_POINTER(encoder_state->tile->wf_jobs);
 }
@@ -345,7 +345,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         children_allow_slice = 1;
         children_allow_tile = 1;
         start_in_ts = 0;
-        end_in_ts = child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
+        end_in_ts = child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
         break;
       case ENCODER_STATE_TYPE_SLICE:
         assert(child_state->parent);
@@ -359,7 +359,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         if (child_state->parent->type != ENCODER_STATE_TYPE_SLICE) children_allow_slice = 1;
         children_allow_wavefront_row = encoder->wpp;
         start_in_ts = child_state->tile->lcu_offset_in_ts;
-        end_in_ts = child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
+        end_in_ts = child_state->tile->lcu_offset_in_ts + child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
         break;
       case ENCODER_STATE_TYPE_WAVEFRONT_ROW:
         //GCC tries to be too clever...
@@ -539,7 +539,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       int lcu_id;
       int lcu_start = 0;
       //End is the element AFTER the end (iterate < lcu_end)
-      int lcu_end = child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu;
+      int lcu_end = child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
       
       //Restrict to the current slice if needed
       lcu_start = MAX(lcu_start, child_state->slice->start_in_ts - child_state->tile->lcu_offset_in_ts);
@@ -547,8 +547,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       
       //Restrict to the current wavefront row if needed
       if (child_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-        lcu_start = MAX(lcu_start, (child_state->wfrow->lcu_offset_y) * child_state->tile->cur_pic->width_in_lcu);
-        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y + 1) * child_state->tile->cur_pic->width_in_lcu);
+        lcu_start = MAX(lcu_start, (child_state->wfrow->lcu_offset_y) * child_state->tile->frame->width_in_lcu);
+        lcu_end = MIN(lcu_end, (child_state->wfrow->lcu_offset_y + 1) * child_state->tile->frame->width_in_lcu);
       }
       
       child_state->lcu_order_count = lcu_end - lcu_start;
@@ -560,8 +560,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         child_state->lcu_order[i].encoder_state = child_state;
         child_state->lcu_order[i].id = lcu_id;
         child_state->lcu_order[i].index = i;
-        child_state->lcu_order[i].position.x = lcu_id % child_state->tile->cur_pic->width_in_lcu;
-        child_state->lcu_order[i].position.y = lcu_id / child_state->tile->cur_pic->width_in_lcu;
+        child_state->lcu_order[i].position.x = lcu_id % child_state->tile->frame->width_in_lcu;
+        child_state->lcu_order[i].position.y = lcu_id / child_state->tile->frame->width_in_lcu;
         child_state->lcu_order[i].position_px.x = child_state->lcu_order[i].position.x * LCU_WIDTH;
         child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
         child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
@@ -593,7 +593,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
               }
             }
           } else {
-            child_state->lcu_order[i].above = &child_state->lcu_order[i-child_state->tile->cur_pic->width_in_lcu];
+            child_state->lcu_order[i].above = &child_state->lcu_order[i-child_state->tile->frame->width_in_lcu];
           }
           assert(child_state->lcu_order[i].above);
           child_state->lcu_order[i].above->below = &child_state->lcu_order[i];
@@ -616,7 +616,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       fprintf(stderr, "Tile %d starts before slice %d, in which it should be included!\n", child_state->tile->id, child_state->slice->id);
       return 0;
     }
-    if (child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu - 1 > child_state->slice->end_in_ts) {
+    if (child_state->tile->lcu_offset_in_ts + child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu - 1 > child_state->slice->end_in_ts) {
       fprintf(stderr, "Tile %d ends after slice %d, in which it should be included!\n", child_state->tile->id, child_state->slice->id);
       return 0;
     }
@@ -627,12 +627,11 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       fprintf(stderr, "Slice %d starts before tile %d, in which it should be included!\n", child_state->slice->id, child_state->tile->id);
       return 0;
     }
-    if (child_state->slice->end_in_ts > child_state->tile->lcu_offset_in_ts + child_state->tile->cur_pic->width_in_lcu * child_state->tile->cur_pic->height_in_lcu - 1) {
+    if (child_state->slice->end_in_ts > child_state->tile->lcu_offset_in_ts + child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu - 1) {
       fprintf(stderr, "Slice %d ends after tile %d, in which it should be included!\n", child_state->slice->id, child_state->tile->id);
       return 0;
     }
   }
-  
   
 #ifdef _DEBUG
   if (!parent_state) encoder_state_dump_graphviz(child_state);

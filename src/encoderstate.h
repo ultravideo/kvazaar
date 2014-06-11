@@ -26,14 +26,16 @@
 
 #include "global.h"
 
+#include "videoframe.h"
 #include "encoder.h"
-#include "picture.h"
+#include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "config.h"
 #include "tables.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
+#include "imagelist.h"
 
 
 // Submodules
@@ -64,7 +66,7 @@ typedef struct {
   int8_t QP;   //!< \brief Quantization parameter
   
   //Current picture available references
-  picture_list *ref;
+  image_list *ref;
   int8_t ref_list;
   //int8_t ref_idx_num[2];
   
@@ -75,8 +77,8 @@ typedef struct {
 } encoder_state_config_global;
 
 typedef struct {
-  //Current picture to encode
-  picture *cur_pic;
+  //Current sub-frame
+  videoframe *frame;
   
   int32_t id;
   
@@ -145,6 +147,9 @@ typedef struct encoder_state {
   struct encoder_state *children;
   struct encoder_state *parent;
   
+  //Pointer to the encoder_state of the previous frame
+  struct encoder_state *previous_encoder_state;
+  
   encoder_state_config_global *global;
   encoder_state_config_tile   *tile;
   encoder_state_config_slice  *slice;
@@ -156,6 +161,10 @@ typedef struct encoder_state {
   
   bitstream stream;
   cabac_data cabac;
+  
+  //Jobs to wait for
+  threadqueue_job * tqj_recon_done; //Reconstruction is done
+  threadqueue_job * tqj_bitstream_written; //Reconstruction is written
 } encoder_state;
 
 
@@ -179,6 +188,8 @@ void encode_transform_coeff(encoder_state *encoder_state, int32_t x_cu, int32_t 
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
+
+int encoder_state_match_children_of_previous_frame(encoder_state * const encoder_state);
 
 coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth);
 

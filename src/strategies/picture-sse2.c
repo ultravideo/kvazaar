@@ -21,7 +21,7 @@
  * \file
  */
 #include "../strategyselector.h"
-#include "../picture.h"
+#include "../image.h"
 #include <immintrin.h>
 #include <assert.h>
 

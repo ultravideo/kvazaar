@@ -112,7 +112,6 @@ typedef int16_t coefficient;
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
-#define NO_SCU_IN_LCU(no_lcu) ((no_lcu) << MAX_DEPTH)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
 #define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
 
@@ -178,5 +177,9 @@ typedef int16_t coefficient;
 #define SCALING_LIST_REM_NUM  6
 
 #define MAX_TR_DYNAMIC_RANGE 15
+
+//Constants
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_index;
+enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
 
 #endif

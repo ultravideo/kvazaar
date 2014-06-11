@@ -383,18 +383,9 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
     }
 
     if (notdone > 0) {
-      //Give threads a change to unlock if needed
-      if (pthread_cond_broadcast(&(threadqueue->cond)) != 0) {
-        fprintf(stderr, "pthread_cond_broadcast failed!\n");
-        assert(0);
-        return 0;
-      }
+      PTHREAD_COND_BROADCAST(&(threadqueue->cond));
       SLEEP();
-      if (pthread_cond_wait(&threadqueue->cb_cond, &threadqueue->lock) != 0) {
-        fprintf(stderr, "pthread_cond_wait failed!\n");
-        assert(0); //FIXME
-        return 0;
-      }
+      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
     }
   } while (notdone > 0);
   
@@ -404,6 +395,32 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
 
   PTHREAD_UNLOCK(&threadqueue->lock);
 
+  return 1;
+}
+
+int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job * const job) {
+  int job_done = 0;
+  
+  //NULL job is clearly OK :-)
+  if (!job) return 1;
+  
+  //Lock the queue
+  PTHREAD_LOCK(&threadqueue->lock);
+  do {
+    
+    PTHREAD_LOCK(&job->lock);
+    job_done = (job->state == THREADQUEUE_JOB_STATE_DONE);
+    PTHREAD_UNLOCK(&job->lock);
+    
+    if (!job_done) {
+      PTHREAD_COND_BROADCAST(&(threadqueue->cond));
+      SLEEP();
+      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
+    }
+  } while (!job_done);
+
+  PTHREAD_UNLOCK(&threadqueue->lock);
+  
   return 1;
 }
 
@@ -493,6 +510,9 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
 int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
   //If we are not using threads, job are NULL pointers, so we can skip that
   if (!job && !depends_on) return 1;
+  
+  assert(job && depends_on);
+  
   //Lock first the job, and then the dependency
   PTHREAD_LOCK(&job->lock);
   PTHREAD_LOCK(&depends_on->lock);
