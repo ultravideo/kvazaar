@@ -80,7 +80,7 @@
       <Defines>ARCH_X86_64=1</Defines>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
     <ClCompile>
@@ -93,7 +93,7 @@
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x86</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
@@ -102,7 +102,7 @@
       <Defines>ARCH_X86_64=0;PREFIX</Defines>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x86</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>
@@ -111,7 +111,7 @@
       <Defines>ARCH_X86_64=1</Defines>
     </YASM>
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
   </ItemDefinitionGroup>

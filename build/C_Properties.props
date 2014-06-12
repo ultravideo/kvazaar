@@ -13,7 +13,7 @@
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;WIN32;WIN64;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4244;4204;4206;4028</DisableSpecificWarnings>
       <OpenMPSupport>false</OpenMPSupport>
       <TreatSpecificWarningsAsErrors>4013;4029</TreatSpecificWarningsAsErrors>
