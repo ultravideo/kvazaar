@@ -300,6 +300,9 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     // Merge only if both luma and chroma can be merged
     sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
     sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+    
+    CHECKPOINT_SAO_INFO("sao_luma", *sao_luma);
+    CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
   }
   
   

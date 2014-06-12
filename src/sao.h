@@ -24,6 +24,7 @@
  * \brief Coding Unit (CU) and picture data related functions.
  */
 
+#include "checkpoint.h"
 #include "global.h"
 #include "videoframe.h"
 #include "encoder.h"
@@ -44,6 +45,13 @@ typedef struct sao_info_struct {
   int band_position;
   int offsets[NUM_SAO_EDGE_CATEGORIES];
 } sao_info;
+
+#define CHECKPOINT_SAO_INFO(prefix_str, sao) CHECKPOINT(prefix_str " type=%d eo_class=%d ddistortion=%d " \
+  "merge_left_flag=%d merge_up_flag=%d band_position=%d " \
+  "offsets[0]=%d offsets[1]=%d offsets[2]=%d offsets[3]=%d offsets[4]=%d", \
+  (sao).type, (sao).eo_class, (sao).ddistortion, \
+  (sao).merge_left_flag, (sao).merge_up_flag, (sao).band_position, \
+  (sao).offsets[0], (sao).offsets[1], (sao).offsets[2], (sao).offsets[3], (sao).offsets[4])
 
 
 void init_sao_info(sao_info *sao);
