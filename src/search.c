@@ -823,15 +823,29 @@ static void sort_modes(int8_t *modes, uint32_t *costs, int length)
   }
 }
 
+static uint32_t search_intra_get_mode_cost(encoder_state * const encoder_state, pixel *ref[2], cost_pixel_nxn_func *cost_func,
+                                           pixel *pred, int width, int16_t recstride, pixel *orig_block,
+                                           int8_t *intra_preds, int8_t mode)
+{
+  uint32_t sad = 0;
+  uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
+  intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
 
-static void search_intra_rough(encoder_state * const encoder_state, 
+  sad = cost_func(pred, orig_block);
+  sad += mode_cost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
+
+  return sad;
+}
+
+static int8_t search_intra_rough(encoder_state * const encoder_state, 
                                pixel *orig, int32_t origstride,
                                pixel *rec, int16_t recstride,
                                int width, int8_t *intra_preds,
                                int8_t modes[35], uint32_t costs[35])
 {
   int16_t mode;
-  cost_pixel_nxn_func * cost_func = pixels_get_sad_func(width);
+  int8_t modes_selected = 0;
+  cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
   pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
@@ -857,19 +871,19 @@ static void search_intra_rough(encoder_state * const encoder_state,
     intra_filter(ref[1], recstride, width, 0);
   }
 
+  
+
   // Try all modes and select the best one.
   for (mode = 0; mode < 35; mode++) {
-    uint32_t sad = 0;
-    uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+    costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
+                                                       recstride, orig_block,intra_preds, mode);
+    modes[modes_selected] = mode;
+    modes_selected++;
 
-    sad = cost_func(pred, orig_block);
-    sad += mode_cost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
-    costs[mode] = sad;
-    modes[mode] = mode;
   }
 
   sort_modes(modes, costs, 35);
+  return modes_selected;
 }
 
 
@@ -982,15 +996,14 @@ static int search_cu_intra(encoder_state * const encoder_state,
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
     int8_t modes[35];
     uint32_t costs[35];
-    
-    search_intra_rough(encoder_state, 
-                       ref_pixels, LCU_WIDTH,
-                       cu_in_rec_buffer, cu_width * 2 + 8,
-                       cu_width, candidate_modes,
-                       modes, costs);
+    int8_t number_of_modes = search_intra_rough(encoder_state, 
+                                                ref_pixels, LCU_WIDTH,
+                                                cu_in_rec_buffer, cu_width * 2 + 8,
+                                                cu_width, candidate_modes,
+                                                modes, costs, &number_of_modes);
 
     if (encoder_state->encoder_control->rdo == 2) {
-      int num_modes_to_check = (cu_width <= 8) ? 8 : 3;
+      int num_modes_to_check = MIN(number_of_modes, (cu_width <= 8) ? 8 : 3);
       search_intra_rdo(encoder_state, 
                        ref_pixels, LCU_WIDTH,
                        cu_in_rec_buffer, cu_width * 2 + 8,
