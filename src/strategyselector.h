@@ -110,6 +110,7 @@ typedef struct {
     int sse41;
     int sse42;
     int avx;
+    int avx2;
   } intel_flags;
   
   int powerpc;

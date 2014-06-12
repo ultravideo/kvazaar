@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <immintrin.h>
 
 hardware_flags g_hardware_flags;
 
@@ -235,7 +236,10 @@ static void set_hardware_flags() {
   {
     unsigned int eax = 0, ebx = 0, ecx = 0, edx =0;
     /* CPU feature bits */
-    enum { BIT_SSE3 = 0,BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20, BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26, BIT_AVX = 28};
+    enum { BIT_SSE3 = 0, BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20,
+           BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26,
+           BIT_OSXSAVE = 27, BIT_AVX = 28};
+    enum { XCR0_XMM = 1, XCR0_YMM = 2 };
 
     // Dig CPU features with cpuid
     get_cpuid(1, &eax, &ebx, &ecx, &edx);
@@ -249,8 +253,28 @@ static void set_hardware_flags() {
     if (ecx & (1<<BIT_SSSE3)) g_hardware_flags.intel_flags.ssse3 = 1;
     if (ecx & (1<<BIT_SSE41)) g_hardware_flags.intel_flags.sse41 = 1;
     if (ecx & (1<<BIT_SSE42)) g_hardware_flags.intel_flags.sse42 = 1;
-    if (ecx & (1<<BIT_AVX))   g_hardware_flags.intel_flags.avx = 1;
     
+    // Use _XCR_XFEATURE_ENABLED_MASK to check if _xgetbv intrinsic is
+    // supported by the compiler.
+#ifdef _XCR_XFEATURE_ENABLED_MASK
+    // Check hardware and OS support for AVX.
+    if (ecx & (1 << BIT_OSXSAVE)) {
+      uint64_t xcr0 = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+      bool avx_support = ecx & (1 << BIT_AVX) || false;
+      bool xmm_support = xcr0 & (1 << XCR0_XMM);
+      bool ymm_support = xcr0 & (1 << XCR0_YMM);
+
+      if (avx_support && xmm_support && ymm_support) {
+        g_hardware_flags.intel_flags.avx = 1;
+      }
+    }
+
+    if (g_hardware_flags.intel_flags.avx) {
+      get_cpuid(7, &eax, &ebx, &ecx, &edx);
+      if (ebx & (1 << 5))  g_hardware_flags.intel_flags.avx2 = 1;
+    }
+#endif
+
     fprintf(stderr, "Compiled: INTEL, flags:");
 #if COMPILE_INTEL_MMX
     fprintf(stderr, " MMX");
@@ -276,6 +300,9 @@ static void set_hardware_flags() {
 #if COMPILE_INTEL_AVX
     fprintf(stderr, " AVX");
 #endif
+#if COMPILE_INTEL_AVX2
+    fprintf(stderr, " AVX2");
+#endif
     fprintf(stderr, "\nRun on  : INTEL, flags:");
     if (g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
     if (g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
@@ -285,6 +312,7 @@ static void set_hardware_flags() {
     if (g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
     if (g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
     if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
+    if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX2");
     fprintf(stderr, "\n");
   }
 #endif //COMPILE_INTEL
