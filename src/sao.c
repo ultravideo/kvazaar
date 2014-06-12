@@ -737,6 +737,14 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
 {
   sao_info edge_sao;
   sao_info band_sao;
+  
+  //Avoid "random" uninitialized value
+  edge_sao.band_position = 0;
+  edge_sao.eo_class = SAO_EO0;
+  band_sao.offsets[0] = 0;
+  band_sao.eo_class = SAO_EO0;
+  //memset(&edge_sao, 0, sizeof(sao_info));
+  //memset(&band_sao, 0, sizeof(sao_info));
 
   sao_search_edge_sao(encoder_state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
   sao_search_band_sao(encoder_state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
