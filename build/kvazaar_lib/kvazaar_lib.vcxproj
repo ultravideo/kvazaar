@@ -138,6 +138,10 @@
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClInclude Include="..\..\src\checkpoint.h" />
+    <ClInclude Include="..\..\src\cu.h" />
+    <ClInclude Include="..\..\src\image.h" />
+    <ClInclude Include="..\..\src\imagelist.h" />
     <ClInclude Include="..\..\src\strategies\picture-altivec.c" />
     <ClCompile Include="..\..\src\videoframe.c" />
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
@@ -173,10 +177,13 @@
     <ClInclude Include="..\..\src\scalinglist.h" />
     <ClInclude Include="..\..\src\search.h" />
     <ClInclude Include="..\..\src\strategies\picture.h" />
+    <ClInclude Include="..\..\src\strategyselector.h" />
     <ClInclude Include="..\..\src\tables.h" />
     <ClInclude Include="..\..\src\threadqueue.h" />
     <ClInclude Include="..\..\src\threads.h" />
     <ClInclude Include="..\..\src\transform.h" />
+    <ClInclude Include="..\..\src\version.h" />
+    <ClInclude Include="..\..\src\videoframe.h" />
     <ClInclude Include="..\..\src\x86\cpu.h" />
   </ItemGroup>
   <ItemGroup>
