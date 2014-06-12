@@ -84,55 +84,6 @@ int encoder_state_match_children_of_previous_frame(encoder_state * const encoder
   return 1;
 }
 
-static void encoder_state_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel, int target_stride, int source_stride) {
-  const int source_offset_x = source_enc->tile->lcu_offset_x * LCU_WIDTH;
-  const int source_offset_y = source_enc->tile->lcu_offset_y * LCU_WIDTH;
-  
-  const int target_offset_x = target_enc->tile->lcu_offset_x * LCU_WIDTH;
-  const int target_offset_y = target_enc->tile->lcu_offset_y * LCU_WIDTH;
-  
-  int width;
-  int height;
-  
-  int source_offset;
-  int target_offset;
-  
-  //Do nothing if the source and the destination is the same!
-  if (source_enc->tile == target_enc->tile) return;
-
-  if (is_y_channel) {
-    target_offset = source_offset_x + source_offset_y * target_enc->tile->frame->width;
-    source_offset = target_offset_x + target_offset_y * source_enc->tile->frame->width;
-  } else {
-    target_offset = source_offset_x/2 + source_offset_y/2 * target_enc->tile->frame->width/2;
-    source_offset = target_offset_x/2 + target_offset_y/2 * source_enc->tile->frame->width/2;
-  }
-  
-  if (target_enc->children) {
-    //Use information from the source
-    width = MIN(source_enc->tile->frame->width_in_lcu * LCU_WIDTH, target_enc->tile->frame->width - source_offset_x);
-    height = MIN(source_enc->tile->frame->height_in_lcu * LCU_WIDTH, target_enc->tile->frame->height - source_offset_y);
-  } else {
-    //Use information from the target
-    width = MIN(target_enc->tile->frame->width_in_lcu * LCU_WIDTH, source_enc->tile->frame->width - target_offset_x);
-    height = MIN(target_enc->tile->frame->height_in_lcu * LCU_WIDTH, source_enc->tile->frame->height - target_offset_y);
-  }
-  
-  if (!is_y_channel) {
-    width /= 2;
-    height /= 2;
-    
-    source_stride /= 2;
-    target_stride /= 2;
-  }
-  
-  //picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_enc->cur_pic->width, target_enc->cur_pic->width);
-  pixels_blit(source + source_offset, target + target_offset, width, height, source_stride, target_stride);
-}
-
-
-
-
 static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, const lcu_order_element * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
   videoframe* const frame = encoder_state->tile->frame;
   
@@ -515,9 +466,6 @@ static void encoder_state_encode(encoder_state * const main_state) {
         assert(!sub_state->tile->frame->rec);
         sub_state->tile->frame->source = image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
         sub_state->tile->frame->rec = image_make_subimage(main_state->tile->frame->rec, offset_x, offset_y, width, height);
-        encoder_state_blit_pixels(sub_state, sub_state->tile->frame->source->y, main_state, main_state->tile->frame->source->y, 1, sub_state->tile->frame->source->stride, main_state->tile->frame->source->stride);
-        encoder_state_blit_pixels(sub_state, sub_state->tile->frame->source->u, main_state, main_state->tile->frame->source->u, 0, sub_state->tile->frame->source->stride, main_state->tile->frame->source->stride);
-        encoder_state_blit_pixels(sub_state, sub_state->tile->frame->source->v, main_state, main_state->tile->frame->source->v, 0, sub_state->tile->frame->source->stride, main_state->tile->frame->source->stride);
       }
       
       //To be the last split, we require that every child is a chain
@@ -598,10 +546,6 @@ static void encoder_state_encode(encoder_state * const main_state) {
     for (i=0; main_state->children[i].encoder_control; ++i) {
       encoder_state *sub_state = &(main_state->children[i]);
       if (sub_state->tile != main_state->tile) {
-         encoder_state_blit_pixels(main_state, main_state->tile->frame->rec->y, sub_state, sub_state->tile->frame->rec->y, 1, main_state->tile->frame->source->stride, sub_state->tile->frame->source->stride);
-         encoder_state_blit_pixels(main_state, main_state->tile->frame->rec->u, sub_state, sub_state->tile->frame->rec->u, 0, main_state->tile->frame->source->stride, sub_state->tile->frame->source->stride);
-         encoder_state_blit_pixels(main_state, main_state->tile->frame->rec->v, sub_state, sub_state->tile->frame->rec->v, 0, main_state->tile->frame->source->stride, sub_state->tile->frame->source->stride);
-
         image_free(sub_state->tile->frame->source);
         image_free(sub_state->tile->frame->rec);
         sub_state->tile->frame->source = NULL;
