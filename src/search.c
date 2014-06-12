@@ -871,18 +871,59 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     intra_filter(ref[1], recstride, width, 0);
   }
 
-  
-
-  // Try all modes and select the best one.
-  for (mode = 0; mode < 35; mode++) {
+  // Planar and DC first
+  for (mode = 0; mode < 2; mode++) {
     costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-                                                       recstride, orig_block,intra_preds, mode);
+                                                       recstride, orig_block, intra_preds, mode);
     modes[modes_selected] = mode;
     modes_selected++;
-
   }
 
-  sort_modes(modes, costs, 35);
+  // Directional from left
+  costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
+                                                     recstride, orig_block, intra_preds, 10);
+  modes[modes_selected] = 10;
+  modes_selected++;
+
+  // Directional from top
+  costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
+                                                     recstride, orig_block, intra_preds, 26);
+  modes[modes_selected] = 26;
+  modes_selected++;
+
+  sort_modes(modes, costs, 4);
+
+  // Only left border modes
+  if (modes[0] == 10) {
+    for (mode = 2; mode < 18; mode++) {
+      if (mode == 10) continue;
+      costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
+        recstride, orig_block, intra_preds, mode);
+      modes[modes_selected] = mode;
+      modes_selected++;
+    }
+  // Only top-border modes
+  } else if (modes[0] == 26) {    
+    for (mode = 18; mode < 35; mode++) {
+      if (mode == 26) continue;
+      costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
+        recstride, orig_block, intra_preds, mode);
+      modes[modes_selected] = mode;
+      modes_selected++;
+    }
+  // When DC or Planar, search all modes
+  } else {
+    
+    for (mode = 2; mode < 35; mode++) {
+      if (mode == 26 || mode == 10) continue;
+      costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
+        recstride, orig_block, intra_preds, mode);
+      modes[modes_selected] = mode;
+      modes_selected++;
+    }
+  }
+
+  sort_modes(modes, costs, modes_selected);
   return modes_selected;
 }
 
