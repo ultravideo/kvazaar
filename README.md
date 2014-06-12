@@ -105,18 +105,28 @@ The only accepted input format so far is 8-bit YUV 4:2:0.
 
 If you have trouble regarding compiling the source code, please make an [issue](https://github.com/ultravideo/kvazaar/issues) about in Github. Others might encounter the same problem and there is probably much to improve in the build process. We want to make this as simple as possible.
 
-No external library dependencies.
+###Required libraries
+- For Visual Studio pthreads-w32 library is required. Platforms with native posix thread support don't need anything.
+  - The project file expects the library to be in ../pthreads.2/ relative to kvazaar. You can just extract the pre-built library there.
+  - The executable needs pthreadVC2.dll to be present. Either install it somewhere or ship it with the executable.
 
 ###Visual Studio 2010
+- VS2010 and older does not have support for some of the c99 features that we use. Please use VS2013 or newer or GCC (MinGW) to compile on windows.
+
+###Visual Studio 2013
 - project files included
 - requires external [vsyasm.exe](http://yasm.tortall.net/Download.html) in %PATH%
   - run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to user variables
 
-###Linux
+###GCC
 - Simple Makefile included in src/
 - Yasm is expected to be in PATH
 
+###OS X
+- The program should compile and work on OS X but you might need a newer version of GCC than what comes with the platform.
+
 ###Other
+- There is a scons SConstruct file that should work on both Windows and Linux.
 - Contact us for support or write an [issue in Github](https://github.com/ultravideo/kvazaar/issues)
 
 
@@ -133,9 +143,8 @@ No external library dependencies.
 ###Testing:
 
 - We do not have a proper testing framework yet. We test mainly by decoding the bitstream with HM and checking that the result matches the encoders own reconstruction.
-- You should check that your code encodes at least 600 frames without crashing, that HM can decode the resulting bitstream and produces no hash warnings.
+- You should at least test that HM decodes a bitstream file made with your changes without throwing checksum errors. If your changes shouldn't alter the bitstream, you should check that they don't.
 - We would like to have a suite of automatic tests that also check for BD-rate increase and speed decrease in addition to checking that the bitstream is valid. As of yet there is no such suite.
-- Compiler should produce no warnings with -W-all. It does now. We are working on fixing that.
 
 
 ###Unit tests:
@@ -150,8 +159,7 @@ No external library dependencies.
 ###Code style:
 
 We try to follow the following conventions:
-- ANSI-C/C89.
- - Limited mainly due to poor C support in Visual Studio 2010.
+- C99 without features not supported by Visual Studio 2013 (VLAs).
  - // comments allowed and encouraged.
 - Follow overall conventions already established in the code.
 - Indent by 2 spaces. (no tabs)
@@ -162,8 +170,8 @@ We try to follow the following conventions:
 - Functions only used inside the module shouldn't be defined in the module header. They can be defined in the beginning of the .c file if necessary.
 
 
-###Tips for studying HEVC:
+###Resources for HEVC bitstream features:
 
-- A good first resource is JCTVC-N1002 High Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder Description
+- A good first resource for HEVC bitstream is JCTVC-N1002 High Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder Description
 - Many good articles regarding specific parts of HEVC can be found on IEEE Transactions on Circuits and Systems for Video Technology, Combined issue on High Efficiency Video Coding (HEVC) Standards and Research
-- A definitive answer to a question regarding the bitstream can often be found faster from the HM reference encoder than by reading the specification. 
+- The specification tends to follow the reference implementation, not the other way around, so check HM if the specification is unclear. 
