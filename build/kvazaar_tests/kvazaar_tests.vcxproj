@@ -89,12 +89,10 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\tests\picture_list_tests.c" />
     <ClCompile Include="..\..\tests\sad_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\tests\picture_list_tests.h" />
     <ClInclude Include="..\..\tests\sad_tests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

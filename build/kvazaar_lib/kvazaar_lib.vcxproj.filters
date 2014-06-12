@@ -203,9 +203,6 @@
     <ClInclude Include="..\..\src\strategies\nal.h">
       <Filter>Header Files\strategies</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\picture-altivec.c">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\image.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -226,6 +223,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\videoframe.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\picture-altivec.c">
+      <Filter>Header Files\strategies</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -1,14 +1,14 @@
 #include "greatest/greatest.h"
 
-#include "src/picture.h"
-
+#include "src/image.h"
+#include "src/strategyselector.h"
 
 //////////////////////////////////////////////////////////////////////////
 // EXTERNAL FUNCTIONS
 
 //////////////////////////////////////////////////////////////////////////
 // DEFINES
-#define TEST_SAD(X, Y) calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8)
+#define TEST_SAD(X, Y) image_calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8)
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
@@ -34,29 +34,30 @@ const uint8_t pic_data[64] = {
   1,1,1,1,1,1,1,1
 };
 
-picture *g_pic = 0;
-picture *g_ref = 0;
+image *g_pic = 0;
+image *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
 void sad_setup(void *environment)
 {
-  unsigned i;
-  g_pic = picture_init(8, 8, 1, 1);
-  for (i = 0; i < 64; ++i) {
-    g_pic->y_data[i] = pic_data[i] + 48;
+  strategyselector_init();
+
+  g_pic = image_alloc(8, 8, 1);
+  for (int i = 0; i < 64; ++i) {
+    g_pic->y[i] = pic_data[i] + 48;
   }
 
-  g_ref = picture_init(8, 8, 1, 1);
-  for (i = 0; i < 64; ++i) {
-    g_ref->y_data[i] = ref_data[i] + 48;
+  g_ref = image_alloc(8, 8, 0);
+  for (int i = 0; i < 64; ++i) {
+    g_ref->y[i] = ref_data[i] + 48;
   }
 }
 
 void sad_teardown(void *environment)
 {
-  free(g_pic); g_pic = 0;
-  free(g_ref); g_ref = 0;
+  image_free(g_pic);
+  image_free(g_ref);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -201,6 +202,7 @@ TEST test_bottomright_out(void)
   PASS();
 }
 
+
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
 SUITE(sad_tests)
@@ -235,5 +237,5 @@ SUITE(sad_tests)
   RUN_TEST(test_bottom_out);
   RUN_TEST(test_bottomright_out);
 
-  sad_setup(0);
+  sad_teardown(0);
 }
