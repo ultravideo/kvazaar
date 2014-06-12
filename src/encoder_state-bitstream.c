@@ -734,9 +734,7 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,type=%c", main_state->global->frame, main_state->type);
   }
   
-  //FIXME: Why is this needed?
-//  assert(main_state->tile->frame->poc == main_state->global->poc);
-  main_state->tile->frame->poc = main_state->global->poc;
+  assert(main_state->tile->frame->poc == main_state->global->poc);
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
