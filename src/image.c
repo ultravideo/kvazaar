@@ -31,6 +31,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "checkpoint.h"
 #include "sao.h"
 
 /**
@@ -702,6 +703,25 @@ void pixels_blit(const pixel * const orig, pixel * const dst,
   //There is absolutely no reason to have a width greater than the source or the destination stride.
   assert(width <= orig_stride);
   assert(width <= dst_stride);
+
+#ifdef CHECKPOINTS
+  for (y = 0; y < height; ++y) {
+    char buffer[3*width];
+    int p;
+    for (p = 0; p < width; ++p) {
+      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
+    }
+    buffer[3*width] = 0;
+    CHECKPOINT("pixels_blit: %04d: %s", y, buffer);
+  }
+#endif //CHECKPOINTS
+
+  if (orig == dst) {
+    //If we have the same array, then we should have the same stride
+    assert(orig_stride == dst_stride);
+    return;
+  }
+  assert(orig != dst || orig_stride == dst_stride);
 
   for (y = 0; y < height; ++y) {
     memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel));
