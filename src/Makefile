@@ -49,8 +49,11 @@ else
   endif
 endif
 
+# Do not use variable length arrays because they don't work in Visual Studio 2013.
+WARNINGS = -Wall -Wtype-limits -Wvla
+
 CC = gcc
-CCFLAGS = $(DFLAGS) -I. -Wall -Wtype-limits
+CCFLAGS = $(DFLAGS) -I. $(WARNINGS)
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
 OBJS = interface_main.o encmain.o bitstream.o cabac.o checkpoint.o config.o context.o cu.o encoder.o encoderstate.o filter.o inter.o intra.o nal.o imagelist.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o encoder_state-bitstream.o encoder_state-ctors_dtors.o encoder_state-geometry.o image.o videoframe.o
