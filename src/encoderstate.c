@@ -142,15 +142,15 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
     const int by = lcu->position.y;
     
     //Copy the bottom row of this LCU to the horizontal buffer
-    pixels_blit(&frame->rec->y[rdpy * frame->width + rdpx],
+    pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
                         &hor_buf->y[lcu->position_px.x + by * frame->width],
-                        lcu->size.x, 1, frame->width, frame->width);
-    pixels_blit(&frame->rec->u[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        lcu->size.x, 1, frame->rec->stride, frame->width);
+    pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &hor_buf->u[lcu->position_px.x / 2 + by * frame->width / 2],
-                        lcu->size.x / 2, 1, frame->width / 2, frame->width / 2);
-    pixels_blit(&frame->rec->v[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
+    pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &hor_buf->v[lcu->position_px.x / 2 + by * frame->width / 2],
-                        lcu->size.x / 2, 1, frame->width / 2, frame->width / 2);
+                        lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
   }
   
   if (ver_buf) {
@@ -160,15 +160,15 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
     
     
     //Copy the right row of this LCU to the vertical buffer.
-    pixels_blit(&frame->rec->y[rdpy * frame->width + rdpx],
+    pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
                         &ver_buf->y[lcu->position_px.y + bx * frame->height],
-                        1, lcu->size.y, frame->width, 1);
-    pixels_blit(&frame->rec->u[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        1, lcu->size.y, frame->rec->stride, 1);
+    pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &ver_buf->u[lcu->position_px.y / 2 + bx * frame->height / 2],
-                        1, lcu->size.y / 2, frame->width / 2, 1);
-    pixels_blit(&frame->rec->v[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        1, lcu->size.y / 2, frame->rec->stride / 2, 1);
+    pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &ver_buf->v[lcu->position_px.y / 2 + bx * frame->height / 2],
-                        1, lcu->size.y / 2, frame->width / 2, 1);
+                        1, lcu->size.y / 2, frame->rec->stride / 2, 1);
   }
   
 }

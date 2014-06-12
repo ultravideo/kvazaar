@@ -117,7 +117,7 @@ typedef int16_t coefficient;
 
 #define LOG2_LCU_WIDTH 6
 // CU_TO_PIXEL = y * lcu_width * pic_width + x * lcu_width
-#define CU_TO_PIXEL(x, y, depth, width) (((y) << (LOG2_LCU_WIDTH - (depth))) * (width) \
+#define CU_TO_PIXEL(x, y, depth, stride) (((y) << (LOG2_LCU_WIDTH - (depth))) * (stride) \
                                          + ((x) << (LOG2_LCU_WIDTH - (depth))))
 //#define SIGN3(x) ((x) > 0) ? +1 : ((x) == 0 ? 0 : -1)
 #define SIGN3(x) (((x) > 0) - ((x) < 0))

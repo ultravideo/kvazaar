@@ -549,7 +549,7 @@ void sao_reconstruct(const encoder_control * const encoder, videoframe * frame, 
                      const sao_info *sao, color_index color_i)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  const int pic_stride = frame->width >> is_chroma;
+  const int pic_stride = frame->rec->stride >> is_chroma;
   const int lcu_stride = LCU_WIDTH >> is_chroma;
   const int buf_stride = lcu_stride + 2;
 
@@ -845,8 +845,8 @@ void sao_search_luma(const encoder_state * const encoder_state, const videoframe
   pixel rec[LCU_LUMA_SIZE];
   const pixel * orig_list[1] = { NULL };
   const pixel * rec_list[1] = { NULL };
-  pixel *data = &frame->source->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->width)];
-  pixel *recdata = &frame->rec->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->width)];
+  pixel *data = &frame->source->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->source->stride)];
+  pixel *recdata = &frame->rec->y[CU_TO_PIXEL(x_ctb, y_ctb, 0, frame->rec->stride)];
   int block_width = LCU_WIDTH;
   int block_height = LCU_WIDTH;
 
@@ -861,8 +861,8 @@ void sao_search_luma(const encoder_state * const encoder_state, const videoframe
   sao->type = SAO_TYPE_EDGE;
 
   // Fill temporary buffers with picture data.
-  pixels_blit(data, orig, block_width, block_height, frame->width, block_width);
-  pixels_blit(recdata, rec, block_width, block_height, frame->width, block_width);
+  pixels_blit(data, orig, block_width, block_height, frame->source->stride, block_width);
+  pixels_blit(recdata, rec, block_width, block_height, frame->rec->stride, block_width);
 
   orig_list[0] = orig;
   rec_list[0] = rec;
