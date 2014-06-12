@@ -1105,7 +1105,8 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || depth < MAX_INTER_SEARCH_DEPTH) {
     int half_cu = cu_width / 2;
-    int split_cost = (int)(4.5 * encoder_state->global->cur_lambda_cost);
+    // Using Cost = lambda * 9 to compensate on the price of the split
+    int split_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5) * 9;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
     // If skip mode was selected for the block, skip further search.
