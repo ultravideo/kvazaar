@@ -585,6 +585,9 @@ void sao_reconstruct(const encoder_control * const encoder, videoframe * frame, 
   assert(ofs.x + tl.x + block.x + br.x <= frame->width);
   assert(ofs.y + tl.y + block.y + br.y <= frame->height);
   
+  CHECKPOINT("ofs.x=%d ofs.y=%d tl.x=%d tl.y=%d block.x=%d block.y=%d br.x=%d br.y=%d", 
+             ofs.x, ofs.y, tl.x, tl.y, block.x, block.y, br.x, br.y);
+  
   // Data to tmp buffer.
   pixels_blit(&old_lcu_rec[ofs.y * pic_stride + ofs.x],
                       buf_rec,
