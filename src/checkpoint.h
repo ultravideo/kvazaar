@@ -41,7 +41,7 @@ extern int g_ckpt_record; //Do we record?
   } \
 } while (0)
     
-#define CHECKPOINTS_FINALIZE() do {fclose(g_ckpt_file); g_ckpt_file = NULL;} while (0)
+#define CHECKPOINTS_FINALIZE() do {if (g_ckpt_file) fclose(g_ckpt_file); g_ckpt_file = NULL;} while (0)
 
 #define CHECKPOINT_MARK(str, ...) do { \
   if (g_ckpt_file) { \

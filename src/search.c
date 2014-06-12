@@ -1205,22 +1205,20 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
   // Copy LCU pixels.
   {
     const videoframe * const frame = encoder_state->tile->frame;
-    int pic_width = frame->width;
-    int x_max = MIN(x + LCU_WIDTH, pic_width) - x;
+    int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
     int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
 
     int x_c = x / 2;
     int y_c = y / 2;
-    int pic_width_c = pic_width / 2;
     int x_max_c = x_max / 2;
     int y_max_c = y_max / 2;
 
-    pixels_blit(&frame->source->y[x + y * pic_width], lcu->ref.y,
-                        x_max, y_max, pic_width, LCU_WIDTH);
-    pixels_blit(&frame->source->u[x_c + y_c * pic_width_c], lcu->ref.u,
-                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
-    pixels_blit(&frame->source->v[x_c + y_c * pic_width_c], lcu->ref.v,
-                        x_max_c, y_max_c, pic_width_c, LCU_WIDTH / 2);
+    pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
+                        x_max, y_max, frame->source->stride, LCU_WIDTH);
+    pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride/2], lcu->ref.u,
+                        x_max_c, y_max_c, frame->source->stride/2, LCU_WIDTH / 2);
+    pixels_blit(&frame->source->v[x_c + y_c * frame->source->stride/2], lcu->ref.v,
+                        x_max_c, y_max_c, frame->source->stride/2, LCU_WIDTH / 2);
   }
 }
 
@@ -1259,15 +1257,15 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
     const int luma_index = x_px + y_px * pic_width;
     const int chroma_index = (x_px / 2) + (y_px / 2) * (pic_width / 2);
 
-    pixels_blit(lcu->rec.y, &pic->rec->y[luma_index],
-                        x_max, y_max, LCU_WIDTH, pic_width);
+    pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
+                        x_max, y_max, LCU_WIDTH, pic->rec->stride);
     coefficients_blit(lcu->coeff.y, &pic->coeff_y[luma_index],
                         x_max, y_max, LCU_WIDTH, pic_width);
 
-    pixels_blit(lcu->rec.u, &pic->rec->u[chroma_index],
-                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-    pixels_blit(lcu->rec.v, &pic->rec->v[chroma_index],
-                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
+                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
+    pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
+                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
     coefficients_blit(lcu->coeff.u, &pic->coeff_u[chroma_index],
                         x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
     coefficients_blit(lcu->coeff.v, &pic->coeff_v[chroma_index],

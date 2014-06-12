@@ -49,8 +49,8 @@ videoframe *videoframe_alloc(const int32_t width, const int32_t height, const in
   if (frame->height_in_lcu * LCU_WIDTH < frame->height) frame->height_in_lcu++;
   
   //Allocate images
-  frame->source = image_alloc(frame->width, frame->height, poc);
-  frame->rec = image_alloc(frame->width, frame->height, poc);
+  //frame->source = image_alloc(frame->width, frame->height, poc);
+  //frame->rec = image_alloc(frame->width, frame->height, poc);
 
   {
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
@@ -76,8 +76,8 @@ videoframe *videoframe_alloc(const int32_t width, const int32_t height, const in
  */
 int videoframe_free(videoframe * const frame)
 {
-  image_free(frame->source);
-  image_free(frame->rec);
+  //image_free(frame->source);
+  //image_free(frame->rec);
 
   FREE_POINTER(frame->cu_array);
 
@@ -94,8 +94,8 @@ int videoframe_free(videoframe * const frame)
 }
 
 void videoframe_set_poc(videoframe * const frame, const int32_t poc) {
-  frame->source->poc = poc;
-  frame->rec->poc = poc;
+  if (frame->source) frame->source->poc = poc;
+  if (frame->rec) frame->rec->poc = poc;
   frame->poc = poc;
 }
 

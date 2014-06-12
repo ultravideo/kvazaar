@@ -11,3 +11,7 @@
 *.exe
 *.o
 *.d
+
+*.log
+.kdev4
+src/kvazaar

@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <pthread.h>
+#include <errno.h> //ETIMEDOUT
 #include <stdlib.h>
 
 #ifdef _DEBUG
@@ -41,7 +42,6 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
 
   for(;;) {
     int i = 0;
-    int signal_count = 0;
     threadqueue_job * job_to_run = NULL;
     
     PTHREAD_LOCK(&threadqueue->lock);
@@ -87,6 +87,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
     
     //Ok we got a job (and we have a lock on it)
     if (job_to_run) {
+      int queue_waiting_dependency_decr, queue_waiting_execution_incr;
       threadqueue_job * const job = job_to_run;
 
       assert(job->state == THREADQUEUE_JOB_STATE_QUEUED || (job == next_job && job->state == THREADQUEUE_JOB_STATE_RUNNING));
@@ -120,9 +121,10 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       
       job->state = THREADQUEUE_JOB_STATE_DONE;
       
-      signal_count = 0;
       next_job = NULL;
       
+      queue_waiting_dependency_decr = 0;
+      queue_waiting_execution_incr = 0;
       //Decrease counter of dependencies
       for (i = 0; i < job->rdepends_count; ++i) {
         threadqueue_job * const depjob = job->rdepends[i];
@@ -138,11 +140,9 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
             next_job = depjob;
             depjob->state = THREADQUEUE_JOB_STATE_RUNNING;
           } else {
-            ++signal_count;
-            ++threadqueue->queue_waiting_execution;
+            ++queue_waiting_execution_incr;
           }
-          assert(threadqueue->queue_waiting_dependency > 0);
-          --threadqueue->queue_waiting_dependency;
+          ++queue_waiting_dependency_decr;
         }
         
         PTHREAD_UNLOCK(&depjob->lock);
@@ -152,9 +152,11 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       
       //Signal the queue that we've done a job
       PTHREAD_LOCK(&threadqueue->lock);
-      for (i = 0; i < signal_count; ++i) {
-        PTHREAD_COND_SIGNAL(&threadqueue->cond);
-      }
+      assert(threadqueue->queue_waiting_dependency >= queue_waiting_dependency_decr);
+      threadqueue->queue_waiting_dependency -= queue_waiting_dependency_decr;
+      threadqueue->queue_waiting_execution += queue_waiting_execution_incr;
+      PTHREAD_COND_BROADCAST(&threadqueue->cond);
+
       //PTHREAD_COND_BROADCAST(&threadqueue->cond);
       //Don't log this one
       //PTHREAD_COND_SIGNAL(&threadqueue->cb_cond);
@@ -364,6 +366,9 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
 int threadqueue_flush(threadqueue_queue * const threadqueue) {
   int notdone = 1;
   int i;
+  struct timespec time_to_wait;
+  time_to_wait.tv_sec = 0;
+  time_to_wait.tv_nsec = 100000;
   
   //Lock the queue
   PTHREAD_LOCK(&threadqueue->lock);
@@ -383,9 +388,15 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
     }
 
     if (notdone > 0) {
+      int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
       SLEEP();
-      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &time_to_wait);
+      if (ret != 0 && ret != ETIMEDOUT) {
+        fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
+        assert(0); 
+        return 0;
+      }
     }
   } while (notdone > 0);
   

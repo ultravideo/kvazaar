@@ -21,6 +21,7 @@
 
 #include <string.h>
 
+#include "checkpoint.h"
 #include "encoderstate.h"
 #include "nal.h"
 
@@ -665,6 +666,7 @@ static void add_checksum(encoder_state * const encoder_state)
     checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) +
                    (checksum[i][2] << 8) + (checksum[i][3]);
     WRITE_U(stream, checksum_val, 32, "picture_checksum");
+    CHECKPOINT("checksum[%d] = %u", i, checksum_val);
   }
 
   bitstream_align(stream);
@@ -734,9 +736,7 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,type=%c", main_state->global->frame, main_state->type);
   }
   
-  //FIXME: Why is this needed?
-//  assert(main_state->tile->frame->poc == main_state->global->poc);
-  main_state->tile->frame->poc = main_state->global->poc;
+  assert(main_state->tile->frame->poc == main_state->global->poc);
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {

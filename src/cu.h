@@ -94,6 +94,23 @@ typedef struct
   cu_info_inter inter;
 } cu_info;
 
+#define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
+  "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \
+  "intra[0].cost=%u intra[0].bitcost=%u intra[0].mode=%d intra[0].mode_chroma=%d intra[0].tr_skip=%d " \
+  "intra[1].cost=%u intra[1].bitcost=%u intra[1].mode=%d intra[1].mode_chroma=%d intra[1].tr_skip=%d " \
+  "intra[2].cost=%u intra[2].bitcost=%u intra[2].mode=%d intra[2].mode_chroma=%d intra[2].tr_skip=%d " \
+  "intra[3].cost=%u intra[3].bitcost=%u intra[3].mode=%d intra[3].mode_chroma=%d intra[3].tr_skip=%d " \
+  "inter.cost=%u inter.bitcost=%u inter.mv[0]=%d inter.mv[1]=%d inter.mvd[0]=%d inter.mvd[1]=%d " \
+  "inter.mv_cand=%d inter.mv_ref=%d inter.mv_dir=%d inter.mode=%d" \
+  , (cu).type, (cu).depth, (cu).part_size, (cu).tr_depth, (cu).coded, \
+  (cu).skipped, (cu).merged, (cu).merge_idx, (cu).cbf.y, (cu).cbf.u, (cu).cbf.v, \
+  (cu).intra[0].cost, (cu).intra[0].bitcost, (cu).intra[0].mode, (cu).intra[0].mode_chroma, (cu).intra[0].tr_skip, \
+  (cu).intra[1].cost, (cu).intra[1].bitcost, (cu).intra[1].mode, (cu).intra[1].mode_chroma, (cu).intra[1].tr_skip, \
+  (cu).intra[2].cost, (cu).intra[2].bitcost, (cu).intra[2].mode, (cu).intra[2].mode_chroma, (cu).intra[2].tr_skip, \
+  (cu).intra[3].cost, (cu).intra[3].bitcost, (cu).intra[3].mode, (cu).intra[3].mode_chroma, (cu).intra[3].tr_skip, \
+  (cu).inter.cost, (cu).inter.bitcost, (cu).inter.mv[0], (cu).inter.mv[1], (cu).inter.mvd[0], (cu).inter.mvd[1], \
+  (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
+
 #define SUB_SCU_BIT_MASK (64 - 1)
 #define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
 #define LCU_CU_WIDTH 8
@@ -143,6 +160,90 @@ typedef struct {
   cu_info cu[9*9+1];
 } lcu_t;
 
+#define CHECKPOINT_LCU(prefix_str, lcu) do { \
+  CHECKPOINT_CU(prefix_str " cu[0]", (lcu).cu[0]); \
+  CHECKPOINT_CU(prefix_str " cu[1]", (lcu).cu[1]); \
+  CHECKPOINT_CU(prefix_str " cu[2]", (lcu).cu[2]); \
+  CHECKPOINT_CU(prefix_str " cu[3]", (lcu).cu[3]); \
+  CHECKPOINT_CU(prefix_str " cu[4]", (lcu).cu[4]); \
+  CHECKPOINT_CU(prefix_str " cu[5]", (lcu).cu[5]); \
+  CHECKPOINT_CU(prefix_str " cu[6]", (lcu).cu[6]); \
+  CHECKPOINT_CU(prefix_str " cu[7]", (lcu).cu[7]); \
+  CHECKPOINT_CU(prefix_str " cu[8]", (lcu).cu[8]); \
+  CHECKPOINT_CU(prefix_str " cu[9]", (lcu).cu[9]); \
+  CHECKPOINT_CU(prefix_str " cu[10]", (lcu).cu[10]); \
+  CHECKPOINT_CU(prefix_str " cu[11]", (lcu).cu[11]); \
+  CHECKPOINT_CU(prefix_str " cu[12]", (lcu).cu[12]); \
+  CHECKPOINT_CU(prefix_str " cu[13]", (lcu).cu[13]); \
+  CHECKPOINT_CU(prefix_str " cu[14]", (lcu).cu[14]); \
+  CHECKPOINT_CU(prefix_str " cu[15]", (lcu).cu[15]); \
+  CHECKPOINT_CU(prefix_str " cu[16]", (lcu).cu[16]); \
+  CHECKPOINT_CU(prefix_str " cu[17]", (lcu).cu[17]); \
+  CHECKPOINT_CU(prefix_str " cu[18]", (lcu).cu[18]); \
+  CHECKPOINT_CU(prefix_str " cu[19]", (lcu).cu[19]); \
+  CHECKPOINT_CU(prefix_str " cu[20]", (lcu).cu[20]); \
+  CHECKPOINT_CU(prefix_str " cu[21]", (lcu).cu[21]); \
+  CHECKPOINT_CU(prefix_str " cu[22]", (lcu).cu[22]); \
+  CHECKPOINT_CU(prefix_str " cu[23]", (lcu).cu[23]); \
+  CHECKPOINT_CU(prefix_str " cu[24]", (lcu).cu[24]); \
+  CHECKPOINT_CU(prefix_str " cu[25]", (lcu).cu[25]); \
+  CHECKPOINT_CU(prefix_str " cu[26]", (lcu).cu[26]); \
+  CHECKPOINT_CU(prefix_str " cu[27]", (lcu).cu[27]); \
+  CHECKPOINT_CU(prefix_str " cu[28]", (lcu).cu[28]); \
+  CHECKPOINT_CU(prefix_str " cu[29]", (lcu).cu[29]); \
+  CHECKPOINT_CU(prefix_str " cu[30]", (lcu).cu[30]); \
+  CHECKPOINT_CU(prefix_str " cu[31]", (lcu).cu[31]); \
+  CHECKPOINT_CU(prefix_str " cu[32]", (lcu).cu[32]); \
+  CHECKPOINT_CU(prefix_str " cu[33]", (lcu).cu[33]); \
+  CHECKPOINT_CU(prefix_str " cu[34]", (lcu).cu[34]); \
+  CHECKPOINT_CU(prefix_str " cu[35]", (lcu).cu[35]); \
+  CHECKPOINT_CU(prefix_str " cu[36]", (lcu).cu[36]); \
+  CHECKPOINT_CU(prefix_str " cu[37]", (lcu).cu[37]); \
+  CHECKPOINT_CU(prefix_str " cu[38]", (lcu).cu[38]); \
+  CHECKPOINT_CU(prefix_str " cu[39]", (lcu).cu[39]); \
+  CHECKPOINT_CU(prefix_str " cu[40]", (lcu).cu[40]); \
+  CHECKPOINT_CU(prefix_str " cu[41]", (lcu).cu[41]); \
+  CHECKPOINT_CU(prefix_str " cu[42]", (lcu).cu[42]); \
+  CHECKPOINT_CU(prefix_str " cu[43]", (lcu).cu[43]); \
+  CHECKPOINT_CU(prefix_str " cu[44]", (lcu).cu[44]); \
+  CHECKPOINT_CU(prefix_str " cu[45]", (lcu).cu[45]); \
+  CHECKPOINT_CU(prefix_str " cu[46]", (lcu).cu[46]); \
+  CHECKPOINT_CU(prefix_str " cu[47]", (lcu).cu[47]); \
+  CHECKPOINT_CU(prefix_str " cu[48]", (lcu).cu[48]); \
+  CHECKPOINT_CU(prefix_str " cu[49]", (lcu).cu[49]); \
+  CHECKPOINT_CU(prefix_str " cu[50]", (lcu).cu[50]); \
+  CHECKPOINT_CU(prefix_str " cu[51]", (lcu).cu[51]); \
+  CHECKPOINT_CU(prefix_str " cu[52]", (lcu).cu[52]); \
+  CHECKPOINT_CU(prefix_str " cu[53]", (lcu).cu[53]); \
+  CHECKPOINT_CU(prefix_str " cu[54]", (lcu).cu[54]); \
+  CHECKPOINT_CU(prefix_str " cu[55]", (lcu).cu[55]); \
+  CHECKPOINT_CU(prefix_str " cu[56]", (lcu).cu[56]); \
+  CHECKPOINT_CU(prefix_str " cu[57]", (lcu).cu[57]); \
+  CHECKPOINT_CU(prefix_str " cu[58]", (lcu).cu[58]); \
+  CHECKPOINT_CU(prefix_str " cu[59]", (lcu).cu[59]); \
+  CHECKPOINT_CU(prefix_str " cu[60]", (lcu).cu[60]); \
+  CHECKPOINT_CU(prefix_str " cu[61]", (lcu).cu[61]); \
+  CHECKPOINT_CU(prefix_str " cu[62]", (lcu).cu[62]); \
+  CHECKPOINT_CU(prefix_str " cu[63]", (lcu).cu[63]); \
+  CHECKPOINT_CU(prefix_str " cu[64]", (lcu).cu[64]); \
+  CHECKPOINT_CU(prefix_str " cu[65]", (lcu).cu[65]); \
+  CHECKPOINT_CU(prefix_str " cu[66]", (lcu).cu[66]); \
+  CHECKPOINT_CU(prefix_str " cu[67]", (lcu).cu[67]); \
+  CHECKPOINT_CU(prefix_str " cu[68]", (lcu).cu[68]); \
+  CHECKPOINT_CU(prefix_str " cu[69]", (lcu).cu[69]); \
+  CHECKPOINT_CU(prefix_str " cu[70]", (lcu).cu[70]); \
+  CHECKPOINT_CU(prefix_str " cu[71]", (lcu).cu[71]); \
+  CHECKPOINT_CU(prefix_str " cu[72]", (lcu).cu[72]); \
+  CHECKPOINT_CU(prefix_str " cu[73]", (lcu).cu[73]); \
+  CHECKPOINT_CU(prefix_str " cu[74]", (lcu).cu[74]); \
+  CHECKPOINT_CU(prefix_str " cu[75]", (lcu).cu[75]); \
+  CHECKPOINT_CU(prefix_str " cu[76]", (lcu).cu[76]); \
+  CHECKPOINT_CU(prefix_str " cu[77]", (lcu).cu[77]); \
+  CHECKPOINT_CU(prefix_str " cu[78]", (lcu).cu[78]); \
+  CHECKPOINT_CU(prefix_str " cu[79]", (lcu).cu[79]); \
+  CHECKPOINT_CU(prefix_str " cu[80]", (lcu).cu[80]); \
+  CHECKPOINT_CU(prefix_str " cu[81]", (lcu).cu[81]); \
+} while(0)
 
 
 void coefficients_blit(const coefficient *orig, coefficient *dst,

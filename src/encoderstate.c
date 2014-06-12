@@ -84,58 +84,6 @@ int encoder_state_match_children_of_previous_frame(encoder_state * const encoder
   return 1;
 }
 
-static void encoder_state_blit_pixels(const encoder_state * const target_enc, pixel * const target, const encoder_state * const source_enc, const pixel * const source, const int is_y_channel) {
-  const int source_offset_x = source_enc->tile->lcu_offset_x * LCU_WIDTH;
-  const int source_offset_y = source_enc->tile->lcu_offset_y * LCU_WIDTH;
-  
-  const int target_offset_x = target_enc->tile->lcu_offset_x * LCU_WIDTH;
-  const int target_offset_y = target_enc->tile->lcu_offset_y * LCU_WIDTH;
-  
-  int source_stride = source_enc->tile->frame->width;
-  int target_stride = target_enc->tile->frame->width;
-  
-  int width;
-  int height;
-  
-  int source_offset;
-  int target_offset;
-  
-  //Do nothing if the source and the destination is the same!
-  if (source_enc->tile == target_enc->tile) return;
-
-  if (is_y_channel) {
-    target_offset = source_offset_x + source_offset_y * target_enc->tile->frame->width;
-    source_offset = target_offset_x + target_offset_y * source_enc->tile->frame->width;
-  } else {
-    target_offset = source_offset_x/2 + source_offset_y/2 * target_enc->tile->frame->width/2;
-    source_offset = target_offset_x/2 + target_offset_y/2 * source_enc->tile->frame->width/2;
-  }
-  
-  if (target_enc->children) {
-    //Use information from the source
-    width = MIN(source_enc->tile->frame->width_in_lcu * LCU_WIDTH, target_enc->tile->frame->width - source_offset_x);
-    height = MIN(source_enc->tile->frame->height_in_lcu * LCU_WIDTH, target_enc->tile->frame->height - source_offset_y);
-  } else {
-    //Use information from the target
-    width = MIN(target_enc->tile->frame->width_in_lcu * LCU_WIDTH, source_enc->tile->frame->width - target_offset_x);
-    height = MIN(target_enc->tile->frame->height_in_lcu * LCU_WIDTH, source_enc->tile->frame->height - target_offset_y);
-  }
-  
-  if (!is_y_channel) {
-    width /= 2;
-    height /= 2;
-    
-    source_stride /= 2;
-    target_stride /= 2;
-  }
-  
-  //picture_blit_pixels(source + source_offset, target + target_offset, width, height, source_enc->cur_pic->width, target_enc->cur_pic->width);
-  pixels_blit(source + source_offset, target + target_offset, width, height, source_stride, target_stride);
-}
-
-
-
-
 static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, const lcu_order_element * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
   videoframe* const frame = encoder_state->tile->frame;
   
@@ -145,15 +93,15 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
     const int by = lcu->position.y;
     
     //Copy the bottom row of this LCU to the horizontal buffer
-    pixels_blit(&frame->rec->y[rdpy * frame->width + rdpx],
+    pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
                         &hor_buf->y[lcu->position_px.x + by * frame->width],
-                        lcu->size.x, 1, frame->width, frame->width);
-    pixels_blit(&frame->rec->u[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        lcu->size.x, 1, frame->rec->stride, frame->width);
+    pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &hor_buf->u[lcu->position_px.x / 2 + by * frame->width / 2],
-                        lcu->size.x / 2, 1, frame->width / 2, frame->width / 2);
-    pixels_blit(&frame->rec->v[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
+    pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &hor_buf->v[lcu->position_px.x / 2 + by * frame->width / 2],
-                        lcu->size.x / 2, 1, frame->width / 2, frame->width / 2);
+                        lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
   }
   
   if (ver_buf) {
@@ -163,15 +111,15 @@ static void encoder_state_recdata_to_bufs(encoder_state * const encoder_state, c
     
     
     //Copy the right row of this LCU to the vertical buffer.
-    pixels_blit(&frame->rec->y[rdpy * frame->width + rdpx],
+    pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
                         &ver_buf->y[lcu->position_px.y + bx * frame->height],
-                        1, lcu->size.y, frame->width, 1);
-    pixels_blit(&frame->rec->u[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        1, lcu->size.y, frame->rec->stride, 1);
+    pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &ver_buf->u[lcu->position_px.y / 2 + bx * frame->height / 2],
-                        1, lcu->size.y / 2, frame->width / 2, 1);
-    pixels_blit(&frame->rec->v[(rdpy/2) * frame->width/2 + (rdpx/2)],
+                        1, lcu->size.y / 2, frame->rec->stride / 2, 1);
+    pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &ver_buf->v[lcu->position_px.y / 2 + bx * frame->height / 2],
-                        1, lcu->size.y / 2, frame->width / 2, 1);
+                        1, lcu->size.y / 2, frame->rec->stride / 2, 1);
   }
   
 }
@@ -300,6 +248,12 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     // Merge only if both luma and chroma can be merged
     sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
     sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+    
+    assert(sao_luma->eo_class < SAO_NUM_EO);
+    assert(sao_chroma->eo_class < SAO_NUM_EO);
+    
+    CHECKPOINT_SAO_INFO("sao_luma", *sao_luma);
+    CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
   }
   
   
@@ -503,9 +457,15 @@ static void encoder_state_encode(encoder_state * const main_state) {
       encoder_state *sub_state = &(main_state->children[i]);
       
       if (sub_state->tile != main_state->tile) {
-        encoder_state_blit_pixels(sub_state, sub_state->tile->frame->source->y, main_state, main_state->tile->frame->source->y, 1);
-        encoder_state_blit_pixels(sub_state, sub_state->tile->frame->source->u, main_state, main_state->tile->frame->source->u, 0);
-        encoder_state_blit_pixels(sub_state, sub_state->tile->frame->source->v, main_state, main_state->tile->frame->source->v, 0);
+        const int offset_x = sub_state->tile->lcu_offset_x * LCU_WIDTH;
+        const int offset_y = sub_state->tile->lcu_offset_y * LCU_WIDTH;
+        const int width = MIN(sub_state->tile->frame->width_in_lcu * LCU_WIDTH, main_state->tile->frame->width - offset_x);
+        const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
+        
+        assert(!sub_state->tile->frame->source);
+        assert(!sub_state->tile->frame->rec);
+        sub_state->tile->frame->source = image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
+        sub_state->tile->frame->rec = image_make_subimage(main_state->tile->frame->rec, offset_x, offset_y, width, height);
       }
       
       //To be the last split, we require that every child is a chain
@@ -586,9 +546,10 @@ static void encoder_state_encode(encoder_state * const main_state) {
     for (i=0; main_state->children[i].encoder_control; ++i) {
       encoder_state *sub_state = &(main_state->children[i]);
       if (sub_state->tile != main_state->tile) {
-        encoder_state_blit_pixels(main_state, main_state->tile->frame->rec->y, sub_state, sub_state->tile->frame->rec->y, 1);
-        encoder_state_blit_pixels(main_state, main_state->tile->frame->rec->u, sub_state, sub_state->tile->frame->rec->u, 0);
-        encoder_state_blit_pixels(main_state, main_state->tile->frame->rec->v, sub_state, sub_state->tile->frame->rec->v, 0);
+        image_free(sub_state->tile->frame->source);
+        image_free(sub_state->tile->frame->rec);
+        sub_state->tile->frame->source = NULL;
+        sub_state->tile->frame->rec = NULL;
       }
     }
   } else {

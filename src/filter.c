@@ -182,7 +182,7 @@ void filter_deblock_edge_luma(encoder_state * const encoder_state,
   }
 
   {
-    int32_t stride = frame->width;
+    int32_t stride = frame->rec->stride;
     int32_t offset = stride;
     int32_t beta_offset_div2 = encoder->beta_offset_div2;
     int32_t tc_offset_div2   = encoder->tc_offset_div2;
@@ -313,7 +313,7 @@ void filter_deblock_edge_chroma(encoder_state * const encoder_state,
 
   // For each subpart
   {
-    int32_t stride = frame->width >> 1;
+    int32_t stride = frame->rec->stride >> 1;
     int32_t tc_offset_div2 = encoder->tc_offset_div2;
     // TODO: support 10+bits
     pixel *src_u = &frame->rec->u[x + y*stride];

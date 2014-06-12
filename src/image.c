@@ -31,6 +31,7 @@
 #include <math.h>
 #include <assert.h>
 
+#include "checkpoint.h"
 #include "sao.h"
 
 /**
@@ -80,8 +81,12 @@ int image_free(image * const im)
   assert(im->base_image == im || im->refcount == 0);
   
   int32_t new_refcount = ATOMIC_DEC(&(im->base_image->refcount));
+  //If we're freeing a subimage, then we must free the pointer
+  //Base image may be stored in image_list, and should not be freed
+  //FIXME I don't find this very clean...
+  if (new_refcount > 0 && im->base_image != im) free(im);
   if (new_refcount > 0) return 1;
-  FREE_POINTER(im->fulldata);
+  FREE_POINTER(im->base_image->fulldata);
   
   //Just to make the program crash when using those values after the free
   im->y = im->u = im->v = im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
@@ -156,7 +161,7 @@ void yuv_t_free(yuv_t * yuv)
  * \returns Sum of Absolute Differences
  */
 static unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
-                        int block_width, int block_height, unsigned pic_width)
+                        int block_width, int block_height, unsigned pic_stride)
 {
   pixel ref = *ref_data;
   int x, y;
@@ -164,7 +169,7 @@ static unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
 
   for (y = 0; y < block_height; ++y) {
     for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * pic_width + x] - ref);
+      sad += abs(pic_data[y * pic_stride + x] - ref);
     }
   }
 
@@ -183,14 +188,14 @@ static unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
  * \returns Sum of Absolute Differences
  */
 static unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
-                        int block_width, int block_height, unsigned pic_width)
+                        int block_width, int block_height, unsigned pic_stride)
 {
   int x, y;
   unsigned sad = 0;
 
   for (y = 0; y < block_height; ++y) {
     for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * pic_width + x] - ref_data[x]);
+      sad += abs(pic_data[y * pic_stride + x] - ref_data[x]);
     }
   }
 
@@ -209,14 +214,14 @@ static unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
  * \returns Sum of Absolute Differences
  */
 static unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
-                        int block_width, int block_height, unsigned pic_width, unsigned ref_width)
+                        int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
 {
   int x, y;
   unsigned sad = 0;
 
   for (y = 0; y < block_height; ++y) {
     for (x = 0; x < block_width; ++x) {
-      sad += abs(pic_data[y * pic_width + x] - ref_data[y * ref_width]);
+      sad += abs(pic_data[y * pic_stride + x] - ref_data[y * ref_stride]);
     }
   }
 
@@ -265,8 +270,8 @@ static unsigned image_interpolated_sad(const image *pic, const image *ref,
   // movement vector is pointing to. That point might be outside the buffer,
   // but that is ok because we project the movement vector to the buffer
   // before dereferencing the pointer.
-  pic_data = &pic->y[pic_y * pic->width + pic_x];
-  ref_data = &ref->y[ref_y * ref->width + ref_x];
+  pic_data = &pic->y[pic_y * pic->stride + pic_x];
+  ref_data = &ref->y[ref_y * ref->stride + ref_x];
 
   // The handling of movement vectors that point outside the picture is done
   // in the following way.
@@ -278,86 +283,86 @@ static unsigned image_interpolated_sad(const image *pic, const image *ref,
   //   being compared is correct.
   if (top && left) {
     result += cor_sad(pic_data,
-                      &ref_data[top * ref->width + left],
-                      left, top, pic->width);
+                      &ref_data[top * ref->stride + left],
+                      left, top, pic->stride);
     result += ver_sad(&pic_data[left],
-                      &ref_data[top * ref->width + left],
-                      block_width - left, top, pic->width);
-    result += hor_sad(&pic_data[top * pic->width],
-                      &ref_data[top * ref->width + left],
-                      left, block_height - top, pic->width, ref->width);
-    result += reg_sad(&pic_data[top * pic->width + left],
-                      &ref_data[top * ref->width + left],
-                      block_width - left, block_height - top, pic->width, ref->width);
+                      &ref_data[top * ref->stride + left],
+                      block_width - left, top, pic->stride);
+    result += hor_sad(&pic_data[top * pic->stride],
+                      &ref_data[top * ref->stride + left],
+                      left, block_height - top, pic->stride, ref->stride);
+    result += reg_sad(&pic_data[top * pic->stride + left],
+                      &ref_data[top * ref->stride + left],
+                      block_width - left, block_height - top, pic->stride, ref->stride);
   } else if (top && right) {
     result += ver_sad(pic_data,
-                      &ref_data[top * ref->width],
-                      block_width - right, top, pic->width);
+                      &ref_data[top * ref->stride],
+                      block_width - right, top, pic->stride);
     result += cor_sad(&pic_data[block_width - right],
-                      &ref_data[top * ref->width + (block_width - right - 1)],
-                      right, top, pic->width);
-    result += reg_sad(&pic_data[top * pic->width],
-                      &ref_data[top * ref->width],
-                      block_width - right, block_height - top, pic->width, ref->width);
-    result += hor_sad(&pic_data[top * pic->width + (block_width - right)],
-                      &ref_data[top * ref->width + (block_width - right - 1)],
-                      right, block_height - top, pic->width, ref->width);
+                      &ref_data[top * ref->stride + (block_width - right - 1)],
+                      right, top, pic->stride);
+    result += reg_sad(&pic_data[top * pic->stride],
+                      &ref_data[top * ref->stride],
+                      block_width - right, block_height - top, pic->stride, ref->stride);
+    result += hor_sad(&pic_data[top * pic->stride + (block_width - right)],
+                      &ref_data[top * ref->stride + (block_width - right - 1)],
+                      right, block_height - top, pic->stride, ref->stride);
   } else if (bottom && left) {
     result += hor_sad(pic_data,
                       &ref_data[left],
-                      left, block_height - bottom, pic->width, ref->width);
+                      left, block_height - bottom, pic->stride, ref->stride);
     result += reg_sad(&pic_data[left],
                       &ref_data[left],
-                      block_width - left, block_height - bottom, pic->width, ref->width);
-    result += cor_sad(&pic_data[(block_height - bottom) * pic->width],
-                      &ref_data[(block_height - bottom - 1) * ref->width + left],
-                      left, bottom, pic->width);
-    result += ver_sad(&pic_data[(block_height - bottom) * pic->width + left],
-                      &ref_data[(block_height - bottom - 1) * ref->width + left],
-                      block_width - left, bottom, pic->width);
+                      block_width - left, block_height - bottom, pic->stride, ref->stride);
+    result += cor_sad(&pic_data[(block_height - bottom) * pic->stride],
+                      &ref_data[(block_height - bottom - 1) * ref->stride + left],
+                      left, bottom, pic->stride);
+    result += ver_sad(&pic_data[(block_height - bottom) * pic->stride + left],
+                      &ref_data[(block_height - bottom - 1) * ref->stride + left],
+                      block_width - left, bottom, pic->stride);
   } else if (bottom && right) {
     result += reg_sad(pic_data,
                       ref_data,
-                      block_width - right, block_height - bottom, pic->width, ref->width);
+                      block_width - right, block_height - bottom, pic->stride, ref->stride);
     result += hor_sad(&pic_data[block_width - right],
                       &ref_data[block_width - right - 1],
-                      right, block_height - bottom, pic->width, ref->width);
-    result += ver_sad(&pic_data[(block_height - bottom) * pic->width],
-                      &ref_data[(block_height - bottom - 1) * ref->width],
-                      block_width - right, bottom, pic->width);
-    result += cor_sad(&pic_data[(block_height - bottom) * pic->width + block_width - right],
-                      &ref_data[(block_height - bottom - 1) * ref->width + block_width - right - 1],
-                      right, bottom, pic->width);
+                      right, block_height - bottom, pic->stride, ref->stride);
+    result += ver_sad(&pic_data[(block_height - bottom) * pic->stride],
+                      &ref_data[(block_height - bottom - 1) * ref->stride],
+                      block_width - right, bottom, pic->stride);
+    result += cor_sad(&pic_data[(block_height - bottom) * pic->stride + block_width - right],
+                      &ref_data[(block_height - bottom - 1) * ref->stride + block_width - right - 1],
+                      right, bottom, pic->stride);
   } else if (top) {
     result += ver_sad(pic_data,
-                      &ref_data[top * ref->width],
-                      block_width, top, pic->width);
-    result += reg_sad(&pic_data[top * pic->width],
-                      &ref_data[top * ref->width],
-                      block_width, block_height - top, pic->width, ref->width);
+                      &ref_data[top * ref->stride],
+                      block_width, top, pic->stride);
+    result += reg_sad(&pic_data[top * pic->stride],
+                      &ref_data[top * ref->stride],
+                      block_width, block_height - top, pic->stride, ref->stride);
   } else if (bottom) {
     result += reg_sad(pic_data,
                       ref_data,
-                      block_width, block_height - bottom, pic->width, ref->width);
-    result += ver_sad(&pic_data[(block_height - bottom) * pic->width],
-                      &ref_data[(block_height - bottom - 1) * ref->width],
-                      block_width, bottom, pic->width);
+                      block_width, block_height - bottom, pic->stride, ref->stride);
+    result += ver_sad(&pic_data[(block_height - bottom) * pic->stride],
+                      &ref_data[(block_height - bottom - 1) * ref->stride],
+                      block_width, bottom, pic->stride);
   } else if (left) {
     result += hor_sad(pic_data,
                       &ref_data[left],
-                      left, block_height, pic->width, ref->width);
+                      left, block_height, pic->stride, ref->stride);
     result += reg_sad(&pic_data[left],
                       &ref_data[left],
-                      block_width - left, block_height, pic->width, ref->width);
+                      block_width - left, block_height, pic->stride, ref->stride);
   } else if (right) {
     result += reg_sad(pic_data,
                       ref_data,
-                      block_width - right, block_height, pic->width, ref->width);
+                      block_width - right, block_height, pic->stride, ref->stride);
     result += hor_sad(&pic_data[block_width - right],
                       &ref_data[block_width - right - 1],
-                      right, block_height, pic->width, ref->width);
+                      right, block_height, pic->stride, ref->stride);
   } else {
-    result += reg_sad(pic_data, ref_data, block_width, block_height, pic->width, ref->width);
+    result += reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
   }
 
   return result;
@@ -373,9 +378,9 @@ unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    const pixel *pic_data = &pic->y[pic_y * pic->width + pic_x];
-    const pixel *ref_data = &ref->y[ref_y * ref->width + ref_x];
-    return reg_sad(pic_data, ref_data, block_width, block_height, pic->width, ref->width);
+    const pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
     return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height);
@@ -702,6 +707,25 @@ void pixels_blit(const pixel * const orig, pixel * const dst,
   //There is absolutely no reason to have a width greater than the source or the destination stride.
   assert(width <= orig_stride);
   assert(width <= dst_stride);
+
+#ifdef CHECKPOINTS
+  for (y = 0; y < height; ++y) {
+    char buffer[3*width];
+    int p;
+    for (p = 0; p < width; ++p) {
+      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
+    }
+    buffer[3*width] = 0;
+    CHECKPOINT("pixels_blit: %04d: %s", y, buffer);
+  }
+#endif //CHECKPOINTS
+
+  if (orig == dst) {
+    //If we have the same array, then we should have the same stride
+    assert(orig_stride == dst_stride);
+    return;
+  }
+  assert(orig != dst || orig_stride == dst_stride);
 
   for (y = 0; y < height; ++y) {
     memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel));
