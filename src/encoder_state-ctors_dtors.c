@@ -46,6 +46,15 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   
   const encoder_control * const encoder = encoder_state->encoder_control;
   encoder_state->tile->frame = videoframe_alloc(width, height, 0);
+  
+  if (encoder_state->type == ENCODER_STATE_TYPE_MAIN) {
+    //If not a parent, then we can avoid keeping a copy of the image
+    encoder_state->tile->frame->source = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, 0);
+    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, 0);
+  } else {
+    encoder_state->tile->frame->source = NULL;
+    encoder_state->tile->frame->rec = NULL;
+  }
 
   if (!encoder_state->tile->frame) {
     printf("Error allocating videoframe!\r\n");
@@ -95,6 +104,14 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
   yuv_t_free(encoder_state->tile->hor_buf_search);
   yuv_t_free(encoder_state->tile->ver_buf_search);
   
+  if (encoder_state->type == ENCODER_STATE_TYPE_MAIN) {
+    //If not a parent, then we can avoid keeping a copy of the image
+    image_free(encoder_state->tile->frame->source);
+    image_free(encoder_state->tile->frame->rec);
+  } else {
+    assert(!encoder_state->tile->frame->source);
+    assert(!encoder_state->tile->frame->rec);
+  }
   videoframe_free(encoder_state->tile->frame);
   encoder_state->tile->frame = NULL;
   
