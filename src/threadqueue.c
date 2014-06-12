@@ -1,6 +1,7 @@
 
 #include <assert.h>
 #include <pthread.h>
+#include <errno.h> //ETIMEDOUT
 #include <stdlib.h>
 
 #ifdef _DEBUG
@@ -364,6 +365,9 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
 int threadqueue_flush(threadqueue_queue * const threadqueue) {
   int notdone = 1;
   int i;
+  struct timespec time_to_wait;
+  time_to_wait.tv_sec = 0;
+  time_to_wait.tv_nsec = 100000;
   
   //Lock the queue
   PTHREAD_LOCK(&threadqueue->lock);
@@ -383,9 +387,15 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
     }
 
     if (notdone > 0) {
+      int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
       SLEEP();
-      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &time_to_wait);
+      if (ret != 0 && ret != ETIMEDOUT) {
+        fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
+        assert(0); 
+        return 0;
+      }
     }
   } while (notdone > 0);
   
