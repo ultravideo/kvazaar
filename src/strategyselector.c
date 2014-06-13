@@ -312,7 +312,7 @@ static void set_hardware_flags() {
     if (g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
     if (g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
     if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
-    if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX2");
+    if (g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
     fprintf(stderr, "\n");
   }
 #endif //COMPILE_INTEL
