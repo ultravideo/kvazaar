@@ -680,8 +680,10 @@ void encode_one_frame(encoder_state * const main_state)
     
     _encode_one_frame_add_bitstream_deps(main_state, job);
     threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
+    assert(!main_state->tqj_bitstream_written);
+    main_state->tqj_bitstream_written = job;
   }
-  threadqueue_flush(main_state->encoder_control->threadqueue);
+  //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
@@ -766,6 +768,12 @@ int read_one_frame(FILE* file, const encoder_state * const encoder_state)
 
 void encoder_next_frame(encoder_state *encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
+  
+  //Blocking call
+  threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
+  
+  //FIXME FIXME FIXME Compute statistics here
+  
   
   // Remove the ref pic (if present)
   if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
