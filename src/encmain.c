@@ -299,7 +299,8 @@ int main(int argc, char *argv[])
       encoder_state_match_children_of_previous_frame(&encoder_states[i]);
     }
     
-    encoder_states[current_encoder_state].global->frame    = 0;
+    //Initial frame
+    encoder_states[current_encoder_state].global->frame    = -1;
 
     // Only the code that handles conformance window coding needs to know
     // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
@@ -336,6 +337,9 @@ int main(int argc, char *argv[])
           break;
         }
       }
+      
+      //Clear encoder
+      encoder_next_frame(&encoder_states[current_encoder_state]);
       
       CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
@@ -379,6 +383,7 @@ int main(int argc, char *argv[])
       diff = (int32_t)(curpos-lastpos);
       lastpos = curpos;
 
+      //FIXME Stats are completely broken!!!
       // PSNR calculations
       videoframe_compute_psnr(encoder_states[current_encoder_state].tile->frame, temp_psnr);
       
@@ -390,12 +395,16 @@ int main(int argc, char *argv[])
       psnr[0] += temp_psnr[0];
       psnr[1] += temp_psnr[1];
       psnr[2] += temp_psnr[2];
-
-
-      // TODO: add more than one reference
-
-      encoder_next_frame(&encoder_states[current_encoder_state]);
+      
+      //Stop otherwise we will end up doing too much work
+      if (encoder_states[current_encoder_state].global->frame >= cfg->frames - 1) {
+        break;
+      }
+      //Switch to the next encoder
+      current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
     }
+    threadqueue_flush(encoder.threadqueue);
+    
     // Coding finished
     fgetpos(output,(fpos_t*)&curpos);
 

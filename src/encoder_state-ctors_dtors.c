@@ -284,6 +284,8 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   child_state->parent = parent_state;
   child_state->children = MALLOC(encoder_state, 1);
   child_state->children[0].encoder_control = NULL;
+  child_state->tqj_bitstream_written = NULL;
+  child_state->tqj_recon_done = NULL;
   
   if (!parent_state) {
     const encoder_control * const encoder = child_state->encoder_control;

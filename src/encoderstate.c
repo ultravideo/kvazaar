@@ -679,6 +679,10 @@ void encode_one_frame(encoder_state * const main_state)
     job = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) main_state, 1, job_description);
     
     _encode_one_frame_add_bitstream_deps(main_state, job);
+    if (main_state->previous_encoder_state != main_state && main_state->previous_encoder_state->tqj_bitstream_written) {
+      //We need to depend on previous bitstream generation
+      threadqueue_job_dep_add(job, main_state->previous_encoder_state->tqj_bitstream_written);
+    }
     threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
     assert(!main_state->tqj_bitstream_written);
     main_state->tqj_bitstream_written = job;
@@ -774,7 +778,22 @@ void encoder_next_frame(encoder_state *encoder_state) {
   
   //FIXME FIXME FIXME Compute statistics here
   
+  if (encoder_state->global->frame == -1) {
+    //We're at the first frame, so don't care about all this stuff;
+    encoder_state->global->frame = 0;
+    return;
+  }
   
+  if (encoder_state->previous_encoder_state != encoder_state) {
+    //We have a "real" previous encoder
+    encoder_state->global->frame = encoder_state->previous_encoder_state->global->frame + 1;
+    encoder_state->global->poc = encoder_state->previous_encoder_state->global->poc + 1;
+    
+    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+    videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
+    return; //FIXME reference frames
+  }
+
   // Remove the ref pic (if present)
   if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
     image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
