@@ -65,17 +65,12 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
 
   for(;;) {
     int i = 0;
-    threadqueue_job * job_to_run = NULL;
+    threadqueue_job * job = NULL;
     
     PTHREAD_LOCK(&threadqueue->lock);
 
     while(!threadqueue->stop && threadqueue->queue_waiting_execution == 0 && !next_job) {
       PTHREAD_COND_WAIT(&threadqueue->cond, &threadqueue->lock);
-      /*if (pthread_cond_wait(&threadqueue->cond, &threadqueue->lock) != 0) {
-        fprintf(stderr, "pthread_cond_wait failed!\n");
-        assert(0);
-        return 0;
-      }*/
     }
     
     if(threadqueue->stop) {
@@ -88,38 +83,41 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
     }
     
     //Find a task (should be fast enough)
-    job_to_run = NULL;
+    job = NULL;
     if (next_job) {
       PTHREAD_LOCK(&next_job->lock);
       assert(next_job->ndepends == 0);
-      job_to_run = next_job;
+      job = next_job;
      } else {
-      for (i = threadqueue->queue_start; i < threadqueue->queue_count; ++i) {
+      for (i = threadqueue->queue_count - 1; i >= threadqueue->queue_start; --i) {
+      //for (i = threadqueue->queue_start; i < threadqueue->queue_count; ++i) {
         threadqueue_job * const i_job = threadqueue->queue[i];
-        PTHREAD_LOCK(&i_job->lock);
         
         if (i_job->state == THREADQUEUE_JOB_STATE_QUEUED && i_job->ndepends == 0) {
-          job_to_run = i_job;
-          break; //Task remains locked
+          PTHREAD_LOCK(&i_job->lock);
+          if (i_job->state == THREADQUEUE_JOB_STATE_QUEUED && i_job->ndepends == 0) {
+            job = i_job;
+            job->state = THREADQUEUE_JOB_STATE_RUNNING;
+          }
+          PTHREAD_UNLOCK(&i_job->lock);
+          if (job) break;
         }
-        
-        //Not this task, so unlock it
-        PTHREAD_UNLOCK(&i_job->lock);
       }
     }
     
     //Ok we got a job (and we have a lock on it)
-    if (job_to_run) {
+    if (job) {
       int queue_waiting_dependency_decr, queue_waiting_execution_incr;
-      threadqueue_job * const job = job_to_run;
 
-      assert(job->state == THREADQUEUE_JOB_STATE_QUEUED || (job == next_job && job->state == THREADQUEUE_JOB_STATE_RUNNING));
-      job->state = THREADQUEUE_JOB_STATE_RUNNING;
+      assert(job->state == THREADQUEUE_JOB_STATE_RUNNING);
       
       //Move the queue_start "pointer" if needed
       while (threadqueue->queue_start < threadqueue->queue_count && threadqueue->queue[threadqueue->queue_start]->state != THREADQUEUE_JOB_STATE_QUEUED) threadqueue->queue_start++;
       
-      if (!next_job) --threadqueue->queue_waiting_execution;
+      if (!next_job) {
+        --threadqueue->queue_waiting_execution;
+        ++threadqueue->queue_running;
+      }
       
       //We can unlock the job here, since fptr and arg are constant
       PTHREAD_UNLOCK(&job->lock);
@@ -175,6 +173,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       
       //Signal the queue that we've done a job
       PTHREAD_LOCK(&threadqueue->lock);
+      if (!next_job) threadqueue->queue_running--;
       assert(threadqueue->queue_waiting_dependency >= queue_waiting_dependency_decr);
       threadqueue->queue_waiting_dependency -= queue_waiting_dependency_decr;
       threadqueue->queue_waiting_execution += queue_waiting_execution_incr;
@@ -250,6 +249,7 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
   threadqueue->queue_start = 0;
   threadqueue->queue_waiting_execution = 0;
   threadqueue->queue_waiting_dependency = 0;
+  threadqueue->queue_running = 0;
   
   //Lock the queue before creating threads, to ensure they all have correct information
   PTHREAD_LOCK(&threadqueue->lock);
@@ -388,32 +388,22 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
 
 int threadqueue_flush(threadqueue_queue * const threadqueue) {
   int notdone = 1;
-  int i;
   struct timespec time_to_wait;
-  time_to_wait.tv_sec = 0;
-  time_to_wait.tv_nsec = 100000;
+  time_to_wait.tv_sec = 1;
+  time_to_wait.tv_nsec = 0;
   
   //Lock the queue
   PTHREAD_LOCK(&threadqueue->lock);
   
   do {
-    if (threadqueue->queue_waiting_execution + threadqueue->queue_waiting_dependency > 0) {
-      notdone = threadqueue->queue_waiting_execution + threadqueue->queue_waiting_dependency;
-    } else {
-      notdone = 0;
-      for (i = 0; i < threadqueue->queue_count; ++i) {
-        PTHREAD_LOCK(&threadqueue->queue[i]->lock);
-        if (threadqueue->queue[i]->state != THREADQUEUE_JOB_STATE_DONE) {
-          notdone++;
-        }
-        PTHREAD_UNLOCK(&threadqueue->queue[i]->lock);
-      }
-    }
+    notdone = threadqueue->queue_waiting_execution + threadqueue->queue_waiting_dependency + threadqueue->queue_running;
 
     if (notdone > 0) {
       int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
+      PTHREAD_UNLOCK(&threadqueue->lock);
       SLEEP();
+      PTHREAD_LOCK(&threadqueue->lock);
       ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &time_to_wait);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
@@ -425,7 +415,7 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
   
   threadqueue_free_jobs(threadqueue);
 
-  assert(threadqueue->queue_waiting_dependency == 0 && threadqueue->queue_waiting_execution == 0);
+  assert(threadqueue->queue_waiting_dependency == 0 && threadqueue->queue_waiting_execution == 0 && threadqueue->queue_running == 0);
 
   PTHREAD_UNLOCK(&threadqueue->lock);
 
