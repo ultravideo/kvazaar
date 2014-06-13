@@ -53,7 +53,9 @@
 
 #define ATOMIC_INC(ptr)                     InterlockedIncrement((volatile LONG*)ptr)
 #define ATOMIC_DEC(ptr)                     InterlockedDecrement((volatile LONG*)ptr)
-#define SLEEP()                             Sleep(0)
+// Sleep(0) results in bad performance on Windows for some reason,
+// As a work around sleep for 10ms.
+#define SLEEP()                             Sleep(10)
 
 #endif //__GNUC__
 
