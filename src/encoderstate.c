@@ -560,7 +560,6 @@ static void encoder_state_encode(encoder_state * const main_state) {
           }
         }
       }
-      threadqueue_flush(main_state->encoder_control->threadqueue);
     } else {
       for (i=0; main_state->children[i].encoder_control; ++i) {
         encoder_state_worker_encode_children(&(main_state->children[i]));
@@ -641,6 +640,18 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
 
 }
 
+static void _encode_one_frame_add_bitstream_deps(const encoder_state * const encoder_state, threadqueue_job * const job) {
+  int i;
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+    _encode_one_frame_add_bitstream_deps(&encoder_state->children[i], job);
+  }
+  if (encoder_state->tqj_bitstream_written) {
+    threadqueue_job_dep_add(job, encoder_state->tqj_bitstream_written);
+  }
+  if (encoder_state->tqj_recon_done) {
+    threadqueue_job_dep_add(job, encoder_state->tqj_recon_done);
+  }
+}
 
 
 void encode_one_frame(encoder_state * const main_state)
@@ -655,8 +666,20 @@ void encode_one_frame(encoder_state * const main_state)
     encoder_state_encode(main_state);
     PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=encode,frame=%d", main_state->global->frame);
   }
+  //threadqueue_flush(main_state->encoder_control->threadqueue);
   {
-    encoder_state_write_bitstream(main_state);
+    threadqueue_job *job;
+#ifdef _DEBUG
+    char job_description[256];
+    sprintf(job_description, "frame=%d", main_state->global->frame);
+#else
+    char* job_description = NULL;
+#endif
+          
+    job = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) main_state, 1, job_description);
+    
+    _encode_one_frame_add_bitstream_deps(main_state, job);
+    threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
   }
   threadqueue_flush(main_state->encoder_control->threadqueue);
 }
