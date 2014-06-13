@@ -177,11 +177,10 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       assert(threadqueue->queue_waiting_dependency >= queue_waiting_dependency_decr);
       threadqueue->queue_waiting_dependency -= queue_waiting_dependency_decr;
       threadqueue->queue_waiting_execution += queue_waiting_execution_incr;
-      PTHREAD_COND_BROADCAST(&threadqueue->cond);
-
-      //PTHREAD_COND_BROADCAST(&threadqueue->cond);
-      //Don't log this one
-      //PTHREAD_COND_SIGNAL(&threadqueue->cb_cond);
+      for (i = 0; i < queue_waiting_execution_incr; ++i) {
+        PTHREAD_COND_SIGNAL(&threadqueue->cond);
+      }
+      //We only signal cb_cond since we finished a job
       pthread_cond_signal(&threadqueue->cb_cond);
       PTHREAD_UNLOCK(&threadqueue->lock);
     } else {
