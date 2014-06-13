@@ -3,6 +3,25 @@
 #include "src/image.h"
 #include "src/strategyselector.h"
 
+static strategy_list strategies;
+
+void init_strategies()
+{
+  strategies.allocated = 0;
+  strategies.count = 0;
+  strategies.strategies = NULL;
+
+  // Init strategyselector because it sets hardware flags.
+  strategyselector_init();
+
+  // Collect all strategies.
+  if (!strategy_register_picture(&strategies)) {
+    fprintf(stderr, "strategy_register_picture failed!\n");
+    return;
+  }
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 // EXTERNAL FUNCTIONS
 
@@ -39,9 +58,9 @@ image *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
-void sad_setup(void *environment)
+static void setup_tests()
 {
-  strategyselector_init();
+  init_strategies();
 
   g_pic = image_alloc(8, 8, 1);
   for (int i = 0; i < 64; ++i) {
@@ -54,11 +73,12 @@ void sad_setup(void *environment)
   }
 }
 
-void sad_teardown(void *environment)
+static void tear_down_tests()
 {
   image_free(g_pic);
   image_free(g_ref);
 }
+
 
 //////////////////////////////////////////////////////////////////////////
 // OVERLAPPING BOUNDARY TESTS
@@ -203,6 +223,12 @@ TEST test_bottomright_out(void)
 }
 
 
+struct sad_test_env_t {
+  image *g_pic;
+  image *g_ref;
+};
+
+
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
 SUITE(sad_tests)
@@ -210,32 +236,37 @@ SUITE(sad_tests)
   //SET_SETUP(sad_setup);
   //SET_TEARDOWN(sad_teardown);
 
-  sad_setup(0);
+  setup_tests();
+
+  for (unsigned i = 0; i < strategies.count; ++i) {
+    // Change the global reg_sad function pointer.
+    reg_sad = strategies.strategies[i].fptr;
+
+    // Tests for movement vectors that overlap frame.
+    RUN_TEST(test_topleft);
+    RUN_TEST(test_top);
+    RUN_TEST(test_topright);
+
+    RUN_TEST(test_left);
+    RUN_TEST(test_no_offset);
+    RUN_TEST(test_right);
+
+    RUN_TEST(test_bottomleft);
+    RUN_TEST(test_bottom);
+    RUN_TEST(test_bottomright);
+
+    // Tests for movement vectors that are outside the frame.
+    RUN_TEST(test_topleft_out);
+    RUN_TEST(test_top_out);
+    RUN_TEST(test_topright_out);
+
+    RUN_TEST(test_left_out);
+    RUN_TEST(test_right_out);
+
+    RUN_TEST(test_bottomleft_out);
+    RUN_TEST(test_bottom_out);
+    RUN_TEST(test_bottomright_out);
+  }
   
-  // Tests for movement vectors that overlap frame.
-  RUN_TEST(test_topleft);
-  RUN_TEST(test_top);
-  RUN_TEST(test_topright);
-
-  RUN_TEST(test_left);
-  RUN_TEST(test_no_offset);
-  RUN_TEST(test_right);
-
-  RUN_TEST(test_bottomleft);
-  RUN_TEST(test_bottom);
-  RUN_TEST(test_bottomright);
-
-  // Tests for movement vectors that are outside the frame.
-  RUN_TEST(test_topleft_out);
-  RUN_TEST(test_top_out);
-  RUN_TEST(test_topright_out);
-
-  RUN_TEST(test_left_out);
-  RUN_TEST(test_right_out);
-
-  RUN_TEST(test_bottomleft_out);
-  RUN_TEST(test_bottom_out);
-  RUN_TEST(test_bottomright_out);
-
-  sad_teardown(0);
+  tear_down_tests();
 }
