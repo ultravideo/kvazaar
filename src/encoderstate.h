@@ -164,7 +164,7 @@ typedef struct encoder_state {
   
   //Jobs to wait for
   threadqueue_job * tqj_recon_done; //Reconstruction is done
-  threadqueue_job * tqj_bitstream_written; //Reconstruction is written
+  threadqueue_job * tqj_bitstream_written; //Bitstream is written
 } encoder_state;
 
 

@@ -358,6 +358,13 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
         }
         threadqueue_job_unwait_job(encoder_state->encoder_control->threadqueue, encoder_state->tile->wf_jobs[lcu->id]);
       }
+      if (lcu->position.x == encoder_state->tile->frame->width_in_lcu - 1) {
+        if (!encoder->sao_enable) {
+          //No SAO + last LCU: the row is reconstructed
+          assert(!encoder_state->tqj_recon_done);
+          encoder_state->tqj_recon_done = encoder_state->tile->wf_jobs[lcu->id];
+        }
+      }
     }
   }
 }
@@ -383,6 +390,10 @@ static void encoder_state_worker_encode_children(void * opaque) {
       job = threadqueue_submit(sub_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream_leaf, sub_state, 1, job_description);
       threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->frame->width_in_lcu + sub_state->lcu_order_count - 1]);
       threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
+      
+      assert(!sub_state->tqj_bitstream_written);
+      //Bitstream is written for the row, if we're at the last LCU
+      sub_state->tqj_bitstream_written = job;
       return;
     }
   }
@@ -462,6 +473,15 @@ static void encoder_state_encode(encoder_state * const main_state) {
         const int width = MIN(sub_state->tile->frame->width_in_lcu * LCU_WIDTH, main_state->tile->frame->width - offset_x);
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
         
+        if (sub_state->tile->frame->source) {
+          image_free(sub_state->tile->frame->source);
+          sub_state->tile->frame->source = NULL;
+        }
+        if (sub_state->tile->frame->rec) {
+          image_free(sub_state->tile->frame->rec);
+          sub_state->tile->frame->rec = NULL;
+        }
+        
         assert(!sub_state->tile->frame->source);
         assert(!sub_state->tile->frame->rec);
         sub_state->tile->frame->source = image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
@@ -492,7 +512,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
 #else
           char* job_description = NULL;
 #endif
-          threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 0, job_description);
+          main_state->children[i].tqj_recon_done = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 0, job_description);
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
@@ -534,22 +554,16 @@ static void encoder_state_encode(encoder_state * const main_state) {
           }
           threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
           
+          if (y == frame->height_in_lcu - 1) {
+            assert(!main_state->tqj_recon_done);
+            main_state->tqj_recon_done = job;
+          }
         }
       }
       threadqueue_flush(main_state->encoder_control->threadqueue);
     } else {
       for (i=0; main_state->children[i].encoder_control; ++i) {
         encoder_state_worker_encode_children(&(main_state->children[i]));
-      }
-    }
-    
-    for (i=0; main_state->children[i].encoder_control; ++i) {
-      encoder_state *sub_state = &(main_state->children[i]);
-      if (sub_state->tile != main_state->tile) {
-        image_free(sub_state->tile->frame->source);
-        image_free(sub_state->tile->frame->rec);
-        sub_state->tile->frame->source = NULL;
-        sub_state->tile->frame->rec = NULL;
       }
     }
   } else {
@@ -615,6 +629,11 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
     // Initialize lambda value(s) to use in search
     encoder_state_init_lambda(main_state);
   }
+  
+  //Clear the jobs
+  main_state->tqj_bitstream_written = NULL;
+  main_state->tqj_recon_done = NULL;
+  
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     encoder_state_new_frame(&main_state->children[i]);
   }
@@ -639,6 +658,7 @@ void encode_one_frame(encoder_state * const main_state)
   {
     encoder_state_write_bitstream(main_state);
   }
+  threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,

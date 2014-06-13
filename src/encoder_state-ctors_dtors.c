@@ -104,14 +104,9 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
   yuv_t_free(encoder_state->tile->hor_buf_search);
   yuv_t_free(encoder_state->tile->ver_buf_search);
   
-  if (encoder_state->type == ENCODER_STATE_TYPE_MAIN) {
-    //If not a parent, then we can avoid keeping a copy of the image
-    image_free(encoder_state->tile->frame->source);
-    image_free(encoder_state->tile->frame->rec);
-  } else {
-    assert(!encoder_state->tile->frame->source);
-    assert(!encoder_state->tile->frame->rec);
-  }
+  if (encoder_state->tile->frame->source) image_free(encoder_state->tile->frame->source);
+  if (encoder_state->tile->frame->rec) image_free(encoder_state->tile->frame->rec);
+
   videoframe_free(encoder_state->tile->frame);
   encoder_state->tile->frame = NULL;
   
