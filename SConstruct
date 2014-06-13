@@ -86,8 +86,8 @@ if 'TMP' in os.environ:
     env_x86['ENV']['TMP'] = os.environ['TMP']
     env_x64['ENV']['TMP'] = os.environ['TMP']
 
-env_x86.MergeFlags('-Iextras')
-env_x64.MergeFlags('-Iextras')
+env_x86.MergeFlags('-I. -Iextras -Istrategies')
+env_x64.MergeFlags('-I. -Iextras -Istrategies')
     
 preprocessor_defines = ARGUMENTS.get('D', '')
 if preprocessor_defines:

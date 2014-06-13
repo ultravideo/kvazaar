@@ -29,10 +29,15 @@
  * \param width Width of the picture.
  * \param stride Width of one row in the pixel array.
  */
-extern void (*array_checksum)(const pixel* data,
-                              const int height, const int width,
-                              const int stride,
-                              unsigned char checksum_out[SEI_HASH_MAX_LENGTH]);
+typedef void (*array_checksum_func)(const pixel* data,
+                                    const int height, const int width,
+                                    const int stride,
+                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH]);
+extern array_checksum_func array_checksum;
+
+
+int strategy_register_nal(void* opaque);
+
 
 #define STRATEGIES_NAL_EXPORTS {"array_checksum", (void**) &array_checksum}
 

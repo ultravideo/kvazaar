@@ -8,6 +8,7 @@ Import('env')
 sources = []
 sources += env.Glob('*.c')
 sources += env.Glob('extras/*.c')
+sources += env.Glob('strategies/*.c')
 sources += env.Glob('x86/*.asm')
 env.Depends('x86/cpu.asm', 'x86/x86inc.asm')
 

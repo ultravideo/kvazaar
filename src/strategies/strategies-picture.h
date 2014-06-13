@@ -22,8 +22,14 @@
 #include "../image.h"
 
 //Function pointer to reg_sad
-extern unsigned (*reg_sad)(const pixel * const data1, const pixel * const data2,
-                           const int width, const int height, const unsigned stride1, const unsigned stride2);
+typedef unsigned(*reg_sad_func)(const pixel *const data1, const pixel *const data2,
+                                const int width, const int height,
+                                const unsigned stride1, const unsigned stride2);
+extern reg_sad_func reg_sad;
+
+
+int strategy_register_picture(void* opaque);
+
 
 #define STRATEGIES_PICTURE_EXPORTS {"reg_sad", (void**) &reg_sad}
 

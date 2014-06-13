@@ -20,15 +20,15 @@
 /*
  * \file
  */
-#include "../strategyselector.h"
-#include "../image.h"
+#include "strategyselector.h"
+#include "image.h"
 #include <immintrin.h>
 #include <assert.h>
 
 #ifdef __GNUC__
-  __attribute__ ((__target__ ("sse2")))
+__attribute__ ((__target__ ("sse2,sse4.1")))
 #endif
-static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data2,
+static unsigned reg_sad_sse41(const pixel * const data1, const pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -42,6 +42,40 @@ static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data
       const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
       sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a,b));
     }
+    
+    {
+      const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
+      const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
+      switch (((width - (width%2)) - x)/2) {
+        case 0:
+          break;
+        case 1:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x01)));
+          break;
+        case 2:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x03)));
+          break;
+        case 3:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x07)));
+          break;
+        case 4:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x0f)));
+          break;
+        case 5:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x1f)));
+          break;
+        case 6:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x3f)));
+          break;
+        case 7:
+          sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a, _mm_blend_epi16(a, b, 0x7f)));
+          break;
+        default:
+          //Should not happen
+          assert(0);
+      }
+      x = (width - (width%2));
+    }
 
     for (; x < width; ++x) {
       sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
@@ -53,6 +87,6 @@ static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data
   return sad;
 }
 
-static int strategy_register_picture_sse2(void* opaque) {
-  return strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
+static int strategy_register_picture_sse41(void* opaque) {
+  return strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
 }

@@ -1,19 +1,21 @@
-#include "picture-generic.c"
+#include "strategies-picture.h"
+
+#include "picture/picture-generic.c"
 #if COMPILE_INTEL_SSE2
-#include "picture-sse2.c"
+#include "picture/picture-sse2.c"
 #endif
 #if COMPILE_INTEL_SSE2 && COMPILE_INTEL_SSE41
-#include "picture-sse41.c"
+#include "picture/picture-sse41.c"
 #endif
 #if COMPILE_POWERPC_ALTIVEC
-#include "picture-altivec.c"
+#include "picture/picture-altivec.c"
 #endif
 
-unsigned (*reg_sad)(const pixel * const data1, const pixel * const data2,
-                    const int width, const int height, const unsigned stride1, const unsigned stride2);
+
+reg_sad_func reg_sad;
 
 
-static int strategy_register_picture(void* opaque) {
+int strategy_register_picture(void* opaque) {
   if (!strategy_register_picture_generic(opaque)) return 0;
   
 #if COMPILE_INTEL

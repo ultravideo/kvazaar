@@ -20,41 +20,39 @@
 /*
  * \file
  */
+#include "strategyselector.h"
+#include "image.h"
+#include <immintrin.h>
+#include <assert.h>
 
-#include <stdlib.h>
-
-#include "../strategyselector.h"
-
-
-/**
- * \brief Calculate Sum of Absolute Differences (SAD)
- *
- * Calculate Sum of Absolute Differences (SAD) between two rectangular regions
- * located in arbitrary points in the picture.
- *
- * \param data1   Starting point of the first picture.
- * \param data2   Starting point of the second picture.
- * \param width   Width of the region for which SAD is calculated.
- * \param height  Height of the region for which SAD is calculated.
- * \param stride  Width of the pixel array.
- *
- * \returns Sum of Absolute Differences
- */
-static unsigned reg_sad_generic(const pixel * const data1, const pixel * const data2,
+#ifdef __GNUC__
+  __attribute__ ((__target__ ("sse2")))
+#endif
+static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
   unsigned sad = 0;
-
+  __m128i sse_inc = _mm_setzero_si128 ();
+  long long int sse_inc_array[2];
+  
   for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
+    for (x = 0; x <= width-16; x+=16) {
+      const __m128i a = _mm_loadu_si128((__m128i const*) &data1[y * stride1 + x]);
+      const __m128i b = _mm_loadu_si128((__m128i const*) &data2[y * stride2 + x]);
+      sse_inc = _mm_add_epi32(sse_inc, _mm_sad_epu8(a,b));
+    }
+
+    for (; x < width; ++x) {
       sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
     }
   }
+  _mm_storeu_si128((__m128i*) sse_inc_array, sse_inc);
+  sad += sse_inc_array[0] + sse_inc_array[1];
 
   return sad;
 }
 
-static int strategy_register_picture_generic(void* opaque) {
-  return strategyselector_register(opaque, "reg_sad", "generic", 0, &reg_sad_generic);
+static int strategy_register_picture_sse2(void* opaque) {
+  return strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
 }

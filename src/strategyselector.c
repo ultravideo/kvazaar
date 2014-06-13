@@ -21,10 +21,11 @@
  * \file
  */
 
+#include "strategyselector.h"
+
 #include <assert.h>
 #include <string.h>
-
-#include "strategyselector.h"
+#include <stdlib.h>
 
 hardware_flags g_hardware_flags;
 
@@ -32,8 +33,6 @@ static void set_hardware_flags();
 static void* strategyselector_choose_for(const strategy_list * const strategies, const char * const strategy_type);
 
 //Strategies to include (add new file here)
-#include "strategies/picture.c"
-#include "strategies/nal.c"
 
 //Returns 1 if successful
 int strategyselector_init() {

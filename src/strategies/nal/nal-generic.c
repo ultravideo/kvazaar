@@ -22,10 +22,10 @@
  */
 
 #include <stdlib.h>
-
-#include "nal.h"
 #include <assert.h>
-#include "../strategyselector.h"
+
+#include "strategyselector.h"
+#include "nal.h"
 
 
 static void array_checksum_generic(const pixel* data,

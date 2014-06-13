@@ -20,8 +20,8 @@
 /*
  * \file
  */
-#include "../strategyselector.h"
-#include "../image.h"
+#include "strategyselector.h"
+#include "image.h"
 #include <altivec.h>
 #include <assert.h>
 
