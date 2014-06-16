@@ -3,23 +3,7 @@
 #include "src/image.h"
 #include "src/strategyselector.h"
 
-static strategy_list strategies;
-
-void init_strategies()
-{
-  strategies.allocated = 0;
-  strategies.count = 0;
-  strategies.strategies = NULL;
-
-  // Init strategyselector because it sets hardware flags.
-  strategyselector_init();
-
-  // Collect all strategies.
-  if (!strategy_register_picture(&strategies)) {
-    fprintf(stderr, "strategy_register_picture failed!\n");
-    return;
-  }
-}
+#include <string.h>
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -31,6 +15,8 @@ void init_strategies()
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
+static strategy_list strategies;
+
 const uint8_t ref_data[64] = {
   1,2,2,2,2,2,2,3,
   4,5,5,5,5,5,5,6,
@@ -58,6 +44,23 @@ image *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
+static void init_strategies()
+{
+  strategies.allocated = 0;
+  strategies.count = 0;
+  strategies.strategies = NULL;
+
+  // Init strategyselector because it sets hardware flags.
+  strategyselector_init();
+
+  // Collect all strategies.
+  if (!strategy_register_picture(&strategies)) {
+    fprintf(stderr, "strategy_register_picture failed!\n");
+    return;
+  }
+}
+
+
 static void setup_tests()
 {
   init_strategies();
@@ -239,6 +242,10 @@ SUITE(sad_tests)
   setup_tests();
 
   for (unsigned i = 0; i < strategies.count; ++i) {
+    if (strcmp(strategies.strategies[i].type, "reg_sad") != 0) {
+      continue;
+    }
+
     // Change the global reg_sad function pointer.
     reg_sad = strategies.strategies[i].fptr;
 
