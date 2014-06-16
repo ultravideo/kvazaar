@@ -88,9 +88,14 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       PTHREAD_LOCK(&next_job->lock);
       assert(next_job->ndepends == 0);
       job = next_job;
-     } else {
-      for (i = threadqueue->queue_count - 1; i >= threadqueue->queue_start; --i) {
+    } else {
+      //FIXME: if not using OWF, the first is better than the second, otherwise we should use the second order
+      //for (i = threadqueue->queue_count - 1; i >= threadqueue->queue_start; --i) {
       //for (i = threadqueue->queue_start; i < threadqueue->queue_count; ++i) {
+        
+      for (i = (threadqueue->fifo ? threadqueue->queue_start : threadqueue->queue_count - 1);
+           (threadqueue->fifo ? i < threadqueue->queue_count : i >= threadqueue->queue_start); 
+           (threadqueue->fifo ? ++i : --i)) {
         threadqueue_job * const i_job = threadqueue->queue[i];
         
         if (i_job->state == THREADQUEUE_JOB_STATE_QUEUED && i_job->ndepends == 0) {
@@ -206,7 +211,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   
   return NULL;
 }
-int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
+int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count, int fifo) {
   int i;
   if (pthread_mutex_init(&threadqueue->lock, NULL) != 0) {
     fprintf(stderr, "pthread_mutex_init failed!\n");
@@ -226,6 +231,7 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
   }
   
   threadqueue->stop = 0;
+  threadqueue->fifo = !!fifo;
   threadqueue->threads_running = 0;
   threadqueue->threads_count = thread_count;
   
