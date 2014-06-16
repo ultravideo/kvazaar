@@ -343,10 +343,19 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
 #endif
       encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
       if (encoder_state->previous_encoder_state != encoder_state && encoder_state->previous_encoder_state->tqj_recon_done && !encoder_state->global->is_radl_frame) {
-        //Add dependencies to the previous frame
-        //FIXME is this correct? (we may need to have also the next line?)
-        threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->previous_encoder_state->tqj_recon_done);
-        //Do we also need a dep for pixels below? I don't think so?
+        
+        //Only for the first in the row (we reconstruct row-wise)
+        if (!lcu->left) {
+          //If we have a row below, then we wait till it's completed
+          if (lcu->below) {
+            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+          }
+          //Also add always a dep on current line
+          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+          if (lcu->above) {
+            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->above->encoder_state->previous_encoder_state->tqj_recon_done);
+          }
+        }
       }
       if (encoder_state->tile->wf_jobs[lcu->id]) {
         if (lcu->position.x > 0) {
