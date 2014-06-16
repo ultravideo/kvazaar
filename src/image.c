@@ -392,7 +392,7 @@ unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y
  * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
  * From HM 13.0
  */
-static unsigned satd_16bit_4x4(const pixel *piOrg, const pixel *piCur)
+static unsigned satd_8bit_4x4(const pixel *piOrg, const pixel *piCur)
 {
   int32_t k, satd = 0, diff[16], m[16], d[16];
   for( k = 0; k < 16; ++k ) {
@@ -588,10 +588,10 @@ unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrideOrg,
     }
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, pixel, 16bit)
-SATD_NXN(16, pixel, 16bit)
-SATD_NXN(32, pixel, 16bit)
-SATD_NXN(64, pixel, 16bit)
+SATD_NXN(8, pixel, 8bit)
+SATD_NXN(16, pixel, 8bit)
+SATD_NXN(32, pixel, 8bit)
+SATD_NXN(64, pixel, 8bit)
 
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
@@ -609,12 +609,12 @@ SATD_NXN(64, pixel, 16bit)
 
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
-// They are used through get_sad_16bit_nxn_func.
-SAD_NXN(4, pixel, 16bit)
-SAD_NXN(8, pixel, 16bit)
-SAD_NXN(16, pixel, 16bit)
-SAD_NXN(32, pixel, 16bit)
-SAD_NXN(64, pixel, 16bit)
+// They are used through get_pixel_sad_func.
+SAD_NXN(4, pixel, 8bit)
+SAD_NXN(8, pixel, 8bit)
+SAD_NXN(16, pixel, 8bit)
+SAD_NXN(32, pixel, 8bit)
+SAD_NXN(64, pixel, 8bit)
 
 /**
  * \brief  Get a function that calculates SATD for NxN block.
@@ -623,19 +623,19 @@ SAD_NXN(64, pixel, 16bit)
  *
  * \returns  Pointer to cost_16bit_nxn_func.
  */
-cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
+ cost_pixel_nxn_func * pixels_get_satd_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return &satd_16bit_4x4;
+    return &satd_8bit_4x4;
   case 8:
-    return &satd_16bit_8x8;
+    return &satd_8bit_8x8;
   case 16:
-    return &satd_16bit_16x16;
+    return &satd_8bit_16x16;
   case 32:
-    return &satd_16bit_32x32;
+    return &satd_8bit_32x32;
   case 64:
-    return &satd_16bit_64x64;
+    return &satd_8bit_64x64;
   default:
     return NULL;
     }
@@ -648,19 +648,19 @@ cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n)
  *
  * \returns  Pointer to cost_16bit_nxn_func.
  */
-cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n)
+cost_pixel_nxn_func * pixels_get_sad_func(unsigned n)
   {
   switch (n) {
   case 4:
-    return &sad_16bit_4x4;
+    return &sad_8bit_4x4;
   case 8:
-    return &sad_16bit_8x8;
+    return &sad_8bit_8x8;
   case 16:
-    return &sad_16bit_16x16;
+    return &sad_8bit_16x16;
   case 32:
-    return &sad_16bit_32x32;
+    return &sad_8bit_32x32;
   case 64:
-    return &sad_16bit_64x64;
+    return &sad_8bit_64x64;
   default:
     return NULL;
   }
