@@ -567,6 +567,9 @@ static void encoder_state_encode(encoder_state * const main_state) {
           }
           threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
           
+          //Set wfrow recon job
+          main_state->children[y].tqj_recon_done = job;
+          
           if (y == frame->height_in_lcu - 1) {
             assert(!main_state->tqj_recon_done);
             main_state->tqj_recon_done = job;
