@@ -31,6 +31,7 @@
 #include "config.h"
 #include "bitstream.h"
 #include "image.h"
+#include "strategies/strategies-picture.h"
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"

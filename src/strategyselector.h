@@ -137,8 +137,8 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 #include "strategies/strategies-picture.h"
 
 static const strategy_to_select strategies_to_select[] = {
-  STRATEGIES_NAL_EXPORTS,
-  STRATEGIES_PICTURE_EXPORTS,
+  STRATEGIES_NAL_EXPORTS
+  STRATEGIES_PICTURE_EXPORTS
   {NULL, NULL},
 };
 
