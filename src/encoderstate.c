@@ -782,6 +782,58 @@ int read_one_frame(FILE* file, const encoder_state * const encoder_state)
   return 1;
 }
 
+void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3]) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  
+  if (encoder_state->stats_done) return;
+  encoder_state->stats_done = 1;
+  
+  ++(*stat_frames);
+  
+  //Blocking call
+  threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
+  
+  if (recout) {
+    const videoframe * const frame = encoder_state->tile->frame;
+    // Write reconstructed frame out.
+    // Use conformance-window dimensions instead of internal ones.
+    const int width = frame->width;
+    const int out_width = encoder->in.real_width;
+    const int out_height = encoder->in.real_height;
+    int y;
+    const pixel *y_rec = frame->rec->y;
+    const pixel *u_rec = frame->rec->u;
+    const pixel *v_rec = frame->rec->v;
+
+    for (y = 0; y < out_height; ++y) {
+      fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
+    }
+    for (y = 0; y < out_height / 2; ++y) {
+      fwrite(&u_rec[y * width / 2], sizeof(*u_rec), out_width / 2, recout);
+    }
+    for (y = 0; y < out_height / 2; ++y) {
+      fwrite(&v_rec[y * width / 2], sizeof(*v_rec), out_width / 2, recout);
+    }
+  }
+  
+  // PSNR calculations
+  {
+    int32_t diff=0; //FIXME: get the correct length of bitstream
+    double temp_psnr[3];
+    
+    videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
+    
+    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
+          "BPI"[encoder_state->global->slicetype%3], diff<<3,
+          temp_psnr[0], temp_psnr[1], temp_psnr[2]);
+
+    // Increment total PSNR
+    psnr[0] += temp_psnr[0];
+    psnr[1] += temp_psnr[1];
+    psnr[2] += temp_psnr[2];
+  }
+}
+
 
 void encoder_next_frame(encoder_state *encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -789,7 +841,7 @@ void encoder_next_frame(encoder_state *encoder_state) {
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
   
-  //FIXME FIXME FIXME Compute statistics here
+  encoder_state->stats_done = 0;
   
   if (encoder_state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;

@@ -286,6 +286,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   child_state->children[0].encoder_control = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
+  child_state->stats_done = 1; //It avoids printing meaningless stats at the beginning
   
   if (!parent_state) {
     const encoder_control * const encoder = child_state->encoder_control;
