@@ -26,7 +26,9 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#if COMPILE_INTEL
 #include <immintrin.h>
+#endif
 
 hardware_flags g_hardware_flags;
 

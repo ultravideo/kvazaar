@@ -35,6 +35,7 @@ void encoder_state_write_bitstream_slice_header(struct encoder_state * const enc
 void encoder_state_write_bitstream(struct encoder_state * const main_state);
 void encoder_state_write_bitstream_leaf(struct encoder_state * const encoder_state);
 void encoder_state_worker_write_bitstream_leaf(void * opaque);
+void encoder_state_worker_write_bitstream(void * opaque);
 
 
 #endif // ENCODER_STATE_BITSTREAM_H_

@@ -43,7 +43,7 @@ image_list * image_list_alloc(int size)
   list->size = size;
   if (size > 0) {
     list->images = (image**)malloc(sizeof(image*) * size);
-    list->cu_arrays = (cu_info**)malloc(sizeof(cu_info*) * size);
+    list->cu_arrays = (cu_array**)malloc(sizeof(cu_array*) * size);
   }
 
   list->used_size = 0;
@@ -61,7 +61,7 @@ int image_list_resize(image_list *list, unsigned size)
 {
   unsigned int i;
   image** old_images = NULL;
-  cu_info** old_cu_arrays = NULL;
+  cu_array** old_cu_arrays = NULL;
   
   //FIXME This could be done in a simple way using realloc...
 
@@ -78,7 +78,7 @@ int image_list_resize(image_list *list, unsigned size)
 
   // allocate space for the new list
   list->images = (image**)malloc(sizeof(image*)*size);
-  list->cu_arrays = (cu_info**)malloc(sizeof(cu_info*)*size);
+  list->cu_arrays = (cu_array**)malloc(sizeof(cu_array*)*size);
 
   // Copy everything from the old list to the new if needed.
   if (old_images != NULL) {
@@ -106,7 +106,7 @@ int image_list_destroy(image_list *list)
     for (i = 0; i < list->used_size; ++i) {
       image_free(list->images[i]);
       list->images[i] = NULL;
-      free(list->cu_arrays[i]);
+      cu_array_free(list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
     }
   }
@@ -125,11 +125,17 @@ int image_list_destroy(image_list *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int image_list_add(image_list *list, image* im, cu_info* cu_array)
+int image_list_add(image_list *list, image* im, cu_array* cua)
 {
   int i = 0;
   if (ATOMIC_INC(&(im->refcount)) == 1) {
     fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
+    assert(0); //Stop for debugging
+    return 0;
+  }
+  
+  if (ATOMIC_INC(&(cua->refcount)) == 1) {
+    fprintf(stderr, "Tried to add an unreferenced cu_array. This is a bug!\n");
     assert(0); //Stop for debugging
     return 0;
   }
@@ -144,20 +150,8 @@ int image_list_add(image_list *list, image* im, cu_info* cu_array)
   }
 
   list->images[0] = im;
-  //We need (only here, for malloc/memcpy) to compute the size of the image in SCU
-  {
-    //FIXME FIXME FIXME Do like images, use a pointer instead of copying
-    unsigned int width_in_lcu, height_in_lcu, width_in_scu, height_in_scu;
-    width_in_lcu  = im->width / LCU_WIDTH;
-    if (width_in_lcu * LCU_WIDTH < im->width) width_in_lcu++;
-    height_in_lcu = im->height / LCU_WIDTH;
-    if (height_in_lcu * LCU_WIDTH < im->height) height_in_lcu++;
-    height_in_scu = height_in_lcu << MAX_DEPTH;
-    width_in_scu = width_in_lcu << MAX_DEPTH;
-    
-    list->cu_arrays[0] = (cu_info*)malloc(sizeof(cu_info) * width_in_scu * height_in_scu);
-    memcpy(list->cu_arrays[0], cu_array, sizeof(cu_info) * width_in_scu * height_in_scu);
-  }
+  list->cu_arrays[0] = cua;
+  
   list->used_size++;
   return 1;
 }
@@ -181,7 +175,12 @@ int image_list_rem(image_list * const list, const unsigned n)
     assert(0); //Stop here
     return 0;
   }
-  free(list->cu_arrays[n]);
+  
+  if (!cu_array_free(list->cu_arrays[n])) {
+    fprintf(stderr, "Could not free cu_array!\n");
+    assert(0); //Stop here
+    return 0;
+  }
 
   // The last item is easy to remove
   if (n == list->used_size - 1) {
@@ -200,5 +199,17 @@ int image_list_rem(image_list * const list, const unsigned n)
     list->used_size--;
   }
 
+  return 1;
+}
+
+int image_list_copy_contents(image_list *target, image_list *source) {
+  int i;
+  while (target->used_size > 0) {
+    image_list_rem(target, 0);
+  }
+  
+  for (i = source->used_size - 1; i >= 0; --i) {
+    image_list_add(target, source->images[i], source->cu_arrays[i]);
+  }
   return 1;
 }

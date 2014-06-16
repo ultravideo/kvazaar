@@ -198,6 +198,11 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
   unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
+  int max_lcu_below = -1;
+  
+  if (encoder_state->encoder_control->owf) {
+    max_lcu_below = 1;
+  }
 
 
   // Search the initial 7 points of the hexagon.
@@ -206,7 +211,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
-                             block_width, block_width);
+                             block_width, block_width, max_lcu_below);
     cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost < best_cost) {
@@ -221,7 +226,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
-                             block_width, block_width);
+                             block_width, block_width, max_lcu_below);
     cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     // If the 0,0 is better, redo the hexagon around that point.
@@ -237,7 +242,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
         unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                                  (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
                                  (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
-                                 block_width, block_width);
+                                 block_width, block_width, max_lcu_below);
         cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
         if (cost < best_cost) {
@@ -272,7 +277,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
       unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                                (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                               block_width, block_width);
+                               block_width, block_width, max_lcu_below);
       cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
       if (cost < best_cost) {
@@ -295,7 +300,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                             block_width, block_width);
+                             block_width, block_width, max_lcu_below);
     cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
@@ -399,7 +404,7 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 
   for (ref_idx = 0; ref_idx < encoder_state->global->ref->used_size; ref_idx++) {
     image *ref_image = encoder_state->global->ref->images[ref_idx];
-    const cu_info *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx][x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
+    const cu_info *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx]->data[x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;

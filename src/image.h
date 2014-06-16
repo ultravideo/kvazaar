@@ -72,7 +72,7 @@ void yuv_t_free(yuv_t * yuv);
 
 //Algorithms
 unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height);
+                        int block_width, int block_height, int max_lcu_below);
 
 
 unsigned pixels_calc_ssd(const pixel *const ref, const pixel *const rec,

@@ -77,6 +77,9 @@ image *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
  */
 int image_free(image * const im)
 {
+  //Nothing to do
+  if (!im) return 1;
+  
   //Either we are the base image, or we should have no references
   assert(im->base_image == im || im->refcount == 0);
   
@@ -370,9 +373,14 @@ static unsigned image_interpolated_sad(const image *pic, const image *ref,
 
 
 unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height) {
+                        int block_width, int block_height, int max_lcu_below) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
+  
+  if ((((ref_y + block_height)/LCU_WIDTH) > (pic_y/LCU_WIDTH) + max_lcu_below) && max_lcu_below >= 0) {
+    //printf("OOB %d %d -> %d\n", ref_y + block_height, pic_y, ref_y + block_height - pic_y);
+    return INT_MAX;
+  }
   if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
       ref_y >= 0 && ref_y <= ref->height - block_height)
   {

@@ -111,6 +111,15 @@ typedef struct
   (cu).inter.cost, (cu).inter.bitcost, (cu).inter.mv[0], (cu).inter.mv[1], (cu).inter.mvd[0], (cu).inter.mvd[1], \
   (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
 
+typedef struct {
+  cu_info *data;           //!< \brief cu_info data
+  int32_t refcount;        //!< \brief number of references in reflists to this cu_array
+} cu_array;
+
+cu_array * cu_array_alloc(int width_in_scu, int height_in_scu);
+int cu_array_free(cu_array *cua);
+  
+
 #define SUB_SCU_BIT_MASK (64 - 1)
 #define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
 #define LCU_CU_WIDTH 8

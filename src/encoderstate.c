@@ -342,6 +342,21 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
       char* job_description = NULL;
 #endif
       encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      if (encoder_state->previous_encoder_state != encoder_state && encoder_state->previous_encoder_state->tqj_recon_done && !encoder_state->global->is_radl_frame) {
+        
+        //Only for the first in the row (we reconstruct row-wise)
+        if (!lcu->left) {
+          //If we have a row below, then we wait till it's completed
+          if (lcu->below) {
+            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+          }
+          //Also add always a dep on current line
+          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+          if (lcu->above) {
+            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->above->encoder_state->previous_encoder_state->tqj_recon_done);
+          }
+        }
+      }
       if (encoder_state->tile->wf_jobs[lcu->id]) {
         if (lcu->position.x > 0) {
           // Wait for the LCU on the left.
@@ -357,6 +372,13 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
           }
         }
         threadqueue_job_unwait_job(encoder_state->encoder_control->threadqueue, encoder_state->tile->wf_jobs[lcu->id]);
+      }
+      if (lcu->position.x == encoder_state->tile->frame->width_in_lcu - 1) {
+        if (!encoder->sao_enable) {
+          //No SAO + last LCU: the row is reconstructed
+          assert(!encoder_state->tqj_recon_done);
+          encoder_state->tqj_recon_done = encoder_state->tile->wf_jobs[lcu->id];
+        }
       }
     }
   }
@@ -383,6 +405,10 @@ static void encoder_state_worker_encode_children(void * opaque) {
       job = threadqueue_submit(sub_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream_leaf, sub_state, 1, job_description);
       threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->frame->width_in_lcu + sub_state->lcu_order_count - 1]);
       threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
+      
+      assert(!sub_state->tqj_bitstream_written);
+      //Bitstream is written for the row, if we're at the last LCU
+      sub_state->tqj_bitstream_written = job;
       return;
     }
   }
@@ -462,6 +488,15 @@ static void encoder_state_encode(encoder_state * const main_state) {
         const int width = MIN(sub_state->tile->frame->width_in_lcu * LCU_WIDTH, main_state->tile->frame->width - offset_x);
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
         
+        if (sub_state->tile->frame->source) {
+          image_free(sub_state->tile->frame->source);
+          sub_state->tile->frame->source = NULL;
+        }
+        if (sub_state->tile->frame->rec) {
+          image_free(sub_state->tile->frame->rec);
+          sub_state->tile->frame->rec = NULL;
+        }
+        
         assert(!sub_state->tile->frame->source);
         assert(!sub_state->tile->frame->rec);
         sub_state->tile->frame->source = image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
@@ -492,7 +527,14 @@ static void encoder_state_encode(encoder_state * const main_state) {
 #else
           char* job_description = NULL;
 #endif
-          threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 0, job_description);
+          main_state->children[i].tqj_recon_done = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
+          if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_radl_frame) {
+            //Add dependencies to the previous frame
+            //FIXME is this correct?
+            threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);
+            //Do we also need a dep for pixels below? I don't think so?
+          }
+          threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
@@ -534,22 +576,18 @@ static void encoder_state_encode(encoder_state * const main_state) {
           }
           threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
           
+          //Set wfrow recon job
+          main_state->children[y].tqj_recon_done = job;
+          
+          if (y == frame->height_in_lcu - 1) {
+            assert(!main_state->tqj_recon_done);
+            main_state->tqj_recon_done = job;
+          }
         }
       }
-      threadqueue_flush(main_state->encoder_control->threadqueue);
     } else {
       for (i=0; main_state->children[i].encoder_control; ++i) {
         encoder_state_worker_encode_children(&(main_state->children[i]));
-      }
-    }
-    
-    for (i=0; main_state->children[i].encoder_control; ++i) {
-      encoder_state *sub_state = &(main_state->children[i]);
-      if (sub_state->tile != main_state->tile) {
-        image_free(sub_state->tile->frame->source);
-        image_free(sub_state->tile->frame->rec);
-        sub_state->tile->frame->source = NULL;
-        sub_state->tile->frame->rec = NULL;
       }
     }
   } else {
@@ -615,6 +653,11 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
     // Initialize lambda value(s) to use in search
     encoder_state_init_lambda(main_state);
   }
+  
+  //Clear the jobs
+  main_state->tqj_bitstream_written = NULL;
+  main_state->tqj_recon_done = NULL;
+  
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     encoder_state_new_frame(&main_state->children[i]);
   }
@@ -622,6 +665,18 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
 
 }
 
+static void _encode_one_frame_add_bitstream_deps(const encoder_state * const encoder_state, threadqueue_job * const job) {
+  int i;
+  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+    _encode_one_frame_add_bitstream_deps(&encoder_state->children[i], job);
+  }
+  if (encoder_state->tqj_bitstream_written) {
+    threadqueue_job_dep_add(job, encoder_state->tqj_bitstream_written);
+  }
+  if (encoder_state->tqj_recon_done) {
+    threadqueue_job_dep_add(job, encoder_state->tqj_recon_done);
+  }
+}
 
 
 void encode_one_frame(encoder_state * const main_state)
@@ -636,9 +691,28 @@ void encode_one_frame(encoder_state * const main_state)
     encoder_state_encode(main_state);
     PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=encode,frame=%d", main_state->global->frame);
   }
+  //threadqueue_flush(main_state->encoder_control->threadqueue);
   {
-    encoder_state_write_bitstream(main_state);
+    threadqueue_job *job;
+#ifdef _DEBUG
+    char job_description[256];
+    sprintf(job_description, "frame=%d", main_state->global->frame);
+#else
+    char* job_description = NULL;
+#endif
+          
+    job = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) main_state, 1, job_description);
+    
+    _encode_one_frame_add_bitstream_deps(main_state, job);
+    if (main_state->previous_encoder_state != main_state && main_state->previous_encoder_state->tqj_bitstream_written) {
+      //We need to depend on previous bitstream generation
+      threadqueue_job_dep_add(job, main_state->previous_encoder_state->tqj_bitstream_written);
+    }
+    threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
+    assert(!main_state->tqj_bitstream_written);
+    main_state->tqj_bitstream_written = job;
   }
+  //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
@@ -720,10 +794,102 @@ int read_one_frame(FILE* file, const encoder_state * const encoder_state)
   return 1;
 }
 
+void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3]) {
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  
+  if (encoder_state->stats_done) return;
+  encoder_state->stats_done = 1;
+  
+  ++(*stat_frames);
+  
+  //Blocking call
+  threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
+  
+  if (recout) {
+    const videoframe * const frame = encoder_state->tile->frame;
+    // Write reconstructed frame out.
+    // Use conformance-window dimensions instead of internal ones.
+    const int width = frame->width;
+    const int out_width = encoder->in.real_width;
+    const int out_height = encoder->in.real_height;
+    int y;
+    const pixel *y_rec = frame->rec->y;
+    const pixel *u_rec = frame->rec->u;
+    const pixel *v_rec = frame->rec->v;
+
+    for (y = 0; y < out_height; ++y) {
+      fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
+    }
+    for (y = 0; y < out_height / 2; ++y) {
+      fwrite(&u_rec[y * width / 2], sizeof(*u_rec), out_width / 2, recout);
+    }
+    for (y = 0; y < out_height / 2; ++y) {
+      fwrite(&v_rec[y * width / 2], sizeof(*v_rec), out_width / 2, recout);
+    }
+  }
+  
+  // PSNR calculations
+  {
+    int32_t diff=0; //FIXME: get the correct length of bitstream
+    double temp_psnr[3];
+    
+    videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
+    
+    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
+          "BPI"[encoder_state->global->slicetype%3], diff<<3,
+          temp_psnr[0], temp_psnr[1], temp_psnr[2]);
+
+    // Increment total PSNR
+    psnr[0] += temp_psnr[0];
+    psnr[1] += temp_psnr[1];
+    psnr[2] += temp_psnr[2];
+  }
+}
+
 
 void encoder_next_frame(encoder_state *encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   
+  //Blocking call
+  threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
+  
+  encoder_state->stats_done = 0;
+
+  if (encoder_state->global->frame == -1) {
+    //We're at the first frame, so don't care about all this stuff;
+    encoder_state->global->frame = 0;
+    encoder_state->global->poc = 0;
+    assert(!encoder_state->tile->frame->rec);
+    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+    return;
+  }
+  
+  if (encoder_state->previous_encoder_state != encoder_state) {
+    //We have a "real" previous encoder
+    encoder_state->global->frame = encoder_state->previous_encoder_state->global->frame + 1;
+    encoder_state->global->poc = encoder_state->previous_encoder_state->global->poc + 1;
+    
+    image_free(encoder_state->tile->frame->rec);
+    cu_array_free(encoder_state->tile->frame->cu_array);
+    
+    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+    {
+      // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
+      unsigned height_in_scu = encoder_state->tile->frame->height_in_lcu << MAX_DEPTH;
+      unsigned width_in_scu = encoder_state->tile->frame->width_in_lcu << MAX_DEPTH;
+      encoder_state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
+    }
+    videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
+    
+    image_list_copy_contents(encoder_state->global->ref, encoder_state->previous_encoder_state->global->ref);
+    image_list_add(encoder_state->global->ref, encoder_state->previous_encoder_state->tile->frame->rec, encoder_state->previous_encoder_state->tile->frame->cu_array);
+    // Remove the ref pics in excess
+    while (encoder_state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
+      image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
+    }
+    return; //FIXME reference frames
+  }
+
   // Remove the ref pic (if present)
   if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
     image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);

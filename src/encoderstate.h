@@ -162,9 +162,11 @@ typedef struct encoder_state {
   bitstream stream;
   cabac_data cabac;
   
+  int stats_done;
+  
   //Jobs to wait for
   threadqueue_job * tqj_recon_done; //Reconstruction is done
-  threadqueue_job * tqj_bitstream_written; //Reconstruction is written
+  threadqueue_job * tqj_bitstream_written; //Bitstream is written
 } encoder_state;
 
 
@@ -172,6 +174,7 @@ typedef struct encoder_state {
 void encode_one_frame(encoder_state *encoder_state);
 int read_one_frame(FILE* file, const encoder_state *encoder);
 
+void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3]);
 void encoder_next_frame(encoder_state *encoder_state);
 
 

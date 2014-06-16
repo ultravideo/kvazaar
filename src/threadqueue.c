@@ -54,6 +54,8 @@ typedef struct {
 } while (0);
 #endif //PTHREAD_DUMP
 
+const struct timespec time_to_wait = {1, 0};
+
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   threadqueue_worker_spec * const threadqueue_worker_spec = threadqueue_worker_spec_opaque;
   threadqueue_queue * const threadqueue = threadqueue_worker_spec->threadqueue;
@@ -88,9 +90,14 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       PTHREAD_LOCK(&next_job->lock);
       assert(next_job->ndepends == 0);
       job = next_job;
-     } else {
-      for (i = threadqueue->queue_count - 1; i >= threadqueue->queue_start; --i) {
+    } else {
+      //FIXME: if not using OWF, the first is better than the second, otherwise we should use the second order
+      //for (i = threadqueue->queue_count - 1; i >= threadqueue->queue_start; --i) {
       //for (i = threadqueue->queue_start; i < threadqueue->queue_count; ++i) {
+        
+      for (i = (threadqueue->fifo ? threadqueue->queue_start : threadqueue->queue_count - 1);
+           (threadqueue->fifo ? i < threadqueue->queue_count : i >= threadqueue->queue_start); 
+           (threadqueue->fifo ? ++i : --i)) {
         threadqueue_job * const i_job = threadqueue->queue[i];
         
         if (i_job->state == THREADQUEUE_JOB_STATE_QUEUED && i_job->ndepends == 0) {
@@ -206,7 +213,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   
   return NULL;
 }
-int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
+int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count, int fifo) {
   int i;
   if (pthread_mutex_init(&threadqueue->lock, NULL) != 0) {
     fprintf(stderr, "pthread_mutex_init failed!\n");
@@ -226,6 +233,7 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count) {
   }
   
   threadqueue->stop = 0;
+  threadqueue->fifo = !!fifo;
   threadqueue->threads_running = 0;
   threadqueue->threads_count = thread_count;
   
@@ -387,9 +395,6 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
 
 int threadqueue_flush(threadqueue_queue * const threadqueue) {
   int notdone = 1;
-  struct timespec time_to_wait;
-  time_to_wait.tv_sec = 1;
-  time_to_wait.tv_nsec = 0;
   
   //Lock the queue
   PTHREAD_LOCK(&threadqueue->lock);
@@ -436,9 +441,17 @@ int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job *
     PTHREAD_UNLOCK(&job->lock);
     
     if (!job_done) {
+      int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
+      PTHREAD_UNLOCK(&threadqueue->lock);
       SLEEP();
-      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
+      PTHREAD_LOCK(&threadqueue->lock);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &time_to_wait);
+      if (ret != 0 && ret != ETIMEDOUT) {
+        fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
+        assert(0); 
+        return 0;
+      }
     }
   } while (!job_done);
 

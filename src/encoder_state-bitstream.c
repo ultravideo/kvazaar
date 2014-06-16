@@ -814,3 +814,7 @@ void encoder_state_write_bitstream(encoder_state * const main_state) {
   }
 }
 
+void encoder_state_worker_write_bitstream(void * opaque) {
+  encoder_state_write_bitstream((encoder_state *) opaque);
+}
+

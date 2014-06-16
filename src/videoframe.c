@@ -56,9 +56,7 @@ videoframe *videoframe_alloc(const int32_t width, const int32_t height, const in
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
     unsigned height_in_scu = frame->height_in_lcu << MAX_DEPTH;
     unsigned width_in_scu = frame->width_in_lcu << MAX_DEPTH;
-    unsigned cu_array_size = height_in_scu * width_in_scu;
-    frame->cu_array = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
-    memset(frame->cu_array, 0, sizeof(cu_info) * cu_array_size);
+    frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
   }
 
   frame->coeff_y = NULL; frame->coeff_u = NULL; frame->coeff_v = NULL;
@@ -79,7 +77,7 @@ int videoframe_free(videoframe * const frame)
   //image_free(frame->source);
   //image_free(frame->rec);
 
-  FREE_POINTER(frame->cu_array);
+  cu_array_free(frame->cu_array);
 
   FREE_POINTER(frame->coeff_y);
   FREE_POINTER(frame->coeff_u);
@@ -103,14 +101,14 @@ const cu_info* videoframe_get_cu_const(const videoframe * const frame, unsigned 
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
   
-  return &frame->cu_array[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
+  return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
 }
 
 cu_info* videoframe_get_cu(videoframe * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu) {
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
   
-  return &frame->cu_array[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
+  return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
 }
 
 #define PSNRMAX (255.0 * 255.0)

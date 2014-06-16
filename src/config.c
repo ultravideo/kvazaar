@@ -87,6 +87,7 @@ int config_init(config *cfg)
   cfg->tiles_height_split          = NULL;
   
   cfg->wpp = 0;
+  cfg->owf = 0;
   cfg->slice_count = 1;
   cfg->slice_addresses_in_ts = MALLOC(int32_t, 1);
   cfg->slice_addresses_in_ts[0] = 0;
@@ -412,6 +413,13 @@ static int config_parse(config *cfg, const char *name, const char *value)
     error = !parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
   else if OPT("wpp")
     cfg->wpp = atobool(value);
+  else if OPT("owf") {
+    cfg->owf = atoi(value);
+    if (cfg->owf < 0) {
+      fprintf(stderr, "--owf parameter smaller than 0, set to 0\n");
+      cfg->owf = 0;
+    }
+  }
   else if OPT("slice-addresses")
     error = !parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
   else if OPT("threads")
@@ -465,6 +473,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "tiles-width-split",  required_argument, NULL, 0 },
     { "tiles-height-split", required_argument, NULL, 0 },
     { "wpp",                      no_argument, NULL, 0 },
+    { "owf",                required_argument, NULL, 0 },
     { "slice-addresses",    required_argument, NULL, 0 },
     { "threads",            required_argument, NULL, 0 },
     {0, 0, 0, 0}

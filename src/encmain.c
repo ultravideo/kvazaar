@@ -38,6 +38,7 @@
 #include "checkpoint.h"
 #include "global.h"
 #include "config.h"
+#include "threads.h"
 #include "encoder.h"
 #include "cabac.h"
 #include "image.h"
@@ -58,10 +59,15 @@ int main(int argc, char *argv[])
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   encoder_control encoder;
   double psnr[3] = { 0.0, 0.0, 0.0 };
-  uint64_t curpos  = 0;
-  uint64_t lastpos = 0;
+  uint32_t stat_frames = 0;
+  uint64_t curpos = 0;
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
+  clock_t encoding_start_cpu_time;
+  CLOCK_T encoding_start_real_time;
+  
+  clock_t encoding_end_cpu_time;
+  CLOCK_T encoding_end_real_time;
 
   // Stdin and stdout need to be binary for input and output to work.
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -158,6 +164,7 @@ int main(int argc, char *argv[])
             "\n"
             "  Wpp:\n"
             "          --wpp:                   Enable wavefront parallel processing\n"
+            "          --owf <integer>:         Enable parallel processing of multiple frames\n"
             "\n"
             "  Slices:\n"
             "          --slice-addresses <string>|u<int>: \n"
@@ -299,7 +306,8 @@ int main(int argc, char *argv[])
       encoder_state_match_children_of_previous_frame(&encoder_states[i]);
     }
     
-    encoder_states[current_encoder_state].global->frame    = 0;
+    //Initial frame
+    encoder_states[current_encoder_state].global->frame    = -1;
 
     // Only the code that handles conformance window coding needs to know
     // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
@@ -308,12 +316,12 @@ int main(int argc, char *argv[])
     // The real fix would be: never go dig in cfg
     //cfg->width = encoder.in.width;
     //cfg->height = encoder.in.height;
+    
+    GET_TIME(&encoding_start_real_time);
+    encoding_start_cpu_time = clock();
 
     // Start coding cycle while data on input and not on the last frame
-    while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames) {
-      int32_t diff;
-      double temp_psnr[3];
-
+    while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames - 1) {
       // Skip '--seek' frames before input.
       // This block can be moved outside this while loop when there is a
       // mechanism to skip the while loop on error.
@@ -335,7 +343,15 @@ int main(int argc, char *argv[])
           fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
           break;
         }
+        GET_TIME(&encoding_start_real_time);
+        encoding_start_cpu_time = clock();
       }
+      
+      //Compute stats
+      encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr);
+      
+      //Clear encoder
+      encoder_next_frame(&encoder_states[current_encoder_state]);
       
       CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
@@ -343,66 +359,50 @@ int main(int argc, char *argv[])
       if (!read_one_frame(input, &encoder_states[current_encoder_state])) {
         if (!feof(input))
           fprintf(stderr, "Failed to read a frame %d\n", encoder_states[current_encoder_state].global->frame);
+        
+        //Ignore this frame, which is not valid...
+        encoder_states[current_encoder_state].stats_done = 1;
         break;
       }
 
       // The actual coding happens here, after this function we have a coded frame
       encode_one_frame(&encoder_states[current_encoder_state]);
       
-      
-
-      if (cfg->debug != NULL) {
-        const videoframe * const frame = encoder_states[current_encoder_state].tile->frame;
-        // Write reconstructed frame out.
-        // Use conformance-window dimensions instead of internal ones.
-        const int width = frame->width;
-        const int out_width = encoder.in.real_width;
-        const int out_height = encoder.in.real_height;
-        int y;
-        const pixel *y_rec = frame->rec->y;
-        const pixel *u_rec = frame->rec->u;
-        const pixel *v_rec = frame->rec->v;
-
-        for (y = 0; y < out_height; ++y) {
-          fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
-        }
-        for (y = 0; y < out_height / 2; ++y) {
-          fwrite(&u_rec[y * width / 2], sizeof(*u_rec), out_width / 2, recout);
-        }
-        for (y = 0; y < out_height / 2; ++y) {
-          fwrite(&v_rec[y * width / 2], sizeof(*v_rec), out_width / 2, recout);
-        }
-      }
-
-      // Calculate the bytes pushed to output for this frame
-      fgetpos(output,(fpos_t*)&curpos);
-      diff = (int32_t)(curpos-lastpos);
-      lastpos = curpos;
-
-      // PSNR calculations
-      videoframe_compute_psnr(encoder_states[current_encoder_state].tile->frame, temp_psnr);
-      
-      fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_states[current_encoder_state].global->frame,
-            "BPI"[encoder_states[current_encoder_state].global->slicetype%3], diff<<3,
-            temp_psnr[0], temp_psnr[1], temp_psnr[2]);
-
-      // Increment total PSNR
-      psnr[0] += temp_psnr[0];
-      psnr[1] += temp_psnr[1];
-      psnr[2] += temp_psnr[2];
-
-
-      // TODO: add more than one reference
-
-      encoder_next_frame(&encoder_states[current_encoder_state]);
+      //Switch to the next encoder
+      current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
     }
+    
+    //Compute stats for the remaining encoders
+    {
+      int first_enc = current_encoder_state;
+      do {
+        current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
+        encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr);
+      } while (current_encoder_state != first_enc);
+    }
+    
+    GET_TIME(&encoding_end_real_time);
+    encoding_end_cpu_time = clock();
+    
+    threadqueue_flush(encoder.threadqueue);
+    
+    
     // Coding finished
     fgetpos(output,(fpos_t*)&curpos);
 
     // Print statistics of the coding
-    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", encoder_states[current_encoder_state].global->frame, (long long unsigned int) curpos<<3,
-          psnr[0] / encoder_states[current_encoder_state].global->frame, psnr[1] / encoder_states[current_encoder_state].global->frame, psnr[2] / encoder_states[current_encoder_state].global->frame);
-    fprintf(stderr, " Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
+    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", stat_frames, (long long unsigned int) curpos<<3,
+          psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
+    fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
+    
+    {
+      double encoding_time = ((double)(encoding_end_cpu_time - encoding_start_cpu_time)) / CLOCKS_PER_SEC;
+      double wall_time = CLOCK_T_AS_DOUBLE(encoding_end_real_time) - CLOCK_T_AS_DOUBLE(encoding_start_real_time);
+      fprintf(stderr, " Encoding time: %.3lf s.\n", encoding_time);
+      fprintf(stderr, " Encoding wall time: %.3lf s.\n", wall_time);
+      fprintf(stderr, " Encoding CPU usage: %.2lf%%\n", encoding_time/wall_time*100.f);
+      fprintf(stderr, " FPS: %.2lf\n", ((double)stat_frames)/wall_time);
+    }
 
     fclose(input);
     fclose(output);

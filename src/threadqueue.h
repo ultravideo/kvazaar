@@ -71,6 +71,8 @@ typedef struct {
 
   int stop; //=>1: threads should stop asap
   
+  int fifo;
+  
   threadqueue_job **queue;
   unsigned int queue_start;
   unsigned int queue_count;
@@ -93,8 +95,8 @@ typedef struct {
 #endif
 } threadqueue_queue;
 
-//Init a threadqueue
-int threadqueue_init(threadqueue_queue * threadqueue, int thread_count);
+//Init a threadqueue (if fifo, then behave as a FIFO with dependencies, otherwise as a LIFO with dependencies)
+int threadqueue_init(threadqueue_queue * threadqueue, int thread_count, int fifo);
 
 //Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run threadqueue_job_unwait_job in order to have it run
 threadqueue_job * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
