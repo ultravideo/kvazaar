@@ -402,6 +402,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding time: %.3lf s.\n", encoding_time);
       fprintf(stderr, " Encoding wall time: %.3lf s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2lf%%\n", encoding_time/wall_time*100.f);
+      fprintf(stderr, " FPS: %.2lf\n", ((double)stat_frames)/wall_time);
     }
 
     fclose(input);
