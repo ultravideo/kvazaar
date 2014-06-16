@@ -100,9 +100,9 @@ int strategyselector_register(void * const opaque, const char * const type, cons
     new_strategy->priority = priority;
     new_strategy->fptr = fptr;
   }
-#ifdef _DEBUG
+#ifdef DEBUG_STRATEGYSELECTOR
   fprintf(stderr, "Registered strategy %s:%s with priority %d (%p)\n", type, strategy_name, priority, fptr);
-#endif //_DEBUG
+#endif //DEBUG_STRATEGYSELECTOR
   
   return 1;
 }
@@ -139,7 +139,7 @@ static void* strategyselector_choose_for(const strategy_list * const strategies,
     return NULL;
   }
 
-#ifdef _DEBUG
+#ifdef DEBUG_STRATEGYSELECTOR
   fprintf(stderr, "Choosing strategy for %s:\n", strategy_type);
   for (i=0; i < strategies->count; ++i) {
     if (strcmp(strategies->strategies[i].type, strategy_type) == 0) {
@@ -150,7 +150,7 @@ static void* strategyselector_choose_for(const strategy_list * const strategies,
       }
     }
   }
-#endif //_DEBUG
+#endif //DEBUG_STRATEGYSELECTOR
   
   
   if (max_priority_i == -1) {
