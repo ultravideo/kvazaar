@@ -342,6 +342,12 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
       char* job_description = NULL;
 #endif
       encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      if (encoder_state->previous_encoder_state != encoder_state && encoder_state->previous_encoder_state->tqj_recon_done && !encoder_state->global->is_radl_frame) {
+        //Add dependencies to the previous frame
+        //FIXME is this correct? (we may need to have also the next line?)
+        threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->previous_encoder_state->tqj_recon_done);
+        //Do we also need a dep for pixels below? I don't think so?
+      }
       if (encoder_state->tile->wf_jobs[lcu->id]) {
         if (lcu->position.x > 0) {
           // Wait for the LCU on the left.
@@ -512,7 +518,14 @@ static void encoder_state_encode(encoder_state * const main_state) {
 #else
           char* job_description = NULL;
 #endif
-          main_state->children[i].tqj_recon_done = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 0, job_description);
+          main_state->children[i].tqj_recon_done = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
+          if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_radl_frame) {
+            //Add dependencies to the previous frame
+            //FIXME is this correct?
+            threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);
+            //Do we also need a dep for pixels below? I don't think so?
+          }
+          threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
