@@ -83,10 +83,6 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
-    <ClCompile>
-      <DisableSpecificWarnings>
-      </DisableSpecificWarnings>
-    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>
