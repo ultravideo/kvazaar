@@ -120,6 +120,9 @@
     <ClCompile Include="..\..\src\strategies\strategies-picture.c">
       <Filter>Source Files\strategies</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\picture\picture-avx.c">
+      <Filter>Source Files\strategies\picture</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -236,9 +239,18 @@
     <ClInclude Include="..\..\src\strategies\nal\nal-generic.c">
       <Filter>Source Files\strategies\nal</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\x86\picture_x86.h">
+      <Filter>Header Files\x86</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\x86\cpu.asm">
+      <Filter>Source Files\x86</Filter>
+    </YASM>
+    <YASM Include="..\..\src\x86\picture_x86.asm">
+      <Filter>Source Files\x86</Filter>
+    </YASM>
+    <YASM Include="..\..\src\x86\x86inc.asm">
       <Filter>Source Files\x86</Filter>
     </YASM>
   </ItemGroup>
