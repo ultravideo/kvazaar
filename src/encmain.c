@@ -321,7 +321,7 @@ int main(int argc, char *argv[])
     encoding_start_cpu_time = clock();
 
     // Start coding cycle while data on input and not on the last frame
-    while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames) {
+    while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames - 1) {
       // Skip '--seek' frames before input.
       // This block can be moved outside this while loop when there is a
       // mechanism to skip the while loop on error.
@@ -359,16 +359,15 @@ int main(int argc, char *argv[])
       if (!read_one_frame(input, &encoder_states[current_encoder_state])) {
         if (!feof(input))
           fprintf(stderr, "Failed to read a frame %d\n", encoder_states[current_encoder_state].global->frame);
+        
+        //Ignore this frame, which is not valid...
+        encoder_states[current_encoder_state].stats_done = 1;
         break;
       }
 
       // The actual coding happens here, after this function we have a coded frame
       encode_one_frame(&encoder_states[current_encoder_state]);
       
-      //Stop otherwise we will end up doing too much work
-      if (encoder_states[current_encoder_state].global->frame >= cfg->frames - 1) {
-        break;
-      }
       //Switch to the next encoder
       current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
     }
