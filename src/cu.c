@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "cu.h"
+#include "threads.h"
 
 
 void coefficients_blit(const coefficient * const orig, coefficient * const dst,
@@ -51,4 +52,26 @@ unsigned coefficients_calc_abs(const coefficient *const buf, const int buf_strid
   }
 
   return sum;
+}
+
+cu_array * cu_array_alloc(const int width_in_scu, const int height_in_scu) {
+  unsigned cu_array_size = height_in_scu * width_in_scu;
+  cu_array *cua;
+  cua = MALLOC(cu_array, 1);
+  cua->data = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
+  cua->refcount = 1;
+  memset(cua->data, 0, sizeof(cu_info) * cu_array_size);
+  return cua;
+}
+
+int cu_array_free(cu_array * const cua)
+{
+  int32_t new_refcount = ATOMIC_DEC(&(cua->refcount));
+  //Still we have some references, do nothing
+  if (new_refcount > 0) return 1;
+  
+  FREE_POINTER(cua->data);
+  free(cua);
+
+  return 1;
 }

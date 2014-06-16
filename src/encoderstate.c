@@ -791,6 +791,13 @@ void encoder_next_frame(encoder_state *encoder_state) {
     
     encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
     videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
+    
+    image_list_copy_contents(encoder_state->global->ref, encoder_state->previous_encoder_state->global->ref);
+    image_list_add(encoder_state->global->ref, encoder_state->previous_encoder_state->tile->frame->rec, encoder_state->previous_encoder_state->tile->frame->cu_array);
+    // Remove the ref pics in excess
+    while (encoder_state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
+      image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
+    }
     return; //FIXME reference frames
   }
 

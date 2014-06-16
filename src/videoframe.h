@@ -47,7 +47,7 @@ typedef struct videoframe
   int32_t height_in_lcu;  //!< \brief Picture width in number of LCU's.
   int32_t width_in_lcu;   //!< \brief Picture height in number of LCU's.
 
-  cu_info* cu_array;     //!< \brief Info for each CU at each depth.
+  cu_array* cu_array;     //!< \brief Info for each CU at each depth.
   struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count

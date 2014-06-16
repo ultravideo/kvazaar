@@ -32,8 +32,8 @@
  */
 typedef struct
 {
-  struct image** images;          //!< \brief Pointer to array of picture pointers.
-  cu_info** cu_arrays;
+  struct image* *images;          //!< \brief Pointer to array of picture pointers.
+  cu_array* *cu_arrays;
   uint32_t size;       //!< \brief Array size.
   uint32_t used_size;
 } image_list;
@@ -41,7 +41,7 @@ typedef struct
 image_list * image_list_alloc(int size);
 int image_list_resize(image_list *list, unsigned size);
 int image_list_destroy(image_list *list);
-int image_list_add(image_list *list, image *im, cu_info* cu_array);
+int image_list_add(image_list *list, image *im, cu_array* cua);
 int image_list_rem(image_list *list, unsigned n);
 
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };

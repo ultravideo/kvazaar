@@ -398,7 +398,7 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 
   for (ref_idx = 0; ref_idx < encoder_state->global->ref->used_size; ref_idx++) {
     image *ref_image = encoder_state->global->ref->images[ref_idx];
-    const cu_info *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx][x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
+    const cu_info *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx]->data[x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d orig, mv, mvd;
