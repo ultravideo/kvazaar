@@ -71,6 +71,7 @@ typedef struct
   int32_t* tiles_height_split;      /*!< \brief tiles split y coordinates (dimension: tiles_height_count) */
   
   int wpp;
+  int owf;
   
   int32_t slice_count;
   int32_t* slice_addresses_in_ts;

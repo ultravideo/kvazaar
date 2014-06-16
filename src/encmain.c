@@ -158,6 +158,7 @@ int main(int argc, char *argv[])
             "\n"
             "  Wpp:\n"
             "          --wpp:                   Enable wavefront parallel processing\n"
+            "          --owf <integer>:         Enable parallel processing of multiple frames\n"
             "\n"
             "  Slices:\n"
             "          --slice-addresses <string>|u<int>: \n"

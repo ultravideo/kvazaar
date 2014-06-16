@@ -52,8 +52,7 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   
   encoder->threadqueue = MALLOC(threadqueue_queue, 1);
   
-  //FIXME use cfg
-  encoder->owf = 1;
+  encoder->owf = cfg->owf;
     
   //Init threadqueue
   if (!encoder->threadqueue || !threadqueue_init(encoder->threadqueue, cfg->threads, encoder->owf > 0)) {
