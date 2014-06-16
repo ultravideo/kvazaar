@@ -38,6 +38,7 @@
 #include "checkpoint.h"
 #include "global.h"
 #include "config.h"
+#include "threads.h"
 #include "encoder.h"
 #include "cabac.h"
 #include "image.h"
@@ -62,6 +63,11 @@ int main(int argc, char *argv[])
   uint64_t curpos = 0;
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
+  clock_t encoding_start_cpu_time;
+  CLOCK_T encoding_start_real_time;
+  
+  clock_t encoding_end_cpu_time;
+  CLOCK_T encoding_end_real_time;
 
   // Stdin and stdout need to be binary for input and output to work.
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -310,6 +316,9 @@ int main(int argc, char *argv[])
     // The real fix would be: never go dig in cfg
     //cfg->width = encoder.in.width;
     //cfg->height = encoder.in.height;
+    
+    GET_TIME(&encoding_start_real_time);
+    encoding_start_cpu_time = clock();
 
     // Start coding cycle while data on input and not on the last frame
     while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames) {
@@ -334,6 +343,8 @@ int main(int argc, char *argv[])
           fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
           break;
         }
+        GET_TIME(&encoding_start_real_time);
+        encoding_start_cpu_time = clock();
       }
       
       //Compute stats
@@ -354,11 +365,6 @@ int main(int argc, char *argv[])
       // The actual coding happens here, after this function we have a coded frame
       encode_one_frame(&encoder_states[current_encoder_state]);
       
-
-
-      //FIXME Stats are completely broken!!!
-
-      
       //Stop otherwise we will end up doing too much work
       if (encoder_states[current_encoder_state].global->frame >= cfg->frames - 1) {
         break;
@@ -376,6 +382,9 @@ int main(int argc, char *argv[])
       } while (current_encoder_state != first_enc);
     }
     
+    GET_TIME(&encoding_end_real_time);
+    encoding_end_cpu_time = clock();
+    
     threadqueue_flush(encoder.threadqueue);
     
     
@@ -385,7 +394,15 @@ int main(int argc, char *argv[])
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", stat_frames, (long long unsigned int) curpos<<3,
           psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
-    fprintf(stderr, " Total time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
+    fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
+    
+    {
+      double encoding_time = ((double)(encoding_end_cpu_time - encoding_start_cpu_time)) / CLOCKS_PER_SEC;
+      double wall_time = CLOCK_T_AS_DOUBLE(encoding_end_real_time) - CLOCK_T_AS_DOUBLE(encoding_start_real_time);
+      fprintf(stderr, " Encoding time: %.3lf s.\n", encoding_time);
+      fprintf(stderr, " Encoding wall time: %.3lf s.\n", wall_time);
+      fprintf(stderr, " Encoding CPU usage: %.2lf%%\n", encoding_time/wall_time*100.f);
+    }
 
     fclose(input);
     fclose(output);
