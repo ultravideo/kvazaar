@@ -44,6 +44,8 @@ int image_list_destroy(image_list *list);
 int image_list_add(image_list *list, image *im, cu_array* cua);
 int image_list_rem(image_list *list, unsigned n);
 
+int image_list_copy_contents(image_list *target, image_list *source);
+
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
 
 #endif //PICTURE_LIST_H_

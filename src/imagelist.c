@@ -201,3 +201,15 @@ int image_list_rem(image_list * const list, const unsigned n)
 
   return 1;
 }
+
+int image_list_copy_contents(image_list *target, image_list *source) {
+  int i;
+  while (target->used_size > 0) {
+    image_list_rem(target, 0);
+  }
+  
+  for (i = source->used_size - 1; i >= 0; --i) {
+    image_list_add(target, source->images[i], source->cu_arrays[i]);
+  }
+  return 1;
+}
