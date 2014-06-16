@@ -854,10 +854,13 @@ void encoder_next_frame(encoder_state *encoder_state) {
   threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
   
   encoder_state->stats_done = 0;
-  
+
   if (encoder_state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
     encoder_state->global->frame = 0;
+    encoder_state->global->poc = 0;
+    assert(!encoder_state->tile->frame->rec);
+    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
     return;
   }
   
@@ -866,7 +869,16 @@ void encoder_next_frame(encoder_state *encoder_state) {
     encoder_state->global->frame = encoder_state->previous_encoder_state->global->frame + 1;
     encoder_state->global->poc = encoder_state->previous_encoder_state->global->poc + 1;
     
+    image_free(encoder_state->tile->frame->rec);
+    cu_array_free(encoder_state->tile->frame->cu_array);
+    
     encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+    {
+      // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
+      unsigned height_in_scu = encoder_state->tile->frame->height_in_lcu << MAX_DEPTH;
+      unsigned width_in_scu = encoder_state->tile->frame->width_in_lcu << MAX_DEPTH;
+      encoder_state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
+    }
     videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
     
     image_list_copy_contents(encoder_state->global->ref, encoder_state->previous_encoder_state->global->ref);

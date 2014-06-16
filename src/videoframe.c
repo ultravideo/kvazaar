@@ -77,7 +77,7 @@ int videoframe_free(videoframe * const frame)
   //image_free(frame->source);
   //image_free(frame->rec);
 
-  FREE_POINTER(frame->cu_array);
+  cu_array_free(frame->cu_array);
 
   FREE_POINTER(frame->coeff_y);
   FREE_POINTER(frame->coeff_u);

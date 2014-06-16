@@ -77,6 +77,9 @@ image *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
  */
 int image_free(image * const im)
 {
+  //Nothing to do
+  if (!im) return 1;
+  
   //Either we are the base image, or we should have no references
   assert(im->base_image == im || im->refcount == 0);
   

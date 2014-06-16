@@ -66,7 +66,10 @@ cu_array * cu_array_alloc(const int width_in_scu, const int height_in_scu) {
 
 int cu_array_free(cu_array * const cua)
 {
-  int32_t new_refcount = ATOMIC_DEC(&(cua->refcount));
+  int32_t new_refcount;
+  if (!cua) return 1;
+  
+  new_refcount = ATOMIC_DEC(&(cua->refcount));
   //Still we have some references, do nothing
   if (new_refcount > 0) return 1;
   
