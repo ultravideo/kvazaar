@@ -75,15 +75,6 @@ unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y
                         int block_width, int block_height);
 
 
-typedef unsigned (*cost_16bit_nxn_func)(const pixel *block1, const pixel *block2);
-
-
-cost_16bit_nxn_func get_satd_16bit_nxn_func(unsigned n);
-cost_16bit_nxn_func get_sad_16bit_nxn_func(unsigned n);
-
-unsigned pixels_satd_16bit_nxn(pixel *block1, pixel *block2, unsigned n);
-unsigned pixels_sad_16bit_nxn(pixel *block1, pixel *block2, unsigned n);
-
 unsigned pixels_calc_ssd(const pixel *const ref, const pixel *const rec,
                   const int ref_stride, const int rec_stride,
                   const int width);

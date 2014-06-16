@@ -19,6 +19,10 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#if defined(_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
+# define DEBUG_STRATEGYSELECTOR
+#endif
+
 //Hardware data (abstraction of defines). Extend for other compilers
 
 #if defined(_M_IX86) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
@@ -137,8 +141,8 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 #include "strategies/strategies-picture.h"
 
 static const strategy_to_select strategies_to_select[] = {
-  STRATEGIES_NAL_EXPORTS,
-  STRATEGIES_PICTURE_EXPORTS,
+  STRATEGIES_NAL_EXPORTS
+  STRATEGIES_PICTURE_EXPORTS
   {NULL, NULL},
 };
 

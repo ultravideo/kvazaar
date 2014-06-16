@@ -39,6 +39,7 @@ extern array_checksum_func array_checksum;
 int strategy_register_nal(void* opaque);
 
 
-#define STRATEGIES_NAL_EXPORTS {"array_checksum", (void**) &array_checksum}
+#define STRATEGIES_NAL_EXPORTS \
+  {"array_checksum", (void**) &array_checksum},
 
 #endif //STRATEGIES_NAL_H_

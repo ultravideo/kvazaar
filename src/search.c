@@ -31,6 +31,7 @@
 #include "config.h"
 #include "bitstream.h"
 #include "image.h"
+#include "strategies/strategies-picture.h"
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"
@@ -825,7 +826,7 @@ static void search_intra_rough(encoder_state * const encoder_state,
                                int8_t modes[35], uint32_t costs[35])
 {
   int16_t mode;
-  cost_16bit_nxn_func cost_func = get_sad_16bit_nxn_func(width);
+  cost_pixel_nxn_func * cost_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
   pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
