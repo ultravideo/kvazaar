@@ -72,7 +72,7 @@ void yuv_t_free(yuv_t * yuv);
 
 //Algorithms
 unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height);
+                        int block_width, int block_height, int max_lcu_below);
 
 
 typedef unsigned (*cost_16bit_nxn_func)(const pixel *block1, const pixel *block2);
