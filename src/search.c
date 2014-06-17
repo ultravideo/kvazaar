@@ -873,10 +873,17 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
   unsigned min_cost = UINT_MAX;
   unsigned max_cost = 0;
+  int offset = 8;
+
+  if (width == 4) {
+    offset = 2;
+  } else if (width == 8) {
+    offset = 4;
+  }
 
   int8_t modes_selected = 0;
   // Search 2 vertical and 3 diagonal modes.
-  for (int mode = 2; mode <= 34; mode += 8) {
+  for (int mode = 2; mode <= 34; mode += offset) {
     intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
     costs[modes_selected] = cost_func(pred, orig_block);
     modes[modes_selected] = mode;
@@ -891,8 +898,9 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   // current best mode. Unless all costs are the same in which let's not
   // bother.
   if (min_cost != max_cost) {
-    int offset = 4;
-    while (offset > 0) {
+    while (offset > 1) {
+      offset >>= 1;
+
       sort_modes(modes, costs, modes_selected);
 
       int8_t mode = modes[0] - offset;
@@ -910,8 +918,6 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
         modes[modes_selected] = mode;
         ++modes_selected;
       }
-
-      offset >>= 1;
     }
   }
 
