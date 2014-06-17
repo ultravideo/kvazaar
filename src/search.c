@@ -844,7 +844,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
                                int8_t modes[35], uint32_t costs[35])
 {
   int16_t mode;
-  int8_t modes_selected = 0;
+  
   cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
@@ -871,56 +871,65 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     intra_filter(ref[1], recstride, width, 0);
   }
 
-  // Planar and DC first
-  for (mode = 0; mode < 2; mode++) {
-    costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-                                                       recstride, orig_block, intra_preds, mode);
+
+  int8_t modes_selected = 0;
+  // Search 2 vertical and 3 diagonal modes.
+  for (int mode = 2; mode <= 34; mode += 8) {
+    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+    costs[modes_selected] = cost_func(pred, orig_block);
     modes[modes_selected] = mode;
-    modes_selected++;
+    ++modes_selected;
+  }
+  
+  // Do a halving search to find the best mode, always centering on the
+  // current best mode.
+  int offset = 4;
+  while (offset > 0) {
+    sort_modes(modes, costs, modes_selected);
+
+    int8_t mode = modes[0] - offset;
+    if (mode >= 2) {
+      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+      costs[modes_selected] = cost_func(pred, orig_block);
+      modes[modes_selected] = mode;
+      ++modes_selected;
+    }
+
+    mode = modes[0] + offset;
+    if (mode <= 34) {
+      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+      costs[modes_selected] = cost_func(pred, orig_block);
+      modes[modes_selected] = mode;
+      ++modes_selected;
+    }
+
+    offset >>= 1;
   }
 
-  // Directional from left
-  costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-                                                     recstride, orig_block, intra_preds, 10);
-  modes[modes_selected] = 10;
-  modes_selected++;
-
-  // Directional from top
-  costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-                                                     recstride, orig_block, intra_preds, 26);
-  modes[modes_selected] = 26;
-  modes_selected++;
-
-  sort_modes(modes, costs, 4);
-
-  // Only left border modes
-  if (modes[0] == 10) {
-    for (mode = 2; mode < 18; mode++) {
-      if (mode == 10) continue;
-      costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-        recstride, orig_block, intra_preds, mode);
-      modes[modes_selected] = mode;
-      modes_selected++;
+  // Add predicted modes, even if they weren't selected based on search.
+  for (int8_t pred_i = 0; pred_i < 3; ++pred_i) {
+    bool has_mode = false;
+    for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
+      if (modes[mode_i] == intra_preds[pred_i]) {
+        has_mode = true;
+        break;
+      }
     }
-  // Only top-border modes
-  } else if (modes[0] == 26) {    
-    for (mode = 18; mode < 35; mode++) {
-      if (mode == 26) continue;
-      costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-        recstride, orig_block, intra_preds, mode);
+
+    if (!has_mode) {
+      int8_t mode = intra_preds[pred_i];
+      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+      costs[modes_selected] = cost_func(pred, orig_block);
       modes[modes_selected] = mode;
-      modes_selected++;
+      ++modes_selected;
     }
-  // When DC or Planar, search all modes
-  } else {
-    
-    for (mode = 2; mode < 35; mode++) {
-      if (mode == 26 || mode == 10) continue;
-      costs[modes_selected] = search_intra_get_mode_cost(encoder_state, ref, cost_func, pred, width,
-        recstride, orig_block, intra_preds, mode);
-      modes[modes_selected] = mode;
-      modes_selected++;
-    }
+  }
+
+  // Add prediction mode coding cost as the last thing. We don't want this
+  // affecting the halving search.
+  int lambda_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5);
+  for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
+    costs[mode_i] += lambda_cost * intra_pred_ratecost(modes[mode_i], intra_preds);
   }
 
   sort_modes(modes, costs, modes_selected);
