@@ -823,19 +823,6 @@ static void sort_modes(int8_t *modes, uint32_t *costs, int length)
   }
 }
 
-static uint32_t search_intra_get_mode_cost(encoder_state * const encoder_state, pixel *ref[2], cost_pixel_nxn_func *cost_func,
-                                           pixel *pred, int width, int16_t recstride, pixel *orig_block,
-                                           int8_t *intra_preds, int8_t mode)
-{
-  uint32_t sad = 0;
-  uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
-  intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-
-  sad = cost_func(pred, orig_block);
-  sad += mode_cost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
-
-  return sad;
-}
 
 static int8_t search_intra_rough(encoder_state * const encoder_state, 
                                  pixel *orig, int32_t origstride,
@@ -843,8 +830,6 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
                                  int width, int8_t *intra_preds,
                                  int8_t modes[35], uint32_t costs[35])
 {
-  int16_t mode;
-  
   cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
@@ -1074,7 +1059,7 @@ static int search_cu_intra(encoder_state * const encoder_state,
                                                 ref_pixels, LCU_WIDTH,
                                                 cu_in_rec_buffer, cu_width * 2 + 8,
                                                 cu_width, candidate_modes,
-                                                modes, costs, &number_of_modes);
+                                                modes, costs);
 
     if (encoder_state->encoder_control->rdo == 2) {
       int num_modes_to_check = MIN(number_of_modes, (cu_width <= 8) ? 8 : 3);
