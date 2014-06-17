@@ -78,6 +78,7 @@ typedef struct encoder_control
   int8_t sao_enable;     // \brief Flag to enable sample adaptive offset filter
   int8_t rdoq_enable;    // \brief Whether RDOQ is enabled or not.
   int8_t rdo;            // \brief RDO level
+  int8_t full_intra_search; // \brief Whether to skip intra modes during search.
   int8_t trskip_enable;    // \brief Flag to enable transform skipping (4x4 intra)
   int8_t beta_offset_div2; // \brief (deblocking) beta offset (div 2), range -6...6
   int8_t tc_offset_div2;   // \brief (deblocking)tc offset (div 2), range -6...6

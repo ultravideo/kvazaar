@@ -823,15 +823,29 @@ static void sort_modes(int8_t *modes, uint32_t *costs, int length)
   }
 }
 
+static uint32_t search_intra_get_mode_cost(encoder_state * const encoder_state, pixel *ref[2], cost_pixel_nxn_func *cost_func,
+                                           pixel *pred, int width, int16_t recstride, pixel *orig_block,
+                                           int8_t *intra_preds, int8_t mode)
+{
+  uint32_t sad = 0;
+  uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
+  intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
 
-static void search_intra_rough(encoder_state * const encoder_state, 
-                               pixel *orig, int32_t origstride,
-                               pixel *rec, int16_t recstride,
-                               int width, int8_t *intra_preds,
-                               int8_t modes[35], uint32_t costs[35])
+  sad = cost_func(pred, orig_block);
+  sad += mode_cost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
+
+  return sad;
+}
+
+static int8_t search_intra_rough(encoder_state * const encoder_state, 
+                                 pixel *orig, int32_t origstride,
+                                 pixel *rec, int16_t recstride,
+                                 int width, int8_t *intra_preds,
+                                 int8_t modes[35], uint32_t costs[35])
 {
   int16_t mode;
-  cost_pixel_nxn_func * cost_func = pixels_get_sad_func(width);
+  
+  cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
   pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
@@ -856,20 +870,94 @@ static void search_intra_rough(encoder_state * const encoder_state,
     }
     intra_filter(ref[1], recstride, width, 0);
   }
-
-  // Try all modes and select the best one.
-  for (mode = 0; mode < 35; mode++) {
-    uint32_t sad = 0;
-    uint32_t mode_cost = intra_pred_ratecost(mode, intra_preds);
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-
-    sad = cost_func(pred, orig_block);
-    sad += mode_cost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
-    costs[mode] = sad;
-    modes[mode] = mode;
+  
+  int8_t modes_selected = 0;
+  unsigned min_cost = UINT_MAX;
+  unsigned max_cost = 0;
+  
+  // Initial offset decides how many modes are tried before moving on to the
+  // recursive search.
+  int offset;
+  if (encoder_state->encoder_control->full_intra_search) {
+    offset = 1;
+  } else if (width == 4) {
+    offset = 2;
+  } else if (width == 8) {
+    offset = 4;
+  } else {
+    offset = 8;
   }
 
-  sort_modes(modes, costs, 35);
+  // Calculate SAD for evenly spaced modes to select the starting point for 
+  // the recursive search.
+  for (int mode = 2; mode <= 34; mode += offset) {
+    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+    costs[modes_selected] = cost_func(pred, orig_block);
+    modes[modes_selected] = mode;
+
+    min_cost = MIN(min_cost, costs[modes_selected]);
+    max_cost = MAX(max_cost, costs[modes_selected]);
+
+    ++modes_selected;
+  }
+  
+  // Skip recursive search if all modes have the same cost.
+  if (min_cost != max_cost) {
+    // Do a recursive search to find the best mode, always centering on the
+    // current best mode.
+    while (offset > 1) {
+      offset >>= 1;
+      sort_modes(modes, costs, modes_selected);
+
+      int8_t mode = modes[0] - offset;
+      if (mode >= 2) {
+        intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+        costs[modes_selected] = cost_func(pred, orig_block);
+        modes[modes_selected] = mode;
+        ++modes_selected;
+      }
+
+      mode = modes[0] + offset;
+      if (mode <= 34) {
+        intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+        costs[modes_selected] = cost_func(pred, orig_block);
+        modes[modes_selected] = mode;
+        ++modes_selected;
+      }
+    }
+  }
+
+  int8_t add_modes[5] = {intra_preds[0], intra_preds[1], intra_preds[2], 0, 1};
+
+  // Add DC, planar and missing predicted modes.
+  for (int8_t pred_i = 0; pred_i < 5; ++pred_i) {
+    bool has_mode = false;
+    int8_t mode = add_modes[pred_i];
+
+    for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
+      if (modes[mode_i] == add_modes[pred_i]) {
+        has_mode = true;
+        break;
+      }
+    }
+
+    if (!has_mode) {
+      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+      costs[modes_selected] = cost_func(pred, orig_block);
+      modes[modes_selected] = mode;
+      ++modes_selected;
+    }
+  }
+
+  // Add prediction mode coding cost as the last thing. We don't want this
+  // affecting the halving search.
+  int lambda_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5);
+  for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
+    costs[mode_i] += lambda_cost * intra_pred_ratecost(modes[mode_i], intra_preds);
+  }
+
+  sort_modes(modes, costs, modes_selected);
+  return modes_selected;
 }
 
 
@@ -982,15 +1070,14 @@ static int search_cu_intra(encoder_state * const encoder_state,
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
     int8_t modes[35];
     uint32_t costs[35];
-    
-    search_intra_rough(encoder_state, 
-                       ref_pixels, LCU_WIDTH,
-                       cu_in_rec_buffer, cu_width * 2 + 8,
-                       cu_width, candidate_modes,
-                       modes, costs);
+    int8_t number_of_modes = search_intra_rough(encoder_state, 
+                                                ref_pixels, LCU_WIDTH,
+                                                cu_in_rec_buffer, cu_width * 2 + 8,
+                                                cu_width, candidate_modes,
+                                                modes, costs, &number_of_modes);
 
     if (encoder_state->encoder_control->rdo == 2) {
-      int num_modes_to_check = (cu_width <= 8) ? 8 : 3;
+      int num_modes_to_check = MIN(number_of_modes, (cu_width <= 8) ? 8 : 3);
       search_intra_rdo(encoder_state, 
                        ref_pixels, LCU_WIDTH,
                        cu_in_rec_buffer, cu_width * 2 + 8,
