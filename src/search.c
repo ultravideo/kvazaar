@@ -878,7 +878,9 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   // Initial offset decides how many modes are tried before moving on to the
   // recursive search.
   int offset;
-  if (width == 4) {
+  if (encoder_state->encoder_control->full_intra_search) {
+    offset = 1;
+  } else if (width == 4) {
     offset = 2;
   } else if (width == 8) {
     offset = 4;

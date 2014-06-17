@@ -120,6 +120,7 @@ int main(int argc, char *argv[])
             "                                     0: no RDO\n"
             "                                     1: estimated RDO\n"
             "                                     2: full RDO\n"
+            "          --full-intra-search    : Try all intra modes.\n"
             "          --no-transform-skip    : Disable transform skip\n"
             "          --aud                  : Use access unit delimiters\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
@@ -256,6 +257,7 @@ int main(int argc, char *argv[])
   // RDO
   encoder.rdoq_enable = (int8_t)encoder.cfg->rdoq_enable;
   encoder.rdo         = (int8_t)encoder.cfg->rdo;
+  encoder.full_intra_search = (int8_t)encoder.cfg->full_intra_search;
   // TR SKIP
   encoder.trskip_enable = (int8_t)encoder.cfg->trskip_enable;
   // VUI

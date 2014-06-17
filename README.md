@@ -35,6 +35,7 @@ meant to be user configurable later.
                                          0: no RDO
                                          1: estimated RDO
                                          2: full RDO
+              --full-intra-search    : Try all intra modes.
               --no-transform-skip    : Disable transform skip
               --aud                  : Use access unit delimiters
               --cqmfile <string>     : Custom Quantization Matrices from a file
