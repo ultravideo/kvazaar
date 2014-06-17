@@ -906,18 +906,21 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     offset >>= 1;
   }
 
-  // Add predicted modes, even if they weren't selected based on search.
-  for (int8_t pred_i = 0; pred_i < 3; ++pred_i) {
+  int8_t add_modes[5] = {intra_preds[0], intra_preds[1], intra_preds[2], 0, 1};
+
+  // Add DC, planar and missing predicted modes.
+  for (int8_t pred_i = 0; pred_i < 5; ++pred_i) {
     bool has_mode = false;
+    int8_t mode = add_modes[pred_i];
+
     for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-      if (modes[mode_i] == intra_preds[pred_i]) {
+      if (modes[mode_i] == add_modes[pred_i]) {
         has_mode = true;
         break;
       }
     }
 
     if (!has_mode) {
-      int8_t mode = intra_preds[pred_i];
       intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
       costs[modes_selected] = cost_func(pred, orig_block);
       modes[modes_selected] = mode;
