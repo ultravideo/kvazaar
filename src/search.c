@@ -871,6 +871,8 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     intra_filter(ref[1], recstride, width, 0);
   }
 
+  unsigned min_cost = UINT_MAX;
+  unsigned max_cost = 0;
 
   int8_t modes_selected = 0;
   // Search 2 vertical and 3 diagonal modes.
@@ -878,32 +880,39 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
     costs[modes_selected] = cost_func(pred, orig_block);
     modes[modes_selected] = mode;
+
+    min_cost = MIN(min_cost, costs[modes_selected]);
+    max_cost = MAX(max_cost, costs[modes_selected]);
+
     ++modes_selected;
   }
   
   // Do a halving search to find the best mode, always centering on the
-  // current best mode.
-  int offset = 4;
-  while (offset > 0) {
-    sort_modes(modes, costs, modes_selected);
+  // current best mode. Unless all costs are the same in which let's not
+  // bother.
+  if (min_cost != max_cost) {
+    int offset = 4;
+    while (offset > 0) {
+      sort_modes(modes, costs, modes_selected);
 
-    int8_t mode = modes[0] - offset;
-    if (mode >= 2) {
-      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-      costs[modes_selected] = cost_func(pred, orig_block);
-      modes[modes_selected] = mode;
-      ++modes_selected;
+      int8_t mode = modes[0] - offset;
+      if (mode >= 2) {
+        intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+        costs[modes_selected] = cost_func(pred, orig_block);
+        modes[modes_selected] = mode;
+        ++modes_selected;
+      }
+
+      mode = modes[0] + offset;
+      if (mode <= 34) {
+        intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+        costs[modes_selected] = cost_func(pred, orig_block);
+        modes[modes_selected] = mode;
+        ++modes_selected;
+      }
+
+      offset >>= 1;
     }
-
-    mode = modes[0] + offset;
-    if (mode <= 34) {
-      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-      costs[modes_selected] = cost_func(pred, orig_block);
-      modes[modes_selected] = mode;
-      ++modes_selected;
-    }
-
-    offset >>= 1;
   }
 
   int8_t add_modes[5] = {intra_preds[0], intra_preds[1], intra_preds[2], 0, 1};
