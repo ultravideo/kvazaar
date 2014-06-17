@@ -838,10 +838,10 @@ static uint32_t search_intra_get_mode_cost(encoder_state * const encoder_state, 
 }
 
 static int8_t search_intra_rough(encoder_state * const encoder_state, 
-                               pixel *orig, int32_t origstride,
-                               pixel *rec, int16_t recstride,
-                               int width, int8_t *intra_preds,
-                               int8_t modes[35], uint32_t costs[35])
+                                 pixel *orig, int32_t origstride,
+                                 pixel *rec, int16_t recstride,
+                                 int width, int8_t *intra_preds,
+                                 int8_t modes[35], uint32_t costs[35])
 {
   int16_t mode;
   
@@ -870,19 +870,24 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     }
     intra_filter(ref[1], recstride, width, 0);
   }
-
+  
+  int8_t modes_selected = 0;
   unsigned min_cost = UINT_MAX;
   unsigned max_cost = 0;
-  int offset = 8;
-
+  
+  // Initial offset decides how many modes are tried before moving on to the
+  // recursive search.
+  int offset;
   if (width == 4) {
     offset = 2;
   } else if (width == 8) {
     offset = 4;
+  } else {
+    offset = 8;
   }
 
-  int8_t modes_selected = 0;
-  // Search 2 vertical and 3 diagonal modes.
+  // Calculate SAD for evenly spaced modes to select the starting point for 
+  // the recursive search.
   for (int mode = 2; mode <= 34; mode += offset) {
     intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
     costs[modes_selected] = cost_func(pred, orig_block);
@@ -894,13 +899,12 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     ++modes_selected;
   }
   
-  // Do a halving search to find the best mode, always centering on the
-  // current best mode. Unless all costs are the same in which let's not
-  // bother.
+  // Skip recursive search if all modes have the same cost.
   if (min_cost != max_cost) {
+    // Do a recursive search to find the best mode, always centering on the
+    // current best mode.
     while (offset > 1) {
       offset >>= 1;
-
       sort_modes(modes, costs, modes_selected);
 
       int8_t mode = modes[0] - offset;
