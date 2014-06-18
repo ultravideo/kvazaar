@@ -256,12 +256,22 @@ static void set_hardware_flags() {
     if (ecx & (1<<BIT_SSE41)) g_hardware_flags.intel_flags.sse41 = 1;
     if (ecx & (1<<BIT_SSE42)) g_hardware_flags.intel_flags.sse42 = 1;
     
-    // Use _XCR_XFEATURE_ENABLED_MASK to check if _xgetbv intrinsic is
-    // supported by the compiler.
-#ifdef _XCR_XFEATURE_ENABLED_MASK
     // Check hardware and OS support for AVX.
     if (ecx & (1 << BIT_OSXSAVE)) {
-      uint64_t xcr0 = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+      uint64_t xcr0 = 0;
+      // Use _XCR_XFEATURE_ENABLED_MASK to check if _xgetbv intrinsic is
+      // supported by the compiler.
+#ifdef _XCR_XFEATURE_ENABLED_MASK
+      xcr0 = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
+#elif defined(__GNUC__)
+      uint32_t geax = 0;
+      // Apparently there are some older assemblers that don't support xgetbv,
+      // so we use the byte sequence for xgetbv just in case.
+      //__asm__("xgetbv" : "=a" (geax), "=d" (gedx) : "c" (0));
+      __asm__(".byte 0x0f, 0x01, 0xd0" : "=a" (geax) : "c" (0) : "edx");
+      // edx is spillover, but we don't care about those bits.
+      xcr0 = geax;
+#endif
       bool avx_support = ecx & (1 << BIT_AVX) || false;
       bool xmm_support = xcr0 & (1 << XCR0_XMM);
       bool ymm_support = xcr0 & (1 << XCR0_YMM);
@@ -275,7 +285,7 @@ static void set_hardware_flags() {
       get_cpuid(7, &eax, &ebx, &ecx, &edx);
       if (ebx & (1 << 5))  g_hardware_flags.intel_flags.avx2 = 1;
     }
-#endif
+
 
     fprintf(stderr, "Compiled: INTEL, flags:");
 #if COMPILE_INTEL_MMX
