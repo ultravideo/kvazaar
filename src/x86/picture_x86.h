@@ -23,17 +23,20 @@
     \brief assembly functions header for sad and satd
 */
 
-unsigned kvz_sad_4x4(const pixel*, const pixel*);
-unsigned kvz_sad_8x8(const pixel*, const pixel*);
-unsigned kvz_sad_16x16(const pixel*, const pixel*);
+unsigned kvz_sad_4x4_avx(const pixel*, const pixel*);
+unsigned kvz_sad_8x8_avx(const pixel*, const pixel*);
+unsigned kvz_sad_16x16_avx(const pixel*, const pixel*);
 
-unsigned kvz_sad_4x4_stride(const pixel *data1, const pixel *data2, unsigned stride);
-unsigned kvz_sad_8x8_stride(const pixel *data1, const pixel *data2, unsigned stride);
-unsigned kvz_sad_16x16_stride(const pixel *data1, const pixel *data2, unsigned stride);
+unsigned kvz_sad_4x4_stride_avx(const pixel *data1, const pixel *data2, unsigned stride);
+unsigned kvz_sad_8x8_stride_avx(const pixel *data1, const pixel *data2, unsigned stride);
+unsigned kvz_sad_16x16_stride_avx(const pixel *data1, const pixel *data2, unsigned stride);
 
-unsigned kvz_satd_4x4(const pixel *org, const pixel *cur);
-unsigned kvz_satd_8x8(const pixel *org, const pixel *cur);
+unsigned kvz_satd_4x4_avx(const pixel *org, const pixel *cur);
+unsigned kvz_satd_8x8_avx(const pixel *org, const pixel *cur);
+unsigned kvz_satd_16x16_avx(const pixel *org, const pixel *cur);
+unsigned kvz_satd_32x32_avx(const pixel *org, const pixel *cur);
+unsigned kvz_satd_64x64_avx(const pixel *org, const pixel *cur);
 
-unsigned kvz_satd_8x8_stride(const pixel *org, int32_t org_stride, const pixel *cur, int32_t cur_stride);
+//unsigned kvz_satd_8x8_stride_avx(const pixel *org, int32_t org_stride, const pixel *cur, int32_t cur_stride);
 
 #endif

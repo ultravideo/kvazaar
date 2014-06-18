@@ -23,6 +23,8 @@
 
 SECTION .text
 
+INIT_XMM avx
+
 ;KVZ_SAD_4X4
 ;Calculates SAD of the 16 consequtive bytes in memory
 ;r0 address of the first value(current)
@@ -80,25 +82,29 @@ RET
 
 cglobal sad_8x8, 2, 2, 5
 
-vpxor m0, m0
+vmovdqu m0, [r0]
+vmovdqu m2, [r0+16]
 
-%rep 2
+vmovdqu m1, [r1]
+vmovdqu m3, [r1+16]
 
-vmovdqu m1, [r0]
-vmovdqu m3, [r0+16]
-add r0, 32
+vpsadbw m0, m1
+vpsadbw m2, m3
 
-vmovdqu m2, [r1]
-vmovdqu m4, [r1+16]
-add r1, 32
+vpaddw m0, m2
+
+vmovdqu m1, [r0+16*2]
+vmovdqu m3, [r0+16*3]
+
+vmovdqu m2, [r1+16*2]
+vmovdqu m4, [r1+16*3]
 
 vpsadbw m1, m2
 vpsadbw m3, m4
 
-vpaddw m0, m1
-vpaddw m0, m3
+vpaddw m1, m3
 
-%endrep
+vpaddw m0, m1
 
 vmovhlps m1, m0
 vpaddw m0, m1
@@ -183,23 +189,25 @@ cglobal sad_16x16, 2, 2, 5
 
 vpxor m4, m4
 
+%assign i 0
+
 %rep 8
 
-; Load 2 rows from rec_buf to m0 and m2
-vmovdqu m0, [r0]
-vmovdqu m2, [r0 + 16]
-add r0, 32
+;
+vmovdqu m0, [r0 + 16 * i]
+vmovdqu m2, [r0 + 16 * (i + 1)]
 
-; Load 2 rows from ref_buf to m1 and m3
-vmovdqu m1, [r1]
-vmovdqu m3, [r1 + 16]
-add r1, 32
+;
+vmovdqu m1, [r1 + 16 * i]
+vmovdqu m3, [r1 + 16 * (i + 1)]
 
 vpsadbw m0, m1
 vpsadbw m2, m3
 
 vpaddw m4, m0
 vpaddw m4, m2
+
+%assign i i+2
 
 %endrep
 
@@ -290,12 +298,22 @@ vphaddw m0, m0
 
 vpextrw eax, m0, 0
 
-;Uncomment if transformed values not divided elsewhere
-;add eax, 1
-;shr eax, 1
+add eax, 1
+shr eax, 1
 
 RET
 
+;Zero extend all packed words in xmm to dwords in ymm
+;%1 destination register
+;%2 free xmm register
+%macro KVZ_ZERO_EXTEND 2
+
+vpmovzxwd xmm%2, xmm%1
+vmovhlps xmm%1, xmm%1
+vpmovzxwd xmm%1, xmm%1
+vinserti128 ymm%1, ymm%1, xmm%2, 1
+
+%endmacro
 
 ;KVZ_SATD_8X8_STRIDE
 ;Calculates SATD of a 8x8 block inside a frame with stride
@@ -303,157 +321,162 @@ RET
 ;r1 address of the first value(current)
 ;r2 stride
 
-%if ARCH_X86_64
-    cglobal satd_8x8_stride, 4, 4, 16
-%else
-    cglobal satd_8x8_stride, 4, 4, 8
-%endif
+%macro KVZ_SATD_8X8_STRIDE 0
 
 vpmovzxbw m0, [r0]
 vpmovzxbw m7, [r2]
 vpsubw m0, m7
 
 vpmovzxbw m1, [r0+r1]
-lea r0, [r0+r1*2]
 vpmovzxbw m7, [r2+r3]
-lea r2, [r2+r3*2]
 vpsubw m1, m7
+
+lea r0, [r0+r1*2]
+lea r2, [r2+r3*2]
 
 vpmovzxbw m2, [r0]
 vpmovzxbw m7, [r2]
 vpsubw m2, m7
 
 vpmovzxbw m3, [r0+r1]
-lea r0, [r0+r1*2]
 vpmovzxbw m7, [r2+r3]
-lea r2, [r2+r3*2]
 vpsubw m3, m7
+
+lea r0, [r0+r1*2]
+lea r2, [r2+r3*2]
 
 vpmovzxbw m4, [r0]
 vpmovzxbw m7, [r2]
 vpsubw m4, m7
 
 vpmovzxbw m5, [r0+r1]
-lea r0, [r0+r1*2]
 vpmovzxbw m7, [r2+r3]
-lea r2, [r2+r3*2]
 vpsubw m5, m7
+
+lea r0, [r0+r1*2]
+lea r2, [r2+r3*2]
 
 vpmovzxbw m6, [r0]
 vpmovzxbw m7, [r2]
 vpsubw m6, m7
 
-
 %if ARCH_X86_64
     vpmovzxbw m7, [r0+r1]
     vpmovzxbw m8, [r2+r3]
     vpsubw m7, m8
-%elif
-    vpmovzxbw m7, [r2+r3]
-    movdqu [esp-16], m7
-    vpmovzxbw m7, [r0+r1]
-    vpsubw m7, [esp-16]
+%else
+    %define temp0 esp+16*3
+    %define temp1 esp+16*2
+    %define temp2 esp+16*1
+    %define temp3 esp+16*0
+    
+    sub esp, 16*4
 
-    movdqu [esp-16], m4
-    movdqu [esp-16*2], m5
-    movdqu [esp-16*3], m6
-    movdqu [esp-16*4], m7
-    lea esp, [esp-16*4]
+    vpmovzxbw m7, [r2+r3]
+    vmovdqu [temp0], m7
+    vpmovzxbw m7, [r0+r1]
+    vpsubw m7, [temp0]
+
+    
+    vmovdqu [temp0], m4
+    vmovdqu [temp1], m5
+    vmovdqu [temp2], m6
+    vmovdqu [temp3], m7
 %endif
 
 ;Horizontal phaze
 
 %if ARCH_X86_64
-vphaddw m8, m0, m1
-vphsubw m9, m0, m1
+    vphaddw m8, m0, m1
+    vphsubw m9, m0, m1
 
-vphaddw m10, m2, m3
-vphsubw m11, m2, m3
+    vphaddw m10, m2, m3
+    vphsubw m11, m2, m3
 
-vphaddw m12, m4, m5
-vphsubw m13, m4, m5
+    vphaddw m12, m4, m5
+    vphsubw m13, m4, m5
 
-vphaddw m14, m6, m7 
-vphsubw m15, m6, m7
-
-
-vphaddw m0, m8, m9
-vphsubw m1, m8, m9
-
-vphaddw m2, m10, m11
-vphsubw m3, m10, m11
-
-vphaddw m4, m12, m13
-vphsubw m5, m12, m13
-
-vphaddw m6, m14, m15
-vphsubw m7, m14, m15
+    vphaddw m14, m6, m7 
+    vphsubw m15, m6, m7
 
 
-vphaddw m8, m0, m1
-vphsubw m9, m0, m1
+    vphaddw m0, m8, m9
+    vphsubw m1, m8, m9
 
-vphaddw m10, m2, m3
-vphsubw m11, m2, m3
+    vphaddw m2, m10, m11
+    vphsubw m3, m10, m11
 
-vphaddw m12, m4, m5
-vphsubw m13, m4, m5
+    vphaddw m4, m12, m13
+    vphsubw m5, m12, m13
 
-vphaddw m14, m6, m7
-vphsubw m15, m6, m7
-
-%elif
-
-vphaddw m4, m0, m1
-vphsubw m5, m0, m1
-
-vphaddw m6, m2, m3
-vphsubw m7, m2, m3
+    vphaddw m6, m14, m15
+    vphsubw m7, m14, m15
 
 
-vphaddw m0, m4, m5
-vphsubw m1, m4, m5
+    vphaddw m8, m0, m1
+    vphsubw m9, m0, m1
 
-vphaddw m2, m6, m7
-vphsubw m3, m6, m7
+    vphaddw m10, m2, m3
+    vphsubw m11, m2, m3
 
+    vphaddw m12, m4, m5
+    vphsubw m13, m4, m5
 
-vphaddw m4, m0, m1
-vphsubw m5, m0, m1
+    vphaddw m14, m6, m7
+    vphsubw m15, m6, m7
 
-vphaddw m6, m2, m3
-vphsubw m7, m2, m3
+%else
 
+    vphaddw m4, m0, m1
+    vphsubw m5, m0, m1
 
-movdqu m3, [esp]
-movdqu m2, [esp+16]
-movdqu m1, [esp+16*2]
-movdqu m0, [esp+16*3]
-
-movdqu [esp], m7
-movdqu [esp+16*1], m6
-movdqu [esp+16*2], m5
-movdqu [esp+16*3], m4
-
-vphaddw m4, m0, m1
-vphsubw m5, m0, m1
-
-vphaddw m6, m2, m3
-vphsubw m7, m2, m3
+    vphaddw m6, m2, m3
+    vphsubw m7, m2, m3
 
 
-vphaddw m0, m4, m5
-vphsubw m1, m4, m5
+    vphaddw m0, m4, m5
+    vphsubw m1, m4, m5
 
-vphaddw m2, m6, m7
-vphsubw m3, m6, m7
+    vphaddw m2, m6, m7
+    vphsubw m3, m6, m7
 
 
-vphaddw m4, m0, m1
-vphsubw m5, m0, m1
+    vphaddw m4, m0, m1
+    vphsubw m5, m0, m1
 
-vphaddw m6, m2, m3
-vphsubw m7, m2, m3
+    vphaddw m6, m2, m3
+    vphsubw m7, m2, m3
+
+
+    vmovdqu m3, [temp3]
+    vmovdqu m2, [temp2]
+    vmovdqu m1, [temp1]
+    vmovdqu m0, [temp0]
+
+    vmovdqu [temp3], m7
+    vmovdqu [temp2], m6
+    vmovdqu [temp1], m5
+    vmovdqu [temp0], m4
+
+    vphaddw m4, m0, m1
+    vphsubw m5, m0, m1
+
+    vphaddw m6, m2, m3
+    vphsubw m7, m2, m3
+
+
+    vphaddw m0, m4, m5
+    vphsubw m1, m4, m5
+
+    vphaddw m2, m6, m7
+    vphsubw m3, m6, m7
+
+
+    vphaddw m4, m0, m1
+    vphsubw m5, m0, m1
+
+    vphaddw m6, m2, m3
+    vphsubw m7, m2, m3
 
 %endif
 
@@ -462,159 +485,219 @@ vphsubw m7, m2, m3
 
 %if ARCH_X86_64
 
-vphaddw m0, m8, m9
-vphsubw m1, m8, m9
+    vphaddw m0, m8, m9
+    vphsubw m1, m8, m9
 
-vphaddw m2, m10, m11
-vphsubw m3, m10, m11
+    vphaddw m2, m10, m11
+    vphsubw m3, m10, m11
 
-vphaddw m4, m12, m13
-vphsubw m5, m12, m13
+    vphaddw m4, m12, m13
+    vphsubw m5, m12, m13
 
-vphaddw m6, m14, m15
-vphsubw m7, m14, m15
+    vphaddw m6, m14, m15
+    vphsubw m7, m14, m15
 
-vpmovzxwd m0, m0
-vpmovzxwd m1, m1
-vpmovzxwd m2, m2
-vpmovzxwd m3, m3
-vpmovzxwd m4, m4
-vpmovzxwd m5, m5
-vpmovzxwd m6, m6
-vpmovzxwd m7, m7
+    vpaddw m8, m0, m2
+    vpaddw m9, m1, m3
+    vpsubw m10, m0, m2
+    vpsubw m11, m1, m3
 
-vpaddd m8, m0, m2
-vpaddd m9, m1, m3
-vpsubd m10, m0, m2
-vpsubd m11, m1, m3
+    vpaddw m12, m4, m6
+    vpaddw m13, m5, m7
+    vpsubw m14, m4, m6
+    vpsubw m15, m5, m7
 
-vpaddd m12, m4, m6
-vpaddd m13, m5, m7
-vpsubd m14, m4, m6
-vpsubd m15, m5, m7
+    vpaddw m0, m8, m12
+    vpaddw m1, m9, m13
+    vpaddw m2, m10, m14
+    vpaddw m3, m11, m15
 
-vpaddd m0, m8, m12
-vpaddd m1, m9, m13
-vpaddd m2, m10, m14
-vpaddd m3, m11, m15
+    vpsubw m4, m8, m12
+    vpsubw m5, m9, m13
+    vpsubw m6, m10, m14
+    vpsubw m7, m11, m15
 
-vpsubd m4, m8, m12
-vpsubd m5, m9, m13
-vpsubd m6, m10, m14
-vpsubd m7, m11, m15
+%else
 
-%elif
+    vphaddw m0, m4, m5
+    vphsubw m1, m4, m5
 
-vphaddw m0, m4, m5
-vphsubw m1, m4, m5
+    vphaddw m2, m6, m7
+    vphsubw m3, m6, m7
 
-vphaddw m2, m6, m7
-vphsubw m3, m6, m7
+    vpaddw m4, m0, m2
+    vpaddw m5, m1, m3
+    vpsubw m6, m0, m2
+    vpsubw m7, m1, m3
 
-vpmovzxwd m0, m0
-vpmovzxwd m1, m1
-vpmovzxwd m2, m2
-vpmovzxwd m3, m3
+    vmovdqu m3, [temp3]
+    vmovdqu m2, [temp2]
+    vmovdqu m1, [temp1]
+    vmovdqu m0, [temp0]
 
-vpaddd m4, m0, m2
-vpaddd m5, m1, m3
-vpsubd m6, m0, m2
-vpsubd m7, m1, m3
+    vmovdqu [temp3], m7
+    vmovdqu [temp2], m6
+    vmovdqu [temp1], m5
+    vmovdqu [temp0], m4
 
-movdqu m3, [esp]
-movdqu m2, [esp+16]
-movdqu m1, [esp+16*2]
-movdqu m0, [esp+16*3]
+    vphaddw m4, m0, m1
+    vphsubw m5, m0, m1
 
-movdqu [esp], m7
-movdqu [esp+16*1], m6
-movdqu [esp+16*2], m5
-movdqu [esp+16*3], m4
+    vphaddw m6, m2, m3
+    vphsubw m7, m2, m3
 
-vphaddw m0, m4, m5
-vphsubw m1, m4, m5
+    vpaddw m0, m4, m6
+    vpaddw m1, m5, m7
+    vpsubw m2, m4, m6
+    vpsubw m3, m5, m7
 
-vphaddw m2, m6, m7
-vphsubw m3, m6, m7
+    vpaddw m4, m0, [temp0]
+    vpaddw m5, m1, [temp1]
+    vpsubw m6, m0, [temp0]
+    vpsubw m7, m1, [temp1]
 
-vpmovzxwd m0, m0
-vpmovzxwd m1, m1
-vpmovzxwd m2, m2
-vpmovzxwd m3, m3
+    vpabsw m4, m4
+    KVZ_ZERO_EXTEND 4, 1
+    vpabsw m5, m5
+    KVZ_ZERO_EXTEND 5, 1
+    vpabsw m6, m6
+    KVZ_ZERO_EXTEND 6, 1
+    vpabsw m7, m7
+    KVZ_ZERO_EXTEND 7, 1
 
-vpaddd m4, m0, m2
-vpaddd m5, m1, m3
-vpsubd m6, m0, m2
-vpsubd m7, m1, m3
+    vpaddd ymm0, ymm4, ymm5
+    vpaddd ymm0, ymm6
+    vpaddd ymm0, ymm7
 
-vpaddd m4, m2, [esp-16]
-vpaddd m5, m3, [esp]
-vpsubd m6, m2, [esp-16]
-vpsubd m7, m3, [esp]
+    vpaddw m4, m2, [temp2]
+    vpaddw m5, m3, [temp3]
+    vpsubw m6, m2, [temp2]
+    vpsubw m7, m3, [temp3]
 
-vpabsd m4, m4
-vpabsd m5, m5
-vpabsd m6, m6
-vpabsd m7, m7
+    vpabsw m4, m4
+    KVZ_ZERO_EXTEND 4, 1
+    vpabsw m5, m5
+    KVZ_ZERO_EXTEND 5, 1
+    vpabsw m6, m6
+    KVZ_ZERO_EXTEND 6, 1
+    vpabsw m7, m7
+    KVZ_ZERO_EXTEND 7, 1
 
-vpaddd m2, m4, m5
-vpaddd m2, m6
-vpaddd m2, m7
+    vpaddd ymm4, ymm5
+    vpaddd ymm4, ymm6
+    vpaddd ymm4, ymm7
 
-vpaddd m4, m0, [esp-16*3]
-vpaddd m5, m1, [esp-16*2]
-vpsubd m6, m0, [esp-16*3]
-vpsubd m7, m1, [esp-16*2]
-
-vpabsd m4, m4
-vpabsd m5, m5
-vpabsd m6, m6
-vpabsd m7, m7
-
-vpaddd m0, m4, m5
-vpaddd m0, m6
-vpaddd m0, m7
-
-vpaddd m0, m2
+    vpaddd ymm0, ymm4
 
 %endif
 
 %if ARCH_X86_64
-vpabsd m0, m0
-vpabsd m1, m1
-vpabsd m2, m2
-vpabsd m3, m3
-vpabsd m4, m4
-vpabsd m5, m5
-vpabsd m6, m6
-vpabsd m7, m7
+    vpabsw m0, m0
+    KVZ_ZERO_EXTEND 0, 8
+    vpabsw m1, m1
+    KVZ_ZERO_EXTEND 1, 8
+    vpabsw m2, m2
+    KVZ_ZERO_EXTEND 2, 8
+    vpabsw m3, m3
+    KVZ_ZERO_EXTEND 3, 8
+    vpabsw m4, m4
+    KVZ_ZERO_EXTEND 4, 8
+    vpabsw m5, m5
+    KVZ_ZERO_EXTEND 5, 8
+    vpabsw m6, m6
+    KVZ_ZERO_EXTEND 6, 8
+    vpabsw m7, m7
+    KVZ_ZERO_EXTEND 7, 8
 
-vpaddd m0, m1
-vpaddd m0, m2
-vpaddd m0, m3
-vpaddd m0, m4
-vpaddd m0, m5
-vpaddd m0, m6
-vpaddd m0, m7
+    vpaddd ymm0, ymm1
+    vpaddd ymm0, ymm2
+    vpaddd ymm0, ymm3
+    vpaddd ymm0, ymm4
+    vpaddd ymm0, ymm5
+    vpaddd ymm0, ymm6
+    vpaddd ymm0, ymm7
 %endif
 
+vextracti128 m1, ymm0, 1
+vpaddd m0, m1
 vphaddd m0, m0
 vphaddd m0, m0
-vpextrd eax, m0, 1
-vpinsrd m1, eax, 0
-vpaddd m0, m1
-vpextrd eax, m0, 1
-vpinsrd m1, eax, 0
-vpaddd m0, m1
+
+vmovd r4d, m0
+
+add r4, 2
+shr r4, 2
 
 %if ARCH_X86_64 == 0
-    lea esp, [esp+16*4]
+    add esp, 16*4
 %endif
 
-vmovd eax, m0
+%endmacro
 
-;Uncomment if transformed values not divided elsewhere
-;add eax, 2
-;shr eax, 2
+%if ARCH_X86_64
+    cglobal satd_8x8, 4, 5, 16
+%else
+    cglobal satd_8x8, 4, 5, 8
+%endif
+mov r2, r1
+mov r1, 8
+mov r3, 8
+KVZ_SATD_8X8_STRIDE
+mov rax, r4
+RET
+
+;KVZ_SATD_NXN
+;Calculates SATD of a 64x64 block inside a frame with stride
+;r0 address of the first value(reference)
+;r1 address of the first value(current)
+
+%macro KVZ_SATD_NXN 1
+
+%if ARCH_X86_64
+    cglobal satd_%1x%1, 2, 7, 16
+%else
+    cglobal satd_%1x%1, 2, 7, 8
+%endif
+
+mov r2, r1
+mov r1, %1
+mov r3, %1
+
+xor r5, r5
+xor r6, r6
+
+.yloop
+
+    xor r4, r4
+
+    .xloop
+        push r4
+    
+        KVZ_SATD_8X8_STRIDE
+        add r6, r4
+
+        sub r2, 6*%1-8
+        sub r0, 6*%1-8
+
+        pop r4
+        add r4, 8
+        cmp r4, %1
+    jne .xloop
+
+    add r2, 7*%1
+    add r0, 7*%1
+
+    add r5, 8
+    cmp r5, %1
+jne .yloop
+
+
+mov rax, r6
 
 RET
+
+%endmacro
+
+KVZ_SATD_NXN 16
+KVZ_SATD_NXN 32
+KVZ_SATD_NXN 64

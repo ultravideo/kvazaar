@@ -24,6 +24,9 @@ cost_pixel_nxn_func * satd_8bit_64x64 = 0;
 #if COMPILE_INTEL_SSE2 && COMPILE_INTEL_SSE41
 #include "picture/picture-sse41.c"
 #endif
+#if COMPILE_INTEL_AVX
+#include "picture/picture-avx.c"
+#endif
 #if COMPILE_POWERPC_ALTIVEC
 #include "picture/picture-altivec.c"
 #endif
@@ -40,6 +43,11 @@ int strategy_register_picture(void* opaque) {
     if (g_hardware_flags.intel_flags.sse41) {
 #if COMPILE_INTEL_SSE2 && COMPILE_INTEL_SSE41
       if (!strategy_register_picture_sse41(opaque)) return 0;
+#endif
+    }
+    if (g_hardware_flags.intel_flags.avx) {
+#if COMPILE_INTEL_AVX
+      if (!strategy_register_picture_avx(opaque)) return 0;
 #endif
     }
   }
