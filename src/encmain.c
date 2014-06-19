@@ -355,6 +355,13 @@ int main(int argc, char *argv[])
       //Clear encoder
       encoder_next_frame(&encoder_states[current_encoder_state]);
       
+      //Abort if enough frames
+      if (cfg->frames && encoder_states[current_encoder_state].global->frame >= cfg->frames) {
+        //Ignore this frame, which is not valid...
+        encoder_states[current_encoder_state].stats_done = 1;
+        break;
+      }
+      
       CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
       // Read one frame from the input
