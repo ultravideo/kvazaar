@@ -830,13 +830,12 @@ void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, ui
   
   // PSNR calculations
   {
-    int32_t diff=0; //FIXME: get the correct length of bitstream
     double temp_psnr[3];
     
     videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
     
     fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
-          "BPI"[encoder_state->global->slicetype%3], diff<<3,
+          "BPI"[encoder_state->global->slicetype%3], encoder_state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
     // Increment total PSNR

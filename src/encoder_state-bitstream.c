@@ -675,8 +675,18 @@ static void add_checksum(encoder_state * const encoder_state)
 static void encoder_state_write_bitstream_main(encoder_state * const main_state) {
   const encoder_control * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
-
+  uint64_t curpos;
   int i;
+  
+  if (main_state->stream.base.type == BITSTREAM_TYPE_FILE) {
+    fgetpos(main_state->stream.file.output,(fpos_t*)&curpos);
+  } else if (main_state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
+    curpos = stream->mem.output_length;
+  } else {
+    //Should not happen
+    assert(0);
+    curpos = 0;
+  }
 
   if (main_state->global->is_radl_frame) {
     // Access Unit Delimiter (AUD)
@@ -737,6 +747,19 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   }
   
   assert(main_state->tile->frame->poc == main_state->global->poc);
+  
+  //Get bitstream length for stats
+  if (main_state->stream.base.type == BITSTREAM_TYPE_FILE) {
+    uint64_t newpos;
+    fgetpos(main_state->stream.file.output,(fpos_t*)&newpos);
+    main_state->stats_bitstream_length = newpos - curpos;
+  } else if (main_state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
+    main_state->stats_bitstream_length = stream->mem.output_length - curpos;
+  } else {
+    //Should not happen
+    assert(0);
+    main_state->stats_bitstream_length = 0;
+  }
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {

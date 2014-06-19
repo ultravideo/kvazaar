@@ -163,6 +163,7 @@ typedef struct encoder_state {
   cabac_data cabac;
   
   int stats_done;
+  uint32_t stats_bitstream_length; //Bitstream length written in bytes
   
   //Jobs to wait for
   threadqueue_job * tqj_recon_done; //Reconstruction is done
