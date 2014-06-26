@@ -162,7 +162,7 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+  return temp_bitcost*(int32_t)(encoder_state->global->cur_lambda_cost_sqrt+0.5);
 }
 
 
@@ -936,7 +936,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
-  int lambda_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5);
+  int lambda_cost = (int)(encoder_state->global->cur_lambda_cost_sqrt + 0.5);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
     costs[mode_i] += lambda_cost * intra_pred_ratecost(modes[mode_i], intra_preds);
   }

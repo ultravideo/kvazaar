@@ -71,6 +71,7 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
   }
 
   encoder_state->global->cur_lambda_cost = lambda;
+  encoder_state->global->cur_lambda_cost_sqrt = sqrt(lambda);
 }
 
 int encoder_state_match_children_of_previous_frame(encoder_state * const encoder_state) {

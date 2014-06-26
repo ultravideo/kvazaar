@@ -58,7 +58,8 @@ typedef enum {
 
 
 typedef struct {
-  double cur_lambda_cost;
+  double cur_lambda_cost; //!< \brief Lambda for SSE
+  double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
   
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */
