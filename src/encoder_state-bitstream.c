@@ -736,14 +736,14 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     //FIXME: Move this...
     bitstream_clear(&main_state->children[i].stream);
   }
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
   }
   
   {
     PERFORMANCE_MEASURE_START();
     // Calculate checksum
     add_checksum(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
   }
   
   assert(main_state->tile->frame->poc == main_state->global->poc);
