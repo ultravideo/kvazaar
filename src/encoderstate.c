@@ -554,7 +554,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
           threadqueue_job *job;
 #ifdef _DEBUG
           char job_description[256];
-          sprintf(job_description, "frame=%d,tile=%d,position_y=%d", main_state->global->frame, main_state->tile->id, y + main_state->tile->lcu_offset_y);
+          sprintf(job_description, "type=sao,frame=%d,tile=%d,position_y=%d", main_state->global->frame, main_state->tile->id, y + main_state->tile->lcu_offset_y);
 #else
           char* job_description = NULL;
 #endif
@@ -697,7 +697,7 @@ void encode_one_frame(encoder_state * const main_state)
     threadqueue_job *job;
 #ifdef _DEBUG
     char job_description[256];
-    sprintf(job_description, "frame=%d", main_state->global->frame);
+    sprintf(job_description, "type=write_bitstream,frame=%d", main_state->global->frame);
 #else
     char* job_description = NULL;
 #endif
