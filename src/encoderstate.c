@@ -685,7 +685,7 @@ void encode_one_frame(encoder_state * const main_state)
   {
     PERFORMANCE_MEASURE_START();
     encoder_state_new_frame(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=new_frame,frame=%d", main_state->global->frame);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", main_state->global->frame, main_state->global->poc);
   }
   {
     PERFORMANCE_MEASURE_START();
