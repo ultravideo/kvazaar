@@ -203,16 +203,20 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   if (encoder_state->encoder_control->owf) {
     max_lcu_below = 1;
   }
-
-
+  
   // Search the initial 7 points of the hexagon.
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = &large_hexbs[i];
-    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+    unsigned cost;
+    {
+      PERFORMANCE_MEASURE_START();
+      cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              block_width, block_width, max_lcu_below);
-    cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sad,frame=%d,ref=%d,x=%d,y=%d,ref_x=%d,ref_y=%d,width=%d,height=%d", encoder_state->global->frame, ref->poc - encoder_state->global->poc, orig->x, orig->y, (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y, block_width, block_width);
+    }
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -223,11 +227,16 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
 
   // Try the 0,0 vector.
   if (!(mv.x == 0 && mv.y == 0)) {
-    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+    unsigned cost;
+    {
+      PERFORMANCE_MEASURE_START();
+      cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
                              block_width, block_width, max_lcu_below);
-    cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sad,frame=%d,ref=%d,x=%d,y=%d,ref_x=%d,ref_y=%d,width=%d,height=%d", encoder_state->global->frame, ref->poc - encoder_state->global->poc, orig->x, orig->y, (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y, block_width, block_width);
+    }
 
     // If the 0,0 is better, redo the hexagon around that point.
     if (cost < best_cost) {
@@ -239,11 +248,16 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
 
       for (i = 1; i < 7; ++i) {
         const vector2d *pattern = &large_hexbs[i];
-        unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+        unsigned cost;
+        {
+          PERFORMANCE_MEASURE_START();
+          cost = image_calc_sad(pic, ref, orig->x, orig->y,
                                  (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
                                  (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
                                  block_width, block_width, max_lcu_below);
-        cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+          cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+          PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sad,frame=%d,ref=%d,x=%d,y=%d,ref_x=%d,ref_y=%d,width=%d,height=%d", encoder_state->global->frame, ref->poc - encoder_state->global->poc, orig->x, orig->y, (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x, (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y, block_width, block_width);
+        }
 
         if (cost < best_cost) {
           best_cost    = cost;
@@ -274,11 +288,16 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
       const vector2d *offset = &large_hexbs[start + i];
-      unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+      unsigned cost;
+      {
+        PERFORMANCE_MEASURE_START();
+        cost = image_calc_sad(pic, ref, orig->x, orig->y,
                                (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sad,frame=%d,ref=%d,x=%d,y=%d,ref_x=%d,ref_y=%d,width=%d,height=%d", encoder_state->global->frame, ref->poc - encoder_state->global->poc, orig->x, orig->y, (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y, block_width, block_width);
+      }
 
       if (cost < best_cost) {
         best_cost    = cost;
@@ -297,11 +316,16 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
     const vector2d *offset = &small_hexbs[i];
-    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+    unsigned cost;
+    {
+      PERFORMANCE_MEASURE_START();
+      cost = image_calc_sad(pic, ref, orig->x, orig->y,
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              block_width, block_width, max_lcu_below);
-    cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sad,frame=%d,ref=%d,x=%d,y=%d,ref_x=%d,ref_y=%d,width=%d,height=%d", encoder_state->global->frame, ref->poc - encoder_state->global->poc, orig->x, orig->y, (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y, block_width, block_width);
+    }
 
     if (cost > 0 && cost < best_cost) {
       best_cost    = cost;
@@ -1099,6 +1123,10 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
   int cost = MAX_INT;
   cu_info *cur_cu;
   int x_local = (x&0x3f), y_local = (y&0x3f);
+#if _DEBUG
+  int debug_split = 0;
+#endif
+  PERFORMANCE_MEASURE_START();
 
   // Stop recursion if the CU is completely outside the frame.
   if (x >= frame->width || y >= frame->height) {
@@ -1196,12 +1224,17 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       // Copy split modes to this depth.
       cost = split_cost;
       work_tree_copy_up(x, y, depth, work_tree);
+#if _DEBUG
+      debug_split = 1;
+#endif
     } else {
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       work_tree_copy_down(x, y, depth, work_tree);
     }
   }
+  
+  PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,x=%d,y=%d,depth=%d,split=%d,cur_cu_is_intra=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, x, y, depth, debug_split, (cur_cu->type==CU_INTRA)?1:0);
 
   return cost;
 }
