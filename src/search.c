@@ -847,7 +847,6 @@ static void sort_modes(int8_t *modes, uint32_t *costs, int length)
   }
 }
 
-
 static int8_t search_intra_rough(encoder_state * const encoder_state, 
                                  pixel *orig, int32_t origstride,
                                  pixel *rec, int16_t recstride,
@@ -857,8 +856,12 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
-  pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
-  pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
+  pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
+  
+  pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+  
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
 
   pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
