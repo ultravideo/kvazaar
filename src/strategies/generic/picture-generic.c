@@ -300,7 +300,7 @@ SAD_NXN(32, pixel, 8bit)
 SAD_NXN(64, pixel, 8bit)
 
 
-static int strategy_register_picture_generic(void* opaque)
+int strategy_register_picture_generic(void* opaque)
 {
   bool success = true;
 

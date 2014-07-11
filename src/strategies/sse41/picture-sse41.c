@@ -20,13 +20,17 @@
 /*
  * \file
  */
+#include "picture-sse41.h"
 #include "strategyselector.h"
-#include "image.h"
-#include <immintrin.h>
-#include <assert.h>
+
+#if COMPILE_INTEL_SSE41
+#  include "image.h"
+#  include <immintrin.h>
+#  include <assert.h>
+
 
 #ifdef __GNUC__
-__attribute__ ((__target__ ("sse2,sse4.1")))
+__attribute__((__target__("sse2,sse4.1")))
 #endif
 static unsigned reg_sad_sse41(const pixel * const data1, const pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
@@ -87,6 +91,13 @@ static unsigned reg_sad_sse41(const pixel * const data1, const pixel * const dat
   return sad;
 }
 
-static int strategy_register_picture_sse41(void* opaque) {
-  return strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
+#endif //COMPILE_INTEL_SSE41
+
+
+int strategy_register_picture_sse41(void* opaque) {
+  bool success = true;
+#if COMPILE_INTEL_SSE41
+  success &= strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
+#endif
+  return success;
 }

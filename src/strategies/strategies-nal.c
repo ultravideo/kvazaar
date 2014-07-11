@@ -1,6 +1,6 @@
 #include "strategies-nal.h"
 
-#include "nal/nal-generic.c"
+#include "generic/nal-generic.h"
 
 void (*array_checksum)(const pixel* data,
                        const int height, const int width,
@@ -9,7 +9,9 @@ void (*array_checksum)(const pixel* data,
 
 
 int strategy_register_nal(void* opaque) {
-  if (!strategy_register_nal_generic(opaque)) return 0;
+  bool success = true;
+
+  success &= strategy_register_nal_generic(opaque);
   
-  return 1;
+  return success;
 }

@@ -137,9 +137,12 @@ static void array_checksum_generic8(const pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-static int strategy_register_nal_generic(void* opaque) {
-  if (!strategyselector_register(opaque, "array_checksum", "generic", 0, &array_checksum_generic)) return 0;
-  if (!strategyselector_register(opaque, "array_checksum", "generic4", 1, &array_checksum_generic4)) return 0;
-  if (!strategyselector_register(opaque, "array_checksum", "generic8", 2, &array_checksum_generic8)) return 0;
-  return 1;
+int strategy_register_nal_generic(void* opaque) {
+  bool success = true;
+
+  success &= strategyselector_register(opaque, "array_checksum", "generic", 0, &array_checksum_generic);
+  success &= strategyselector_register(opaque, "array_checksum", "generic4", 1, &array_checksum_generic4);
+  success &= strategyselector_register(opaque, "array_checksum", "generic8", 2, &array_checksum_generic8);
+  
+  return success;
 }
