@@ -57,6 +57,8 @@ CCFLAGS = $(DFLAGS) -I. -I./strategies $(WARNINGS)
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
 OBJS = interface_main.o encmain.o bitstream.o cabac.o checkpoint.o config.o context.o cu.o encoder.o encoderstate.o filter.o inter.o intra.o nal.o imagelist.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o encoder_state-bitstream.o encoder_state-ctors_dtors.o encoder_state-geometry.o image.o videoframe.o strategies/strategies-picture.o strategies/strategies-nal.o
+ASMOBJS = picture_x86.o
+YASM = yasm
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
@@ -68,6 +70,9 @@ all: $(PROGS)
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
+%.o: %.asm Makefile
+	$(YASM) $(ASMFLAGS) -o $@
+	
 %.o: %.c Makefile
 	$(CC) $(CCFLAGS) -c $< -o $@
 
