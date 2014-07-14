@@ -1,4 +1,5 @@
 #include "strategies-picture.h"
+#include "strategyselector.h"
 
 // Define function pointers.
 reg_sad_func * reg_sad = 0;
@@ -16,51 +17,33 @@ cost_pixel_nxn_func * satd_8bit_32x32 = 0;
 cost_pixel_nxn_func * satd_8bit_64x64 = 0;
 
 
-// Include inline functions.
-#include "picture/picture-generic.c"
-#if COMPILE_INTEL_SSE2
-#include "picture/picture-sse2.c"
-#endif
-#if COMPILE_INTEL_SSE2 && COMPILE_INTEL_SSE41
-#include "picture/picture-sse41.c"
-#endif
-#if COMPILE_INTEL_AVX
+// Headers for platform optimizations.
+#include "generic/picture-generic.h"
+#include "sse2/picture-sse2.h"
+#include "sse41/picture-sse41.h"
+#include "altivec/picture-altivec.h"
 #include "picture/picture-avx.c"
-#endif
-#if COMPILE_POWERPC_ALTIVEC
-#include "picture/picture-altivec.c"
-#endif
 
 
 int strategy_register_picture(void* opaque) {
-  if (!strategy_register_picture_generic(opaque)) return 0;
-  
-#if COMPILE_INTEL
-  if (g_hardware_flags.intel_flags.sse2) {
-#if COMPILE_INTEL_SSE2
-    if (!strategy_register_picture_sse2(opaque)) return 0;
-#endif
-    if (g_hardware_flags.intel_flags.sse41) {
-#if COMPILE_INTEL_SSE2 && COMPILE_INTEL_SSE41
-      if (!strategy_register_picture_sse41(opaque)) return 0;
-#endif
-    }
-    if (g_hardware_flags.intel_flags.avx) {
-#if COMPILE_INTEL_AVX
-      if (!strategy_register_picture_avx(opaque)) return 0;
-#endif
-    }
-  }
-#endif //COMPILE_INTEL
+  bool success = true;
 
-#if COMPILE_POWERPC
-  if (g_hardware_flags.powerpc_flags.altivec) {
-#if COMPILE_POWERPC_ALTIVEC
-    if (!strategy_register_picture_altivec(opaque)) return 0;
-#endif //COMPILE_POWERPC_ALTIVEC
+  success &= strategy_register_picture_generic(opaque);
+
+  if (g_hardware_flags.intel_flags.sse2) {
+    success &= strategy_register_picture_sse2(opaque);
+    if (g_hardware_flags.intel_flags.avx) {
+    success &= strategy_register_picture_avx(opaque);
+    }
   }
-#endif //COMPILE_POWERPC
-  return 1;
+  if (g_hardware_flags.intel_flags.sse41) {
+    success &= strategy_register_picture_sse41(opaque);
+  }
+  if (g_hardware_flags.powerpc_flags.altivec) {
+    success &= strategy_register_picture_altivec(opaque);
+  }
+
+  return success;
 }
 
 

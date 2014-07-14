@@ -25,11 +25,29 @@
     <Filter Include="Source Files\strategies">
       <UniqueIdentifier>{aa218f1d-2e13-425d-80a7-3f4d74076c5c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\strategies\picture">
-      <UniqueIdentifier>{86192670-5bb2-4a4e-b4cb-7ab11c6b81cc}</UniqueIdentifier>
+    <Filter Include="Source Files\strategies\generic">
+      <UniqueIdentifier>{e4e77a4f-e708-4b11-9ba7-9d2b746e3f5d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\strategies\nal">
-      <UniqueIdentifier>{88ef4396-528d-4706-8719-0a43e59786cf}</UniqueIdentifier>
+    <Filter Include="Source Files\strategies\sse2">
+      <UniqueIdentifier>{0c7b7451-4b19-443f-b51c-588e63bb4c93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\strategies\sse41">
+      <UniqueIdentifier>{2b47e32d-3fee-4a34-a4cb-8453b769b1b0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\strategies\altivec">
+      <UniqueIdentifier>{770e42cd-56bc-4377-af83-c14872722ed2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\strategies\generic">
+      <UniqueIdentifier>{62b39266-3f82-421d-91df-7f12caa817ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\strategies\sse2">
+      <UniqueIdentifier>{675b31f0-f1a3-4b1f-b436-ae24c2ab7279}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\strategies\sse41">
+      <UniqueIdentifier>{1e811a93-2291-426e-951b-0c1137af77f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\strategies\altivec">
+      <UniqueIdentifier>{9e275b7f-3094-4614-b817-6ce0bee827b2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -119,6 +137,21 @@
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\strategies-picture.c">
       <Filter>Source Files\strategies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\nal-generic.c">
+      <Filter>Source Files\strategies\generic</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\picture-generic.c">
+      <Filter>Source Files\strategies\generic</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\altivec\picture-altivec.c">
+      <Filter>Source Files\strategies\altivec</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\sse41\picture-sse41.c">
+      <Filter>Source Files\strategies\sse41</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\sse2\picture-sse2.c">
+      <Filter>Source Files\strategies\sse2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\picture\picture-avx.c">
       <Filter>Source Files\strategies\picture</Filter>
@@ -224,20 +257,20 @@
     <ClInclude Include="..\..\src\strategies\strategies-picture.h">
       <Filter>Header Files\strategies</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\picture\picture-altivec.c">
-      <Filter>Source Files\strategies\picture</Filter>
+    <ClInclude Include="..\..\src\strategies\altivec\picture-altivec.h">
+      <Filter>Header Files\strategies\altivec</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\picture\picture-generic.c">
-      <Filter>Source Files\strategies\picture</Filter>
+    <ClInclude Include="..\..\src\strategies\generic\nal-generic.h">
+      <Filter>Header Files\strategies\generic</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\picture\picture-sse2.c">
-      <Filter>Source Files\strategies\picture</Filter>
+    <ClInclude Include="..\..\src\strategies\generic\picture-generic.h">
+      <Filter>Header Files\strategies\generic</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\picture\picture-sse41.c">
-      <Filter>Source Files\strategies\picture</Filter>
+    <ClInclude Include="..\..\src\strategies\sse41\picture-sse41.h">
+      <Filter>Header Files\strategies\sse41</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\strategies\nal\nal-generic.c">
-      <Filter>Source Files\strategies\nal</Filter>
+    <ClInclude Include="..\..\src\strategies\sse2\picture-sse2.h">
+      <Filter>Header Files\strategies\sse2</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\x86\picture_x86.h">
       <Filter>Header Files\x86</Filter>

@@ -331,7 +331,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  WRITE_UE(stream, 0, "sps_max_dec_pic_buffering");
+  WRITE_UE(stream, encoder_state->encoder_control->cfg->ref_frames-1, "sps_max_dec_pic_buffering");
   WRITE_UE(stream, 0, "sps_num_reorder_pics");
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
@@ -675,8 +675,18 @@ static void add_checksum(encoder_state * const encoder_state)
 static void encoder_state_write_bitstream_main(encoder_state * const main_state) {
   const encoder_control * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
-
+  uint64_t curpos;
   int i;
+  
+  if (main_state->stream.base.type == BITSTREAM_TYPE_FILE) {
+    fgetpos(main_state->stream.file.output,(fpos_t*)&curpos);
+  } else if (main_state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
+    curpos = stream->mem.output_length;
+  } else {
+    //Should not happen
+    assert(0);
+    curpos = 0;
+  }
 
   if (main_state->global->is_radl_frame) {
     // Access Unit Delimiter (AUD)
@@ -726,17 +736,30 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     //FIXME: Move this...
     bitstream_clear(&main_state->children[i].stream);
   }
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
   }
   
   {
     PERFORMANCE_MEASURE_START();
     // Calculate checksum
     add_checksum(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
   }
   
   assert(main_state->tile->frame->poc == main_state->global->poc);
+  
+  //Get bitstream length for stats
+  if (main_state->stream.base.type == BITSTREAM_TYPE_FILE) {
+    uint64_t newpos;
+    fgetpos(main_state->stream.file.output,(fpos_t*)&newpos);
+    main_state->stats_bitstream_length = newpos - curpos;
+  } else if (main_state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
+    main_state->stats_bitstream_length = stream->mem.output_length - curpos;
+  } else {
+    //Should not happen
+    assert(0);
+    main_state->stats_bitstream_length = 0;
+  }
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {

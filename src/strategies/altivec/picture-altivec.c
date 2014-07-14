@@ -20,19 +20,23 @@
 /*
  * \file
  */
+#include "picture-altivec.h"
 #include "strategyselector.h"
 #include "image.h"
-#include <altivec.h>
 #include <assert.h>
 
+#if COMPILE_POWERPC_ALTIVEC
+#include <altivec.h>
+
+
 #ifdef __GNUC__
-  __attribute__ ((__target__ ("altivec")))
+__attribute__ ((__target__ ("altivec")))
 #endif
 static unsigned reg_sad_altivec(const pixel * const data1, const pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   vector unsigned int vsad = {0,0,0,0}, vzero = {0,0,0,0}; 
-  vector signed int sumdiffs; 
+  vector signed int sumdiffs;
   int tmpsad, sad = 0;
   
   int y, x;
@@ -72,7 +76,12 @@ static unsigned reg_sad_altivec(const pixel * const data1, const pixel * const d
   return sad;
 }
 
-static int strategy_register_picture_altivec(void* opaque) {
-  if (!strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec)) return 0;
-  return 1;
+#endif //COMPILE_POWERPC_ALTIVEC
+
+int strategy_register_picture_altivec(void* opaque) {
+  bool success = true;
+#if COMPILE_POWERPC_ALTIVEC
+  success &= strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec);
+#endif
+  return success;
 }

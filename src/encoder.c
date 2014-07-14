@@ -72,6 +72,7 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   encoder->sao_enable = 1;
   // Rate-distortion optimization level
   encoder->rdo        = 1;
+  encoder->full_intra_search = 0;
   
   // Initialize the scaling list
   scalinglist_init(&encoder->scaling_list);

@@ -58,7 +58,8 @@ typedef enum {
 
 
 typedef struct {
-  double cur_lambda_cost;
+  double cur_lambda_cost; //!< \brief Lambda for SSE
+  double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
   
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */
@@ -163,6 +164,7 @@ typedef struct encoder_state {
   cabac_data cabac;
   
   int stats_done;
+  uint32_t stats_bitstream_length; //Bitstream length written in bytes
   
   //Jobs to wait for
   threadqueue_job * tqj_recon_done; //Reconstruction is done

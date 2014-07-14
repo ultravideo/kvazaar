@@ -147,6 +147,11 @@ typedef int16_t coefficient;
   #define INLINE inline
 #endif
 
+// Return the next aligned address for *p. Result is at most alignment larger than p.
+#define ALIGNED_POINTER(p, alignment) (void*)((intptr_t)(p) + (alignment) - ((intptr_t)(p) % (alignment)))
+// 32 bytes is enough for AVX2
+#define SIMD_ALIGNMENT 32
+
 #ifdef _MSC_VER
 // Buggy VS2010 throws intellisense warnings if void* is not casted.
   #define MALLOC(type, num) (type *)malloc(sizeof(type) * (num))

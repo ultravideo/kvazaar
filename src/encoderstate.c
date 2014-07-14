@@ -71,6 +71,7 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
   }
 
   encoder_state->global->cur_lambda_cost = lambda;
+  encoder_state->global->cur_lambda_cost_sqrt = sqrt(lambda);
 }
 
 int encoder_state_match_children_of_previous_frame(encoder_state * const encoder_state) {
@@ -553,7 +554,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
           threadqueue_job *job;
 #ifdef _DEBUG
           char job_description[256];
-          sprintf(job_description, "frame=%d,tile=%d,position_y=%d", main_state->global->frame, main_state->tile->id, y + main_state->tile->lcu_offset_y);
+          sprintf(job_description, "type=sao,frame=%d,tile=%d,position_y=%d", main_state->global->frame, main_state->tile->id, y + main_state->tile->lcu_offset_y);
 #else
           char* job_description = NULL;
 #endif
@@ -684,7 +685,7 @@ void encode_one_frame(encoder_state * const main_state)
   {
     PERFORMANCE_MEASURE_START();
     encoder_state_new_frame(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=new_frame,frame=%d", main_state->global->frame);
+    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", main_state->global->frame, main_state->global->poc);
   }
   {
     PERFORMANCE_MEASURE_START();
@@ -696,7 +697,7 @@ void encode_one_frame(encoder_state * const main_state)
     threadqueue_job *job;
 #ifdef _DEBUG
     char job_description[256];
-    sprintf(job_description, "frame=%d", main_state->global->frame);
+    sprintf(job_description, "type=write_bitstream,frame=%d", main_state->global->frame);
 #else
     char* job_description = NULL;
 #endif
@@ -830,13 +831,12 @@ void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, ui
   
   // PSNR calculations
   {
-    int32_t diff=0; //FIXME: get the correct length of bitstream
     double temp_psnr[3];
     
     videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
     
     fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
-          "BPI"[encoder_state->global->slicetype%3], diff<<3,
+          "BPI"[encoder_state->global->slicetype%3], encoder_state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
     // Increment total PSNR

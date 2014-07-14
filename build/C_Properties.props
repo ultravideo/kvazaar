@@ -22,6 +22,7 @@
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
     <YASM>
       <Defines>HAVE_ALIGNED_STACK=1</Defines>

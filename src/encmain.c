@@ -120,6 +120,7 @@ int main(int argc, char *argv[])
             "                                     0: no RDO\n"
             "                                     1: estimated RDO\n"
             "                                     2: full RDO\n"
+            "          --full-intra-search    : Try all intra modes.\n"
             "          --no-transform-skip    : Disable transform skip\n"
             "          --aud                  : Use access unit delimiters\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
@@ -256,6 +257,7 @@ int main(int argc, char *argv[])
   // RDO
   encoder.rdoq_enable = (int8_t)encoder.cfg->rdoq_enable;
   encoder.rdo         = (int8_t)encoder.cfg->rdo;
+  encoder.full_intra_search = (int8_t)encoder.cfg->full_intra_search;
   // TR SKIP
   encoder.trskip_enable = (int8_t)encoder.cfg->trskip_enable;
   // VUI
@@ -352,6 +354,13 @@ int main(int argc, char *argv[])
       
       //Clear encoder
       encoder_next_frame(&encoder_states[current_encoder_state]);
+      
+      //Abort if enough frames
+      if (cfg->frames && encoder_states[current_encoder_state].global->frame >= cfg->frames) {
+        //Ignore this frame, which is not valid...
+        encoder_states[current_encoder_state].stats_done = 1;
+        break;
+      }
       
       CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 

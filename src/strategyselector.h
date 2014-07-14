@@ -26,59 +26,64 @@
 //Hardware data (abstraction of defines). Extend for other compilers
 
 #if defined(_M_IX86) || defined(__i586__) || defined(__i686__) || defined(_M_X64) || defined(_M_AMD64) || defined(__amd64__) || defined(__x86_64__)
-#define COMPILE_INTEL 1
-
-#if defined(__MMX__)
-#define COMPILE_INTEL_MMX 1
-#endif
-
-#if defined(__SSE__)
-#define COMPILE_INTEL_SSE 1
-#endif
-    
-#if defined(__SSE2__)
-#define COMPILE_INTEL_SSE2 1
-#endif
-
-#if defined(__SSE3__)
-#define COMPILE_INTEL_SSE3 1
-#endif
-
-#if defined(__SSSE3__)
-#define COMPILE_INTEL_SSSE3 1
-#endif
-
-#if defined(__SSE4_1__)
-#define COMPILE_INTEL_SSE41 1
-#endif
-
-#if defined(__SSE4_2__)
-#define COMPILE_INTEL_SSE42 1
-#endif
-
-#if defined(__AVX__)
-#define COMPILE_INTEL_AVX 1
-#endif
-
+#  define COMPILE_INTEL 1
 #else
-#define COMPILE_INTEL 0
+#  define COMPILE_INTEL 0
+#endif
+
+// Visual Studio note:
+// Because these macros are only used to guard code that is guarded by CPUID
+// at runtime, use /arch parameter to disable them, but enable all intrinsics
+// supported by VisualStudio if SSE2 (highest) is enabled.
+// AVX and AVX2 are handled by /arch directly and sse intrinsics will use VEX
+// versions if they are defined.
+#define MSC_X86_SIMD(level) (_M_X64 || (_M_IX86_FP >= (level)))
+
+#if COMPILE_INTEL
+#  if defined(__MMX__) || MSC_X86_SIMD(1)
+#    define COMPILE_INTEL_MMX 1
+#  endif
+#  if defined(__SSE__) || MSC_X86_SIMD(1)
+#    define COMPILE_INTEL_SSE 1
+#  endif
+#  if defined(__SSE2__) || MSC_X86_SIMD(2)
+#    define COMPILE_INTEL_SSE2 1
+#  endif
+#  if defined(__SSE3__)
+#    define COMPILE_INTEL_SSE3 1
+#  endif
+#  if defined(__SSSE3__) || MSC_X86_SIMD(2)
+#    define COMPILE_INTEL_SSSE3 1
+#  endif
+#  if defined(__SSE4_1__) || MSC_X86_SIMD(2)
+#    define COMPILE_INTEL_SSE41 1
+#  endif
+#  if defined(__SSE4_2__) || MSC_X86_SIMD(2)
+#    define COMPILE_INTEL_SSE42 1
+#  endif
+#  if defined(__AVX__)
+#    define COMPILE_INTEL_AVX 1
+#   endif
+#  if defined(__AVX2__)
+#    define COMPILE_INTEL_AVX2 1
+#   endif
 #endif
 
 #if defined (_M_PPC) || defined(__powerpc64__) || defined(__powerpc__)
-#define COMPILE_POWERPC 1
-#ifdef __ALTIVEC__
-#define COMPILE_POWERPC_ALTIVEC 1
+#  define COMPILE_POWERPC 1
+#  ifdef __ALTIVEC__
+#    define COMPILE_POWERPC_ALTIVEC 1
+#  else
+#    define COMPILE_POWERPC_ALTIVEC 0
+#  endif
 #else
-#define COMPILE_POWERPC_ALTIVEC 0
-#endif
-#else
-#define COMPILE_POWERPC 0
+#  define COMPILE_POWERPC 0
 #endif
 
 #if defined (_M_ARM) || defined(__arm__) || defined(__thumb__)
-#define COMPILE_ARM 1
+#  define COMPILE_ARM 1
 #else
-#define COMPILE_ARM 0
+#  define COMPILE_ARM 0
 #endif
 
 
