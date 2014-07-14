@@ -109,7 +109,7 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on);
 //Blocking call until the queue is empty. Previously set threadqueue_job handles should not be used anymore
 int threadqueue_flush(threadqueue_queue * threadqueue);
 
-//Blocking call until job is executed. Job handles submitted before job should not be used any more.
+//Blocking call until job is executed. Job handles submitted before job should not be used any more as they are removed from the queue.
 int threadqueue_waitfor(threadqueue_queue * threadqueue, threadqueue_job * job);
 
 //Free ressources in a threadqueue

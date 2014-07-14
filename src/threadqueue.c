@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <errno.h> //ETIMEDOUT
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef _DEBUG
 #include <string.h>
@@ -283,22 +284,33 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count, in
   return 1;
 }
 
+/**
+ * \brief Free a single job from the threadqueue index i, destroying it.
+ */
+static void threadqueue_free_job(threadqueue_queue * const threadqueue, int i)
+{
+#ifdef _DEBUG
+  int j;
+  GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
+  fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
+
+  for (j = 0; j < threadqueue->queue[i]->rdepends_count; ++j) {
+    fprintf(threadqueue->debug_log, "%p->%p\n", threadqueue->queue[i], threadqueue->queue[i]->rdepends[j]);
+  }
+
+  FREE_POINTER(threadqueue->queue[i]->debug_description);
+#endif
+  FREE_POINTER(threadqueue->queue[i]->rdepends);
+  
+  pthread_mutex_destroy(&threadqueue->queue[i]->lock);
+
+  FREE_POINTER(threadqueue->queue[i]);
+}
+
 static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
   int i;
   for (i=0; i < threadqueue->queue_count; ++i) {
-#ifdef _DEBUG
-    int j;
-    GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
-    fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
-    
-    for (j = 0; j < threadqueue->queue[i]->rdepends_count; ++j) {
-      fprintf(threadqueue->debug_log, "%p->%p\n", threadqueue->queue[i], threadqueue->queue[i]->rdepends[j]);
-    }
-    
-    FREE_POINTER(threadqueue->queue[i]->debug_description);
-#endif
-    FREE_POINTER(threadqueue->queue[i]->rdepends);
-    FREE_POINTER(threadqueue->queue[i]);
+    threadqueue_free_job(threadqueue, i);
   }
   threadqueue->queue_count = 0;
   threadqueue->queue_start = 0;
@@ -454,6 +466,20 @@ int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job *
       }
     }
   } while (!job_done);
+
+  // Free jobs submitted before this job.
+  int i;
+  for (i = 0; i < threadqueue->queue_count; ++i) {
+    if (threadqueue->queue[i] == job) break;
+    threadqueue_free_job(threadqueue, i);
+  }
+  // Move remaining jobs to the beginning of the array.
+  if (i > 0) {
+    threadqueue->queue_count -= i;
+    threadqueue->queue_start = 0;
+    memmove(threadqueue->queue, &threadqueue->queue[i], threadqueue->queue_count * sizeof(*threadqueue->queue));
+    memset(&threadqueue->queue[threadqueue->queue_count], 0, i * sizeof(*threadqueue->queue));
+  }
 
   PTHREAD_UNLOCK(&threadqueue->lock);
   
