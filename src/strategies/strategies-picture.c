@@ -21,6 +21,7 @@ cost_pixel_nxn_func * satd_8bit_64x64 = 0;
 #include "generic/picture-generic.h"
 #include "sse2/picture-sse2.h"
 #include "sse41/picture-sse41.h"
+#include "avx2/picture-avx2.h"
 #include "altivec/picture-altivec.h"
 
 
@@ -34,6 +35,9 @@ int strategy_register_picture(void* opaque) {
   }
   if (g_hardware_flags.intel_flags.sse41) {
     success &= strategy_register_picture_sse41(opaque);
+  }
+  if (g_hardware_flags.intel_flags.avx2) {
+    success &= strategy_register_picture_avx2(opaque);
   }
   if (g_hardware_flags.powerpc_flags.altivec) {
     success &= strategy_register_picture_altivec(opaque);

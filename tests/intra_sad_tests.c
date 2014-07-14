@@ -52,8 +52,11 @@ static void setup_tests()
 
     for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
       unsigned size = 1 << (w * 2);
-      bufs[test][w][0] = malloc(size * sizeof(pixel));
-      bufs[test][w][1] = malloc(size * sizeof(pixel));
+      bufs[test][w][0] = malloc(size * sizeof(pixel) + SIMD_ALIGNMENT);
+      bufs[test][w][0] = ALIGNED_POINTER(bufs[test][w][0], SIMD_ALIGNMENT);
+
+      bufs[test][w][1] = malloc(size * sizeof(pixel) + SIMD_ALIGNMENT);
+      bufs[test][w][1] = ALIGNED_POINTER(bufs[test][w][1], SIMD_ALIGNMENT);
     }
   }
 
@@ -69,8 +72,8 @@ static void tear_down_tests()
 {
   for (int test = 0; test < NUM_TESTS; ++test) {
     for (int log_width = 2; log_width <= 6; ++log_width) {
-      free(bufs[test][log_width][0]);
-      free(bufs[test][log_width][1]);
+      //free(bufs[test][log_width][0]);
+      //free(bufs[test][log_width][1]);
     }
   }
 }

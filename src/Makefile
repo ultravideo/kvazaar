@@ -90,7 +90,8 @@ OBJS = interface_main.o \
   strategies/generic/picture-generic.o \
   strategies/sse2/picture-sse2.o \
   strategies/sse41/picture-sse41.o \
-  strategies/altivec/picture-altivec.o
+  strategies/altivec/picture-altivec.o \
+  strategies/avx2/picture-avx2.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
@@ -108,6 +109,7 @@ ifeq ($(ARCH), ppc64)
 else
   strategies/sse2/%.o: EXTRA_FLAGS += -msse2
   strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1
+  strategies/avx2/%.o: EXTRA_FLAGS += -mavx2
 endif
 
 

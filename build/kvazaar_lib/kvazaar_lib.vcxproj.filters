@@ -49,6 +49,12 @@
     <Filter Include="Header Files\strategies\altivec">
       <UniqueIdentifier>{9e275b7f-3094-4614-b817-6ce0bee827b2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\strategies\avx2">
+      <UniqueIdentifier>{80a08f4c-ca27-488b-bd63-8df6eacd1f3a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\strategies\avx2">
+      <UniqueIdentifier>{4ffb5d27-c5bb-44d5-a935-fa93066a259e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\encmain.c">
@@ -152,6 +158,9 @@
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\sse2\picture-sse2.c">
       <Filter>Source Files\strategies\sse2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.c">
+      <Filter>Source Files\strategies\avx2</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -268,6 +277,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\sse2\picture-sse2.h">
       <Filter>Header Files\strategies\sse2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\picture-avx2.h">
+      <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
