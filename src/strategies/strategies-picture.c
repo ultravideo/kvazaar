@@ -22,7 +22,7 @@ cost_pixel_nxn_func * satd_8bit_64x64 = 0;
 #include "sse2/picture-sse2.h"
 #include "sse41/picture-sse41.h"
 #include "altivec/picture-altivec.h"
-#include "picture/picture-avx.c"
+#include "x86_avx/picture-avx.c"
 
 
 int strategy_register_picture(void* opaque) {

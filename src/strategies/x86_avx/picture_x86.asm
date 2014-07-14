@@ -17,7 +17,7 @@
 ;* along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ;****************************************************************************/
 
-%include "x86inc.asm"
+%include "../../extras/x86inc.asm"
 
 ;cglobal and RET macros are from the x86.inc
 ;they push and pop the necessary registers to

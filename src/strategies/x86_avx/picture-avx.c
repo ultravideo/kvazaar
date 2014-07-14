@@ -20,8 +20,8 @@
 /*
 * \file
 */
-#include "../strategyselector.h"
-#include "../x86/picture_x86.h"
+#include "../../strategyselector.h"
+#include "picture_x86.h"
 
 #ifdef __GNUC__
 __attribute__((__target__("avx")))

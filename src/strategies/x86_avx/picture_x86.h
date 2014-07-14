@@ -37,6 +37,4 @@ unsigned kvz_satd_16x16_avx(const pixel *org, const pixel *cur);
 unsigned kvz_satd_32x32_avx(const pixel *org, const pixel *cur);
 unsigned kvz_satd_64x64_avx(const pixel *org, const pixel *cur);
 
-//unsigned kvz_satd_8x8_stride_avx(const pixel *org, int32_t org_stride, const pixel *cur, int32_t cur_stride);
-
 #endif

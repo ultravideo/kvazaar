@@ -135,7 +135,6 @@ TEST satd_test_checkers(void)
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
-  printf("SATD CHECKERS: %d\n", result1);
   ASSERT_EQ(result1, satd_checkers_results[satd_test_env.log_width - 2]);
 
   PASS();
@@ -155,7 +154,6 @@ TEST satd_test_gradient(void)
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
-  printf("SATD GRADIENT: %d\n", result1);
   ASSERT_EQ(result1, satd_gradient_results[satd_test_env.log_width - 2]);
 
   PASS();
