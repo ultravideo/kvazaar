@@ -27,6 +27,7 @@
 #  include "image.h"
 #  include <immintrin.h>
 #  include <assert.h>
+#  include <stdlib.h>
 
 
 #ifdef __GNUC__
