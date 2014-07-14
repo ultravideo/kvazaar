@@ -58,6 +58,7 @@ static void setup_tests()
     }
   }
 
+  //Black and white buffers
   int test = 0;
   for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
     unsigned size = 1 << (w * 2);
@@ -65,15 +66,17 @@ static void setup_tests()
     memset(satd_bufs[test][w][1], 255, size);
   }
 
+  //Checker patterns, buffer 1 is negative of buffer 2
   test = 1;
   for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
     unsigned size = 1 << (w * 2);
     for (int i = 0; i < size; ++i){
-      satd_bufs[test][w][0][i] = 255 * ( ( i + (i / (1 << w) ) ) % 2);
-      satd_bufs[test][w][1][i] = 255 * ( ( i + (i / (1 << w) ) + 1 ) % 2);
+      satd_bufs[test][w][0][i] = 255 * ( ( ((i >> w)%2) + (i % 2) ) % 2);
+      satd_bufs[test][w][1][i] = (satd_bufs[test][w][0][i] + 1) % 2 ;
     }
   }
 
+  //Gradient test pattern
   test = 2;
   for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
     unsigned size = 1 << (w * 2);
@@ -101,9 +104,6 @@ static void satd_tear_down_tests()
 //////////////////////////////////////////////////////////////////////////
 // TESTS
 
-/**
-* Test that the maximum SAD value for a given buffer size doesn't overflow.
-*/
 TEST satd_test_black_and_white(void)
 {
   const int const satd_results[5] = {2040, 4080, 16320, 65280, 261120};
@@ -117,13 +117,7 @@ TEST satd_test_black_and_white(void)
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
-  printf("SATD B&W: %d\n", result1);
   ASSERT_EQ(result1, satd_results[satd_test_env.log_width - 2]);
-  // Order of parameters must not matter.
-  //ASSERT_EQ(result1, result2);
-
-  // Result matches trivial implementation.
-  //ASSERT_EQ(result1, 255 * width * width);
 
   PASS();
 }
@@ -138,16 +132,11 @@ TEST satd_test_checkers(void)
   pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
   pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
   
-    unsigned result1 = satd_test_env.tested_func(buf1, buf2);
-    unsigned result2 = satd_test_env.tested_func(buf2, buf1);
+  unsigned result1 = satd_test_env.tested_func(buf1, buf2);
+  unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
-    printf("SATD CHECKERS: %d\n", result1);
-    ASSERT_EQ(result1, satd_checkers_results[satd_test_env.log_width - 2]);
-    // Order of parameters must not matter.
-    //ASSERT_EQ(result1, result2);
-  
-  // Result matches trivial implementation.
-  //ASSERT_EQ(result1, 255 * width * width);
+  printf("SATD CHECKERS: %d\n", result1);
+  ASSERT_EQ(result1, satd_checkers_results[satd_test_env.log_width - 2]);
 
   PASS();
 }
@@ -168,11 +157,6 @@ TEST satd_test_gradient(void)
 
   printf("SATD GRADIENT: %d\n", result1);
   ASSERT_EQ(result1, satd_gradient_results[satd_test_env.log_width - 2]);
-  // Order of parameters must not matter.
-  //ASSERT_EQ(result1, result2);
-  
-  // Result matches trivial implementation.
-  //ASSERT_EQ(result1, 255 * width * width);
 
   PASS();
 }
@@ -193,9 +177,6 @@ static unsigned satd_test_performance(void)
 // TEST FIXTURES
 SUITE(satd_tests)
 {
-  //SET_SETUP(sad_setup);
-  //SET_TEARDOWN(sad_teardown);
-
   setup_tests();
 
   // Loop through all strategies picking out the intra sad ones and run
@@ -225,12 +206,9 @@ SUITE(satd_tests)
     satd_test_env.tested_func = strategies.strategies[i].fptr;
 
     // Tests
-    //RUN_TEST(satd_test_black_and_white);
-    //RUN_TEST(satd_test_checkers);
+    RUN_TEST(satd_test_black_and_white);
+    RUN_TEST(satd_test_checkers);
     RUN_TEST(satd_test_gradient);
-    for (int i = 0; i < 100000; ++i){
-      satd_test_performance();
-    }
   }
 
   satd_tear_down_tests();

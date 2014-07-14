@@ -21,9 +21,7 @@
 * \file
 */
 #include "../strategyselector.h"
-//#include "../picture.h"
 #include "../x86/picture_x86.h"
-#include <math.h>
 
 #ifdef __GNUC__
 __attribute__((__target__("avx")))
@@ -69,7 +67,7 @@ static unsigned kvz_sad_64x64_stride_avx(const pixel *data1, const pixel *data2,
   return sad;
 }
 
-static unsigned kvz_sad_generic(const pixel * const data1, const pixel * const data2,
+static unsigned kvz_sad_other_avx(const pixel * const data1, const pixel * const data2,
   const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -98,7 +96,7 @@ const int width, const int height, const unsigned stride1, const unsigned stride
   } else if (width == 64 && height == 64) {
     return kvz_sad_64x64_stride_avx(data1, data2, stride1);
   } else {
-    return kvz_sad_generic(data1, data2, width, height, stride1, stride2);
+    return kvz_sad_other_avx(data1, data2, width, height, stride1, stride2);
   }
 }
 
@@ -121,14 +119,11 @@ const int width, const int height, const unsigned stride1, const unsigned stride
 }
 
 // Declare these functions to make sure the signature of the macro matches.
-//static cost_pixel_nxn_func kvz_satd_8bit_16x16;
-//static cost_pixel_nxn_func kvz_satd_8bit_32x32;
-//static cost_pixel_nxn_func kvz_satd_8bit_64x64;
-
-// These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-//KVZ_SATD_NXN(16, pixel, 8bit)
-//KVZ_SATD_NXN(32, pixel, 8bit)
-//KVZ_SATD_NXN(64, pixel, 8bit)
+cost_pixel_nxn_func kvz_satd_8bit_4x4_avx;
+cost_pixel_nxn_func kvz_satd_8bit_8x8_avx;
+cost_pixel_nxn_func kvz_satd_8bit_16x16_avx;
+cost_pixel_nxn_func kvz_satd_8bit_32x32_avx;
+cost_pixel_nxn_func kvz_satd_8bit_64x64_avx;
 
 
 static int strategy_register_picture_avx(void* opaque) {
