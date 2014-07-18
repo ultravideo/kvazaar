@@ -56,11 +56,46 @@ CC = gcc
 CCFLAGS = $(DFLAGS) -std=gnu99 -I. -I./strategies $(WARNINGS)
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
-OBJS = interface_main.o encmain.o bitstream.o cabac.o checkpoint.o config.o context.o cu.o encoder.o encoderstate.o filter.o inter.o intra.o nal.o imagelist.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o encoder_state-bitstream.o encoder_state-ctors_dtors.o encoder_state-geometry.o image.o videoframe.o strategies/strategies-picture.o strategies/strategies-nal.o strategies/generic/nal-generic.o strategies/generic/picture-generic.o strategies/sse2/picture-sse2.o strategies/sse41/picture-sse41.o strategies/altivec/picture-altivec.o
+OBJS = interface_main.o \
+  encmain.o \
+  bitstream.o \
+  cabac.o \
+  checkpoint.o \
+  config.o \
+  context.o \
+  cu.o \
+  encoder.o \
+  encoderstate.o \
+  filter.o \
+  inter.o \
+  intra.o \
+  nal.o \
+  imagelist.o \
+  rdo.o \
+  sao.o \
+  scalinglist.o \
+  search.o \
+  strategyselector.o \
+  tables.o \
+  threadqueue.o \
+  transform.o \
+  encoder_state-bitstream.o \
+  encoder_state-ctors_dtors.o \
+  encoder_state-geometry.o \
+  image.o \
+  videoframe.o \
+  strategies/strategies-picture.o \
+  strategies/strategies-nal.o \
+  strategies/generic/nal-generic.o \
+  strategies/generic/picture-generic.o \
+  strategies/sse2/picture-sse2.o \
+  strategies/sse41/picture-sse41.o \
+  strategies/altivec/picture-altivec.o
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
 DEPS = $(OBJS:.o=.d)
+
 
 all: $(PROGS)
 .PHONY: all clean
