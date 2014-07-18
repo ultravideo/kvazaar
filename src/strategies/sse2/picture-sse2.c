@@ -58,12 +58,25 @@ static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data
   return sad;
 }
 
+static unsigned sad_8bit_4x4_sse2(const pixel *buf1, const pixel *buf2)
+{
+  const __m128i *const mbuf1 = (const __m128i *)buf1;
+  const __m128i *const mbuf2 = (const __m128i *)buf2;
+
+  __m128i sum = _mm_sad_epu8(_mm_load_si128(mbuf1), _mm_load_si128(mbuf2));
+
+  uint32_t result[4];
+  _mm_storeu_si128((__m128i*)result, sum);
+  return result[0] + result[2];
+}
+
 #endif //COMPILE_INTEL_SSE2
 
 int strategy_register_picture_sse2(void* opaque) {
   bool success = true;
 #if COMPILE_INTEL_SSE2
   success &= strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
+  success &= strategyselector_register(opaque, "sad_8bit_4x4", "sse2", 10, &sad_8bit_4x4_sse2);
 #endif
   return success;
 }
