@@ -5,7 +5,7 @@ ifeq (, $(ARCH))
 endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
-DFLAGS = -O2 -g -Werror -march=native -ftree-vectorize
+DFLAGS = -O2 -g -Werror -ftree-vectorize
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
@@ -65,11 +65,22 @@ DEPS = $(OBJS:.o=.d)
 all: $(PROGS)
 .PHONY: all clean
 
+
+# Compile files in strategy directories with appropriate flags.
+EXTRA_FLAGS =
+ifeq ($(ARCH), ppc64)
+  strategies/altivec/%.o: EXTRA_FLAGS += -maltivec
+else
+  strategies/sse2/%.o: EXTRA_FLAGS += -msse2
+  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1
+endif
+
+
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 %.o: %.c Makefile
-	$(CC) $(CCFLAGS) -c $< -o $@
+	$(CC) $(CCFLAGS) $(EXTRA_FLAGS) -c $< -o $@
 
 %.d: %.c Makefile
 	$(CC) $(CCFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
