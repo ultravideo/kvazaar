@@ -59,14 +59,16 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <PostBuildEvent>
-      <Command>$(TargetPath)</Command>
-    </PostBuildEvent>
+    <PostBuildEvent />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <PostBuildEvent>
       <Command>$(TargetPath)</Command>
     </PostBuildEvent>
+    <ClCompile>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <PostBuildEvent>
@@ -91,10 +93,12 @@
   <ItemGroup>
     <ClCompile Include="..\..\tests\intra_sad_tests.c" />
     <ClCompile Include="..\..\tests\sad_tests.c" />
+    <ClCompile Include="..\..\tests\satd_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tests\sad_tests.h" />
+    <ClInclude Include="..\..\tests\satd_tests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

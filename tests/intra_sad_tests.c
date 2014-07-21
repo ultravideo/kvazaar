@@ -115,6 +115,18 @@ TEST test_black_and_white(void)
   PASS();
 }
 
+void sad_intra_test_performance(void)
+{
+  const int test = 0;
+  const int width = 1 << test_env.log_width;
+
+  pixel * buf1 = bufs[test][test_env.log_width][0];
+  pixel * buf2 = bufs[test][test_env.log_width][1];
+
+  unsigned result1 = test_env.tested_func(buf1, buf2);
+  
+  return;
+}
 
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
@@ -148,6 +160,9 @@ SUITE(intra_sad_tests)
 
     // Tests
     RUN_TEST(test_black_and_white);
+    for (int i = 0; i < 100000; ++i){
+      sad_intra_test_performance();
+    }
   }
 
   tear_down_tests();

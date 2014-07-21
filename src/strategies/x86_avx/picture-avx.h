@@ -1,5 +1,5 @@
-#ifndef _CPU_H_
-#define _CPU_H_
+#ifndef STRATEGIES_PICTURE_X86_AVX_H_
+#define STRATEGIES_PICTURE_X86_AVX_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -19,10 +19,6 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
- /*! \file cpu.h
-    \brief cpu functions header
-*/
+int strategy_register_picture_avx(void* opaque);
 
-void kvz_cpu_cpuid(int *ecx, int *edx);
-
-#endif
+#endif //STRATEGIES_PICTURE_X86_AVX_H_

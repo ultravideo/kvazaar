@@ -76,13 +76,14 @@
     <OutDir>$(SolutionDir)$(Platform)-$(Configuration)-libs\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <YASM>
-      <Defines>ARCH_X86_64=1</Defines>
-    </YASM>
+    <YASM />
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
+    <YASM>
+      <Defines>ARCH_X86_64=1;%(Defines)</Defines>
+    </YASM>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>
@@ -92,6 +93,10 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
+    <ClCompile>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <YASM>
@@ -101,15 +106,23 @@
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
+    <ClCompile>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <YASM>
-      <Defines>ARCH_X86_64=1</Defines>
+      <Defines>ARCH_X86_64=1;%(Defines)</Defines>
     </YASM>
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
     </Lib>
+    <ClCompile>
+      <UndefinePreprocessorDefinitions>
+      </UndefinePreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\bitstream.c" />
@@ -151,6 +164,7 @@
     <ClCompile Include="..\..\src\strategies\sse41\picture-sse41.c" />
     <ClCompile Include="..\..\src\strategies\strategies-nal.c" />
     <ClCompile Include="..\..\src\strategies\strategies-picture.c" />
+    <ClCompile Include="..\..\src\strategies\x86_avx\picture-avx.c" />
     <ClCompile Include="..\..\src\videoframe.c" />
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
     <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h" />
@@ -185,6 +199,8 @@
     <ClInclude Include="..\..\src\strategies\sse41\picture-sse41.h" />
     <ClInclude Include="..\..\src\strategies\strategies-nal.h" />
     <ClInclude Include="..\..\src\strategies\strategies-picture.h" />
+    <ClInclude Include="..\..\src\strategies\x86_avx\picture-avx.h" />
+    <ClInclude Include="..\..\src\strategies\x86_avx\picture_x86.h" />
     <ClInclude Include="..\..\src\strategyselector.h" />
     <ClInclude Include="..\..\src\tables.h" />
     <ClInclude Include="..\..\src\threadqueue.h" />
@@ -192,10 +208,10 @@
     <ClInclude Include="..\..\src\transform.h" />
     <ClInclude Include="..\..\src\version.h" />
     <ClInclude Include="..\..\src\videoframe.h" />
-    <ClInclude Include="..\..\src\x86\cpu.h" />
   </ItemGroup>
   <ItemGroup>
-    <YASM Include="..\..\src\x86\cpu.asm" />
+    <YASM Include="..\..\src\extras\x86inc.asm" />
+    <YASM Include="..\..\src\strategies\x86_avx\picture_x86.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

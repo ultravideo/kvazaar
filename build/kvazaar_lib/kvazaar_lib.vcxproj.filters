@@ -13,12 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Source Files\x86">
-      <UniqueIdentifier>{9e551421-7564-43be-a2b6-1ffb16d744a4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\x86">
-      <UniqueIdentifier>{d1533c70-cb9a-419d-9a38-5161894ec359}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\strategies">
       <UniqueIdentifier>{84b28f88-c0de-4ee8-8566-c2c56d2b0f6e}</UniqueIdentifier>
     </Filter>
@@ -48,6 +42,15 @@
     </Filter>
     <Filter Include="Header Files\strategies\altivec">
       <UniqueIdentifier>{9e275b7f-3094-4614-b817-6ce0bee827b2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\strategies\x86_avx">
+      <UniqueIdentifier>{1623782d-4d14-4de9-b9e8-53904da33191}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\strategies\x86_avx">
+      <UniqueIdentifier>{ba4b5a81-cd88-440c-b058-1fef083df4a5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\extras">
+      <UniqueIdentifier>{7b258ce6-90d8-4e47-ab43-babda9eefbd9}</UniqueIdentifier>
     </Filter>
     <Filter Include="Header Files\strategies\avx2">
       <UniqueIdentifier>{80a08f4c-ca27-488b-bd63-8df6eacd1f3a}</UniqueIdentifier>
@@ -159,6 +162,9 @@
     <ClCompile Include="..\..\src\strategies\sse2\picture-sse2.c">
       <Filter>Source Files\strategies\sse2</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\x86_avx\picture-avx.c">
+      <Filter>Source Files\strategies\x86_avx</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.c">
       <Filter>Source Files\strategies\avx2</Filter>
     </ClCompile>
@@ -205,9 +211,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\rdo.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\x86\cpu.h">
-      <Filter>Header Files\x86</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\extras\getopt.h">
       <Filter>Header Files</Filter>
@@ -278,13 +281,22 @@
     <ClInclude Include="..\..\src\strategies\sse2\picture-sse2.h">
       <Filter>Header Files\strategies\sse2</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\strategies\x86_avx\picture_x86.h">
+      <Filter>Header Files\strategies\x86_avx</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\x86_avx\picture-avx.h">
+      <Filter>Header Files\strategies\x86_avx</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\strategies\avx2\picture-avx2.h">
       <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <YASM Include="..\..\src\x86\cpu.asm">
-      <Filter>Source Files\x86</Filter>
+    <YASM Include="..\..\src\strategies\x86_avx\picture_x86.asm">
+      <Filter>Source Files\strategies\x86_avx</Filter>
+    </YASM>
+    <YASM Include="..\..\src\extras\x86inc.asm">
+      <Filter>Source Files\extras</Filter>
     </YASM>
   </ItemGroup>
 </Project>

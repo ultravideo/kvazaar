@@ -151,8 +151,7 @@ static const strategy_to_select strategies_to_select[] = {
   {NULL, NULL},
 };
 
-
-
+unsigned satd_8bit_8x8_generic(const pixel * const block1, const pixel * const block2);
 
 
 #endif //STRATEGYSELECTOR_H_

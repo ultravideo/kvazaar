@@ -24,6 +24,9 @@
       <SubSystem>Console</SubSystem>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
     </Link>
+    <YASM>
+      <Defines>HAVE_ALIGNED_STACK=1</Defines>
+    </YASM>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>

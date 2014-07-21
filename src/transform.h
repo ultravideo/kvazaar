@@ -29,8 +29,6 @@
 #include "encoder.h"
 #include "encoderstate.h"
 
-#include <math.h>
-
 extern const uint8_t g_chroma_scale[58];
 extern const int16_t g_inv_quant_scales[6];
 

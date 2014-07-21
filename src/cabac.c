@@ -27,7 +27,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <math.h>
 
 
 const uint8_t g_auc_next_state_mps[128] =

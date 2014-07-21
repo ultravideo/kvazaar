@@ -27,9 +27,11 @@ LDFLAGS += -m$(TARGET_CPU_BITS)
 ifneq ( ,$(findstring Windows, $(OS)))
   ifeq ($(ARCH), x86_64)
     ASMFLAGS += -f win64
+    ASMFLAGS += -DARCH_X86_64=1
   else
     ASMFLAGS += -f win32
     ASMFLAGS += -DPREFIX
+    ASMFLAGS += -DARCH_X86_64=0
   endif
   DFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 # OS X specific flags
@@ -44,8 +46,10 @@ ASMFLAGS += -DPREFIX
 else
   ifeq ($(ARCH), x86_64)
       ASMFLAGS += -f elf64
+      ASMFLAGS += -DARCH_X86_64=1
   else
       ASMFLAGS += -f elf32
+      ASMFLAGS += -DARCH_X86_64=0
   endif
 endif
 
@@ -91,7 +95,21 @@ OBJS = interface_main.o \
   strategies/sse2/picture-sse2.o \
   strategies/sse41/picture-sse41.o \
   strategies/altivec/picture-altivec.o \
-  strategies/avx2/picture-avx2.o
+  strategies/avx2/picture-avx2.o \
+  strategies/x86_avx/picture-avx.o
+ASMOBJS =
+
+ifeq ($(TARGET_CPU_ARCH), x86)
+  ifneq ($(KVAZAAR_DISABLE_YASM), 1)
+    ASMOBJS += strategies/x86_avx/picture_x86.o
+  endif
+endif
+
+ifeq ($(KVAZAAR_DISABLE_YASM), 1)
+  DFLAGS += -DKVAZAAR_DISABLE_YASM
+endif
+
+YASM = yasm
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
@@ -115,6 +133,12 @@ endif
 
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
+
+%.o: %.asm Makefile
+	$(YASM) $(ASMFLAGS) -o $@ $<
+
+%.d: %.asm Makefile
+	$(YASM) $(ASMFLAGS) -M -o $@ > $<
 
 %.o: %.c Makefile
 	$(CC) $(CCFLAGS) $(EXTRA_FLAGS) -c $< -o $@

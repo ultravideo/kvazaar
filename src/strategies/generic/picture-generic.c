@@ -148,7 +148,7 @@ static unsigned satd_8bit_4x4_generic(const pixel *piOrg, const pixel *piCur)
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-static unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrideOrg,
+unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrideOrg,
   const pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
@@ -242,7 +242,7 @@ static unsigned satd_16bit_8x8_general(const pixel * piOrg, const int32_t iStrid
 // for fixed size blocks. They calculate hadamard for integer
 // multiples of 8x8 with the 8x8 hadamard function.
 #define SATD_NXN(n, pixel_type, suffix) \
-static unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
+unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
   const pixel_type * const block1, const pixel_type * const block2) \
 { \
   unsigned x, y; \
@@ -257,11 +257,11 @@ static unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
-static cost_pixel_nxn_func satd_8bit_4x4_generic;
-static cost_pixel_nxn_func satd_8bit_8x8_generic;
-static cost_pixel_nxn_func satd_8bit_16x16_generic;
-static cost_pixel_nxn_func satd_8bit_32x32_generic;
-static cost_pixel_nxn_func satd_8bit_64x64_generic;
+cost_pixel_nxn_func satd_8bit_4x4_generic;
+cost_pixel_nxn_func satd_8bit_8x8_generic;
+cost_pixel_nxn_func satd_8bit_16x16_generic;
+cost_pixel_nxn_func satd_8bit_32x32_generic;
+cost_pixel_nxn_func satd_8bit_64x64_generic;
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
 SATD_NXN(8, pixel, 8bit)
