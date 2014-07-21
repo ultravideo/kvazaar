@@ -1,5 +1,5 @@
-#ifndef STRATEGIES_PICTURE_X86_AVX_H_
-#define STRATEGIES_PICTURE_X86_AVX_H_
+#ifndef STRATEGIES_PICTURE_X86_ASM_H_
+#define STRATEGIES_PICTURE_X86_ASM_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -19,6 +19,6 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_picture_avx(void* opaque);
+int strategy_register_picture_x86_asm_avx(void* opaque);
 
-#endif //STRATEGIES_PICTURE_X86_AVX_H_
+#endif //STRATEGIES_PICTURE_X86_ASM_H_

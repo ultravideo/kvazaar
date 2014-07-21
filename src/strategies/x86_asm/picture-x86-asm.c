@@ -25,7 +25,8 @@
 
 #if !defined(KVAZAAR_DISABLE_YASM)
 
-#include "picture_x86.h"
+#include "picture-x86-asm-sad.h"
+#include "picture-x86-asm-satd.h"
 
 #ifdef __GNUC__
 __attribute__((__target__("avx")))
@@ -86,7 +87,7 @@ static unsigned kvz_sad_other_avx(const pixel * const data1, const pixel * const
   return sad;
 }
 
-static unsigned reg_sad_avx(const pixel * const data1, const pixel * const data2,
+static unsigned reg_sad_x86_asm(const pixel * const data1, const pixel * const data2,
 const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   if (width == 4 && height == 4) {
@@ -131,22 +132,22 @@ cost_pixel_nxn_func kvz_satd_8bit_64x64_avx;
 
 #endif //COMPILE_INTEL_AVX && !defined(KVAZAAR_DISABLE_YASM)
 
-int strategy_register_picture_avx(void* opaque) {
+int strategy_register_picture_x86_asm_avx(void* opaque) {
   bool success = true;
 #if !defined(KVAZAAR_DISABLE_YASM)
-  success &= strategyselector_register(opaque, "reg_sad", "avx", 30, &reg_sad_avx);
+  success &= strategyselector_register(opaque, "reg_sad", "x86_asm_avx", 30, &reg_sad_x86_asm);
 
-  success &= strategyselector_register(opaque, "sad_8bit_4x4", "avx", 30, &kvz_sad_4x4_avx);
-  success &= strategyselector_register(opaque, "sad_8bit_8x8", "avx", 30, &kvz_sad_8x8_avx);
-  success &= strategyselector_register(opaque, "sad_8bit_16x16", "avx", 30, &kvz_sad_16x16_avx);
-  success &= strategyselector_register(opaque, "sad_8bit_32x32", "avx", 30, &kvz_sad_32x32_avx);
-  success &= strategyselector_register(opaque, "sad_8bit_64x64", "avx", 30, &kvz_sad_64x64_avx);
+  success &= strategyselector_register(opaque, "sad_8bit_4x4", "x86_asm_avx", 30, &kvz_sad_4x4_avx);
+  success &= strategyselector_register(opaque, "sad_8bit_8x8", "x86_asm_avx", 30, &kvz_sad_8x8_avx);
+  success &= strategyselector_register(opaque, "sad_8bit_16x16", "x86_asm_avx", 30, &kvz_sad_16x16_avx);
+  success &= strategyselector_register(opaque, "sad_8bit_32x32", "x86_asm_avx", 30, &kvz_sad_32x32_avx);
+  success &= strategyselector_register(opaque, "sad_8bit_64x64", "x86_asm_avx", 30, &kvz_sad_64x64_avx);
 
-  success &= strategyselector_register(opaque, "satd_8bit_4x4", "avx", 30, &kvz_satd_4x4_avx);
-  success &= strategyselector_register(opaque, "satd_8bit_8x8", "avx", 30, &kvz_satd_8x8_avx);
-  success &= strategyselector_register(opaque, "satd_8bit_16x16", "avx", 30, &kvz_satd_16x16_avx);
-  success &= strategyselector_register(opaque, "satd_8bit_32x32", "avx", 30, &kvz_satd_32x32_avx);
-  success &= strategyselector_register(opaque, "satd_8bit_64x64", "avx", 30, &kvz_satd_64x64_avx);
+  success &= strategyselector_register(opaque, "satd_8bit_4x4", "x86_asm_avx", 30, &kvz_satd_4x4_avx);
+  success &= strategyselector_register(opaque, "satd_8bit_8x8", "x86_asm_avx", 30, &kvz_satd_8x8_avx);
+  success &= strategyselector_register(opaque, "satd_8bit_16x16", "x86_asm_avx", 30, &kvz_satd_16x16_avx);
+  success &= strategyselector_register(opaque, "satd_8bit_32x32", "x86_asm_avx", 30, &kvz_satd_32x32_avx);
+  success &= strategyselector_register(opaque, "satd_8bit_64x64", "x86_asm_avx", 30, &kvz_satd_64x64_avx);
 #endif //COMPILE_INTEL_AVX && !defined(KVAZAAR_DISABLE_YASM)
   return success;
 }
