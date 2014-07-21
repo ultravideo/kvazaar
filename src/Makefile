@@ -27,9 +27,11 @@ LDFLAGS += -m$(TARGET_CPU_BITS)
 ifneq ( ,$(findstring Windows, $(OS)))
   ifeq ($(ARCH), x86_64)
     ASMFLAGS += -f win64
+    ASMFLAGS += -DARCH_X86_64=1
   else
     ASMFLAGS += -f win32
     ASMFLAGS += -DPREFIX
+    ASMFLAGS += -DARCH_X86_64=0
   endif
   DFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 # OS X specific flags
@@ -44,8 +46,10 @@ ASMFLAGS += -DPREFIX
 else
   ifeq ($(ARCH), x86_64)
       ASMFLAGS += -f elf64
+      ASMFLAGS += -DARCH_X86_64=1
   else
       ASMFLAGS += -f elf32
+      ASMFLAGS += -DARCH_X86_64=0
   endif
 endif
 
@@ -56,8 +60,19 @@ CC = gcc
 CCFLAGS = $(DFLAGS) -std=gnu99 -I. -I./strategies $(WARNINGS)
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
-OBJS = interface_main.o encmain.o bitstream.o cabac.o checkpoint.o config.o context.o cu.o encoder.o encoderstate.o filter.o inter.o intra.o nal.o imagelist.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o encoder_state-bitstream.o encoder_state-ctors_dtors.o encoder_state-geometry.o image.o videoframe.o strategies/strategies-picture.o strategies/strategies-nal.o strategies/generic/nal-generic.o strategies/generic/picture-generic.o strategies/sse2/picture-sse2.o strategies/sse41/picture-sse41.o strategies/altivec/picture-altivec.o
-ASMOBJS = picture_x86.o
+OBJS = interface_main.o encmain.o bitstream.o cabac.o checkpoint.o config.o context.o cu.o encoder.o encoderstate.o filter.o inter.o intra.o nal.o imagelist.o rdo.o sao.o scalinglist.o search.o strategyselector.o tables.o threadqueue.o transform.o encoder_state-bitstream.o encoder_state-ctors_dtors.o encoder_state-geometry.o image.o videoframe.o strategies/strategies-picture.o strategies/strategies-nal.o strategies/generic/nal-generic.o strategies/generic/picture-generic.o strategies/sse2/picture-sse2.o strategies/sse41/picture-sse41.o strategies/x86_avx/picture-avx.o strategies/altivec/picture-altivec.o
+ASMOBJS =
+
+ifeq ($(TARGET_CPU_ARCH), x86)
+  ifneq ($(KVAZAAR_DISABLE_YASM), 1)
+    ASMOBJS += strategies/x86_avx/picture_x86.o
+  endif
+endif
+
+ifeq ($(KVAZAAR_DISABLE_YASM), 1)
+  DFLAGS += -DKVAZAAR_DISABLE_YASM
+endif
+
 YASM = yasm
 PROG  = ./kvazaar
 PROGS = $(PROG)
@@ -71,8 +86,11 @@ $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 %.o: %.asm Makefile
-	$(YASM) $(ASMFLAGS) -o $@
-	
+	$(YASM) $(ASMFLAGS) -o $@ $<
+
+%.d: %.asm Makefile
+	$(YASM) $(ASMFLAGS) -M -o $@ > $<
+
 %.o: %.c Makefile
 	$(CC) $(CCFLAGS) -c $< -o $@
 

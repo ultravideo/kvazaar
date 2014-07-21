@@ -192,6 +192,7 @@
     <ClInclude Include="..\..\src\strategies\sse41\picture-sse41.h" />
     <ClInclude Include="..\..\src\strategies\strategies-nal.h" />
     <ClInclude Include="..\..\src\strategies\strategies-picture.h" />
+    <ClInclude Include="..\..\src\strategies\x86_avx\picture-avx.h" />
     <ClInclude Include="..\..\src\strategies\x86_avx\picture_x86.h" />
     <ClInclude Include="..\..\src\strategyselector.h" />
     <ClInclude Include="..\..\src\tables.h" />

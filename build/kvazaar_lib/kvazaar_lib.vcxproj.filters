@@ -275,6 +275,9 @@
     <ClInclude Include="..\..\src\strategies\x86_avx\picture_x86.h">
       <Filter>Header Files\strategies\x86_avx</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\strategies\x86_avx\picture-avx.h">
+      <Filter>Header Files\strategies\x86_avx</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\strategies\x86_avx\picture_x86.asm">
