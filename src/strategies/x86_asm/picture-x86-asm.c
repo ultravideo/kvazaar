@@ -105,32 +105,7 @@ const int width, const int height, const unsigned stride1, const unsigned stride
   }
 }
 
-// Function macro for defining hadamard calculating functions
-// for fixed size blocks. They calculate hadamard for integer
-// multiples of 8x8 with the 8x8 hadamard function.
-#define KVZ_SATD_NXN(n, pixel_type, suffix) \
-  static unsigned kvz_satd_ ## suffix ## _ ## n ## x ## n ## _stride( \
-  const pixel_type * const block1, const pixel_type * const block2) \
-{ \
-  unsigned x, y; \
-  unsigned sum = 0; \
-  for (y = 0; y < (n); y += 8) { \
-  unsigned row = y * (n); \
-  for (x = 0; x < (n); x += 8) { \
-  sum += kvz_satd_8x8_stride_avx(&block1[row + x], (n), &block2[row + x], (n)); \
-  } \
-  } \
-  return sum; \
-}
-
-// Declare these functions to make sure the signature of the macro matches.
-cost_pixel_nxn_func kvz_satd_8bit_4x4_avx;
-cost_pixel_nxn_func kvz_satd_8bit_8x8_avx;
-cost_pixel_nxn_func kvz_satd_8bit_16x16_avx;
-cost_pixel_nxn_func kvz_satd_8bit_32x32_avx;
-cost_pixel_nxn_func kvz_satd_8bit_64x64_avx;
-
-#endif //COMPILE_INTEL_AVX && !defined(KVAZAAR_DISABLE_YASM)
+#endif //!defined(KVAZAAR_DISABLE_YASM)
 
 int strategy_register_picture_x86_asm_avx(void* opaque) {
   bool success = true;
@@ -148,6 +123,6 @@ int strategy_register_picture_x86_asm_avx(void* opaque) {
   success &= strategyselector_register(opaque, "satd_8bit_16x16", "x86_asm_avx", 30, &kvz_satd_16x16_avx);
   success &= strategyselector_register(opaque, "satd_8bit_32x32", "x86_asm_avx", 30, &kvz_satd_32x32_avx);
   success &= strategyselector_register(opaque, "satd_8bit_64x64", "x86_asm_avx", 30, &kvz_satd_64x64_avx);
-#endif //COMPILE_INTEL_AVX && !defined(KVAZAAR_DISABLE_YASM)
+#endif //!defined(KVAZAAR_DISABLE_YASM)
   return success;
 }
