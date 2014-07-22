@@ -41,22 +41,22 @@ INIT_XMM avx
 
 cglobal sad_4x4, 2, 2, 2
 
-;Load 16 bytes of both frames
-vmovdqu m0, [r0]
-vmovdqu m1, [r1]
+    ;Load 16 bytes of both frames
+    vmovdqu m0, [r0]
+    vmovdqu m1, [r1]
 
-;Calculate SAD. The results are written in
-;m0[15:0] and m0[79:64]
-vpsadbw m0, m1
+    ;Calculate SAD. The results are written in
+    ;m0[15:0] and m0[79:64]
+    vpsadbw m0, m1
 
-;Sum the result
-vmovhlps m1, m0
-vpaddw m0, m1
+    ;Sum the results
+    vmovhlps m1, m0
+    vpaddw m0, m1
 
-;Set the result to eax
-vmovd eax, m0
+    ;Write the result to eax
+    vmovd eax, m0
 
-RET
+    RET
 
 
 ;KVZ_SAD_4X4_STRIDE
@@ -67,27 +67,27 @@ RET
 
 cglobal sad_4x4_stride, 3, 3, 2
 
-;Load 4 times 4 bytes of both frames
-vpinsrd m0, [r0], 0
-add r0, r2
-vpinsrd m0, [r0], 1
-vpinsrd m0, [r0+r2], 2
-vpinsrd m0, [r0+r2*2], 3
+    ;Load 4 times 4 bytes of both frames
+    vpinsrd m0, [r0], 0
+    add r0, r2
+    vpinsrd m0, [r0], 1
+    vpinsrd m0, [r0+r2], 2
+    vpinsrd m0, [r0+r2*2], 3
 
-vpinsrd m1, [r1], 0
-add r1, r2
-vpinsrd m1, [r1], 1
-vpinsrd m1, [r1+r2], 2
-vpinsrd m1, [r1+r2*2], 3
+    vpinsrd m1, [r1], 0
+    add r1, r2
+    vpinsrd m1, [r1], 1
+    vpinsrd m1, [r1+r2], 2
+    vpinsrd m1, [r1+r2*2], 3
 
-vpsadbw m0, m1
+    vpsadbw m0, m1
 
-vmovhlps m1, m0
-vpaddw m0, m1
+    vmovhlps m1, m0
+    vpaddw m0, m1
 
-vmovd eax, m0
+    vmovd eax, m0
 
-RET
+    RET
 
 
 ;KVZ_SAD_8X8
@@ -97,41 +97,41 @@ RET
 
 cglobal sad_8x8, 2, 2, 5
 
-;Load the first half of both frames
-vmovdqu m0, [r0]
-vmovdqu m2, [r0+16]
+    ;Load the first half of both frames
+    vmovdqu m0, [r0]
+    vmovdqu m2, [r0+16]
 
-vmovdqu m1, [r1]
-vmovdqu m3, [r1+16]
+    vmovdqu m1, [r1]
+    vmovdqu m3, [r1+16]
 
-;Calculate SADs for both
-vpsadbw m0, m1
-vpsadbw m2, m3
+    ;Calculate SADs for both
+    vpsadbw m0, m1
+    vpsadbw m2, m3
 
-;Sum
-vpaddw m0, m2
+    ;Sum
+    vpaddw m0, m2
 
-;Repeat for the latter half
-vmovdqu m1, [r0+16*2]
-vmovdqu m3, [r0+16*3]
+    ;Repeat for the latter half
+    vmovdqu m1, [r0+16*2]
+    vmovdqu m3, [r0+16*3]
 
-vmovdqu m2, [r1+16*2]
-vmovdqu m4, [r1+16*3]
+    vmovdqu m2, [r1+16*2]
+    vmovdqu m4, [r1+16*3]
 
-vpsadbw m1, m2
-vpsadbw m3, m4
+    vpsadbw m1, m2
+    vpsadbw m3, m4
 
-vpaddw m1, m3
+    vpaddw m1, m3
 
-;Sum all the SADs
-vpaddw m0, m1
+    ;Sum all the SADs
+    vpaddw m0, m1
 
-vmovhlps m1, m0
-vpaddw m0, m1
+    vmovhlps m1, m0
+    vpaddw m0, m1
 
-vmovd eax, m0
+    vmovd eax, m0
 
-RET
+    RET
 
 
 ;KVZ_SAD_8X8_STRIDE
@@ -142,73 +142,73 @@ RET
 
 cglobal sad_8x8_stride, 3, 3, 5
 
-;Zero m0 register
-vpxor m0, m0
+    ;Zero m0 register
+    vpxor m0, m0
 
-;Load the first half to m1 and m3 registers(cur)
-;Current frame
-;Load to the high 64 bits of xmm
-vmovhpd m1, [r0]
-add r0, r2
-;Load to the low 64 bits
-vmovlpd m1, [r0] 
+    ;Load the first half to m1 and m3 registers(cur)
+    ;Current frame
+    ;Load to the high 64 bits of xmm
+    vmovhpd m1, [r0]
+    add r0, r2
+    ;Load to the low 64 bits
+    vmovlpd m1, [r0] 
 
-vmovhpd m3, [r0+r2]
-vmovlpd m3, [r0+r2*2] 
-;lea calculates the address to r0,
-;but doesn't load anything from
-;the memory. Equivalent for
-;two add r0, r2 instructions.
-lea r0, [r0+r2*2]
-add r0, r2
+    vmovhpd m3, [r0+r2]
+    vmovlpd m3, [r0+r2*2] 
+    ;lea calculates the address to r0,
+    ;but doesn't load anything from
+    ;the memory. Equivalent for
+    ;two add r0, r2 instructions.
+    lea r0, [r0+r2*2]
+    add r0, r2
 
-;Reference frame
-vmovhpd m2, [r1]
-add r1, r2
-vmovlpd m2, [r1] 
+    ;Reference frame
+    vmovhpd m2, [r1]
+    add r1, r2
+    vmovlpd m2, [r1] 
 
-vmovhpd m4, [r1+r2]
-vmovlpd m4, [r1+r2*2] 
-lea r1, [r1+r2*2]
-add r1, r2
+    vmovhpd m4, [r1+r2]
+    vmovlpd m4, [r1+r2*2] 
+    lea r1, [r1+r2*2]
+    add r1, r2
 
-vpsadbw m1, m2
-vpsadbw m3, m4
+    vpsadbw m1, m2
+    vpsadbw m3, m4
 
-vpaddw m0, m1
-vpaddw m0, m3
+    vpaddw m0, m1
+    vpaddw m0, m3
 
-;Repeat for the other half
-vmovhpd m1, [r0]
-add r0, r2
-vmovlpd m1, [r0] 
+    ;Repeat for the other half
+    vmovhpd m1, [r0]
+    add r0, r2
+    vmovlpd m1, [r0] 
 
-vmovhpd m3, [r0+r2]
-vmovlpd m3, [r0+r2*2] 
-lea r0, [r0+r2*2]
-add r0, r2
+    vmovhpd m3, [r0+r2]
+    vmovlpd m3, [r0+r2*2] 
+    lea r0, [r0+r2*2]
+    add r0, r2
 
-vmovhpd m2, [r1]
-add r1, r2
-vmovlpd m2, [r1] 
+    vmovhpd m2, [r1]
+    add r1, r2
+    vmovlpd m2, [r1] 
 
-vmovhpd m4, [r1+r2]
-vmovlpd m4, [r1+r2*2] 
-lea r1, [r1+r2*2]
-add r1, r2
+    vmovhpd m4, [r1+r2]
+    vmovlpd m4, [r1+r2*2] 
+    lea r1, [r1+r2*2]
+    add r1, r2
 
-vpsadbw m1, m2
-vpsadbw m3, m4
+    vpsadbw m1, m2
+    vpsadbw m3, m4
 
-vpaddw m0, m1
-vpaddw m0, m3
+    vpaddw m0, m1
+    vpaddw m0, m3
 
-vmovhlps m1, m0
-vpaddw m0, m1
+    vmovhlps m1, m0
+    vpaddw m0, m1
 
-vmovd eax, m0
+    vmovd eax, m0
 
-RET
+    RET
 
 
 ;KVZ_SAD_16X16
@@ -218,40 +218,40 @@ RET
 
 cglobal sad_16x16, 2, 2, 5
 
-;Zero m4
-vpxor m4, m4
+    ;Zero m4
+    vpxor m4, m4
 
-%assign i 0
+    %assign i 0
 
-;Repeat 8 times.
-%rep 8
+    ;Repeat 8 times.
+    %rep 8
 
-;Load the next to rows of the current frame
-vmovdqu m0, [r0 + 16 * i]
-vmovdqu m2, [r0 + 16 * (i + 1)]
+        ;Load the next to rows of the current frame
+        vmovdqu m0, [r0 + 16 * i]
+        vmovdqu m2, [r0 + 16 * (i + 1)]
 
-;Load the next to rows of the reference frame
-vmovdqu m1, [r1 + 16 * i]
-vmovdqu m3, [r1 + 16 * (i + 1)]
+        ;Load the next to rows of the reference frame
+        vmovdqu m1, [r1 + 16 * i]
+        vmovdqu m3, [r1 + 16 * (i + 1)]
 
-vpsadbw m0, m1
-vpsadbw m2, m3
+        vpsadbw m0, m1
+        vpsadbw m2, m3
 
-;Accumulate SADs to m4
-vpaddw m4, m0
-vpaddw m4, m2
+        ;Accumulate SADs to m4
+        vpaddw m4, m0
+        vpaddw m4, m2
 
-%assign i i+2
+        %assign i i+2
 
-%endrep
+    %endrep
 
-;Calculate the final sum
-vmovhlps m0, m4
-vpaddw m4, m0
+    ;Calculate the final sum
+    vmovhlps m0, m4
+    vpaddw m4, m0
 
-vmovd eax, m4
+    vmovd eax, m4
 
-RET
+    RET
 
 
 ;KVZ_SAD_16X16_STRIDE
@@ -262,31 +262,31 @@ RET
 
 cglobal sad_16x16_stride, 3, 3, 5
 
-vpxor m4, m4
+    vpxor m4, m4
 
-%rep 8
+    %rep 8
 
-; Load the next 2 rows from rec_buf to m0 and m2
-vmovdqu m0, [r0]
-vmovdqu m2, [r0 + r2]
-lea r0, [r0 + r2*2]
+        ; Load the next 2 rows from rec_buf to m0 and m2
+        vmovdqu m0, [r0]
+        vmovdqu m2, [r0 + r2]
+        lea r0, [r0 + r2*2]
 
-; Load the next 2 rows from ref_buf to m1 and m3
-vmovdqu m1, [r1]
-vmovdqu m3, [r1 + r2]
-lea r1, [r1 + r2*2]
+        ; Load the next 2 rows from ref_buf to m1 and m3
+        vmovdqu m1, [r1]
+        vmovdqu m3, [r1 + r2]
+        lea r1, [r1 + r2*2]
  
-vpsadbw m0, m1
-vpsadbw m2, m3
+        vpsadbw m0, m1
+        vpsadbw m2, m3
 
-vpaddw m4, m0
-vpaddw m4, m2
+        vpaddw m4, m0
+        vpaddw m4, m2
 
-%endrep
+    %endrep
 
-vmovhlps m0, m4
-vpaddw m4, m0
+    vmovhlps m0, m4
+    vpaddw m4, m0
 
-vmovd eax, m4
+    vmovd eax, m4
 
-RET
+    RET
