@@ -56,8 +56,10 @@ endif
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
 WARNINGS = -Wall -Wtype-limits -Wvla
 
+INCLUDEDIRS = -I. -I./strategies -I./extras
+
 CC = gcc
-CCFLAGS = $(DFLAGS) -std=gnu99 -I. -I./strategies $(WARNINGS)
+CCFLAGS = $(DFLAGS) -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
 OBJS = interface_main.o \
@@ -96,12 +98,15 @@ OBJS = interface_main.o \
   strategies/sse41/picture-sse41.o \
   strategies/altivec/picture-altivec.o \
   strategies/avx2/picture-avx2.o \
-  strategies/x86_avx/picture-avx.o
+  strategies/x86_asm/picture-x86-asm.o
+
+ASMFLAGS += $(INCLUDEDIRS)
 ASMOBJS =
 
 ifeq ($(TARGET_CPU_ARCH), x86)
   ifneq ($(KVAZAAR_DISABLE_YASM), 1)
-    ASMOBJS += strategies/x86_avx/picture_x86.o
+    ASMOBJS += strategies/x86_asm/picture-x86-asm-sad.o
+    ASMOBJS += strategies/x86_asm/picture-x86-asm-satd.o
   endif
 endif
 
