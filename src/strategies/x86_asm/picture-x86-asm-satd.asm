@@ -51,19 +51,22 @@ INIT_XMM avx
 %endmacro ; KVZ_ZERO_EXTEND
 
 ; Use nondestructive horizontal add and sub to calculate both at the same time.
-; TODO: It would probably be possible to do this with 3 registers.
+; TODO: It would probably be possible to do this with 3 registers (destructive vphsubw).
 ; args:
 ;	1, 2: input registers
 ;   3, 4: output registers
 %macro SATD_HORIZONTAL_SUB_AND_ADD 4
     ; TODO: It might be possible to do this with 3 registers?
+    ;First stage
     vphaddw %3, %1, %2
     vphsubw %4, %1, %2
+    ;Second stage
     vphaddw %1, %3, %4
     vphsubw %2, %3, %4
+    ;Third stage
     vphaddw %3, %1, %2
     vphsubw %4, %1, %2
-%endmacro
+%endmacro ; SATD_HORIZONTAL_SUB_AND_ADD
 
 ;KVZ_SATD_8X8_STRIDE
 ;Calculates SATD of a 8x8 block inside a frame with stride
@@ -76,270 +79,302 @@ INIT_XMM avx
 %macro KVZ_SATD_8X8_STRIDE 0
 
 
-;Calculate differences of the 8 rows into
-;registers m0-m7
-vpmovzxbw m0, [r0]
-vpmovzxbw m7, [r2]
-vpsubw m0, m7
+    ;Calculate differences of the 8 rows into
+    ;registers m0-m7
+    vpmovzxbw m0, [r0]
+    vpmovzxbw m7, [r2]
+    vpsubw m0, m7
 
-vpmovzxbw m1, [r0+r1]
-vpmovzxbw m7, [r2+r3]
-vpsubw m1, m7
-
-;Set r0 and r2 2 rows forward
-lea r0, [r0+r1*2]
-lea r2, [r2+r3*2]
-
-vpmovzxbw m2, [r0]
-vpmovzxbw m7, [r2]
-vpsubw m2, m7
-
-vpmovzxbw m3, [r0+r1]
-vpmovzxbw m7, [r2+r3]
-vpsubw m3, m7
-
-lea r0, [r0+r1*2]
-lea r2, [r2+r3*2]
-
-vpmovzxbw m4, [r0]
-vpmovzxbw m7, [r2]
-vpsubw m4, m7
-
-vpmovzxbw m5, [r0+r1]
-vpmovzxbw m7, [r2+r3]
-vpsubw m5, m7
-
-lea r0, [r0+r1*2]
-lea r2, [r2+r3*2]
-
-vpmovzxbw m6, [r0]
-vpmovzxbw m7, [r2]
-vpsubw m6, m7
-
-;32-bit AVX doesn't have registers
-;xmm8-xmm15, use stack instead
-%if ARCH_X86_64
-    vpmovzxbw m7, [r0+r1]
-    vpmovzxbw m8, [r2+r3]
-    vpsubw m7, m8
-%else
-    %define temp0 esp+16*3
-    %define temp1 esp+16*2
-    %define temp2 esp+16*1
-    %define temp3 esp+16*0
-    ;Reserve memory for 4 x 128 bits
-    sub esp, 16*4
-
+    vpmovzxbw m1, [r0+r1]
     vpmovzxbw m7, [r2+r3]
-    vmovdqu [temp0], m7
-    vpmovzxbw m7, [r0+r1]
-    vpsubw m7, [temp0]
+    vpsubw m1, m7
 
-    ;Put rows 5-8 to stack
-    vmovdqu [temp0], m4
-    vmovdqu [temp1], m5
-    vmovdqu [temp2], m6
-    vmovdqu [temp3], m7
-%endif
+    ;Set r0 and r2 2 rows forward
+    lea r0, [r0+r1*2]
+    lea r2, [r2+r3*2]
 
-;Hadamard transform
-;Horizontal phaze
+    vpmovzxbw m2, [r0]
+    vpmovzxbw m7, [r2]
+    vpsubw m2, m7
 
-%if ARCH_X86_64
-;Calculate each step into the other half of the
-;xmm registers(xmm0-xmm7 <-> xmm8-xmm15) in order to
-;eliminate the need for memory access.
-    SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m8, m9
-    SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m10, m11
-    SATD_HORIZONTAL_SUB_AND_ADD m4, m5, m12, m13
-    SATD_HORIZONTAL_SUB_AND_ADD m6, m7, m14, m15
+    vpmovzxbw m3, [r0+r1]
+    vpmovzxbw m7, [r2+r3]
+    vpsubw m3, m7
+
+    lea r0, [r0+r1*2]
+    lea r2, [r2+r3*2]
+
+    vpmovzxbw m4, [r0]
+    vpmovzxbw m7, [r2]
+    vpsubw m4, m7
+
+    vpmovzxbw m5, [r0+r1]
+    vpmovzxbw m7, [r2+r3]
+    vpsubw m5, m7
+
+    lea r0, [r0+r1*2]
+    lea r2, [r2+r3*2]
+
+    vpmovzxbw m6, [r0]
+    vpmovzxbw m7, [r2]
+    vpsubw m6, m7
+
+    ;32-bit AVX doesn't have registers
+    ;xmm8-xmm15, use stack instead
+    %if ARCH_X86_64
+        vpmovzxbw m7, [r0+r1]
+        vpmovzxbw m8, [r2+r3]
+        vpsubw m7, m8
+    %else
+        %define temp0 esp+16*3
+        %define temp1 esp+16*2
+        %define temp2 esp+16*1
+        %define temp3 esp+16*0
+        ;Reserve memory for 4 x 128 bits.
+        sub esp, 16*4
+
+        vpmovzxbw m7, [r2+r3]
+        vmovdqu [temp0], m7
+        vpmovzxbw m7, [r0+r1]
+        vpsubw m7, [temp0]
+
+        ;Put rows 5-8 to stack
+        vmovdqu [temp0], m4
+        vmovdqu [temp1], m5
+        vmovdqu [temp2], m6
+        vmovdqu [temp3], m7
+    %endif
+
+    ;Hadamard transform (FWHT algorithm)
+    ;Horizontal transform
+
+    %if ARCH_X86_64
+    ;Calculate horizontal transform for each row.
+    ;Transforms of two rows are interleaved in register pairs.
+    ;(m8 and m9, m10 and m11,...)
+        SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m8, m9
+        SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m10, m11
+        SATD_HORIZONTAL_SUB_AND_ADD m4, m5, m12, m13
+        SATD_HORIZONTAL_SUB_AND_ADD m6, m7, m14, m15
 
 
-%else
-;Calculate horizontal transforms for the first half.
-;Then load to second half into registers and store
-;transforms in the stack.
-    SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m4, m5
-    SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m6, m7
+    %else
+    ;Calculate horizontal transforms for the first four rows.
+    ;Then load the other four into the registers and store
+    ;ready transforms in the stack.
+    ;Input registers are m0-m3, results are written in
+    ;registers m4-m7 (and memory).
+        SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m4, m5
+        SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m6, m7
 
-    vmovdqu m3, [temp3]
-    vmovdqu m2, [temp2]
-    vmovdqu m1, [temp1]
-    vmovdqu m0, [temp0]
+        vmovdqu m3, [temp3]
+        vmovdqu m2, [temp2]
+        vmovdqu m1, [temp1]
+        vmovdqu m0, [temp0]
 
-    vmovdqu [temp3], m7
-    vmovdqu [temp2], m6
-    vmovdqu [temp1], m5
-    vmovdqu [temp0], m4
+        vmovdqu [temp3], m7
+        vmovdqu [temp2], m6
+        vmovdqu [temp1], m5
+        vmovdqu [temp0], m4
 
-    SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m4, m5
-    SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m6, m7
-%endif
+        SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m4, m5
+        SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m6, m7
+    %endif
 
 
-;Vertical phase
+    ;Vertical transform
+    ;Transform columns of the 8x8 block.
+    ;First sum the interleaved horizontally
+    ;transformed values with one horizontal add
+    ;for each pair of rows. Then calculate
+    ;with regular packed additions and
+    ;subtractions.
+    %if ARCH_X86_64
+        ;Horizontally transformed values are in registers m8-m15
+        ;Results are written in m0-m7
 
-%if ARCH_X86_64
+        ;First stage
+        vphaddw m0, m8, m9
+        vphsubw m1, m8, m9
 
-    vphaddw m0, m8, m9
-    vphsubw m1, m8, m9
+        vphaddw m2, m10, m11
+        vphsubw m3, m10, m11
 
-    vphaddw m2, m10, m11
-    vphsubw m3, m10, m11
+        vphaddw m4, m12, m13
+        vphsubw m5, m12, m13
 
-    vphaddw m4, m12, m13
-    vphsubw m5, m12, m13
+        vphaddw m6, m14, m15
+        vphsubw m7, m14, m15
 
-    vphaddw m6, m14, m15
-    vphsubw m7, m14, m15
+        ;Second stage
+        vpaddw m8, m0, m2
+        vpaddw m9, m1, m3
+        vpsubw m10, m0, m2
+        vpsubw m11, m1, m3
 
-    vpaddw m8, m0, m2
-    vpaddw m9, m1, m3
-    vpsubw m10, m0, m2
-    vpsubw m11, m1, m3
+        vpaddw m12, m4, m6
+        vpaddw m13, m5, m7
+        vpsubw m14, m4, m6
+        vpsubw m15, m5, m7
 
-    vpaddw m12, m4, m6
-    vpaddw m13, m5, m7
-    vpsubw m14, m4, m6
-    vpsubw m15, m5, m7
+        ;Third stage
+        vpaddw m0, m8, m12
+        vpaddw m1, m9, m13
+        vpaddw m2, m10, m14
+        vpaddw m3, m11, m15
 
-    vpaddw m0, m8, m12
-    vpaddw m1, m9, m13
-    vpaddw m2, m10, m14
-    vpaddw m3, m11, m15
+        vpsubw m4, m8, m12
+        vpsubw m5, m9, m13
+        vpsubw m6, m10, m14
+        vpsubw m7, m11, m15
 
-    vpsubw m4, m8, m12
-    vpsubw m5, m9, m13
-    vpsubw m6, m10, m14
-    vpsubw m7, m11, m15
+    %else
+        ;Transformed values are in registers m4-m7
+        ;and in memory(temp0-temp3). Transformed values
+        ;are written in m4-m7. Also calculate absolute
+        ;values for them and accumulate into ymm0.
 
-%else
+        ;First stage
+        vphaddw m0, m4, m5
+        vphsubw m1, m4, m5
 
-    vphaddw m0, m4, m5
-    vphsubw m1, m4, m5
+        vphaddw m2, m6, m7
+        vphsubw m3, m6, m7
 
-    vphaddw m2, m6, m7
-    vphsubw m3, m6, m7
+        ;Second stage
+        vpaddw m4, m0, m2
+        vpaddw m5, m1, m3
+        vpsubw m6, m0, m2
+        vpsubw m7, m1, m3
 
-    vpaddw m4, m0, m2
-    vpaddw m5, m1, m3
-    vpsubw m6, m0, m2
-    vpsubw m7, m1, m3
+        vmovdqu m3, [temp3]
+        vmovdqu m2, [temp2]
+        vmovdqu m1, [temp1]
+        vmovdqu m0, [temp0]
 
-    vmovdqu m3, [temp3]
-    vmovdqu m2, [temp2]
-    vmovdqu m1, [temp1]
-    vmovdqu m0, [temp0]
+        vmovdqu [temp3], m7
+        vmovdqu [temp2], m6
+        vmovdqu [temp1], m5
+        vmovdqu [temp0], m4
 
-    vmovdqu [temp3], m7
-    vmovdqu [temp2], m6
-    vmovdqu [temp1], m5
-    vmovdqu [temp0], m4
+        ;First stage (second half)
+        vphaddw m4, m0, m1
+        vphsubw m5, m0, m1
 
-    vphaddw m4, m0, m1
-    vphsubw m5, m0, m1
+        vphaddw m6, m2, m3
+        vphsubw m7, m2, m3
 
-    vphaddw m6, m2, m3
-    vphsubw m7, m2, m3
+        ;Second stage (second half)
+        vpaddw m0, m4, m6
+        vpaddw m1, m5, m7
+        vpsubw m2, m4, m6
+        vpsubw m3, m5, m7
 
-    vpaddw m0, m4, m6
-    vpaddw m1, m5, m7
-    vpsubw m2, m4, m6
-    vpsubw m3, m5, m7
+        ;Third stage
+        vpaddw m4, m0, [temp0]
+        vpaddw m5, m1, [temp1]
+        vpsubw m6, m0, [temp0]
+        vpsubw m7, m1, [temp1]
 
-    vpaddw m4, m0, [temp0]
-    vpaddw m5, m1, [temp1]
-    vpsubw m6, m0, [temp0]
-    vpsubw m7, m1, [temp1]
+        ;Calculate the absolute values and
+        ;zero extend 16-bit values to 32-bit
+        ;values. In other words: extend xmm to
+        ;corresponding ymm.
 
-    ;Calculate the absolute values and
-    ;zero extend 16-bit values to 32-bit
-    ;values. Needs ymm registers (256 bits).
-    vpabsw m4, m4
-    KVZ_ZERO_EXTEND 4, 1
-    vpabsw m5, m5
-    KVZ_ZERO_EXTEND 5, 1
-    vpabsw m6, m6
-    KVZ_ZERO_EXTEND 6, 1
-    vpabsw m7, m7
-    KVZ_ZERO_EXTEND 7, 1
+        vpabsw m4, m4
+        KVZ_ZERO_EXTEND 4, 1
+        vpabsw m5, m5
+        KVZ_ZERO_EXTEND 5, 1
+        vpabsw m6, m6
+        KVZ_ZERO_EXTEND 6, 1
+        vpabsw m7, m7
+        KVZ_ZERO_EXTEND 7, 1
 
-    ;Sum half of the packed results to ymm0
-    vpaddd ymm0, ymm4, ymm5
-    vpaddd ymm0, ymm6
-    vpaddd ymm0, ymm7
+        ;Sum half of the packed results to ymm0
+        vpaddd ymm0, ymm4, ymm5
+        vpaddd ymm0, ymm6
+        vpaddd ymm0, ymm7
 
-    vpaddw m4, m2, [temp2]
-    vpaddw m5, m3, [temp3]
-    vpsubw m6, m2, [temp2]
-    vpsubw m7, m3, [temp3]
+        ;Repeat for the rest
+        vpaddw m4, m2, [temp2]
+        vpaddw m5, m3, [temp3]
+        vpsubw m6, m2, [temp2]
+        vpsubw m7, m3, [temp3]
 
-    vpabsw m4, m4
-    KVZ_ZERO_EXTEND 4, 1
-    vpabsw m5, m5
-    KVZ_ZERO_EXTEND 5, 1
-    vpabsw m6, m6
-    KVZ_ZERO_EXTEND 6, 1
-    vpabsw m7, m7
-    KVZ_ZERO_EXTEND 7, 1
+        vpabsw m4, m4
+        KVZ_ZERO_EXTEND 4, 1
+        vpabsw m5, m5
+        KVZ_ZERO_EXTEND 5, 1
+        vpabsw m6, m6
+        KVZ_ZERO_EXTEND 6, 1
+        vpabsw m7, m7
+        KVZ_ZERO_EXTEND 7, 1
 
-    ;Sum the rest of the packed results in ymm0
-    vpaddd ymm4, ymm5
-    vpaddd ymm4, ymm6
-    vpaddd ymm4, ymm7
+        ;Sum the other half of the packed results to ymm4
+        vpaddd ymm4, ymm5
+        vpaddd ymm4, ymm6
+        vpaddd ymm4, ymm7
 
-    vpaddd ymm0, ymm4
+        ;Sum all packed results to ymm0
+        vpaddd ymm0, ymm4
 
-%endif
+    %endif
 
-%if ARCH_X86_64
-    vpabsw m0, m0
-    KVZ_ZERO_EXTEND 0, 8
-    vpabsw m1, m1
-    KVZ_ZERO_EXTEND 1, 8
-    vpabsw m2, m2
-    KVZ_ZERO_EXTEND 2, 8
-    vpabsw m3, m3
-    KVZ_ZERO_EXTEND 3, 8
-    vpabsw m4, m4
-    KVZ_ZERO_EXTEND 4, 8
-    vpabsw m5, m5
-    KVZ_ZERO_EXTEND 5, 8
-    vpabsw m6, m6
-    KVZ_ZERO_EXTEND 6, 8
-    vpabsw m7, m7
-    KVZ_ZERO_EXTEND 7, 8
+    %if ARCH_X86_64
+    
+        ;Calculate the absolute values and
+        ;zero extend 16-bit values to 32-bit
+        ;values. In other words: extend xmm to
+        ;corresponding ymm.
 
-    vpaddd ymm0, ymm1
-    vpaddd ymm0, ymm2
-    vpaddd ymm0, ymm3
-    vpaddd ymm0, ymm4
-    vpaddd ymm0, ymm5
-    vpaddd ymm0, ymm6
-    vpaddd ymm0, ymm7
-%endif
+        vpabsw m0, m0
+        KVZ_ZERO_EXTEND 0, 8
+        vpabsw m1, m1
+        KVZ_ZERO_EXTEND 1, 8
+        vpabsw m2, m2
+        KVZ_ZERO_EXTEND 2, 8
+        vpabsw m3, m3
+        KVZ_ZERO_EXTEND 3, 8
+        vpabsw m4, m4
+        KVZ_ZERO_EXTEND 4, 8
+        vpabsw m5, m5
+        KVZ_ZERO_EXTEND 5, 8
+        vpabsw m6, m6
+        KVZ_ZERO_EXTEND 6, 8
+        vpabsw m7, m7
+        KVZ_ZERO_EXTEND 7, 8
 
-;Sum the packed values
-vextracti128 m1, ymm0, 1
-vpaddd m0, m1
-vphaddd m0, m0
-vphaddd m0, m0
+        ;Calculate packed sum of transformed values to ymm0
+        vpaddd ymm0, ymm1
+        vpaddd ymm0, ymm2
+        vpaddd ymm0, ymm3
+        vpaddd ymm0, ymm4
+        vpaddd ymm0, ymm5
+        vpaddd ymm0, ymm6
+        vpaddd ymm0, ymm7
+    %endif
 
-;The result is in the lowest 32 bits in m0
-vmovd r4d, m0
+    ;Sum the packed values to m0[32:0]
+    vextracti128 m1, ymm0, 1
+    vpaddd m0, m1
+    vphaddd m0, m0
+    vphaddd m0, m0
 
-;8x8 Hadamard transform requires
-;adding 2 and dividing by 4
-add r4, 2
-shr r4, 2
+    ;The result is in the lowest 32 bits in m0
+    vmovd r4d, m0
 
-;Zero high 128 bits of ymm registers to
-;prevent AVX-SSE transition penalty.
-vzeroupper
+    ;8x8 Hadamard transform requires
+    ;adding 2 and dividing by 4
+    add r4, 2
+    shr r4, 2
 
-%if ARCH_X86_64 == 0
-    add esp, 16*4
-%endif
+    ;Zero high 128 bits of ymm registers to
+    ;prevent AVX-SSE transition penalty.
+    vzeroupper
+
+    %if ARCH_X86_64 == 0
+        add esp, 16*4
+    %endif
 
 %endmacro ; KVZ_SATD_8X8_STRIDE
 
@@ -362,16 +397,18 @@ cglobal satd_4x4, 2, 2, 6
 
     ;Hadamard transform
     ;Horizontal phase
+    ;First stage
     vphaddw m4, m0, m1
     vphsubw m5, m0, m1
-
+    ;Second stage
     vphaddw m0, m4, m5
     vphsubw m1, m4, m5
 
     ;Vertical phase
+    ;First stage
     vphaddw m4, m0, m1
     vphsubw m5, m0, m1
-
+    ;Second stage
     vphaddw m0, m4, m5
     vphsubw m1, m4, m5
 
@@ -390,7 +427,8 @@ cglobal satd_4x4, 2, 2, 6
     ;into eax
     vpextrw eax, m0, 0
 
-    ;Add 1 and divide by 2
+    ;4x4 Hadamard transform requires
+    ;Addition of 1 and division by 2
     add eax, 1
     shr eax, 1
 

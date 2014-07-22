@@ -211,7 +211,12 @@
     <ClInclude Include="..\..\src\videoframe.h" />
   </ItemGroup>
   <ItemGroup>
-    <YASM Include="..\..\src\extras\x86inc.asm" />
+    <YASM Include="..\..\src\extras\x86inc.asm">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </YASM>
     <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.asm" />
     <YASM Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.asm" />
   </ItemGroup>
