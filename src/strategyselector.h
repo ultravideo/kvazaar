@@ -144,11 +144,13 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 //Strategy to include
 #include "strategies/strategies-nal.h"
 #include "strategies/strategies-picture.h"
+#include "strategies/strategies-partial-butterfly.h"
 
 static const strategy_to_select strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
   STRATEGIES_PICTURE_EXPORTS
-  {NULL, NULL},
+  STRATEGIES_PARTIAL_BUTTERFLY_EXPORTS
+  { NULL, NULL },
 };
 
 unsigned satd_8bit_8x8_generic(const pixel * const block1, const pixel * const block2);

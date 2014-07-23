@@ -58,6 +58,11 @@ int strategyselector_init() {
     fprintf(stderr, "strategy_register_nal failed!\n");
     return 0;
   }
+
+  if (!strategy_register_partial_butterfly(&strategies)) {
+    fprintf(stderr, "strategy_register_partial_butterfly failed!\n");
+    return 0;
+  }
   
   while(cur_strategy_to_select->fptr) {
     *(cur_strategy_to_select->fptr) = strategyselector_choose_for(&strategies, cur_strategy_to_select->strategy_type);
