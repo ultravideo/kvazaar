@@ -103,27 +103,24 @@ OBJS = interface_main.o \
 ASMFLAGS += $(INCLUDEDIRS)
 ASMOBJS =
 
-ifeq ($(TARGET_CPU_ARCH), x86)
-  ifneq ($(KVAZAAR_DISABLE_YASM), 1)
-    ASMOBJS += strategies/x86_asm/picture-x86-asm-sad.o
-    ASMOBJS += strategies/x86_asm/picture-x86-asm-satd.o
+AS = yasm
+
+# Compile asm files by default if yasm is present.
+ifndef KVZ_DISABLE_ASM
+  has_as := $(shell type $(AS) 2>/dev/null)
+  ifeq ($(has_as),)
+    KVZ_DISABLE_ASM := 1
   endif
 endif
 
-ifeq ($(KVAZAAR_DISABLE_YASM), 1)
-  DFLAGS += -DKVAZAAR_DISABLE_YASM
-endif
 
-YASM = yasm
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
 DEPS = $(OBJS:.o=.d)
 
-
 all: $(PROGS)
 .PHONY: all clean
-
 
 # Compile files in strategy directories with appropriate flags.
 EXTRA_FLAGS =
@@ -135,15 +132,21 @@ else
   strategies/avx2/%.o: EXTRA_FLAGS += -mavx2
 endif
 
+ifndef KVZ_DISABLE_ASM
+  ASMOBJS += strategies/x86_asm/picture-x86-asm-sad.o
+  ASMOBJS += strategies/x86_asm/picture-x86-asm-satd.o
+  strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
+endif
+
 
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 %.o: %.asm Makefile
-	$(YASM) $(ASMFLAGS) -o $@ $<
+	$(AS) $(ASMFLAGS) -o $@ $<
 
 %.d: %.asm Makefile
-	$(YASM) $(ASMFLAGS) -M -o $@ > $<
+	$(AS) $(ASMFLAGS) -M -o $@ > $<
 
 %.o: %.c Makefile
 	$(CC) $(CCFLAGS) $(EXTRA_FLAGS) -c $< -o $@
@@ -153,7 +156,6 @@ $(PROG): $(OBJS) $(ASMOBJS)
 
 
 clean:
-	echo $(ARCH)
 	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)
 
 -include $(DEPS)
