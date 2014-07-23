@@ -38,6 +38,7 @@ INIT_XMM avx
 ;zero extend all packed words in xmm to dwords in ymm
 ;%1 number of the destination register
 ;%2 number of a free xmm register
+
 %macro KVZ_ZERO_EXTEND 2
 
     ;Zero extend low 64 bits
@@ -55,17 +56,23 @@ INIT_XMM avx
 ; args:
 ;	1, 2: input registers
 ;   3, 4: output registers
+
 %macro SATD_HORIZONTAL_SUB_AND_ADD 4
+
     ; TODO: It might be possible to do this with 3 registers?
+    
     ;First stage
     vphaddw %3, %1, %2
     vphsubw %4, %1, %2
+    
     ;Second stage
     vphaddw %1, %3, %4
     vphsubw %2, %3, %4
+    
     ;Third stage
     vphaddw %3, %1, %2
     vphsubw %4, %1, %2
+
 %endmacro ; SATD_HORIZONTAL_SUB_AND_ADD
 
 ;KVZ_SATD_8X8_STRIDE
@@ -77,7 +84,6 @@ INIT_XMM avx
 ;The Result is written in the register r4
 
 %macro KVZ_SATD_8X8_STRIDE 0
-
 
     ;Calculate differences of the 8 rows into
     ;registers m0-m7
@@ -121,6 +127,7 @@ INIT_XMM avx
 
     ;32-bit AVX doesn't have registers
     ;xmm8-xmm15, use stack instead
+    
     %if ARCH_X86_64
         vpmovzxbw m7, [r0+r1]
         vpmovzxbw m8, [r2+r3]
@@ -130,6 +137,7 @@ INIT_XMM avx
         %define temp1 esp+16*2
         %define temp2 esp+16*1
         %define temp3 esp+16*0
+        
         ;Reserve memory for 4 x 128 bits.
         sub esp, 16*4
 
@@ -149,21 +157,22 @@ INIT_XMM avx
     ;Horizontal transform
 
     %if ARCH_X86_64
-    ;Calculate horizontal transform for each row.
-    ;Transforms of two rows are interleaved in register pairs.
-    ;(m8 and m9, m10 and m11,...)
+        ;Calculate horizontal transform for each row.
+        ;Transforms of two rows are interleaved in register pairs.
+        ;(m8 and m9, m10 and m11,...)
+        
         SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m8, m9
         SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m10, m11
         SATD_HORIZONTAL_SUB_AND_ADD m4, m5, m12, m13
         SATD_HORIZONTAL_SUB_AND_ADD m6, m7, m14, m15
 
-
     %else
-    ;Calculate horizontal transforms for the first four rows.
-    ;Then load the other four into the registers and store
-    ;ready transforms in the stack.
-    ;Input registers are m0-m3, results are written in
-    ;registers m4-m7 (and memory).
+        ;Calculate horizontal transforms for the first four rows.
+        ;Then load the other four into the registers and store
+        ;ready transforms in the stack.
+        ;Input registers are m0-m3, results are written in
+        ;registers m4-m7 (and memory).
+        
         SATD_HORIZONTAL_SUB_AND_ADD m0, m1, m4, m5
         SATD_HORIZONTAL_SUB_AND_ADD m2, m3, m6, m7
 
@@ -189,6 +198,7 @@ INIT_XMM avx
     ;for each pair of rows. Then calculate
     ;with regular packed additions and
     ;subtractions.
+    
     %if ARCH_X86_64
         ;Horizontally transformed values are in registers m8-m15
         ;Results are written in m0-m7
@@ -441,15 +451,18 @@ cglobal satd_4x4, 2, 2, 6
 ;r0 address of the first value(reference)
 ;r1 address of the first value(current)
 ;r2 stride
+
 %if ARCH_X86_64
     cglobal satd_8x8, 4, 5, 16
 %else
     cglobal satd_8x8, 4, 5, 8
 %endif
+    
     ;Set arguments
     mov r2, r1
     mov r1, 8
     mov r3, 8
+    
     ;Calculate 8x8 SATD. Result is written
     ;in the register r4.
     KVZ_SATD_8X8_STRIDE
@@ -468,10 +481,12 @@ cglobal satd_4x4, 2, 2, 6
     %else
         cglobal satd_%1x%1, 2, 7, 8
     %endif
+    
     ;Set arguments
     mov r2, r1
     mov r1, %1
     mov r3, %1
+    
     ;Zero r5 and r6
     xor r5, r5
     xor r6, r6
@@ -480,7 +495,9 @@ cglobal satd_4x4, 2, 2, 6
     ;and accumulate the results in r6. Repeat yloop
     ;N times. Repeat xloop N times. r4 and r5 are counters
     ;for the loops.
+    
     .yloop
+        
         ;zero r4
         xor r4, r4
 
@@ -511,9 +528,7 @@ cglobal satd_4x4, 2, 2, 6
         cmp r5, %1
     jne .yloop
 
-
     mov rax, r6
-
     RET
 
 %endmacro ; KVZ_SATD_NXN
