@@ -56,8 +56,10 @@ endif
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
 WARNINGS = -Wall -Wtype-limits -Wvla
 
+INCLUDEDIRS = -I. -I./strategies -I./extras
+
 CC = gcc
-CCFLAGS = $(DFLAGS) -std=gnu99 -I. -I./strategies $(WARNINGS)
+CCFLAGS = $(DFLAGS) -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm
 LD = gcc -pthread -lrt
 OBJS = interface_main.o \
@@ -96,29 +98,29 @@ OBJS = interface_main.o \
   strategies/sse41/picture-sse41.o \
   strategies/altivec/picture-altivec.o \
   strategies/avx2/picture-avx2.o \
-  strategies/x86_avx/picture-avx.o
+  strategies/x86_asm/picture-x86-asm.o
+
+ASMFLAGS += $(INCLUDEDIRS)
 ASMOBJS =
 
-ifeq ($(TARGET_CPU_ARCH), x86)
-  ifneq ($(KVAZAAR_DISABLE_YASM), 1)
-    ASMOBJS += strategies/x86_avx/picture_x86.o
+AS = yasm
+
+# Compile asm files by default if yasm is present.
+ifndef KVZ_DISABLE_ASM
+  has_as := $(shell type $(AS) 2>/dev/null)
+  ifeq ($(has_as),)
+    KVZ_DISABLE_ASM := 1
   endif
 endif
 
-ifeq ($(KVAZAAR_DISABLE_YASM), 1)
-  DFLAGS += -DKVAZAAR_DISABLE_YASM
-endif
 
-YASM = yasm
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
 DEPS = $(OBJS:.o=.d)
 
-
 all: $(PROGS)
 .PHONY: all clean
-
 
 # Compile files in strategy directories with appropriate flags.
 EXTRA_FLAGS =
@@ -130,15 +132,21 @@ else
   strategies/avx2/%.o: EXTRA_FLAGS += -mavx2
 endif
 
+ifndef KVZ_DISABLE_ASM
+  ASMOBJS += strategies/x86_asm/picture-x86-asm-sad.o
+  ASMOBJS += strategies/x86_asm/picture-x86-asm-satd.o
+  strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
+endif
+
 
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 %.o: %.asm Makefile
-	$(YASM) $(ASMFLAGS) -o $@ $<
+	$(AS) $(ASMFLAGS) -o $@ $<
 
 %.d: %.asm Makefile
-	$(YASM) $(ASMFLAGS) -M -o $@ > $<
+	$(AS) $(ASMFLAGS) -M -o $@ > $<
 
 %.o: %.c Makefile
 	$(CC) $(CCFLAGS) $(EXTRA_FLAGS) -c $< -o $@
@@ -148,7 +156,6 @@ $(PROG): $(OBJS) $(ASMOBJS)
 
 
 clean:
-	echo $(ARCH)
 	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)
 
 -include $(DEPS)
