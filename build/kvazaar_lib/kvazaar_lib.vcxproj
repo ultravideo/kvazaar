@@ -152,6 +152,12 @@
     <ClInclude Include="..\..\src\image.h" />
     <ClInclude Include="..\..\src\imagelist.h" />
     <ClCompile Include="..\..\src\strategies\altivec\picture-altivec.c" />
+    <ClCompile Include="..\..\src\strategies\avx2\partial-butterfly-avx2.c">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
     <ClCompile Include="..\..\src\strategies\avx2\picture-avx2.c">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
@@ -159,10 +165,12 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <ClCompile Include="..\..\src\strategies\generic\nal-generic.c" />
+    <ClCompile Include="..\..\src\strategies\generic\partial-butterfly-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\picture-generic.c" />
     <ClCompile Include="..\..\src\strategies\sse2\picture-sse2.c" />
     <ClCompile Include="..\..\src\strategies\sse41\picture-sse41.c" />
     <ClCompile Include="..\..\src\strategies\strategies-nal.c" />
+    <ClCompile Include="..\..\src\strategies\strategies-partial-butterfly.c" />
     <ClCompile Include="..\..\src\strategies\strategies-picture.c" />
     <ClCompile Include="..\..\src\strategies\x86_asm\picture-x86-asm.c" />
     <ClCompile Include="..\..\src\videoframe.c" />
@@ -192,12 +200,15 @@
     <ClInclude Include="..\..\src\scalinglist.h" />
     <ClInclude Include="..\..\src\search.h" />
     <ClInclude Include="..\..\src\strategies\altivec\picture-altivec.h" />
+    <ClInclude Include="..\..\src\strategies\avx2\partial-butterfly-avx2.h" />
     <ClInclude Include="..\..\src\strategies\avx2\picture-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\nal-generic.h" />
+    <ClInclude Include="..\..\src\strategies\generic\partial-butterfly-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\picture-generic.h" />
     <ClInclude Include="..\..\src\strategies\sse2\picture-sse2.h" />
     <ClInclude Include="..\..\src\strategies\sse41\picture-sse41.h" />
     <ClInclude Include="..\..\src\strategies\strategies-nal.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-partial-butterfly.h" />
     <ClInclude Include="..\..\src\strategies\strategies-picture.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.h" />
