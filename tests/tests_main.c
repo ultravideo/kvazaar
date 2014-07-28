@@ -1,5 +1,6 @@
 #include "greatest/greatest.h"
 
+#include "test_strategies.h"
 
 GREATEST_MAIN_DEFS();
 extern SUITE(sad_tests);
@@ -10,6 +11,9 @@ extern SUITE(speed_tests);
 int main(int argc, char **argv)
 {
   GREATEST_MAIN_BEGIN();
+
+  init_test_strategies();
+
   RUN_SUITE(sad_tests);
   RUN_SUITE(intra_sad_tests);
   RUN_SUITE(satd_tests);

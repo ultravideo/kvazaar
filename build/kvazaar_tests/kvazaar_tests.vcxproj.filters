@@ -30,12 +30,18 @@
     <ClCompile Include="..\..\tests\speed_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\test_strategies.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\tests\sad_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\tests\satd_tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\tests\test_strategies.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

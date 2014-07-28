@@ -1,5 +1,7 @@
 #include "greatest/greatest.h"
 
+#include "test_strategies.h"
+
 #include "src/image.h"
 #include "src/strategyselector.h"
 
@@ -14,7 +16,6 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-static strategy_list strategies;
 pixel * bufs[NUM_TESTS][6][2];
 
 static struct {
@@ -25,23 +26,6 @@ static struct {
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
-static void init_strategies()
-{
-  strategies.allocated = 0;
-  strategies.count = 0;
-  strategies.strategies = NULL;
-
-  // Init strategyselector because it sets hardware flags.
-  strategyselector_init();
-
-  // Collect all strategies.
-  if (!strategy_register_picture(&strategies)) {
-    fprintf(stderr, "strategy_register_picture failed!\n");
-    return;
-  }
-}
-
-
 static void init_gradient(int x_px, int y_px, int width, int slope, pixel *buf)
 {
   for (int y = 0; y < width; ++y) {
@@ -57,8 +41,6 @@ static void init_gradient(int x_px, int y_px, int width, int slope, pixel *buf)
 
 static void setup_tests()
 {
-  init_strategies();
-
   for (int test = 0; test < NUM_TESTS; ++test) {
     for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
       bufs[test][w][0] = 0;
