@@ -3,10 +3,12 @@
 #include "src/image.h"
 #include "src/strategyselector.h"
 
+#include <math.h>
+
 
 //////////////////////////////////////////////////////////////////////////
 // MACROS
-#define NUM_TESTS 1
+#define NUM_TESTS 2
 #define LCU_MAX_LOG_W 6
 #define LCU_MIN_LOG_W 2
 
@@ -40,6 +42,19 @@ static void init_strategies()
 }
 
 
+static void init_gradient(int x_px, int y_px, int width, int slope, pixel *buf)
+{
+  for (int y = 0; y < width; ++y) {
+    for (int x = 0; x < width; ++x) {
+      int diff_x = x_px - x;
+      int diff_y = y_px - y;
+      int val = sqrt(diff_x * diff_x + diff_y * diff_y) + 0.5 + slope;
+      buf[y * width + x] = CLIP(0, 255, val);
+    }
+  }
+}
+
+
 static void setup_tests()
 {
   init_strategies();
@@ -65,6 +80,15 @@ static void setup_tests()
     unsigned size = 1 << (w * 2);
     memset(bufs[test][w][0], 0, size);
     memset(bufs[test][w][1], 255, size);
+  }
+
+  test = 1;
+  for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
+    unsigned width = 1 << w;
+    unsigned size = 1 << (w * 2);
+    init_gradient(3, 1, width, 1, bufs[test][w][0]);
+    //init_gradient(width / 2, 0, width, 1, bufs[test][w][1]);
+    memset(bufs[test][w][1], 128, size);
   }
 }
 
@@ -116,6 +140,31 @@ TEST test_black_and_white(void)
 }
 
 
+/**
+* Test that the maximum SAD value for a given buffer size doesn't overflow.
+*/
+TEST test_gradient(void)
+{
+  const int test = 1;
+  const int width = 1 << test_env.log_width;
+
+  pixel * buf1 = bufs[test][test_env.log_width][0];
+  pixel * buf2 = bufs[test][test_env.log_width][1];
+
+  unsigned result = test_calc_sad(buf1, buf2, width);
+  unsigned result1 = test_env.tested_func(buf1, buf2);
+  unsigned result2 = test_env.tested_func(buf2, buf1);
+  
+  // Order of parameters must not matter.
+  ASSERT_EQ(result1, result2);
+
+  // Result matches trivial implementation.
+  ASSERT_EQ(result1, result);
+
+  PASS();
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
 SUITE(intra_sad_tests)
@@ -148,6 +197,7 @@ SUITE(intra_sad_tests)
 
     // Tests
     RUN_TEST(test_black_and_white);
+    RUN_TEST(test_gradient);
   }
 
   tear_down_tests();
