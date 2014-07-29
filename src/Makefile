@@ -94,7 +94,7 @@ OBJS = interface_main.o \
   videoframe.o \
   strategies/strategies-picture.o \
   strategies/strategies-nal.o \
-  strategies/strategies-partial-butterfly.o \
+  strategies/strategies-dct.o \
   strategies/generic/nal-generic.o \
   strategies/generic/picture-generic.o \
   strategies/sse2/picture-sse2.o \
@@ -102,7 +102,8 @@ OBJS = interface_main.o \
   strategies/altivec/picture-altivec.o \
   strategies/avx2/picture-avx2.o \
   strategies/x86_asm/picture-x86-asm.o \
-  strategies/generic/partial-butterfly-generic.o
+  strategies/generic/dct-generic.o \
+  strategies/avx2/dct-avx2.o
 
 ASMFLAGS += $(INCLUDEDIRS)
 ASMOBJS =

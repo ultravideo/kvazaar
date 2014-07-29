@@ -59,7 +59,7 @@ int strategyselector_init() {
     return 0;
   }
 
-  if (!strategy_register_partial_butterfly(&strategies)) {
+  if (!strategy_register_dct(&strategies)) {
     fprintf(stderr, "strategy_register_partial_butterfly failed!\n");
     return 0;
   }

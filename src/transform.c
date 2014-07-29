@@ -31,7 +31,7 @@
 #include "config.h"
 #include "nal.h"
 #include "rdo.h"
-#include "strategies/strategies-partial-butterfly.h"
+#include "strategies/strategies-dct.h"
 
 //////////////////////////////////////////////////////////////////////////
 // INITIALIZATIONS
@@ -146,44 +146,6 @@ int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
   return qp_scaled;
 }
 
-// Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
-// gives identical results
-static void fast_forward_dst(short *block, short *coeff, int32_t shift)  // input block, output coeff
-{
-  int32_t i, c[4];
-  int32_t rnd_factor = 1<<(shift - 1);
-  for (i = 0; i < 4; i++) {
-    // int32_termediate Variables
-    c[0] = block[4*i + 0] + block[4*i + 3];
-    c[1] = block[4*i + 1] + block[4*i + 3];
-    c[2] = block[4*i + 0] - block[4*i + 1];
-    c[3] = 74* block[4*i + 2];
-
-    coeff[   i] =  (short)(( 29*c[0] + 55*c[1]         + c[3]                     + rnd_factor ) >> shift);
-    coeff[ 4+i] =  (short)(( 74*(block[4*i + 0]+ block[4*i + 1] - block[4*i + 3]) + rnd_factor ) >> shift);
-    coeff[ 8+i] =  (short)(( 29*c[2] + 55*c[0]         - c[3]                     + rnd_factor ) >> shift);
-    coeff[12+i] =  (short)(( 55*c[2] - 29*c[1]         + c[3]                     + rnd_factor ) >> shift);
-  }
-}
-
-static void fast_inverse_dst(short *tmp,short *block,int shift)  // input tmp, output block
-{
-  int i, c[4];
-  int rnd_factor = 1<<(shift-1);
-  for (i = 0; i < 4; i++) {
-    // Intermediate Variables
-    c[0] = tmp[    i] + tmp[ 8 + i];
-    c[1] = tmp[8 + i] + tmp[12 + i];
-    c[2] = tmp[    i] - tmp[12 + i];
-    c[3] = 74 * tmp[4 + i];
-
-    block[4*i + 0] = (short)CLIP(-32768, 32767, ( 29*c[0] + 55*c[1]     + c[3]            + rnd_factor ) >> shift);
-    block[4*i + 1] = (short)CLIP(-32768, 32767, ( 55*c[2] - 29*c[1]     + c[3]            + rnd_factor ) >> shift);
-    block[4*i + 2] = (short)CLIP(-32768, 32767, ( 74*(tmp[i] - tmp[8 + i]  + tmp[12 + i]) + rnd_factor ) >> shift);
-    block[4*i + 3] = (short)CLIP(-32768, 32767, ( 55*c[0] + 29*c[2]     - c[3]            + rnd_factor ) >> shift);
-  }
-}
-
 /**
  * \brief NxN inverse transform (2D)
  * \param coeff input data (transform coefficients)
@@ -228,51 +190,18 @@ void itransformskip(const encoder_control * const encoder, int16_t *block,int16_
  * \param coeff transform coefficients
  * \param block_size width of transform
  */
-void transform2d(const encoder_control * const encoder, int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
+void transform2d(const encoder_control * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
 {
-  int32_t shift_1st = g_convert_to_bit[block_size]  + 1 + (encoder->bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[block_size]  + 8;
 
-  int16_t tmp[LCU_WIDTH * LCU_WIDTH];
-
-  partial_butterfly_func *partial_butterfly_func = 0;
-
-  if (block_size == 4 && mode != 65535) {
-    // Forward DST BY FAST ALGORITHM
-    fast_forward_dst(block,tmp,shift_1st);
-    fast_forward_dst(tmp,coeff,shift_2nd); 
-  } else {
-    partial_butterfly_func = get_partial_butterfly_func(block_size);
-    partial_butterfly_func( block, tmp, shift_1st, block_size );
-    partial_butterfly_func( tmp, coeff, shift_2nd, block_size );
-  }
+  dct_func *dct_func = get_dct_func(block_size, mode);  
+  dct_func(encoder->bitdepth, block, coeff);
 }
 
-
-/**
- * \brief NxN inverse transform (2D)
- * \param coeff input data (transform coefficients)
- * \param block output data (residual)
- * \param block_size input data (width of transform)
- * \param mode
- */
-void itransform2d(const encoder_control * const encoder,int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode)
+void itransform2d(const encoder_control * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
 {
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (encoder->bitdepth - 8);
-  int16_t tmp[LCU_WIDTH*LCU_WIDTH];
 
-  partial_butterfly_func *partial_butterfly_inverse_func = 0;
-
-  if (block_size == 4 && mode != 65535) {
-    // Inverse DST by FAST Algorithm
-    fast_inverse_dst(coeff, tmp, shift_1st);
-    fast_inverse_dst(tmp, block, shift_2nd);
-  } else {
-    partial_butterfly_inverse_func = get_partial_butterfly_inverse_func(block_size);
-    partial_butterfly_inverse_func(coeff, tmp, shift_1st, block_size);
-    partial_butterfly_inverse_func(tmp, block, shift_2nd, block_size);
-  }
+  dct_func *idct_func = get_idct_func(block_size, mode);
+  idct_func(encoder->bitdepth, block, coeff);
 }
 
 

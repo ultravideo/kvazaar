@@ -23,8 +23,9 @@
 
 #include <stdlib.h>
 
-#include "partial-butterfly-avx2.h"
+#include "dct-avx2.h"
 #include "strategyselector.h"
+#include "tables.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
@@ -45,12 +46,51 @@ extern const int16_t g_t32[32][32];
  */
 
 
+// Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
+// gives identical results
+static void fast_forward_dst_4_avx2(short *block, short *coeff, int32_t shift)  // input block, output coeff
+{
+  int32_t i, c[4];
+  int32_t rnd_factor = 1 << (shift - 1);
+  for (i = 0; i < 4; i++) {
+    // int32_termediate Variables
+    c[0] = block[4 * i + 0] + block[4 * i + 3];
+    c[1] = block[4 * i + 1] + block[4 * i + 3];
+    c[2] = block[4 * i + 0] - block[4 * i + 1];
+    c[3] = 74 * block[4 * i + 2];
+
+    coeff[i] = (short)((29 * c[0] + 55 * c[1] + c[3] + rnd_factor) >> shift);
+    coeff[4 + i] = (short)((74 * (block[4 * i + 0] + block[4 * i + 1] - block[4 * i + 3]) + rnd_factor) >> shift);
+    coeff[8 + i] = (short)((29 * c[2] + 55 * c[0] - c[3] + rnd_factor) >> shift);
+    coeff[12 + i] = (short)((55 * c[2] - 29 * c[1] + c[3] + rnd_factor) >> shift);
+  }
+}
+
+static void fast_inverse_dst_4_avx2(short *tmp, short *block, int shift)  // input tmp, output block
+{
+  int i, c[4];
+  int rnd_factor = 1 << (shift - 1);
+  for (i = 0; i < 4; i++) {
+    // Intermediate Variables
+    c[0] = tmp[i] + tmp[8 + i];
+    c[1] = tmp[8 + i] + tmp[12 + i];
+    c[2] = tmp[i] - tmp[12 + i];
+    c[3] = 74 * tmp[4 + i];
+
+    block[4 * i + 0] = (short)CLIP(-32768, 32767, (29 * c[0] + 55 * c[1] + c[3] + rnd_factor) >> shift);
+    block[4 * i + 1] = (short)CLIP(-32768, 32767, (55 * c[2] - 29 * c[1] + c[3] + rnd_factor) >> shift);
+    block[4 * i + 2] = (short)CLIP(-32768, 32767, (74 * (tmp[i] - tmp[8 + i] + tmp[12 + i]) + rnd_factor) >> shift);
+    block[4 * i + 3] = (short)CLIP(-32768, 32767, (55 * c[0] + 29 * c[2] - c[3] + rnd_factor) >> shift);
+  }
+}
+
 static void partial_butterfly_4_avx2(short *src, short *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j;
   int32_t e[2], o[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 4;
 
   for (j = 0; j < line; j++) {
     // E and O
@@ -71,11 +111,12 @@ static void partial_butterfly_4_avx2(short *src, short *dst,
 
 
 static void partial_butterfly_inverse_4_avx2(short *src, short *dst,
-  int shift, int line)
+  int shift)
 {
   int j;
   int e[2], o[2];
   int add = 1 << (shift - 1);
+  const int32_t line = 4;
 
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
@@ -97,12 +138,13 @@ static void partial_butterfly_inverse_4_avx2(short *src, short *dst,
 
 
 static void partial_butterfly_8_avx2(short *src, short *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j, k;
   int32_t e[4], o[4];
   int32_t ee[2], eo[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 8;
 
   for (j = 0; j < line; j++) {
     // E and O
@@ -133,12 +175,13 @@ static void partial_butterfly_8_avx2(short *src, short *dst,
 
 
 static void partial_butterfly_inverse_8_avx2(int16_t *src, int16_t *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j, k;
   int32_t e[4], o[4];
   int32_t ee[2], eo[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 8;
 
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
@@ -167,13 +210,14 @@ static void partial_butterfly_inverse_8_avx2(int16_t *src, int16_t *dst,
 
 
 static void partial_butterfly_16_avx2(short *src, short *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j, k;
   int32_t e[8], o[8];
   int32_t ee[4], eo[4];
   int32_t eee[2], eeo[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 16;
 
   for (j = 0; j < line; j++) {
     // E and O
@@ -213,13 +257,14 @@ static void partial_butterfly_16_avx2(short *src, short *dst,
 
 
 static void partial_butterfly_inverse_16_avx2(int16_t *src, int16_t *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j, k;
   int32_t e[8], o[8];
   int32_t ee[4], eo[4];
   int32_t eee[2], eeo[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 16;
 
   for (j = 0; j < line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
@@ -255,7 +300,7 @@ static void partial_butterfly_inverse_16_avx2(int16_t *src, int16_t *dst,
 
 
 static void partial_butterfly_32_avx2(short *src, short *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j, k;
   int32_t e[16], o[16];
@@ -263,6 +308,7 @@ static void partial_butterfly_32_avx2(short *src, short *dst,
   int32_t eee[4], eeo[4];
   int32_t eeee[2], eeeo[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 32;
 
   for (j = 0; j < line; j++) {
     // E and O
@@ -310,7 +356,7 @@ static void partial_butterfly_32_avx2(short *src, short *dst,
 
 
 static void partial_butterfly_inverse_32_avx2(int16_t *src, int16_t *dst,
-  int32_t shift, int32_t line)
+  int32_t shift)
 {
   int32_t j, k;
   int32_t e[16], o[16];
@@ -318,6 +364,7 @@ static void partial_butterfly_inverse_32_avx2(int16_t *src, int16_t *dst,
   int32_t eee[4], eeo[4];
   int32_t eeee[2], eeeo[2];
   int32_t add = 1 << (shift - 1);
+  const int32_t line = 32;
 
   for (j = 0; j<line; j++) {
     // Utilizing symmetry properties to the maximum to minimize the number of multiplications
@@ -360,21 +407,78 @@ static void partial_butterfly_inverse_32_avx2(int16_t *src, int16_t *dst,
     dst += 32;
   }
 }
+
+#define DCT_NXN_AVX2(n) \
+static void dct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
+\
+  int16_t tmp[ ## n ## * ## n ##]; \
+  int32_t shift_1st = g_convert_to_bit[ ## n ## ] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = g_convert_to_bit[ ## n ## ] + 8; \
+\
+  partial_butterfly_ ## n ## _avx2(block, tmp, shift_1st); \
+  partial_butterfly_ ## n ## _avx2(tmp, coeff, shift_2nd); \
+}
+
+#define IDCT_NXN_AVX2(n) \
+static void idct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
+\
+  int16_t tmp[ ## n ## * ## n ##]; \
+  int32_t shift_1st = 7; \
+  int32_t shift_2nd = 12 - (bitdepth - 8); \
+\
+  partial_butterfly_inverse_ ## n ## _avx2(coeff, tmp, shift_1st); \
+  partial_butterfly_inverse_ ## n ## _avx2(tmp, block, shift_2nd); \
+}
+
+DCT_NXN_AVX2(4);
+DCT_NXN_AVX2(8);
+DCT_NXN_AVX2(16);
+DCT_NXN_AVX2(32);
+
+IDCT_NXN_AVX2(4);
+IDCT_NXN_AVX2(8);
+IDCT_NXN_AVX2(16);
+IDCT_NXN_AVX2(32);
+
+static void fast_forward_dst_4x4_avx2(int8_t bitdepth, int16_t *block, int16_t *coeff)
+{
+  int16_t tmp[4 * 4];
+  int32_t shift_1st = g_convert_to_bit[4] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = g_convert_to_bit[4] + 8;
+
+  fast_forward_dst_4_avx2(block, tmp, shift_1st);
+  fast_forward_dst_4_avx2(tmp, coeff, shift_2nd);
+}
+
+static void fast_inverse_dst_4x4_avx2(int8_t bitdepth, int16_t *block, int16_t *coeff)
+{
+  int16_t tmp[4 * 4];
+  int32_t shift_1st = 7;
+  int32_t shift_2nd = 12 - (bitdepth - 8);
+
+  fast_inverse_dst_4_avx2(coeff, tmp, shift_1st);
+  fast_inverse_dst_4_avx2(tmp, block, shift_2nd);
+}
+
 #endif //COMPILE_INTEL_AVX2
 
-int strategy_register_partial_butterfly_avx2(void* opaque)
+int strategy_register_dct_avx2(void* opaque)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-  success &= strategyselector_register(opaque, "partial_butterfly_4", "avx2", 0, &partial_butterfly_4_avx2);
-  success &= strategyselector_register(opaque, "partial_butterfly_8", "avx2", 0, &partial_butterfly_8_avx2);
-  success &= strategyselector_register(opaque, "partial_butterfly_16", "avx2", 0, &partial_butterfly_16_avx2);
-  success &= strategyselector_register(opaque, "partial_butterfly_32", "avx2", 0, &partial_butterfly_32_avx2);
+  success &= strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 0, &fast_forward_dst_4x4_avx2);
 
-  success &= strategyselector_register(opaque, "partial_butterfly_inverse_4", "avx2", 0, &partial_butterfly_inverse_4_avx2);
-  success &= strategyselector_register(opaque, "partial_butterfly_inverse_8", "avx2", 0, &partial_butterfly_inverse_8_avx2);
-  success &= strategyselector_register(opaque, "partial_butterfly_inverse_16", "avx2", 0, &partial_butterfly_inverse_16_avx2);
-  success &= strategyselector_register(opaque, "partial_butterfly_inverse_32", "avx2", 0, &partial_butterfly_inverse_32_avx2);
+  success &= strategyselector_register(opaque, "dct_4x4", "avx2", 0, &dct_4x4_avx2);
+  success &= strategyselector_register(opaque, "dct_8x8", "avx2", 0, &dct_8x8_avx2);
+  success &= strategyselector_register(opaque, "dct_16x16", "avx2", 0, &dct_16x16_avx2);
+  success &= strategyselector_register(opaque, "dct_32x32", "avx2", 0, &dct_32x32_avx2);
+
+  success &= strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 0, &fast_inverse_dst_4x4_avx2);
+
+  success &= strategyselector_register(opaque, "idct_4x4", "avx2", 0, &idct_4x4_avx2);
+  success &= strategyselector_register(opaque, "idct_8x8", "avx2", 0, &idct_8x8_avx2);
+  success &= strategyselector_register(opaque, "idct_16x16", "avx2", 0, &idct_16x16_avx2);
+  success &= strategyselector_register(opaque, "idct_32x32", "avx2", 0, &idct_32x32_avx2);
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }

@@ -144,12 +144,12 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 //Strategy to include
 #include "strategies/strategies-nal.h"
 #include "strategies/strategies-picture.h"
-#include "strategies/strategies-partial-butterfly.h"
+#include "strategies/strategies-dct.h"
 
 static const strategy_to_select strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
   STRATEGIES_PICTURE_EXPORTS
-  STRATEGIES_PARTIAL_BUTTERFLY_EXPORTS
+  STRATEGIES_DCT_EXPORTS
   { NULL, NULL },
 };
 

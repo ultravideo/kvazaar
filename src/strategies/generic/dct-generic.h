@@ -1,5 +1,5 @@
-#ifndef STRATEGIES_PARTIAL_BUTTERFLY_AVX2_H_
-#define STRATEGIES_PARTIAL_BUTTERFLY_AVX2_H_
+#ifndef STRATEGIES_DCT_GENERIC_H_
+#define STRATEGIES_DCT_GENERIC_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -19,6 +19,6 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_partial_butterfly_avx2(void* opaque);
+int strategy_register_dct_generic(void* opaque);
 
-#endif //STRATEGIES_PARTIAL_BUTTERFLY_AVX2_H_
+#endif //STRATEGIES_DCT_GENERIC_H_
