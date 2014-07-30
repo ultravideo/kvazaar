@@ -28,10 +28,12 @@ ifneq ( ,$(findstring Windows, $(OS)))
   ifeq ($(ARCH), x86_64)
     ASMFLAGS += -f win64
     ASMFLAGS += -DARCH_X86_64=1
+    ASMFLAGS += -DHAVE_ALIGNED_STACK=1
   else
     ASMFLAGS += -f win32
     ASMFLAGS += -DPREFIX
     ASMFLAGS += -DARCH_X86_64=0
+    ASMFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
   DFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 # OS X specific flags
