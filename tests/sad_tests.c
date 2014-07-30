@@ -1,7 +1,8 @@
 #include "greatest/greatest.h"
 
+#include "test_strategies.h"
+
 #include "src/image.h"
-#include "src/strategyselector.h"
 
 #include <string.h>
 
@@ -15,8 +16,6 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-static strategy_list strategies;
-
 const uint8_t ref_data[64] = {
   1,2,2,2,2,2,2,3,
   4,5,5,5,5,5,5,6,
@@ -44,27 +43,8 @@ image *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
-static void init_strategies()
-{
-  strategies.allocated = 0;
-  strategies.count = 0;
-  strategies.strategies = NULL;
-
-  // Init strategyselector because it sets hardware flags.
-  strategyselector_init();
-
-  // Collect all strategies.
-  if (!strategy_register_picture(&strategies)) {
-    fprintf(stderr, "strategy_register_picture failed!\n");
-    return;
-  }
-}
-
-
 static void setup_tests()
 {
-  init_strategies();
-
   g_pic = image_alloc(8, 8, 1);
   for (int i = 0; i < 64; ++i) {
     g_pic->y[i] = pic_data[i] + 48;

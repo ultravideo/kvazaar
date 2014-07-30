@@ -91,12 +91,15 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\tests\test_strategies.c" />
     <ClCompile Include="..\..\tests\intra_sad_tests.c" />
     <ClCompile Include="..\..\tests\sad_tests.c" />
     <ClCompile Include="..\..\tests\satd_tests.c" />
+    <ClCompile Include="..\..\tests\speed_tests.c" />
     <ClCompile Include="..\..\tests\tests_main.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\tests\test_strategies.h" />
     <ClInclude Include="..\..\tests\sad_tests.h" />
     <ClInclude Include="..\..\tests\satd_tests.h" />
   </ItemGroup>
