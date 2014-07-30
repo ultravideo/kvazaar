@@ -50,9 +50,8 @@ static void init_gradient(int x_px, int y_px, int width, int slope, pixel *buf)
 static void setup_tests()
 {
   for (int test = 0; test < NUM_TESTS; ++test) {
-    bufs[test] = 0;
-    bufs[test] = 0;
-    unsigned size = 36*64*64;
+    unsigned size = NUM_CHUNKS * 64 * 64;
+    
     actual_bufs[test] = malloc(size * sizeof(pixel) + SIMD_ALIGNMENT);
     bufs[test] = ALIGNED_POINTER(actual_bufs[test], SIMD_ALIGNMENT);
   }
@@ -168,6 +167,54 @@ TEST test_inter_speed(const int width)
 }
 
 
+TEST dct_speed(const int width)
+{
+  const int size = width * width;
+  uint64_t call_cnt = 0;
+  dct_func * tested_func = test_env.strategy->fptr;
+
+  CLOCK_T clock_now;
+  GET_TIME(&clock_now);
+  double test_end = CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
+
+  int16_t _tmp_residual[32 * 32 + SIMD_ALIGNMENT];
+  int16_t _tmp_coeffs[32 * 32 + SIMD_ALIGNMENT];
+  int16_t *tmp_residual = ALIGNED_POINTER(_tmp_residual, SIMD_ALIGNMENT);
+  int16_t *tmp_coeffs = ALIGNED_POINTER(_tmp_coeffs, SIMD_ALIGNMENT);
+  
+  // Loop until time allocated for test has passed.
+  for (unsigned i = 0;
+    test_end > CLOCK_T_AS_DOUBLE(clock_now);
+    ++i, GET_TIME(&clock_now))
+  {
+    int test = i % NUM_TESTS;
+    uint64_t sum = 0;
+    for (int offset = 0; offset < NUM_CHUNKS * 64 * 64; offset += NUM_CHUNKS * size) {
+      // Compare the first chunk against the 35 other chunks to simulate real usage.
+      for (int chunk = 0; chunk < NUM_CHUNKS; ++chunk) {
+        pixel * buf1 = &bufs[test][offset];
+        pixel * buf2 = &bufs[test][chunk * size + offset];
+        for (int p = 0; p < size; ++p) {
+          tmp_residual[p] = (int16_t)(buf1[p] - buf2[p]);
+        }
+
+        tested_func(8, tmp_residual, tmp_coeffs);
+        ++call_cnt;
+        sum += tmp_coeffs[0];
+      }
+    }
+
+    ASSERT(sum > 0);
+  }
+  
+  sprintf(test_env.msg, "%.3fM x %s:%s",
+    (double)call_cnt / 1000000.0,
+    test_env.strategy->type,
+    test_env.strategy->strategy_name);
+  PASSm(test_env.msg);
+}
+
+
 TEST intra_sad(void)
 {
   const int width = 1 << test_env.log_width;
@@ -187,6 +234,21 @@ TEST inter_sad(void)
   const int width = 1 << test_env.log_width;
   return test_inter_speed(width);
 }
+
+
+TEST fdct(void)
+{
+  const int width = 1 << test_env.log_width;
+  return dct_speed(width);
+}
+
+
+TEST idct(void)
+{
+  const int width = 1 << test_env.log_width;
+  return dct_speed(width);
+}
+
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -224,6 +286,28 @@ SUITE(speed_tests)
       test_env.log_width = 5;
     } else if (strcmp(strategy->type, "satd_8bit_64x64") == 0) {
       test_env.log_width = 6;
+    } else if (strcmp(strategy->type, "dct_4x4") == 0) {
+      test_env.log_width = 2;
+    } else if (strcmp(strategy->type, "dct_8x8") == 0) {
+      test_env.log_width = 3;
+    } else if (strcmp(strategy->type, "dct_16x16") == 0) {
+      test_env.log_width = 4;
+    } else if (strcmp(strategy->type, "dct_32x32") == 0) {
+      test_env.log_width = 5;
+    } else if (strcmp(strategy->type, "idct_4x4") == 0) {
+      test_env.log_width = 2;
+    } else if (strcmp(strategy->type, "idct_8x8") == 0) {
+      test_env.log_width = 3;
+    } else if (strcmp(strategy->type, "idct_16x16") == 0) {
+      test_env.log_width = 4;
+    } else if (strcmp(strategy->type, "idct_32x32") == 0) {
+      test_env.log_width = 5;
+    } else if (strcmp(strategy->type, "fast_forward_dst_4x4") == 0) {
+      test_env.log_width = 2;
+    } else if (strcmp(strategy->type, "fast_inverse_dst_4x4") == 0) {
+      test_env.log_width = 2;
+    } else {
+      test_env.log_width = 0;
     }
 
     test_env.tested_func = strategies.strategies[i].fptr;
@@ -241,6 +325,14 @@ SUITE(speed_tests)
         test_env.log_width = width;
         RUN_TEST(inter_sad);
       }
+    } else if (strncmp(strategy->type, "dct_", 4) == 0 ||
+               strcmp(strategy->type, "fast_forward_dst_4x4") == 0)
+    {
+      RUN_TEST(fdct);
+    } else if (strncmp(strategy->type, "idct_", 4) == 0 ||
+               strcmp(strategy->type, "fast_inverse_dst_4x4") == 0)
+    {
+      RUN_TEST(idct);
     }
   }
 
