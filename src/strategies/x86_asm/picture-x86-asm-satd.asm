@@ -34,22 +34,21 @@ SECTION .text
 ;Set x86inc.asm macros to use avx and xmm registers
 INIT_XMM avx
 
-;KVZ_ZERO_EXTEND
-;zero extend all packed words in xmm to dwords in ymm
-;%1 number of the destination register
-;%2 number of a free xmm register
+;KVZ_ZERO_EXTEND_WD
+;zero extend all packed words in xmm to dwords in 2 xmm registers
+;%1 source register
+;%2 lower destination register
+;%3 higher destination register
 
-%macro KVZ_ZERO_EXTEND 2
+%macro KVZ_ZERO_EXTEND_WD 3
 
-    ;Zero extend low 64 bits
-    vpmovzxwd xmm%2, xmm%1
     ;Zero extend high 64 bits
-    vmovhlps xmm%1, xmm%1
-    vpmovzxwd xmm%1, xmm%1
-    ;Combine xmm%1 and xmm%2 in ymm%1
-    vinserti128 ymm%1, ymm%2, xmm%1, 1
+    vmovhlps %3, %1
+    vpmovzxwd %3, %3
+    ;Zero extend low 64 bits
+    vpmovzxwd %2, %1
 
-%endmacro ; KVZ_ZERO_EXTEND
+%endmacro ; KVZ_ZERO_EXTEND_WD
 
 ; Use nondestructive horizontal add and sub to calculate both at the same time.
 ; TODO: It would probably be possible to do this with 3 registers (destructive vphsubw).
@@ -288,22 +287,27 @@ INIT_XMM avx
 
         ;Calculate the absolute values and
         ;zero extend 16-bit values to 32-bit
-        ;values. In other words: extend xmm to
-        ;corresponding ymm.
+        ;values. Then sum the values.
 
         vpabsw m4, m4
-        KVZ_ZERO_EXTEND 4, 1
-        vpabsw m5, m5
-        KVZ_ZERO_EXTEND 5, 1
-        vpabsw m6, m6
-        KVZ_ZERO_EXTEND 6, 1
-        vpabsw m7, m7
-        KVZ_ZERO_EXTEND 7, 1
+        KVZ_ZERO_EXTEND_WD m4, m4, m1
+        vpaddd m4, m1
 
-        ;Sum half of the packed results to ymm0
-        vpaddd ymm0, ymm4, ymm5
-        vpaddd ymm0, ymm6
-        vpaddd ymm0, ymm7
+        vpabsw m5, m5
+        KVZ_ZERO_EXTEND_WD m5, m5, m1
+        vpaddd m5, m1
+
+        vpabsw m6, m6
+        KVZ_ZERO_EXTEND_WD m6, m6, m1
+        vpaddd m6, m1
+
+        vpabsw m7, m7
+        KVZ_ZERO_EXTEND_WD m7, m7, m1
+        vpaddd m7, m1
+      
+        vpaddd m0, m4, m5
+        vpaddd m0, m6
+        vpaddd m0, m7
 
         ;Repeat for the rest
         vpaddw m4, m2, [temp2]
@@ -312,21 +316,28 @@ INIT_XMM avx
         vpsubw m7, m3, [temp3]
 
         vpabsw m4, m4
-        KVZ_ZERO_EXTEND 4, 1
+        KVZ_ZERO_EXTEND_WD m4, m4, m1
+        vpaddd m4, m1
+
         vpabsw m5, m5
-        KVZ_ZERO_EXTEND 5, 1
+        KVZ_ZERO_EXTEND_WD m5, m5, m1
+        vpaddd m5, m1
+
         vpabsw m6, m6
-        KVZ_ZERO_EXTEND 6, 1
+        KVZ_ZERO_EXTEND_WD m6, m6, m1
+        vpaddd m6, m1
+
         vpabsw m7, m7
-        KVZ_ZERO_EXTEND 7, 1
+        KVZ_ZERO_EXTEND_WD m7, m7, m1
+        vpaddd m7, m1
 
         ;Sum the other half of the packed results to ymm4
-        vpaddd ymm4, ymm5
-        vpaddd ymm4, ymm6
-        vpaddd ymm4, ymm7
+        vpaddd m4, m5
+        vpaddd m4, m6
+        vpaddd m4, m7
 
         ;Sum all packed results to ymm0
-        vpaddd ymm0, ymm4
+        vpaddd m0, m4
 
     %endif
 
@@ -338,35 +349,48 @@ INIT_XMM avx
         ;corresponding ymm.
 
         vpabsw m0, m0
-        KVZ_ZERO_EXTEND 0, 8
+        KVZ_ZERO_EXTEND_WD m0, m0, m8
+        vpaddd m0, m8
+
         vpabsw m1, m1
-        KVZ_ZERO_EXTEND 1, 8
+        KVZ_ZERO_EXTEND_WD m1, m1, m8
+        vpaddd m1, m8
+
         vpabsw m2, m2
-        KVZ_ZERO_EXTEND 2, 8
+        KVZ_ZERO_EXTEND_WD m2, m2, m8
+        vpaddd m1, m8
+
         vpabsw m3, m3
-        KVZ_ZERO_EXTEND 3, 8
+        KVZ_ZERO_EXTEND_WD m3, m3, m8
+        vpaddd m3, m8
+
         vpabsw m4, m4
-        KVZ_ZERO_EXTEND 4, 8
+        KVZ_ZERO_EXTEND_WD m4, m4, m8
+        vpaddd m4, m8
+
         vpabsw m5, m5
-        KVZ_ZERO_EXTEND 5, 8
+        KVZ_ZERO_EXTEND_WD m5, m5, m8
+        vpaddd m5, m8
+
         vpabsw m6, m6
-        KVZ_ZERO_EXTEND 6, 8
+        KVZ_ZERO_EXTEND_WD m6, m6, m8
+        vpaddd m6, m8
+
         vpabsw m7, m7
-        KVZ_ZERO_EXTEND 7, 8
+        KVZ_ZERO_EXTEND_WD m7, m7, m8
+        vpaddd m7, m8
 
         ;Calculate packed sum of transformed values to ymm0
-        vpaddd ymm0, ymm1
-        vpaddd ymm0, ymm2
-        vpaddd ymm0, ymm3
-        vpaddd ymm0, ymm4
-        vpaddd ymm0, ymm5
-        vpaddd ymm0, ymm6
-        vpaddd ymm0, ymm7
+        vpaddd m0, m1
+        vpaddd m0, m2
+        vpaddd m0, m3
+        vpaddd m0, m4
+        vpaddd m0, m5
+        vpaddd m0, m6
+        vpaddd m0, m7
     %endif
 
     ;Sum the packed values to m0[32:0]
-    vextracti128 m1, ymm0, 1
-    vpaddd m0, m1
     vphaddd m0, m0
     vphaddd m0, m0
 
