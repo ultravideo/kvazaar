@@ -84,29 +84,53 @@ static void fast_inverse_dst_4_avx2(short *tmp, short *block, int shift)  // inp
   }
 }
 
-static void partial_butterfly_4_avx2(short *src, short *dst,
-  int32_t shift)
+static void partial_butterfly_4_avx2(const int16_t * const src, int16_t * const dst,
+  const int32_t shift)
 {
-  int32_t j;
-  int32_t e[2], o[2];
-  int32_t add = 1 << (shift - 1);
-  const int32_t line = 4;
+  __m256i tmp0, tmp1, coeff, e, o;
+  __m256i add = _mm256_set1_epi32(1 << (shift - 1));
 
-  for (j = 0; j < line; j++) {
-    // E and O
-    e[0] = src[0] + src[3];
-    o[0] = src[0] - src[3];
-    e[1] = src[1] + src[2];
-    o[1] = src[1] - src[2];
+  tmp0 = _mm256_loadu_si256( (__m256i *)src );
 
-    dst[0] = (short)((g_t4[0][0] * e[0] + g_t4[0][1] * e[1] + add) >> shift);
-    dst[2 * line] = (short)((g_t4[2][0] * e[0] + g_t4[2][1] * e[1] + add) >> shift);
-    dst[line] = (short)((g_t4[1][0] * o[0] + g_t4[1][1] * o[1] + add) >> shift);
-    dst[3 * line] = (short)((g_t4[3][0] * o[0] + g_t4[3][1] * o[1] + add) >> shift);
+  int32_t a, b, c, d;
 
-    src += 4;
-    dst++;
-  }
+  tmp0 = _mm256_shufflelo_epi16(tmp0, 128 + 16 + 12 + 0);
+  tmp0 = _mm256_shufflehi_epi16(tmp0, 128 + 16 + 12 + 0);
+  tmp1 = _mm256_castsi128_si256(_mm256_extractf128_si256(tmp0, 1));
+
+  //Get pairs of coeff
+  a = ((int32_t*)g_t4)[0];
+  b = ((int32_t*)g_t4)[2];
+  c = ((int32_t*)g_t4)[4];
+  d = ((int32_t*)g_t4)[6];
+
+  //Copy and set coeffs in the right order for madd
+  coeff = _mm256_castsi128_si256(_mm_set1_epi32(a));
+  coeff = _mm256_insertf128_si256(coeff, _mm_set1_epi32(b), 1);
+
+  e = _mm256_hadd_epi16(tmp0, tmp1);
+  o = _mm256_hsub_epi16(tmp0, tmp1);
+  e = _mm256_insertf128_si256(e, _mm256_castsi256_si128(o), 1);
+    
+  //Multiply 16-bit pairs, extends results to 32 bits
+  tmp0 = _mm256_madd_epi16(coeff, e);
+
+  coeff = _mm256_castsi128_si256(_mm_set1_epi32(c));
+  coeff = _mm256_insertf128_si256(coeff, _mm_set1_epi32(d), 1);
+
+  tmp1 = _mm256_madd_epi16(coeff, e);
+
+  tmp0 = _mm256_add_epi32(tmp0, add);
+  tmp0 = _mm256_srai_epi32(tmp0, shift);
+
+  tmp1 = _mm256_add_epi32(tmp1, add);
+  tmp1 = _mm256_srai_epi32(tmp1, shift);
+  
+  //32-bit -> 16-bit
+  tmp0 = _mm256_packs_epi32(tmp0, tmp1);
+  tmp0 = _mm256_permute4x64_epi64(tmp0, 8+16+128+64);
+
+  _mm256_storeu_si256( (__m256i *)dst, tmp0 );
 }
 
 
@@ -410,11 +434,11 @@ static void partial_butterfly_inverse_32_avx2(int16_t *src, int16_t *dst,
 
 #define DCT_NXN_AVX2(n) \
 static void dct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
-\
-  int16_t tmp[ ## n ## * ## n ##]; \
-  int32_t shift_1st = g_convert_to_bit[ ## n ## ] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = g_convert_to_bit[ ## n ## ] + 8; \
-\
+  \
+  int16_t tmp[n*n]; \
+  int32_t shift_1st = g_convert_to_bit[n] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = g_convert_to_bit[n] + 8; \
+  \
   partial_butterfly_ ## n ## _avx2(block, tmp, shift_1st); \
   partial_butterfly_ ## n ## _avx2(tmp, coeff, shift_2nd); \
 }
