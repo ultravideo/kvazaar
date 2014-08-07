@@ -419,8 +419,8 @@ static void dct_ ## n ## x ## n ## _generic(int8_t bitdepth, int16_t *block, int
 static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
 \
   int16_t tmp[ ## n ## * ## n ##]; \
-  int32_t shift_1st = g_convert_to_bit[ ## n ## ] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = g_convert_to_bit[ ## n ## ] + 8; \
+  int32_t shift_1st = 7; \
+  int32_t shift_2nd = 12 - (bitdepth - 8); \
 \
   partial_butterfly_inverse_ ## n ## _generic(coeff, tmp, shift_1st); \
   partial_butterfly_inverse_ ## n ## _generic(tmp, block, shift_2nd); \
@@ -449,8 +449,8 @@ static void fast_forward_dst_4x4_generic(int8_t bitdepth, int16_t *block, int16_
 static void fast_inverse_dst_4x4_generic(int8_t bitdepth, int16_t *block, int16_t *coeff)
 {
   int16_t tmp[4 * 4];
-  int32_t shift_1st = g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[4] + 8;
+  int32_t shift_1st = 7;
+  int32_t shift_2nd = 12 - (bitdepth - 8);
 
   fast_inverse_dst_4_generic(coeff, tmp, shift_1st);
   fast_inverse_dst_4_generic(tmp, block, shift_2nd);
