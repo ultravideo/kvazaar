@@ -1258,7 +1258,12 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     }
   }
   
-  PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_CU, encoder_state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,x=%d,y=%d,depth=%d,split=%d,cur_cu_is_intra=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, x, y, depth, debug_split, (cur_cu->type==CU_INTRA)?1:0);
+  PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_CU, encoder_state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, 
+                          (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + x,
+                          (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + x + (LCU_WIDTH >> depth), 
+                          (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + y,
+                          (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + y + (LCU_WIDTH >> depth), 
+                          depth, debug_split, (cur_cu->type==CU_INTRA)?1:0);
 
   return cost;
 }
