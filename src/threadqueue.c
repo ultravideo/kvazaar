@@ -290,6 +290,7 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count, in
 static void threadqueue_free_job(threadqueue_queue * const threadqueue, int i)
 {
 #ifdef _DEBUG
+#if _DEBUG & _DEBUG_PERF_JOB
   int j;
   GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
   fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
@@ -299,6 +300,7 @@ static void threadqueue_free_job(threadqueue_queue * const threadqueue, int i)
   }
 
   FREE_POINTER(threadqueue->queue[i]->debug_description);
+#endif
 #endif
   FREE_POINTER(threadqueue->queue[i]->rdepends);
   
@@ -315,12 +317,14 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
   threadqueue->queue_count = 0;
   threadqueue->queue_start = 0;
 #ifdef _DEBUG
+#if _DEBUG & _DEBUG_PERF_JOB
   {
     CLOCK_T time;
     GET_TIME(&time);
    
     fprintf(threadqueue->debug_log, "\t\t-\t-\t%lf\t-\tFLUSH\n", CLOCK_T_AS_DOUBLE(time));
   }
+#endif
 #endif
 }
 
@@ -491,9 +495,9 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
     //FIXME: This should be improved in order to handle dependencies
-    PERFORMANCE_MEASURE_START();
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_JOB);
     fptr(arg);
-    PERFORMANCE_MEASURE_END(threadqueue, "%s", debug_description);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_JOB, threadqueue, "%s", debug_description);
     return NULL;
   }
   

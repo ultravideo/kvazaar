@@ -316,29 +316,32 @@ static void encoder_state_encode_leaf(encoder_state * const encoder_state) {
   //If we're not using wavefronts, or we have a WAVEFRONT_ROW which is the single child of its parent, than we should not use parallelism
   if (encoder_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->parent->children[1].encoder_control)) {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-      PERFORMANCE_MEASURE_START();
+      PERFORMANCE_MEASURE_START(_DEBUG_PERF_ENCODE_LCU);
 
       encoder_state_worker_encode_lcu(&encoder_state->lcu_order[i]);
 
 #ifdef _DEBUG
       {
         const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
-        PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=search_lcu,frame=%d,tile=%d,slice=%d,position_x=%d,position_y=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position.x + encoder_state->tile->lcu_offset_x, lcu->position.y + encoder_state->tile->lcu_offset_y);
+        PERFORMANCE_MEASURE_END(_DEBUG_PERF_ENCODE_LCU, encoder_state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
       }
 #endif //_DEBUG
     }
     
     if (encoder->sao_enable) {
-      PERFORMANCE_MEASURE_START();
+      PERFORMANCE_MEASURE_START(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME);
       sao_reconstruct_frame(encoder_state);
-      PERFORMANCE_MEASURE_END(encoder_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->lcu_order[0].position.y + encoder_state->tile->lcu_offset_y, encoder_state->lcu_order[encoder_state->lcu_order_count-1].position.y + encoder_state->tile->lcu_offset_y);
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, encoder_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->lcu_order[0].position.y + encoder_state->tile->lcu_offset_y, encoder_state->lcu_order[encoder_state->lcu_order_count-1].position.y + encoder_state->tile->lcu_offset_y,
+        encoder_state->tile->lcu_offset_x * LCU_WIDTH, encoder_state->tile->frame->width + encoder_state->tile->lcu_offset_x * LCU_WIDTH - 1,
+        encoder_state->tile->lcu_offset_y * LCU_WIDTH, encoder_state->tile->frame->height + encoder_state->tile->lcu_offset_y * LCU_WIDTH - 1
+      );
     }
   } else {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
       const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
 #ifdef _DEBUG
       char job_description[256];
-      sprintf(job_description, "type=search_lcu,frame=%d,tile=%d,slice=%d,row=%d,position_x=%d,position_y=%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->wfrow->lcu_offset_y, lcu->position.x + encoder_state->tile->lcu_offset_x, lcu->position.y + encoder_state->tile->lcu_offset_y);
+      sprintf(job_description, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
 #else
       char* job_description = NULL;
 #endif
@@ -392,14 +395,14 @@ static void encoder_state_worker_encode_children(void * opaque) {
   encoder_state_encode(sub_state);
   if (sub_state->is_leaf) {
     if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-      PERFORMANCE_MEASURE_START();
+      PERFORMANCE_MEASURE_START(_DEBUG_PERF_WRITE_BITSTREAM_LEAF);
       encoder_state_write_bitstream_leaf(sub_state);
-      PERFORMANCE_MEASURE_END(sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position.y + sub_state->tile->lcu_offset_y, sub_state->lcu_order[sub_state->lcu_order_count-1].position.y + sub_state->tile->lcu_offset_y);
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_WRITE_BITSTREAM_LEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
     } else {
       threadqueue_job *job;
 #ifdef _DEBUG
       char job_description[256];
-      sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,row=%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->wfrow->lcu_offset_y);
+      sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
 #else
       char* job_description = NULL;
 #endif
@@ -516,13 +519,15 @@ static void encoder_state_encode(encoder_state * const main_state) {
           char job_description[256];
           switch (main_state->children[i].type) {
             case ENCODER_STATE_TYPE_TILE: 
-              sprintf(job_description, "frame=%d,tile=%d,row=%d-%d,position_x=%d,position_y=%d", main_state->children[i].global->frame, main_state->children[i].tile->id, main_state->children[i].lcu_order[0].position.y + main_state->children[i].tile->lcu_offset_y, main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].position.y + main_state->children[i].tile->lcu_offset_y, main_state->children[i].tile->lcu_offset_x, main_state->children[i].tile->lcu_offset_y);
+              sprintf(job_description, "type=encode_child,frame=%d,tile=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", main_state->children[i].global->frame, main_state->children[i].tile->id, main_state->children[i].lcu_order[0].position.y + main_state->children[i].tile->lcu_offset_y, main_state->children[i].lcu_order[0].position.y + main_state->children[i].tile->lcu_offset_y, 
+                      main_state->children[i].lcu_order[0].position_px.x + main_state->children[i].tile->lcu_offset_x * LCU_WIDTH, main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].position_px.x + main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].size.x + main_state->children[i].tile->lcu_offset_x * LCU_WIDTH - 1,
+                      main_state->children[i].lcu_order[0].position_px.y + main_state->children[i].tile->lcu_offset_y * LCU_WIDTH, main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].position_px.y + main_state->children[i].lcu_order[main_state->children[i].lcu_order_count-1].size.y + main_state->children[i].tile->lcu_offset_y * LCU_WIDTH - 1);
               break;
             case ENCODER_STATE_TYPE_SLICE:
-              sprintf(job_description, "frame=%d,slice=%d,start_in_ts=%d", main_state->children[i].global->frame, main_state->children[i].slice->id, main_state->children[i].slice->start_in_ts);
+              sprintf(job_description, "type=encode_child,frame=%d,slice=%d,start_in_ts=%d", main_state->children[i].global->frame, main_state->children[i].slice->id, main_state->children[i].slice->start_in_ts);
               break;
             default:
-              sprintf(job_description, "frame=%d,invalid", main_state->children[i].global->frame);
+              sprintf(job_description, "type=encode_child,frame=%d,invalid", main_state->children[i].global->frame);
               break;
           }
 #else
@@ -554,7 +559,7 @@ static void encoder_state_encode(encoder_state * const main_state) {
           threadqueue_job *job;
 #ifdef _DEBUG
           char job_description[256];
-          sprintf(job_description, "type=sao,frame=%d,tile=%d,position_y=%d", main_state->global->frame, main_state->tile->id, y + main_state->tile->lcu_offset_y);
+          sprintf(job_description, "type=sao,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d", main_state->global->frame, main_state->tile->id, main_state->tile->lcu_offset_x * LCU_WIDTH, main_state->tile->lcu_offset_x * LCU_WIDTH + main_state->tile->frame->width - 1, (main_state->tile->lcu_offset_y + y) * LCU_WIDTH, MIN(main_state->tile->lcu_offset_y * LCU_WIDTH + main_state->tile->frame->height, (main_state->tile->lcu_offset_y + y + 1) * LCU_WIDTH)-1);
 #else
           char* job_description = NULL;
 #endif
@@ -683,14 +688,14 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state * const enc
 void encode_one_frame(encoder_state * const main_state)
 {
   {
-    PERFORMANCE_MEASURE_START();
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
     encoder_state_new_frame(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", main_state->global->frame, main_state->global->poc);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", main_state->global->frame, main_state->global->poc);
   }
   {
-    PERFORMANCE_MEASURE_START();
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
     encoder_state_encode(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=encode,frame=%d", main_state->global->frame);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=encode,frame=%d", main_state->global->frame);
   }
   //threadqueue_flush(main_state->encoder_control->threadqueue);
   {
