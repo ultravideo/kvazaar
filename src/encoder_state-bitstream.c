@@ -729,21 +729,21 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
               main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
   }
   {
-    PERFORMANCE_MEASURE_START();
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
   for (i = 0; main_state->children[i].encoder_control; ++i) {
     //Append bitstream to main stream
     bitstream_append(&main_state->stream, &main_state->children[i].stream);
     //FIXME: Move this...
     bitstream_clear(&main_state->children[i].stream);
   }
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
   }
   
   {
-    PERFORMANCE_MEASURE_START();
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
     // Calculate checksum
     add_checksum(main_state);
-    PERFORMANCE_MEASURE_END(main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
   }
   
   assert(main_state->tile->frame->poc == main_state->global->poc);

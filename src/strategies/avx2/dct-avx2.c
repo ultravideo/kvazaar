@@ -411,9 +411,9 @@ static void partial_butterfly_inverse_32_avx2(int16_t *src, int16_t *dst,
 #define DCT_NXN_AVX2(n) \
 static void dct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
 \
-  int16_t tmp[ ## n ## * ## n ##]; \
-  int32_t shift_1st = g_convert_to_bit[ ## n ## ] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = g_convert_to_bit[ ## n ## ] + 8; \
+  int16_t tmp[ n * n ]; \
+  int32_t shift_1st = g_convert_to_bit[ n ] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = g_convert_to_bit[ n ] + 8; \
 \
   partial_butterfly_ ## n ## _avx2(block, tmp, shift_1st); \
   partial_butterfly_ ## n ## _avx2(tmp, coeff, shift_2nd); \
@@ -422,7 +422,7 @@ static void dct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_
 #define IDCT_NXN_AVX2(n) \
 static void idct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
 \
-  int16_t tmp[ ## n ## * ## n ##]; \
+  int16_t tmp[ n * n ]; \
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
 \
