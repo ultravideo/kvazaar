@@ -12,7 +12,15 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <OmitFramePointers>
+      </OmitFramePointers>
+      <EnableFiberSafeOptimizations>
+      </EnableFiberSafeOptimizations>
     </ClCompile>
+    <Link>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
   </ItemDefinitionGroup>
   <ItemGroup />
 </Project>
