@@ -255,11 +255,7 @@ void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int re
     int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     int filter = !is_chroma && width < 32;
-    if (dist_from_vert_or_hor <= filter_threshold) {
-      intra_get_angular_pred(encoder, ref_pixels, recstride, dst, width, width, mode, filter);
-    } else {
-      intra_get_angular_pred(encoder, ref_pixels, recstride, dst, width, width, mode, filter);
-    }
+    intra_get_angular_pred(encoder, ref_pixels, recstride, dst, width, width, mode, filter);
   }
 }
 
