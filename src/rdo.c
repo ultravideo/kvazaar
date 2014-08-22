@@ -230,7 +230,7 @@ int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coeffi
  * \returns cost of given absolute transform level
  * From HM 12.0
  */
-double get_ic_rate_cost  (encoder_state * const encoder_state,
+int32_t get_ic_rate  (encoder_state * const encoder_state,
                           uint32_t abs_level,
                           uint16_t ctx_num_one,
                           uint16_t ctx_num_abs,
@@ -241,7 +241,7 @@ double get_ic_rate_cost  (encoder_state * const encoder_state,
                           )
 {
   cabac_data * const cabac = &encoder_state->cabac;
-  double rate = 32768.0;
+  int32_t rate = 32768;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
   cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx_cu_one_model_luma[0]) : &(cabac->ctx_cu_one_model_chroma[0]);
   cabac_ctx *base_abs_ctx = (type == 0) ? &(cabac->ctx_cu_abs_model_luma[0]) : &(cabac->ctx_cu_abs_model_chroma[0]);
@@ -275,52 +275,6 @@ double get_ic_rate_cost  (encoder_state * const encoder_state,
     rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],0);
   }
 
-  return rate;
-}
-
-
-int32_t get_ic_rate( encoder_state * const encoder_state, uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
-                     uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type)
-{
-  cabac_data * const cabac = &encoder_state->cabac;
-  int32_t rate = 0;
-  uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx_cu_one_model_luma[0]) : &(cabac->ctx_cu_one_model_chroma[0]);
-  cabac_ctx *base_abs_ctx = (type == 0) ? &(cabac->ctx_cu_abs_model_luma[0]) : &(cabac->ctx_cu_abs_model_chroma[0]);
-
-  if(!abs_level) return 0;
-
-  if (abs_level >= base_level) {
-    uint32_t symbol     = abs_level - base_level;
-    uint32_t max_vlc     = g_go_rice_range[ abs_go_rice ];
-    uint16_t pref_len,num_bins;
-
-    if (symbol > max_vlc) { //Exp. Golomb
-      int32_t iEGS    = 1;
-      uint32_t uiMax = 2;
-      abs_level  = symbol - max_vlc;
-      for(; abs_level >= uiMax; uiMax <<= 1, iEGS += 2 );
-      rate      += iEGS << 15;
-      symbol    = MIN( symbol, ( max_vlc + 1 ) );
-    }
-
-    pref_len = (uint16_t)(symbol >> abs_go_rice) + 1;
-    num_bins = (uint16_t)MIN( pref_len, g_go_rice_prefix_len[ abs_go_rice ] ) + abs_go_rice;
-
-    rate += num_bins << 15;
-
-    if (c1_idx < C1FLAG_NUMBER) {
-      rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
-      if (c2_idx < C2FLAG_NUMBER) {
-        rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],1);
-      }
-    }
-  } else if( abs_level == 1 ) {
-    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],0);
-  } else if( abs_level == 2 ) {
-    rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
-    rate += CTX_ENTROPY_BITS(&base_abs_ctx[ctx_num_abs],0);
-  }
   return rate;
 }
 
@@ -371,8 +325,8 @@ uint32_t get_coded_level ( encoder_state * const encoder_state, double *coded_co
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
     double err       = (double)(level_double - ( abs_level << q_bits ) );
     double cur_cost  = err * err * temp + encoder_state->global->cur_lambda_cost *
-                       get_ic_rate_cost( encoder_state, abs_level, ctx_num_one, ctx_num_abs,
-                                         abs_go_rice, c1_idx, c2_idx, type);
+                       get_ic_rate( encoder_state, abs_level, ctx_num_one, ctx_num_abs,
+                                    abs_go_rice, c1_idx, c2_idx, type);
     cur_cost        += cur_cost_sig;
 
     if( cur_cost < *coded_cost ) {

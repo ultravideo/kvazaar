@@ -54,8 +54,6 @@ int32_t get_coeff_cost(const encoder_state *encoder_state, coefficient *coeff, i
 
 int32_t get_ic_rate(encoder_state *encoder_state, uint32_t abs_level, uint16_t ctx_num_one,uint16_t ctx_num_abs,
                      uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
-double get_ic_rate_cost  (encoder_state *encoder_state, uint32_t abs_level, uint16_t ctx_num_one, uint16_t ctx_num_abs,
-                          uint16_t abs_go_rice, uint32_t c1_idx, uint32_t c2_idx, int8_t type);
 uint32_t get_coded_level ( encoder_state * encoder_state, double* coded_cost, double* coded_cost0, double* coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
