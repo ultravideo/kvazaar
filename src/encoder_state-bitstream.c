@@ -399,7 +399,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
-  WRITE_SE(stream, ((int8_t)encoder_state->global->QP)-26, "pic_init_qp_minus26");
+  WRITE_SE(stream, ((int8_t)encoder->cfg->qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder_state->encoder_control->trskip_enable, 1, "transform_skip_enabled_flag");
   WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
@@ -617,10 +617,10 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
       WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
   }
 
-  // Skip flags that are not present
-  // if !entropy_slice_flag
-    WRITE_SE(stream, 0, "slice_qp_delta");
-    //WRITE_U(stream, 1, 1, "alignment");
+  {
+    int slice_qp_delta = encoder_state->global->QP - encoder_state->encoder_control->cfg->qp;
+    WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
+  }
    
   if (encoder->tiles_enable || encoder->wpp) {
     int num_entry_points = 0;
