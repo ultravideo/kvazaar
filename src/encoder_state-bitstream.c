@@ -331,7 +331,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  WRITE_UE(stream, encoder_state->encoder_control->cfg->ref_frames-1, "sps_max_dec_pic_buffering");
+  WRITE_UE(stream, encoder_state->encoder_control->cfg->ref_frames, "sps_max_dec_pic_buffering");
   WRITE_UE(stream, 0, "sps_num_reorder_pics");
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
