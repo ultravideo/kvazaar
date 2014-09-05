@@ -417,6 +417,9 @@ int quantize_residual(encoder_state *const encoder_state,
 
   int has_coeffs = 0;
 
+  assert(width <= TR_MAX_WIDTH);
+  assert(width >= TR_MIN_WIDTH);
+
   // Get residual. (ref_in - pred_in -> residual)
   {
     int y, x;

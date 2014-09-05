@@ -90,7 +90,9 @@ typedef int16_t coefficient;
 #define LCU_WIDTH_C (LCU_WIDTH / 2) /*!< spec: CtbWidthC and CtbHeightC */
 
 #define TR_MAX_LOG2_SIZE 5 /*!< spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5) */
-#define TR_MAX_WIDTH (1 << 5) /*!< spec: Log2MaxTrafoSize */
+#define TR_MAX_WIDTH (1 << TR_MAX_LOG2_SIZE)
+#define TR_MIN_LOG2_SIZE 2 /*!< spec: Log2MinTrafoSize */
+#define TR_MIN_WIDTH (1 << TR_MIN_LOG2_SIZE)
 
 #if LCU_WIDTH != 64
   #error "Kvazaar only support LCU_WIDTH == 64"

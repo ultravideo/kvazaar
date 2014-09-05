@@ -626,7 +626,26 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
 }
 
 
-static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth, int pred_mode, int chroma_mode, int part_mode)
+static void lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
+{
+  const int width_cu = LCU_CU_WIDTH >> depth;
+  const vector2d lcu_cu = { (x_px & (LCU_WIDTH - 1)) / 8, (y_px & (LCU_WIDTH - 1)) / 8 };
+  cu_info *const cur_cu = &lcu->cu[lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH + LCU_CU_OFFSET];
+  int x, y;
+
+  // Depth 4 doesn't go inside the loop. Set the top-left CU.
+  cur_cu->tr_depth = tr_depth;
+
+  for (y = 0; y < width_cu; ++y) {
+    for (x = 0; x < width_cu; ++x) {
+      cu_info *cu = &cur_cu[x + y * LCU_T_CU_WIDTH];
+      cu->tr_depth = tr_depth;
+    }
+  }
+}
+
+
+static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pred_mode, int chroma_mode, int part_mode)
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
   const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
@@ -639,9 +658,9 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int tr
     cu_info *cu = &lcu_cu[x_cu + y_cu * LCU_T_CU_WIDTH];
     cu->depth = MAX_DEPTH;
     cu->type = CU_INTRA;
-    // It is assumed that cu->intra[].mode's are already set.
+    cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode = pred_mode;
+    cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode_chroma = chroma_mode;
     cu->part_size = part_mode;
-    cu->tr_depth = tr_depth;
     return;
   }
 
@@ -657,7 +676,6 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int tr
       cu->intra[3].mode = pred_mode;
       cu->intra[0].mode_chroma = chroma_mode;
       cu->part_size = part_mode;
-      cu->tr_depth = tr_depth;
       cu->coded = 1;
     }
   }
@@ -716,143 +734,262 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
 
 
 /**
- * Calculate "final cost" for the block
- * \return Cost of block
- *
- * Take SSD between reconstruction and original and add cost from
- * coding (bitcost * lambda) and cost for coding coefficients (estimated
- * here as (coefficient_sum * 1.5) * lambda)
- */
-static int lcu_get_final_cost_luma(const encoder_state * const encoder_state,
-                                   const int x_px, const int y_px,
-                                   const int depth, lcu_t *lcu)
+* Calculate RD cost for a Coding Unit.
+* \return Cost of block
+* \param ref_cu  CU used for prediction parameters.
+*
+* Calculates the RDO cost of a single CU that will not be split further.
+* Takes into account SSD of reconstruction and the cost of encoding whatever
+* prediction unit data needs to be coded.
+*/
+static int cu_rd_cost_luma(const encoder_state *const encoder_state,
+  const int x_px, const int y_px, const int depth,
+  const cu_info *const pred_cu,
+  lcu_t *const lcu)
 {
-  cu_info *cur_cu;
-  int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
-  int cost = 0;
-  int coeff_cost = 0;
   const int rdo = encoder_state->encoder_control->rdo;
+  const int width = LCU_WIDTH >> depth;
 
-  int width = LCU_WIDTH>>depth;
-  int x,y;
-  cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+  // cur_cu is used for TU parameters.
+  cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (x_px / 8) + (y_px / 8) * LCU_T_CU_WIDTH];
+
+  int x, y;
+  int cost = 0;
+
+  // Check that lcu is not in 
+  assert(x_px >= 0 && x_px < LCU_WIDTH);
+  assert(y_px >= 0 && y_px < LCU_WIDTH);
+
+  {
+    int trtree_bits = 0;
+    if (width <= TR_MAX_WIDTH
+      && width > TR_MIN_WIDTH
+      && pred_cu->part_size != SIZE_NxN) {
+      trtree_bits += 1; // split_transform_flag
+    }
+    cost += trtree_bits * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
+  }
+  if (tr_cu->tr_depth > depth) {
+    int offset = width / 2;
+
+    cost += cu_rd_cost_luma(encoder_state, x_px, y_px, depth + 1, pred_cu, lcu);
+    cost += cu_rd_cost_luma(encoder_state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
+    cost += cu_rd_cost_luma(encoder_state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
+    cost += cu_rd_cost_luma(encoder_state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+
+    return cost;
+  }
+
+  if (pred_cu->type == CU_INTRA || depth > pred_cu->depth) {
+    int trtree_bits = 1; // cbf_luma
+    cost += trtree_bits * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
+  }
 
   // SSD between reconstruction and original
-  for (y = y_local; y < y_local+width; ++y) {
-    for (x = x_local; x < x_local+width; ++x) {
+  for (y = y_px; y < y_px + width; ++y) {
+    for (x = x_px; x < x_px + width; ++x) {
       int diff = (int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x];
       cost += diff*diff;
     }
   }
 
-  if(rdo == 1) {
-    // sum of coeffs
-    for (y = y_local; y < y_local+width; ++y) {
-      for (x = x_local; x < x_local+width; ++x) {
+  if (rdo == 1) {
+    int coeff_cost = 0;
+
+    // Estimate coding cost to be 1.5 * summ of abs coeffs.
+    for (y = y_px; y < y_px + width; ++y) {
+      for (x = x_px; x < x_px + width; ++x) {
         coeff_cost += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
       }
     }
-    // Coefficient costs
-    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+    cost += (coeff_cost + (coeff_cost >> 1)) * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
 
-  // Calculate actual bit costs for coding the coeffs
-  // RDO
   } else if (rdo == 2) {
-    coefficient coeff_temp[32*32];
-    int i;
-    int blocks = (width == 64)?4:1;
-    int8_t luma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
+    int coeff_cost = 0;
 
-    for(i = 0; i < blocks; i++) {
-      // For 64x64 blocks we need to do transform split to 32x32
-      int blk_y = i&2 ? 32:0 + y_local;
-      int blk_x = i&1 ? 32:0 + x_local;
-      int blockwidth = (width == 64)?32:width;
+    coefficient coeff_temp[32 * 32];
+    int8_t luma_scan_mode = get_scan_order(pred_cu->type, pred_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
 
-      // Calculate luma coeff bit count
-      coefficients_blit(&lcu->coeff.y[(blk_y*LCU_WIDTH)+blk_x],coeff_temp,blockwidth,blockwidth,LCU_WIDTH,blockwidth);
-      coeff_cost += get_coeff_cost(encoder_state, coeff_temp, blockwidth, 0, luma_scan_mode);
-    }
+    // Code coeffs using cabac to get a better estimate of real coding costs.
+    coefficients_blit(&lcu->coeff.y[(y_px*LCU_WIDTH) + x_px], coeff_temp, width, width, LCU_WIDTH, width);
+    coeff_cost += get_coeff_cost(encoder_state, coeff_temp, width, 0, luma_scan_mode);
+
     // Multiply bit count with lambda to get RD-cost
-    cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+    cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
   }
 
   return cost;
 }
 
-static int lcu_get_final_cost_chroma(const encoder_state * const encoder_state,
-                                     const int x_px, const int y_px,
-                                     const int depth, lcu_t *lcu)
-{
-  cu_info *cur_cu;
-  int x_local = (x_px&0x3f), y_local = (y_px&0x3f);
-  int cost = 0;
-  int coeff_cost = 0;
-  const int rdo = encoder_state->encoder_control->rdo;
 
-  int width = LCU_WIDTH>>depth;
-  int x,y;
-  cur_cu = &lcu->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+static int cu_rd_cost_chroma(const encoder_state *const encoder_state,
+  const int x_px, const int y_px, const int depth,
+  const cu_info *const pred_cu,
+  lcu_t *const lcu)
+{
+  const vector2d lcu_px = { x_px / 2, y_px / 2 };
+  const int rdo = encoder_state->encoder_control->rdo;
+  const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
+  cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x / 4) + (lcu_px.y / 4)*LCU_T_CU_WIDTH];
+
+  int x, y;
+
+  int cost = 0;
+
+  assert(x_px >= 0 && x_px < LCU_WIDTH);
+  assert(y_px >= 0 && y_px < LCU_WIDTH);
+
+  if (depth < MAX_PU_DEPTH) {
+    int trtree_bits = 0;
+    // cbf_c bits are present only when log2TrafoSize > 2
+    if (tr_cu->tr_depth == depth) {
+      // cbf_c bits are always present at transform depth 0.
+      trtree_bits += 2;
+    } else {
+      // cbf_c bits are not present if cbf has already been set to 0.
+      trtree_bits += cbf_is_set(tr_cu->cbf.u, depth - 1);
+      trtree_bits += cbf_is_set(tr_cu->cbf.v, depth - 1);
+    }
+    cost += trtree_bits * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
+  } else if (PU_INDEX(x_px / 4, y_px / 4) != 0) {
+    // For MAX_PU_DEPTH calculate chroma for previous depth for the first
+    // block and return 0 cost for all others.
+    return 0;
+  }
+
+  if (tr_cu->tr_depth > depth) {
+    int offset = LCU_WIDTH >> (depth + 1);
+
+    cost += cu_rd_cost_chroma(encoder_state, x_px, y_px, depth + 1, pred_cu, lcu);
+    cost += cu_rd_cost_chroma(encoder_state, x_px + offset, y_px, depth + 1, pred_cu, lcu);
+    cost += cu_rd_cost_chroma(encoder_state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
+    cost += cu_rd_cost_chroma(encoder_state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
+
+    return cost;
+  }
 
   // Chroma SSD
-  for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
-    for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
-      int diff = (int)lcu->rec.u[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.u[y * (LCU_WIDTH>>1) + x];
-      cost += diff*diff;
-      diff = (int)lcu->rec.v[y * (LCU_WIDTH>>1) + x] - (int)lcu->ref.v[y * (LCU_WIDTH>>1) + x];
-      cost += diff*diff;
+  for (y = lcu_px.y; y < lcu_px.y + width; ++y) {
+    for (x = lcu_px.x; x < lcu_px.x + width; ++x) {
+      int diff = (int)lcu->rec.u[y * LCU_WIDTH_C + x] - (int)lcu->ref.u[y * LCU_WIDTH_C + x];
+      cost += diff * diff;
+      diff = (int)lcu->rec.v[y * LCU_WIDTH_C + x] - (int)lcu->ref.v[y * LCU_WIDTH_C + x];
+      cost += diff * diff;
     }
   }
 
-  if(rdo == 1) {
-    // Chroma sum of coeffs
-    for (y = y_local>>1; y < (y_local+width)>>1; ++y) {
-      for (x = x_local>>1; x < (x_local+width)>>1; ++x) {
-        coeff_cost += abs((int)lcu->coeff.u[y * (LCU_WIDTH>>1) + x]);
-        coeff_cost += abs((int)lcu->coeff.v[y * (LCU_WIDTH>>1) + x]);
+  if (rdo == 1) {
+    int coeff_cost = 0;
+
+    // Estimate coding cost to be 1.5 * summ of abs coeffs.
+    for (y = lcu_px.y; y < lcu_px.y + width; ++y) {
+      for (x = lcu_px.x; x < lcu_px.x + width; ++x) {
+        coeff_cost += abs((int)lcu->coeff.u[y * (LCU_WIDTH_C)+x]);
+        coeff_cost += abs((int)lcu->coeff.v[y * (LCU_WIDTH_C)+x]);
       }
     }
-    // Coefficient costs
-    cost += (coeff_cost + (coeff_cost>>1)) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
 
-  // Calculate actual bit costs for coding the coeffs
-  // RDO
+    cost += (coeff_cost + (coeff_cost >> 1)) * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
   } else if (rdo == 2) {
-    coefficient coeff_temp_u[16*16];
-    coefficient coeff_temp_v[16*16];
-    int i;
-    int blocks = (width == 64)?4:1;
-    int8_t chroma_scan_mode = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
+    coefficient coeff_temp[16 * 16];
+    int8_t scan_order = get_scan_order(pred_cu->type, pred_cu->intra[0].mode_chroma, depth);
 
-    for(i = 0; i < blocks; i++) {
-      // For 64x64 blocks we need to do transform split to 32x32
-      int blk_y = i&2 ? 32:0 + y_local;
-      int blk_x = i&1 ? 32:0 + x_local;
-      int blockwidth = (width == 64)?32:width;
+    int coeff_cost = 0;
 
-      blk_y >>= 1;
-      blk_x >>= 1;
-      if (blockwidth > 4) {
-        // Chroma is 1/4th of luma unless luma is 4x4.
-        blockwidth >>= 1;
-      } else if (x_px % 8 != 0 || y_px % 8 != 0) {
-        // Only add chroma cost for 4x4 blocks for the one on the 8x8 grid.
-        break;
-      }
+    coefficients_blit(&lcu->coeff.u[(lcu_px.y*(LCU_WIDTH_C)) + lcu_px.x],
+      coeff_temp, width, width, LCU_WIDTH_C, width);
+    coeff_cost += get_coeff_cost(encoder_state, coeff_temp, width, 2, scan_order);
 
-      coefficients_blit(&lcu->coeff.u[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_u,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
-      coefficients_blit(&lcu->coeff.v[(blk_y*(LCU_WIDTH>>1))+blk_x],coeff_temp_v,blockwidth,blockwidth,LCU_WIDTH>>1,blockwidth);
 
-      coeff_cost += get_coeff_cost(encoder_state, coeff_temp_u, blockwidth, 2, chroma_scan_mode);
-      coeff_cost += get_coeff_cost(encoder_state, coeff_temp_v, blockwidth, 2, chroma_scan_mode);
-    }
+    coefficients_blit(&lcu->coeff.v[(lcu_px.y*(LCU_WIDTH_C)) + lcu_px.x],
+      coeff_temp, width, width, LCU_WIDTH_C, width);
+    coeff_cost += get_coeff_cost(encoder_state, coeff_temp, width, 2, scan_order);
+
     // Multiply bit count with lambda to get RD-cost
-    cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+    cost += coeff_cost * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
   }
 
   return cost;
 }
 
+
+/**
+* \brief Perform search for best intra transform split configuration.
+*
+* This function does a recursive search for the best intra transform split
+* configuration for a given intra prediction mode.
+*
+* \return RD cost of best transform split configuration. Splits in lcu->cu.
+* \param depth  Current transform depth.
+* \param max_depth  Depth to which TR split will be tried.
+* \param intra_mode  Intra prediction mode.
+* \param cost_treshold  RD cost at which search can be stopped.
+*/
+static int32_t search_intra_trdepth(encoder_state * const encoder_state,
+  int x_px, int y_px, int depth, int max_depth,
+  int intra_mode, int cost_treshold,
+  const cu_info *const pred_cu,
+  lcu_t *const lcu)
+{
+  const int width = LCU_WIDTH >> depth;
+  const int offset = width / 2;
+  const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+
+  pixel nosplit_pixels[TR_MAX_WIDTH*TR_MAX_WIDTH];
+
+  int32_t split_cost = INT32_MAX;
+  int32_t nosplit_cost = INT32_MAX;
+
+  assert(width >= TR_MIN_WIDTH);
+
+  if (depth > 0) {
+    tr_cu->tr_depth = depth;
+    intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, lcu);
+    nosplit_cost = cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+
+    // Clear cbf bits because they have been set by the reconstruction.
+    cbf_clear(&tr_cu->cbf.y, depth + PU_INDEX(x_px / 4, y_px / 4));
+
+    // Early stop codition for the recursive search.
+    // If the cost of any 1/4th of the transform is already larger than the
+    // whole transform, assume that splitting further is a bad idea.
+    if (nosplit_cost >= cost_treshold) {
+      return nosplit_cost;
+    }
+
+    pixels_blit(lcu->rec.y, nosplit_pixels, width, width, LCU_WIDTH, width);
+  }
+
+  if (depth < max_depth && depth < MAX_PU_DEPTH) {
+    split_cost = 3 * (int32_t)(encoder_state->global->cur_lambda_cost + 0.5);
+
+    split_cost += search_intra_trdepth(encoder_state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+    if (split_cost < nosplit_cost) {
+      split_cost += search_intra_trdepth(encoder_state, x_px + offset, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+    }
+    if (split_cost < nosplit_cost) {
+      split_cost += search_intra_trdepth(encoder_state, x_px, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+    }
+    if (split_cost < nosplit_cost) {
+      split_cost += search_intra_trdepth(encoder_state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
+    }
+  } else {
+    assert(width <= TR_MAX_WIDTH);
+  }
+
+  if (depth == 0 || split_cost < nosplit_cost) {
+    return split_cost;
+  } else {
+    lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+
+    // We only restore the pixel data and not coefficients or cbf data.
+    // The only thing we really need are the border pixels.
+    pixels_blit(nosplit_pixels, lcu->rec.y, width, width, width, LCU_WIDTH);
+
+    return nosplit_cost;
+  }
+}
 
 
 static void sort_modes(int8_t *modes, uint32_t *costs, int length)
@@ -995,12 +1132,17 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
 
 static void search_intra_rdo(encoder_state * const encoder_state, 
+                             int x_px, int y_px, int depth,
                              pixel *orig, int32_t origstride,
                              pixel *rec, int16_t recstride,
-                             int width, int8_t *intra_preds,
+                             int8_t *intra_preds,
+                             int modes_to_check,
                              int8_t modes[35], uint32_t costs[35],
-                             int modes_to_check)
+                             lcu_t *lcu)
 {
+  const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + encoder_state->encoder_control->tr_depth_intra);
+  const int width = LCU_WIDTH >> depth;
+
   pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
   pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
   int rdo_mode;
@@ -1040,15 +1182,26 @@ static void search_intra_rdo(encoder_state * const encoder_state,
   }
 
   for(rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
-    int rdo_bitcost;
-    // The reconstruction is calculated again here, it could be saved from before..
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[rdo_mode], 0);
+    int rdo_bitcost = intra_pred_ratecost(modes[rdo_mode], intra_preds);
+    costs[rdo_mode] = rdo_bitcost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
 
-    costs[rdo_mode] = rdo_cost_intra(encoder_state,pred,orig_block,width,modes[rdo_mode], width == 4 ? 1 : 0);
-    // Bitcost also calculated again for this mode
-    rdo_bitcost = intra_pred_ratecost(modes[rdo_mode],intra_preds);
-    // Add bitcost * lambda
-    costs[rdo_mode] += rdo_bitcost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
+    if (tr_depth == depth) {
+      // The reconstruction is calculated again here, it could be saved from before..
+      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[rdo_mode], 0);
+      costs[rdo_mode] += rdo_cost_intra(encoder_state, pred, orig_block, width, modes[rdo_mode], width == 4 ? 1 : 0);
+    } else {
+      // Perform transform split search and save mode RD cost for the best one.
+      cu_info pred_cu;
+      pred_cu.depth = depth;
+      pred_cu.type = CU_INTRA;
+      pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
+      pred_cu.intra[0].mode = modes[rdo_mode];
+
+      // Reset transform split data in lcu.cu for this area.
+      lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+
+      costs[rdo_mode] += search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
+    }
   }
 
   sort_modes(modes, costs, modes_to_check);
@@ -1109,13 +1262,18 @@ static int search_cu_intra(encoder_state * const encoder_state,
                                                 cu_width, candidate_modes,
                                                 modes, costs);
 
+    // Set transform depth to current depth, meaning no transform splits.
+    lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+
     if (encoder_state->encoder_control->rdo == 2) {
       int num_modes_to_check = MIN(number_of_modes, (cu_width <= 8) ? 8 : 3);
       search_intra_rdo(encoder_state, 
+                       lcu_px.x, lcu_px.y, depth,
                        ref_pixels, LCU_WIDTH,
                        cu_in_rec_buffer, cu_width * 2 + 8,
-                       cu_width, candidate_modes,
-                       modes, costs, num_modes_to_check);
+                       candidate_modes,
+                       num_modes_to_check,
+                       modes, costs, lcu);
     }
 
     cur_cu->intra[pu_index].mode = modes[0];
@@ -1194,11 +1352,13 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
-      lcu_set_intra_mode(&work_tree[depth], x, y, depth, cur_cu->tr_depth,
-                         cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode,
-                         cur_cu->intra[0].mode_chroma,
+      int8_t intra_mode = cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode;
+      int8_t intra_mode_chroma = cur_cu->intra[0].mode_chroma;
+      lcu_set_intra_mode(&work_tree[depth], x, y, depth,
+                         intra_mode,
+                         intra_mode_chroma,
                          cur_cu->part_size);
-      intra_recon_lcu_luma(encoder_state, x, y, depth, &work_tree[depth]);
+      intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
       intra_recon_lcu_chroma(encoder_state, x, y, depth, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
@@ -1219,8 +1379,8 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = lcu_get_final_cost_luma(encoder_state, x, y, depth, &work_tree[depth]);
-    cost += lcu_get_final_cost_chroma(encoder_state, x, y, depth, &work_tree[depth]);
+    cost = cu_rd_cost_luma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+    cost += cu_rd_cost_chroma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
     
     // Bitcost
     cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
