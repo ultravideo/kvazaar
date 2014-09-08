@@ -540,7 +540,7 @@ int quantize_residual_trskip(
     // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum).
     unsigned abs_coeffs = coefficients_calc_abs(noskip.coeff, 4, 4);
     noskip.cost += (abs_coeffs + (abs_coeffs / 2)) * bit_cost;
-  } else if (encoder_state->encoder_control->rdo == 2) {
+  } else if (encoder_state->encoder_control->rdo >= 2) {
     noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
   }
 
@@ -558,7 +558,7 @@ int quantize_residual_trskip(
       // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum + 1).
       unsigned abs_coeffs = coefficients_calc_abs(skip.coeff, 4, 4);
       skip.cost += (1 + abs_coeffs + (abs_coeffs / 2)) * bit_cost;
-    } else if (encoder_state->encoder_control->rdo == 2) {
+    } else if (encoder_state->encoder_control->rdo >= 2) {
       skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
     }
   }

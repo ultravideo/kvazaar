@@ -170,7 +170,7 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
       }
       cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
       // Full RDO
-    } else if(encoder->rdo == 2) {
+    } else if(encoder->rdo >= 2) {
       coeffcost = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
 
       cost  += coeffcost*((int)encoder_state->global->cur_lambda_cost+0.5);

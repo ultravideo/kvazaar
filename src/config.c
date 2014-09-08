@@ -368,7 +368,7 @@ static int config_parse(config *cfg, const char *name, const char *value)
   {
     int rdo = 0;
     if (sscanf(value, "%d", &rdo)) {
-      if (rdo < 0 || rdo > 2) {
+      if (rdo < 0 || rdo > 3) {
         fprintf(stderr, "--rd parameter out of range [0..2], set to 1\n");
         rdo = 1;
       }
