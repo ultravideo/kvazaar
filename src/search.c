@@ -1205,6 +1205,15 @@ static void search_intra_rdo(encoder_state * const encoder_state,
   }
 
   sort_modes(modes, costs, modes_to_check);
+
+  if (tr_depth != depth) {
+    cu_info pred_cu;
+    pred_cu.depth = depth;
+    pred_cu.type = CU_INTRA;
+    pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
+    pred_cu.intra[0].mode = modes[0];
+    search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
+  }
 }
 
 
