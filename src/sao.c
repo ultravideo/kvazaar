@@ -22,6 +22,7 @@
  */
 
 #include "sao.h"
+#include "rdo.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -144,52 +145,61 @@ static int sao_check_merge(const sao_info *sao_candidate, int type,
 }
 
 
-static int sao_mode_bits_none(sao_info *sao_top, sao_info *sao_left)
+static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_info *sao_top, sao_info *sao_left)
 {
-  int mode_bits = 0;
-
+  float mode_bits = 0.0;
+  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    mode_bits += 1;
+    ctx = &(cabac->ctx_sao_merge_flag_model);
+    mode_bits += sao_left->type == SAO_TYPE_NONE ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
     if (sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0)) {
       return mode_bits;
     }
   }
-  if (sao_top != NULL) {
-    mode_bits += 1;
+  if (sao_top != NULL) {    
+    ctx = &(cabac->ctx_sao_merge_flag_model);
+    mode_bits += sao_top->type == SAO_TYPE_NONE ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
     if (sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0)) {
       return mode_bits;
     }
   }
 
   // TR coded type_idx_, none = 0
-  mode_bits += 1;
+  ctx = &(cabac->ctx_sao_type_idx_model);
+  mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
 
   return mode_bits;
 }
 
 
-static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
+static float sao_mode_bits_edge(const encoder_state * const encoder_state,
+                              int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
                               sao_info *sao_top, sao_info *sao_left)
 {
-  int mode_bits = 0;
-
+  float mode_bits = 0.0;
+  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    mode_bits += 1;
+    ctx = &(cabac->ctx_sao_merge_flag_model);    
+    mode_bits += sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
     if (sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class)) {
       return mode_bits;
     }
   }
   if (sao_top != NULL) {
-    mode_bits += 1;
+    ctx = &(cabac->ctx_sao_merge_flag_model);
+    mode_bits += sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
     if (sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class)) {
       return mode_bits;
     }
   }
 
   // TR coded type_idx_, edge = 2 = cMax
-  mode_bits += 1;
+  ctx = &(cabac->ctx_sao_type_idx_model);
+  mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets.
   {
@@ -204,38 +214,38 @@ static int sao_mode_bits_edge(int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIE
     }    
   }
 
-  // TR coded sao_eo_class_
-  if (edge_class == SAO_EO0 || edge_class == SAO_EO3) {
-    mode_bits += 1;
-  } else {
-    mode_bits += 2;
-  }
+  mode_bits += 2.0;
 
   return mode_bits;
 }
 
 
-static int sao_mode_bits_band(int band_position, int offsets[5],
+static float sao_mode_bits_band(const encoder_state * const encoder_state,
+                              int band_position, int offsets[5],
                               sao_info *sao_top, sao_info *sao_left)
 {
-  int mode_bits = 0;
-
+  float mode_bits = 0.0;
+  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    mode_bits += 1;
+    const cabac_ctx *ctx = &(cabac->ctx_sao_merge_flag_model);
+    mode_bits += sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, band_position, 0) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
     if (sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0)) {
       return mode_bits;
     }
   }
   if (sao_top != NULL) {
-    mode_bits += 1;
+    const cabac_ctx *ctx = &(cabac->ctx_sao_merge_flag_model);
+    mode_bits += sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, band_position, 0) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
     if (sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0)) {
       return mode_bits;
     }
   }
 
   // TR coded sao_type_idx_, band = 1
-  mode_bits += 2;
+  ctx = &(cabac->ctx_sao_type_idx_model);
+  mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets and possible FL coded offset signs.
   {
@@ -244,16 +254,16 @@ static int sao_mode_bits_band(int band_position, int offsets[5],
       int abs_offset = abs(offsets[i+1]);
       if (abs_offset == 0) {
         mode_bits += abs_offset + 1;
-      } else if (abs_offset == SAO_ABS_OFFSET_MAX) {
+      } else if(abs_offset == SAO_ABS_OFFSET_MAX) {
         mode_bits += abs_offset + 1 + 1;
       } else {
-        mode_bits += abs_offset + 2 + 1;
-      }
+        mode_bits += abs_offset + 2  + 1;
+      }      
     }
   }
 
   // FL coded band position.
-  mode_bits += 5;
+  mode_bits += 5.0;
 
   return mode_bits;
 }
@@ -669,8 +679,8 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
     }
 
     {
-      int mode_bits = sao_mode_bits_edge(edge_class, edge_offset, sao_top, sao_left);
-      sum_ddistortion += (int)((double)mode_bits*(encoder_state->global->cur_lambda_cost+0.5));
+      float mode_bits = sao_mode_bits_edge(encoder_state,edge_class, edge_offset, sao_top, sao_left);
+      sum_ddistortion += (int)((double)mode_bits*encoder_state->global->cur_lambda_cost+0.5);
     }
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
@@ -701,7 +711,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
     int sao_bands[2][32];
     int temp_offsets[5];
     int ddistortion;
-    int temp_rate = 0;
+    float temp_rate = 0.0;
 
     memset(sao_bands, 0, 2 * 32 * sizeof(int));
     for (i = 0; i < buf_cnt; ++i) {
@@ -711,8 +721,8 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
 
     ddistortion = calc_sao_band_offsets(sao_bands, &temp_offsets[1], &sao_out->band_position);
 
-    temp_rate = sao_mode_bits_band(sao_out->band_position, temp_offsets, sao_top, sao_left);
-    ddistortion += (int)((double)temp_rate*(encoder_state->global->cur_lambda_cost+0.5));
+    temp_rate = sao_mode_bits_band(encoder_state, sao_out->band_position, temp_offsets, sao_top, sao_left);
+    ddistortion += (int)((double)temp_rate*encoder_state->global->cur_lambda_cost+0.5);
 
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
@@ -753,8 +763,8 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   sao_search_band_sao(encoder_state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
 
   {
-    int mode_bits = sao_mode_bits_edge(edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
-    int ddistortion = mode_bits * (int)(encoder_state->global->cur_lambda_cost + 0.5);
+    float mode_bits = sao_mode_bits_edge(encoder_state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
+    int ddistortion = (int)(mode_bits * encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -767,8 +777,8 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   }
 
   {
-    int mode_bits = sao_mode_bits_band(band_sao.band_position, band_sao.offsets, sao_top, sao_left);
-    int ddistortion = mode_bits * (int)(encoder_state->global->cur_lambda_cost + 0.5);
+    float mode_bits = sao_mode_bits_band(encoder_state, band_sao.band_position, band_sao.offsets, sao_top, sao_left);
+    int ddistortion = (int)(mode_bits * encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
@@ -789,7 +799,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   // Choose between SAO and doing nothing, taking into account the
   // rate-distortion cost of coding do nothing.
   {
-    int cost_of_nothing = sao_mode_bits_none(sao_top, sao_left) * (int)(encoder_state->global->cur_lambda_cost + 0.5);
+    int cost_of_nothing = (int)(sao_mode_bits_none(encoder_state, sao_top, sao_left) * encoder_state->global->cur_lambda_cost + 0.5);
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
     }
