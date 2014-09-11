@@ -53,8 +53,8 @@ typedef struct
   cabac_ctx ctx_intra_mode_model;    //!< \brief intra mode context models
   cabac_ctx ctx_chroma_pred_model[2];
   cabac_ctx ctx_trans_subdiv_model[3]; //!< \brief intra mode context models
-  cabac_ctx ctx_qt_cbf_model_luma[3];
-  cabac_ctx ctx_qt_cbf_model_chroma[3];
+  cabac_ctx ctx_qt_cbf_model_luma[4];
+  cabac_ctx ctx_qt_cbf_model_chroma[4];
   cabac_ctx ctx_part_size_model[4];
   cabac_ctx ctx_cu_sig_coeff_group_model[4];
   cabac_ctx ctx_cu_sig_model_luma[27];

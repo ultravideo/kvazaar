@@ -114,10 +114,10 @@ const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
   { 153,  138,  138 },
 };
 
-const uint8_t INIT_QT_CBF[3][6] = {
-  { 153,  111,  CNU,  149,   92,  167 },
-  { 153,  111,  CNU,  149,  107,  167 },
-  { 111,  141,  CNU,   94,  138,  182 },
+const uint8_t INIT_QT_CBF[3][8] = {
+  { 153,  111,  CNU,  CNU,   149,   92,  167,  154 },
+  { 153,  111,  CNU,  CNU,   149,  107,  167,  154 },
+  { 111,  141,  CNU,  CNU,    94,  138,  182,  154 },
 };
 
 const uint8_t INIT_SIG_CG_FLAG[3][4] = {
@@ -248,8 +248,10 @@ void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
   }
   for (i = 0; i < 3; i++) {
     ctx_init(&cabac->ctx_trans_subdiv_model[i], QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
+  }
+  for (i = 0; i < 4; i++) {
     ctx_init(&cabac->ctx_qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
-    ctx_init(&cabac->ctx_qt_cbf_model_chroma[i], QP, INIT_QT_CBF[slice][i+3]);
+    ctx_init(&cabac->ctx_qt_cbf_model_chroma[i], QP, INIT_QT_CBF[slice][i + 4]);
   }
 
   for (i = 0; i < 8; i++) {
