@@ -131,6 +131,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
 {
   cabac_data * const cabac = &encoder_state->cabac;
   sao_eo_cat i;
+  int offset_index = (color_i == COLOR_V) ? 5 : 0;
 
   // Skip colors with no SAO.
   //FIXME: for now, we always have SAO for all channels
@@ -141,7 +142,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
   // Encode sao_type_idx for Y and U+V.
   if (color_i != COLOR_V) {
-    cabac->ctx = &(cabac->ctx_sao_type_idx_model);;
+    cabac->ctx = &(cabac->ctx_sao_type_idx_model);
     CABAC_BIN(cabac, sao->type != SAO_TYPE_NONE, "sao_type_idx");
     if (sao->type == SAO_TYPE_BAND) {
       CABAC_BIN_EP(cabac, 0, "sao_type_idx_ep");
@@ -155,7 +156,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
   for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i]), SAO_ABS_OFFSET_MAX);
+    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + (sao->type == SAO_TYPE_BAND?offset_index:0)]), SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
@@ -165,13 +166,13 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   if (sao->type == SAO_TYPE_BAND) {
     for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
       // Positive sign is coded as 0.
-      if(sao->offsets[i] != 0) {
-        CABAC_BIN_EP(cabac, sao->offsets[i] < 0 ? 1 : 0, "sao_offset_sign");
+      if (sao->offsets[i + offset_index] != 0) {
+        CABAC_BIN_EP(cabac, sao->offsets[i + offset_index] < 0 ? 1 : 0, "sao_offset_sign");
       }
     }
     // TODO: sao_band_position
     // FL cMax=31 (5 bits)
-    CABAC_BINS_EP(cabac, sao->band_position, 5, "sao_band_position");
+    CABAC_BINS_EP(cabac, sao->band_position[color_i == COLOR_V ? 1:0], 5, "sao_band_position");
   } else if (color_i != COLOR_V) {
     CABAC_BINS_EP(cabac, sao->eo_class, 2, "sao_eo_class");
   }

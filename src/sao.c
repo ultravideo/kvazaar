@@ -134,7 +134,7 @@ static int sao_check_merge(const sao_info *sao_candidate, int type,
         offsets[3] == sao_candidate->offsets[3] &&
         offsets[4] == sao_candidate->offsets[4]) {
       // Type must be BAND or EDGE
-      if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position) ||
+      if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position[0]) ||
           (type == SAO_TYPE_EDGE && eo_class == sao_candidate->eo_class))
       {
           return 1;
@@ -179,7 +179,7 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
 
 static float sao_mode_bits_edge(const encoder_state * const encoder_state,
                               int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
-                              sao_info *sao_top, sao_info *sao_left)
+                              sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
   int8_t merge_top = 0, merge_left = 0;
@@ -213,9 +213,9 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int abs_offset = abs(offsets[edge_cat]);
       if (abs_offset == 0 || abs_offset == SAO_ABS_OFFSET_MAX) {
-        mode_bits += abs_offset + 1;
+        mode_bits += (abs_offset + 1) * buf_cnt;
       } else {
-        mode_bits += abs_offset + 2;
+        mode_bits += (abs_offset + 2) * buf_cnt;
       }
     }    
   }
@@ -227,17 +227,18 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
 
 
 static float sao_mode_bits_band(const encoder_state * const encoder_state,
-                              int band_position, int offsets[5],
-                              sao_info *sao_top, sao_info *sao_left)
+                              int band_position[2], int offsets[10],
+                              sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
+  int buf_index;
   int8_t merge_top = 0, merge_left = 0;
   cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0);
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position[0], 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
     if (merge_left) {
       return mode_bits;
@@ -245,7 +246,7 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0);
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position[0], 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
     if (merge_top) {
       return mode_bits;
@@ -257,22 +258,23 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets and possible FL coded offset signs.
+  for (buf_index = 0; buf_index < buf_cnt; buf_index++)
   {
     int i;
     for (i = 0; i < 4; ++i) {
-      int abs_offset = abs(offsets[i+1]);
+      int abs_offset = abs(offsets[i + 1 + buf_index*5]);
       if (abs_offset == 0) {
-        mode_bits += abs_offset + 1;
+        mode_bits += (abs_offset + 1)*buf_cnt;
       } else if(abs_offset == SAO_ABS_OFFSET_MAX) {
-        mode_bits += abs_offset + 1 + 1;
+        mode_bits += (abs_offset + 1 + 1)*buf_cnt;
       } else {
-        mode_bits += abs_offset + 2 + 1;
+        mode_bits += (abs_offset + 2 + 1)*buf_cnt;
       }      
     }
   }
 
   // FL coded band position.
-  mode_bits += 5.0;
+  mode_bits += 5.0 * buf_cnt;
 
   return mode_bits;
 }
@@ -281,17 +283,18 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
-static void calc_sao_offset_array(const encoder_control * const encoder, const sao_info *sao, int *offset)
+static void calc_sao_offset_array(const encoder_control * const encoder, const sao_info *sao, int *offset, color_index color_i)
 {
   int val;
   int values = (1<<encoder->bitdepth);
   int shift = encoder->bitdepth-5;
+  int band_pos = color_i == COLOR_V ? 1 : 0;
 
   // Loop through all intensity values and construct an offset array
   for (val = 0; val < values; val++) {
     int cur_band = val>>shift;
-    if(cur_band >= sao->band_position && cur_band < sao->band_position+4) {
-      offset[val] = CLIP(0, values-1,val+sao->offsets[cur_band-sao->band_position+1]);
+    if (cur_band >= sao->band_position[band_pos] && cur_band < sao->band_position[band_pos] + 4) {
+      offset[val] = CLIP(0, values - 1, val + sao->offsets[cur_band - sao->band_position[band_pos] + 1 + 5 * band_pos]);
     } else {
       offset[val] = val;
     }
@@ -416,7 +419,8 @@ static void sao_reconstruct_color(const encoder_control * const encoder,
                                   const pixel *rec_data, pixel *new_rec_data,
                                   const sao_info *sao,
                                   int stride, int new_stride,
-                                  int block_width, int block_height)
+                                  int block_width, int block_height,
+                                  color_index color_i)
 {
   int y, x;
   // Arrays orig_data and rec_data are quarter size for chroma.
@@ -424,7 +428,7 @@ static void sao_reconstruct_color(const encoder_control * const encoder,
 
   if(sao->type == SAO_TYPE_BAND) {
     int offsets[1<<BIT_DEPTH];
-    calc_sao_offset_array(encoder, sao, offsets);
+    calc_sao_offset_array(encoder, sao, offsets, color_i);
     for (y = 0; y < block_height; ++y) {
       for (x = 0; x < block_width; ++x) {
         new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
@@ -618,7 +622,7 @@ void sao_reconstruct(const encoder_control * const encoder, videoframe * frame, 
                         &new_rec[(ofs.y + tl.y) * lcu_stride + ofs.x + tl.x],
                         sao,
                         buf_stride, lcu_stride,
-                        block.x, block.y);
+                        block.x, block.y, color_i);
 
   // Copy reconstructed block from tmp buffer to rec image.
   pixels_blit(&new_rec[(tl.y + ofs.y) * lcu_stride + (tl.x + ofs.x)],
@@ -688,7 +692,7 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
     }
 
     {
-      float mode_bits = sao_mode_bits_edge(encoder_state,edge_class, edge_offset, sao_top, sao_left);
+      float mode_bits = sao_mode_bits_edge(encoder_state, edge_class, edge_offset, sao_top, sao_left, buf_cnt);
       sum_ddistortion += (int)((double)mode_bits*encoder_state->global->cur_lambda_cost+0.5);
     }
     // SAO is not applied for category 0.
@@ -718,26 +722,27 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
   // Band offset
   {
     int sao_bands[2][32];
-    int temp_offsets[5];
-    int ddistortion;
+    int temp_offsets[10];
+    int ddistortion = 0;
     float temp_rate = 0.0;
 
     memset(sao_bands, 0, 2 * 32 * sizeof(int));
     for (i = 0; i < buf_cnt; ++i) {
       calc_sao_bands(encoder_state, data[i], recdata[i],block_width,
                      block_height,sao_bands);
+    
+
+      ddistortion += calc_sao_band_offsets(sao_bands, &temp_offsets[1+5*i], &sao_out->band_position[i]);      
     }
 
-    ddistortion = calc_sao_band_offsets(sao_bands, &temp_offsets[1], &sao_out->band_position);
-
-    temp_rate = sao_mode_bits_band(encoder_state, sao_out->band_position, temp_offsets, sao_top, sao_left);
-    ddistortion += (int)((double)temp_rate*encoder_state->global->cur_lambda_cost+0.5);
+    temp_rate = sao_mode_bits_band(encoder_state, sao_out->band_position, temp_offsets, sao_top, sao_left, buf_cnt);
+    ddistortion += (int)((double)temp_rate*encoder_state->global->cur_lambda_cost + 0.5);
 
     // Select band sao over edge sao when distortion is lower
     if (ddistortion < sao_out->ddistortion) {
       sao_out->type = SAO_TYPE_BAND;
       sao_out->ddistortion = ddistortion;
-      memcpy(&sao_out->offsets[1], &temp_offsets[1], sizeof(int) * 4);
+      memcpy(&sao_out->offsets[0], &temp_offsets[0], sizeof(int) * buf_cnt * 5);
     }
   }
 }
@@ -761,7 +766,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   sao_info band_sao;
   
   //Avoid "random" uninitialized value
-  edge_sao.band_position = 0;
+  edge_sao.band_position[0] = edge_sao.band_position[1] = 0;
   edge_sao.eo_class = SAO_EO0;
   band_sao.offsets[0] = 0;
   band_sao.eo_class = SAO_EO0;
@@ -772,7 +777,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   sao_search_band_sao(encoder_state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
 
   {
-    float mode_bits = sao_mode_bits_edge(encoder_state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left);
+    float mode_bits = sao_mode_bits_edge(encoder_state, edge_sao.eo_class, edge_sao.offsets, sao_top, sao_left, buf_cnt);
     int ddistortion = (int)(mode_bits * encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
@@ -786,14 +791,14 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   }
 
   {
-    float mode_bits = sao_mode_bits_band(encoder_state, band_sao.band_position, band_sao.offsets, sao_top, sao_left);
+    float mode_bits = sao_mode_bits_band(encoder_state, band_sao.band_position, band_sao.offsets, sao_top, sao_left, buf_cnt);
     int ddistortion = (int)(mode_bits * encoder_state->global->cur_lambda_cost + 0.5);
     unsigned buf_i;
     
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
       ddistortion += sao_band_ddistortion(encoder_state, data[buf_i], recdata[buf_i], 
                                           block_width, block_height, 
-                                          band_sao.band_position, &band_sao.offsets[1]);
+                                          band_sao.band_position[buf_i], &band_sao.offsets[1 + 5 * buf_i]);
     }
     
     band_sao.ddistortion = ddistortion;
@@ -815,9 +820,15 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   }
 
   sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
-                                            sao_out->band_position, sao_out->eo_class);
+                                            sao_out->band_position[0], sao_out->eo_class);
   sao_out->merge_left_flag = sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
-                                              sao_out->band_position, sao_out->eo_class);
+                                              sao_out->band_position[0], sao_out->eo_class);
+  if (buf_cnt == 2 && sao_out->type == SAO_TYPE_BAND) {
+    sao_out->merge_up_flag &= sao_check_merge(sao_top, sao_out->type, &sao_out->offsets[5],
+      sao_out->band_position[1], sao_out->eo_class);
+    sao_out->merge_left_flag &= sao_check_merge(sao_left, sao_out->type, &sao_out->offsets[5],
+      sao_out->band_position[1], sao_out->eo_class);
+  }
 
   return;
 }
