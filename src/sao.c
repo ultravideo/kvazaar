@@ -148,20 +148,23 @@ static int sao_check_merge(const sao_info *sao_candidate, int type,
 static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_info *sao_top, sao_info *sao_left)
 {
   float mode_bits = 0.0;
+  int8_t merge_top = 0, merge_left = 0;
   cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    mode_bits += sao_left->type == SAO_TYPE_NONE ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
-    if (sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0)) {
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
+    if (merge_left) {
       return mode_bits;
     }
   }
   if (sao_top != NULL) {    
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    mode_bits += sao_top->type == SAO_TYPE_NONE ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
-    if (sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0)) {
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
+    if (merge_top) {
       return mode_bits;
     }
   }
@@ -179,20 +182,23 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left)
 {
   float mode_bits = 0.0;
+  int8_t merge_top = 0, merge_left = 0;
   cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    ctx = &(cabac->ctx_sao_merge_flag_model);    
-    mode_bits += sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
-    if (sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class)) {
+    ctx = &(cabac->ctx_sao_merge_flag_model);   
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
+    if (merge_left) {
       return mode_bits;
     }
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    mode_bits += sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
-    if (sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class)) {
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
+    if (merge_top) {
       return mode_bits;
     }
   }
@@ -225,20 +231,23 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left)
 {
   float mode_bits = 0.0;
+  int8_t merge_top = 0, merge_left = 0;
   cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    const cabac_ctx *ctx = &(cabac->ctx_sao_merge_flag_model);
-    mode_bits += sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, band_position, 0) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
-    if (sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0)) {
+    ctx = &(cabac->ctx_sao_merge_flag_model);
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position, 0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
+    if (merge_left) {
       return mode_bits;
     }
   }
   if (sao_top != NULL) {
-    const cabac_ctx *ctx = &(cabac->ctx_sao_merge_flag_model);
-    mode_bits += sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, band_position, 0) ? CTX_ENTROPY_FBITS(ctx, 1) : CTX_ENTROPY_FBITS(ctx, 0);
-    if (sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0)) {
+    ctx = &(cabac->ctx_sao_merge_flag_model);
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position, 0);
+    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
+    if (merge_top) {
       return mode_bits;
     }
   }
@@ -257,7 +266,7 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
       } else if(abs_offset == SAO_ABS_OFFSET_MAX) {
         mode_bits += abs_offset + 1 + 1;
       } else {
-        mode_bits += abs_offset + 2  + 1;
+        mode_bits += abs_offset + 2 + 1;
       }      
     }
   }
