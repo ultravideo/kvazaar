@@ -1414,11 +1414,15 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
   }
 
+#ifndef CU_SPLIT_COST
+#  define CU_SPLIT_COST 9
+#endif
+
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || (depth < MAX_INTER_SEARCH_DEPTH && encoder_state->global->slicetype != SLICE_I)) {
     int half_cu = cu_width / 2;
     // Using Cost = lambda * 9 to compensate on the price of the split
-    int split_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5) * 9;
+    int split_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5) * CU_SPLIT_COST;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
     // If skip mode was selected for the block, skip further search.
