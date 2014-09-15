@@ -155,25 +155,31 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0, 0);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
-    if (merge_left) {
-      return mode_bits;
-    }
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
   if (sao_top != NULL) {    
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0, 0);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
-    if (merge_top) {
-      return mode_bits;
-    }
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
 
   // TR coded type_idx_, none = 0
   ctx = &(cabac->ctx_sao_type_idx_model);
   mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
 
+  return mode_bits;
+}
+
+static float sao_mode_bits_merge(const encoder_state * const encoder_state,
+                                 int8_t merge_cand) {
+  float mode_bits = 0.0;
+  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_ctx *ctx = NULL;
+  // FL coded merges.
+  ctx = &(cabac->ctx_sao_merge_flag_model);
+
+  mode_bits += CTX_ENTROPY_FBITS(ctx, merge_cand == 1);
+  if (merge_cand == 1) return mode_bits;
+  mode_bits += CTX_ENTROPY_FBITS(ctx, merge_cand == 2);
   return mode_bits;
 }
 
@@ -190,19 +196,11 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);   
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class, 0);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
-    if (merge_left) {
-      return mode_bits;
-    }
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class, 0);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
-    if (merge_top) {
-      return mode_bits;
-    }
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
 
   // TR coded type_idx_, edge = 2 = cMax
@@ -240,19 +238,11 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position[0], 0, 0);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
-    if (merge_left) {
-      return mode_bits;
-    }
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position[0], 0, 0);
-    mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
-    if (merge_top) {
-      return mode_bits;
-    }
+    mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
 
   // TR coded sao_type_idx_, band = 1
@@ -765,7 +755,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
                                  int block_width, int block_height,
                                  unsigned buf_cnt,
                                  sao_info *sao_out, sao_info *sao_top,
-                                 sao_info *sao_left)
+                                 sao_info *sao_left, int32_t merge_cost[3])
 {
   sao_info edge_sao;
   sao_info band_sao;
@@ -812,8 +802,10 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
 
   if (edge_sao.ddistortion <= band_sao.ddistortion) {
     *sao_out = edge_sao;
+    merge_cost[0] = edge_sao.ddistortion;
   } else {
     *sao_out = band_sao;
+    merge_cost[0] = band_sao.ddistortion;
   }
 
   // Choose between SAO and doing nothing, taking into account the
@@ -822,24 +814,51 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
     int cost_of_nothing = (int)(sao_mode_bits_none(encoder_state, sao_top, sao_left) * encoder_state->global->cur_lambda_cost + 0.5);
     if (sao_out->ddistortion >= cost_of_nothing) {
       sao_out->type = SAO_TYPE_NONE;
+      merge_cost[0] = cost_of_nothing;
     }
   }
 
-  sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
-                                            sao_out->band_position[0], sao_out->eo_class, 0);
-  sao_out->merge_left_flag = sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
-                                              sao_out->band_position[0], sao_out->eo_class, 0);
-  if (buf_cnt == 2) {
-    sao_out->merge_up_flag &= sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
-      sao_out->band_position[1], sao_out->eo_class, 1);
-    sao_out->merge_left_flag &= sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
-      sao_out->band_position[1], sao_out->eo_class, 1);
+  // Calculate merge costs
+  if (sao_top || sao_left) {
+    sao_info* merge_sao[2] = { sao_left, sao_top};
+    int i;
+    for (i = 0; i < 2; i++) {
+      sao_info* merge_cand = merge_sao[i];
+
+      if (merge_cand) {
+        unsigned buf_i;
+        float mode_bits = sao_mode_bits_merge(encoder_state, i + 1);
+        int ddistortion = (int)(mode_bits * encoder_state->global->cur_lambda_cost + 0.5);
+
+        switch (merge_cand->type) {
+          case SAO_TYPE_EDGE:
+                for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
+                  ddistortion += sao_edge_ddistortion(data[buf_i], recdata[buf_i],
+                    block_width, block_height,
+                    merge_cand->eo_class, &merge_cand->offsets[5 * buf_i]);
+                }
+                merge_cost[i + 1] = ddistortion;
+            break;
+          case SAO_TYPE_BAND:
+              for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
+                ddistortion += sao_band_ddistortion(encoder_state, data[buf_i], recdata[buf_i],
+                  block_width, block_height,
+                  merge_cand->band_position[buf_i], &merge_cand->offsets[1 + 5 * buf_i]);
+              }
+              merge_cost[i + 1] = ddistortion;
+            break;
+          case SAO_TYPE_NONE:
+            merge_cost[i + 1] = ddistortion;
+            break;
+          }
+      }
+    }
   }
 
   return;
 }
 
- void sao_search_chroma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
+void sao_search_chroma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -872,10 +891,10 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   }
 
   // Calculate
-  sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left);
+  sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
 }
 
-void sao_search_luma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left)
+void sao_search_luma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
@@ -902,7 +921,7 @@ void sao_search_luma(const encoder_state * const encoder_state, const videoframe
 
   orig_list[0] = orig;
   rec_list[0] = rec;
-  sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left);
+  sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left, merge_cost);
 }
 
 void sao_reconstruct_frame(encoder_state * const encoder_state)
