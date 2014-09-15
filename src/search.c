@@ -1385,7 +1385,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
                          intra_mode_chroma,
                          cur_cu->part_size);
       intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
-      intra_recon_lcu_chroma(encoder_state, x, y, depth, &work_tree[depth]);
+      intra_recon_lcu_chroma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
       inter_recon_lcu(encoder_state, encoder_state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);

@@ -703,7 +703,7 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
   }
 }
 
-void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
+void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, lcu_t *lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
@@ -714,10 +714,10 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu_chroma(encoder_state, x,          y,          depth+1, lcu);
-    intra_recon_lcu_chroma(encoder_state, x + offset, y,          depth+1, lcu);
-    intra_recon_lcu_chroma(encoder_state, x,          y + offset, depth+1, lcu);
-    intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, lcu);
+    intra_recon_lcu_chroma(encoder_state, x,          y,          depth+1, intra_mode, lcu);
+    intra_recon_lcu_chroma(encoder_state, x + offset, y,          depth+1, intra_mode, lcu);
+    intra_recon_lcu_chroma(encoder_state, x,          y + offset, depth+1, intra_mode, lcu);
+    intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, intra_mode, lcu);
 
     if (depth < MAX_DEPTH) {
       cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
@@ -757,7 +757,7 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
                   width_c,
                   recbase_u,
                   rec_stride >> 1,
-                  cur_cu->intra[0].mode_chroma,
+                  intra_mode,
                   1);
 
       intra_build_reference_border(encoder, x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 2,
@@ -768,7 +768,7 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
                   width_c,
                   recbase_v,
                   rec_stride >> 1,
-                  cur_cu->intra[0].mode_chroma,
+                  intra_mode,
                   2);
     }
 
