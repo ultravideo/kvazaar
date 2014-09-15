@@ -156,7 +156,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
   for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + (sao->type == SAO_TYPE_BAND?offset_index:0)]), SAO_ABS_OFFSET_MAX);
+    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}

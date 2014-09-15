@@ -123,18 +123,19 @@ void init_sao_info(sao_info *sao) {
  */
 static int sao_check_merge(const sao_info *sao_candidate, int type,
                            int offsets[NUM_SAO_EDGE_CATEGORIES],
-                           int band_position, int eo_class)
+                           int band_position, int eo_class, int shift)
 {
+  int off_index = 5 * shift;
   if (sao_candidate && sao_candidate->type == type) {
     if (type == SAO_TYPE_NONE) {
       return 1;
     }
-    if (offsets[1] == sao_candidate->offsets[1] &&
-        offsets[2] == sao_candidate->offsets[2] &&
-        offsets[3] == sao_candidate->offsets[3] &&
-        offsets[4] == sao_candidate->offsets[4]) {
+    if (offsets[1 + off_index] == sao_candidate->offsets[1 + off_index] &&
+      offsets[2 + off_index] == sao_candidate->offsets[2 + off_index] &&
+      offsets[3 + off_index] == sao_candidate->offsets[3 + off_index] &&
+      offsets[4 + off_index] == sao_candidate->offsets[4 + off_index]) {
       // Type must be BAND or EDGE
-      if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position[0]) ||
+      if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position[shift]) ||
           (type == SAO_TYPE_EDGE && eo_class == sao_candidate->eo_class))
       {
           return 1;
@@ -154,7 +155,7 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0);
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_NONE, 0, 0, 0, 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
     if (merge_left) {
       return mode_bits;
@@ -162,7 +163,7 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
   }
   if (sao_top != NULL) {    
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0);
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_NONE, 0, 0, 0, 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
     if (merge_top) {
       return mode_bits;
@@ -182,13 +183,14 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
+  int buf_index;
   int8_t merge_top = 0, merge_left = 0;
   cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);   
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class);
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_EDGE, offsets, 0, edge_class, 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
     if (merge_left) {
       return mode_bits;
@@ -196,7 +198,7 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class);
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_EDGE, offsets, 0, edge_class, 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
     if (merge_top) {
       return mode_bits;
@@ -208,14 +210,14 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
   mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets.
-  {
+  for (buf_index = 0; buf_index < buf_cnt; buf_index++) {
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
-      int abs_offset = abs(offsets[edge_cat]);
+      int abs_offset = abs(offsets[edge_cat+5*buf_index]);
       if (abs_offset == 0 || abs_offset == SAO_ABS_OFFSET_MAX) {
-        mode_bits += (abs_offset + 1) * buf_cnt;
+        mode_bits += abs_offset + 1;
       } else {
-        mode_bits += (abs_offset + 2) * buf_cnt;
+        mode_bits += abs_offset + 2;
       }
     }    
   }
@@ -238,7 +240,7 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   // FL coded merges.
   if (sao_left != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_left = sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position[0], 0);
+    merge_left = sao_check_merge(sao_left, SAO_TYPE_BAND, offsets, band_position[0], 0, 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_left);
     if (merge_left) {
       return mode_bits;
@@ -246,7 +248,7 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   }
   if (sao_top != NULL) {
     ctx = &(cabac->ctx_sao_merge_flag_model);
-    merge_top = sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position[0], 0);
+    merge_top = sao_check_merge(sao_top, SAO_TYPE_BAND, offsets, band_position[0], 0, 0);
     mode_bits += CTX_ENTROPY_FBITS(ctx, merge_top);
     if (merge_top) {
       return mode_bits;
@@ -264,11 +266,11 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
     for (i = 0; i < 4; ++i) {
       int abs_offset = abs(offsets[i + 1 + buf_index*5]);
       if (abs_offset == 0) {
-        mode_bits += (abs_offset + 1)*buf_cnt;
+        mode_bits += abs_offset + 1;
       } else if(abs_offset == SAO_ABS_OFFSET_MAX) {
-        mode_bits += (abs_offset + 1 + 1)*buf_cnt;
+        mode_bits += abs_offset + 1 + 1;
       } else {
-        mode_bits += (abs_offset + 2 + 1)*buf_cnt;
+        mode_bits += abs_offset + 2 + 1;
       }      
     }
   }
@@ -288,7 +290,7 @@ static void calc_sao_offset_array(const encoder_control * const encoder, const s
   int val;
   int values = (1<<encoder->bitdepth);
   int shift = encoder->bitdepth-5;
-  int band_pos = color_i == COLOR_V ? 1 : 0;
+  int band_pos = (color_i == COLOR_V) ? 1 : 0;
 
   // Loop through all intensity values and construct an offset array
   for (val = 0; val < values; val++) {
@@ -424,7 +426,7 @@ static void sao_reconstruct_color(const encoder_control * const encoder,
 {
   int y, x;
   // Arrays orig_data and rec_data are quarter size for chroma.
-
+  int offset_v = color_i == COLOR_V ? 5 : 0;
 
   if(sao->type == SAO_TYPE_BAND) {
     int offsets[1<<BIT_DEPTH];
@@ -449,7 +451,7 @@ static void sao_reconstruct_color(const encoder_control * const encoder,
 
         int eo_cat = sao_calc_eo_cat(a, b, c);
 
-        new_data[0] = (pixel)CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat]);
+        new_data[0] = (pixel)CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
       }
     }
   }
@@ -643,52 +645,54 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
   // This array is used to calculate the mean offset used to minimize distortion.
   int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES];
   unsigned i = 0;
-  memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
+  
 
   sao_out->type = SAO_TYPE_EDGE;
   sao_out->ddistortion = INT_MAX;
 
   for (edge_class = SAO_EO0; edge_class <= SAO_EO3; ++edge_class) {
-    int edge_offset[NUM_SAO_EDGE_CATEGORIES];
+    int edge_offset[NUM_SAO_EDGE_CATEGORIES*2];
     int sum_ddistortion = 0;
     sao_eo_cat edge_cat;
 
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
+      memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
       calc_sao_edge_dir(data[i], recdata[i], edge_class,
                         block_width, block_height, cat_sum_cnt);
-    }
+    
 
-    for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
-      int cat_sum = cat_sum_cnt[0][edge_cat];
-      int cat_cnt = cat_sum_cnt[1][edge_cat];
+      for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
+        int cat_sum = cat_sum_cnt[0][edge_cat];
+        int cat_cnt = cat_sum_cnt[1][edge_cat];
 
-      // The optimum offset can be calculated by getting the minima of the
-      // fast ddistortion estimation formula. The minima is the mean error
-      // and we round that to the nearest integer.
-      int offset = 0;
-      if (cat_cnt != 0) {
-        offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
-        offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
+        // The optimum offset can be calculated by getting the minima of the
+        // fast ddistortion estimation formula. The minima is the mean error
+        // and we round that to the nearest integer.
+        int offset = 0;
+        if (cat_cnt != 0) {
+          offset = (cat_sum + (cat_cnt >> 1)) / cat_cnt;
+          offset = CLIP(-SAO_ABS_OFFSET_MAX, SAO_ABS_OFFSET_MAX, offset);
+        }
+
+        // Sharpening edge offsets can't be encoded, so set them to 0 here.
+        if (edge_cat >= SAO_EO_CAT1 && edge_cat <= SAO_EO_CAT2 && offset < 0) {
+          offset = 0;
+        }
+        if (edge_cat >= SAO_EO_CAT3 && edge_cat <= SAO_EO_CAT4 && offset > 0) {
+          offset = 0;
+        }
+
+        edge_offset[edge_cat+5*i] = offset;
+        // The ddistortion is amount by which the SSE of data changes. It should
+        // be negative for all categories, if offset was chosen correctly.
+        // ddistortion = N * h^2 - 2 * h * E, where N is the number of samples
+        // and E is the sum of errors.
+        // It basically says that all pixels that are not improved by offset
+        // increase increase SSE by h^2 and all pixels that are improved by
+        // offset decrease SSE by h*E.
+        sum_ddistortion += cat_cnt * offset * offset - 2 * offset * cat_sum;
       }
-
-      // Sharpening edge offsets can't be encoded, so set them to 0 here.
-      if (edge_cat >= SAO_EO_CAT1 && edge_cat <= SAO_EO_CAT2 && offset < 0) {
-        offset = 0;
-      }
-      if (edge_cat >= SAO_EO_CAT3 && edge_cat <= SAO_EO_CAT4 && offset > 0) {
-        offset = 0;
-      }
-
-      edge_offset[edge_cat] = offset;
-      // The ddistortion is amount by which the SSE of data changes. It should
-      // be negative for all categories, if offset was chosen correctly.
-      // ddistortion = N * h^2 - 2 * h * E, where N is the number of samples
-      // and E is the sum of errors.
-      // It basically says that all pixels that are not improved by offset
-      // increase increase SSE by h^2 and all pixels that are improved by
-      // offset decrease SSE by h*E.
-      sum_ddistortion += cat_cnt * offset * offset - 2 * offset * cat_sum;
     }
 
     {
@@ -697,12 +701,13 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
     }
     // SAO is not applied for category 0.
     edge_offset[SAO_EO_CAT0] = 0;
+    edge_offset[SAO_EO_CAT0 + 5] = 0;
 
     // Choose the offset class that offers the least error after offset.
     if (sum_ddistortion < sao_out->ddistortion) {
       sao_out->eo_class = edge_class;
       sao_out->ddistortion = sum_ddistortion;
-      memcpy(sao_out->offsets, edge_offset, sizeof(int) * NUM_SAO_EDGE_CATEGORIES);
+      memcpy(sao_out->offsets, edge_offset, sizeof(int) * NUM_SAO_EDGE_CATEGORIES * 2);
     }
   }
 }
@@ -725,9 +730,9 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
     int temp_offsets[10];
     int ddistortion = 0;
     float temp_rate = 0.0;
-
-    memset(sao_bands, 0, 2 * 32 * sizeof(int));
+    
     for (i = 0; i < buf_cnt; ++i) {
+      memset(sao_bands, 0, 2 * 32 * sizeof(int));
       calc_sao_bands(encoder_state, data[i], recdata[i],block_width,
                      block_height,sao_bands);
     
@@ -769,6 +774,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   edge_sao.band_position[0] = edge_sao.band_position[1] = 0;
   edge_sao.eo_class = SAO_EO0;
   band_sao.offsets[0] = 0;
+  band_sao.offsets[5] = 0;
   band_sao.eo_class = SAO_EO0;
   //memset(&edge_sao, 0, sizeof(sao_info));
   //memset(&band_sao, 0, sizeof(sao_info));
@@ -784,7 +790,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
     for (buf_i = 0; buf_i < buf_cnt; ++buf_i) {
       ddistortion += sao_edge_ddistortion(data[buf_i], recdata[buf_i], 
                                           block_width, block_height,
-                                          edge_sao.eo_class, edge_sao.offsets);
+                                          edge_sao.eo_class, &edge_sao.offsets[5 * buf_i]);
     }
     
     edge_sao.ddistortion = ddistortion;
@@ -820,14 +826,14 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   }
 
   sao_out->merge_up_flag = sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
-                                            sao_out->band_position[0], sao_out->eo_class);
+                                            sao_out->band_position[0], sao_out->eo_class, 0);
   sao_out->merge_left_flag = sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
-                                              sao_out->band_position[0], sao_out->eo_class);
-  if (buf_cnt == 2 && sao_out->type == SAO_TYPE_BAND) {
-    sao_out->merge_up_flag &= sao_check_merge(sao_top, sao_out->type, &sao_out->offsets[5],
-      sao_out->band_position[1], sao_out->eo_class);
-    sao_out->merge_left_flag &= sao_check_merge(sao_left, sao_out->type, &sao_out->offsets[5],
-      sao_out->band_position[1], sao_out->eo_class);
+                                              sao_out->band_position[0], sao_out->eo_class, 0);
+  if (buf_cnt == 2) {
+    sao_out->merge_up_flag &= sao_check_merge(sao_top, sao_out->type, sao_out->offsets,
+      sao_out->band_position[1], sao_out->eo_class, 1);
+    sao_out->merge_left_flag &= sao_check_merge(sao_left, sao_out->type, sao_out->offsets,
+      sao_out->band_position[1], sao_out->eo_class, 1);
   }
 
   return;
