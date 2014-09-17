@@ -111,6 +111,43 @@ static void transpose_8x8_16bit(const int16_t *src, int16_t *dst)
 
 static void transpose_16x16_16bit(const int16_t *src, int16_t *dst)
 {
+  int i;
+  __m256i row[16], tmp[16];
+  for (i = 0; i < 16; ++i) {
+    row[i] = _mm256_loadu_si256((__m256i*) src + i);
+  }
+
+  for (i = 0; i < 16; i += 4) {
+    tmp[i + 0] = _mm256_unpacklo_epi16(row[i + 0], row[i + 1]);
+    tmp[i + 1] = _mm256_unpackhi_epi16(row[i + 0], row[i + 1]);
+    tmp[i + 2] = _mm256_unpacklo_epi16(row[i + 2], row[i + 3]);
+    tmp[i + 3] = _mm256_unpackhi_epi16(row[i + 2], row[i + 3]);
+  }
+  for (i = 0; i < 16; i += 4) {
+    row[i + 0] = _mm256_unpacklo_epi32(tmp[i + 0], tmp[i + 2]);
+    row[i + 1] = _mm256_unpackhi_epi32(tmp[i + 0], tmp[i + 2]);
+    row[i + 2] = _mm256_unpacklo_epi32(tmp[i + 1], tmp[i + 3]);
+    row[i + 3] = _mm256_unpackhi_epi32(tmp[i + 1], tmp[i + 3]);
+  }
+
+  for (i = 0; i < 8; i += 2) {
+    tmp[i + 0] = _mm256_unpacklo_epi64(row[i / 2 + 0], row[i / 2 + 4]);
+    tmp[i + 1] = _mm256_unpackhi_epi64(row[i / 2 + 0], row[i / 2 + 4]);
+  }
+  for (i = 8; i < 16; i += 2) {
+    tmp[i + 0] = _mm256_unpacklo_epi64(row[i / 2 + 4], row[i / 2 + 8]);
+    tmp[i + 1] = _mm256_unpackhi_epi64(row[i / 2 + 4], row[i / 2 + 8]);
+  }
+
+
+  for (i = 0; i < 8; ++i) {
+    _mm_storeu_si128((__m128i*)dst + 2 * i, _mm256_extracti128_si256(tmp[i], 0));
+    _mm_storeu_si128(((__m128i*)dst) + 2 * i + 1, _mm256_extracti128_si256(tmp[i + 8], 0));
+  }
+  for (i = 8; i < 16; ++i) {
+    _mm_storeu_si128((__m128i*)dst + 2 * i, _mm256_extracti128_si256(tmp[(i + 8) % 16], 1));
+    _mm_storeu_si128((__m128i*)dst + 2 * i + 1, _mm256_extracti128_si256(tmp[i], 1));
+  }
 }
 static void mul_matrix_4x4_avx2(const int16_t *first, const int16_t *second, int16_t *dst, int32_t shift)
 {
