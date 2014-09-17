@@ -1184,7 +1184,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     int rdo_bitcost = intra_pred_ratecost(modes[rdo_mode], intra_preds);
     costs[rdo_mode] = rdo_bitcost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
 
-    if (tr_depth == depth) {
+    if (0 && tr_depth == depth) {
       // The reconstruction is calculated again here, it could be saved from before..
       intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[rdo_mode], 0);
       costs[rdo_mode] += rdo_cost_intra(encoder_state, pred, orig_block, width, modes[rdo_mode], width == 4 ? 1 : 0);
