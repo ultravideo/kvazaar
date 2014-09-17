@@ -109,6 +109,9 @@ static void transpose_8x8_16bit(const int16_t *src, int16_t *dst)
   _mm_storeu_si128((__m128i*)dst + 7, _mm256_extracti128_si256(tmp[3], 1));
 }
 
+static void transpose_16x16_16bit(const int16_t *src, int16_t *dst)
+{
+}
 static void mul_matrix_4x4_avx2(const int16_t *first, const int16_t *second, int16_t *dst, int32_t shift)
 {
   __m256i b[2], a, result,  even[2], odd[2];
@@ -202,6 +205,11 @@ static void mul_matrix_8x8_avx2(const int16_t *first, const int16_t *second, int
   }
 }
 
+static void mul_matrix_16x16_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+{
+
+}
+
 static void matrix_transform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[4 * 4];
@@ -242,6 +250,15 @@ static void matrix_itransform_2d_8x8_avx2(const int16_t *src, int16_t *dst, cons
   mul_matrix_8x8_avx2(tmp, transform, dst, shift1);
 }
 
+static void matrix_transform_2d_16x16_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
+{
+  int16_t tmp[16 * 16];
+  int16_t transposed[16 * 16];
+
+  transpose_16x16_16bit(transform, transposed);
+  mul_matrix_16x16_avx2(src, transposed, tmp, shift0);
+  mul_matrix_16x16_avx2(transform, tmp, dst, shift1);
+}
 
 static void partial_butterfly_16_avx2(short *src, short *dst,
   int32_t shift)
@@ -510,6 +527,13 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
   matrix_itransform_2d_8x8_avx2(src, dst, (const int16_t*)g_t8, shift_1st, shift_2nd);
+}
+
+static void matrix_dct_16x16_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
+{
+  int32_t shift_1st = g_convert_to_bit[16] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = g_convert_to_bit[16] + 8;
+  matrix_transform_2d_16x16_avx2(src, dst, (const int16_t*)g_t16, shift_1st, shift_2nd);
 }
 
 #endif //COMPILE_INTEL_AVX2
