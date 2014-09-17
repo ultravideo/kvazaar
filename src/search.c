@@ -47,6 +47,13 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
+#ifndef CU_SPLIT_COST
+#  define CU_SPLIT_COST 9
+#endif
+#ifndef FULL_CU_SPLIT_SEARCH
+#  define FULL_CU_SPLIT_SEARCH false
+#endif
+
 /**
  * This is used in the hexagon_search to select 3 points to search.
  *
@@ -1404,11 +1411,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     // Bitcost
     cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
   }
-
-#ifndef CU_SPLIT_COST
-#  define CU_SPLIT_COST 9
-#endif
-
+  
   // Recursively split all the way to max search depth.
   if (depth < MAX_INTRA_SEARCH_DEPTH || (depth < MAX_INTER_SEARCH_DEPTH && encoder_state->global->slicetype != SLICE_I)) {
     int half_cu = cu_width / 2;
@@ -1419,7 +1422,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
-    if(cur_cu->type == CU_NOTSET || cbf) {
+    if (cur_cu->type == CU_NOTSET || cbf || FULL_CU_SPLIT_SEARCH) {
       split_cost += search_cu(encoder_state, x,           y,           depth + 1, work_tree);
       split_cost += search_cu(encoder_state, x + half_cu, y,           depth + 1, work_tree);
       split_cost += search_cu(encoder_state, x,           y + half_cu, depth + 1, work_tree);
