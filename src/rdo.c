@@ -196,8 +196,6 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
-    uint32_t cost = 0;
-    uint32_t coeffcost = 0;
     int8_t luma_scan_mode = SCAN_DIAG;
 
     int i = 0,x,y;
@@ -225,26 +223,28 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     dequant(encoder_state, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
     itransform2d(encoder, temp_block,pre_quant_coeff,width,0);
 
+    unsigned ssd = 0;
     // SSD between original and reconstructed
     for (i = 0; i < width*width; i++) {
       int diff = temp_block[i]-block[i];
-      cost += diff*diff;
+      ssd += diff*diff;
     }
 
+    double coeff_bits = 0;
     // Simple RDO
     if(encoder->rdo == 1) {
       // SSD between reconstruction and original + sum of coeffs
+      int coeff_abs = 0;
       for (i = 0; i < width*width; i++) {
-        coeffcost += abs((int)temp_coeff[i]);
+        coeff_abs += abs((int)temp_coeff[i]);
       }
-      cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
+      coeff_bits += 1 + 1.5 * coeff_abs;
       // Full RDO
     } else if(encoder->rdo >= 2) {
-      coeffcost = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
-
-      cost  += coeffcost*((int)encoder_state->global->cur_lambda_cost+0.5);
+      coeff_bits = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
     }
-    return cost;
+
+    return (uint32_t)(0.5 + ssd + coeff_bits * encoder_state->global->cur_lambda_cost);
 }
 
 
