@@ -252,8 +252,6 @@ void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int re
       intra_dc_pred_filtering(ref_pixels, recstride, dst, width, width, width);
     }
   } else {
-    int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
-    int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     int filter = !is_chroma && width < 32;
     intra_get_angular_pred(encoder, ref_pixels, recstride, dst, width, width, mode, filter);
   }
@@ -658,21 +656,20 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
   }
 }
 
-void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
+void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, lcu_t *lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
   cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH >> depth;
-  const int pu_index = PU_INDEX(x >> 2, y >> 2);
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu_luma(encoder_state, x,          y,          depth+1, lcu);
-    intra_recon_lcu_luma(encoder_state, x + offset, y,          depth+1, lcu);
-    intra_recon_lcu_luma(encoder_state, x,          y + offset, depth+1, lcu);
-    intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, lcu);
+    intra_recon_lcu_luma(encoder_state, x,          y,          depth+1, intra_mode, lcu);
+    intra_recon_lcu_luma(encoder_state, x + offset, y,          depth+1, intra_mode, lcu);
+    intra_recon_lcu_luma(encoder_state, x,          y + offset, depth+1, intra_mode, lcu);
+    intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, intra_mode, lcu);
 
     if (depth < MAX_DEPTH) {
       cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
@@ -700,7 +697,7 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
     intra_build_reference_border(encoder, x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
                                  pic_width, pic_height, lcu);
     intra_recon(encoder, rec_shift, width * 2 + 8,
-                width, recbase_y, rec_stride, cur_cu->intra[pu_index].mode, 0);
+                width, recbase_y, rec_stride, intra_mode, 0);
 
     quantize_lcu_luma_residual(encoder_state, x, y, depth, lcu);
   }

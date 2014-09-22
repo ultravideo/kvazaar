@@ -42,21 +42,21 @@ typedef struct sao_info_struct {
   int ddistortion;
   int merge_left_flag;
   int merge_up_flag;
-  int band_position;
-  int offsets[NUM_SAO_EDGE_CATEGORIES];
+  int band_position[2];
+  int offsets[NUM_SAO_EDGE_CATEGORIES * 2];
 } sao_info;
 
 #define CHECKPOINT_SAO_INFO(prefix_str, sao) CHECKPOINT(prefix_str " type=%d eo_class=%d ddistortion=%d " \
   "merge_left_flag=%d merge_up_flag=%d band_position=%d " \
   "offsets[0]=%d offsets[1]=%d offsets[2]=%d offsets[3]=%d offsets[4]=%d", \
   (sao).type, (sao).eo_class, (sao).ddistortion, \
-  (sao).merge_left_flag, (sao).merge_up_flag, (sao).band_position, \
+  (sao).merge_left_flag, (sao).merge_up_flag, (sao).band_position[0], \
   (sao).offsets[0], (sao).offsets[1], (sao).offsets[2], (sao).offsets[3], (sao).offsets[4])
 
 
 void init_sao_info(sao_info *sao);
-void sao_search_chroma(const encoder_state * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left);
-void sao_search_luma(const encoder_state * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left);
+void sao_search_chroma(const encoder_state * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
+void sao_search_luma(const encoder_state * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
 void sao_reconstruct(const encoder_control * encoder, videoframe *frame, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i);

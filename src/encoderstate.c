@@ -131,6 +131,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
 {
   cabac_data * const cabac = &encoder_state->cabac;
   sao_eo_cat i;
+  int offset_index = (color_i == COLOR_V) ? 5 : 0;
 
   // Skip colors with no SAO.
   //FIXME: for now, we always have SAO for all channels
@@ -141,7 +142,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
   // Encode sao_type_idx for Y and U+V.
   if (color_i != COLOR_V) {
-    cabac->ctx = &(cabac->ctx_sao_type_idx_model);;
+    cabac->ctx = &(cabac->ctx_sao_type_idx_model);
     CABAC_BIN(cabac, sao->type != SAO_TYPE_NONE, "sao_type_idx");
     if (sao->type == SAO_TYPE_BAND) {
       CABAC_BIN_EP(cabac, 0, "sao_type_idx_ep");
@@ -155,7 +156,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
   for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i]), SAO_ABS_OFFSET_MAX);
+    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
@@ -165,13 +166,13 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   if (sao->type == SAO_TYPE_BAND) {
     for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
       // Positive sign is coded as 0.
-      if(sao->offsets[i] != 0) {
-        CABAC_BIN_EP(cabac, sao->offsets[i] < 0 ? 1 : 0, "sao_offset_sign");
+      if (sao->offsets[i + offset_index] != 0) {
+        CABAC_BIN_EP(cabac, sao->offsets[i + offset_index] < 0 ? 1 : 0, "sao_offset_sign");
       }
     }
     // TODO: sao_band_position
     // FL cMax=31 (5 bits)
-    CABAC_BINS_EP(cabac, sao->band_position, 5, "sao_band_position");
+    CABAC_BINS_EP(cabac, sao->band_position[color_i == COLOR_V ? 1:0], 5, "sao_band_position");
   } else if (color_i != COLOR_V) {
     CABAC_BINS_EP(cabac, sao->eo_class, 2, "sao_eo_class");
   }
@@ -229,26 +230,46 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
 
   if (encoder->sao_enable) {
     const int stride = frame->width_in_lcu;
+    int32_t merge_cost_luma[3] = { INT32_MAX };
+    int32_t merge_cost_chroma[3] = { INT32_MAX };
     sao_info *sao_luma = &frame->sao_luma[lcu->position.y * stride + lcu->position.x];
     sao_info *sao_chroma = &frame->sao_chroma[lcu->position.y * stride + lcu->position.x];
+
+    // Merge candidates
+    sao_info *sao_top_luma = lcu->position.y != 0 ? &frame->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+    sao_info *sao_left_luma = lcu->position.x != 0 ? &frame->sao_luma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
+    sao_info *sao_top_chroma = lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+    sao_info *sao_left_chroma = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
+
     init_sao_info(sao_luma);
     init_sao_info(sao_chroma);
 
-    {
-      sao_info *sao_top =  lcu->position.y != 0 ? &frame->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-      sao_info *sao_left = lcu->position.x != 0 ? &frame->sao_luma[lcu->position.y * stride + lcu->position.x -1] : NULL;
-      sao_search_luma(encoder_state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top, sao_left);
-    }
+    sao_search_luma(encoder_state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
+    sao_search_chroma(encoder_state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
 
-    {
-      sao_info *sao_top =  lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-      sao_info *sao_left = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
-      sao_search_chroma(encoder_state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top, sao_left);
+    sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
+    // Check merge costs
+    if (sao_top_luma) {
+      // Merge up if cost is equal or smaller to the searched mode cost
+      if (merge_cost_luma[2] + merge_cost_chroma[2] <= merge_cost_luma[0] + merge_cost_chroma[0]) {        
+        *sao_luma = *sao_top_luma;
+        *sao_chroma = *sao_top_chroma;
+        sao_luma->merge_up_flag = 1;
+        sao_luma->merge_left_flag = 0;
+      }
     }
-
-    // Merge only if both luma and chroma can be merged
-    sao_luma->merge_left_flag = sao_luma->merge_left_flag & sao_chroma->merge_left_flag;
-    sao_luma->merge_up_flag = sao_luma->merge_up_flag & sao_chroma->merge_up_flag;
+    if (sao_left_luma) {
+      // Merge left if cost is equal or smaller to the searched mode cost 
+      // AND smaller than merge up cost, if merge up was already chosen
+      if (merge_cost_luma[1] + merge_cost_chroma[1] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
+        if (!sao_luma->merge_up_flag || merge_cost_luma[1] + merge_cost_chroma[1] < merge_cost_luma[2] + merge_cost_chroma[2]) {      
+          *sao_luma = *sao_left_luma;
+          *sao_chroma = *sao_left_chroma;
+          sao_luma->merge_left_flag = 1;
+          sao_luma->merge_up_flag = 0;
+        }
+      }
+    }
     
     assert(sao_luma->eo_class < SAO_NUM_EO);
     assert(sao_chroma->eo_class < SAO_NUM_EO);
@@ -1467,7 +1488,8 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
   int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
-  int max_tr_depth = (cur_cu->type == CU_INTRA ? TR_DEPTH_INTRA + intra_split_flag : TR_DEPTH_INTER);
+  int tr_depth_intra = encoder_state->encoder_control->tr_depth_intra;
+  int max_tr_depth = (cur_cu->type == CU_INTRA ? tr_depth_intra + intra_split_flag : TR_DEPTH_INTER);
 
   int8_t split = (cur_cu->tr_depth > depth);
 

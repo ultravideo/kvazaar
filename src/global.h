@@ -60,11 +60,19 @@ typedef int16_t coefficient;
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
 
 //Search depth for intra and inter. Block sizes: 0 => 64x64, 1 => 32x32, 2 => 16x16, 3 => 8x8, 4 => 4x4
-#define MAX_INTER_SEARCH_DEPTH 3
-#define MIN_INTER_SEARCH_DEPTH 0
+#ifndef MAX_INTER_SEARCH_DEPTH
+#   define MAX_INTER_SEARCH_DEPTH 3
+#endif
+#ifndef MIN_INTER_SEARCH_DEPTH
+#   define MIN_INTER_SEARCH_DEPTH 0
+#endif
 
-#define MAX_INTRA_SEARCH_DEPTH 4
-#define MIN_INTRA_SEARCH_DEPTH 1
+#ifndef MAX_INTRA_SEARCH_DEPTH
+#   define MAX_INTRA_SEARCH_DEPTH 4
+#endif
+#ifndef MIN_INTRA_SEARCH_DEPTH
+#   define MIN_INTRA_SEARCH_DEPTH 0
+#endif
 
 // Maximum CU depth when descending form LCU level.
 #define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */
@@ -74,7 +82,6 @@ typedef int16_t coefficient;
 #define MAX_PU_DEPTH 4 /*!< Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu() */
 
 // Minimum log2 transform sizes.
-#define TR_DEPTH_INTRA 2 /*!< spec: max_transform_hierarchy_depth_intra */
 #define TR_DEPTH_INTER 2 /*!< spec: max_transform_hierarchy_depth_inter */
 
 #define ENABLE_PCM 0 /*!< spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
@@ -91,7 +98,9 @@ typedef int16_t coefficient;
 #define LCU_WIDTH_C (LCU_WIDTH / 2) /*!< spec: CtbWidthC and CtbHeightC */
 
 #define TR_MAX_LOG2_SIZE 5 /*!< spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5) */
-#define TR_MAX_WIDTH (1 << 5) /*!< spec: Log2MaxTrafoSize */
+#define TR_MAX_WIDTH (1 << TR_MAX_LOG2_SIZE)
+#define TR_MIN_LOG2_SIZE 2 /*!< spec: Log2MinTrafoSize */
+#define TR_MIN_WIDTH (1 << TR_MIN_LOG2_SIZE)
 
 #if LCU_WIDTH != 64
   #error "Kvazaar only support LCU_WIDTH == 64"
