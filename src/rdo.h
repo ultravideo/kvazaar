@@ -62,6 +62,6 @@ uint32_t get_coded_level ( encoder_state * encoder_state, double* coded_cost, do
                            int32_t q_bits,double temp, int8_t last, int8_t type);
 
 extern const float f_entropy_bits[128];
-#define CTX_ENTROPY_FBITS(ctx,val) f_entropy_bits[(ctx)->uc_state ^ val]
+#define CTX_ENTROPY_FBITS(ctx,val) f_entropy_bits[(ctx)->uc_state ^ (val)]
 
 #endif

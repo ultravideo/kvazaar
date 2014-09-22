@@ -1342,8 +1342,6 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     return 0;
   }
 
-  lcu_t *lcu = &work_tree[depth];
-
   cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
   // Assign correct depth
   cur_cu->depth = depth > MAX_DEPTH ? MAX_DEPTH : depth;

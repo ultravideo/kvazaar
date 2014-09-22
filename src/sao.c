@@ -118,39 +118,10 @@ void init_sao_info(sao_info *sao) {
 }
 
 
-/**
- * \brief Check merge conditions
- */
-static int sao_check_merge(const sao_info *sao_candidate, int type,
-                           int offsets[NUM_SAO_EDGE_CATEGORIES],
-                           int band_position, int eo_class, int shift)
-{
-  int off_index = 5 * shift;
-  if (sao_candidate && sao_candidate->type == type) {
-    if (type == SAO_TYPE_NONE) {
-      return 1;
-    }
-    if (offsets[1 + off_index] == sao_candidate->offsets[1 + off_index] &&
-      offsets[2 + off_index] == sao_candidate->offsets[2 + off_index] &&
-      offsets[3 + off_index] == sao_candidate->offsets[3 + off_index] &&
-      offsets[4 + off_index] == sao_candidate->offsets[4 + off_index]) {
-      // Type must be BAND or EDGE
-      if ((type == SAO_TYPE_BAND && band_position == sao_candidate->band_position[shift]) ||
-          (type == SAO_TYPE_EDGE && eo_class == sao_candidate->eo_class))
-      {
-          return 1;
-      }
-    }
-  }
-  return 0;
-}
-
-
 static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_info *sao_top, sao_info *sao_left)
 {
   float mode_bits = 0.0;
-  int8_t merge_top = 0, merge_left = 0;
-  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
@@ -172,7 +143,7 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
 static float sao_mode_bits_merge(const encoder_state * const encoder_state,
                                  int8_t merge_cand) {
   float mode_bits = 0.0;
-  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   ctx = &(cabac->ctx_sao_merge_flag_model);
@@ -189,9 +160,7 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
-  int buf_index;
-  int8_t merge_top = 0, merge_left = 0;
-  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
@@ -208,7 +177,7 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
   mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets.
-  for (buf_index = 0; buf_index < buf_cnt; buf_index++) {
+  for (unsigned buf_index = 0; buf_index < buf_cnt; buf_index++) {
     sao_eo_cat edge_cat;
     for (edge_cat = SAO_EO_CAT1; edge_cat <= SAO_EO_CAT4; ++edge_cat) {
       int abs_offset = abs(offsets[edge_cat+5*buf_index]);
@@ -231,9 +200,7 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
-  int buf_index;
-  int8_t merge_top = 0, merge_left = 0;
-  cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
@@ -250,7 +217,7 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets and possible FL coded offset signs.
-  for (buf_index = 0; buf_index < buf_cnt; buf_index++)
+  for (unsigned buf_index = 0; buf_index < buf_cnt; buf_index++)
   {
     int i;
     for (i = 0; i < 4; ++i) {
