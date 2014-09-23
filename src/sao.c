@@ -125,16 +125,16 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    ctx = &(cabac->ctx_sao_merge_flag_model);
+    ctx = &(cabac->ctx.sao_merge_flag_model);
     mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
   if (sao_top != NULL) {    
-    ctx = &(cabac->ctx_sao_merge_flag_model);
+    ctx = &(cabac->ctx.sao_merge_flag_model);
     mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
 
   // TR coded type_idx_, none = 0
-  ctx = &(cabac->ctx_sao_type_idx_model);
+  ctx = &(cabac->ctx.sao_type_idx_model);
   mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
 
   return mode_bits;
@@ -146,7 +146,7 @@ static float sao_mode_bits_merge(const encoder_state * const encoder_state,
   const cabac_data * const cabac = &encoder_state->cabac;
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
-  ctx = &(cabac->ctx_sao_merge_flag_model);
+  ctx = &(cabac->ctx.sao_merge_flag_model);
 
   mode_bits += CTX_ENTROPY_FBITS(ctx, merge_cand == 1);
   if (merge_cand == 1) return mode_bits;
@@ -164,16 +164,16 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    ctx = &(cabac->ctx_sao_merge_flag_model);   
+    ctx = &(cabac->ctx.sao_merge_flag_model);   
     mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
   if (sao_top != NULL) {
-    ctx = &(cabac->ctx_sao_merge_flag_model);
+    ctx = &(cabac->ctx.sao_merge_flag_model);
     mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
 
   // TR coded type_idx_, edge = 2 = cMax
-  ctx = &(cabac->ctx_sao_type_idx_model);
+  ctx = &(cabac->ctx.sao_type_idx_model);
   mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets.
@@ -204,16 +204,16 @@ static float sao_mode_bits_band(const encoder_state * const encoder_state,
   const cabac_ctx *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
-    ctx = &(cabac->ctx_sao_merge_flag_model);
+    ctx = &(cabac->ctx.sao_merge_flag_model);
     mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
   if (sao_top != NULL) {
-    ctx = &(cabac->ctx_sao_merge_flag_model);
+    ctx = &(cabac->ctx.sao_merge_flag_model);
     mode_bits += CTX_ENTROPY_FBITS(ctx, 0);
   }
 
   // TR coded sao_type_idx_, band = 1
-  ctx = &(cabac->ctx_sao_type_idx_model);
+  ctx = &(cabac->ctx.sao_type_idx_model);
   mode_bits += CTX_ENTROPY_FBITS(ctx, 1) + 1.0;
 
   // TR coded offsets and possible FL coded offset signs.
