@@ -279,7 +279,9 @@ void context_copy(encoder_state * const target_encoder_state, const encoder_stat
   cabac_data * const target_cabac = &target_encoder_state->cabac;
   const cabac_data * const source_cabac = &source_encoder_state->cabac;
   
-  *target_cabac = *source_cabac;
+  if (target_cabac == source_cabac) return;
+
+  target_cabac->ctx = source_cabac->ctx;
 }
 
 
