@@ -944,7 +944,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 
   if (depth > 0) {
     tr_cu->tr_depth = depth;
-    intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, lcu);
+    intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
     nosplit_cost = cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
 
     // Clear cbf bits because they have been set by the reconstruction.
@@ -1384,13 +1384,13 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
                          intra_mode,
                          intra_mode_chroma,
                          cur_cu->part_size);
-      intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
-      intra_recon_lcu_chroma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
+      intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
+      intra_recon_lcu_chroma(encoder_state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
       inter_recon_lcu(encoder_state, encoder_state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
-      quantize_lcu_luma_residual(encoder_state, x, y, depth, &work_tree[depth]);
-      quantize_lcu_chroma_residual(encoder_state, x, y, depth, &work_tree[depth]);
+      quantize_lcu_luma_residual(encoder_state, x, y, depth, NULL, &work_tree[depth]);
+      quantize_lcu_chroma_residual(encoder_state, x, y, depth, NULL, &work_tree[depth]);
 
       cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 

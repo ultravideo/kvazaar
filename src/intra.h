@@ -48,7 +48,7 @@ void intra_get_angular_pred(const encoder_control *encoder, pixel* src, int32_t 
 
 void intra_recon(const encoder_control *encoder, pixel* rec, int32_t rec_stride, uint32_t width, pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
-void intra_recon_lcu_luma(encoder_state *encoder_state, int x, int y, int depth, int8_t intra_mode, lcu_t *lcu);
-void intra_recon_lcu_chroma(encoder_state *encoder_state, int x, int y, int depth, int8_t intra_mode, lcu_t *lcu);
+void intra_recon_lcu_luma(encoder_state *encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu);
+void intra_recon_lcu_chroma(encoder_state *encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu);
 
 #endif

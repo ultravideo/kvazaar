@@ -46,7 +46,7 @@ void itransform2d(const encoder_control *encoder, int16_t *block,int16_t *coeff,
 
 int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
 
-void quantize_lcu_luma_residual(encoder_state *encoder_state, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu);
-void quantize_lcu_chroma_residual(encoder_state *encoder_state, int32_t x, int32_t y, uint8_t depth, lcu_t* lcu);
+void quantize_lcu_luma_residual(encoder_state *encoder_state, int32_t x, int32_t y, uint8_t depth, cu_info *cur_cu, lcu_t* lcu);
+void quantize_lcu_chroma_residual(encoder_state *encoder_state, int32_t x, int32_t y, uint8_t depth, cu_info *cur_cu, lcu_t* lcu);
 
 #endif

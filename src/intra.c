@@ -656,20 +656,22 @@ void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel*
   }
 }
 
-void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, lcu_t *lcu)
+void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
+  if (cur_cu == NULL) {
+    cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+  }
   const int8_t width = LCU_WIDTH >> depth;
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu_luma(encoder_state, x,          y,          depth+1, intra_mode, lcu);
-    intra_recon_lcu_luma(encoder_state, x + offset, y,          depth+1, intra_mode, lcu);
-    intra_recon_lcu_luma(encoder_state, x,          y + offset, depth+1, intra_mode, lcu);
-    intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, intra_mode, lcu);
+    intra_recon_lcu_luma(encoder_state, x,          y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(encoder_state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(encoder_state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
       cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
@@ -699,25 +701,28 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
     intra_recon(encoder, rec_shift, width * 2 + 8,
                 width, recbase_y, rec_stride, intra_mode, 0);
 
-    quantize_lcu_luma_residual(encoder_state, x, y, depth, lcu);
+    quantize_lcu_luma_residual(encoder_state, x, y, depth, NULL, lcu);
   }
 }
 
-void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, lcu_t *lcu)
+void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
+
+  if (cur_cu == NULL) {
+    cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+  }
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu_chroma(encoder_state, x,          y,          depth+1, intra_mode, lcu);
-    intra_recon_lcu_chroma(encoder_state, x + offset, y,          depth+1, intra_mode, lcu);
-    intra_recon_lcu_chroma(encoder_state, x,          y + offset, depth+1, intra_mode, lcu);
-    intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, intra_mode, lcu);
+    intra_recon_lcu_chroma(encoder_state, x,          y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(encoder_state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(encoder_state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
       cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
@@ -772,6 +777,6 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
                   2);
     }
 
-    quantize_lcu_chroma_residual(encoder_state, x, y, depth, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x, y, depth, NULL, lcu);
   }
 }
