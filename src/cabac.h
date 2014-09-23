@@ -37,7 +37,7 @@ typedef struct
 
 typedef struct
 {
-  cabac_ctx *ctx;
+  cabac_ctx *cur_ctx;
   uint32_t   low;
   uint32_t   range;
   uint32_t   buffered_byte;
