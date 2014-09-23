@@ -771,7 +771,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
       && width > TR_MIN_WIDTH
       && pred_cu->part_size != SIZE_NxN)
   {
-    trtree_bits += 1; // split_transform_flag
+    //trtree_bits += 1; // split_transform_flag
   }
 
   if (tr_cu->tr_depth > depth) {
@@ -787,7 +787,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   }
 
   if (pred_cu->type == CU_INTRA || depth > pred_cu->depth) {
-    trtree_bits += 1;  // cbf_luma
+    //trtree_bits += 1;  // cbf_luma
   }
 
   unsigned ssd = 0;
@@ -843,11 +843,11 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
     // cbf_c bits are present only when log2TrafoSize > 2
     if (tr_cu->tr_depth == depth) {
       // cbf_c bits are always present at transform depth 0.
-      trtree_bits += 2;
+      //trtree_bits += 2;
     } else {
       // cbf_c bits are not present if cbf has already been set to 0.
-      trtree_bits += cbf_is_set(tr_cu->cbf.u, depth - 1);
-      trtree_bits += cbf_is_set(tr_cu->cbf.v, depth - 1);
+      //trtree_bits += cbf_is_set(tr_cu->cbf.u, depth - 1);
+      //trtree_bits += cbf_is_set(tr_cu->cbf.v, depth - 1);
     }
   } else if (PU_INDEX(x_px / 4, y_px / 4) != 0) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
