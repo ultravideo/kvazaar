@@ -97,20 +97,20 @@ void cabac_encode_bin(cabac_data * const data, const uint32_t bin_value)
   uint32_t lps;
 
 
-  lps = g_auc_lpst_table[CTX_STATE(data->ctx)][(data->range >> 6) & 3];
+  lps = g_auc_lpst_table[CTX_STATE(data->cur_ctx)][(data->range >> 6) & 3];
   data->range -= lps;
 
   // Not the Most Probable Symbol?
-  if ((bin_value ? 1 : 0) != CTX_MPS(data->ctx)) {
+  if ((bin_value ? 1 : 0) != CTX_MPS(data->cur_ctx)) {
     int num_bits = g_auc_renorm_table[lps >> 3];
     data->low = (data->low + data->range) << num_bits;
     data->range = lps << num_bits;
 
-    CTX_UPDATE_LPS(data->ctx);
+    CTX_UPDATE_LPS(data->cur_ctx);
 
     data->bits_left -= num_bits;
   } else {
-    CTX_UPDATE_MPS(data->ctx);
+    CTX_UPDATE_MPS(data->cur_ctx);
     if (data->range >= 256) return;
 
     data->low <<= 1;
@@ -306,17 +306,17 @@ void cabac_write_unary_max_symbol(cabac_data * const data, cabac_ctx * const ctx
 
   if (!max_symbol) return;
 
-  data->ctx = &ctx[0];
+  data->cur_ctx = &ctx[0];
   CABAC_BIN(data, symbol, "ums");
 
   if (!symbol) return;
 
   while (--symbol) {
-    data->ctx = &ctx[offset];
+    data->cur_ctx = &ctx[offset];
     CABAC_BIN(data, 1, "ums");
   }
   if (code_last) {
-    data->ctx = &ctx[offset];
+    data->cur_ctx = &ctx[offset];
     CABAC_BIN(data, 0, "ums");
   }
 }

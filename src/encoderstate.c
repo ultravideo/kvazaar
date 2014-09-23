@@ -142,7 +142,7 @@ static void encode_sao_color(encoder_state * const encoder_state, sao_info *sao,
   /// sao_type_idx_chroma: TR, cMax = 2, cRiceParam = 0, bins = {0, bypass}
   // Encode sao_type_idx for Y and U+V.
   if (color_i != COLOR_V) {
-    cabac->ctx = &(cabac->ctx_sao_type_idx_model);
+    cabac->cur_ctx = &(cabac->ctx.sao_type_idx_model);
     CABAC_BIN(cabac, sao->type != SAO_TYPE_NONE, "sao_type_idx");
     if (sao->type == SAO_TYPE_BAND) {
       CABAC_BIN_EP(cabac, 0, "sao_type_idx_ep");
@@ -183,11 +183,11 @@ static void encode_sao_merge_flags(encoder_state * const encoder_state, sao_info
   cabac_data * const cabac = &encoder_state->cabac;
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
-    cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
+    cabac->cur_ctx = &(cabac->ctx.sao_merge_flag_model);
     CABAC_BIN(cabac, sao->merge_left_flag, "sao_merge_left_flag");
   }
   if (y_ctb > 0 && !sao->merge_left_flag) {
-    cabac->ctx = &(cabac->ctx_sao_merge_flag_model);
+    cabac->cur_ctx = &(cabac->ctx.sao_merge_flag_model);
     CABAC_BIN(cabac, sao->merge_up_flag, "sao_merge_up_flag");
   }
 }
@@ -967,7 +967,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
         split_model++;
       }
 
-      cabac->ctx = &(cabac->ctx_split_flag_model[split_model]);
+      cabac->cur_ctx = &(cabac->ctx.split_flag_model[split_model]);
       CABAC_BIN(cabac, split_flag, "SplitFlag");
     }
 
@@ -1006,7 +1006,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
       ctx_skip++;
     }
 
-    cabac->ctx = &(cabac->ctx_cu_skip_flag_model[ctx_skip]);
+    cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
     // IF SKIP
@@ -1015,7 +1015,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
         for (ui = 0; ui < num_cand - 1; ui++) {
           int32_t symbol = (ui != cur_cu->merge_idx);
           if (ui == 0) {
-            cabac->ctx = &(cabac->ctx_cu_merge_idx_ext_model);
+            cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
             CABAC_BIN(cabac, symbol, "MergeIndex");
           } else {
             CABAC_BIN_EP(cabac,symbol,"MergeIndex");
@@ -1033,14 +1033,14 @@ void encode_coding_tree(encoder_state * const encoder_state,
 
   // Prediction mode
   if (encoder_state->global->slicetype != SLICE_I) {
-    cabac->ctx = &(cabac->ctx_cu_pred_mode_model);
+    cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }
 
   // part_mode
   if (cur_cu->type == CU_INTRA) {
     if (depth == MAX_DEPTH) {
-      cabac->ctx = &(cabac->ctx_part_size_model[0]);
+      cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
       if (cur_cu->part_size == SIZE_2Nx2N) {
         CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
       } else {
@@ -1049,7 +1049,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
     }
   } else {
     // TODO: Handle inter sizes other than 2Nx2N
-    cabac->ctx = &(cabac->ctx_part_size_model[0]);
+    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
     CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
   }
 
@@ -1058,7 +1058,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
     // FOR each part
     // Mergeflag
     int16_t num_cand = 0;
-    cabac->ctx = &(cabac->ctx_cu_merge_flag_ext_model);
+    cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
     CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
     num_cand = MRG_MAX_NUM_CANDS;
     if (cur_cu->merged) { //merge
@@ -1067,7 +1067,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
         for (ui = 0; ui < num_cand - 1; ui++) {
           int32_t symbol = (ui != cur_cu->merge_idx);
           if (ui == 0) {
-            cabac->ctx = &(cabac->ctx_cu_merge_idx_ext_model);
+            cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
             CABAC_BIN(cabac, symbol, "MergeIndex");
           } else {
             CABAC_BIN_EP(cabac,symbol,"MergeIndex");
@@ -1104,14 +1104,14 @@ void encode_coding_tree(encoder_state * const encoder_state,
               // parseRefFrmIdx
               int32_t ref_frame = cur_cu->inter.mv_ref;
 
-              cabac->ctx = &(cabac->ctx_cu_ref_pic_model[0]);
+              cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
               CABAC_BIN(cabac, (ref_frame != 0), "ref_frame_flag");
 
               if (ref_frame > 0) {
                 int32_t i;
                 int32_t ref_num = encoder_state->global->ref->used_size - 2;
 
-                cabac->ctx = &(cabac->ctx_cu_ref_pic_model[1]);
+                cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
                 ref_frame--;
 
                 for (i = 0; i < ref_num; ++i) {
@@ -1135,11 +1135,11 @@ void encode_coding_tree(encoder_state * const encoder_state,
               const uint32_t mvd_hor_abs = abs(mvd_hor);
               const uint32_t mvd_ver_abs = abs(mvd_ver);
 
-              cabac->ctx = &(cabac->ctx_cu_mvd_model[0]);
+              cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
               CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
               CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
 
-              cabac->ctx = &(cabac->ctx_cu_mvd_model[1]);
+              cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
 
               if (hor_abs_gr0) {
                 CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
@@ -1167,7 +1167,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
             }
 
             // Signal which candidate MV to use
-            cabac_write_unary_max_symbol(cabac, cabac->ctx_mvp_idx_model, cur_cu->inter.mv_cand, 1,
+            cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand, 1,
                                         AMVP_MAX_NUM_CANDS - 1);
           }
           }
@@ -1182,7 +1182,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
       // Only need to signal coded block flag if not skipped or merged
       // skip = no coded residual, merge = coded residual
       if (!cur_cu->merged) {
-        cabac->ctx = &(cabac->ctx_cu_qt_root_cbf_model);
+        cabac->cur_ctx = &(cabac->ctx.cu_qt_root_cbf_model);
         CABAC_BIN(cabac, cbf, "rqt_root_cbf");
       }
       // Code (possible) coeffs to bitstream
@@ -1239,7 +1239,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
       flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
     }
 
-    cabac->ctx = &(cabac->ctx_intra_mode_model);
+    cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
     for (j = 0; j < num_pred_units; ++j) {
       CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
     }
@@ -1305,7 +1305,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
        * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
        *   intra_chroma_pred_mode[][] = 0, bypass, bypass
        */
-      cabac->ctx = &(cabac->ctx_chroma_pred_model[0]);
+      cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
       if (pred_mode == 4) {
         CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
       } else {
@@ -1507,7 +1507,7 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
       tr_depth < max_tr_depth &&
       !(intra_split_flag && tr_depth == 0))
   {
-    cabac->ctx = &(cabac->ctx_trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
+    cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
     CABAC_BIN(cabac, split, "split_transform_flag");
   }
 
@@ -1517,7 +1517,7 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
   if (depth < MAX_PU_DEPTH) {
-    cabac->ctx = &(cabac->ctx_qt_cbf_model_chroma[tr_depth]);
+    cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     if (tr_depth == 0 || parent_coeff_u) {
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
     }
@@ -1541,7 +1541,7 @@ void encode_transform_coeff(encoder_state * const encoder_state, int32_t x_pu,in
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
   if(cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) {
-      cabac->ctx = &(cabac->ctx_qt_cbf_model_luma[!tr_depth]);
+      cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[!tr_depth]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
   }
 
@@ -1579,9 +1579,9 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
 
   // Init base contexts according to block type
-  cabac_ctx *base_coeff_group_ctx = &(cabac->ctx_cu_sig_coeff_group_model[type]);
-  cabac_ctx *baseCtx           = (type == 0) ? &(cabac->ctx_cu_sig_model_luma[0]) :
-                                 &(cabac->ctx_cu_sig_model_chroma[0]);
+  cabac_ctx *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
+                                 &(cabac->ctx.cu_sig_model_chroma[0]);
   memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
 
   // Count non-zero coeffs
@@ -1596,7 +1596,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
 
   // transform skip flag
   if(width == 4 && encoder->trskip_enable) {
-    cabac->ctx = (type == 0) ? &(cabac->ctx_transform_skip_model_luma) : &(cabac->ctx_transform_skip_model_chroma);
+    cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
 
@@ -1656,7 +1656,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
       uint32_t sig_coeff_group   = (sig_coeffgroup_flag[cg_blk_pos] != 0);
       uint32_t ctx_sig  = context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                       cg_pos_y, width);
-      cabac->ctx = &base_coeff_group_ctx[ctx_sig];
+      cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
     }
 
@@ -1673,7 +1673,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
         if (scan_pos_sig > sub_pos || i == 0 || num_non_zero) {
           ctx_sig  = context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                              log2_block_size, type);
-          cabac->ctx = &baseCtx[ctx_sig];
+          cabac->cur_ctx = &baseCtx[ctx_sig];
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
         }
 
@@ -1706,14 +1706,14 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
 
       c1 = 1;
 
-      base_ctx_mod     = (type == 0) ? &(cabac->ctx_cu_one_model_luma[4 * ctx_set]) :
-                         &(cabac->ctx_cu_one_model_chroma[4 * ctx_set]);
+      base_ctx_mod     = (type == 0) ? &(cabac->ctx.cu_one_model_luma[4 * ctx_set]) :
+                         &(cabac->ctx.cu_one_model_chroma[4 * ctx_set]);
       num_c1_flag      = MIN(num_non_zero, C1FLAG_NUMBER);
       first_c2_flag_idx = -1;
 
       for (idx = 0; idx < num_c1_flag; idx++) {
         uint32_t symbol = (abs_coeff[idx] > 1) ? 1 : 0;
-        cabac->ctx = &base_ctx_mod[c1];
+        cabac->cur_ctx = &base_ctx_mod[c1];
         CABAC_BIN(cabac, symbol, "coeff_abs_level_greater1_flag");
 
         if (symbol) {
@@ -1728,12 +1728,12 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
       }
 
       if (c1 == 0) {
-        base_ctx_mod = (type == 0) ? &(cabac->ctx_cu_abs_model_luma[ctx_set]) :
-                       &(cabac->ctx_cu_abs_model_chroma[ctx_set]);
+        base_ctx_mod = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[ctx_set]) :
+                       &(cabac->ctx.cu_abs_model_chroma[ctx_set]);
 
         if (first_c2_flag_idx != -1) {
           uint8_t symbol = (abs_coeff[first_c2_flag_idx] > 2) ? 1 : 0;
-          cabac->ctx      = &base_ctx_mod[0];
+          cabac->cur_ctx      = &base_ctx_mod[0];
           CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
         }
       }
@@ -1789,8 +1789,8 @@ void encode_last_significant_xy(encoder_state * const encoder_state,
   int group_idx_x;
   int group_idx_y;
   int last_x,last_y,i;
-  cabac_ctx *base_ctx_x = (type ? cabac->ctx_cu_ctx_last_x_chroma : cabac->ctx_cu_ctx_last_x_luma);
-  cabac_ctx *base_ctx_y = (type ? cabac->ctx_cu_ctx_last_y_chroma : cabac->ctx_cu_ctx_last_y_luma);
+  cabac_ctx *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
+  cabac_ctx *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
   if (scan == SCAN_VER) {
     SWAP( lastpos_x, lastpos_y,uint8_t );
@@ -1801,23 +1801,23 @@ void encode_last_significant_xy(encoder_state * const encoder_state,
 
   // Last X binarization
   for (last_x = 0; last_x < group_idx_x ; last_x++) {
-    cabac->ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
+    cabac->cur_ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
     CABAC_BIN(cabac,1,"last_sig_coeff_x_prefix");
   }
 
   if (group_idx_x < g_group_idx[width - 1]) {
-    cabac->ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
+    cabac->cur_ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
     CABAC_BIN(cabac,0,"last_sig_coeff_x_prefix");
   }
 
   // Last Y binarization
   for (last_y = 0; last_y < group_idx_y ; last_y++) {
-    cabac->ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
+    cabac->cur_ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
     CABAC_BIN(cabac,1,"last_sig_coeff_y_prefix");
   }
 
   if (group_idx_y < g_group_idx[height - 1]) {
-    cabac->ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
+    cabac->cur_ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
     CABAC_BIN(cabac,0,"last_sig_coeff_y_prefix");
   }
 
