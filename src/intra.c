@@ -701,7 +701,7 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
     intra_recon(encoder, rec_shift, width * 2 + 8,
                 width, recbase_y, rec_stride, intra_mode, 0);
 
-    quantize_lcu_luma_residual(encoder_state, x, y, depth, NULL, lcu);
+    quantize_lcu_luma_residual(encoder_state, x, y, depth, cur_cu, lcu);
   }
 }
 

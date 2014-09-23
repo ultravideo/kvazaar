@@ -361,8 +361,10 @@ int quantize_residual(encoder_state *const encoder_state,
 
   // Quantize coeffs. (coeff -> quant_coeff)
   if (encoder_state->encoder_control->rdoq_enable) {
+    int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
+    tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     rdoq(encoder_state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
-         scan_order, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+         scan_order, cur_cu->type, tr_depth);
   } else {
     quant(encoder_state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
           scan_order, cur_cu->type);

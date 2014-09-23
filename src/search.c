@@ -927,7 +927,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
 static double search_intra_trdepth(encoder_state * const encoder_state,
   int x_px, int y_px, int depth, int max_depth,
   int intra_mode, int cost_treshold,
-  const cu_info *const pred_cu,
+  cu_info *const pred_cu,
   lcu_t *const lcu)
 {
   const int width = LCU_WIDTH >> depth;
@@ -944,6 +944,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 
   if (depth > 0) {
     tr_cu->tr_depth = depth;
+    pred_cu->tr_depth = depth;
     intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
     nosplit_cost = cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
 
@@ -1195,6 +1196,10 @@ static void search_intra_rdo(encoder_state * const encoder_state,
       pred_cu.type = CU_INTRA;
       pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
       pred_cu.intra[0].mode = modes[rdo_mode];
+      pred_cu.intra[1].mode = modes[rdo_mode];
+      pred_cu.intra[2].mode = modes[rdo_mode];
+      pred_cu.intra[3].mode = modes[rdo_mode];
+      pred_cu.intra[0].mode_chroma = modes[rdo_mode];
 
       // Reset transform split data in lcu.cu for this area.
       lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
@@ -1212,6 +1217,10 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
     pred_cu.intra[0].mode = modes[0];
+    pred_cu.intra[1].mode = modes[0];
+    pred_cu.intra[2].mode = modes[0];
+    pred_cu.intra[3].mode = modes[0];
+    pred_cu.intra[0].mode_chroma = modes[0];
     search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
 }
@@ -1294,7 +1303,7 @@ static int search_cu_intra(encoder_state * const encoder_state,
       }
       int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
       search_intra_rdo(encoder_state, 
-                       lcu_px.x, lcu_px.y, depth,
+                       x_px, y_px, depth,
                        ref_pixels, LCU_WIDTH,
                        cu_in_rec_buffer, cu_width * 2 + 8,
                        candidate_modes,

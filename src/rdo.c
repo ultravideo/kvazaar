@@ -226,7 +226,9 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     unsigned ssd = 0;
     // SSD between original and reconstructed
     for (i = 0; i < width*width; i++) {
-      int diff = temp_block[i]-block[i];
+      //int diff = temp_block[i]-block[i];
+      int diff = orig_block[i] - CLIP(0, 255, pred[i] + temp_block[i]);
+
       ssd += diff*diff;
     }
 
