@@ -244,7 +244,62 @@ static void mul_matrix_8x8_avx2(const int16_t *first, const int16_t *second, int
 
 static void mul_matrix_16x16_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
 {
+  int i, j;
+  __m256i row[4], accu[16][2], even, odd;
 
+  const int32_t stride = 8;
+
+  const int32_t add = 1 << (shift - 1);
+
+  row[0] = _mm256_loadu_si256((__m256i*) second);
+  row[1] = _mm256_loadu_si256((__m256i*) second + 1);
+  row[2] = _mm256_unpacklo_epi16(row[0], row[1]);
+  row[3] = _mm256_unpackhi_epi16(row[0], row[1]);
+  row[0] = _mm256_permute2x128_si256(row[2], row[3], 0 + 32);
+  row[1] = _mm256_permute2x128_si256(row[2], row[3], 1 + 48);
+
+  for (i = 0; i < 16; i += 2) {
+
+    even = _mm256_set1_epi32(((int32_t*)first)[stride * i]);
+    accu[i][0] = _mm256_madd_epi16(even, row[0]);
+    accu[i][1] = _mm256_madd_epi16(even, row[1]);
+
+    odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1)]);
+    accu[i+1][0] = _mm256_madd_epi16(odd, row[0]);
+    accu[i+1][1] = _mm256_madd_epi16(odd, row[1]);
+  }
+
+  for (j = 2; j < 16; j+=2) {
+
+    row[0] = _mm256_loadu_si256((__m256i*)second + j);
+    row[1] = _mm256_loadu_si256((__m256i*)second + j + 1);
+    row[2] = _mm256_unpacklo_epi16(row[0], row[1]);
+    row[3] = _mm256_unpackhi_epi16(row[0], row[1]);
+    row[0] = _mm256_permute2x128_si256(row[2], row[3], 0 + 32);
+    row[1] = _mm256_permute2x128_si256(row[2], row[3], 1 + 48);
+
+    for (i = 0; i < 16; i += 2) {
+
+      even = _mm256_set1_epi32(((int32_t*)first)[stride * i + j/2]);
+      accu[i][0] = _mm256_add_epi32(accu[i][0], _mm256_madd_epi16(even, row[0]));
+      accu[i][1] = _mm256_add_epi32(accu[i][1], _mm256_madd_epi16(even, row[1]));
+
+      odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1) + j/2]);
+      accu[i + 1][0] = _mm256_add_epi32(accu[i + 1][0], _mm256_madd_epi16(odd, row[0]));
+      accu[i + 1][1] = _mm256_add_epi32(accu[i + 1][1], _mm256_madd_epi16(odd, row[1]));
+
+    }
+  }
+
+  for (i = 0; i < 16; ++i) {
+    __m256i result, first_half, second_half;
+
+    first_half = _mm256_srai_epi32(_mm256_add_epi32(accu[i][0], _mm256_set1_epi32(add)), shift);
+    second_half = _mm256_srai_epi32(_mm256_add_epi32(accu[i][1], _mm256_set1_epi32(add)), shift);
+    result = _mm256_permute4x64_epi64(_mm256_packs_epi32(first_half, second_half), 0 + 8 + 16 + 192);
+    _mm256_storeu_si256((__m256i*)dst + i, result);
+
+  }
 }
 
 static void matrix_transform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
@@ -297,95 +352,15 @@ static void matrix_transform_2d_16x16_avx2(const int16_t *src, int16_t *dst, con
   mul_matrix_16x16_avx2(transform, tmp, dst, shift1);
 }
 
-static void partial_butterfly_16_avx2(short *src, short *dst,
-  int32_t shift)
+static void matrix_itransform_2d_16x16_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
-  int32_t j, k;
-  int32_t e[8], o[8];
-  int32_t ee[4], eo[4];
-  int32_t eee[2], eeo[2];
-  int32_t add = 1 << (shift - 1);
-  const int32_t line = 16;
+  int16_t tmp[16 * 16];
+  int16_t transposed[16 * 16];
 
-  for (j = 0; j < line; j++) {
-    // E and O
-    for (k = 0; k < 8; k++) {
-      e[k] = src[k] + src[15 - k];
-      o[k] = src[k] - src[15 - k];
-    }
-    // EE and EO
-    for (k = 0; k < 4; k++) {
-      ee[k] = e[k] + e[7 - k];
-      eo[k] = e[k] - e[7 - k];
-    }
-    // EEE and EEO
-    eee[0] = ee[0] + ee[3];
-    eeo[0] = ee[0] - ee[3];
-    eee[1] = ee[1] + ee[2];
-    eeo[1] = ee[1] - ee[2];
-
-    dst[0] = (short)((g_t16[0][0] * eee[0] + g_t16[0][1] * eee[1] + add) >> shift);
-    dst[8 * line] = (short)((g_t16[8][0] * eee[0] + g_t16[8][1] * eee[1] + add) >> shift);
-    dst[4 * line] = (short)((g_t16[4][0] * eeo[0] + g_t16[4][1] * eeo[1] + add) >> shift);
-    dst[12 * line] = (short)((g_t16[12][0] * eeo[0] + g_t16[12][1] * eeo[1] + add) >> shift);
-
-    for (k = 2; k < 16; k += 4) {
-      dst[k*line] = (short)((g_t16[k][0] * eo[0] + g_t16[k][1] * eo[1] + g_t16[k][2] * eo[2] + g_t16[k][3] * eo[3] + add) >> shift);
-    }
-
-    for (k = 1; k < 16; k += 2) {
-      dst[k*line] = (short)((g_t16[k][0] * o[0] + g_t16[k][1] * o[1] + g_t16[k][2] * o[2] + g_t16[k][3] * o[3] +
-        g_t16[k][4] * o[4] + g_t16[k][5] * o[5] + g_t16[k][6] * o[6] + g_t16[k][7] * o[7] + add) >> shift);
-    }
-
-    src += 16;
-    dst++;
-  }
+  transpose_16x16_16bit(transform, transposed);
+  mul_matrix_16x16_avx2(transposed, src, tmp, shift0);
+  mul_matrix_16x16_avx2(tmp, transform, dst, shift1);
 }
-
-
-static void partial_butterfly_inverse_16_avx2(int16_t *src, int16_t *dst,
-  int32_t shift)
-{
-  int32_t j, k;
-  int32_t e[8], o[8];
-  int32_t ee[4], eo[4];
-  int32_t eee[2], eeo[2];
-  int32_t add = 1 << (shift - 1);
-  const int32_t line = 16;
-
-  for (j = 0; j < line; j++) {
-    // Utilizing symmetry properties to the maximum to minimize the number of multiplications
-    for (k = 0; k < 8; k++)  {
-      o[k] = g_t16[1][k] * src[line] + g_t16[3][k] * src[3 * line] + g_t16[5][k] * src[5 * line] + g_t16[7][k] * src[7 * line] +
-        g_t16[9][k] * src[9 * line] + g_t16[11][k] * src[11 * line] + g_t16[13][k] * src[13 * line] + g_t16[15][k] * src[15 * line];
-    }
-    for (k = 0; k < 4; k++) {
-      eo[k] = g_t16[2][k] * src[2 * line] + g_t16[6][k] * src[6 * line] + g_t16[10][k] * src[10 * line] + g_t16[14][k] * src[14 * line];
-    }
-    eeo[0] = g_t16[4][0] * src[4 * line] + g_t16[12][0] * src[12 * line];
-    eee[0] = g_t16[0][0] * src[0] + g_t16[8][0] * src[8 * line];
-    eeo[1] = g_t16[4][1] * src[4 * line] + g_t16[12][1] * src[12 * line];
-    eee[1] = g_t16[0][1] * src[0] + g_t16[8][1] * src[8 * line];
-
-    // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
-    for (k = 0; k < 2; k++) {
-      ee[k] = eee[k] + eeo[k];
-      ee[k + 2] = eee[1 - k] - eeo[1 - k];
-    }
-    for (k = 0; k < 4; k++) {
-      e[k] = ee[k] + eo[k];
-      e[k + 4] = ee[3 - k] - eo[3 - k];
-    }
-    for (k = 0; k < 8; k++) {
-      dst[k] = (short)MAX(-32768, MIN(32767, (e[k] + o[k] + add) >> shift));
-      dst[k + 8] = (short)MAX(-32768, MIN(32767, (e[7 - k] - o[7 - k] + add) >> shift));
-    }
-    src++;
-    dst += 16;
-  }
-}
-
 
 static void partial_butterfly_32_avx2(short *src, short *dst,
   int32_t shift)
@@ -518,10 +493,8 @@ static void idct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16
   partial_butterfly_inverse_ ## n ## _avx2(tmp, block, shift_2nd); \
 }
 
-DCT_NXN_AVX2(16);
 DCT_NXN_AVX2(32);
 
-IDCT_NXN_AVX2(16);
 IDCT_NXN_AVX2(32);
 
 static void matrix_dst_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
@@ -573,6 +546,12 @@ static void matrix_dct_16x16_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
   matrix_transform_2d_16x16_avx2(src, dst, (const int16_t*)g_t16, shift_1st, shift_2nd);
 }
 
+static void matrix_idct_16x16_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
+{
+  int32_t shift_1st = 7;
+  int32_t shift_2nd = 12 - (bitdepth - 8);
+  matrix_itransform_2d_16x16_avx2(src, dst, (const int16_t*)g_t16, shift_1st, shift_2nd);
+}
 #endif //COMPILE_INTEL_AVX2
 
 int strategy_register_dct_avx2(void* opaque)
@@ -583,14 +562,14 @@ int strategy_register_dct_avx2(void* opaque)
 
   success &= strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
   success &= strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
-  success &= strategyselector_register(opaque, "dct_16x16", "avx2", 40, &dct_16x16_avx2);
+  success &= strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
   success &= strategyselector_register(opaque, "dct_32x32", "avx2", 40, &dct_32x32_avx2);
 
   success &= strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
 
   success &= strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
   success &= strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
-  success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &idct_16x16_avx2);
+  success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
   success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &idct_32x32_avx2);
 #endif //COMPILE_INTEL_AVX2  
   return success;
