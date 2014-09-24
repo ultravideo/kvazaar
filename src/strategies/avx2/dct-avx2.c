@@ -396,6 +396,92 @@ static void mul_matrix_16x16_avx2(const int16_t *first, const int16_t *second, i
   }
 }
 
+static void mul_matrix_32x32_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+{
+  int i, j;
+  __m256i row[4], tmp[2], accu[32][4], even, odd;
+
+  const int32_t stride = 16;
+
+  const int32_t add = 1 << (shift - 1);
+
+  row[0] = _mm256_loadu_si256((__m256i*) second);
+  row[1] = _mm256_loadu_si256((__m256i*) second + 2);
+  tmp[0] = _mm256_unpacklo_epi16(row[0], row[1]);
+  tmp[1] = _mm256_unpackhi_epi16(row[0], row[1]);
+  row[0] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
+  row[1] = _mm256_permute2x128_si256(tmp[0], tmp[1], 1 + 48);
+
+  row[2] = _mm256_loadu_si256((__m256i*) second + 1);
+  row[3] = _mm256_loadu_si256((__m256i*) second + 3);
+  tmp[0] = _mm256_unpacklo_epi16(row[2], row[3]);
+  tmp[1] = _mm256_unpackhi_epi16(row[2], row[3]);
+  row[2] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
+  row[3] = _mm256_permute2x128_si256(tmp[0], tmp[1], 1 + 48);
+
+  for (i = 0; i < 32; i += 2) {
+
+    even = _mm256_set1_epi32(((int32_t*)first)[stride * i]);
+    accu[i][0] = _mm256_madd_epi16(even, row[0]);
+    accu[i][1] = _mm256_madd_epi16(even, row[1]);
+    accu[i][2] = _mm256_madd_epi16(even, row[2]);
+    accu[i][3] = _mm256_madd_epi16(even, row[3]);
+
+    odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1)]);
+    accu[i + 1][0] = _mm256_madd_epi16(odd, row[0]);
+    accu[i + 1][1] = _mm256_madd_epi16(odd, row[1]);
+    accu[i + 1][2] = _mm256_madd_epi16(odd, row[2]);
+    accu[i + 1][3] = _mm256_madd_epi16(odd, row[3]);
+  }
+
+  for (j = 4; j < 64; j += 4) {
+
+    row[0] = _mm256_loadu_si256((__m256i*)second + j);
+    row[1] = _mm256_loadu_si256((__m256i*)second + j + 2);
+    tmp[0] = _mm256_unpacklo_epi16(row[0], row[1]);
+    tmp[1] = _mm256_unpackhi_epi16(row[0], row[1]);
+    row[0] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
+    row[1] = _mm256_permute2x128_si256(tmp[0], tmp[1], 1 + 48);
+
+    row[2] = _mm256_loadu_si256((__m256i*) second + j + 1);
+    row[3] = _mm256_loadu_si256((__m256i*) second + j + 3);
+    tmp[0] = _mm256_unpacklo_epi16(row[2], row[3]);
+    tmp[1] = _mm256_unpackhi_epi16(row[2], row[3]);
+    row[2] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
+    row[3] = _mm256_permute2x128_si256(tmp[0], tmp[1], 1 + 48);
+
+    for (i = 0; i < 32; i += 2) {
+
+      even = _mm256_set1_epi32(((int32_t*)first)[stride * i + j / 4]);
+      accu[i][0] = _mm256_add_epi32(accu[i][0], _mm256_madd_epi16(even, row[0]));
+      accu[i][1] = _mm256_add_epi32(accu[i][1], _mm256_madd_epi16(even, row[1]));
+      accu[i][2] = _mm256_add_epi32(accu[i][2], _mm256_madd_epi16(even, row[2]));
+      accu[i][3] = _mm256_add_epi32(accu[i][3], _mm256_madd_epi16(even, row[3]));
+
+      odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1) + j / 4]);
+      accu[i + 1][0] = _mm256_add_epi32(accu[i + 1][0], _mm256_madd_epi16(odd, row[0]));
+      accu[i + 1][1] = _mm256_add_epi32(accu[i + 1][1], _mm256_madd_epi16(odd, row[1]));
+      accu[i + 1][2] = _mm256_add_epi32(accu[i + 1][2], _mm256_madd_epi16(odd, row[2]));
+      accu[i + 1][3] = _mm256_add_epi32(accu[i + 1][3], _mm256_madd_epi16(odd, row[3]));
+
+    }
+  }
+
+  for (i = 0; i < 32; ++i) {
+    __m256i result, first_quarter, second_quarter, third_quarter, fourth_quarter;
+
+    first_quarter = _mm256_srai_epi32(_mm256_add_epi32(accu[i][0], _mm256_set1_epi32(add)), shift);
+    second_quarter = _mm256_srai_epi32(_mm256_add_epi32(accu[i][1], _mm256_set1_epi32(add)), shift);
+    third_quarter = _mm256_srai_epi32(_mm256_add_epi32(accu[i][2], _mm256_set1_epi32(add)), shift);
+    fourth_quarter = _mm256_srai_epi32(_mm256_add_epi32(accu[i][3], _mm256_set1_epi32(add)), shift);
+    result = _mm256_permute4x64_epi64(_mm256_packs_epi32(first_quarter, second_quarter), 0 + 8 + 16 + 192);
+    _mm256_storeu_si256((__m256i*)dst + 2 * i, result);
+    result = _mm256_permute4x64_epi64(_mm256_packs_epi32(third_quarter, fourth_quarter), 0 + 8 + 16 + 192);
+    _mm256_storeu_si256((__m256i*)dst + 2 * i + 1, result);
+
+  }
+}
+
 static void matrix_transform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[4 * 4];
@@ -456,59 +542,14 @@ static void matrix_itransform_2d_16x16_avx2(const int16_t *src, int16_t *dst, co
   mul_matrix_16x16_avx2(tmp, transform, dst, shift1);
 }
 
-static void partial_butterfly_32_avx2(short *src, short *dst,
-  int32_t shift)
+static void matrix_transform_2d_32x32_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
-  int32_t j, k;
-  int32_t e[16], o[16];
-  int32_t ee[8], eo[8];
-  int32_t eee[4], eeo[4];
-  int32_t eeee[2], eeeo[2];
-  int32_t add = 1 << (shift - 1);
-  const int32_t line = 32;
+  int16_t tmp[32 * 32];
+  int16_t transposed[32 * 32];
 
-  for (j = 0; j < line; j++) {
-    // E and O
-    for (k = 0; k < 16; k++) {
-      e[k] = src[k] + src[31 - k];
-      o[k] = src[k] - src[31 - k];
-    }
-    // EE and EO
-    for (k = 0; k < 8; k++) {
-      ee[k] = e[k] + e[15 - k];
-      eo[k] = e[k] - e[15 - k];
-    }
-    // EEE and EEO
-    for (k = 0; k < 4; k++) {
-      eee[k] = ee[k] + ee[7 - k];
-      eeo[k] = ee[k] - ee[7 - k];
-    }
-    // EEEE and EEEO
-    eeee[0] = eee[0] + eee[3];
-    eeeo[0] = eee[0] - eee[3];
-    eeee[1] = eee[1] + eee[2];
-    eeeo[1] = eee[1] - eee[2];
-
-    dst[0] = (short)((g_t32[0][0] * eeee[0] + g_t32[0][1] * eeee[1] + add) >> shift);
-    dst[16 * line] = (short)((g_t32[16][0] * eeee[0] + g_t32[16][1] * eeee[1] + add) >> shift);
-    dst[8 * line] = (short)((g_t32[8][0] * eeeo[0] + g_t32[8][1] * eeeo[1] + add) >> shift);
-    dst[24 * line] = (short)((g_t32[24][0] * eeeo[0] + g_t32[24][1] * eeeo[1] + add) >> shift);
-    for (k = 4; k < 32; k += 8) {
-      dst[k*line] = (short)((g_t32[k][0] * eeo[0] + g_t32[k][1] * eeo[1] + g_t32[k][2] * eeo[2] + g_t32[k][3] * eeo[3] + add) >> shift);
-    }
-    for (k = 2; k < 32; k += 4) {
-      dst[k*line] = (short)((g_t32[k][0] * eo[0] + g_t32[k][1] * eo[1] + g_t32[k][2] * eo[2] + g_t32[k][3] * eo[3] +
-        g_t32[k][4] * eo[4] + g_t32[k][5] * eo[5] + g_t32[k][6] * eo[6] + g_t32[k][7] * eo[7] + add) >> shift);
-    }
-    for (k = 1; k < 32; k += 2) {
-      dst[k*line] = (short)((g_t32[k][0] * o[0] + g_t32[k][1] * o[1] + g_t32[k][2] * o[2] + g_t32[k][3] * o[3] +
-        g_t32[k][4] * o[4] + g_t32[k][5] * o[5] + g_t32[k][6] * o[6] + g_t32[k][7] * o[7] +
-        g_t32[k][8] * o[8] + g_t32[k][9] * o[9] + g_t32[k][10] * o[10] + g_t32[k][11] * o[11] +
-        g_t32[k][12] * o[12] + g_t32[k][13] * o[13] + g_t32[k][14] * o[14] + g_t32[k][15] * o[15] + add) >> shift);
-    }
-    src += 32;
-    dst++;
-  }
+  transpose_32x32_16bit(transform, transposed);
+  mul_matrix_32x32_avx2(src, transposed, tmp, shift0);
+  mul_matrix_32x32_avx2(transform, tmp, dst, shift1);
 }
 
 
@@ -587,8 +628,6 @@ static void idct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16
   partial_butterfly_inverse_ ## n ## _avx2(tmp, block, shift_2nd); \
 }
 
-DCT_NXN_AVX2(32);
-
 IDCT_NXN_AVX2(32);
 
 static void matrix_dst_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
@@ -646,6 +685,13 @@ static void matrix_idct_16x16_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
   int32_t shift_2nd = 12 - (bitdepth - 8);
   matrix_itransform_2d_16x16_avx2(src, dst, (const int16_t*)g_t16, shift_1st, shift_2nd);
 }
+
+static void matrix_dct_32x32_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
+{
+  int32_t shift_1st = g_convert_to_bit[32] + 1 + (bitdepth - 8);
+  int32_t shift_2nd = g_convert_to_bit[32] + 8;
+  matrix_transform_2d_32x32_avx2(src, dst, (const int16_t*)g_t32, shift_1st, shift_2nd);
+}
 #endif //COMPILE_INTEL_AVX2
 
 int strategy_register_dct_avx2(void* opaque)
@@ -657,7 +703,7 @@ int strategy_register_dct_avx2(void* opaque)
   success &= strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
   success &= strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
   success &= strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
-  success &= strategyselector_register(opaque, "dct_32x32", "avx2", 40, &dct_32x32_avx2);
+  success &= strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
 
   success &= strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
 
