@@ -552,83 +552,15 @@ static void matrix_transform_2d_32x32_avx2(const int16_t *src, int16_t *dst, con
   mul_matrix_32x32_avx2(transform, tmp, dst, shift1);
 }
 
-
-static void partial_butterfly_inverse_32_avx2(int16_t *src, int16_t *dst,
-  int32_t shift)
+static void matrix_itransform_2d_32x32_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
-  int32_t j, k;
-  int32_t e[16], o[16];
-  int32_t ee[8], eo[8];
-  int32_t eee[4], eeo[4];
-  int32_t eeee[2], eeeo[2];
-  int32_t add = 1 << (shift - 1);
-  const int32_t line = 32;
+  int16_t tmp[32 * 32];
+  int16_t transposed[32 * 32];
 
-  for (j = 0; j<line; j++) {
-    // Utilizing symmetry properties to the maximum to minimize the number of multiplications
-    for (k = 0; k < 16; k++) {
-      o[k] = g_t32[1][k] * src[line] + g_t32[3][k] * src[3 * line] + g_t32[5][k] * src[5 * line] + g_t32[7][k] * src[7 * line] +
-        g_t32[9][k] * src[9 * line] + g_t32[11][k] * src[11 * line] + g_t32[13][k] * src[13 * line] + g_t32[15][k] * src[15 * line] +
-        g_t32[17][k] * src[17 * line] + g_t32[19][k] * src[19 * line] + g_t32[21][k] * src[21 * line] + g_t32[23][k] * src[23 * line] +
-        g_t32[25][k] * src[25 * line] + g_t32[27][k] * src[27 * line] + g_t32[29][k] * src[29 * line] + g_t32[31][k] * src[31 * line];
-    }
-    for (k = 0; k < 8; k++) {
-      eo[k] = g_t32[2][k] * src[2 * line] + g_t32[6][k] * src[6 * line] + g_t32[10][k] * src[10 * line] + g_t32[14][k] * src[14 * line] +
-        g_t32[18][k] * src[18 * line] + g_t32[22][k] * src[22 * line] + g_t32[26][k] * src[26 * line] + g_t32[30][k] * src[30 * line];
-    }
-    for (k = 0; k < 4; k++) {
-      eeo[k] = g_t32[4][k] * src[4 * line] + g_t32[12][k] * src[12 * line] + g_t32[20][k] * src[20 * line] + g_t32[28][k] * src[28 * line];
-    }
-    eeeo[0] = g_t32[8][0] * src[8 * line] + g_t32[24][0] * src[24 * line];
-    eeeo[1] = g_t32[8][1] * src[8 * line] + g_t32[24][1] * src[24 * line];
-    eeee[0] = g_t32[0][0] * src[0] + g_t32[16][0] * src[16 * line];
-    eeee[1] = g_t32[0][1] * src[0] + g_t32[16][1] * src[16 * line];
-
-    // Combining even and odd terms at each hierarchy levels to calculate the final spatial domain vector
-    eee[0] = eeee[0] + eeeo[0];
-    eee[3] = eeee[0] - eeeo[0];
-    eee[1] = eeee[1] + eeeo[1];
-    eee[2] = eeee[1] - eeeo[1];
-    for (k = 0; k < 4; k++) {
-      ee[k] = eee[k] + eeo[k];
-      ee[k + 4] = eee[3 - k] - eeo[3 - k];
-    }
-    for (k = 0; k < 8; k++) {
-      e[k] = ee[k] + eo[k];
-      e[k + 8] = ee[7 - k] - eo[7 - k];
-    }
-    for (k = 0; k<16; k++) {
-      dst[k] = (short)MAX(-32768, MIN(32767, (e[k] + o[k] + add) >> shift));
-      dst[k + 16] = (short)MAX(-32768, MIN(32767, (e[15 - k] - o[15 - k] + add) >> shift));
-    }
-    src++;
-    dst += 32;
-  }
+  transpose_32x32_16bit(transform, transposed);
+  mul_matrix_32x32_avx2(transposed, src, tmp, shift0);
+  mul_matrix_32x32_avx2(tmp, transform, dst, shift1);
 }
-
-#define DCT_NXN_AVX2(n) \
-static void dct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
-  \
-  int16_t tmp[n*n]; \
-  int32_t shift_1st = g_convert_to_bit[n] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = g_convert_to_bit[n] + 8; \
-  \
-  partial_butterfly_ ## n ## _avx2(block, tmp, shift_1st); \
-  partial_butterfly_ ## n ## _avx2(tmp, coeff, shift_2nd); \
-}
-
-#define IDCT_NXN_AVX2(n) \
-static void idct_ ## n ## x ## n ## _avx2(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
-\
-  int16_t tmp[n*n]; \
-  int32_t shift_1st = 7; \
-  int32_t shift_2nd = 12 - (bitdepth - 8); \
-\
-  partial_butterfly_inverse_ ## n ## _avx2(coeff, tmp, shift_1st); \
-  partial_butterfly_inverse_ ## n ## _avx2(tmp, block, shift_2nd); \
-}
-
-IDCT_NXN_AVX2(32);
 
 static void matrix_dst_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
 {
@@ -692,6 +624,13 @@ static void matrix_dct_32x32_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
   int32_t shift_2nd = g_convert_to_bit[32] + 8;
   matrix_transform_2d_32x32_avx2(src, dst, (const int16_t*)g_t32, shift_1st, shift_2nd);
 }
+
+static void matrix_idct_32x32_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
+{
+  int32_t shift_1st = 7;
+  int32_t shift_2nd = 12 - (bitdepth - 8);
+  matrix_itransform_2d_32x32_avx2(src, dst, (const int16_t*)g_t32, shift_1st, shift_2nd);
+}
 #endif //COMPILE_INTEL_AVX2
 
 int strategy_register_dct_avx2(void* opaque)
@@ -710,7 +649,7 @@ int strategy_register_dct_avx2(void* opaque)
   success &= strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
   success &= strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
   success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
-  success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &idct_32x32_avx2);
+  success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }
