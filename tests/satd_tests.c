@@ -14,7 +14,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-pixel * satd_bufs[NUM_TESTS][6][2];
+pixel * satd_bufs[NUM_TESTS][7][2];
 
 static struct {
   int log_width; // for selecting dim from satd_bufs
@@ -27,9 +27,9 @@ static struct {
 static void setup_tests()
 {
   for (int test = 0; test < NUM_TESTS; ++test) {
-    for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
-      satd_bufs[test][w][0] = 0;
-      satd_bufs[test][w][1] = 0;
+    for (int w = 0; w <= LCU_MIN_LOG_W; ++w) {
+      satd_bufs[test][w][0] = NULL;
+      satd_bufs[test][w][1] = NULL;
     }
 
     for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {

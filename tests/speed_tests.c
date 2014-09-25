@@ -26,7 +26,7 @@ pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
 
 static struct test_env_t {
   int log_width; // for selecting dim from bufs
-  cost_pixel_nxn_func * tested_func;
+  void * tested_func;
   const strategy * strategy;
   char msg[1024];
 } test_env;
@@ -107,7 +107,9 @@ TEST test_intra_speed(const int width)
       pixel * buf1 = &bufs[test][offset];
       for (int chunk = 1; chunk < NUM_CHUNKS; ++chunk) {
         pixel * buf2 = &bufs[test][chunk * size + offset];
-        sum += test_env.tested_func(buf1, buf2);
+
+        cost_pixel_nxn_func *tested_func = test_env.tested_func;
+        sum += tested_func(buf1, buf2);
         ++call_cnt;
       }
     }
@@ -148,7 +150,8 @@ TEST test_inter_speed(const int width)
           for (int x = 0; x < 8; ++x) {
             const int stride1 = 2 * 64;
             const int stride2 = 2 * 64;
-            sum += test_env.tested_func(buf1, &buf2[y * stride2 + x], width, width, stride1, stride2);
+            reg_sad_func *tested_func = test_env.tested_func;
+            sum += tested_func(buf1, &buf2[y * stride2 + x], width, width, stride1, stride2);
             ++call_cnt;
           }
         }
