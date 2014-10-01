@@ -960,6 +960,8 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
 
+  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+
   struct {
     pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
     pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -980,7 +982,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
     nosplit_cost += cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
 
-    if (PU_INDEX(x_px >> 2, y_px >> 2) == 0) {
+    if (reconstruct_chroma) {
       intra_recon_lcu_chroma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
       nosplit_cost += cu_rd_cost_chroma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
@@ -993,12 +995,17 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     }
 
     pixels_blit(lcu->rec.y, nosplit_pixels.y, width, width, LCU_WIDTH, width);
-    if (PU_INDEX(x_px >> 2, y_px >> 2) == 0) {
+    if (reconstruct_chroma) {
       pixels_blit(lcu->rec.u, nosplit_pixels.u, width_c, width_c, LCU_WIDTH_C, width_c);
       pixels_blit(lcu->rec.v, nosplit_pixels.v, width_c, width_c, LCU_WIDTH_C, width_c);
     }
   }
 
+  // Recurse further if all of the following:
+  // - Current depth is less than maximum depth of the search (max_depth).
+  //   - Maximum transform hierarchy depth is constrained by clipping
+  //     max_depth.
+  // - Min transform size hasn't been reached (MAX_PU_DEPTH).
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
     split_cost = 3 * encoder_state->global->cur_lambda_cost;
 
@@ -1016,8 +1023,9 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     double tr_split_bit = 0.0;
     double cbf_bits = 0.0;
 
-    bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
-    if (depth >= 1 && depth <= 3 && !intra_split_flag) {
+    // Add bits for split_transform_flag = 1, because transform depth search bypasses
+    // the normal recursion in the cost functions.
+    if (depth >= 1 && depth <= 3) {
       const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
       tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
     }
@@ -1028,8 +1036,9 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     // if this and any previous transform block has no chroma coefficients.
     // When searching the first block we don't actually know the real values,
     // so this will code cbf as 0 and not code the cbf at all for descendants.
-    int tr_depth = depth - pred_cu->depth;
-    if (depth < MAX_PU_DEPTH) {  // log2TrafoSize > 2 
+    {
+      const uint8_t tr_depth = depth - pred_cu->depth;
+
       const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
@@ -1053,7 +1062,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     // We only restore the pixel data and not coefficients or cbf data.
     // The only thing we really need are the border pixels.
     pixels_blit(nosplit_pixels.y, lcu->rec.y, width, width, width, LCU_WIDTH);
-    if (PU_INDEX(x_px >> 2, y_px >> 2) == 0) {
+    if (reconstruct_chroma) {
       pixels_blit(nosplit_pixels.u, lcu->rec.u, width_c, width_c, width_c, LCU_WIDTH_C);
       pixels_blit(nosplit_pixels.v, lcu->rec.v, width_c, width_c, width_c, LCU_WIDTH_C);
     }
