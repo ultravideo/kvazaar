@@ -777,6 +777,6 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
                   2);
     }
 
-    quantize_lcu_chroma_residual(encoder_state, x, y, depth, NULL, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x, y, depth, cur_cu, lcu);
   }
 }

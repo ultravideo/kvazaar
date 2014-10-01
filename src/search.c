@@ -931,11 +931,17 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
   lcu_t *const lcu)
 {
   const int width = LCU_WIDTH >> depth;
+  const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
+
   const int offset = width / 2;
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
 
-  pixel nosplit_pixels[TR_MAX_WIDTH*TR_MAX_WIDTH];
+  struct {
+    pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
+    pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
+    pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
+  } nosplit_pixels;
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
@@ -945,11 +951,16 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
   if (depth > 0) {
     tr_cu->tr_depth = depth;
     pred_cu->tr_depth = depth;
-    intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
-    nosplit_cost = cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
 
-    // Clear cbf bits because they have been set by the reconstruction.
-    cbf_clear(&tr_cu->cbf.y, depth + PU_INDEX(x_px / 4, y_px / 4));
+    nosplit_cost = 0.0;
+
+    intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
+    nosplit_cost += cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+
+    if (PU_INDEX(x_px >> 2, y_px >> 2) == 0) {
+      intra_recon_lcu_chroma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
+      nosplit_cost += cu_rd_cost_chroma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+    }
 
     // Early stop codition for the recursive search.
     // If the cost of any 1/4th of the transform is already larger than the
@@ -958,7 +969,11 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
       return nosplit_cost;
     }
 
-    pixels_blit(lcu->rec.y, nosplit_pixels, width, width, LCU_WIDTH, width);
+    pixels_blit(lcu->rec.y, nosplit_pixels.y, width, width, LCU_WIDTH, width);
+    if (PU_INDEX(x_px >> 2, y_px >> 2) == 0) {
+      pixels_blit(lcu->rec.u, nosplit_pixels.u, width_c, width_c, LCU_WIDTH_C, width_c);
+      pixels_blit(lcu->rec.v, nosplit_pixels.v, width_c, width_c, LCU_WIDTH_C, width_c);
+    }
   }
 
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
@@ -985,7 +1000,11 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 
     // We only restore the pixel data and not coefficients or cbf data.
     // The only thing we really need are the border pixels.
-    pixels_blit(nosplit_pixels, lcu->rec.y, width, width, width, LCU_WIDTH);
+    pixels_blit(nosplit_pixels.y, lcu->rec.y, width, width, width, LCU_WIDTH);
+    if (PU_INDEX(x_px >> 2, y_px >> 2) == 0) {
+      pixels_blit(nosplit_pixels.u, lcu->rec.u, width_c, width_c, width_c, LCU_WIDTH_C);
+      pixels_blit(nosplit_pixels.v, lcu->rec.v, width_c, width_c, width_c, LCU_WIDTH_C);
+    }
 
     return nosplit_cost;
   }
