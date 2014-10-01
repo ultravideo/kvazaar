@@ -967,6 +967,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
     pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
   } nosplit_pixels;
+  cu_cbf_t nosplit_cbf;
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
@@ -979,10 +980,15 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 
     nosplit_cost = 0.0;
 
+    cbf_clear(&pred_cu->cbf.y, depth + PU_INDEX(x_px / 4, y_px / 4));
+
     intra_recon_lcu_luma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
     nosplit_cost += cu_rd_cost_luma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
 
     if (reconstruct_chroma) {
+      cbf_clear(&pred_cu->cbf.u, depth);
+      cbf_clear(&pred_cu->cbf.v, depth);
+
       intra_recon_lcu_chroma(encoder_state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
       nosplit_cost += cu_rd_cost_chroma(encoder_state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
@@ -993,6 +999,8 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     if (nosplit_cost >= cost_treshold) {
       return nosplit_cost;
     }
+
+    nosplit_cbf = pred_cu->cbf;
 
     pixels_blit(lcu->rec.y, nosplit_pixels.y, width, width, LCU_WIDTH, width);
     if (reconstruct_chroma) {
@@ -1058,6 +1066,8 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     return split_cost;
   } else {
     lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+
+    pred_cu->cbf = nosplit_cbf;
 
     // We only restore the pixel data and not coefficients or cbf data.
     // The only thing we really need are the border pixels.
@@ -1280,6 +1290,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
       pred_cu.intra[2].mode = modes[rdo_mode];
       pred_cu.intra[3].mode = modes[rdo_mode];
       pred_cu.intra[0].mode_chroma = modes[rdo_mode];
+      memset(&pred_cu.cbf, 0, sizeof(pred_cu.cbf));
 
       // Reset transform split data in lcu.cu for this area.
       lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
@@ -1301,6 +1312,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     pred_cu.intra[2].mode = modes[0];
     pred_cu.intra[3].mode = modes[0];
     pred_cu.intra[0].mode_chroma = modes[0];
+    memset(&pred_cu.cbf, 0, sizeof(pred_cu.cbf));
     search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
 }
