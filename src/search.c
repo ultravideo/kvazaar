@@ -767,14 +767,37 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
+  bool split_transform_flag = tr_cu->tr_depth > depth;
+
+  // Add cost of intra split flag on transform tree.
+  bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
+  double tr_tree_bits = 0.0;
   if (width <= TR_MAX_WIDTH
       && width > TR_MIN_WIDTH
-      && pred_cu->part_size != SIZE_NxN)
+      && !intra_split_flag)
   {
-    //trtree_bits += 1; // split_transform_flag
+    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, split_transform_flag);
   }
 
-  if (tr_cu->tr_depth > depth) {
+  // Add cost of cbf chroma bits on transform tree.
+  // All cbf bits are accumulated to pred_cu.cbf and cbf_is_set returns true
+  // if cbf is set at any level >= depth, so cbf chroma is assumed to be 0
+  // if this and any previous transform block has no chroma coefficients.
+  // When searching the first block we don't actually know the real values,
+  // so this will code cbf as 0 and not code the cbf at all for descendants.
+  int tr_depth = depth - pred_cu->depth;
+  if (depth < MAX_PU_DEPTH) {  // log2TrafoSize > 2 
+    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
+    }
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
+    }
+  }
+
+  if (split_transform_flag) {
     int offset = width / 2;
     double sum = 0;
 
@@ -989,6 +1012,35 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     if (split_cost < nosplit_cost) {
       split_cost += search_intra_trdepth(encoder_state, x_px + offset, y_px + offset, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     }
+
+    double tr_split_bit = 0.0;
+    double cbf_bits = 0.0;
+
+    bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
+    if (depth >= 1 && depth <= 3 && !intra_split_flag) {
+      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+      tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
+    }
+
+    // Add cost of cbf chroma bits on transform tree.
+    // All cbf bits are accumulated to pred_cu.cbf and cbf_is_set returns true
+    // if cbf is set at any level >= depth, so cbf chroma is assumed to be 0
+    // if this and any previous transform block has no chroma coefficients.
+    // When searching the first block we don't actually know the real values,
+    // so this will code cbf as 0 and not code the cbf at all for descendants.
+    int tr_depth = depth - pred_cu->depth;
+    if (depth < MAX_PU_DEPTH) {  // log2TrafoSize > 2 
+      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
+        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
+      }
+      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
+        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
+      }
+    }
+
+    double bits = tr_split_bit + cbf_bits;
+    split_cost += bits * encoder_state->global->cur_lambda_cost;
   } else {
     assert(width <= TR_MAX_WIDTH);
   }
