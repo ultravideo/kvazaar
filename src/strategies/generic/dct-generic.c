@@ -568,25 +568,25 @@ static void partial_butterfly_inverse_32_generic(int16_t *src, int16_t *dst,
 }
 
 #define DCT_NXN_GENERIC(n) \
-static void dct_ ## n ## x ## n ## _generic(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
+static void dct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
 \
   int16_t tmp[ n * n ]; \
   int32_t shift_1st = g_convert_to_bit[ n ] + 1 + (bitdepth - 8); \
   int32_t shift_2nd = g_convert_to_bit[ n ] + 8; \
 \
-  partial_butterfly_ ## n ## _generic(block, tmp, shift_1st); \
-  partial_butterfly_ ## n ## _generic(tmp, coeff, shift_2nd); \
+  partial_butterfly_ ## n ## _generic(input, tmp, shift_1st); \
+  partial_butterfly_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
 #define IDCT_NXN_GENERIC(n) \
-static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, int16_t *block, int16_t *coeff) { \
+static void idct_ ## n ## x ## n ## _generic(int8_t bitdepth, const int16_t *input, int16_t *output) { \
 \
   int16_t tmp[ n * n ]; \
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
 \
-  partial_butterfly_inverse_ ## n ## _generic(coeff, tmp, shift_1st); \
-  partial_butterfly_inverse_ ## n ## _generic(tmp, block, shift_2nd); \
+  partial_butterfly_inverse_ ## n ## _generic(input, tmp, shift_1st); \
+  partial_butterfly_inverse_ ## n ## _generic(tmp, output, shift_2nd); \
 }
 
 DCT_NXN_GENERIC(4);
@@ -599,24 +599,24 @@ IDCT_NXN_GENERIC(8);
 IDCT_NXN_GENERIC(16);
 IDCT_NXN_GENERIC(32);
 
-static void fast_forward_dst_4x4_generic(int8_t bitdepth, int16_t *block, int16_t *coeff)
+static void fast_forward_dst_4x4_generic(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
   int16_t tmp[4*4]; 
   int32_t shift_1st = g_convert_to_bit[4] + 1 + (bitdepth - 8);
   int32_t shift_2nd = g_convert_to_bit[4] + 8;
 
-  fast_forward_dst_4_generic(block, tmp, shift_1st); 
-  fast_forward_dst_4_generic(tmp, coeff, shift_2nd); 
+  fast_forward_dst_4_generic(input, tmp, shift_1st); 
+  fast_forward_dst_4_generic(tmp, output, shift_2nd);
 }
 
-static void fast_inverse_dst_4x4_generic(int8_t bitdepth, int16_t *block, int16_t *coeff)
+static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t *input, int16_t *output)
 {
   int16_t tmp[4 * 4];
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
 
-  fast_inverse_dst_4_generic(coeff, tmp, shift_1st);
-  fast_inverse_dst_4_generic(tmp, block, shift_2nd);
+  fast_inverse_dst_4_generic(input, tmp, shift_1st);
+  fast_inverse_dst_4_generic(tmp, output, shift_2nd);
 }
 
 int strategy_register_dct_generic(void* opaque)

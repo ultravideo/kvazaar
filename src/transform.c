@@ -116,16 +116,14 @@ void itransformskip(const encoder_control * const encoder, int16_t *block,int16_
  */
 void transform2d(const encoder_control * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
 {
-
   dct_func *dct_func = get_dct_func(block_size, mode);  
   dct_func(encoder->bitdepth, block, coeff);
 }
 
 void itransform2d(const encoder_control * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
 {
-
   dct_func *idct_func = get_idct_func(block_size, mode);
-  idct_func(encoder->bitdepth, block, coeff);
+  idct_func(encoder->bitdepth, coeff, block);
 }
 
 
