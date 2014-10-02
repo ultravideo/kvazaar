@@ -761,7 +761,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (x_px / 8) + (y_px / 8) * LCU_T_CU_WIDTH];
 
   double coeff_bits = 0;
-  double trtree_bits = 0;
+  double tr_tree_bits = 0;
 
   // Check that lcu is not in 
   assert(x_px >= 0 && x_px < LCU_WIDTH);
@@ -771,30 +771,12 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
 
   // Add cost of intra split flag on transform tree.
   bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
-  double tr_tree_bits = 0.0;
   if (width <= TR_MAX_WIDTH
       && width > TR_MIN_WIDTH
       && !intra_split_flag)
   {
     const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, split_transform_flag);
-  }
-
-  // Add cost of cbf chroma bits on transform tree.
-  // All cbf bits are accumulated to pred_cu.cbf and cbf_is_set returns true
-  // if cbf is set at any level >= depth, so cbf chroma is assumed to be 0
-  // if this and any previous transform block has no chroma coefficients.
-  // When searching the first block we don't actually know the real values,
-  // so this will code cbf as 0 and not code the cbf at all for descendants.
-  int tr_depth = depth - pred_cu->depth;
-  if (depth < MAX_PU_DEPTH) {  // log2TrafoSize > 2 
-    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
-    }
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
-    }
   }
 
   if (split_transform_flag) {
@@ -806,7 +788,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
     sum += cu_rd_cost_luma(encoder_state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += cu_rd_cost_luma(encoder_state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + trtree_bits * encoder_state->global->cur_lambda_cost;
+    return sum + tr_tree_bits * encoder_state->global->cur_lambda_cost;
   }
 
   if (pred_cu->type == CU_INTRA || depth > pred_cu->depth) {
@@ -841,7 +823,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
     coeff_bits += get_coeff_cost(encoder_state, coeff_temp, width, 0, luma_scan_mode);
   }
 
-  double bits = trtree_bits + coeff_bits;
+  double bits = tr_tree_bits + coeff_bits;
   return ssd + bits * encoder_state->global->cur_lambda_cost;
 }
 
@@ -856,26 +838,27 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x / 4) + (lcu_px.y / 4)*LCU_T_CU_WIDTH];
 
-  double trtree_bits = 0;
+  double tr_tree_bits = 0;
   double coeff_bits = 0;
 
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
-  if (depth < MAX_PU_DEPTH) {
-    // cbf_c bits are present only when log2TrafoSize > 2
-    if (tr_cu->tr_depth == depth) {
-      // cbf_c bits are always present at transform depth 0.
-      //trtree_bits += 2;
-    } else {
-      // cbf_c bits are not present if cbf has already been set to 0.
-      //trtree_bits += cbf_is_set(tr_cu->cbf.u, depth - 1);
-      //trtree_bits += cbf_is_set(tr_cu->cbf.v, depth - 1);
-    }
-  } else if (PU_INDEX(x_px / 4, y_px / 4) != 0) {
+  if (PU_INDEX(x_px / 4, y_px / 4) != 0) {
     // For MAX_PU_DEPTH calculate chroma for previous depth for the first
     // block and return 0 cost for all others.
     return 0;
+  }
+
+  if (depth < MAX_PU_DEPTH) {
+    const int tr_depth = depth - pred_cu->depth;
+    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
+    }
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
+    }
   }
 
   if (tr_cu->tr_depth > depth) {
@@ -887,7 +870,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
     sum += cu_rd_cost_chroma(encoder_state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += cu_rd_cost_chroma(encoder_state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + trtree_bits * encoder_state->global->cur_lambda_cost;
+    return sum + tr_tree_bits * encoder_state->global->cur_lambda_cost;
   }
 
   // Chroma SSD
@@ -930,7 +913,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
     coeff_bits += get_coeff_cost(encoder_state, coeff_temp, width, 2, scan_order);
   }
 
-  double bits = trtree_bits + coeff_bits;
+  double bits = tr_tree_bits + coeff_bits;
   return ssd + bits * encoder_state->global->cur_lambda_cost;
 }
 
