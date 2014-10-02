@@ -756,6 +756,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
 {
   const int rdo = encoder_state->encoder_control->rdo;
   const int width = LCU_WIDTH >> depth;
+  const uint8_t pu_index = PU_INDEX(x_px / 4, y_px / 4);
 
   // cur_cu is used for TU parameters.
   cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (x_px / 8) + (y_px / 8) * LCU_T_CU_WIDTH];
@@ -767,19 +768,19 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   assert(x_px >= 0 && x_px < LCU_WIDTH);
   assert(y_px >= 0 && y_px < LCU_WIDTH);
 
-  bool split_transform_flag = tr_cu->tr_depth > depth;
+  const uint8_t tr_depth = tr_cu->tr_depth - depth;
 
-  // Add cost of intra split flag on transform tree.
+  // Add transform_tree split_transform_flag bit cost.
   bool intra_split_flag = pred_cu->type == CU_INTRA && pred_cu->part_size == SIZE_NxN && depth == 3;
   if (width <= TR_MAX_WIDTH
       && width > TR_MIN_WIDTH
       && !intra_split_flag)
   {
     const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
-    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, split_transform_flag);
+    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
   }
 
-  if (split_transform_flag) {
+  if (tr_depth > 0) {
     int offset = width / 2;
     double sum = 0;
 
@@ -791,8 +792,14 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
     return sum + tr_tree_bits * encoder_state->global->cur_lambda_cost;
   }
 
-  if (pred_cu->type == CU_INTRA || depth > pred_cu->depth) {
-    //trtree_bits += 1;  // cbf_luma
+  // Add transform_tree cbf_luma bit cost.
+  if (pred_cu->type == CU_INTRA ||
+      tr_depth > 0 ||
+      cbf_is_set(tr_cu->cbf.u, depth) ||
+      cbf_is_set(tr_cu->cbf.v, depth))
+  {
+    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
+    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.y, depth + pu_index));
   }
 
   unsigned ssd = 0;
