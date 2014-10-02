@@ -43,6 +43,90 @@ static const int16_t dst_4x4[4][4] =
   { 55, -84, 74, -29 }
 };
 
+static const int16_t dst_4x4_t[4][4] =
+{
+  { 29, 74, 84, 55 },
+  { 55, 74, -29, -84 },
+  { 74, 0, -74, 74 },
+  { 84, -74, 55, -29 }
+};
+
+static const int16_t g_t4_t[4][4] =
+{
+  { 64, 83, 64, 36, },
+  { 64, 36, -64, -83, },
+  { 64, -36, -64, 83, },
+  { 64, -83, 64, -36 }
+};
+
+static const int16_t g_t8_t[8][8] =
+{
+  { 64, 89, 83, 75, 64, 50, 36, 18, },
+  { 64, 75, 36, -18, -64, -89, -83, -50, },
+  { 64, 50, -36, -89, -64, 18, 83, 75, },
+  { 64, 18, -83, -50, 64, 75, -36, -89, },
+  { 64, -18, -83, 50, 64, -75, -36, 89, },
+  { 64, -50, -36, 89, -64, -18, 83, -75, },
+  { 64, -75, 36, 18, -64, 89, -83, 50, },
+  { 64, -89, 83, -75, 64, -50, 36, -18 }
+};
+
+static const int16_t g_t16_t[16][16] =
+{
+  { 64, 90, 89, 87, 83, 80, 75, 70, 64, 57, 50, 43, 36, 25, 18, 9, },
+  { 64, 87, 75, 57, 36, 9, -18, -43, -64, -80, -89, -90, -83, -70, -50, -25, },
+  { 64, 80, 50, 9, -36, -70, -89, -87, -64, -25, 18, 57, 83, 90, 75, 43, },
+  { 64, 70, 18, -43, -83, -87, -50, 9, 64, 90, 75, 25, -36, -80, -89, -57, },
+  { 64, 57, -18, -80, -83, -25, 50, 90, 64, -9, -75, -87, -36, 43, 89, 70, },
+  { 64, 43, -50, -90, -36, 57, 89, 25, -64, -87, -18, 70, 83, 9, -75, -80, },
+  { 64, 25, -75, -70, 36, 90, 18, -80, -64, 43, 89, 9, -83, -57, 50, 87, },
+  { 64, 9, -89, -25, 83, 43, -75, -57, 64, 70, -50, -80, 36, 87, -18, -90, },
+  { 64, -9, -89, 25, 83, -43, -75, 57, 64, -70, -50, 80, 36, -87, -18, 90, },
+  { 64, -25, -75, 70, 36, -90, 18, 80, -64, -43, 89, -9, -83, 57, 50, -87, },
+  { 64, -43, -50, 90, -36, -57, 89, -25, -64, 87, -18, -70, 83, -9, -75, 80, },
+  { 64, -57, -18, 80, -83, 25, 50, -90, 64, 9, -75, 87, -36, -43, 89, -70, },
+  { 64, -70, 18, 43, -83, 87, -50, -9, 64, -90, 75, -25, -36, 80, -89, 57, },
+  { 64, -80, 50, -9, -36, 70, -89, 87, -64, 25, 18, -57, 83, -90, 75, -43, },
+  { 64, -87, 75, -57, 36, -9, -18, 43, -64, 80, -89, 90, -83, 70, -50, 25, },
+  { 64, -90, 89, -87, 83, -80, 75, -70, 64, -57, 50, -43, 36, -25, 18, -9 }
+};
+
+static const int16_t g_t32_t[32][32] =
+{
+  { 64, 90, 90, 90, 89, 88, 87, 85, 83, 82, 80, 78, 75, 73, 70, 67, 64, 61, 57, 54, 50, 46, 43, 38, 36, 31, 25, 22, 18, 13, 9, 4, },
+  { 64, 90, 87, 82, 75, 67, 57, 46, 36, 22, 9, -4, -18, -31, -43, -54, -64, -73, -80, -85, -89, -90, -90, -88, -83, -78, -70, -61, -50, -38, -25, -13, },
+  { 64, 88, 80, 67, 50, 31, 9, -13, -36, -54, -70, -82, -89, -90, -87, -78, -64, -46, -25, -4, 18, 38, 57, 73, 83, 90, 90, 85, 75, 61, 43, 22, },
+  { 64, 85, 70, 46, 18, -13, -43, -67, -83, -90, -87, -73, -50, -22, 9, 38, 64, 82, 90, 88, 75, 54, 25, -4, -36, -61, -80, -90, -89, -78, -57, -31, },
+  { 64, 82, 57, 22, -18, -54, -80, -90, -83, -61, -25, 13, 50, 78, 90, 85, 64, 31, -9, -46, -75, -90, -87, -67, -36, 4, 43, 73, 89, 88, 70, 38, },
+  { 64, 78, 43, -4, -50, -82, -90, -73, -36, 13, 57, 85, 89, 67, 25, -22, -64, -88, -87, -61, -18, 31, 70, 90, 83, 54, 9, -38, -75, -90, -80, -46, },
+  { 64, 73, 25, -31, -75, -90, -70, -22, 36, 78, 90, 67, 18, -38, -80, -90, -64, -13, 43, 82, 89, 61, 9, -46, -83, -88, -57, -4, 50, 85, 87, 54, },
+  { 64, 67, 9, -54, -89, -78, -25, 38, 83, 85, 43, -22, -75, -90, -57, 4, 64, 90, 70, 13, -50, -88, -80, -31, 36, 82, 87, 46, -18, -73, -90, -61, },
+  { 64, 61, -9, -73, -89, -46, 25, 82, 83, 31, -43, -88, -75, -13, 57, 90, 64, -4, -70, -90, -50, 22, 80, 85, 36, -38, -87, -78, -18, 54, 90, 67, },
+  { 64, 54, -25, -85, -75, -4, 70, 88, 36, -46, -90, -61, 18, 82, 80, 13, -64, -90, -43, 38, 89, 67, -9, -78, -83, -22, 57, 90, 50, -31, -87, -73, },
+  { 64, 46, -43, -90, -50, 38, 90, 54, -36, -90, -57, 31, 89, 61, -25, -88, -64, 22, 87, 67, -18, -85, -70, 13, 83, 73, -9, -82, -75, 4, 80, 78, },
+  { 64, 38, -57, -88, -18, 73, 80, -4, -83, -67, 25, 90, 50, -46, -90, -31, 64, 85, 9, -78, -75, 13, 87, 61, -36, -90, -43, 54, 89, 22, -70, -82, },
+  { 64, 31, -70, -78, 18, 90, 43, -61, -83, 4, 87, 54, -50, -88, -9, 82, 64, -38, -90, -22, 75, 73, -25, -90, -36, 67, 80, -13, -89, -46, 57, 85, },
+  { 64, 22, -80, -61, 50, 85, -9, -90, -36, 73, 70, -38, -89, -4, 87, 46, -64, -78, 25, 90, 18, -82, -57, 54, 83, -13, -90, -31, 75, 67, -43, -88, },
+  { 64, 13, -87, -38, 75, 61, -57, -78, 36, 88, -9, -90, -18, 85, 43, -73, -64, 54, 80, -31, -89, 4, 90, 22, -83, -46, 70, 67, -50, -82, 25, 90, },
+  { 64, 4, -90, -13, 89, 22, -87, -31, 83, 38, -80, -46, 75, 54, -70, -61, 64, 67, -57, -73, 50, 78, -43, -82, 36, 85, -25, -88, 18, 90, -9, -90, },
+  { 64, -4, -90, 13, 89, -22, -87, 31, 83, -38, -80, 46, 75, -54, -70, 61, 64, -67, -57, 73, 50, -78, -43, 82, 36, -85, -25, 88, 18, -90, -9, 90, },
+  { 64, -13, -87, 38, 75, -61, -57, 78, 36, -88, -9, 90, -18, -85, 43, 73, -64, -54, 80, 31, -89, -4, 90, -22, -83, 46, 70, -67, -50, 82, 25, -90, },
+  { 64, -22, -80, 61, 50, -85, -9, 90, -36, -73, 70, 38, -89, 4, 87, -46, -64, 78, 25, -90, 18, 82, -57, -54, 83, 13, -90, 31, 75, -67, -43, 88, },
+  { 64, -31, -70, 78, 18, -90, 43, 61, -83, -4, 87, -54, -50, 88, -9, -82, 64, 38, -90, 22, 75, -73, -25, 90, -36, -67, 80, 13, -89, 46, 57, -85, },
+  { 64, -38, -57, 88, -18, -73, 80, 4, -83, 67, 25, -90, 50, 46, -90, 31, 64, -85, 9, 78, -75, -13, 87, -61, -36, 90, -43, -54, 89, -22, -70, 82, },
+  { 64, -46, -43, 90, -50, -38, 90, -54, -36, 90, -57, -31, 89, -61, -25, 88, -64, -22, 87, -67, -18, 85, -70, -13, 83, -73, -9, 82, -75, -4, 80, -78, },
+  { 64, -54, -25, 85, -75, 4, 70, -88, 36, 46, -90, 61, 18, -82, 80, -13, -64, 90, -43, -38, 89, -67, -9, 78, -83, 22, 57, -90, 50, 31, -87, 73, },
+  { 64, -61, -9, 73, -89, 46, 25, -82, 83, -31, -43, 88, -75, 13, 57, -90, 64, 4, -70, 90, -50, -22, 80, -85, 36, 38, -87, 78, -18, -54, 90, -67, },
+  { 64, -67, 9, 54, -89, 78, -25, -38, 83, -85, 43, 22, -75, 90, -57, -4, 64, -90, 70, -13, -50, 88, -80, 31, 36, -82, 87, -46, -18, 73, -90, 61, },
+  { 64, -73, 25, 31, -75, 90, -70, 22, 36, -78, 90, -67, 18, 38, -80, 90, -64, 13, 43, -82, 89, -61, 9, 46, -83, 88, -57, 4, 50, -85, 87, -54, },
+  { 64, -78, 43, 4, -50, 82, -90, 73, -36, -13, 57, -85, 89, -67, 25, 22, -64, 88, -87, 61, -18, -31, 70, -90, 83, -54, 9, 38, -75, 90, -80, 46, },
+  { 64, -82, 57, -22, -18, 54, -80, 90, -83, 61, -25, -13, 50, -78, 90, -85, 64, -31, -9, 46, -75, 90, -87, 67, -36, -4, 43, -73, 89, -88, 70, -38, },
+  { 64, -85, 70, -46, 18, 13, -43, 67, -83, 90, -87, 73, -50, 22, 9, -38, 64, -82, 90, -88, 75, -54, 25, 4, -36, 61, -80, 90, -89, 78, -57, 31, },
+  { 64, -88, 80, -67, 50, -31, 9, 13, -36, 54, -70, 82, -89, 90, -87, 78, -64, 46, -25, 4, 18, -38, 57, -73, 83, -90, 90, -85, 75, -61, 43, -22, },
+  { 64, -90, 87, -82, 75, -67, 57, -46, 36, -22, 9, 4, -18, 31, -43, 54, -64, 73, -80, 85, -89, 90, -90, 88, -83, 78, -70, 61, -50, 38, -25, 13, },
+  { 64, -90, 90, -90, 89, -88, 87, -85, 83, -82, 80, -78, 75, -73, 70, -67, 64, -61, 57, -54, 50, -46, 43, -38, 36, -31, 25, -22, 18, -13, 9, -4 }
+};
+
 /**
 * \brief AVX2 transform functions
 *
@@ -243,7 +327,7 @@ static void transpose_32x32_16bit(const int16_t *src, int16_t *dst)
 }
 
 
-static void mul_matrix_4x4_avx2(const int16_t *first, const int16_t *second, int16_t *dst, int32_t shift)
+static void mul_clip_matrix_4x4_avx2(const int16_t *first, const int16_t *second, int16_t *dst, int32_t shift)
 {
   __m256i b[2], a, result,  even[2], odd[2];
 
@@ -281,7 +365,7 @@ static void mul_matrix_4x4_avx2(const int16_t *first, const int16_t *second, int
   _mm256_storeu_si256((__m256i*)dst, result);
 }
 
-static void mul_matrix_8x8_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+static void mul_clip_matrix_8x8_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
 {
   int i, j;
   __m256i b[2], accu[8], even[2], odd[2];
@@ -336,7 +420,7 @@ static void mul_matrix_8x8_avx2(const int16_t *first, const int16_t *second, int
   }
 }
 
-static void mul_matrix_16x16_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+static void mul_clip_matrix_16x16_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
 {
   int i, j;
   __m256i row[4], accu[16][2], even, odd;
@@ -396,7 +480,7 @@ static void mul_matrix_16x16_avx2(const int16_t *first, const int16_t *second, i
   }
 }
 
-static void mul_matrix_32x32_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+static void mul_clip_matrix_32x32_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
 {
   int i, j;
   __m256i row[4], tmp[2], accu[32][4], even, odd;
@@ -482,98 +566,98 @@ static void mul_matrix_32x32_avx2(const int16_t *first, const int16_t *second, i
   }
 }
 
+static void matrix_dst_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
+{
+  int16_t tmp[4 * 4];
+
+  mul_clip_matrix_4x4_avx2(src, (int16_t*)dst_4x4_t, tmp, shift0);
+  mul_clip_matrix_4x4_avx2((int16_t*)dst_4x4, tmp, dst, shift1);
+}
+
+static void matrix_idst_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
+{
+  int16_t tmp[4 * 4];
+
+  mul_clip_matrix_4x4_avx2((int16_t*)dst_4x4_t, src, tmp, shift0);
+  mul_clip_matrix_4x4_avx2(tmp, (int16_t*)dst_4x4, dst, shift1);
+}
+
 static void matrix_transform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[4 * 4];
-  int16_t transposed[16];
 
-  transpose_4x4_16bit(transform, transposed);
-  mul_matrix_4x4_avx2(src, transposed, tmp, shift0);
-  mul_matrix_4x4_avx2(transform, tmp, dst, shift1);
+  mul_clip_matrix_4x4_avx2(src, (int16_t*)g_t4_t, tmp, shift0);
+  mul_clip_matrix_4x4_avx2((int16_t*)g_t4, tmp, dst, shift1);
 }
 
 static void matrix_itransform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[4*4];
-  int16_t transposed[16];
 
-  transpose_4x4_16bit(transform, transposed);
-  mul_matrix_4x4_avx2(transposed, src, tmp, shift0);
-  mul_matrix_4x4_avx2(tmp, transform, dst, shift1);
+  mul_clip_matrix_4x4_avx2((int16_t*)g_t4_t, src, tmp, shift0);
+  mul_clip_matrix_4x4_avx2(tmp, (int16_t*)g_t4, dst, shift1);
 }
 
 static void matrix_transform_2d_8x8_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[8 * 8];
-  int16_t transposed[64];
 
-  transpose_8x8_16bit(transform, transposed);
-  mul_matrix_8x8_avx2(src, transposed, tmp, shift0);
-  mul_matrix_8x8_avx2(transform, tmp, dst, shift1);
+  mul_clip_matrix_8x8_avx2(src, (int16_t*)g_t8_t, tmp, shift0);
+  mul_clip_matrix_8x8_avx2((int16_t*)g_t8, tmp, dst, shift1);
 }
 
 static void matrix_itransform_2d_8x8_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[8 * 8];
-  int16_t transposed[64];
 
-  transpose_8x8_16bit(transform, transposed);
-  mul_matrix_8x8_avx2(transposed, src, tmp, shift0);
-  mul_matrix_8x8_avx2(tmp, transform, dst, shift1);
+  mul_clip_matrix_8x8_avx2((int16_t*)g_t8_t, src, tmp, shift0);
+  mul_clip_matrix_8x8_avx2(tmp, (int16_t*)g_t8, dst, shift1);
 }
 
 static void matrix_transform_2d_16x16_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[16 * 16];
-  int16_t transposed[16 * 16];
 
-  transpose_16x16_16bit(transform, transposed);
-  mul_matrix_16x16_avx2(src, transposed, tmp, shift0);
-  mul_matrix_16x16_avx2(transform, tmp, dst, shift1);
+  mul_clip_matrix_16x16_avx2(src, (int16_t*)g_t16_t, tmp, shift0);
+  mul_clip_matrix_16x16_avx2((int16_t*)g_t16, tmp, dst, shift1);
 }
 
 static void matrix_itransform_2d_16x16_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[16 * 16];
-  int16_t transposed[16 * 16];
 
-  transpose_16x16_16bit(transform, transposed);
-  mul_matrix_16x16_avx2(transposed, src, tmp, shift0);
-  mul_matrix_16x16_avx2(tmp, transform, dst, shift1);
+  mul_clip_matrix_16x16_avx2((int16_t*)g_t16_t, src, tmp, shift0);
+  mul_clip_matrix_16x16_avx2(tmp, (int16_t*)g_t16, dst, shift1);
 }
 
 static void matrix_transform_2d_32x32_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[32 * 32];
-  int16_t transposed[32 * 32];
 
-  transpose_32x32_16bit(transform, transposed);
-  mul_matrix_32x32_avx2(src, transposed, tmp, shift0);
-  mul_matrix_32x32_avx2(transform, tmp, dst, shift1);
+  mul_clip_matrix_32x32_avx2(src, (int16_t*)g_t32_t, tmp, shift0);
+  mul_clip_matrix_32x32_avx2((int16_t*)g_t32, tmp, dst, shift1);
 }
 
 static void matrix_itransform_2d_32x32_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
 {
   int16_t tmp[32 * 32];
-  int16_t transposed[32 * 32];
 
-  transpose_32x32_16bit(transform, transposed);
-  mul_matrix_32x32_avx2(transposed, src, tmp, shift0);
-  mul_matrix_32x32_avx2(tmp, transform, dst, shift1);
+  mul_clip_matrix_32x32_avx2((int16_t*) g_t32_t, src, tmp, shift0);
+  mul_clip_matrix_32x32_avx2(tmp, (int16_t*)g_t32, dst, shift1);
 }
 
 static void matrix_dst_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
 {
   int32_t shift_1st = g_convert_to_bit[4] + 1 + (bitdepth - 8);
   int32_t shift_2nd = g_convert_to_bit[4] + 8;
-  matrix_transform_2d_4x4_avx2(src, dst, (const int16_t*)dst_4x4, shift_1st, shift_2nd);
+  matrix_dst_2d_4x4_avx2(src, dst, (const int16_t*)dst_4x4, shift_1st, shift_2nd);
 }
 
 static void matrix_idst_4x4_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_itransform_2d_4x4_avx2(src, dst, (const int16_t*)dst_4x4, shift_1st, shift_2nd);
+  matrix_idst_2d_4x4_avx2(src, dst, (const int16_t*)dst_4x4, shift_1st, shift_2nd);
 }
 
 static void matrix_dct_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
@@ -601,7 +685,7 @@ static void matrix_idct_8x8_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
 {
   int32_t shift_1st = 7;
   int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_itransform_2d_8x8_avx2(src, dst, (const int16_t*)g_t8, shift_1st, shift_2nd);
+  matrix_itransform_2d_8x8_avx2(src, dst, (const int16_t*)g_t8_t, shift_1st, shift_2nd);
 }
 
 static void matrix_dct_16x16_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
