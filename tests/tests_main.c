@@ -7,6 +7,7 @@ extern SUITE(sad_tests);
 extern SUITE(intra_sad_tests);
 extern SUITE(satd_tests);
 extern SUITE(speed_tests);
+extern SUITE(dct_tests);
 
 int main(int argc, char **argv)
 {
@@ -17,6 +18,7 @@ int main(int argc, char **argv)
   RUN_SUITE(sad_tests);
   RUN_SUITE(intra_sad_tests);
   RUN_SUITE(satd_tests);
+  RUN_SUITE(dct_tests);
 
   if (greatest_info.suite_filter &&
       greatest_name_match("speed", greatest_info.suite_filter))

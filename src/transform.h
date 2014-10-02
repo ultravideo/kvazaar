@@ -32,10 +32,6 @@
 extern const uint8_t g_chroma_scale[58];
 extern const int16_t g_inv_quant_scales[6];
 
-extern const int16_t g_t4[4][4];
-extern const int16_t g_t8[8][8];
-extern const int16_t g_t16[16][16];
-extern const int16_t g_t32[32][32];
 
 
 void quant(const encoder_state *encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
