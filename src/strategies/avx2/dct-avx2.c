@@ -488,9 +488,11 @@ static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const 
   int32_t shift_1st = g_convert_to_bit[n] + 1 + (bitdepth - 8); \
   int32_t shift_2nd = g_convert_to_bit[n] + 8; \
   int16_t tmp[n * n];\
+  const int16_t *tdct = &g_ ## type ## _ ## n ## _t[0][0];\
+  const int16_t *dct = &g_ ## type ## _ ## n ## [0][0];\
 \
-  mul_clip_matrix_ ## n ## x ## n ## _avx2(src, (int16_t*)g_ ## type ## _ ## n ## _t, tmp, shift_1st);\
-  mul_clip_matrix_ ## n ## x ## n ## _avx2((int16_t*)g_ ## type ## _ ## n ##, tmp, dst, shift_2nd);\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2(src, tdct, tmp, shift_1st);\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, dst, shift_2nd);\
 }\
 
 #define ITRANSFORM(type, n) \
@@ -500,9 +502,11 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
   int16_t tmp[n * n];\
+  const int16_t *tdct = &g_ ## type ## _ ## n ## _t[0][0];\
+  const int16_t *dct = &g_ ## type ## _ ## n ## [0][0];\
 \
-  mul_clip_matrix_ ## n ## x ## n ## _avx2((int16_t*)g_ ## type ## _ ## n ## _t, src, tmp, shift_1st);\
-  mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, (int16_t*)g_ ## type ## _ ## n ##, dst, shift_2nd);\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2(tdct, src, tmp, shift_1st);\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, dst, shift_2nd);\
 }\
 
 TRANSFORM(dst, 4);
