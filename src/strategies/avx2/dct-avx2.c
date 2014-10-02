@@ -30,17 +30,17 @@
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
 
-extern const int16_t g_dst[4][4];
-extern const int16_t g_t4[4][4];
-extern const int16_t g_t8[8][8];
-extern const int16_t g_t16[16][16];
-extern const int16_t g_t32[32][32];
+extern const int16_t g_dst_4[4][4];
+extern const int16_t g_dct_4[4][4];
+extern const int16_t g_dct_8[8][8];
+extern const int16_t g_dct_16[16][16];
+extern const int16_t g_dct_32[32][32];
 
-extern const int16_t g_dst_t[4][4];
-extern const int16_t g_t4_t[4][4];
-extern const int16_t g_t8_t[8][8];
-extern const int16_t g_t16_t[16][16];
-extern const int16_t g_t32_t[32][32];
+extern const int16_t g_dst_4_t[4][4];
+extern const int16_t g_dct_4_t[4][4];
+extern const int16_t g_dct_8_t[8][8];
+extern const int16_t g_dct_16_t[16][16];
+extern const int16_t g_dct_32_t[32][32];
 
 /**
 * \brief AVX2 transform functions
@@ -481,155 +481,42 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *first, const int16_t *seco
   }
 }
 
-static void matrix_dst_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[4 * 4];
+#define TRANSFORM(type, n) \
+\
+static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *src, int16_t *dst)\
+{\
+  int32_t shift_1st = g_convert_to_bit[n] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = g_convert_to_bit[n] + 8; \
+  int16_t tmp[n * n];\
+\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2(src, (int16_t*)g_ ## type ## _ ## n ## _t, tmp, shift_1st);\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2((int16_t*)g_ ## type ## _ ## n ##, tmp, dst, shift_2nd);\
+}\
 
-  mul_clip_matrix_4x4_avx2(src, (int16_t*)g_dst_t, tmp, shift0);
-  mul_clip_matrix_4x4_avx2((int16_t*)g_dst, tmp, dst, shift1);
-}
+#define ITRANSFORM(type, n) \
+\
+static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *dst, int16_t *src)\
+{\
+  int32_t shift_1st = 7; \
+  int32_t shift_2nd = 12 - (bitdepth - 8); \
+  int16_t tmp[n * n];\
+\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2((int16_t*)g_ ## type ## _ ## n ## _t, src, tmp, shift_1st);\
+  mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, (int16_t*)g_ ## type ## _ ## n ##, dst, shift_2nd);\
+}\
 
-static void matrix_idst_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[4 * 4];
+TRANSFORM(dst, 4);
+TRANSFORM(dct, 4);
+TRANSFORM(dct, 8);
+TRANSFORM(dct, 16);
+TRANSFORM(dct, 32);
 
-  mul_clip_matrix_4x4_avx2((int16_t*)g_dst_t, src, tmp, shift0);
-  mul_clip_matrix_4x4_avx2(tmp, (int16_t*)g_dst, dst, shift1);
-}
+ITRANSFORM(dst, 4);
+ITRANSFORM(dct, 4);
+ITRANSFORM(dct, 8);
+ITRANSFORM(dct, 16);
+ITRANSFORM(dct, 32);
 
-static void matrix_transform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[4 * 4];
-
-  mul_clip_matrix_4x4_avx2(src, (int16_t*)g_t4_t, tmp, shift0);
-  mul_clip_matrix_4x4_avx2((int16_t*)g_t4, tmp, dst, shift1);
-}
-
-static void matrix_itransform_2d_4x4_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[4*4];
-
-  mul_clip_matrix_4x4_avx2((int16_t*)g_t4_t, src, tmp, shift0);
-  mul_clip_matrix_4x4_avx2(tmp, (int16_t*)g_t4, dst, shift1);
-}
-
-static void matrix_transform_2d_8x8_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[8 * 8];
-
-  mul_clip_matrix_8x8_avx2(src, (int16_t*)g_t8_t, tmp, shift0);
-  mul_clip_matrix_8x8_avx2((int16_t*)g_t8, tmp, dst, shift1);
-}
-
-static void matrix_itransform_2d_8x8_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[8 * 8];
-
-  mul_clip_matrix_8x8_avx2((int16_t*)g_t8_t, src, tmp, shift0);
-  mul_clip_matrix_8x8_avx2(tmp, (int16_t*)g_t8, dst, shift1);
-}
-
-static void matrix_transform_2d_16x16_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[16 * 16];
-
-  mul_clip_matrix_16x16_avx2(src, (int16_t*)g_t16_t, tmp, shift0);
-  mul_clip_matrix_16x16_avx2((int16_t*)g_t16, tmp, dst, shift1);
-}
-
-static void matrix_itransform_2d_16x16_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[16 * 16];
-
-  mul_clip_matrix_16x16_avx2((int16_t*)g_t16_t, src, tmp, shift0);
-  mul_clip_matrix_16x16_avx2(tmp, (int16_t*)g_t16, dst, shift1);
-}
-
-static void matrix_transform_2d_32x32_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[32 * 32];
-
-  mul_clip_matrix_32x32_avx2(src, (int16_t*)g_t32_t, tmp, shift0);
-  mul_clip_matrix_32x32_avx2((int16_t*)g_t32, tmp, dst, shift1);
-}
-
-static void matrix_itransform_2d_32x32_avx2(const int16_t *src, int16_t *dst, const int16_t *transform, const int16_t shift0, const int16_t shift1)
-{
-  int16_t tmp[32 * 32];
-
-  mul_clip_matrix_32x32_avx2((int16_t*) g_t32_t, src, tmp, shift0);
-  mul_clip_matrix_32x32_avx2(tmp, (int16_t*)g_t32, dst, shift1);
-}
-
-static void matrix_dst_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
-{
-  int32_t shift_1st = g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[4] + 8;
-  matrix_dst_2d_4x4_avx2(src, dst, (const int16_t*)g_dst, shift_1st, shift_2nd);
-}
-
-static void matrix_idst_4x4_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
-{
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_idst_2d_4x4_avx2(src, dst, (const int16_t*)g_dst, shift_1st, shift_2nd);
-}
-
-static void matrix_dct_4x4_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
-{
-  int32_t shift_1st = g_convert_to_bit[4] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[4] + 8;
-  matrix_transform_2d_4x4_avx2(src, dst, (const int16_t*)g_t4, shift_1st, shift_2nd);
-}
-
-static void matrix_idct_4x4_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
-{
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_itransform_2d_4x4_avx2(src, dst, (const int16_t*)g_t4, shift_1st, shift_2nd);
-}
-
-static void matrix_dct_8x8_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
-{
-  int32_t shift_1st = g_convert_to_bit[8] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[8] + 8;
-  matrix_transform_2d_8x8_avx2(src, dst, (const int16_t*)g_t8, shift_1st, shift_2nd);
-}
-
-static void matrix_idct_8x8_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
-{
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_itransform_2d_8x8_avx2(src, dst, (const int16_t*)g_t8_t, shift_1st, shift_2nd);
-}
-
-static void matrix_dct_16x16_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
-{
-  int32_t shift_1st = g_convert_to_bit[16] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[16] + 8;
-  matrix_transform_2d_16x16_avx2(src, dst, (const int16_t*)g_t16, shift_1st, shift_2nd);
-}
-
-static void matrix_idct_16x16_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
-{
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_itransform_2d_16x16_avx2(src, dst, (const int16_t*)g_t16, shift_1st, shift_2nd);
-}
-
-static void matrix_dct_32x32_avx2(int8_t bitdepth, int16_t *src, int16_t *dst)
-{
-  int32_t shift_1st = g_convert_to_bit[32] + 1 + (bitdepth - 8);
-  int32_t shift_2nd = g_convert_to_bit[32] + 8;
-  matrix_transform_2d_32x32_avx2(src, dst, (const int16_t*)g_t32, shift_1st, shift_2nd);
-}
-
-static void matrix_idct_32x32_avx2(int8_t bitdepth, int16_t *dst, int16_t *src)
-{
-  int32_t shift_1st = 7;
-  int32_t shift_2nd = 12 - (bitdepth - 8);
-  matrix_itransform_2d_32x32_avx2(src, dst, (const int16_t*)g_t32, shift_1st, shift_2nd);
-}
 #endif //COMPILE_INTEL_AVX2
 
 int strategy_register_dct_avx2(void* opaque)
