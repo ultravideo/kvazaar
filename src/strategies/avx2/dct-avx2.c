@@ -52,14 +52,14 @@ extern const int16_t g_dct_32_t[32][32];
 * \returns TODO
 */
 
-static void mul_clip_matrix_4x4_avx2(const int16_t *first, const int16_t *second, int16_t *dst, int32_t shift)
+static void mul_clip_matrix_4x4_avx2(const int16_t *left, const int16_t *right, int16_t *dst, int32_t shift)
 {
   __m256i b[2], a, result,  even[2], odd[2];
 
   const int32_t add = 1 << (shift - 1);
 
-  a = _mm256_loadu_si256((__m256i*) first);
-  b[0] = _mm256_loadu_si256((__m256i*) second);
+  a = _mm256_loadu_si256((__m256i*) left);
+  b[0] = _mm256_loadu_si256((__m256i*) right);
 
   b[0] = _mm256_unpacklo_epi16(b[0], _mm256_srli_si256(b[0], 8));
   b[1] = _mm256_permute2x128_si256(b[0], b[0], 1 + 16);
@@ -90,14 +90,14 @@ static void mul_clip_matrix_4x4_avx2(const int16_t *first, const int16_t *second
   _mm256_storeu_si256((__m256i*)dst, result);
 }
 
-static void mul_clip_matrix_8x8_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
 {
   int i, j;
   __m256i b[2], accu[8], even[2], odd[2];
 
   const int32_t add = 1 << (shift - 1);
 
-  b[0] = _mm256_loadu_si256((__m256i*) second);
+  b[0] = _mm256_loadu_si256((__m256i*) right);
 
   b[1] = _mm256_unpackhi_epi16(b[0], _mm256_castsi128_si256(_mm256_extracti128_si256(b[0], 1)));
   b[0] = _mm256_unpacklo_epi16(b[0], _mm256_castsi128_si256(_mm256_extracti128_si256(b[0], 1)));
@@ -105,18 +105,18 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *first, const int16_t *second
 
   for (i = 0; i < 8; i += 2) {
 
-    even[0] = _mm256_set1_epi32(((int32_t*)first)[4 * i]);
+    even[0] = _mm256_set1_epi32(((int32_t*)left)[4 * i]);
     even[0] = _mm256_madd_epi16(even[0], b[0]);
     accu[i] = even[0];
     
-    odd[0] = _mm256_set1_epi32(((int32_t*)first)[4 * (i + 1)]);
+    odd[0] = _mm256_set1_epi32(((int32_t*)left)[4 * (i + 1)]);
     odd[0] = _mm256_madd_epi16(odd[0], b[0]);
     accu[i + 1] = odd[0];
-    }
+  }
 
   for (j = 1; j < 4; ++j) {
 
-    b[0] = _mm256_loadu_si256((__m256i*)second + j);
+    b[0] = _mm256_loadu_si256((__m256i*)right + j);
 
     b[1] = _mm256_unpackhi_epi16(b[0], _mm256_castsi128_si256(_mm256_extracti128_si256(b[0], 1)));
     b[0] = _mm256_unpacklo_epi16(b[0], _mm256_castsi128_si256(_mm256_extracti128_si256(b[0], 1)));
@@ -124,15 +124,15 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *first, const int16_t *second
 
     for (i = 0; i < 8; i += 2) {
     
-      even[0] = _mm256_set1_epi32(((int32_t*)first)[4 * i + j]);
+      even[0] = _mm256_set1_epi32(((int32_t*)left)[4 * i + j]);
       even[0] = _mm256_madd_epi16(even[0], b[0]);
       accu[i] = _mm256_add_epi32(accu[i], even[0]);
 
-      odd[0] = _mm256_set1_epi32(((int32_t*)first)[4 * (i + 1) + j]);
+      odd[0] = _mm256_set1_epi32(((int32_t*)left)[4 * (i + 1) + j]);
       odd[0] = _mm256_madd_epi16(odd[0], b[0]);
       accu[i + 1] = _mm256_add_epi32(accu[i + 1], odd[0]);
     }
-    }
+  }
 
   for (i = 0; i < 8; i += 2) {
      __m256i result, first_half, second_half;
@@ -145,7 +145,7 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *first, const int16_t *second
     }
 }
 
-static void mul_clip_matrix_16x16_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
 {
   int i, j;
   __m256i row[4], accu[16][2], even, odd;
@@ -154,8 +154,8 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *first, const int16_t *seco
 
   const int32_t add = 1 << (shift - 1);
 
-  row[0] = _mm256_loadu_si256((__m256i*) second);
-  row[1] = _mm256_loadu_si256((__m256i*) second + 1);
+  row[0] = _mm256_loadu_si256((__m256i*) right);
+  row[1] = _mm256_loadu_si256((__m256i*) right + 1);
   row[2] = _mm256_unpacklo_epi16(row[0], row[1]);
   row[3] = _mm256_unpackhi_epi16(row[0], row[1]);
   row[0] = _mm256_permute2x128_si256(row[2], row[3], 0 + 32);
@@ -163,19 +163,19 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *first, const int16_t *seco
 
   for (i = 0; i < 16; i += 2) {
 
-    even = _mm256_set1_epi32(((int32_t*)first)[stride * i]);
+    even = _mm256_set1_epi32(((int32_t*)left)[stride * i]);
     accu[i][0] = _mm256_madd_epi16(even, row[0]);
     accu[i][1] = _mm256_madd_epi16(even, row[1]);
 
-    odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1)]);
+    odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1)]);
     accu[i+1][0] = _mm256_madd_epi16(odd, row[0]);
     accu[i+1][1] = _mm256_madd_epi16(odd, row[1]);
-    }
+  }
 
   for (j = 2; j < 16; j+=2) {
 
-    row[0] = _mm256_loadu_si256((__m256i*)second + j);
-    row[1] = _mm256_loadu_si256((__m256i*)second + j + 1);
+    row[0] = _mm256_loadu_si256((__m256i*)right + j);
+    row[1] = _mm256_loadu_si256((__m256i*)right + j + 1);
     row[2] = _mm256_unpacklo_epi16(row[0], row[1]);
     row[3] = _mm256_unpackhi_epi16(row[0], row[1]);
     row[0] = _mm256_permute2x128_si256(row[2], row[3], 0 + 32);
@@ -183,16 +183,16 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *first, const int16_t *seco
 
     for (i = 0; i < 16; i += 2) {
 
-      even = _mm256_set1_epi32(((int32_t*)first)[stride * i + j/2]);
+      even = _mm256_set1_epi32(((int32_t*)left)[stride * i + j/2]);
       accu[i][0] = _mm256_add_epi32(accu[i][0], _mm256_madd_epi16(even, row[0]));
       accu[i][1] = _mm256_add_epi32(accu[i][1], _mm256_madd_epi16(even, row[1]));
 
-      odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1) + j/2]);
+      odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1) + j/2]);
       accu[i + 1][0] = _mm256_add_epi32(accu[i + 1][0], _mm256_madd_epi16(odd, row[0]));
       accu[i + 1][1] = _mm256_add_epi32(accu[i + 1][1], _mm256_madd_epi16(odd, row[1]));
 
     }
-    }
+  }
 
   for (i = 0; i < 16; ++i) {
     __m256i result, first_half, second_half;
@@ -202,10 +202,10 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *first, const int16_t *seco
     result = _mm256_permute4x64_epi64(_mm256_packs_epi32(first_half, second_half), 0 + 8 + 16 + 192);
     _mm256_storeu_si256((__m256i*)dst + i, result);
 
-    }
+  }
 }
 
-static void mul_clip_matrix_32x32_avx2(const int16_t *first, const int16_t *second, int16_t *dst, const int32_t shift)
+static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
 {
   int i, j;
   __m256i row[4], tmp[2], accu[32][4], even, odd;
@@ -214,15 +214,15 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *first, const int16_t *seco
 
   const int32_t add = 1 << (shift - 1);
 
-  row[0] = _mm256_loadu_si256((__m256i*) second);
-  row[1] = _mm256_loadu_si256((__m256i*) second + 2);
+  row[0] = _mm256_loadu_si256((__m256i*) right);
+  row[1] = _mm256_loadu_si256((__m256i*) right + 2);
   tmp[0] = _mm256_unpacklo_epi16(row[0], row[1]);
   tmp[1] = _mm256_unpackhi_epi16(row[0], row[1]);
   row[0] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
   row[1] = _mm256_permute2x128_si256(tmp[0], tmp[1], 1 + 48);
 
-  row[2] = _mm256_loadu_si256((__m256i*) second + 1);
-  row[3] = _mm256_loadu_si256((__m256i*) second + 3);
+  row[2] = _mm256_loadu_si256((__m256i*) right + 1);
+  row[3] = _mm256_loadu_si256((__m256i*) right + 3);
   tmp[0] = _mm256_unpacklo_epi16(row[2], row[3]);
   tmp[1] = _mm256_unpackhi_epi16(row[2], row[3]);
   row[2] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
@@ -230,30 +230,30 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *first, const int16_t *seco
 
   for (i = 0; i < 32; i += 2) {
 
-    even = _mm256_set1_epi32(((int32_t*)first)[stride * i]);
+    even = _mm256_set1_epi32(((int32_t*)left)[stride * i]);
     accu[i][0] = _mm256_madd_epi16(even, row[0]);
     accu[i][1] = _mm256_madd_epi16(even, row[1]);
     accu[i][2] = _mm256_madd_epi16(even, row[2]);
     accu[i][3] = _mm256_madd_epi16(even, row[3]);
 
-    odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1)]);
+    odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1)]);
     accu[i + 1][0] = _mm256_madd_epi16(odd, row[0]);
     accu[i + 1][1] = _mm256_madd_epi16(odd, row[1]);
     accu[i + 1][2] = _mm256_madd_epi16(odd, row[2]);
     accu[i + 1][3] = _mm256_madd_epi16(odd, row[3]);
-    }
+  }
 
   for (j = 4; j < 64; j += 4) {
 
-    row[0] = _mm256_loadu_si256((__m256i*)second + j);
-    row[1] = _mm256_loadu_si256((__m256i*)second + j + 2);
+    row[0] = _mm256_loadu_si256((__m256i*)right + j);
+    row[1] = _mm256_loadu_si256((__m256i*)right + j + 2);
     tmp[0] = _mm256_unpacklo_epi16(row[0], row[1]);
     tmp[1] = _mm256_unpackhi_epi16(row[0], row[1]);
     row[0] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
     row[1] = _mm256_permute2x128_si256(tmp[0], tmp[1], 1 + 48);
 
-    row[2] = _mm256_loadu_si256((__m256i*) second + j + 1);
-    row[3] = _mm256_loadu_si256((__m256i*) second + j + 3);
+    row[2] = _mm256_loadu_si256((__m256i*) right + j + 1);
+    row[3] = _mm256_loadu_si256((__m256i*) right + j + 3);
     tmp[0] = _mm256_unpacklo_epi16(row[2], row[3]);
     tmp[1] = _mm256_unpackhi_epi16(row[2], row[3]);
     row[2] = _mm256_permute2x128_si256(tmp[0], tmp[1], 0 + 32);
@@ -261,20 +261,20 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *first, const int16_t *seco
 
     for (i = 0; i < 32; i += 2) {
 
-      even = _mm256_set1_epi32(((int32_t*)first)[stride * i + j / 4]);
+      even = _mm256_set1_epi32(((int32_t*)left)[stride * i + j / 4]);
       accu[i][0] = _mm256_add_epi32(accu[i][0], _mm256_madd_epi16(even, row[0]));
       accu[i][1] = _mm256_add_epi32(accu[i][1], _mm256_madd_epi16(even, row[1]));
       accu[i][2] = _mm256_add_epi32(accu[i][2], _mm256_madd_epi16(even, row[2]));
       accu[i][3] = _mm256_add_epi32(accu[i][3], _mm256_madd_epi16(even, row[3]));
 
-      odd = _mm256_set1_epi32(((int32_t*)first)[stride * (i + 1) + j / 4]);
+      odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1) + j / 4]);
       accu[i + 1][0] = _mm256_add_epi32(accu[i + 1][0], _mm256_madd_epi16(odd, row[0]));
       accu[i + 1][1] = _mm256_add_epi32(accu[i + 1][1], _mm256_madd_epi16(odd, row[1]));
       accu[i + 1][2] = _mm256_add_epi32(accu[i + 1][2], _mm256_madd_epi16(odd, row[2]));
       accu[i + 1][3] = _mm256_add_epi32(accu[i + 1][3], _mm256_madd_epi16(odd, row[3]));
 
     }
-    }
+  }
 
   for (i = 0; i < 32; ++i) {
     __m256i result, first_quarter, second_quarter, third_quarter, fourth_quarter;
