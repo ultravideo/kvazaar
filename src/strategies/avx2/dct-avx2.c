@@ -1,25 +1,25 @@
 /*****************************************************************************
- * This file is part of Kvazaar HEVC encoder.
- *
- * Copyright (C) 2013-2014 Tampere University of Technology and others (see
- * COPYING file).
- *
- * Kvazaar is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation.
- *
- * Kvazaar is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
- ****************************************************************************/
+* This file is part of Kvazaar HEVC encoder.
+*
+* Copyright (C) 2013-2014 Tampere University of Technology and others (see
+* COPYING file).
+*
+* Kvazaar is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License version 2 as published
+* by the Free Software Foundation.
+*
+* Kvazaar is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
+****************************************************************************/
 
 /*
- * \file
- */
+* \file
+*/
 
 #include <stdlib.h>
 
@@ -42,39 +42,43 @@ extern const int16_t g_dct_8_t[8][8];
 extern const int16_t g_dct_16_t[16][16];
 extern const int16_t g_dct_32_t[32][32];
 
-/**
-* \brief AVX2 transform functions
-*
-* TODO: description
-*
-* \param TODO
-*
-* \returns TODO
+/*
+* \file
+* \brief AVX2 transformations.
 */
 
+// 4x4 matrix multiplication with value clipping.
+// Parameters: Two 4x4 matrices containing 16-bit values in consecutive addresses,
+//             destination for the result and the shift value for clipping.
 static void mul_clip_matrix_4x4_avx2(const int16_t *left, const int16_t *right, int16_t *dst, int32_t shift)
 {
-  __m256i b[2], a, result,  even[2], odd[2];
+  __m256i b[2], a, result, even[2], odd[2];
 
   const int32_t add = 1 << (shift - 1);
 
   a = _mm256_loadu_si256((__m256i*) left);
   b[0] = _mm256_loadu_si256((__m256i*) right);
 
+  // Interleave values in both 128-bit lanes
   b[0] = _mm256_unpacklo_epi16(b[0], _mm256_srli_si256(b[0], 8));
   b[1] = _mm256_permute2x128_si256(b[0], b[0], 1 + 16);
   b[0] = _mm256_permute2x128_si256(b[0], b[0], 0);
 
+  // Fill both 128-lanes with the first pair of 16-bit factors in the lane.
   even[0] = _mm256_shuffle_epi32(a, 0);
   odd[0] = _mm256_shuffle_epi32(a, 1 + 4 + 16 + 64);
 
+  // Multiply packed elements and sum pairs. Input 16-bit output 32-bit.
   even[0] = _mm256_madd_epi16(even[0], b[0]);
   odd[0] = _mm256_madd_epi16(odd[0], b[1]);
 
+  // Add the halves of the dot product and
+  // round.
   result = _mm256_add_epi32(even[0], odd[0]);
   result = _mm256_add_epi32(result, _mm256_set1_epi32(add));
   result = _mm256_srai_epi32(result, shift);
 
+  //Repeat for the remaining parts
   even[1] = _mm256_shuffle_epi32(a, 2 + 8 + 32 + 128);
   odd[1] = _mm256_shuffle_epi32(a, 3 + 12 + 48 + 192);
 
@@ -85,11 +89,16 @@ static void mul_clip_matrix_4x4_avx2(const int16_t *left, const int16_t *right, 
   odd[1] = _mm256_add_epi32(odd[1], _mm256_set1_epi32(add));
   odd[1] = _mm256_srai_epi32(odd[1], shift);
 
+  // Truncate to 16-bit values
   result = _mm256_packs_epi32(result, odd[1]);
 
   _mm256_storeu_si256((__m256i*)dst, result);
 }
 
+// 8x8 matrix multiplication with value clipping.
+// Parameters: Two 8x8 matrices containing 16-bit values in consecutive addresses,
+//             destination for the result and the shift value for clipping.
+//
 static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
 {
   int i, j;
@@ -108,7 +117,7 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
     even[0] = _mm256_set1_epi32(((int32_t*)left)[4 * i]);
     even[0] = _mm256_madd_epi16(even[0], b[0]);
     accu[i] = even[0];
-    
+
     odd[0] = _mm256_set1_epi32(((int32_t*)left)[4 * (i + 1)]);
     odd[0] = _mm256_madd_epi16(odd[0], b[0]);
     accu[i + 1] = odd[0];
@@ -123,7 +132,7 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
     b[0] = _mm256_inserti128_si256(b[0], _mm256_castsi256_si128(b[1]), 1);
 
     for (i = 0; i < 8; i += 2) {
-    
+
       even[0] = _mm256_set1_epi32(((int32_t*)left)[4 * i + j]);
       even[0] = _mm256_madd_epi16(even[0], b[0]);
       accu[i] = _mm256_add_epi32(accu[i], even[0]);
@@ -135,16 +144,19 @@ static void mul_clip_matrix_8x8_avx2(const int16_t *left, const int16_t *right, 
   }
 
   for (i = 0; i < 8; i += 2) {
-     __m256i result, first_half, second_half;
-  
+    __m256i result, first_half, second_half;
+
     first_half = _mm256_srai_epi32(_mm256_add_epi32(accu[i], _mm256_set1_epi32(add)), shift);
     second_half = _mm256_srai_epi32(_mm256_add_epi32(accu[i + 1], _mm256_set1_epi32(add)), shift);
     result = _mm256_permute4x64_epi64(_mm256_packs_epi32(first_half, second_half), 0 + 8 + 16 + 192);
     _mm256_storeu_si256((__m256i*)dst + i / 2, result);
 
-    }
+  }
 }
 
+// 16x16 matrix multiplication with value clipping.
+// Parameters: Two 16x16 matrices containing 16-bit values in consecutive addresses,
+//             destination for the result and the shift value for clipping.
 static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
 {
   int i, j;
@@ -168,11 +180,11 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
     accu[i][1] = _mm256_madd_epi16(even, row[1]);
 
     odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1)]);
-    accu[i+1][0] = _mm256_madd_epi16(odd, row[0]);
-    accu[i+1][1] = _mm256_madd_epi16(odd, row[1]);
+    accu[i + 1][0] = _mm256_madd_epi16(odd, row[0]);
+    accu[i + 1][1] = _mm256_madd_epi16(odd, row[1]);
   }
 
-  for (j = 2; j < 16; j+=2) {
+  for (j = 2; j < 16; j += 2) {
 
     row[0] = _mm256_loadu_si256((__m256i*)right + j);
     row[1] = _mm256_loadu_si256((__m256i*)right + j + 1);
@@ -183,11 +195,11 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
 
     for (i = 0; i < 16; i += 2) {
 
-      even = _mm256_set1_epi32(((int32_t*)left)[stride * i + j/2]);
+      even = _mm256_set1_epi32(((int32_t*)left)[stride * i + j / 2]);
       accu[i][0] = _mm256_add_epi32(accu[i][0], _mm256_madd_epi16(even, row[0]));
       accu[i][1] = _mm256_add_epi32(accu[i][1], _mm256_madd_epi16(even, row[1]));
 
-      odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1) + j/2]);
+      odd = _mm256_set1_epi32(((int32_t*)left)[stride * (i + 1) + j / 2]);
       accu[i + 1][0] = _mm256_add_epi32(accu[i + 1][0], _mm256_madd_epi16(odd, row[0]));
       accu[i + 1][1] = _mm256_add_epi32(accu[i + 1][1], _mm256_madd_epi16(odd, row[1]));
 
@@ -205,6 +217,9 @@ static void mul_clip_matrix_16x16_avx2(const int16_t *left, const int16_t *right
   }
 }
 
+// 32x32 matrix multiplication with value clipping.
+// Parameters: Two 32x32 matrices containing 16-bit values in consecutive addresses,
+//             destination for the result and the shift value for clipping.
 static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right, int16_t *dst, const int32_t shift)
 {
   int i, j;
@@ -288,9 +303,12 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right
     result = _mm256_permute4x64_epi64(_mm256_packs_epi32(third_quarter, fourth_quarter), 0 + 8 + 16 + 192);
     _mm256_storeu_si256((__m256i*)dst + 2 * i + 1, result);
 
-    }
+  }
 }
 
+// Macro that generates 2D transform functions with clipping values.
+// Sets correct shift values and matrices according to transform type and
+// block size. Performs matrix multiplication horizontally and vertically.
 #define TRANSFORM(type, n) static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
 {\
   int32_t shift_1st = g_convert_to_bit[n] + 1 + (bitdepth - 8); \
@@ -303,6 +321,9 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right
   mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, output, shift_2nd);\
 }\
 
+// Macro that generates 2D inverse transform functions with clipping values.
+// Sets correct shift values and matrices according to transform type and
+// block size. Performs matrix multiplication horizontally and vertically.
 #define ITRANSFORM(type, n) \
 static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
 {\
@@ -316,6 +337,7 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, output, shift_2nd);\
 }\
 
+// Generate all the transform functions
 TRANSFORM(dst, 4);
 TRANSFORM(dct, 4);
 TRANSFORM(dct, 8);
