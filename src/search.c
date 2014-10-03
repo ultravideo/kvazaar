@@ -1387,12 +1387,16 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
       intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
       intra_recon_lcu_chroma(encoder_state, x, y, depth, &work_tree[depth]);
     } else if (cur_cu->type == CU_INTER) {
-      int cbf;
+      // Reset transform depth because intra messes with them.
+      // This will no longer be necessary if the transform depths are not shared.
+      int tr_depth = depth > 0 ? depth : 1;
+      lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
+
       inter_recon_lcu(encoder_state, encoder_state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
       quantize_lcu_luma_residual(encoder_state, x, y, depth, &work_tree[depth]);
       quantize_lcu_chroma_residual(encoder_state, x, y, depth, &work_tree[depth]);
 
-      cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
+      int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
       if(cur_cu->merged && !cbf) {
         cur_cu->merged = 0;
