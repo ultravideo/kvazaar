@@ -47,11 +47,18 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-#ifndef CU_SPLIT_COST
-#  define CU_SPLIT_COST 9
+#ifndef CUSPL
+#  define CUSPL 9
 #endif
 #ifndef FULL_CU_SPLIT_SEARCH
 #  define FULL_CU_SPLIT_SEARCH false
+#endif
+
+#ifndef LMUL
+# define LMUL 1.0
+#endif
+#ifndef CMUL
+# define CMUL 1.0
 #endif
 
 /**
@@ -831,7 +838,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return ssd + bits * encoder_state->global->cur_lambda_cost;
+  return (double)ssd * LMUL + bits * encoder_state->global->cur_lambda_cost;
 }
 
 
@@ -921,7 +928,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return ssd + bits * encoder_state->global->cur_lambda_cost;
+  return (double)ssd * CMUL + bits * encoder_state->global->cur_lambda_cost;
 }
 
 
@@ -1507,7 +1514,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
   if (depth < MAX_INTRA_SEARCH_DEPTH || (depth < MAX_INTER_SEARCH_DEPTH && encoder_state->global->slicetype != SLICE_I)) {
     int half_cu = cu_width / 2;
     // Using Cost = lambda * 9 to compensate on the price of the split
-    double split_cost = encoder_state->global->cur_lambda_cost * CU_SPLIT_COST;
+    double split_cost = encoder_state->global->cur_lambda_cost * CUSPL;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
         
     if (depth < MAX_DEPTH) {
