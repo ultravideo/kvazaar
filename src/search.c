@@ -1509,6 +1509,18 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     // Using Cost = lambda * 9 to compensate on the price of the split
     double split_cost = encoder_state->global->cur_lambda_cost * CU_SPLIT_COST;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
+        
+    if (depth < MAX_DEPTH) {
+      vector2d lcu_cu = { x_local / 8, y_local / 8 };
+      cu_info *cu_array = &(&work_tree[depth])->cu[LCU_CU_OFFSET];
+      bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
+      bool condL = y >= 8 && cu_array[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
+      uint8_t split_model = condA + condL;
+
+      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
+      cost += CTX_ENTROPY_FBITS(ctx, 0);
+      split_cost += CTX_ENTROPY_FBITS(ctx, 1);
+    }
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
