@@ -1522,6 +1522,12 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
       split_cost += CTX_ENTROPY_FBITS(ctx, 1);
     }
 
+    if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
+      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.part_size_model[0]);
+      cost += CTX_ENTROPY_FBITS(ctx, 1);  // 2Nx2N
+      split_cost += CTX_ENTROPY_FBITS(ctx, 0);  // NxN
+    }
+
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
