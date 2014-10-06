@@ -1072,13 +1072,13 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 }
 
 
-static void sort_modes(int8_t *modes, uint32_t *costs, int length)
+static void sort_modes(int8_t *modes, double *costs, int length)
 {
   int i, j;
   for (i = 0; i < length; ++i) {
     j = i;
     while (j > 0 && costs[j] < costs[j - 1]) {
-      SWAP(costs[j], costs[j - 1], uint32_t);
+      SWAP(costs[j], costs[j - 1], double);
       SWAP(modes[j], modes[j - 1], int8_t);
       --j;
     }
@@ -1089,7 +1089,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
                                  pixel *orig, int32_t origstride,
                                  pixel *rec, int16_t recstride,
                                  int width, int8_t *intra_preds,
-                                 int8_t modes[35], uint32_t costs[35])
+                                 int8_t modes[35], double costs[35])
 {
   cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
 
@@ -1217,7 +1217,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
                              pixel *rec, int16_t recstride,
                              int8_t *intra_preds,
                              int modes_to_check,
-                             int8_t modes[35], uint32_t costs[35],
+                             int8_t modes[35], double costs[35],
                              lcu_t *lcu)
 {
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + encoder_state->encoder_control->tr_depth_intra);
@@ -1286,7 +1286,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
       lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
 
       double mode_cost = search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
-      costs[rdo_mode] += (uint32_t)(0.5 + mode_cost);
+      costs[rdo_mode] += mode_cost;
     }
   }
 
@@ -1312,7 +1312,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_intra(encoder_state * const encoder_state,
+static double search_cu_intra(encoder_state * const encoder_state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
@@ -1358,7 +1358,7 @@ static int search_cu_intra(encoder_state * const encoder_state,
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
 
     int8_t modes[35];
-    uint32_t costs[35];
+    double costs[35];
     int8_t number_of_modes;
     bool skip_rough_search = (depth == 0 || encoder_state->encoder_control->rdo >= 3);
     if (!skip_rough_search) {
@@ -1415,11 +1415,11 @@ static int search_cu_intra(encoder_state * const encoder_state,
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static int search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static double search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
   const videoframe * const frame = encoder_state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
-  int cost = MAX_INT;
+  double cost = MAX_INT;
   cu_info *cur_cu;
   int x_local = (x&0x3f), y_local = (y&0x3f);
 #ifdef _DEBUG
@@ -1459,7 +1459,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
     if (depth >= MIN_INTRA_SEARCH_DEPTH &&
         depth <= MAX_INTRA_SEARCH_DEPTH)
     {
-      int mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth]);
+      double mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTRA;
@@ -1507,7 +1507,7 @@ static int search_cu(encoder_state * const encoder_state, int x, int y, int dept
   if (depth < MAX_INTRA_SEARCH_DEPTH || (depth < MAX_INTER_SEARCH_DEPTH && encoder_state->global->slicetype != SLICE_I)) {
     int half_cu = cu_width / 2;
     // Using Cost = lambda * 9 to compensate on the price of the split
-    int split_cost = (int)(encoder_state->global->cur_lambda_cost + 0.5) * CU_SPLIT_COST;
+    double split_cost = encoder_state->global->cur_lambda_cost * CU_SPLIT_COST;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
     // If skip mode was selected for the block, skip further search.

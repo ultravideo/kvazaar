@@ -46,7 +46,7 @@ typedef struct {
  */
 typedef struct
 {
-  uint32_t cost;
+  double cost;
   uint32_t bitcost;
   int8_t mode;
   int8_t mode_chroma;
@@ -58,7 +58,7 @@ typedef struct
  */
 typedef struct
 {
-  uint32_t cost;
+  double cost;
   uint32_t bitcost;
   int16_t mv[2];
   int16_t mvd[2];
