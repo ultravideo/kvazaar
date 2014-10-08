@@ -818,17 +818,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
     }
   }
 
-  if (rdo == 1) {
-    int coeff_abs = 0;
-
-    // Estimate coding cost to be 1.5 * summ of abs coeffs.
-    for (int y = y_px; y < y_px + width; ++y) {
-      for (int x = x_px; x < x_px + width; ++x) {
-        coeff_abs += abs((int)lcu->coeff.y[y * LCU_WIDTH + x]);
-      }
-    }
-    coeff_bits += 1.5 * coeff_abs;
-  } else if (rdo >= 2) {
+  if (rdo >= 1) {
     coefficient coeff_temp[32 * 32];
     int8_t luma_scan_mode = get_scan_order(pred_cu->type, pred_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
 
@@ -902,19 +892,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
     }
   }
 
-  if (rdo == 1) {
-    int coeff_abs = 0;
-
-    // Estimate coding cost to be 1.5 * summ of abs coeffs.
-    for (int y = lcu_px.y; y < lcu_px.y + width; ++y) {
-      for (int x = lcu_px.x; x < lcu_px.x + width; ++x) {
-        coeff_abs += abs((int)lcu->coeff.u[y * (LCU_WIDTH_C)+x]);
-        coeff_abs += abs((int)lcu->coeff.v[y * (LCU_WIDTH_C)+x]);
-      }
-    }
-
-    coeff_bits = 1.5 * coeff_abs;
-  } else if (rdo >= 2) {
+  if (rdo >= 1) {
     coefficient coeff_temp[16 * 16];
     int8_t scan_order = get_scan_order(pred_cu->type, pred_cu->intra[0].mode_chroma, depth);
     
