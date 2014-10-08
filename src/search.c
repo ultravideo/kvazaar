@@ -60,6 +60,9 @@
 #ifndef CMUL
 # define CMUL 1.0
 #endif
+#ifndef MN // fast tr_skip Magic Number
+# define MN 0.0
+#endif
 
 /**
  * This is used in the hexagon_search to select 3 points to search.
@@ -1070,13 +1073,31 @@ static void sort_modes(int8_t *modes, double *costs, int length)
   }
 }
 
+
+static unsigned get_cost(pixel *pred, pixel *orig_block, cost_pixel_nxn_func *satd_func, cost_pixel_nxn_func *sad_func, int width)
+{
+  unsigned cost = satd_func(pred, orig_block);
+  if (MN != 0 && width == 4) {
+    // If the mode looks better with SAD than SATD it might be a good
+    // candidate for transform skip. How much better SAD has to be is
+    // controlled by MN.
+    unsigned sad_cost = MN * sad_func(pred, orig_block);
+    if (sad_cost < cost) {
+      cost = sad_cost;
+    }
+  }
+  return cost;
+}
+
+
 static int8_t search_intra_rough(encoder_state * const encoder_state, 
                                  pixel *orig, int32_t origstride,
                                  pixel *rec, int16_t recstride,
                                  int width, int8_t *intra_preds,
                                  int8_t modes[35], double costs[35])
 {
-  cost_pixel_nxn_func *cost_func = pixels_get_sad_func(width);
+  cost_pixel_nxn_func *satd_func = pixels_get_satd_func(width);
+  cost_pixel_nxn_func *sad_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
   pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
@@ -1099,7 +1120,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     int16_t x, y;
     for (y = -1; y < recstride; y++) {
       ref[1][y*recstride - 1] = rec[y*recstride - 1];
-                                                }
+    }
     for (x = 0; x < recstride; x++) {
       ref[1][x - recstride] = rec[x - recstride];
     }
@@ -1127,7 +1148,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   // the recursive search.
   for (int mode = 2; mode <= 34; mode += offset) {
     intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-    costs[modes_selected] = cost_func(pred, orig_block);
+    costs[modes_selected] = get_cost(pred, orig_block, satd_func, sad_func, width);
     modes[modes_selected] = mode;
 
     min_cost = MIN(min_cost, costs[modes_selected]);
@@ -1147,7 +1168,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
       int8_t mode = modes[0] - offset;
       if (mode >= 2) {
         intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-        costs[modes_selected] = cost_func(pred, orig_block);
+        costs[modes_selected] = get_cost(pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         ++modes_selected;
       }
@@ -1155,7 +1176,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
       mode = modes[0] + offset;
       if (mode <= 34) {
         intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-        costs[modes_selected] = cost_func(pred, orig_block);
+        costs[modes_selected] = get_cost(pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         ++modes_selected;
       }
@@ -1178,7 +1199,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
     if (!has_mode) {
       intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
-      costs[modes_selected] = cost_func(pred, orig_block);
+      costs[modes_selected] = get_cost(pred, orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;
     }
