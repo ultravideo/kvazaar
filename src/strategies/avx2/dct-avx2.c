@@ -315,7 +315,7 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right
   int32_t shift_2nd = g_convert_to_bit[n] + 8; \
   int16_t tmp[n * n];\
   const int16_t *tdct = &g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &g_ ## type ## _ ## n ## [0][0];\
+  const int16_t *dct = &g_ ## type ## _ ## n [0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(input, tdct, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, output, shift_2nd);\
@@ -331,7 +331,7 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
   int32_t shift_2nd = 12 - (bitdepth - 8); \
   int16_t tmp[n * n];\
   const int16_t *tdct = &g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &g_ ## type ## _ ## n ## [0][0];\
+  const int16_t *dct = &g_ ## type ## _ ## n [0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tdct, input, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, output, shift_2nd);\
