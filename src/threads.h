@@ -28,7 +28,15 @@
 #include <time.h>
 
 #define CLOCK_T struct timespec
+
+#ifdef __MACH__
+// Workaround Mac OS not having clock_gettime.
+// ToDo: Use mach_absolute_time or something to implement GET_TIME.
+#define GET_TIME(clock_t) memset((clock_t), 0, sizeof(CLOCK_T))
+#else
 #define GET_TIME(clock_t) clock_gettime(CLOCK_MONOTONIC, (clock_t))
+#endif
+
 #define CLOCK_T_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / (double)1000000000L)
 #define CLOCK_T_DIFF(start, stop) ((double)((stop).tv_sec - (start).tv_sec) + (double)((stop).tv_nsec - (start).tv_nsec) / (double)1000000000L)
 
