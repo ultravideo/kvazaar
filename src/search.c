@@ -1082,8 +1082,10 @@ static double get_cost(encoder_state * const encoder_state, pixel *pred, pixel *
     // candidate for transform skip. How much better SAD has to be is
     // controlled by MN.
     const cabac_ctx *ctx = &encoder_state->cabac.ctx.transform_skip_model_luma;
-    double trskip_cost = encoder_state->global->cur_lambda_cost_sqrt * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
-    double sad_cost = MN * sad_func(pred, orig_block) + trskip_cost;
+    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    ctx = &encoder_state->cabac.ctx.transform_skip_model_chroma;
+    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+    double sad_cost = MN * sad_func(pred, orig_block) + encoder_state->global->cur_lambda_cost_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
       return sad_cost;
     }
