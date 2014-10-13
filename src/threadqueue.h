@@ -118,14 +118,8 @@ int threadqueue_finalize(threadqueue_queue * threadqueue);
 #ifdef _DEBUG
 int threadqueue_log(threadqueue_queue * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
 
-#ifdef _GNUC
-  #define ATTR_UNUSED __attribute__((unused))
-#else
-  #define ATTR_UNUSED
-#endif
-
 //This macro HAS TO BE at the beginning of a block
-#define PERFORMANCE_MEASURE_START(mask) CLOCK_T start ATTR_UNUSED, stop ATTR_UNUSED; if (_DEBUG & mask) GET_TIME(&start)
+#define PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if (_DEBUG & mask) GET_TIME(&start)
 #define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) do {if (_DEBUG & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}}} while (0) \
 
 #else
