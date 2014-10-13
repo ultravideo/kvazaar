@@ -206,7 +206,7 @@ const int16_t g_dct_32_t[32][32] =
 
 // Fast DST Algorithm. Full matrix multiplication for DST and Fast DST algorithm
 // gives identical results
-static void fast_forward_dst_4_generic(short *block, short *coeff, int32_t shift)  // input block, output coeff
+static void fast_forward_dst_4_generic(const short *block, short *coeff, int32_t shift)  // input block, output coeff
 {
   int32_t i, c[4];
   int32_t rnd_factor = 1 << (shift - 1);
@@ -224,7 +224,7 @@ static void fast_forward_dst_4_generic(short *block, short *coeff, int32_t shift
   }
 }
 
-static void fast_inverse_dst_4_generic(short *tmp, short *block, int shift)  // input tmp, output block
+static void fast_inverse_dst_4_generic(const short *tmp, short *block, int shift)  // input tmp, output block
 {
   int i, c[4];
   int rnd_factor = 1 << (shift - 1);
@@ -243,7 +243,7 @@ static void fast_inverse_dst_4_generic(short *tmp, short *block, int shift)  // 
 }
 
 
-static void partial_butterfly_4_generic(short *src, short *dst,
+static void partial_butterfly_4_generic(const short *src, short *dst,
   int32_t shift)
 {
   int32_t j;
@@ -269,7 +269,7 @@ static void partial_butterfly_4_generic(short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_4_generic(short *src, short *dst,
+static void partial_butterfly_inverse_4_generic(const short *src, short *dst,
   int shift)
 {
   int j;
@@ -296,7 +296,7 @@ static void partial_butterfly_inverse_4_generic(short *src, short *dst,
 }
 
 
-static void partial_butterfly_8_generic(short *src, short *dst,
+static void partial_butterfly_8_generic(const short *src, short *dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -333,7 +333,7 @@ static void partial_butterfly_8_generic(short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_8_generic(int16_t *src, int16_t *dst,
+static void partial_butterfly_inverse_8_generic(const int16_t *src, int16_t *dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -368,7 +368,7 @@ static void partial_butterfly_inverse_8_generic(int16_t *src, int16_t *dst,
 }
 
 
-static void partial_butterfly_16_generic(short *src, short *dst,
+static void partial_butterfly_16_generic(const short *src, short *dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -415,7 +415,7 @@ static void partial_butterfly_16_generic(short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_16_generic(int16_t *src, int16_t *dst,
+static void partial_butterfly_inverse_16_generic(const int16_t *src, int16_t *dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -458,7 +458,7 @@ static void partial_butterfly_inverse_16_generic(int16_t *src, int16_t *dst,
 }
 
 
-static void partial_butterfly_32_generic(short *src, short *dst,
+static void partial_butterfly_32_generic(const short *src, short *dst,
   int32_t shift)
 {
   int32_t j, k;
@@ -514,7 +514,7 @@ static void partial_butterfly_32_generic(short *src, short *dst,
 }
 
 
-static void partial_butterfly_inverse_32_generic(int16_t *src, int16_t *dst,
+static void partial_butterfly_inverse_32_generic(const int16_t *src, int16_t *dst,
   int32_t shift)
 {
   int32_t j, k;
