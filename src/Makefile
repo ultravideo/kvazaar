@@ -27,12 +27,10 @@ LDFLAGS += -m$(TARGET_CPU_BITS)
 ifneq ( ,$(findstring Windows, $(OS)))
   ifeq ($(ARCH), x86_64)
     ASMFLAGS += -f win64
-    ASMFLAGS += -DARCH_X86_64=1
     ASMFLAGS += -DHAVE_ALIGNED_STACK=1
   else
     ASMFLAGS += -f win32
     ASMFLAGS += -DPREFIX
-    ASMFLAGS += -DARCH_X86_64=0
     ASMFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
   DFLAGS += -D__USE_MINGW_ANSI_STDIO=1
@@ -43,16 +41,20 @@ else ifeq ($(SYSTEM),Darwin)
   else
     ASMFLAGS += -f macho32
   endif
-ASMFLAGS += -DPREFIX
+  ASMFLAGS += -DPREFIX
 # Default to Linux/elf specific flags
 else
   ifeq ($(ARCH), x86_64)
-      ASMFLAGS += -f elf64
-      ASMFLAGS += -DARCH_X86_64=1
+    ASMFLAGS += -f elf64
   else
-      ASMFLAGS += -f elf32
-      ASMFLAGS += -DARCH_X86_64=0
+    ASMFLAGS += -f elf32
   endif
+endif
+# Flags shared across systems
+ifeq ($(ARCH), x86_64)
+  ASMFLAGS += -DARCH_X86_64=1
+else
+  ASMFLAGS += -DARCH_X86_64=0
 endif
 
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
