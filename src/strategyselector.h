@@ -19,6 +19,8 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#include "global.h"
+
 #if defined(_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
 # define DEBUG_STRATEGYSELECTOR
 #endif
@@ -136,7 +138,7 @@ typedef struct {
 extern hardware_flags g_hardware_flags;
 
 
-int strategyselector_init();
+int strategyselector_init(int32_t cpuid);
 void strategyselector_free();
 int strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
 

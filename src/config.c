@@ -95,6 +95,7 @@ int config_init(config *cfg)
   cfg->slice_addresses_in_ts[0] = 0;
   
   cfg->threads = 0;
+  cfg->cpuid = 1;
 
   return 1;
 }
@@ -438,6 +439,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     error = !parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
   else if OPT("threads")
     cfg->threads = atoi(value);
+  else if OPT("cpuid")
+    cfg->cpuid = atoi(value);
   else
     return 0;
 #undef OPT
@@ -492,6 +495,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "owf",                required_argument, NULL, 0 },
     { "slice-addresses",    required_argument, NULL, 0 },
     { "threads",            required_argument, NULL, 0 },
+    { "cpuid",              required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

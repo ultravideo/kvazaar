@@ -79,6 +79,7 @@ typedef struct
   int32_t* slice_addresses_in_ts;
   
   int32_t threads;
+  int32_t cpuid;
 } config;
 
 /* Function definitions */

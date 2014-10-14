@@ -32,13 +32,13 @@
 
 hardware_flags g_hardware_flags;
 
-static void set_hardware_flags();
+static void set_hardware_flags(int32_t cpuid);
 static void* strategyselector_choose_for(const strategy_list * const strategies, const char * const strategy_type);
 
 //Strategies to include (add new file here)
 
 //Returns 1 if successful
-int strategyselector_init() {
+int strategyselector_init(int32_t cpuid) {
   const strategy_to_select *cur_strategy_to_select = strategies_to_select;
   strategy_list strategies;
   
@@ -46,7 +46,7 @@ int strategyselector_init() {
   strategies.count = 0;
   strategies.strategies = NULL;
   
-  set_hardware_flags();
+  set_hardware_flags(cpuid);
   
   //Add new register function here
   if (!strategy_register_picture(&strategies)) {
@@ -232,15 +232,15 @@ out_close:
 }
 #endif //COMPILE_POWERPC
 
-static void set_hardware_flags() {
+static void set_hardware_flags(int32_t cpuid) {
   memset(&g_hardware_flags, 0, sizeof(g_hardware_flags));
   
   g_hardware_flags.arm = COMPILE_ARM;
   g_hardware_flags.intel = COMPILE_INTEL;
   g_hardware_flags.powerpc = COMPILE_POWERPC;
-  
+
 #if COMPILE_INTEL
-  {
+  if (cpuid) {
     unsigned int eax = 0, ebx = 0, ecx = 0, edx =0;
     /* CPU feature bits */
     enum { BIT_SSE3 = 0, BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20,
@@ -290,58 +290,60 @@ static void set_hardware_flags() {
       get_cpuid(7, &eax, &ebx, &ecx, &edx);
       if (ebx & (1 << 5))  g_hardware_flags.intel_flags.avx2 = 1;
     }
+  }
 
-
-    fprintf(stderr, "Compiled: INTEL, flags:");
+  fprintf(stderr, "Compiled: INTEL, flags:");
 #if COMPILE_INTEL_MMX
-    fprintf(stderr, " MMX");
+  fprintf(stderr, " MMX");
 #endif
 #if COMPILE_INTEL_SSE
-    fprintf(stderr, " SSE");
+  fprintf(stderr, " SSE");
 #endif
 #if COMPILE_INTEL_SSE2
-    fprintf(stderr, " SSE2");
+  fprintf(stderr, " SSE2");
 #endif
 #if COMPILE_INTEL_SSE3
-    fprintf(stderr, " SSE3");
+  fprintf(stderr, " SSE3");
 #endif
 #if COMPILE_INTEL_SSSE3
-    fprintf(stderr, " SSSE3");
+  fprintf(stderr, " SSSE3");
 #endif
 #if COMPILE_INTEL_SSE41
-    fprintf(stderr, " SSE41");
+  fprintf(stderr, " SSE41");
 #endif
 #if COMPILE_INTEL_SSE42
-    fprintf(stderr, " SSE42");
+  fprintf(stderr, " SSE42");
 #endif
 #if COMPILE_INTEL_AVX
-    fprintf(stderr, " AVX");
+  fprintf(stderr, " AVX");
 #endif
 #if COMPILE_INTEL_AVX2
-    fprintf(stderr, " AVX2");
+  fprintf(stderr, " AVX2");
 #endif
-    fprintf(stderr, "\nRun on  : INTEL, flags:");
-    if (g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
-    if (g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
-    if (g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
-    if (g_hardware_flags.intel_flags.sse3) fprintf(stderr, " SSE3");
-    if (g_hardware_flags.intel_flags.ssse3) fprintf(stderr, " SSSE3");
-    if (g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
-    if (g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
-    if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
-    if (g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
-    fprintf(stderr, "\n");
-  }
+  fprintf(stderr, "\nDetected: INTEL, flags:");
+  if (g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
+  if (g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
+  if (g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
+  if (g_hardware_flags.intel_flags.sse3) fprintf(stderr, " SSE3");
+  if (g_hardware_flags.intel_flags.ssse3) fprintf(stderr, " SSSE3");
+  if (g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
+  if (g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
+  if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
+  if (g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
+  fprintf(stderr, "\n");
+  
 #endif //COMPILE_INTEL
 
 #if COMPILE_POWERPC
-  g_hardware_flags.powerpc_flags.altivec = altivec_available();
+  if (cpuid) {
+    g_hardware_flags.powerpc_flags.altivec = altivec_available();
+  }
   
   fprintf(stderr, "Compiled: PowerPC, flags:");
 #if COMPILE_POWERPC_ALTIVEC
   fprintf(stderr, " AltiVec");
 #endif
-  fprintf(stderr, "\nRun on  : PowerPC, flags:");
+  fprintf(stderr, "\nDetected: PowerPC, flags:");
   if (g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
   fprintf(stderr, "\n");
 #endif

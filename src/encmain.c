@@ -79,13 +79,6 @@ int main(int argc, char *argv[])
       
   CHECKPOINTS_INIT();
 
-  //Initialize strategies
-  if (!strategyselector_init()) {
-    fprintf(stderr, "Failed to initialize strategies.\n");
-    return EXIT_FAILURE;
-  }
-    
-
   // Handle configuration
   cfg = config_alloc();
 
@@ -125,6 +118,7 @@ int main(int argc, char *argv[])
             "          --aud                  : Use access unit delimiters\n"
             "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
             "          --debug <string>       : Output encoders reconstruction.\n"
+            "          --cpuid <integer>      : Disable runtime cpu optimizations with value 0.\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
@@ -199,6 +193,12 @@ int main(int argc, char *argv[])
 
   // Do more validation to make sure the parameters we have make sense.
   if (!config_validate(cfg)) {
+    goto exit_failure;
+  }
+
+  //Initialize strategies
+  if (!strategyselector_init(cfg->cpuid)) {
+    fprintf(stderr, "Failed to initialize strategies.\n");
     goto exit_failure;
   }
 
