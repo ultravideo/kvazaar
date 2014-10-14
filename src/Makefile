@@ -64,8 +64,8 @@ INCLUDEDIRS = -I. -I./strategies -I./extras
 
 CC = gcc
 CCFLAGS = $(DFLAGS) -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
-LDFLAGS += -lm
-LD = gcc -pthread -lrt
+LDFLAGS += -lm -pthread
+LD = gcc
 OBJS = interface_main.o \
   encmain.o \
   bitstream.o \
