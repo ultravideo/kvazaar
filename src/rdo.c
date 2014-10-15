@@ -128,26 +128,6 @@ const float f_entropy_bits[128] =
 
 
 /**
- * \brief Helper function to find intra merge costs
- * \returns intra mode coding cost in bits
- */
-uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
-{
-   // merge mode -1 means they are not used -> cost 0
-   if(intra_preds[0] == -1) return 0;
-
-   // First candidate needs only one bit and two other need two
-   if(intra_preds[0] == mode) {
-     return 1;
-   } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
-     return 2;
-   }
-   // Without merging the cost is 5 bits
-   return 5;
-}
-
-
-/**
  * \brief Function to compare RDO costs
  * \param rdo_costs array of current costs
  * \param cost new cost to check

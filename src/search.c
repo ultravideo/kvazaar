@@ -1048,7 +1048,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
     pred_cu->cbf = nosplit_cbf;
 
     // We only restore the pixel data and not coefficients or cbf data.
-    // The only thing we really need are the border pixels.
+    // The only thing we really need are the border pixels.intra_get_dir_luma_predictor
     pixels_blit(nosplit_pixels.y, lcu->rec.y, width, width, width, LCU_WIDTH);
     if (reconstruct_chroma) {
       pixels_blit(nosplit_pixels.u, lcu->rec.u, width_c, width_c, width_c, LCU_WIDTH_C);
@@ -1057,6 +1057,30 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 
     return nosplit_cost;
   }
+}
+
+
+static double luma_mode_bits(const encoder_state *encoder_state, int8_t luma_mode, const int8_t *intra_preds)
+{
+  double mode_bits;
+
+  bool mode_in_preds = false;
+  for (int i = 0; i < 3; ++i) {
+    if (luma_mode == intra_preds[i]) {
+      mode_in_preds = true;
+    }
+  }
+
+  const cabac_ctx *ctx = &(encoder_state->cabac.ctx.intra_mode_model);
+  mode_bits = CTX_ENTROPY_FBITS(ctx, mode_in_preds);
+
+  if (mode_in_preds) {
+    mode_bits += ((luma_mode == intra_preds[0]) ? 1 : 2);
+  } else {
+    mode_bits += 5;
+  }
+
+  return mode_bits;
 }
 
 
@@ -1275,7 +1299,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   // affecting the halving search.
   int lambda_cost = (int)(encoder_state->global->cur_lambda_cost_sqrt + 0.5);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-    costs[mode_i] += lambda_cost * intra_pred_ratecost(modes[mode_i], intra_preds);
+    costs[mode_i] += lambda_cost * luma_mode_bits(encoder_state, modes[mode_i], intra_preds);
   }
 
   sort_modes(modes, costs, modes_selected);
@@ -1334,7 +1358,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
   }
 
   for(rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
-    int rdo_bitcost = intra_pred_ratecost(modes[rdo_mode], intra_preds);
+    int rdo_bitcost = luma_mode_bits(encoder_state, modes[rdo_mode], intra_preds);
     costs[rdo_mode] = rdo_bitcost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
 
     if (0 && tr_depth == depth) {
@@ -1424,13 +1448,14 @@ static double search_cu_intra(encoder_state * const encoder_state,
                                lcu);
   }
 
+  int8_t modes[35];
+  double costs[35];
+
   // Find best intra mode for 2Nx2N.
   {
     pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
 
-    int8_t modes[35];
-    double costs[35];
     int8_t number_of_modes;
     bool skip_rough_search = (depth == 0 || encoder_state->encoder_control->rdo >= 3);
     if (!skip_rough_search) {
@@ -1466,11 +1491,9 @@ static double search_cu_intra(encoder_state * const encoder_state,
     }
 
     cur_cu->intra[pu_index].mode = modes[0];
-    cur_cu->intra[pu_index].cost = costs[0];
-    cur_cu->intra[pu_index].bitcost = intra_pred_ratecost(modes[0], candidate_modes);
   }
 
-  return cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].cost;
+  return costs[0];
 }
 
 
@@ -1583,7 +1606,17 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     if (cur_cu->type == CU_INTER) {
       mode_bits = cur_cu->inter.bitcost;
     } else {
-      mode_bits = cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost;
+      int8_t candidate_modes[3];
+      {
+        lcu_t *lcu = &work_tree[depth];
+        const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+        const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
+        const cu_info *left_cu = ((x >> 3) ? &cur_cu[-1] : NULL);
+        const cu_info *above_cu = ((lcu_cu.y) ? &cur_cu[-LCU_T_CU_WIDTH] : NULL);
+        intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
+      }
+
+      mode_bits = luma_mode_bits(encoder_state, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, candidate_modes);
       if (PU_INDEX(x >> 2, y >> 2) == 0) {
         mode_bits += chroma_mode_bits(encoder_state, cur_cu->intra[0].mode_chroma, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode);
       }
