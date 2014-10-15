@@ -1187,7 +1187,7 @@ static void search_intra_chroma_rough(encoder_state * const encoder_state,
                                       const pixel *orig_u, const pixel *orig_v, int16_t origstride,
                                       const pixel *rec_u, const pixel *rec_v, int16_t recstride,
                                       int8_t luma_mode,
-                                      int8_t modes[5], double costs[5], int num_modes)
+                                      int8_t modes[5], double costs[5])
 {
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
   if (!reconstruct_chroma) return;
@@ -1195,23 +1195,9 @@ static void search_intra_chroma_rough(encoder_state * const encoder_state,
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
 
-  modes[0] = 0;
-  modes[1] = 26;
-  modes[2] = 10;
-  modes[3] = 1;
-  if (luma_mode == 0 || luma_mode == 26 || luma_mode == 10 || luma_mode == 1) {
-    modes[4] = 34;
-  } else {
-    modes[4] = luma_mode;
-  }
-
   for (int i = 0; i < 5; ++i) {
     costs[i] = 0;
   }
-
-  // If the number of modes is all of them, skip ordering them.
-  if (num_modes == 5) return;
-
 
   cost_pixel_nxn_func *const satd_func = pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = pixels_get_sad_func(width);
@@ -1636,7 +1622,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
       int8_t intra_mode = cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode;
       lcu_set_intra_mode(&work_tree[depth], x, y, depth,
                          intra_mode,
-                         100,
+                         intra_mode,
                          cur_cu->part_size);
       intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
 
@@ -1650,50 +1636,56 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
         if (encoder_state->encoder_control->rdo < 2) {
           const videoframe * const frame = encoder_state->tile->frame;
 
-          int8_t modes[5];
           double costs[5];
-
-          pixel rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
-          pixel rec_v[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
-
-          const int16_t width_c = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
-          const int16_t rec_stride = width_c * 2 + 8;
-          const int16_t out_stride = rec_stride;
-
-          intra_build_reference_border(encoder_state->encoder_control,
-                                       x, y, out_stride,
-                                       rec_u, rec_stride, COLOR_U,
-                                       frame->width / 2, frame->height / 2,
-                                       lcu);
-          intra_build_reference_border(encoder_state->encoder_control,
-                                       x, y, out_stride,
-                                       rec_v, rec_stride, COLOR_V,
-                                       frame->width / 2, frame->height / 2,
-                                       lcu);
-
-          vector2d lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
-          pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
-          pixel *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+          int8_t modes[5] = { 0, 26, 10, 1, 34 };
+          if (intra_mode != 0 && intra_mode != 26 && intra_mode != 10 && intra_mode != 1) {
+            modes[4] = intra_mode;
+          }
 
           // The number of modes to select for slower chroma search. Luma mode
           // is always one of the modes, so 2 means the final decision is made
           // between luma mode and one other mode that looks the best
           // according to search_intra_chroma_rough.
-          // When tested 2 modes is around -0.5% bdrate compared to 0 and 5 modes
-          // is around -0.8.
-          int num_modes = 2;
+          const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
+          int num_modes = modes_in_depth[depth];
 
-          search_intra_chroma_rough(encoder_state, x, y, depth,
-                                    ref_u, ref_v, LCU_WIDTH_C, 
-                                    &rec_u[rec_stride + 1], &rec_v[rec_stride + 1], rec_stride,
-                                    intra_mode, modes, costs, num_modes);
+          if (num_modes != 1 && num_modes != 5) {
+            pixel rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
+            pixel rec_v[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
 
-          intra_mode_chroma = search_intra_chroma(encoder_state, x, y, depth, intra_mode, modes, num_modes, &work_tree[depth]);
+            const int16_t width_c = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
+            const int16_t rec_stride = width_c * 2 + 8;
+            const int16_t out_stride = rec_stride;
+
+            intra_build_reference_border(encoder_state->encoder_control,
+                                         x, y, out_stride,
+                                         rec_u, rec_stride, COLOR_U,
+                                         frame->width / 2, frame->height / 2,
+                                         lcu);
+            intra_build_reference_border(encoder_state->encoder_control,
+                                         x, y, out_stride,
+                                         rec_v, rec_stride, COLOR_V,
+                                         frame->width / 2, frame->height / 2,
+                                         lcu);
+
+            vector2d lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
+            pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+            pixel *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+
+            search_intra_chroma_rough(encoder_state, x, y, depth,
+                                      ref_u, ref_v, LCU_WIDTH_C,
+                                      &rec_u[rec_stride + 1], &rec_v[rec_stride + 1], rec_stride,
+                                      intra_mode, modes, costs);
+          }
+
+          if (num_modes > 1) {
+            intra_mode_chroma = search_intra_chroma(encoder_state, x, y, depth, intra_mode, modes, num_modes, &work_tree[depth]);
+            lcu_set_intra_mode(&work_tree[depth], x, y, depth,
+                               intra_mode, intra_mode_chroma,
+                               cur_cu->part_size);
+          }
         }
 
-        lcu_set_intra_mode(&work_tree[depth], x, y, depth,
-                           intra_mode, intra_mode_chroma,
-                           cur_cu->part_size);
         intra_recon_lcu_chroma(encoder_state, x, y, depth, intra_mode_chroma, NULL, &work_tree[depth]);
       }
     } else if (cur_cu->type == CU_INTER) {
