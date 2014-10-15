@@ -1187,6 +1187,64 @@ static double get_cost(encoder_state * const encoder_state, pixel *pred, pixel *
 }
 
 
+
+static void search_intra_chroma_rough(encoder_state * const encoder_state,
+                                      int x_px, int y_px, int depth,
+                                      const pixel *orig_u, const pixel *orig_v, int16_t origstride,
+                                      const pixel *rec_u, const pixel *rec_v, int16_t recstride,
+                                      int8_t luma_mode,
+                                      int8_t modes[5], double costs[5])
+{
+  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+  if (!reconstruct_chroma) return;
+
+  const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
+  const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
+
+  modes[0] = 0;
+  modes[1] = 26;
+  modes[2] = 10;
+  modes[3] = 1;
+  if (luma_mode == 0 || luma_mode == 26 || luma_mode == 10 || luma_mode == 1) {
+    modes[4] = 34;
+  } else {
+    modes[4] = luma_mode;
+  }
+
+  cost_pixel_nxn_func *const satd_func = pixels_get_satd_func(width);
+  //cost_pixel_nxn_func *const sad_func = pixels_get_sad_func(width);
+
+  pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
+
+  pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+
+  for (int i = 0; i < 5; ++i) {
+    costs[i] = encoder_state->global->cur_lambda_cost_sqrt * chroma_mode_bits(encoder_state, modes[i], luma_mode);
+  }
+  
+  // Chroma doesn't use filtered pixels, so filtered pixels pointer is NULL.
+  const pixel *ref[2] = { rec_u, NULL };
+  pixels_blit(orig_u, orig_block, width, width, origstride, width);
+  for (int i = 0; i < 5; ++i) {
+    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[i], 1);
+    //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
+    costs[i] += satd_func(pred, orig_block);
+  }
+
+  ref[0] = rec_v;
+  pixels_blit(orig_v, orig_block, width, width, origstride, width);
+  for (int i = 0; i < 5; ++i) {
+    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[i], 2);
+    //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
+    costs[i] += satd_func(pred, orig_block);
+  }
+
+  sort_modes(modes, costs, 5);
+}
+
+
 static int8_t search_intra_rough(encoder_state * const encoder_state, 
                                  pixel *orig, int32_t origstride,
                                  pixel *rec, int16_t recstride,
@@ -1521,6 +1579,11 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_INT;
   cu_info *cur_cu;
+
+  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
+  lcu_t *const lcu = &work_tree[depth];
+
   int x_local = (x&0x3f), y_local = (y&0x3f);
 #ifdef _DEBUG
   int debug_split = 0;
@@ -1578,6 +1641,42 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
 
       if (PU_INDEX(x >> 2, y >> 2) == 0) {
         int8_t intra_mode_chroma = intra_mode;
+        
+        if (encoder_state->encoder_control->rdo >= 1) {
+          const videoframe * const frame = encoder_state->tile->frame;
+
+          int8_t modes[5];
+          double costs[5];
+
+          pixel rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
+          pixel rec_v[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
+
+          const int16_t width_c = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
+          const int16_t rec_stride = width_c * 2 + 8;
+          const int16_t out_stride = rec_stride;
+
+          intra_build_reference_border(encoder_state->encoder_control,
+                                       x, y, out_stride,
+                                       rec_u, rec_stride, COLOR_U,
+                                       frame->width / 2, frame->height / 2,
+                                       lcu);
+          intra_build_reference_border(encoder_state->encoder_control,
+                                       x, y, out_stride,
+                                       rec_v, rec_stride, COLOR_V,
+                                       frame->width / 2, frame->height / 2,
+                                       lcu);
+
+          vector2d lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
+          pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+          pixel *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+
+          search_intra_chroma_rough(encoder_state, x, y, depth,
+                                    ref_u, ref_v, LCU_WIDTH_C, 
+                                    &rec_u[rec_stride + 1], &rec_v[rec_stride + 1], rec_stride,
+                                    intra_mode, modes, costs);
+          intra_mode_chroma = modes[0];
+        }
+
         if (encoder_state->encoder_control->rdo >= 2) {
           intra_mode_chroma = search_intra_chroma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
         }
@@ -1615,9 +1714,6 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     } else {
       int8_t candidate_modes[3];
       {
-        lcu_t *lcu = &work_tree[depth];
-        const vector2d lcu_px = { x & 0x3f, y & 0x3f };
-        const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
         const cu_info *left_cu = ((x >> 3) ? &cur_cu[-1] : NULL);
         const cu_info *above_cu = ((lcu_cu.y) ? &cur_cu[-LCU_T_CU_WIDTH] : NULL);
         intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
