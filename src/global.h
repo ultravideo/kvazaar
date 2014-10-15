@@ -71,7 +71,7 @@ typedef int16_t coefficient;
 #   define MAX_INTRA_SEARCH_DEPTH 4
 #endif
 #ifndef MIN_INTRA_SEARCH_DEPTH
-#   define MIN_INTRA_SEARCH_DEPTH 0
+#   define MIN_INTRA_SEARCH_DEPTH 1
 #endif
 
 // Maximum CU depth when descending form LCU level.

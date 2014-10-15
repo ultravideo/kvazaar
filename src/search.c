@@ -47,21 +47,28 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
-#ifndef CUSPL
-#  define CUSPL 9
+// Extra cost for CU split.
+// Compensates for missing or incorrect bit costs. Must be recalculated if
+// bits are added or removed from cu-tree search.
+#ifndef CU_COST
+#  define CU_COST 3
 #endif
+// Disable early cu-split pruning.
 #ifndef FULL_CU_SPLIT_SEARCH
 #  define FULL_CU_SPLIT_SEARCH false
 #endif
-
-#ifndef LMUL
-# define LMUL 1.0
+// Modify weight of luma SSD.
+#ifndef LUMA_MULT
+# define LUMA_MULT 0.8
 #endif
-#ifndef CMUL
-# define CMUL 1.0
+// Modify weight of chroma SSD.
+#ifndef CHROMA_MULT
+# define CHROMA_MULT 1.5
 #endif
-#ifndef MN // fast tr_skip Magic Number
-# define MN 0.0
+// Normalize SAD for comparison against SATD to estimate transform skip
+// for 4x4 blocks.
+#ifndef TRSKIP_RATIO
+# define TRSKIP_RATIO 1.7
 #endif
 
 /**
@@ -831,7 +838,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * LMUL + bits * encoder_state->global->cur_lambda_cost;
+  return (double)ssd * LUMA_MULT + bits * encoder_state->global->cur_lambda_cost;
 }
 
 
@@ -909,7 +916,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CMUL + bits * encoder_state->global->cur_lambda_cost;
+  return (double)ssd * CHROMA_MULT + bits * encoder_state->global->cur_lambda_cost;
 }
 
 
@@ -1163,15 +1170,15 @@ static void sort_modes(int8_t *modes, double *costs, int length)
 static double get_cost(encoder_state * const encoder_state, pixel *pred, pixel *orig_block, cost_pixel_nxn_func *satd_func, cost_pixel_nxn_func *sad_func, int width)
 {
   double satd_cost = satd_func(pred, orig_block);
-  if (MN != 0 && width == 4) {
+  if (TRSKIP_RATIO != 0 && width == 4) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
-    // controlled by MN.
+    // controlled by TRSKIP_RATIO.
     const cabac_ctx *ctx = &encoder_state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
     ctx = &encoder_state->cabac.ctx.transform_skip_model_chroma;
     trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
-    double sad_cost = MN * sad_func(pred, orig_block) + encoder_state->global->cur_lambda_cost_sqrt * trskip_bits;
+    double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + encoder_state->global->cur_lambda_cost_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
       return sad_cost;
     }
@@ -1628,7 +1635,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
   if (depth < MAX_INTRA_SEARCH_DEPTH || (depth < MAX_INTER_SEARCH_DEPTH && encoder_state->global->slicetype != SLICE_I)) {
     int half_cu = cu_width / 2;
     // Using Cost = lambda * 9 to compensate on the price of the split
-    double split_cost = encoder_state->global->cur_lambda_cost * CUSPL;
+    double split_cost = encoder_state->global->cur_lambda_cost * CU_COST;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
         
     if (depth < MAX_DEPTH) {
