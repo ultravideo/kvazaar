@@ -1060,6 +1060,68 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 }
 
 
+static double chroma_mode_bits(const encoder_state *encoder_state, int8_t chroma_mode, int8_t luma_mode)
+{
+  const cabac_ctx *ctx = &(encoder_state->cabac.ctx.chroma_pred_model[0]);
+  double mode_bits;
+  if (chroma_mode == luma_mode) {
+    mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
+  } else {
+    mode_bits = 2.0 + CTX_ENTROPY_FBITS(ctx, 1);
+  }
+
+  return mode_bits;
+}
+
+
+static int8_t search_intra_chroma(encoder_state * const encoder_state,
+                                int x_px, int y_px, int depth,
+                                int8_t intra_mode,
+                                lcu_t *const lcu)
+{
+  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+
+  if (reconstruct_chroma) {
+    const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
+    cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+
+    int8_t chroma_modes[5] = { 0, 26, 10, 1, intra_mode };
+    const int8_t num_chroma_modes = 5;
+
+    if (intra_mode == 0 || intra_mode == 26 || intra_mode == 10 || intra_mode == 1) {
+      chroma_modes[4] = 34;
+    }
+
+    struct {
+      double cost;
+      int8_t mode;
+    } chroma, best_chroma;
+
+    best_chroma.mode = 0;
+    best_chroma.cost = MAX_INT;
+
+    for (int8_t chroma_mode_i = 0; chroma_mode_i < num_chroma_modes; ++chroma_mode_i) {
+      chroma.mode = chroma_modes[chroma_mode_i];
+
+      intra_recon_lcu_chroma(encoder_state, x_px, y_px, depth, chroma.mode, NULL, lcu);
+      chroma.cost = cu_rd_cost_chroma(encoder_state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
+
+      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.chroma_pred_model[0]);
+      double mode_bits = chroma_mode_bits(encoder_state, chroma.mode, intra_mode);
+      chroma.cost += mode_bits * encoder_state->global->cur_lambda_cost;
+
+      if (chroma.cost < best_chroma.cost) {
+        best_chroma = chroma;
+      }
+    }
+
+    return best_chroma.mode;
+  }
+
+  return 100;
+}
+
+
 static void sort_modes(int8_t *modes, double *costs, int length)
 {
   int i, j;
@@ -1406,8 +1468,6 @@ static double search_cu_intra(encoder_state * const encoder_state,
     cur_cu->intra[pu_index].mode = modes[0];
     cur_cu->intra[pu_index].cost = costs[0];
     cur_cu->intra[pu_index].bitcost = intra_pred_ratecost(modes[0], candidate_modes);
-
-    cur_cu->intra[0].mode_chroma = cur_cu->intra[0].mode;
   }
 
   return cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].cost;
@@ -1480,13 +1540,22 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       int8_t intra_mode = cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode;
-      int8_t intra_mode_chroma = cur_cu->intra[0].mode_chroma;
       lcu_set_intra_mode(&work_tree[depth], x, y, depth,
                          intra_mode,
-                         intra_mode_chroma,
+                         100,
                          cur_cu->part_size);
       intra_recon_lcu_luma(encoder_state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
-      intra_recon_lcu_chroma(encoder_state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
+
+      if (PU_INDEX(x >> 2, y >> 2) == 0) {
+        int8_t intra_mode_chroma = intra_mode;
+        if (encoder_state->encoder_control->rdo >= 2) {
+          intra_mode_chroma = search_intra_chroma(encoder_state, x, y, depth, intra_mode, &work_tree[depth]);
+        }
+        lcu_set_intra_mode(&work_tree[depth], x, y, depth,
+                           intra_mode, intra_mode_chroma,
+                           cur_cu->part_size);
+        intra_recon_lcu_chroma(encoder_state, x, y, depth, intra_mode_chroma, NULL, &work_tree[depth]);
+      }
     } else if (cur_cu->type == CU_INTER) {
       int cbf;
       inter_recon_lcu(encoder_state, encoder_state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
@@ -1509,8 +1578,17 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     cost = cu_rd_cost_luma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
     cost += cu_rd_cost_chroma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
     
+    double mode_bits;
     // Bitcost
-    cost += (cur_cu->type == CU_INTER ? cur_cu->inter.bitcost : cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost) * (int32_t)(encoder_state->global->cur_lambda_cost+0.5);
+    if (cur_cu->type == CU_INTER) {
+      mode_bits = cur_cu->inter.bitcost;
+    } else {
+      mode_bits = cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].bitcost;
+      if (PU_INDEX(x >> 2, y >> 2) == 0) {
+        mode_bits += chroma_mode_bits(encoder_state, cur_cu->intra[0].mode_chroma, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode);
+      }
+    }
+    cost += mode_bits * encoder_state->global->cur_lambda_cost;
   }
   
   // Recursively split all the way to max search depth.

@@ -650,6 +650,9 @@ void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
   if (depth <= MAX_DEPTH || pu_index == 0) {
+    cbf_clear(&cur_cu->cbf.u, depth);
+    cbf_clear(&cur_cu->cbf.v, depth);
+
     const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH_C;
     pixel *recbase_u = &lcu->rec.u[chroma_offset];
     pixel *recbase_v = &lcu->rec.v[chroma_offset];
