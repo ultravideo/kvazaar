@@ -46,8 +46,6 @@ typedef struct {
  */
 typedef struct
 {
-  uint32_t cost;
-  uint32_t bitcost;
   int8_t mode;
   int8_t mode_chroma;
   int8_t tr_skip;    //!< \brief transform skip flag
@@ -58,7 +56,7 @@ typedef struct
  */
 typedef struct
 {
-  uint32_t cost;
+  double cost;
   uint32_t bitcost;
   int16_t mv[2];
   int16_t mvd[2];

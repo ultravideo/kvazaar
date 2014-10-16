@@ -361,8 +361,10 @@ int quantize_residual(encoder_state *const encoder_state,
 
   // Quantize coeffs. (coeff -> quant_coeff)
   if (encoder_state->encoder_control->rdoq_enable) {
+    int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
+    tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     rdoq(encoder_state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
-         scan_order, cur_cu->type, cur_cu->tr_depth-cur_cu->depth);
+         scan_order, cur_cu->type, tr_depth);
   } else {
     quant(encoder_state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
           scan_order, cur_cu->type);
@@ -523,12 +525,14 @@ int quantize_residual_trskip(
  * - lcu->cbf  coded block flags for the area
  * - lcu->cu.intra[].tr_skip  for the area
  */
-void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
+void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info *cur_cu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};
   const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
+  if (cur_cu == NULL) {
+    cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+  }
   const int8_t width = LCU_WIDTH>>depth;
   
   // Tell clang-analyzer what is up. For some reason it can't figure out from
@@ -538,10 +542,10 @@ void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, 
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
-    quantize_lcu_luma_residual(encoder_state, x,          y,          depth+1, lcu);
-    quantize_lcu_luma_residual(encoder_state, x + offset, y,          depth+1, lcu);
-    quantize_lcu_luma_residual(encoder_state, x,          y + offset, depth+1, lcu);
-    quantize_lcu_luma_residual(encoder_state, x + offset, y + offset, depth+1, lcu);
+    quantize_lcu_luma_residual(encoder_state, x,          y,          depth+1, NULL, lcu);
+    quantize_lcu_luma_residual(encoder_state, x + offset, y,          depth+1, NULL, lcu);
+    quantize_lcu_luma_residual(encoder_state, x,          y + offset, depth+1, NULL, lcu);
+    quantize_lcu_luma_residual(encoder_state, x + offset, y + offset, depth+1, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth < MAX_DEPTH) {
@@ -605,13 +609,15 @@ void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, 
 }
 
 
-void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, lcu_t* lcu)
+void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info *cur_cu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};
   const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
-  cu_info *cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x>>3) + (lcu_px.y>>3)*LCU_T_CU_WIDTH];
   const int8_t width = LCU_WIDTH>>depth;
+  if (cur_cu == NULL) {
+    cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+  }
   
   // Tell clang-analyzer what is up. For some reason it can't figure out from
   // asserting just depth.
@@ -620,10 +626,10 @@ void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x
   // Split transform and increase depth
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
-    quantize_lcu_chroma_residual(encoder_state, x,          y,          depth+1, lcu);
-    quantize_lcu_chroma_residual(encoder_state, x + offset, y,          depth+1, lcu);
-    quantize_lcu_chroma_residual(encoder_state, x,          y + offset, depth+1, lcu);
-    quantize_lcu_chroma_residual(encoder_state, x + offset, y + offset, depth+1, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x,          y,          depth+1, NULL, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x + offset, y,          depth+1, NULL, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x,          y + offset, depth+1, NULL, lcu);
+    quantize_lcu_chroma_residual(encoder_state, x + offset, y + offset, depth+1, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth < MAX_DEPTH) {
@@ -644,6 +650,9 @@ void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
   if (depth <= MAX_DEPTH || pu_index == 0) {
+    cbf_clear(&cur_cu->cbf.u, depth);
+    cbf_clear(&cur_cu->cbf.v, depth);
+
     const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH_C;
     pixel *recbase_u = &lcu->rec.u[chroma_offset];
     pixel *recbase_v = &lcu->rec.v[chroma_offset];

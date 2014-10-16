@@ -689,24 +689,26 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   }
 
   if (main_state->global->is_radl_frame) {
-    // Access Unit Delimiter (AUD)
-    if (encoder->aud_enable)
-      encoder_state_write_bitstream_aud(main_state);
+    if (main_state->global->frame == 0) {
+      // Access Unit Delimiter (AUD)
+      if (encoder->aud_enable)
+        encoder_state_write_bitstream_aud(main_state);
 
-    // Video Parameter Set (VPS)
-    nal_write(stream, NAL_VPS_NUT, 0, 1);
-    encoder_state_write_bitstream_vid_parameter_set(main_state);
-    bitstream_align(stream);
+      // Video Parameter Set (VPS)
+      nal_write(stream, NAL_VPS_NUT, 0, 1);
+      encoder_state_write_bitstream_vid_parameter_set(main_state);
+      bitstream_align(stream);
 
-    // Sequence Parameter Set (SPS)
-    nal_write(stream, NAL_SPS_NUT, 0, 1);
-    encoder_state_write_bitstream_seq_parameter_set(main_state);
-    bitstream_align(stream);
+      // Sequence Parameter Set (SPS)
+      nal_write(stream, NAL_SPS_NUT, 0, 1);
+      encoder_state_write_bitstream_seq_parameter_set(main_state);
+      bitstream_align(stream);
 
-    // Picture Parameter Set (PPS)
-    nal_write(stream, NAL_PPS_NUT, 0, 1);
-    encoder_state_write_bitstream_pic_parameter_set(main_state);
-    bitstream_align(stream);
+      // Picture Parameter Set (PPS)
+      nal_write(stream, NAL_PPS_NUT, 0, 1);
+      encoder_state_write_bitstream_pic_parameter_set(main_state);
+      bitstream_align(stream);
+    }
 
     if (main_state->global->frame == 0) {
       // Prefix SEI

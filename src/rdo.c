@@ -128,26 +128,6 @@ const float f_entropy_bits[128] =
 
 
 /**
- * \brief Helper function to find intra merge costs
- * \returns intra mode coding cost in bits
- */
-uint32_t intra_pred_ratecost(int16_t mode, int8_t *intra_preds)
-{
-   // merge mode -1 means they are not used -> cost 0
-   if(intra_preds[0] == -1) return 0;
-
-   // First candidate needs only one bit and two other need two
-   if(intra_preds[0] == mode) {
-     return 1;
-   } else if(intra_preds[1] == mode || intra_preds[2] == mode) {
-     return 2;
-   }
-   // Without merging the cost is 5 bits
-   return 5;
-}
-
-
-/**
  * \brief Function to compare RDO costs
  * \param rdo_costs array of current costs
  * \param cost new cost to check
@@ -196,8 +176,6 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
     coefficient temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
-    uint32_t cost = 0;
-    uint32_t coeffcost = 0;
     int8_t luma_scan_mode = SCAN_DIAG;
 
     int i = 0,x,y;
@@ -225,26 +203,30 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
     dequant(encoder_state, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
     itransform2d(encoder, temp_block,pre_quant_coeff,width,0);
 
+    unsigned ssd = 0;
     // SSD between original and reconstructed
     for (i = 0; i < width*width; i++) {
-      int diff = temp_block[i]-block[i];
-      cost += diff*diff;
+      //int diff = temp_block[i]-block[i];
+      int diff = orig_block[i] - CLIP(0, 255, pred[i] + temp_block[i]);
+
+      ssd += diff*diff;
     }
 
+    double coeff_bits = 0;
     // Simple RDO
     if(encoder->rdo == 1) {
       // SSD between reconstruction and original + sum of coeffs
+      int coeff_abs = 0;
       for (i = 0; i < width*width; i++) {
-        coeffcost += abs((int)temp_coeff[i]);
+        coeff_abs += abs((int)temp_coeff[i]);
       }
-      cost += (1 + coeffcost + (coeffcost>>1))*((int)encoder_state->global->cur_lambda_cost+0.5);
+      coeff_bits += 1 + 1.5 * coeff_abs;
       // Full RDO
     } else if(encoder->rdo >= 2) {
-      coeffcost = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
-
-      cost  += coeffcost*((int)encoder_state->global->cur_lambda_cost+0.5);
+      coeff_bits = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
     }
-    return cost;
+
+    return (uint32_t)(0.5 + ssd + coeff_bits * encoder_state->global->cur_lambda_cost);
 }
 
 

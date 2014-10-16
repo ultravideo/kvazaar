@@ -43,6 +43,9 @@
 #include "sao.h"
 #include "rdo.h"
 
+#ifndef LMBD
+# define LMBD 1.0
+#endif
 
 /*!
   \brief Initializes lambda-value for current QP
@@ -69,6 +72,8 @@ void encoder_state_init_lambda(encoder_state * const encoder_state)
   if (encoder_state->global->slicetype != SLICE_I ) {
     lambda *= 0.95;
   }
+
+  lambda *= LMBD;
 
   encoder_state->global->cur_lambda_cost = lambda;
   encoder_state->global->cur_lambda_cost_sqrt = sqrt(lambda);
