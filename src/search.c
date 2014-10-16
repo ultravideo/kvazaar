@@ -1131,7 +1131,6 @@ static int8_t search_intra_chroma(encoder_state * const encoder_state,
       intra_recon_lcu_chroma(encoder_state, x_px, y_px, depth, chroma.mode, NULL, lcu);
       chroma.cost = cu_rd_cost_chroma(encoder_state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
-      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.chroma_pred_model[0]);
       double mode_bits = chroma_mode_bits(encoder_state, chroma.mode, intra_mode);
       chroma.cost += mode_bits * encoder_state->global->cur_lambda_cost;
 
@@ -1193,7 +1192,6 @@ static void search_intra_chroma_rough(encoder_state * const encoder_state,
   if (!reconstruct_chroma) return;
 
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
-  const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
 
   for (int i = 0; i < 5; ++i) {
     costs[i] = 0;
@@ -1208,22 +1206,18 @@ static void search_intra_chroma_rough(encoder_state * const encoder_state,
   pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
   pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
-  
-  // Chroma doesn't use filtered pixels, so filtered pixels pointer is NULL.
-  const pixel *ref[2] = { rec_u, NULL };
   pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[i], 1);
+    intra_get_pred(encoder_state->encoder_control, rec_u, NULL, recstride, pred, width, modes[i], 1);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
 
-  ref[0] = rec_v;
   pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[i], 2);
+    intra_get_pred(encoder_state->encoder_control, rec_v, NULL, recstride, pred, width, modes[i], 2);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -1250,7 +1244,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
 
-  pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
+  pixel *recf = &rec_filtered_temp[recstride + 1];
 
   assert(width == 4 || width == 8 || width == 16 || width == 32);
 
@@ -1261,12 +1255,12 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   {
     int16_t x, y;
     for (y = -1; y < recstride; y++) {
-      ref[1][y*recstride - 1] = rec[y*recstride - 1];
+      recf[y*recstride - 1] = rec[y*recstride - 1];
     }
     for (x = 0; x < recstride; x++) {
-      ref[1][x - recstride] = rec[x - recstride];
+      recf[x - recstride] = rec[x - recstride];
     }
-    intra_filter(ref[1], recstride, width, 0);
+    intra_filter(recf, recstride, width, 0);
   }
   
   int8_t modes_selected = 0;
@@ -1289,7 +1283,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
   for (int mode = 2; mode <= 34; mode += offset) {
-    intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+    intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
     costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     modes[modes_selected] = mode;
 
@@ -1309,7 +1303,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
       int8_t mode = modes[0] - offset;
       if (mode >= 2) {
-        intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+        intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
         costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         ++modes_selected;
@@ -1317,7 +1311,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
       mode = modes[0] + offset;
       if (mode <= 34) {
-        intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+        intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
         costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         ++modes_selected;
@@ -1340,7 +1334,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     }
 
     if (!has_mode) {
-      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, mode, 0);
+      intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
       costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;
@@ -1377,18 +1371,18 @@ static void search_intra_rdo(encoder_state * const encoder_state,
   int pred_mode;
 
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-  pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
+  pixel *recf = &rec_filtered_temp[recstride + 1];
 
   // Generate filtered reference pixels.
   {
     int x, y;
     for (y = -1; y < recstride; y++) {
-      ref[1][y*recstride - 1] = rec[y*recstride - 1];
+      recf[y*recstride - 1] = rec[y*recstride - 1];
     }
     for (x = 0; x < recstride; x++) {
-      ref[1][x - recstride] = rec[x - recstride];
+      recf[x - recstride] = rec[x - recstride];
     }
-    intra_filter(ref[1], recstride, width, 0);
+    intra_filter(recf, recstride, width, 0);
   }
 
   pixels_blit(orig, orig_block, width, width, origstride, width);
@@ -1415,7 +1409,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
 
     if (0 && tr_depth == depth) {
       // The reconstruction is calculated again here, it could be saved from before..
-      intra_get_pred(encoder_state->encoder_control, ref, recstride, pred, width, modes[rdo_mode], 0);
+      intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, modes[rdo_mode], 0);
       costs[rdo_mode] += rdo_cost_intra(encoder_state, pred, orig_block, width, modes[rdo_mode], width == 4 ? 1 : 0);
     } else {
       // Perform transform split search and save mode RD cost for the best one.

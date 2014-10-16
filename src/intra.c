@@ -86,7 +86,7 @@ void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_
  * \param width block width
  * \returns DC prediction
 */
-pixel intra_get_dc_pred(pixel *pic, uint16_t picwidth, uint8_t width)
+pixel intra_get_dc_pred(const pixel *pic, uint16_t picwidth, uint8_t width)
 {
   int32_t i, sum = 0;
 
@@ -221,21 +221,21 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
  * \param recstride  Stride for rec pixel arrays.
  * \param dst
  */
-void intra_get_pred(const encoder_control * const encoder, pixel *rec[2], int recstride, pixel *dst, int width, int mode, int is_chroma)
+void intra_get_pred(const encoder_control * const encoder, const pixel *rec, const pixel *rec_filtered, int recstride, pixel *dst, int width, int mode, int is_chroma)
 {
-  pixel *ref_pixels = rec[0];
+  const pixel *ref_pixels = rec;
   if (is_chroma || mode == 1 || width == 4) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
     // Otherwise, use filtered for planar.
-    ref_pixels = rec[1];
+    ref_pixels = rec_filtered;
   } else {
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     int filter_threshold = intra_hor_ver_dist_thres[g_to_bits[width]];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     if (dist_from_vert_or_hor > filter_threshold) {
-      ref_pixels = rec[1];
+      ref_pixels = rec_filtered;
     }
   }
 
@@ -274,21 +274,21 @@ void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recs
 {
   pixel pred[LCU_WIDTH * LCU_WIDTH];
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-  pixel *ref[2] = {rec, &rec_filtered_temp[recstride + 1]};
+  pixel *recf = &rec_filtered_temp[recstride + 1];
 
   // Generate filtered reference pixels.
   {
     int x, y;
     for (y = -1; y < recstride; y++) {
-      ref[1][y*recstride - 1] = rec[y*recstride - 1];
+      recf[y*recstride - 1] = rec[y*recstride - 1];
     }
     for (x = 0; x < recstride; x++) {
-      ref[1][x - recstride] = rec[x - recstride];
+      recf[x - recstride] = rec[x - recstride];
     }
-    intra_filter(ref[1], recstride, width, 0);
+    intra_filter(recf, recstride, width, 0);
   }
 
-  intra_get_pred(encoder, ref, recstride, pred, width, mode, chroma);
+  intra_get_pred(encoder, rec, recf, recstride, pred, width, mode, chroma);
 
   pixels_blit(pred, dst, width, width, width, dststride);
 }
@@ -483,7 +483,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(const encoder_control * const encoder, pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
+void intra_get_angular_pred(const encoder_control * const encoder, const pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
 {
   int32_t k,l;
   int32_t blk_size        = width;
@@ -592,7 +592,7 @@ void intra_get_angular_pred(const encoder_control * const encoder, pixel* src, i
 
 
 
-void intra_dc_pred_filtering(pixel *src, int32_t src_stride, pixel *dst, int32_t dst_stride, int32_t width, int32_t height )
+void intra_dc_pred_filtering(const pixel *src, int32_t src_stride, pixel *dst, int32_t dst_stride, int32_t width, int32_t height )
 {
   int32_t x, y, dst_stride2, src_stride2;
 
@@ -619,7 +619,7 @@ void intra_dc_pred_filtering(pixel *src, int32_t src_stride, pixel *dst, int32_t
 
   This function derives the prediction samples for planar mode (intra coding).
 */
-void intra_get_planar_pred(pixel* src, int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride)
+void intra_get_planar_pred(const pixel* src, int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride)
 {
   int32_t k, l, bottom_left, top_right;
   int32_t hor_pred;
