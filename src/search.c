@@ -1627,7 +1627,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        if (encoder_state->encoder_control->rdo < 2) {
+        if (encoder_state->encoder_control->rdo == 3) {
           const videoframe * const frame = encoder_state->tile->frame;
 
           double costs[5];
@@ -1642,6 +1642,10 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
           // according to search_intra_chroma_rough.
           const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
           int num_modes = modes_in_depth[depth];
+
+          if (encoder_state->encoder_control->rdo == 3) {
+            num_modes = 5;
+          }
 
           if (num_modes != 1 && num_modes != 5) {
             pixel rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
