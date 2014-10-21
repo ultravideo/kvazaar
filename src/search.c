@@ -1702,7 +1702,9 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
         // Selecting skip reduces bits needed to code the CU
-        cur_cu->inter.bitcost--;
+        if (cur_cu->inter.bitcost > 1) {
+          cur_cu->inter.bitcost -= 1;
+        }
       }
       lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
       lcu_set_coeff(&work_tree[depth], x, y, depth, cur_cu);
