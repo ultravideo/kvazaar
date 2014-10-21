@@ -27,6 +27,7 @@
 
 #if COMPILE_POWERPC_ALTIVEC
 #include <altivec.h>
+#include <stdlib.h>
 
 
 static unsigned reg_sad_altivec(const pixel * const data1, const pixel * const data2,
