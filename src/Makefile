@@ -138,7 +138,10 @@ ifeq ($(ARCH), ppc64)
 else
   strategies/sse2/%.o: EXTRA_FLAGS += -msse2
   strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1
-  strategies/avx2/%.o: EXTRA_FLAGS += -mavx2
+  #Needs to be defined on Travis
+  ifndef KVZ_DISABLE_AVX2
+    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2
+  endif
 endif
 
 ifndef KVZ_DISABLE_ASM
