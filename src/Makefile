@@ -44,6 +44,7 @@ else ifeq ($(SYSTEM),Darwin)
   ASMFLAGS += -DPREFIX
 # Default to Linux/elf specific flags
 else
+  LDFLAGS += -lrt
   ifeq ($(ARCH), x86_64)
     ASMFLAGS += -f elf64
   else
