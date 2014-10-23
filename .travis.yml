@@ -7,8 +7,6 @@ language: c
 compiler:
   - gcc
   - clang
-  
-env: KVZ_DISABLE_AVX2=1 
 
 before_install:
   - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -18,6 +16,7 @@ before_install:
 
 script: 
   - cd src
+  - export KVZ_DISABLE_AVX2=1 
   - make
-  - if [ "$CC" = "gcc" ]; then make clean && export CC=gcc-4.8 && make; fi
+  - if [ "$CC" = "gcc" ]; then make clean && unset KVZ_DISABLE_AVX2 && export CC=gcc-4.8 && make; fi
   
