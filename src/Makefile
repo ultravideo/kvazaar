@@ -62,7 +62,9 @@ WARNINGS = -Wall -Wtype-limits -Wvla
 
 INCLUDEDIRS = -I. -I./strategies -I./extras
 
-CC = gcc
+ifndef CC
+  CC = gcc
+endif
 CCFLAGS = $(DFLAGS) -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm -pthread
 LD = gcc
