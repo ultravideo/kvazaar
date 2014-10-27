@@ -5,7 +5,7 @@ ifeq (, $(ARCH))
 endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
-DFLAGS = -O2 -g -Werror -ftree-vectorize
+CFLAGS += -O2 -g -Werror -ftree-vectorize
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
@@ -20,7 +20,7 @@ else
     TARGET_CPU_ARCH := x86
 endif
 
-DFLAGS += -m$(TARGET_CPU_BITS)
+CFLAGS += -m$(TARGET_CPU_BITS)
 LDFLAGS += -m$(TARGET_CPU_BITS)
 
 # Windows (cygwin/mingw) specific flags
@@ -33,7 +33,7 @@ ifneq ( ,$(findstring Windows, $(OS)))
     ASMFLAGS += -DPREFIX
     ASMFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
-  DFLAGS += -D__USE_MINGW_ANSI_STDIO=1
+  CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 # OS X specific flags
 else ifeq ($(SYSTEM),Darwin)
   ifeq ($(ARCH), x86_64)
@@ -66,7 +66,7 @@ INCLUDEDIRS = -I. -I./strategies -I./extras
 ifndef CC
   CC = gcc
 endif
-CCFLAGS = $(DFLAGS) -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
+CFLAGS += -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm -pthread
 LD = gcc
 OBJS = interface_main.o \
@@ -162,10 +162,10 @@ $(PROG): $(OBJS) $(ASMOBJS)
 	$(AS) $(ASMFLAGS) -M -o $@ > $<
 
 %.o: %.c Makefile
-	$(CC) $(CCFLAGS) $(EXTRA_FLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -c $< -o $@
 
 %.d: %.c Makefile
-	$(CC) $(CCFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
+	$(CC) $(CFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
 
 
 clean:
