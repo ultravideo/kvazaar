@@ -17,6 +17,6 @@ before_install:
 script: 
   - cd src
   - export KVZ_DISABLE_AVX2=1 
-  - make
-  - if [ "$CC" = "gcc" ]; then make clean && unset KVZ_DISABLE_AVX2 && export CC=gcc-4.8 && make; fi
+  - make && make tests
+  - if [ "$CC" = "gcc" ]; then make clean && unset KVZ_DISABLE_AVX2 && export CC=gcc-4.8 && make && make tests; fi
   
