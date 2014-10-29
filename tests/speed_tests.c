@@ -73,17 +73,6 @@ static void tear_down_tests()
   }
 }
 
-
-static unsigned test_calc_sad(const pixel * buf1, const pixel * buf2, int dim)
-{
-  unsigned result = 0;
-  for (int i = 0; i < dim * dim; ++i) {
-    result += abs(buf1[i] - buf2[i]);
-  }
-  return result;
-}
-
-
 //////////////////////////////////////////////////////////////////////////
 // TESTS
 

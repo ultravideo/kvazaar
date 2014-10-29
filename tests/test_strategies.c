@@ -13,7 +13,7 @@ void init_test_strategies()
   strategies.strategies = NULL;
 
   // Init strategyselector because it sets hardware flags.
-  strategyselector_init();
+  strategyselector_init(1);
 
   // Collect all strategies to be tested.
   if (!strategy_register_picture(&strategies)) {

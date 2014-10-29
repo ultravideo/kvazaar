@@ -61,7 +61,7 @@ endif
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
 WARNINGS = -Wall -Wtype-limits -Wvla
 
-INCLUDEDIRS = -I. -I./strategies -I./extras
+INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
 ifndef CC
   CC = gcc
@@ -110,6 +110,17 @@ OBJS = interface_main.o \
   strategies/generic/dct-generic.o \
   strategies/avx2/dct-avx2.o
 
+TEST_OBJS = $(filter-out encmain.o interface_main.o, $(OBJS)) \
+  ../tests/dct_tests.o \
+  ../tests/intra_sad_tests.o \
+  ../tests/sad_tests.o \
+  ../tests/satd_tests.o \
+  ../tests/speed_tests.o \
+  ../tests/tests_main.o \
+  ../tests/test_strategies.o \
+
+
+
 ASMFLAGS += $(INCLUDEDIRS)
 ASMOBJS =
 
@@ -127,10 +138,17 @@ endif
 PROG  = ./kvazaar
 PROGS = $(PROG)
 
-DEPS = $(OBJS:.o=.d)
+TESTS = ./kvazaar_tests
+
+DEPS = $(OBJS:.o=.d) $(TEST_OBJS:.o=.d)
 
 all: $(PROGS)
-.PHONY: all clean
+.PHONY: all clean build_tests tests
+
+build_tests: $(TESTS)
+
+tests: build_tests
+	$(TESTS)
 
 # Compile files in strategy directories with appropriate flags.
 EXTRA_FLAGS =
@@ -155,6 +173,9 @@ endif
 $(PROG): $(OBJS) $(ASMOBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
+$(TESTS): $(TEST_OBJS) $(ASMOBJS)
+	$(LD) $^ $(LDFLAGS) -o $@
+
 %.o: %.asm Makefile
 	$(AS) $(ASMFLAGS) -o $@ $<
 
@@ -169,6 +190,6 @@ $(PROG): $(OBJS) $(ASMOBJS)
 
 
 clean:
-	rm -f $(OBJS) $(PROGS) $(ASMOBJS) $(DEPS)
+	rm -f $(OBJS) $(PROGS) $(TESTS) $(ASMOBJS) $(TEST_OBJS) $(DEPS) $(TEST_DEPS)
 
 -include $(DEPS)

@@ -90,7 +90,6 @@ TEST satd_test_black_and_white(void)
   const int const satd_results[5] = {2040, 4080, 16320, 65280, 261120};
   
   const int test = 0;
-  const int width = 1 << satd_test_env.log_width;
 
   pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
   pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
@@ -98,6 +97,7 @@ TEST satd_test_black_and_white(void)
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
+  ASSERT_EQ(result1, result2);
   ASSERT_EQ(result1, satd_results[satd_test_env.log_width - 2]);
 
   PASS();
@@ -108,7 +108,6 @@ TEST satd_test_checkers(void)
   const int const satd_checkers_results[5] = { 2040, 4080, 16320, 65280, 261120 };
 
   const int test = 1;
-  const int width = 1 << satd_test_env.log_width;
 
   pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
   pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
@@ -116,6 +115,7 @@ TEST satd_test_checkers(void)
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
+  ASSERT_EQ(result1, result2);
   ASSERT_EQ(result1, satd_checkers_results[satd_test_env.log_width - 2]);
 
   PASS();
@@ -127,7 +127,6 @@ TEST satd_test_gradient(void)
   const int const satd_gradient_results[5] = {3140,9004,20481,67262,258672};
 
   const int test = 2;
-  const int width = 1 << satd_test_env.log_width;
 
   pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
   pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
@@ -135,23 +134,12 @@ TEST satd_test_gradient(void)
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
 
+  ASSERT_EQ(result1, result2);
   ASSERT_EQ(result1, satd_gradient_results[satd_test_env.log_width - 2]);
 
   PASS();
 }
 
-static unsigned satd_test_performance(void)
-{
-  const int test = 0;
-  const int width = 1 << satd_test_env.log_width;
-
-  pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
-  pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
-
-  unsigned result = satd_test_env.tested_func(buf1, buf2);
-
-  return;
-}
 //////////////////////////////////////////////////////////////////////////
 // TEST FIXTURES
 SUITE(satd_tests)
