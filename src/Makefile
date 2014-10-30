@@ -140,16 +140,22 @@ PROGS = $(PROG)
 
 TESTS = ./kvazaar_tests
 
-DEPS = $(OBJS:.o=.d) $(TEST_OBJS:.o=.d)
+DEPS = $(OBJS:.o=.d)
+
+GREATEST = ../greatest/greatest.h
 
 all: $(PROGS)
 .PHONY: all clean build_tests tests
 
-build_tests: $(TESTS)
+build_tests: $(GREATEST) $(TESTS)
 
 tests: build_tests
 	$(TESTS)
 
+$(GREATEST):
+	git submodule init
+	git submodule update
+	
 # Compile files in strategy directories with appropriate flags.
 EXTRA_FLAGS =
 ifeq ($(ARCH), ppc64)
@@ -186,10 +192,15 @@ $(TESTS): $(TEST_OBJS) $(ASMOBJS)
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -c $< -o $@
 
 %.d: %.c Makefile
-	$(CC) $(CFLAGS) -MF"$@" -MG -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
+	$(CC) $(CFLAGS) -MF"$@" -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
+	
+../tests/%.c: ../tests/%.h Makefile
+	touch $@
 
 
 clean:
-	rm -f $(OBJS) $(PROGS) $(TESTS) $(ASMOBJS) $(TEST_OBJS) $(DEPS) $(TEST_DEPS)
+	rm -f $(OBJS) $(PROGS) $(TESTS) $(ASMOBJS) $(TEST_OBJS) $(DEPS)
 
--include $(DEPS)
+ifneq ($(MAKECMDGOALS),clean)
+	-include $(DEPS)
+endif
