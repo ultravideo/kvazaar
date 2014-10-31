@@ -147,7 +147,11 @@ extern int getopt ();
 # endif /* __GNU_LIBRARY__ */
 
 # ifndef __need_getopt
-extern int getopt_long (int __argc, char *const *__argv, const char *__shortopts,
+
+// Notice: Originally argc and argv were named __argc and __argv
+// A macro definition added * in front of them both, causing
+// build error with mingw.
+extern int getopt_long (int argc, char *const *argv, const char *__shortopts,
 		        const struct option *__longopts, int *__longind);
 extern int getopt_long_only (int __argc, char *const *__argv,
 			     const char *__shortopts,
