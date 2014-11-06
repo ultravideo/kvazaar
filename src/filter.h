@@ -54,6 +54,12 @@ void filter_inter_halfpel_chroma(const encoder_control * encoder,
                                  int16_t *src, int16_t src_stride, int width, int height,
                                  int16_t *dst, int16_t dst_stride,  int8_t hor_flag, int8_t ver_flag);
 
+void filter_inter_octpel_chroma(const encoder_control * encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst,
+                                int16_t dst_stride, int8_t hor_flag, int8_t ver_flag);
+
+void filter_inter_quarterpel_luma(const encoder_control * encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst,
+                                  int16_t dst_stride, int8_t hor_flag, int8_t ver_flag);
+
 // SAO
 
 //////////////////////////////////////////////////////////////////////////

@@ -98,6 +98,16 @@ const vector2d small_hexbs[5] = {
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
 
+/*
+ *  6 7 8
+ *  3 4 5
+ *  0 1 2
+ */
+const vector2d square[9] = {
+  { -1, 1 },
+  { 0, 1 }, { 1, 1 }, { -1, 0 }, { 0, 0 }, { 1, 0 }, { -1, -1 },
+  { 0, -1 }, { 1, -1 }
+};
 
 static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 {
@@ -144,7 +154,7 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
   return bitcost;
 }
 
-static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y,
+static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y, int mv_shift,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
@@ -155,8 +165,8 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
   int8_t merged      = 0;
   int8_t cur_mv_cand = 0;
 
-  x <<= 2;
-  y <<= 2;
+  x <<= mv_shift;
+  y <<= mv_shift;
 
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
@@ -238,7 +248,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
 
       PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
                               (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
@@ -263,7 +273,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
                              block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(encoder_state, 0, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, 0, 0, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
       PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=00vector,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
                               (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
                               (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + block_width, 
@@ -288,7 +298,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
                                  (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
                                  (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
                                  block_width, block_width, max_lcu_below);
-          cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+          cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
           PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs_around00,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
                         (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x, 
                         (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x + block_width, 
@@ -332,7 +342,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
                                (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                block_width, block_width, max_lcu_below);
-        cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
         PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs_iterative,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
               (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
               (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + block_width, 
@@ -364,7 +374,7 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd_cost(encoder_state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
       PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=small_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
             (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
             (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + block_width, 
@@ -446,6 +456,149 @@ static unsigned search_mv_full(unsigned depth,
 #endif
 
 /**
+ * \brief Do fractional motion estimation
+ *
+ * \param depth      log2 depth of the search
+ * \param pic        Picture motion vector is searched for.
+ * \param ref        Picture motion vector is searched from.
+ * \param orig       Top left corner of the searched for block.
+ * \param mv_in_out  Predicted mv in and best out. Quarter pixel precision.
+ *
+ * \returns  Cost of the motion vector.
+ *
+ * Algoritm first searches 1/2-pel positions around integer mv and after best match is found,
+ * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
+ */
+static unsigned search_frac( const encoder_state * const encoder_state,
+        unsigned depth,
+        const image *pic, const image *ref,
+        const vector2d *orig, vector2d *mv_in_out,
+        int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+        int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out) {
+
+  //Set mv to halfpel precision
+  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+  unsigned best_cost = UINT32_MAX;
+  uint32_t best_bitcost = 0, bitcost;
+  unsigned i;
+  unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
+
+  unsigned cost = 0;
+
+  cost_pixel_nxn_func *satd = pixels_get_satd_func(block_width);
+
+  vector2d halfpel_offset;
+
+  #define FILTER_SIZE 8
+  #define HALF_FILTER (FILTER_SIZE>>1)
+
+  //create buffer for block + extra for filter
+  int src_stride = block_width+FILTER_SIZE+1;
+  int16_t src[(LCU_WIDTH+FILTER_SIZE+1) * (LCU_WIDTH+FILTER_SIZE+1)];
+  int16_t* src_off = &src[HALF_FILTER+HALF_FILTER*(block_width+FILTER_SIZE+1)];
+
+  //destination buffer for interpolation
+  int dst_stride = (block_width+1)*4;
+  int16_t dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
+  int16_t* dst_off = &dst[dst_stride*4+4];
+
+  extend_borders(orig->x, orig->y, mv.x-1, mv.y-1,
+                encoder_state->tile->lcu_offset_x * LCU_WIDTH,
+                encoder_state->tile->lcu_offset_y * LCU_WIDTH,
+                ref->y, ref->width, ref->height, FILTER_SIZE, block_width+1, block_width+1, src);
+
+  filter_inter_quarterpel_luma(encoder_state->encoder_control, src_off, src_stride, block_width+1,
+      block_width+1, dst, dst_stride, 1, 1);
+
+
+  //Set mv to half-pixel precision
+  mv.x <<= 1;
+  mv.y <<= 1;
+
+  // Search halfpel positions around best integer mv
+  for (i = 0; i < 9; ++i) {
+    const vector2d *pattern = &square[i];
+
+    pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
+    pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
+
+    int y,x;
+    for(y = 0; y < block_width; ++y) {
+      int dst_y = y*4+pattern->y*2;
+      for(x = 0; x < block_width; ++x) {
+        int dst_x = x*4+pattern->x*2;
+        tmp_filtered[y*block_width+x] = (uint8_t)dst_off[dst_y*dst_stride+dst_x];
+        tmp_pic[y*block_width+x] = (uint8_t)pic->y[orig->x+x + (orig->y+y)*pic->width];
+      }
+    }
+
+    cost = satd(tmp_pic,tmp_filtered);
+
+    cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+
+    if (cost < best_cost) {
+      best_cost    = cost;
+      best_index   = i;
+      best_bitcost = bitcost;
+
+    }
+  }
+
+  //Set mv to best match
+  mv.x += square[best_index].x;
+  mv.y += square[best_index].y;
+
+  halfpel_offset.x = square[best_index].x*2;
+  halfpel_offset.y = square[best_index].y*2;
+
+  //Set mv to quarterpel precision
+  mv.x <<= 1;
+  mv.y <<= 1;
+
+  //Search quarterpel points around best halfpel mv
+  for (i = 0; i < 9; ++i) {
+    const vector2d *pattern = &square[i];
+
+    pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
+    pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
+
+    int y,x;
+    for(y = 0; y < block_width; ++y) {
+      int dst_y = y*4+halfpel_offset.y+pattern->y;
+      for(x = 0; x < block_width; ++x) {
+        int dst_x = x*4+halfpel_offset.x+pattern->x;
+        tmp_filtered[y*block_width+x] = (uint8_t)dst_off[dst_y*dst_stride+dst_x];
+        tmp_pic[y*block_width+x] = (uint8_t)pic->y[orig->x+x + (orig->y+y)*pic->width];
+      }
+    }
+
+    cost = satd(tmp_pic,tmp_filtered);
+
+    cost += calc_mvd_cost(encoder_state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+
+    if (cost < best_cost) {
+      best_cost    = cost;
+      best_index   = i;
+      best_bitcost = bitcost;
+    }
+  }
+
+  //Set mv to best final best match
+  mv.x += square[best_index].x;
+  mv.y += square[best_index].y;
+
+  mv_in_out->x = mv.x;
+  mv_in_out->y = mv.y;
+
+  *bitcost_out = best_bitcost;
+
+
+  return best_cost;
+
+}
+
+/**
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
@@ -499,6 +652,8 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 #else
     temp_cost += hexagon_search(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
+
+    temp_cost = search_frac(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 
     merged = 0;
     // Check every candidate to find a match
