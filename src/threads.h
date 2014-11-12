@@ -23,7 +23,7 @@
 
 #include <pthread.h>
 
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__MINGW32__) 
 #include <unistd.h>
 #include <time.h>
 
