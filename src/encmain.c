@@ -216,8 +216,15 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  // Open output file and check that it was opened correctly
-  output = fopen(cfg->output, "wb");
+  // Check if the output file name is a dash, this means stdout 
+  if (!strcmp(cfg->output, "-")) {
+    output = stdout;
+  } else {
+    // Otherwise we try to open the output file
+    output = fopen(cfg->output, "wb");
+  }
+
+  // Check that output was opened correctly
   if (output == NULL) {
     fprintf(stderr, "Could not open output file, shutting down!\n");
     goto exit_failure;
