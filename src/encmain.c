@@ -413,12 +413,12 @@ int main(int argc, char *argv[])
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
     
     {
-      double encoding_time = ((double)(encoding_end_cpu_time - encoding_start_cpu_time)) / CLOCKS_PER_SEC;
+      double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
       double wall_time = CLOCK_T_AS_DOUBLE(encoding_end_real_time) - CLOCK_T_AS_DOUBLE(encoding_start_real_time);
-      fprintf(stderr, " Encoding time: %.3lf s.\n", encoding_time);
-      fprintf(stderr, " Encoding wall time: %.3lf s.\n", wall_time);
-      fprintf(stderr, " Encoding CPU usage: %.2lf%%\n", encoding_time/wall_time*100.f);
-      fprintf(stderr, " FPS: %.2lf\n", ((double)stat_frames)/wall_time);
+      fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
+      fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
+      fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
+      fprintf(stderr, " FPS: %.2f\n", ((double)stat_frames)/wall_time);
     }
 
     fclose(input);
