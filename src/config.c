@@ -433,6 +433,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     if (cfg->owf < 0) {
       fprintf(stderr, "--owf parameter smaller than 0, set to 0\n");
       cfg->owf = 0;
+    } else if (cfg->owf == 0 && !strcmp(value, "auto")) {
+      cfg->owf = -1;
     }
   }
   else if OPT("slice-addresses")
