@@ -29,6 +29,7 @@
 
 #include "config.h"
 #include "filter.h"
+#include "strategies/strategies-ipol.h"
 
 /**
  * \brief Set block info to the CU structure
@@ -59,42 +60,6 @@ void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t de
       cu->inter.mv_dir = cur_cu->inter.mv_dir;
       cu->inter.mv_ref = cur_cu->inter.mv_ref;
       cu->tr_depth = tr_depth;
-    }
-  }
-}
-
-void extend_borders(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel *ref, int ref_width, int ref_height,
-    int filterSize, int width, int height, int16_t *dst) {
-
-  int16_t mv[2] = {mv_x, mv_y};
-  int halfFilterSize = filterSize>>1;
-
-  int dst_y; int y; int dst_x; int x; int coord_x; int coord_y;
-  int8_t overflow_neg_y_temp,overflow_pos_y_temp,overflow_neg_x_temp,overflow_pos_x_temp;
-
-  for (dst_y = 0, y = ypos - halfFilterSize; y < ((ypos + height)) + halfFilterSize; dst_y++, y++) {
-
-    // calculate y-pixel offset
-    coord_y = y + off_y + mv[1];
-
-    // On y-overflow set coord_y accordingly
-    overflow_neg_y_temp = (coord_y < 0) ? 1 : 0;
-    overflow_pos_y_temp = (coord_y >= ref_height) ? 1 : 0;
-    if (overflow_neg_y_temp)      coord_y = 0;
-    else if (overflow_pos_y_temp) coord_y = (ref_height) - 1;
-    coord_y *= ref_width;
-
-    for (dst_x = 0, x = (xpos) - halfFilterSize; x < ((xpos + width)) + halfFilterSize; dst_x++, x++) {
-      coord_x = x + off_x + mv[0];
-
-      // On x-overflow set coord_x accordingly
-      overflow_neg_x_temp = (coord_x < 0) ? 1 : 0;
-      overflow_pos_x_temp = (coord_x >= ref_width) ? 1 : 0;
-      if (overflow_neg_x_temp)      coord_x = 0;
-      else if (overflow_pos_x_temp) coord_x = ref_width - 1;
-
-      // Store source block data (with extended borders)
-      dst[dst_y*(width+filterSize) + dst_x] = ref[coord_y + coord_x];
     }
   }
 }

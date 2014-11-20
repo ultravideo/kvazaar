@@ -32,6 +32,7 @@
 #include "bitstream.h"
 #include "image.h"
 #include "strategies/strategies-picture.h"
+#include "strategies/strategies-ipol.h"
 #include "intra.h"
 #include "inter.h"
 #include "filter.h"

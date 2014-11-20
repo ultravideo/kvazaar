@@ -177,6 +177,15 @@
     <ClCompile Include="..\..\src\strategies\strategies-dct.c">
       <Filter>Source Files\strategies</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\strategies-ipol.c">
+      <Filter>Source Files\strategies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\ipol-avx2.c">
+      <Filter>Source Files\strategies\avx2</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\ipol-generic.c">
+      <Filter>Source Files\strategies\generic</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -307,6 +316,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\generic\dct-generic.h">
       <Filter>Header Files\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-ipol.h">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\generic\ipol-generic.h">
+      <Filter>Header Files\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\ipol-avx2.h">
+      <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
