@@ -69,6 +69,7 @@ int config_init(config *cfg)
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 1;
   cfg->tr_depth_intra  = 0;
+  cfg->fme_level       = 1;
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
   cfg->vui.overscan    = 0; /* undef */
@@ -389,6 +390,13 @@ static int config_parse(config *cfg, const char *name, const char *value)
       error = 1;
     }
   }
+  else if OPT("subme") {
+    cfg->fme_level = atoi(value);
+    if (cfg->fme_level != 0 && cfg->fme_level != 1) {
+      error = 1;
+      fprintf(stderr, "Invalid --subme parameter (must be 0 or 1).\n");
+    }
+  }
   else if OPT("sar") {
       int sar_width, sar_height;
       if (2 == sscanf(value, "%d:%d", &sar_width, &sar_height)) {
@@ -478,6 +486,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "full-intra-search",        no_argument, NULL, 0 },
     { "no-transform-skip",        no_argument, NULL, 0 },
     { "tr-depth-intra",     required_argument, NULL, 0 },
+    { "subme",              required_argument, NULL, 0 },
     { "sar",                required_argument, NULL, 0 },
     { "overscan",           required_argument, NULL, 0 },
     { "videoformat",        required_argument, NULL, 0 },

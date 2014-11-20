@@ -652,8 +652,9 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 #else
     temp_cost += hexagon_search(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
-
-    temp_cost = search_frac(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    if (encoder_state->encoder_control->cfg->fme_level > 0) {
+      temp_cost = search_frac(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    }
 
     merged = 0;
     // Check every candidate to find a match
