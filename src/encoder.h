@@ -74,6 +74,8 @@ typedef struct encoder_control
   int8_t bitdepth;
   int8_t tr_depth_intra;
 
+  int8_t fme_level;
+
   /* Filtering */
   int8_t deblock_enable; // \brief Flag to enable deblocking filter
   int8_t sao_enable;     // \brief Flag to enable sample adaptive offset filter

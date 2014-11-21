@@ -479,7 +479,7 @@ void filter_inter_halfpel_chroma(const encoder_control * const encoder, int16_t 
    * ea0,0 = (-4*B0,-1  + 36*B0,0  + 36*B0,1  - 4*B0,2)  >> shift1
    * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
    */
-
+  int i = 0;
   int32_t x, y;
   int32_t shift1 = encoder->bitdepth-8;
   int32_t shift2 = 6;
@@ -531,5 +531,411 @@ void filter_inter_halfpel_chroma(const encoder_control * const encoder, int16_t 
         dst[dst_pos + 1] = (ae_temp + offset3) >> shift3;
       }
     }
+  }
+  //Clamp values to bitdepth
+  for(i = 0; i < width*height*4; ++i) {
+    if(dst[i] > ((1 << encoder->bitdepth)-1)) dst[i] = (int16_t)((1 << encoder->bitdepth)-1);
+    if(dst[i] < 0) dst[i] = 0;
+  }
+}
+
+void filter_inter_octpel_chroma(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+{
+
+  int32_t x, y;
+  int32_t shift1 = encoder->bitdepth-8;
+  int32_t shift2 = 6;
+  int32_t shift3 = 14-encoder->bitdepth;
+  int32_t offset3 = 1 << (shift3 - 1);
+  int32_t offset23 = 1 << (shift2 + shift3 - 1);
+
+  //coefficients for 1/8, 2/8, 3/8, 4/8, 5/8, 6/8 and 7/8 positions
+  int16_t c1[4], c2[4], c3[4], c4[4], c5[4], c6[4], c7[4];
+
+  int i;
+  for(i = 0; i < 4; ++i ) {
+    c1[i] = g_chroma_filter[1][i];
+    c2[i] = g_chroma_filter[2][i];
+    c3[i] = g_chroma_filter[3][i];
+    c4[i] = g_chroma_filter[4][i];
+    c5[i] = g_chroma_filter[5][i];
+    c6[i] = g_chroma_filter[6][i];
+    c7[i] = g_chroma_filter[7][i];
+  }
+
+  // Loop source pixels and generate 64 filtered 1/8-pel pixels on each round
+  for (y = 0; y < height; y++) {
+    int dst_pos_y = (y<<3)*dst_stride;
+    int src_pos_y = y*src_stride;
+    for (x = 0; x < width; x++) {
+      // Calculate current dst and src pixel positions
+      int dst_pos = dst_pos_y+(x<<3);
+      int src_pos = src_pos_y+x;
+
+      // Temporary horizontally interpolated postions
+      int32_t h_temp[7] = {0,0,0,0,0,0,0};
+
+      // Original pixel
+      dst[dst_pos] = src[src_pos];
+
+      // Horizontal 1/8-values
+      if (hor_flag) {
+
+        h_temp[0] = ((c1[0]*src[src_pos - 1]
+                    + c1[1]*src[src_pos]
+                    + c1[2]*src[src_pos + 1]
+                    + c1[3]*src[src_pos + 2]) >> shift1); // ae0,0 h0
+
+        h_temp[1] = ((c2[0]*src[src_pos - 1]
+                    + c2[1]*src[src_pos]
+                    + c2[2]*src[src_pos + 1]
+                    + c2[3]*src[src_pos + 2]) >> shift1); // ae0,0 h1
+
+        h_temp[2] = ((c3[0]*src[src_pos - 1]
+                    + c3[1]*src[src_pos]
+                    + c3[2]*src[src_pos + 1]
+                    + c3[3]*src[src_pos + 2]) >> shift1); // ae0,0 h2
+
+        h_temp[3] = ((c4[0]*src[src_pos - 1]
+                    + c4[1]*src[src_pos]
+                    + c4[2]*src[src_pos + 1]
+                    + c4[3]*src[src_pos + 2]) >> shift1); // ae0,0 h2
+
+        h_temp[4] = ((c5[0]*src[src_pos - 1]
+                    + c5[1]*src[src_pos]
+                    + c5[2]*src[src_pos + 1]
+                    + c5[3]*src[src_pos + 2]) >> shift1); // ae0,0 h2
+
+        h_temp[5] = ((c6[0]*src[src_pos - 1]
+                    + c6[1]*src[src_pos]
+                    + c6[2]*src[src_pos + 1]
+                    + c6[3]*src[src_pos + 2]) >> shift1); // ae0,0 h2
+
+        h_temp[6] = ((c7[0]*src[src_pos - 1]
+                    + c7[1]*src[src_pos]
+                    + c7[2]*src[src_pos + 1]
+                    + c7[3]*src[src_pos + 2]) >> shift1); // ae0,0 h2
+      }
+
+      // Vertical 1/8-values
+      if(ver_flag) {
+        dst[dst_pos + 1*dst_stride] = (((c1[0]*src[src_pos - 1*src_stride]
+                                       + c1[1]*src[src_pos]
+                                       + c1[2]*src[src_pos + 1*src_stride]
+                                       + c1[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+
+        dst[dst_pos + 2*dst_stride] = (((c2[0]*src[src_pos - 1*src_stride]
+                                       + c2[1]*src[src_pos]
+                                       + c2[2]*src[src_pos + 1*src_stride]
+                                       + c2[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+
+        dst[dst_pos + 3*dst_stride] = (((c3[0]*src[src_pos - 1*src_stride]
+                                       + c3[1]*src[src_pos]
+                                       + c3[2]*src[src_pos + 1*src_stride]
+                                       + c3[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+
+        dst[dst_pos + 4*dst_stride] = (((c4[0]*src[src_pos - 1*src_stride]
+                                       + c4[1]*src[src_pos]
+                                       + c4[2]*src[src_pos + 1*src_stride]
+                                       + c4[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+
+        dst[dst_pos + 5*dst_stride] = (((c5[0]*src[src_pos - 1*src_stride]
+                                       + c5[1]*src[src_pos]
+                                       + c5[2]*src[src_pos + 1*src_stride]
+                                       + c5[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+
+        dst[dst_pos + 6*dst_stride] = (((c6[0]*src[src_pos - 1*src_stride]
+                                       + c6[1]*src[src_pos]
+                                       + c6[2]*src[src_pos + 1*src_stride]
+                                       + c6[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+
+        dst[dst_pos + 7*dst_stride] = (((c7[0]*src[src_pos - 1*src_stride]
+                                       + c7[1]*src[src_pos]
+                                       + c7[2]*src[src_pos + 1*src_stride]
+                                       + c7[3]*src[src_pos + 2*src_stride]) >> shift1)
+                                       + (1<<(shift3-1))) >> shift3; //
+      }
+
+      // When both flags, interpolate values from temporary horizontal values
+      if (hor_flag && ver_flag) {
+
+        int32_t temp[3][7]; // Temporary horizontal values calculated from integer pixels
+
+        // Calculate temporary values
+        src_pos -= 1*src_stride;  //0,-3
+        for(i = 0; i < 3; ++i) {
+
+          temp[i][0] = ((c1[0]*src[src_pos - 1] + c1[1]*src[src_pos]
+                       + c1[2]*src[src_pos + 1] + c1[3]*src[src_pos + 2])
+                      >> shift1); // h0(0,-3+i)
+
+          temp[i][1] = ((c2[0]*src[src_pos - 1] + c2[1]*src[src_pos]
+                       + c2[2]*src[src_pos + 1] + c2[3]*src[src_pos + 2])
+                      >> shift1); // h1(0,-3+i)
+
+          temp[i][2] = ((c3[0]*src[src_pos - 1] + c3[1]*src[src_pos]
+                       + c3[2]*src[src_pos + 1] + c3[3]*src[src_pos + 2])
+                      >> shift1); // h2(0,-3+i)
+
+          temp[i][3] = ((c4[0]*src[src_pos - 1] + c4[1]*src[src_pos]
+                       + c4[2]*src[src_pos + 1] + c4[3]*src[src_pos + 2])
+                       >> shift1); // h2(0,-3+i)
+
+          temp[i][4] = ((c5[0]*src[src_pos - 1] + c5[1]*src[src_pos]
+                       + c5[2]*src[src_pos + 1] + c5[3]*src[src_pos + 2])
+                       >> shift1); // h2(0,-3+i)
+
+          temp[i][5] = ((c6[0]*src[src_pos - 1] + c6[1]*src[src_pos]
+                       + c6[2]*src[src_pos + 1] + c6[3]*src[src_pos + 2])
+                       >> shift1); // h2(0,-3+i)
+
+          temp[i][6] = ((c7[0]*src[src_pos - 1] + c7[1]*src[src_pos]
+                       + c7[2]*src[src_pos + 1] + c7[3]*src[src_pos + 2])
+                       >> shift1); // h2(0,-3+i)
+
+          if(i == 0) {
+            //Skip calculating h_temp again
+            src_pos += 2*src_stride;
+          } else {
+            src_pos += src_stride;
+          }
+        }
+
+
+        //Calculate values from temporary horizontal 1/8-values
+        for(i=0;i<7;++i){
+          dst[dst_pos + 1*dst_stride + i+1] = (((c1[0]*temp[0][i] + c1[1]*h_temp[i]
+                                               + c1[2]*temp[1][i] + c1[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+          dst[dst_pos + 2*dst_stride + i+1] = (((c2[0]*temp[0][i] + c2[1]*h_temp[i]
+                                               + c2[2]*temp[1][i] + c2[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+          dst[dst_pos + 3*dst_stride + i+1] = (((c3[0]*temp[0][i] + c3[1]*h_temp[i]
+                                               + c3[2]*temp[1][i] + c3[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+          dst[dst_pos + 4*dst_stride + i+1] = (((c4[0]*temp[0][i] + c4[1]*h_temp[i]
+                                               + c4[2]*temp[1][i] + c4[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+          dst[dst_pos + 5*dst_stride + i+1] = (((c5[0]*temp[0][i] + c5[1]*h_temp[i]
+                                               + c5[2]*temp[1][i] + c5[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+          dst[dst_pos + 6*dst_stride + i+1] = (((c6[0]*temp[0][i] + c6[1]*h_temp[i]
+                                               + c6[2]*temp[1][i] + c6[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+          dst[dst_pos + 7*dst_stride + i+1] = (((c7[0]*temp[0][i] + c7[1]*h_temp[i]
+                                               + c7[2]*temp[1][i] + c7[3]*temp[2][i])
+                                               + offset23) >> shift2) >> shift3; // ee0,0
+
+        }
+
+      }
+
+      if(hor_flag) {
+        dst[dst_pos + 1] = (h_temp[0] + offset3) >> shift3;
+        dst[dst_pos + 2] = (h_temp[1] + offset3) >> shift3;
+        dst[dst_pos + 3] = (h_temp[2] + offset3) >> shift3;
+        dst[dst_pos + 4] = (h_temp[3] + offset3) >> shift3;
+        dst[dst_pos + 5] = (h_temp[4] + offset3) >> shift3;
+        dst[dst_pos + 6] = (h_temp[5] + offset3) >> shift3;
+        dst[dst_pos + 7] = (h_temp[6] + offset3) >> shift3;
+      }
+
+
+    }
+  }
+
+  //Clamp values to bitdepth
+  for(i = 0; i < width*height*64; ++i) {
+    if(dst[i] > ((1 << encoder->bitdepth)-1)) dst[i] = (int16_t)((1 << encoder->bitdepth)-1);
+    if(dst[i] < 0) dst[i] = 0;
+  }
+}
+
+void filter_inter_quarterpel_luma(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+{
+
+  int32_t x, y;
+  int32_t shift1 = encoder->bitdepth-8;
+  int32_t shift2 = 6;
+  int32_t shift3 = 14-encoder->bitdepth;
+  int32_t offset3 = 1 << (shift3 - 1);
+  int32_t offset23 = 1 << (shift2 + shift3 - 1);
+
+  //coefficients for 1/4, 2/4 and 3/4 positions
+  int16_t c1[8], c2[8], c3[8];
+
+  int i;
+  for(i = 0; i < 8; ++i ) {
+    c1[i] = g_luma_filter[1][i];
+    c2[i] = g_luma_filter[2][i];
+    c3[i] = g_luma_filter[3][i];
+  }
+
+  // Loop source pixels and generate sixteen filtered quarter-pel pixels on each round
+  for (y = 0; y < height; y++) {
+    int dst_pos_y = (y<<2)*dst_stride;
+    int src_pos_y = y*src_stride;
+    for (x = 0; x < width; x++) {
+      // Calculate current dst and src pixel positions
+      int dst_pos = dst_pos_y+(x<<2);
+      int src_pos = src_pos_y+x;
+
+      // Temporary variables..
+      int32_t h_temp[3] = {0,0,0};
+
+      // Original pixel
+      dst[dst_pos] = src[src_pos];
+
+      //
+      if (hor_flag) {
+
+        h_temp[0] = ((c1[0]*src[src_pos - 3]
+                    + c1[1]*src[src_pos - 2]
+                    + c1[2]*src[src_pos - 1]
+                    + c1[3]*src[src_pos]
+                    + c1[4]*src[src_pos + 1]
+                    + c1[5]*src[src_pos + 2]
+                    + c1[6]*src[src_pos + 3]
+                    + c1[7]*src[src_pos + 4]) >> shift1);
+
+
+
+        h_temp[1] = ((c2[0]*src[src_pos - 3]
+                    + c2[1]*src[src_pos - 2]
+                    + c2[2]*src[src_pos - 1]
+                    + c2[3]*src[src_pos]
+                    + c2[4]*src[src_pos + 1]
+                    + c2[5]*src[src_pos + 2]
+                    + c2[6]*src[src_pos + 3]
+                    + c2[7]*src[src_pos + 4]) >> shift1);
+
+        h_temp[2] = ((c3[0]*src[src_pos - 3]
+                    + c3[1]*src[src_pos - 2]
+                    + c3[2]*src[src_pos - 1]
+                    + c3[3]*src[src_pos]
+                    + c3[4]*src[src_pos + 1]
+                    + c3[5]*src[src_pos + 2]
+                    + c3[6]*src[src_pos + 3]
+                    + c3[7]*src[src_pos + 4]) >> shift1);
+      }
+      // ea0,0 - needed only when ver_flag
+      if(ver_flag) {
+        dst[dst_pos + 1*dst_stride] = (((c1[0]*src[src_pos - 3*src_stride]
+                                       + c1[1]*src[src_pos - 2*src_stride]
+                                       + c1[2]*src[src_pos - 1*src_stride]
+                                       + c1[3]*src[src_pos]
+                                       + c1[4]*src[src_pos + 1*src_stride]
+                                       + c1[5]*src[src_pos + 2*src_stride]
+                                       + c1[6]*src[src_pos + 3*src_stride]
+                                       + c1[7]*src[src_pos + 4*src_stride]) >> shift1)
+                                        + (1<<(shift3-1))) >> shift3;
+
+        dst[dst_pos + 2*dst_stride] = (((c2[0]*src[src_pos - 3*src_stride]
+                                       + c2[1]*src[src_pos - 2*src_stride]
+                                       + c2[2]*src[src_pos - 1*src_stride]
+                                       + c2[3]*src[src_pos]
+                                       + c2[4]*src[src_pos + 1*src_stride]
+                                       + c2[5]*src[src_pos + 2*src_stride]
+                                       + c2[6]*src[src_pos + 3*src_stride]
+                                       + c2[7]*src[src_pos + 4*src_stride]) >> shift1)
+                                        + (1<<(shift3-1))) >> shift3;
+
+        dst[dst_pos + 3*dst_stride] = (((c3[0]*src[src_pos - 3*src_stride]
+                                       + c3[1]*src[src_pos - 2*src_stride]
+                                       + c3[2]*src[src_pos - 1*src_stride]
+                                       + c3[3]*src[src_pos]
+                                       + c3[4]*src[src_pos + 1*src_stride]
+                                       + c3[5]*src[src_pos + 2*src_stride]
+                                       + c3[6]*src[src_pos + 3*src_stride]
+                                       + c3[7]*src[src_pos + 4*src_stride]) >> shift1)
+                                        + (1<<(shift3-1))) >> shift3;
+      }
+
+      // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
+      if (hor_flag && ver_flag) {
+
+        int32_t temp[7][3];
+
+        // Calculate temporary values..
+        src_pos -= 3*src_stride;  //0,-3
+        for(i = 0; i < 7; ++i) {
+
+          temp[i][0] = ((c1[0]*src[src_pos - 3] + c1[1]*src[src_pos - 2]
+                       + c1[2]*src[src_pos - 1] + c1[3]*src[src_pos]
+                       + c1[4]*src[src_pos + 1] + c1[5]*src[src_pos + 2]
+                       + c1[6]*src[src_pos + 3] + c1[7]*src[src_pos + 4])
+              >> shift1); // h0(0,-3+i)
+
+          temp[i][1] = ((c2[0]*src[src_pos - 3] + c2[1]*src[src_pos - 2]
+                       + c2[2]*src[src_pos - 1] + c2[3]*src[src_pos]
+                       + c2[4]*src[src_pos + 1] + c2[5]*src[src_pos + 2]
+                       + c2[6]*src[src_pos + 3] + c2[7]*src[src_pos + 4])
+                        >> shift1); // h1(0,-3+i)
+
+          temp[i][2] = ((c3[0]*src[src_pos - 3] + c3[1]*src[src_pos - 2]
+                       + c3[2]*src[src_pos - 1] + c3[3]*src[src_pos]
+                       + c3[4]*src[src_pos + 1] + c3[5]*src[src_pos + 2]
+                       + c3[6]*src[src_pos + 3] + c3[7]*src[src_pos + 4])
+                        >> shift1); // h2(0,-3+i)
+
+          if(i == 2) {
+            //Skip calculating h_temp again
+            src_pos += 2*src_stride;
+          } else {
+            src_pos += src_stride;
+          }
+        }
+
+
+
+        for(i=0;i<3;++i){
+          dst[dst_pos + 1*dst_stride + i+1] = (((c1[0]*temp[0][i] + c1[1]*temp[1][i]
+                                               + c1[2]*temp[2][i] + c1[3]*h_temp[i]
+                                               + c1[4]*temp[3][i] + c1[5]*temp[4][i]
+                                               + c1[6]*temp[5][i] + c1[7]*temp[6][i])
+                                                + offset23) >> shift2) >> shift3;
+
+          dst[dst_pos + 2*dst_stride + i+1] = (((c2[0]*temp[0][i] + c2[1]*temp[1][i]
+                                               + c2[2]*temp[2][i] + c2[3]*h_temp[i]
+                                               + c2[4]*temp[3][i] + c2[5]*temp[4][i]
+                                               + c2[6]*temp[5][i] + c2[7]*temp[6][i])
+                                                + offset23) >> shift2) >> shift3;
+
+          dst[dst_pos + 3*dst_stride + i+1] = (((c3[0]*temp[0][i] + c3[1]*temp[1][i]
+                                               + c3[2]*temp[2][i] + c3[3]*h_temp[i]
+                                               + c3[4]*temp[3][i] + c3[5]*temp[4][i]
+                                               + c3[6]*temp[5][i] + c3[7]*temp[6][i])
+                                                + offset23) >> shift2) >> shift3;
+
+        }
+
+      }
+
+      if(hor_flag) {
+        dst[dst_pos + 1] = (h_temp[0] + offset3) >> shift3;
+        dst[dst_pos + 2] = (h_temp[1] + offset3) >> shift3;
+        dst[dst_pos + 3] = (h_temp[2] + offset3) >> shift3;
+      }
+
+
+    }
+  }
+
+  //Clamp values to bitdepth
+  for(i = 0; i < width*height*16; ++i) {
+    if(dst[i] > ((1 << encoder->bitdepth)-1)) dst[i] = (int16_t)((1 << encoder->bitdepth)-1);
+    if(dst[i] < 0) dst[i] = 0;
   }
 }
