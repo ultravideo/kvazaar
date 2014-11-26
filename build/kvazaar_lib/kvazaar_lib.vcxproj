@@ -218,7 +218,6 @@
     <ClInclude Include="..\..\src\threadqueue.h" />
     <ClInclude Include="..\..\src\threads.h" />
     <ClInclude Include="..\..\src\transform.h" />
-    <ClInclude Include="..\..\src\version.h" />
     <ClInclude Include="..\..\src\videoframe.h" />
   </ItemGroup>
   <ItemGroup>

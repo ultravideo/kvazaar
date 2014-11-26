@@ -263,9 +263,6 @@
     <ClInclude Include="..\..\src\strategyselector.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\version.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\videoframe.h">
       <Filter>Header Files</Filter>
     </ClInclude>
