@@ -42,6 +42,10 @@ meant to be user configurable later.
               --aud                  : Use access unit delimiters
               --cqmfile <string>     : Custom Quantization Matrices from a file
               --debug <string>       : Output encoders reconstruction.
+              --cpuid <integer>      : Disable runtime cpu optimizations with value 0.
+              --subme <integer>      : Set fractional pixel motion estimation level [1].
+                                         0: only integer motion estimation
+                                         1: fractional pixel motion estimation enabled
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio
@@ -82,6 +86,7 @@ meant to be user configurable later.
 
       Wpp:
               --wpp:                   Enable wavefront parallel processing
+              --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.
 
       Slices:
               --slice-addresses <string>|u<int>: 
