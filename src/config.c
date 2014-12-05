@@ -90,7 +90,7 @@ int config_init(config *cfg)
   cfg->tiles_height_split          = NULL;
   
   cfg->wpp = 0;
-  cfg->owf = 0;
+  cfg->owf = -1;
   cfg->slice_count = 1;
   cfg->slice_addresses_in_ts = MALLOC(int32_t, 1);
   cfg->slice_addresses_in_ts[0] = 0;
