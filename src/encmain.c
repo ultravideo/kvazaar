@@ -195,49 +195,9 @@ int main(int argc, char *argv[])
   }
 
   if (cfg->owf == -1) {
-    if (cfg->wpp) {
-      // If --owf=auto and wpp is on, select owf according to the lesser dimension.
-      // An ok rule for all intra seems to be to always have at least 4 wpp
-      // streams per thread. For a single frame that would mean that all threads
-      // are working for at least half of the frame.
-      int lcu_width = (cfg->width + LCU_WIDTH - 1) / LCU_WIDTH;
-      int lcu_height = (cfg->height + LCU_WIDTH - 1) / LCU_WIDTH;
-      int min_dimension = MIN(lcu_width, lcu_height);
-      int threads = (cfg->threads > 1 ? cfg->threads : 1);
-
-      // Find the largest number of threads per frame that satifies the
-      // the condition that there are 4 wpp streams per thread.
-      int threads_per_frame = 1;
-      while (min_dimension / (threads_per_frame + 1) >= 4) {
-        ++threads_per_frame;
-      }
-
-      // Get ceil(threads / threads_per_frame).
-      int frames = (threads + threads_per_frame - 1) / threads_per_frame;
-      cfg->owf = CLIP(0, threads - 1, frames - 1);
-    } else {
-      // If --owf=auto and wpp is not on, select owf such that there is enough
-      // tiles for twice the number of threads. That should make sure there are
-      // always some tiles to work on.
-
-      int tiles_per_frame = 1;
-      if (cfg->tiles_width_split != NULL) {
-        tiles_per_frame *= cfg->tiles_width_count;
-      }
-      if (cfg->tiles_height_split != NULL) {
-        tiles_per_frame *= cfg->tiles_height_count;
-      }
-      int threads = (cfg->threads > 1 ? cfg->threads : 1);
-      // Get ceil(threads * 2 / tiles_per_frame).
-      int frames = (threads * 2 + tiles_per_frame - 1) / tiles_per_frame;
-
-      // Limit number of frames to 1.25x the number of threads for the case
-      // where there is only 1 tile per frame.
-      frames = CLIP(1, threads * 4 / 3, frames);
-      cfg->owf = frames - 1;
+    if (!config_set_owf_auto(cfg)) {
+      goto exit_failure;
     }
-
-    fprintf(stderr, "--owf=auto value set to %d.\n", cfg->owf);
   }
 
   // Do more validation to make sure the parameters we have make sense.

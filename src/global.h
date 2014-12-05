@@ -124,6 +124,7 @@ typedef int16_t coefficient;
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))
 #define PU_INDEX(x_pu, y_pu) (((x_pu) % 2)  + 2 * ((y_pu) % 2))
+#define CEILDIV(x,y) (((x) + (y) - 1) / (y))
 
 #define LOG2_LCU_WIDTH 6
 // CU_TO_PIXEL = y * lcu_width * pic_width + x * lcu_width

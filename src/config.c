@@ -602,3 +602,59 @@ int config_validate(config *cfg)
   }
   return 1;
 }
+
+int size_of_wpp_ends(int threads)
+{
+  // Based on the shape of the area where all threads can't yet run in parallel.
+  return 4 * threads * threads - 2 * threads;
+}
+
+int config_set_owf_auto(config *cfg)
+{
+  if (cfg->wpp) {
+    // If wpp is on, select owf such that less than 15% of the
+    // frame is covered by the are threads can not work at the same time.
+    const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
+    const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
+    
+    // Find the largest number of threads per frame that satifies the
+    // the condition: wpp start/stop inefficiency takes up  less than 15%
+    // of frame area.
+    int threads_per_frame = 1;
+    const int wpp_treshold = lcu_width * lcu_height * 15 / 100;
+    while ((threads_per_frame + 1) * 2 < lcu_width &&
+           threads_per_frame + 1 < lcu_height &&
+           size_of_wpp_ends(threads_per_frame + 1) < wpp_treshold)
+    {
+      ++threads_per_frame;
+    }
+    
+    const int threads = (cfg->threads > 1 ? cfg->threads : 1);
+    const int frames = CEILDIV(threads, threads_per_frame);
+
+    // Convert from number of parallel frames to number of additional frames.
+    cfg->owf = CLIP(0, threads - 1, frames - 1);
+  } else {
+    // If wpp is not on, select owf such that there is enough
+    // tiles for twice the number of threads.
+
+    int tiles_per_frame = 1;
+    if (cfg->tiles_width_count > 0) {
+      tiles_per_frame *= cfg->tiles_width_count + 1;
+    }
+    if (cfg->tiles_height_count > 0) {
+      tiles_per_frame *= cfg->tiles_height_count + 1;
+    }
+    int threads = (cfg->threads > 1 ? cfg->threads : 1);
+    int frames = CEILDIV(threads * 2, tiles_per_frame);
+
+    // Limit number of frames to 1.25x the number of threads for the case
+    // where there is only 1 tile per frame.
+    frames = CLIP(1, threads * 4 / 3, frames);
+    cfg->owf = frames - 1;
+  }
+
+  fprintf(stderr, "--owf=auto value set to %d.\n", cfg->owf);
+  
+  return 1;
+}
