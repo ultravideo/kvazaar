@@ -646,7 +646,7 @@ int config_set_owf_auto(config *cfg)
       tiles_per_frame *= cfg->tiles_height_count + 1;
     }
     int threads = (cfg->threads > 1 ? cfg->threads : 1);
-    int frames = CEILDIV(threads * 2, tiles_per_frame);
+    int frames = CEILDIV(threads * 4, tiles_per_frame);
 
     // Limit number of frames to 1.25x the number of threads for the case
     // where there is only 1 tile per frame.
