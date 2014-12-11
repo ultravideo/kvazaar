@@ -23,11 +23,11 @@
 #include "encoder.h"
 
 
-typedef unsigned(ipol_func)(const encoder_control * encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst,
+typedef unsigned(ipol_func)(const encoder_control * encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst,
   int16_t dst_stride, int8_t hor_flag, int8_t ver_flag);
 
 typedef unsigned(epol_func)(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, int16_t *dst);
+  int filterSize, int width, int height, pixel *dst);
 
 
 // Declare function pointers.

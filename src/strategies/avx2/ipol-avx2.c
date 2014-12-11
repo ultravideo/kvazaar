@@ -30,8 +30,8 @@
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
 
-extern int16_t g_luma_filter[4][8];
-extern int16_t g_chroma_filter[8][4];
+extern int8_t g_luma_filter[4][8];
+extern int8_t g_chroma_filter[8][4];
 
 void filter_inter_quarterpel_luma_avx2(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
@@ -506,7 +506,7 @@ void filter_inter_octpel_chroma_avx2(const encoder_control * const encoder, int1
 }
 
 void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, int16_t *dst) {
+  int filterSize, int width, int height, pixel *dst) {
 
   int16_t mv[2] = { mv_x, mv_y };
   int halfFilterSize = filterSize >> 1;

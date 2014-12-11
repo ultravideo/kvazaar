@@ -27,10 +27,10 @@
 #include "strategyselector.h"
 #include "encoder.h"
 
-extern int16_t g_luma_filter[4][8];
-extern int16_t g_chroma_filter[8][4];
+extern int8_t g_luma_filter[4][8];
+extern int8_t g_chroma_filter[8][4];
 
-void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
@@ -41,7 +41,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
-  int16_t c1[8], c2[8], c3[8];
+  int8_t c1[8], c2[8], c3[8];
 
   int i;
   for (i = 0; i < 8; ++i) {
@@ -60,7 +60,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
       int src_pos = src_pos_y + x;
 
       // Temporary variables..
-      int32_t h_temp[3] = { 0, 0, 0 };
+      int16_t h_temp[3] = { 0, 0, 0 };
 
       // Original pixel
       dst[dst_pos] = src[src_pos];
@@ -133,7 +133,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
       if (hor_flag && ver_flag) {
 
-        int32_t temp[7][3];
+        int16_t temp[7][3];
 
         // Calculate temporary values..
         src_pos -= 3 * src_stride;  //0,-3
@@ -203,11 +203,22 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
 
   //Clamp values to bitdepth
   for (i = 0; i < width*height * 16; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (int16_t)((1 << encoder->bitdepth) - 1);
+    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (pixel)((1 << encoder->bitdepth) - 1);
     if (dst[i] < 0) dst[i] = 0;
   }
 }
-void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+
+/**
+ * \brief Interpolation for chroma half-pixel
+ * \param src source image in integer pels (-2..width+3, -2..height+3)
+ * \param src_stride stride of source image
+ * \param width width of source image block
+ * \param height height of source image block
+ * \param dst destination image in half-pixel resolution
+ * \param dst_stride stride of destination image
+ *
+ */
+void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
   * | B0,0|ae0,0|
@@ -272,12 +283,12 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
   }
   //Clamp values to bitdepth
   for (i = 0; i < width*height * 4; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (int16_t)((1 << encoder->bitdepth) - 1);
+    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (pixel)((1 << encoder->bitdepth) - 1);
     if (dst[i] < 0) dst[i] = 0;
   }
 }
 
-void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
@@ -288,7 +299,7 @@ void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, i
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/8, 2/8, 3/8, 4/8, 5/8, 6/8 and 7/8 positions
-  int16_t c1[4], c2[4], c3[4], c4[4], c5[4], c6[4], c7[4];
+  int8_t c1[4], c2[4], c3[4], c4[4], c5[4], c6[4], c7[4];
 
   int i;
   for (i = 0; i < 4; ++i) {
@@ -497,13 +508,13 @@ void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, i
 
   //Clamp values to bitdepth
   for (i = 0; i < width*height * 64; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (int16_t)((1 << encoder->bitdepth) - 1);
+    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (pixel)((1 << encoder->bitdepth) - 1);
     if (dst[i] < 0) dst[i] = 0;
   }
 }
 
 void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, int16_t *dst) {
+  int filterSize, int width, int height, pixel *dst) {
 
   int16_t mv[2] = { mv_x, mv_y };
   int halfFilterSize = filterSize >> 1;

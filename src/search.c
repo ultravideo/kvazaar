@@ -496,13 +496,13 @@ static unsigned search_frac( const encoder_state * const encoder_state,
 
   //create buffer for block + extra for filter
   int src_stride = block_width+FILTER_SIZE+1;
-  int16_t src[(LCU_WIDTH+FILTER_SIZE+1) * (LCU_WIDTH+FILTER_SIZE+1)];
-  int16_t* src_off = &src[HALF_FILTER+HALF_FILTER*(block_width+FILTER_SIZE+1)];
+  pixel src[(LCU_WIDTH+FILTER_SIZE+1) * (LCU_WIDTH+FILTER_SIZE+1)];
+  pixel* src_off = &src[HALF_FILTER+HALF_FILTER*(block_width+FILTER_SIZE+1)];
 
   //destination buffer for interpolation
   int dst_stride = (block_width+1)*4;
-  int16_t dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
-  int16_t* dst_off = &dst[dst_stride*4+4];
+  pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
+  pixel* dst_off = &dst[dst_stride*4+4];
 
   extend_borders(orig->x, orig->y, mv.x-1, mv.y-1,
                 encoder_state->tile->lcu_offset_x * LCU_WIDTH,
@@ -529,8 +529,8 @@ static unsigned search_frac( const encoder_state * const encoder_state,
       int dst_y = y*4+pattern->y*2;
       for(x = 0; x < block_width; ++x) {
         int dst_x = x*4+pattern->x*2;
-        tmp_filtered[y*block_width+x] = (uint8_t)dst_off[dst_y*dst_stride+dst_x];
-        tmp_pic[y*block_width+x] = (uint8_t)pic->y[orig->x+x + (orig->y+y)*pic->width];
+        tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
+        tmp_pic[y*block_width+x] = pic->y[orig->x+x + (orig->y+y)*pic->width];
       }
     }
 
@@ -569,8 +569,8 @@ static unsigned search_frac( const encoder_state * const encoder_state,
       int dst_y = y*4+halfpel_offset.y+pattern->y;
       for(x = 0; x < block_width; ++x) {
         int dst_x = x*4+halfpel_offset.x+pattern->x;
-        tmp_filtered[y*block_width+x] = (uint8_t)dst_off[dst_y*dst_stride+dst_x];
-        tmp_pic[y*block_width+x] = (uint8_t)pic->y[orig->x+x + (orig->y+y)*pic->width];
+        tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
+        tmp_pic[y*block_width+x] = pic->y[orig->x+x + (orig->y+y)*pic->width];
       }
     }
 

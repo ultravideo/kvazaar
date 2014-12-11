@@ -56,7 +56,7 @@ const uint8_t g_beta_table_8x8[52] =
   62, 64
 };
 
-const int16_t g_luma_filter[4][8] =
+const int8_t g_luma_filter[4][8] =
 {
   {  0, 0,   0, 64,  0,   0, 0,  0 },
   { -1, 4, -10, 58, 17,  -5, 1,  0 },
@@ -64,7 +64,7 @@ const int16_t g_luma_filter[4][8] =
   {  0, 1,  -5, 17, 58, -10, 4, -1 }
 };
 
-const int16_t g_chroma_filter[8][4] =
+const int8_t g_chroma_filter[8][4] =
 {
   {  0, 64,  0,  0 },
   { -2, 58, 10, -2 },
@@ -458,14 +458,3 @@ void filter_deblock_lcu(encoder_state * const encoder_state, int x_px, int y_px)
   filter_deblock_cu(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_HOR);
 }
 
-
-/**
- * \brief Interpolation for chroma half-pixel
- * \param src source image in integer pels (-2..width+3, -2..height+3)
- * \param src_stride stride of source image
- * \param width width of source image block
- * \param height height of source image block
- * \param dst destination image in half-pixel resolution
- * \param dst_stride stride of destination image
- *
- */
