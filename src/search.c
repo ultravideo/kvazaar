@@ -1315,18 +1315,37 @@ static void sort_modes(int8_t *modes, double *costs, int length)
   }
 }
 
-
-static double get_cost(encoder_state * const encoder_state, pixel *pred, pixel *orig_block, cost_pixel_nxn_func *satd_func, cost_pixel_nxn_func *sad_func, int width)
+/**
+ * \brief Calculate quality of the reconstruction.
+ *
+ * \param pred  Predicted pixels in continous memory.
+ * \param orig_block  Orignal (target) pixels in continous memory.
+ * \param satd_func  SATD function for this block size.
+ * \param sad_func  SAD function this block size.
+ * \param width  Pixel width of the block.
+ *
+ * \return  Estimated RD cost of the reconstruction and signaling the
+ *     coefficients of the residual.
+ */
+static double get_cost(encoder_state * const encoder_state, 
+                       pixel *pred, pixel *orig_block,
+                       cost_pixel_nxn_func *satd_func,
+                       cost_pixel_nxn_func *sad_func,
+                       int width)
 {
   double satd_cost = satd_func(pred, orig_block);
   if (TRSKIP_RATIO != 0 && width == 4) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
+
+    // Add the offset bit costs of signaling 'luma and chroma use trskip',
+    // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
     const cabac_ctx *ctx = &encoder_state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
     ctx = &encoder_state->cabac.ctx.transform_skip_model_chroma;
     trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+
     double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + encoder_state->global->cur_lambda_cost_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
       return sad_cost;
@@ -1334,7 +1353,6 @@ static double get_cost(encoder_state * const encoder_state, pixel *pred, pixel *
   }
   return satd_cost;
 }
-
 
 
 static void search_intra_chroma_rough(encoder_state * const encoder_state,
@@ -1382,6 +1400,34 @@ static void search_intra_chroma_rough(encoder_state * const encoder_state,
 }
 
 
+/**
+ * \brief  Order the intra prediction modes according to a fast criteria.
+ *
+ * This function uses SATD to order the intra prediction modes. For 4x4 modes
+ * SAD might be used instead, if the cost given by SAD is much better than the
+ * one given by SATD, to take into account that 4x4 modes can be coded with
+ * transform skip.
+ *
+ * The modes are searched using halving search and the total number of modes
+ * that are tried is dependent on size of the predicted block. More modes
+ * are tried for smaller blocks.
+ *
+ * \param orig  Pointer to the top-left corner of current CU in the picture
+ *     being encoded.
+ * \param orig_stride  Stride of param orig.
+ * \param rec  Pointer to the top-left corner of current CU in the picture
+ *     being encoded.
+ * \param rec_stride  Stride of param rec.
+ * \param width  Width of the prediction block.
+ * \param intra_preds  Array of the 3 predicted intra modes.
+ *
+ * \param[out] modes  The modes ordered according to their RD costs, from best
+ *     to worst. The number of modes and costs output is given by parameter
+ *     modes_to_check.
+ * \param[out] costs  The RD costs of corresponding modes in param modes.
+ *
+ * \return  Number of prediction modes in param modes.
+ */
 static int8_t search_intra_rough(encoder_state * const encoder_state, 
                                  pixel *orig, int32_t origstride,
                                  pixel *rec, int16_t recstride,
@@ -1509,6 +1555,32 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 }
 
 
+/**
+ * \brief  Find best intra mode out of the ones listed in parameter modes.
+ *
+ * This function perform intra search by doing full quantization,
+ * reconstruction and CABAC coding of coefficients. It is very slow
+ * but results in better RD quality than using just the rough search.
+ *
+ * \param x_px  Luma picture coordinate.
+ * \param y_px  Luma picture coordinate.
+ * \param orig  Pointer to the top-left corner of current CU in the picture
+ *     being encoded.
+ * \param orig_stride  Stride of param orig.
+ * \param rec  Pointer to the top-left corner of current CU in the picture
+ *     being encoded.
+ * \param rec_stride  Stride of param rec.
+ * \param intra_preds  Array of the 3 predicted intra modes.
+ * \param modes_to_check  How many of the modes in param modes are checked.
+ * \param[in] modes  The intra prediction modes that are to be checked.
+ * 
+ * \param[out] modes  The modes ordered according to their RD costs, from best
+ *     to worst. The number of modes and costs output is given by parameter
+ *     modes_to_check.
+ * \param[out] costs  The RD costs of corresponding modes in param modes.
+ * \param[out] lcu  If transform split searching is used, the transform split
+ *     information for the best mode is saved in lcu.cu structure.
+ */
 static void search_intra_rdo(encoder_state * const encoder_state, 
                              int x_px, int y_px, int depth,
                              pixel *orig, int32_t origstride,
@@ -1563,8 +1635,15 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     int rdo_bitcost = luma_mode_bits(encoder_state, modes[rdo_mode], intra_preds);
     costs[rdo_mode] = rdo_bitcost * (int)(encoder_state->global->cur_lambda_cost + 0.5);
 
-    if (0 && tr_depth == depth) {
-      // The reconstruction is calculated again here, it could be saved from before..
+    if (0 && width != 4 && tr_depth == depth) {
+      // This code path has been disabled for now because it increases bdrate
+      // by 1-2 %. Possibly due to not taking chroma into account during luma
+      // mode search. Enabling separate chroma search compensates a little,
+      // but not enough.
+
+      // The idea for this code path is, that it would do the same thing as
+      // the more general search_intra_trdepth, but would only handle cases
+      // where transform split or transform skip don't need to be handled.
       intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, modes[rdo_mode], 0);
       costs[rdo_mode] += rdo_cost_intra(encoder_state, pred, orig_block, width, modes[rdo_mode], width == 4 ? 1 : 0);
     } else {
@@ -1590,6 +1669,9 @@ static void search_intra_rdo(encoder_state * const encoder_state,
 
   sort_modes(modes, costs, modes_to_check);
 
+  // The best transform split hierarchy is not saved anywhere, so to get the
+  // transform split hierarchy the search has to be performed again with the
+  // best mode.
   if (tr_depth != depth) {
     cu_info pred_cu;
     pred_cu.depth = depth;
@@ -1630,15 +1712,14 @@ static double search_cu_intra(encoder_state * const encoder_state,
   cu_info *left_cu = 0;
   cu_info *above_cu = 0;
 
+  // Select left and top CUs if they are available.
+  // Top CU is not available across LCU boundary.
   if ((x_px >> 3) > 0) {
     left_cu = &lcu->cu[cu_index - 1];
   }
-  // Don't take the above CU across the LCU boundary.
   if ((y_px >> 3) > 0 && lcu_cu.y != 0) {
     above_cu = &lcu->cu[cu_index - LCU_T_CU_WIDTH];
   }
-
-  // Get intra predictors
   intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   if (depth > 0) {
@@ -1697,7 +1778,6 @@ static double search_cu_intra(encoder_state * const encoder_state,
 
   return costs[0];
 }
-
 
 
 /**
