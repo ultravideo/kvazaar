@@ -59,20 +59,11 @@ typedef int16_t coefficient;
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
 
-//Search depth for intra and inter. Block sizes: 0 => 64x64, 1 => 32x32, 2 => 16x16, 3 => 8x8, 4 => 4x4
-#ifndef MAX_INTER_SEARCH_DEPTH
-#   define MAX_INTER_SEARCH_DEPTH 3
-#endif
-#ifndef MIN_INTER_SEARCH_DEPTH
-#   define MIN_INTER_SEARCH_DEPTH 0
-#endif
-
-#ifndef MAX_INTRA_SEARCH_DEPTH
-#   define MAX_INTRA_SEARCH_DEPTH 4
-#endif
-#ifndef MIN_INTRA_SEARCH_DEPTH
-#   define MIN_INTRA_SEARCH_DEPTH 1
-#endif
+// Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
+#define PU_DEPTH_INTER_MIN 0
+#define PU_DEPTH_INTER_MAX 3
+#define PU_DEPTH_INTRA_MIN 0
+#define PU_DEPTH_INTRA_MAX 4
 
 // Maximum CU depth when descending form LCU level.
 #define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */

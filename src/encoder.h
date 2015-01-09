@@ -136,6 +136,11 @@ typedef struct encoder_control
   const int* slice_addresses_in_ts;
   
   threadqueue_queue *threadqueue;
+
+  struct {
+    uint8_t min;
+    uint8_t max;
+  } pu_depth_inter, pu_depth_intra;
   
 } encoder_control;
 

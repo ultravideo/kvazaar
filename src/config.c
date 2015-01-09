@@ -98,6 +98,12 @@ int config_init(config *cfg)
   cfg->threads = 0;
   cfg->cpuid = 1;
 
+  // Defaults for what sizes of PUs are tried.
+  cfg->pu_depth_inter.min = 0; // 0-3
+  cfg->pu_depth_inter.max = 3; // 0-3
+  cfg->pu_depth_intra.min = 1; // 0-4
+  cfg->pu_depth_intra.max = 4; // 0-4
+
   return 1;
 }
 
@@ -451,6 +457,40 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->threads = atoi(value);
   else if OPT("cpuid")
     cfg->cpuid = atoi(value);
+  else if OPT("pu-depth-inter")
+  {
+    if (2 == sscanf(value, "%d-%d", &cfg->pu_depth_inter.min, &cfg->pu_depth_inter.max)) {
+      if (!WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX) ||
+          !WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX)) 
+      {
+        fprintf(stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)",
+                cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
+        return 0;
+      }
+      if (cfg->pu_depth_inter.min > cfg->pu_depth_inter.max) {
+        fprintf(stderr, "Input error: Inter PU depth min (%d) > max (%d)\n",
+                cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
+        return 0;
+      }
+    }
+  }
+  else if OPT("pu-depth-intra")
+  {
+    if (2 == sscanf(value, "%d-%d", &cfg->pu_depth_intra.min, &cfg->pu_depth_intra.max)) {
+      if (!WITHIN(cfg->pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX) ||
+          !WITHIN(cfg->pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX))
+      {
+        fprintf(stderr, "Input error: illegal value for --pu-depth-intra (%d-%d)",
+          cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
+        return 0;
+      }
+      if (cfg->pu_depth_intra.min > cfg->pu_depth_intra.max) {
+        fprintf(stderr, "Input error: Intra PU depth min (%d) > max (%d)\n",
+                cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
+        return 0;
+      }
+    }
+  }
   else
     return 0;
 #undef OPT
@@ -507,6 +547,8 @@ int config_read(config *cfg,int argc, char *argv[])
     { "slice-addresses",    required_argument, NULL, 0 },
     { "threads",            required_argument, NULL, 0 },
     { "cpuid",              required_argument, NULL, 0 },
+    { "pu-depth-inter",     required_argument, NULL, 0 },
+    { "pu-depth-intra",     required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 
