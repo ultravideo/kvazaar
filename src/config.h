@@ -81,6 +81,11 @@ typedef struct
   
   int32_t threads;
   int32_t cpuid;
+
+  struct {
+    int32_t min;
+    int32_t max;
+  } pu_depth_inter, pu_depth_intra;
 } config;
 
 /* Function definitions */

@@ -1758,10 +1758,16 @@ static double search_cu_intra(encoder_state * const encoder_state,
     // Set transform depth to current depth, meaning no transform splits.
     lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
 
-    if (encoder_state->encoder_control->rdo >= 2) {
-      int number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+    // Refine results with slower search or get some results if rough search was skipped.
+    if (encoder_state->encoder_control->rdo >= 2 || skip_rough_search) {
+      int number_of_modes_to_search;
       if (encoder_state->encoder_control->rdo == 3) {
         number_of_modes_to_search = 35;
+      } else if (encoder_state->encoder_control->rdo == 2) {
+        number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+      } else {
+        // Check only the predicted modes.
+        number_of_modes_to_search = 0;
       }
       int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
       search_intra_rdo(encoder_state, 
@@ -1792,6 +1798,7 @@ static double search_cu_intra(encoder_state * const encoder_state,
  */
 static double search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
+  const encoder_control* ctrl = encoder_state->encoder_control;
   const videoframe * const frame = encoder_state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_INT;
@@ -1826,8 +1833,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
   {
 
     if (encoder_state->global->slicetype != SLICE_I &&
-        depth >= MIN_INTER_SEARCH_DEPTH &&
-        depth <= MAX_INTER_SEARCH_DEPTH)
+        WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max))
     {
       int mode_cost = search_cu_inter(encoder_state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
@@ -1836,9 +1842,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
       }
     }
 
-    if (depth >= MIN_INTRA_SEARCH_DEPTH &&
-        depth <= MAX_INTRA_SEARCH_DEPTH)
-    {
+    if (WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max)) {
       double mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
@@ -1971,7 +1975,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
   }
   
   // Recursively split all the way to max search depth.
-  if (depth < MAX_INTRA_SEARCH_DEPTH || (depth < MAX_INTER_SEARCH_DEPTH && encoder_state->global->slicetype != SLICE_I)) {
+  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && encoder_state->global->slicetype != SLICE_I)) {
     int half_cu = cu_width / 2;
     // Using Cost = lambda * 9 to compensate on the price of the split
     double split_cost = encoder_state->global->cur_lambda_cost * CU_COST;
