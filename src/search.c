@@ -1758,10 +1758,16 @@ static double search_cu_intra(encoder_state * const encoder_state,
     // Set transform depth to current depth, meaning no transform splits.
     lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
 
-    if (encoder_state->encoder_control->rdo >= 2) {
-      int number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+    // Refine results with slower search or get some results if rough search was skipped.
+    if (encoder_state->encoder_control->rdo >= 2 || skip_rough_search) {
+      int number_of_modes_to_search;
       if (encoder_state->encoder_control->rdo == 3) {
         number_of_modes_to_search = 35;
+      } else if (encoder_state->encoder_control->rdo == 2) {
+        number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+      } else {
+        // Check only the predicted modes.
+        number_of_modes_to_search = 0;
       }
       int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
       search_intra_rdo(encoder_state, 
