@@ -47,6 +47,11 @@
   && (x) + (block_width) <= (width) \
   && (y) + (block_height) <= (height))
 
+// Cost treshold for doing intra search in inter frames with --rd=0.
+#ifndef INTRA_TRESHOLD
+# define INTRA_TRESHOLD 20
+#endif
+
 // Extra cost for CU split.
 // Compensates for missing or incorrect bit costs. Must be recalculated if
 // bits are added or removed from cu-tree search.
@@ -1875,7 +1880,15 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
       }
     }
 
-    if (WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max)) {
+    // Try to skip intra search in rd==0 mode.
+    // This can be quite severe on bdrate. It might be better to do this
+    // decision after reconstructing the inter frame.
+    bool skip_intra = encoder_state->encoder_control->rdo == 0
+                      && cur_cu->type == CU_NOTSET
+                      && cost / (cu_width * cu_width) >= INTRA_TRESHOLD;
+    if (!skip_intra 
+        && WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max))
+    {
       double mode_cost = search_cu_intra(encoder_state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
