@@ -199,6 +199,218 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
   return temp_bitcost*(int32_t)(encoder_state->global->cur_lambda_cost_sqrt+0.5);
 }
 
+unsigned TZ_diamond_search(const encoder_state * const encoder_state, const image *pic, const image *ref,
+                           const vector2d *orig, const int iDist, const vector2d mv_start, unsigned best_cost, vector2d *mv_best, int *best_dist,
+                           int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
+                           int block_width)
+{
+  int max_lcu_below = -1;
+  int n_points;
+  int best_index = -1;
+  int i;
+
+  vector2d pattern[8] = {
+      { 0, iDist }, { iDist, 0 }, { 0, -iDist }, { -iDist, 0 },
+      { iDist / 2, iDist / 2 }, { iDist / 2, -iDist / 2 }, { -iDist / 2, -iDist / 2 }, { -iDist / 2, iDist / 2 }
+  };
+
+  if (iDist == 1)
+  {
+    n_points = 4;
+  }
+  else if (iDist <= 8)
+  {
+    n_points = 8;
+  }
+  else
+  {
+    n_points = 4;
+  }
+
+  for (i = 0; i < n_points; i++)
+  {
+    const vector2d *current = &pattern[i];
+    unsigned cost;
+    uint32_t bitcost;
+
+    {
+      PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+      cost = image_calc_sad(pic, ref, orig->x, orig->y,
+                            (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv_start.x + current->x,
+                            (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv_start.y + current->y,
+                            block_width, block_width, max_lcu_below);
+      cost += calc_mvd_cost(encoder_state, mv_start.x + current->x, mv_start.y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+        (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv_start.x + current->x,
+        (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv_start.x + current->x + block_width,
+        (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv_start.y + current->y,
+        (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv_start.y + current->y + block_width);
+    }
+
+    if (cost < best_cost)
+    {
+      best_cost = cost;
+      *best_bitcost = bitcost;
+      best_index = i;
+    }
+  }
+
+  if (best_index >= 0)
+  {
+    *mv_best = pattern[best_index];
+    *best_dist = iDist;
+  }
+
+  return best_cost;
+
+}
+
+unsigned TZ_raster_search(const encoder_state * const encoder_state, const image *pic, const image *ref,
+                          const vector2d *orig, const vector2d mv_start, unsigned best_cost, vector2d *mv_best,
+                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
+                          int block_width, int iSearchRange, int iRaster)
+{
+  int max_lcu_below = -1;
+  int i;
+  int k;
+
+  for (i = iSearchRange; i >= -iSearchRange; i -= iRaster)
+  {
+    for (k = -iSearchRange; k <= iSearchRange; k += iRaster)
+    {
+      vector2d current = { k, i };
+      unsigned cost;
+      uint32_t bitcost;
+
+      {
+        PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+        cost = image_calc_sad(pic, ref, orig->x, orig->y,
+          (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv_start.x + k,
+          (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv_start.y + i,
+          block_width, block_width, max_lcu_below);
+        cost += calc_mvd_cost(encoder_state, mv_start.x + k, mv_start.y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+        PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+          (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv_start.x + k,
+          (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv_start.x + k + block_width,
+          (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv_start.y + i,
+          (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv_start.y + i + block_width);
+      }
+
+      if (cost < best_cost)
+      {
+        best_cost = cost;
+        *best_bitcost = bitcost;
+        *mv_best = current;
+      }
+
+    }
+  }
+
+  return best_cost;
+
+}
+
+static unsigned TZ_search(const encoder_state * const encoder_state, unsigned depth,
+                          const image *pic, const image *ref,
+                          const vector2d *orig, vector2d *mv_in_out,
+                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                          int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
+{
+
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+
+  vector2d mv_start = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  vector2d mv_best = { 0, 0 };
+
+  unsigned best_cost = UINT32_MAX;
+  uint32_t best_bitcost = 0;
+
+  int iDist;
+  int iSearchRange = 64;
+  int best_dist = 0;
+  int iRaster = 8;
+  bool bRasterRefinementEnable = true;
+  bool bStarRefinementEnable = false;
+
+  //step 1, choose best start point prediction
+
+  //step 2, diamond grid search
+  for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
+  {
+    best_cost = TZ_diamond_search(encoder_state, pic, ref, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
+                                  mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width);
+  }
+  mv_start.x += mv_best.x;
+  mv_start.y += mv_best.y;
+
+  //step 3, raster scan
+  if (best_dist > iRaster)
+  {
+    mv_best.x = 0;
+    mv_best.y = 0;
+    best_dist = iRaster;
+
+    best_cost = TZ_raster_search(encoder_state, pic, ref, orig, mv_start, best_cost, &mv_best,
+                                 mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, iSearchRange, iRaster);
+    mv_start.x += mv_best.x;
+    mv_start.y += mv_best.y;
+  }
+
+  //step 4
+
+  //raster refinement
+  if (bRasterRefinementEnable && best_dist > 0)
+  {
+    mv_best.x = 0;
+    mv_best.y = 0;
+
+    iDist = best_dist >> 1;
+    while (iDist > 1)
+    {
+      best_cost = TZ_diamond_search(encoder_state, pic, ref, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
+                                    mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width);
+
+      mv_start.x += mv_best.x;
+      mv_start.y += mv_best.y;
+      mv_best.x = 0;
+      mv_best.y = 0;
+
+      iDist = iDist >> 1;
+    }
+
+    //final search
+    best_cost = TZ_diamond_search(encoder_state, pic, ref, orig, 1, mv_start, best_cost, &mv_best, &best_dist,
+                                  mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width);
+    mv_start.x += mv_best.x;
+    mv_start.y += mv_best.y;
+  }
+
+  //star refinement (repeat step 2 for the current starting point)
+  if (bStarRefinementEnable && best_dist > 0)
+  {
+    mv_best.x = 0;
+    mv_best.y = 0;
+
+    for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
+    {
+      best_cost = TZ_diamond_search(encoder_state, pic, ref, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
+                                    mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width);
+    }
+
+    mv_start.x += mv_best.x;
+    mv_start.y += mv_best.y;
+  }
+
+  mv_start.x = mv_start.x << 2;
+  mv_start.y = mv_start.y << 2;
+
+  *mv_in_out = mv_start;
+  *bitcost_out = best_bitcost;
+
+  return best_cost;
+}
 
 /**
  * \brief Do motion search using the HEXBS algorithm.
