@@ -1811,6 +1811,15 @@ static double calc_mode_bits(const encoder_state *encoder_state,
   return mode_bits;
 }
 
+static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
+{
+  vector2d lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
+  cu_info *cu_array = &(lcu)->cu[LCU_CU_OFFSET];
+  bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
+  bool condL = y >= 8 && cu_array[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
+  return condA + condL;
+}
+
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -1990,11 +1999,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
         
     if (depth < MAX_DEPTH) {
-      vector2d lcu_cu = { x_local / 8, y_local / 8 };
-      cu_info *cu_array = &(&work_tree[depth])->cu[LCU_CU_OFFSET];
-      bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
-      bool condL = y >= 8 && cu_array[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
-      uint8_t split_model = condA + condL;
+      uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
 
       const cabac_ctx *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
       cost += CTX_ENTROPY_FBITS(ctx, 0);
@@ -2047,9 +2052,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
         cost += cu_rd_cost_luma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
         cost += cu_rd_cost_chroma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
 
-        bool condA = x >= 8 && cu_array_d0[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
-        bool condL = y >= 8 && cu_array_d0[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
-        uint8_t split_model = condA + condL;
+        uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
         const cabac_ctx *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
         cost += CTX_ENTROPY_FBITS(ctx, 0);
 
