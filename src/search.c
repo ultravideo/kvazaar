@@ -1814,7 +1814,7 @@ static double calc_mode_bits(const encoder_state *encoder_state,
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
   vector2d lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
-  cu_info *cu_array = &(lcu)->cu[LCU_CU_OFFSET];
+  const cu_info *cu_array = &(lcu)->cu[LCU_CU_OFFSET];
   bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
   bool condL = y >= 8 && cu_array[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
   return condA + condL;
@@ -1839,7 +1839,6 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
   cu_info *cur_cu;
 
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
-  const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   lcu_t *const lcu = &work_tree[depth];
 
   int x_local = (x&0x3f), y_local = (y&0x3f);
@@ -2032,7 +2031,6 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
         && x + cu_width <= frame->width && y + cu_width <= frame->height)
     {
       vector2d lcu_cu = { x_local / 8, y_local / 8 };
-      cu_info *cu_array_d0 = &(&work_tree[depth])->cu[LCU_CU_OFFSET];
       cu_info *cu_array_d1 = &(&work_tree[depth + 1])->cu[LCU_CU_OFFSET];
       cu_info *cu_d1 = &cu_array_d1[(lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH)];
 
