@@ -186,7 +186,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const image * co
       filter_inter_octpel_chroma(encoder_state->encoder_control, octpel_src_off_v, width_c+FILTER_SIZE_C, width_c,
                    width_c, octpel_dst_v, width_c*8, c_off_x, c_off_y);
 
-      //Luma
+      //Sample fractional pixels for luma
       for(y = 0; y < width; ++y) {
         int y_in_lcu = ((y+ypos) & ((LCU_WIDTH)-1));
         int qpel_y = y*4+y_off_y;
@@ -196,7 +196,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const image * co
           lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel)qpel_dst_y[qpel_y*(width*4)+qpel_x];
         }
       }
-      //Chroma
+      //Sample fractional pixels for chroma
       for(y = 0; y < width_c; ++y) {
         int y_in_lcu = ((y+(ypos>>1)) & ((LCU_WIDTH>>1)-1));
         int qpel_y = y*8+c_off_y;
