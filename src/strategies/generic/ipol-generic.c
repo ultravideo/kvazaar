@@ -115,9 +115,9 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = ((eight_tap_filter_ver_generic(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3;
-        dst[dst_pos + 2 * dst_stride] = ((eight_tap_filter_ver_generic(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3;
-        dst[dst_pos + 3 * dst_stride] = ((eight_tap_filter_ver_generic(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3;
+        dst[dst_pos + 1 * dst_stride] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_generic(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 2 * dst_stride] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_generic(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 3 * dst_stride] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_generic(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
@@ -136,29 +136,24 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
 
 
         for (i = 0; i<3; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = ((eight_tap_filter_ver_16bit_generic(c1, &temp[0][i], 3) + offset23) >> shift2) >> shift3;
-          dst[dst_pos + 2 * dst_stride + i + 1] = ((eight_tap_filter_ver_16bit_generic(c2, &temp[0][i], 3) + offset23) >> shift2) >> shift3;
-          dst[dst_pos + 3 * dst_stride + i + 1] = ((eight_tap_filter_ver_16bit_generic(c3, &temp[0][i], 3) + offset23) >> shift2) >> shift3;
+          dst[dst_pos + 1 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_16bit_generic(c1, &temp[0][i], 3) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 2 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_16bit_generic(c2, &temp[0][i], 3) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 3 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_16bit_generic(c3, &temp[0][i], 3) + offset23) >> shift2) >> shift3);
 
         }
 
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = (temp[3][0] + offset3) >> shift3;
-        dst[dst_pos + 2] = (temp[3][1] + offset3) >> shift3;
-        dst[dst_pos + 3] = (temp[3][2] + offset3) >> shift3;
+        dst[dst_pos + 1] = CLIP(0, PIXEL_MAX, (temp[3][0] + offset3) >> shift3);
+        dst[dst_pos + 2] = CLIP(0, PIXEL_MAX, (temp[3][1] + offset3) >> shift3);
+        dst[dst_pos + 3] = CLIP(0, PIXEL_MAX, (temp[3][2] + offset3) >> shift3);
       }
 
 
     }
   }
 
-  //Clamp values to bitdepth
-  for (i = 0; i < width*height * 16; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (pixel)((1 << encoder->bitdepth) - 1);
-    if (dst[i] < 0) dst[i] = 0;
-  }
 }
 
 /**
