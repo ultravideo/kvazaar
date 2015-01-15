@@ -78,9 +78,9 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
 {
 
   int32_t x, y;
-  int32_t shift1 = encoder->bitdepth - 8;
+  int32_t shift1 = 0; // encoder->bitdepth - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - encoder->bitdepth;
+  int32_t shift3 = 6; // 14 - encoder->bitdepth;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
@@ -92,7 +92,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
   c2 = g_luma_filter[2];
   c3 = g_luma_filter[3];
 
-  int16_t temp[8][3];
+  int16_t temp[3][8];
 
   // Loop source pixels and generate sixteen filtered quarter-pel pixels on each round
   for (y = 0; y < height; y++) {
@@ -109,9 +109,9 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
       //
       if (hor_flag && !ver_flag) {
 
-        temp[3][0] = eight_tap_filter_hor_generic(c1, &src[src_pos - 3]) >> shift1;
-        temp[3][1] = eight_tap_filter_hor_generic(c2, &src[src_pos - 3]) >> shift1;
-        temp[3][2] = eight_tap_filter_hor_generic(c3, &src[src_pos - 3]) >> shift1;
+        temp[0][3] = eight_tap_filter_hor_generic(c1, &src[src_pos - 3]) >> shift1;
+        temp[1][3] = eight_tap_filter_hor_generic(c2, &src[src_pos - 3]) >> shift1;
+        temp[2][3] = eight_tap_filter_hor_generic(c3, &src[src_pos - 3]) >> shift1;
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
@@ -127,27 +127,26 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
         src_pos -= 3 * src_stride;  //0,-3
         for (i = 0; i < 8; ++i) {
 
-          temp[i][0] = eight_tap_filter_hor_generic(c1, &src[src_pos - 3]) >> shift1; // h0(0,-3+i)
-          temp[i][1] = eight_tap_filter_hor_generic(c2, &src[src_pos - 3]) >> shift1; // h1(0,-3+i)
-          temp[i][2] = eight_tap_filter_hor_generic(c3, &src[src_pos - 3]) >> shift1; // h2(0,-3+i)
-          src_pos += src_stride;
+          temp[0][i] = eight_tap_filter_hor_generic(c1, &src[src_pos + i * src_stride - 3]) >> shift1; // h0(0,-3+i)
+          temp[1][i] = eight_tap_filter_hor_generic(c2, &src[src_pos + i * src_stride - 3]) >> shift1; // h1(0,-3+i)
+          temp[2][i] = eight_tap_filter_hor_generic(c3, &src[src_pos + i * src_stride - 3]) >> shift1; // h2(0,-3+i)
         }
 
 
 
         for (i = 0; i<3; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_16bit_generic(c1, &temp[0][i], 3) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 2 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_16bit_generic(c2, &temp[0][i], 3) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 3 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_16bit_generic(c3, &temp[0][i], 3) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 1 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_hor_16bit_generic(c1, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 2 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_hor_16bit_generic(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 3 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_hor_16bit_generic(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
 
         }
 
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = CLIP(0, PIXEL_MAX, (temp[3][0] + offset3) >> shift3);
-        dst[dst_pos + 2] = CLIP(0, PIXEL_MAX, (temp[3][1] + offset3) >> shift3);
-        dst[dst_pos + 3] = CLIP(0, PIXEL_MAX, (temp[3][2] + offset3) >> shift3);
+        dst[dst_pos + 1] = CLIP(0, PIXEL_MAX, (temp[0][3] + offset3) >> shift3);
+        dst[dst_pos + 2] = CLIP(0, PIXEL_MAX, (temp[1][3] + offset3) >> shift3);
+        dst[dst_pos + 3] = CLIP(0, PIXEL_MAX, (temp[2][3] + offset3) >> shift3);
       }
 
 
