@@ -193,7 +193,7 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const image * co
         for(x = 0; x < width; ++x) {
           int x_in_lcu = ((x+xpos) & ((LCU_WIDTH)-1));
           int qpel_x = x*4+y_off_x;
-          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (uint8_t)qpel_dst_y[qpel_y*(width*4)+qpel_x];
+          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel)qpel_dst_y[qpel_y*(width*4)+qpel_x];
         }
       }
       //Chroma
@@ -203,8 +203,8 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const image * co
         for(x = 0; x < width_c; ++x) {
           int x_in_lcu = ((x+(xpos>>1)) & ((LCU_WIDTH>>1)-1));
           int qpel_x = x*8+c_off_x;
-          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (uint8_t)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
-          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (uint8_t)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
+          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (pixel)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
+          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (pixel)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
         }
       }
     }
@@ -256,8 +256,8 @@ void inter_recon_lcu(const encoder_state * const encoder_state, const image * co
         for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
           int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
           int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (uint8_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
-          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (uint8_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (pixel)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (pixel)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
         }
       }
     }
