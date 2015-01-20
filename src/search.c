@@ -1884,8 +1884,8 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
     bool skip_intra = encoder_state->encoder_control->rdo == 0
-                      && cur_cu->type == CU_NOTSET
-                      && cost / (cu_width * cu_width) >= INTRA_TRESHOLD;
+                      && cur_cu->type != CU_NOTSET
+                      && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
     if (!skip_intra 
         && WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max))
     {
