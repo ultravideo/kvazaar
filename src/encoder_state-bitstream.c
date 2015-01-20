@@ -688,11 +688,20 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     curpos = 0;
   }
 
+  // The first NAL unit of the access unit must use a long start code.
+  bool first_nal_in_au = true;
+
+  // Access Unit Delimiter (AUD)
+  if (encoder->aud_enable) {
+    first_nal_in_au = false;
+    encoder_state_write_bitstream_aud(main_state);
+  }
+  
   if (main_state->global->is_radl_frame) {
+    // Only write the parameter sets in the first frame.
+    // TODO: Add option to include parameter sets before intra frames.
     if (main_state->global->frame == 0) {
-      // Access Unit Delimiter (AUD)
-      if (encoder->aud_enable)
-        encoder_state_write_bitstream_aud(main_state);
+      first_nal_in_au = false;
 
       // Video Parameter Set (VPS)
       nal_write(stream, NAL_VPS_NUT, 0, 1);
@@ -708,28 +717,19 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
       nal_write(stream, NAL_PPS_NUT, 0, 1);
       encoder_state_write_bitstream_pic_parameter_set(main_state);
       bitstream_align(stream);
-    }
 
-    if (main_state->global->frame == 0) {
       // Prefix SEI
-      nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+      nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
       encoder_state_write_bitstream_prefix_sei_version(main_state);
       bitstream_align(stream);
     }
-  } else {
-    // Access Unit Delimiter (AUD)
-    if (encoder->aud_enable)
-      encoder_state_write_bitstream_aud(main_state);
   }
 
   {
-    // Not quite sure if this is correct, but it seems to have worked so far
-    // so I tried to not change it's behavior.
-    int long_start_code = main_state->global->is_radl_frame || encoder->aud_enable ? 0 : 1;
-
-    nal_write(stream,
-              main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
+    uint8_t nal_type = (main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
+    nal_write(stream, nal_type, 0, first_nal_in_au);
   }
+
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
   for (i = 0; main_state->children[i].encoder_control; ++i) {
