@@ -212,19 +212,7 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
       ssd += diff*diff;
     }
 
-    double coeff_bits = 0;
-    // Simple RDO
-    if(encoder->rdo == 1) {
-      // SSD between reconstruction and original + sum of coeffs
-      int coeff_abs = 0;
-      for (i = 0; i < width*width; i++) {
-        coeff_abs += abs((int)temp_coeff[i]);
-      }
-      coeff_bits += 1 + 1.5 * coeff_abs;
-      // Full RDO
-    } else if(encoder->rdo >= 2) {
-      coeff_bits = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
-    }
+    double coeff_bits = get_coeff_cost(encoder_state, temp_coeff, width, 0, luma_scan_mode);
 
     return (uint32_t)(0.5 + ssd + coeff_bits * encoder_state->global->cur_lambda_cost);
 }

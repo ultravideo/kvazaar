@@ -460,32 +460,9 @@ int quantize_residual_trskip(
       0, in_stride, 4,
       ref_in, pred_in, noskip.rec, noskip.coeff);
   noskip.cost = pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
-  if (encoder_state->encoder_control->rdo == 1) {
-    // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum).
-    unsigned abs_coeffs = coefficients_calc_abs(noskip.coeff, 4, 4);
-    noskip.cost += (abs_coeffs + (abs_coeffs / 2)) * bit_cost;
-  } else if (encoder_state->encoder_control->rdo >= 2) {
-    noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
-  }
+  noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
-  if (encoder_state->encoder_control->rdo == 0) {
-    // Evaluating whether to use transform skip or not requires doing the
-    // transform. So if rdo is off, it's probably better to not use trskip.
-    skip.cost = UINT32_MAX;
-  } else {
-    skip.has_coeffs = quantize_residual(
-        encoder_state, cur_cu, width, color, scan_order,
-        1, in_stride, 4,
-        ref_in, pred_in, skip.rec, skip.coeff);
-    skip.cost = pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
-    if (encoder_state->encoder_control->rdo == 1) {
-      // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum + 1).
-      unsigned abs_coeffs = coefficients_calc_abs(skip.coeff, 4, 4);
-      skip.cost += (1 + abs_coeffs + (abs_coeffs / 2)) * bit_cost;
-    } else if (encoder_state->encoder_control->rdo >= 2) {
-      skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
-    }
-  }
+  skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
 
   if (noskip.cost <= skip.cost) {
     *trskip_out = 0;
