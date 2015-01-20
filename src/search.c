@@ -932,7 +932,6 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
   const cu_info *const pred_cu,
   lcu_t *const lcu)
 {
-  const int rdo = encoder_state->encoder_control->rdo;
   const int width = LCU_WIDTH >> depth;
   const uint8_t pu_index = PU_INDEX(x_px / 4, y_px / 4);
 
@@ -1009,7 +1008,6 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
   lcu_t *const lcu)
 {
   const vector2d lcu_px = { x_px / 2, y_px / 2 };
-  const int rdo = encoder_state->encoder_control->rdo;
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x / 4) + (lcu_px.y / 4)*LCU_T_CU_WIDTH];
 
