@@ -176,7 +176,6 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
   * ea0,0 = (-4*B0,-1  + 36*B0,0  + 36*B0,1  - 4*B0,2)  >> shift1
   * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
   */
-  int i = 0;
   int32_t x, y;
   int32_t shift1 = encoder->bitdepth - 8;
   int32_t shift2 = 6;
@@ -205,8 +204,8 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = (((-4 * src[src_pos - src_stride] + 36 * src[src_pos] + 36 * src[src_pos + src_stride]
-          - 4 * src[src_pos + 2 * src_stride]) >> shift1) + (1 << (shift3 - 1))) >> shift3; // ea0,0
+        dst[dst_pos + 1 * dst_stride] = fast_clip_32bit_to_pixel((((-4 * src[src_pos - src_stride] + 36 * src[src_pos] + 36 * src[src_pos + src_stride]
+          - 4 * src[src_pos + 2 * src_stride]) >> shift1) + (1 << (shift3 - 1))) >> shift3); // ea0,0
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
@@ -221,18 +220,13 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
         src_pos += src_stride;  //0,2
         ae_temp3 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,2
 
-        dst[dst_pos + 1 * dst_stride + 1] = (((-4 * ae_temp1 + 36 * ae_temp + 36 * ae_temp2 - 4 * ae_temp3) + offset23) >> shift2) >> shift3; // ee0,0
+        dst[dst_pos + 1 * dst_stride + 1] = fast_clip_32bit_to_pixel((((-4 * ae_temp1 + 36 * ae_temp + 36 * ae_temp2 - 4 * ae_temp3) + offset23) >> shift2) >> shift3); // ee0,0
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = (ae_temp + offset3) >> shift3;
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((ae_temp + offset3) >> shift3);
       }
     }
-  }
-  //Clamp values to bitdepth
-  for (i = 0; i < width*height * 4; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (pixel)((1 << encoder->bitdepth) - 1);
-    if (dst[i] < 0) dst[i] = 0;
   }
 }
 
@@ -316,47 +310,47 @@ void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, p
 
       // Vertical 1/8-values
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = (((c1[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 1 * dst_stride] = fast_clip_32bit_to_pixel((((c1[0] * src[src_pos - 1 * src_stride]
           + c1[1] * src[src_pos]
           + c1[2] * src[src_pos + 1 * src_stride]
           + c1[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
 
-        dst[dst_pos + 2 * dst_stride] = (((c2[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 2 * dst_stride] = fast_clip_32bit_to_pixel((((c2[0] * src[src_pos - 1 * src_stride]
           + c2[1] * src[src_pos]
           + c2[2] * src[src_pos + 1 * src_stride]
           + c2[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
 
-        dst[dst_pos + 3 * dst_stride] = (((c3[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 3 * dst_stride] = fast_clip_32bit_to_pixel((((c3[0] * src[src_pos - 1 * src_stride]
           + c3[1] * src[src_pos]
           + c3[2] * src[src_pos + 1 * src_stride]
           + c3[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
 
-        dst[dst_pos + 4 * dst_stride] = (((c4[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 4 * dst_stride] = fast_clip_32bit_to_pixel((((c4[0] * src[src_pos - 1 * src_stride]
           + c4[1] * src[src_pos]
           + c4[2] * src[src_pos + 1 * src_stride]
           + c4[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
 
-        dst[dst_pos + 5 * dst_stride] = (((c5[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 5 * dst_stride] = fast_clip_32bit_to_pixel((((c5[0] * src[src_pos - 1 * src_stride]
           + c5[1] * src[src_pos]
           + c5[2] * src[src_pos + 1 * src_stride]
           + c5[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
 
-        dst[dst_pos + 6 * dst_stride] = (((c6[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 6 * dst_stride] = fast_clip_32bit_to_pixel((((c6[0] * src[src_pos - 1 * src_stride]
           + c6[1] * src[src_pos]
           + c6[2] * src[src_pos + 1 * src_stride]
           + c6[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
 
-        dst[dst_pos + 7 * dst_stride] = (((c7[0] * src[src_pos - 1 * src_stride]
+        dst[dst_pos + 7 * dst_stride] = fast_clip_32bit_to_pixel((((c7[0] * src[src_pos - 1 * src_stride]
           + c7[1] * src[src_pos]
           + c7[2] * src[src_pos + 1 * src_stride]
           + c7[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+          + (1 << (shift3 - 1))) >> shift3); //
       }
 
       // When both flags, interpolate values from temporary horizontal values
@@ -408,56 +402,50 @@ void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, p
 
         //Calculate values from temporary horizontal 1/8-values
         for (i = 0; i<7; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = (((c1[0] * temp[0][i] + c1[1] * h_temp[i]
+          dst[dst_pos + 1 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c1[0] * temp[0][i] + c1[1] * h_temp[i]
             + c1[2] * temp[1][i] + c1[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
-          dst[dst_pos + 2 * dst_stride + i + 1] = (((c2[0] * temp[0][i] + c2[1] * h_temp[i]
+          dst[dst_pos + 2 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c2[0] * temp[0][i] + c2[1] * h_temp[i]
             + c2[2] * temp[1][i] + c2[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
-          dst[dst_pos + 3 * dst_stride + i + 1] = (((c3[0] * temp[0][i] + c3[1] * h_temp[i]
+          dst[dst_pos + 3 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c3[0] * temp[0][i] + c3[1] * h_temp[i]
             + c3[2] * temp[1][i] + c3[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
-          dst[dst_pos + 4 * dst_stride + i + 1] = (((c4[0] * temp[0][i] + c4[1] * h_temp[i]
+          dst[dst_pos + 4 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c4[0] * temp[0][i] + c4[1] * h_temp[i]
             + c4[2] * temp[1][i] + c4[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
-          dst[dst_pos + 5 * dst_stride + i + 1] = (((c5[0] * temp[0][i] + c5[1] * h_temp[i]
+          dst[dst_pos + 5 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c5[0] * temp[0][i] + c5[1] * h_temp[i]
             + c5[2] * temp[1][i] + c5[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
-          dst[dst_pos + 6 * dst_stride + i + 1] = (((c6[0] * temp[0][i] + c6[1] * h_temp[i]
+          dst[dst_pos + 6 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c6[0] * temp[0][i] + c6[1] * h_temp[i]
             + c6[2] * temp[1][i] + c6[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
-          dst[dst_pos + 7 * dst_stride + i + 1] = (((c7[0] * temp[0][i] + c7[1] * h_temp[i]
+          dst[dst_pos + 7 * dst_stride + i + 1] = fast_clip_32bit_to_pixel((((c7[0] * temp[0][i] + c7[1] * h_temp[i]
             + c7[2] * temp[1][i] + c7[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+            + offset23) >> shift2) >> shift3); // ee0,0
 
         }
 
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = (h_temp[0] + offset3) >> shift3;
-        dst[dst_pos + 2] = (h_temp[1] + offset3) >> shift3;
-        dst[dst_pos + 3] = (h_temp[2] + offset3) >> shift3;
-        dst[dst_pos + 4] = (h_temp[3] + offset3) >> shift3;
-        dst[dst_pos + 5] = (h_temp[4] + offset3) >> shift3;
-        dst[dst_pos + 6] = (h_temp[5] + offset3) >> shift3;
-        dst[dst_pos + 7] = (h_temp[6] + offset3) >> shift3;
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((h_temp[0] + offset3) >> shift3);
+        dst[dst_pos + 2] = fast_clip_32bit_to_pixel((h_temp[1] + offset3) >> shift3);
+        dst[dst_pos + 3] = fast_clip_32bit_to_pixel((h_temp[2] + offset3) >> shift3);
+        dst[dst_pos + 4] = fast_clip_32bit_to_pixel((h_temp[3] + offset3) >> shift3);
+        dst[dst_pos + 5] = fast_clip_32bit_to_pixel((h_temp[4] + offset3) >> shift3);
+        dst[dst_pos + 6] = fast_clip_32bit_to_pixel((h_temp[5] + offset3) >> shift3);
+        dst[dst_pos + 7] = fast_clip_32bit_to_pixel((h_temp[6] + offset3) >> shift3);
       }
 
 
     }
-  }
-
-  //Clamp values to bitdepth
-  for (i = 0; i < width*height * 64; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (pixel)((1 << encoder->bitdepth) - 1);
-    if (dst[i] < 0) dst[i] = 0;
   }
 }
 
