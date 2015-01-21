@@ -25,7 +25,49 @@
 
 #include "strategyselector.h"
 
+// Function to clip int16_t to pixel. (0-255 or 0-1023)
+// Assumes PIXEL_MAX to be 2^n-1
+pixel fast_clip_16bit_to_pixel(int16_t value)
+{
+  // Ensure that compiler generates arithmetic shift from ">>" 
+#if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
 
+  if (value & ~PIXEL_MAX) {
+    int16_t temp = (-value) >> 15;
+#if BITDEPTH == 10
+    temp &= PIXEL_MAX;
+#endif
+    return temp;
+  }
+  else {
+    return value;
+  }
+#else
+  CLIP(PIXEL_MIN, PIXEL_MAX, value);
+#endif
+}
+
+// Function to clip int32_t to pixel. (0-255 or 0-1023)
+// Assumes PIXEL_MAX to be 2^n-1
+pixel fast_clip_32bit_to_pixel(int32_t value)
+{
+  // Ensure that compiler generates arithmetic shift from ">>" 
+#if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
+
+  if (value & ~PIXEL_MAX) {
+    int32_t temp = (-value) >> 31;
+#if BITDEPTH == 10
+    temp &= PIXEL_MAX;
+#endif
+    return temp;
+  }
+  else {
+    return value;
+  }
+#else
+  CLIP(PIXEL_MIN, PIXEL_MAX, value);
+#endif
+}
 
 /**
  * \brief Calculate Sum of Absolute Differences (SAD)

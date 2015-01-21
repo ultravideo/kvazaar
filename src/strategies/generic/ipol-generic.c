@@ -26,6 +26,7 @@
 #include "ipol-generic.h"
 #include "strategyselector.h"
 #include "encoder.h"
+#include "picture-generic.h"
 
 extern int8_t g_luma_filter[4][8];
 extern int8_t g_chroma_filter[8][4];
@@ -115,9 +116,9 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_generic(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-        dst[dst_pos + 2 * dst_stride] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_generic(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-        dst[dst_pos + 3 * dst_stride] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_ver_generic(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 1 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_generic(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 2 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_generic(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 3 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_generic(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
@@ -135,18 +136,18 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
 
 
         for (i = 0; i<3; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_hor_16bit_generic(c1, &temp[i][0]) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 2 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_hor_16bit_generic(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 3 * dst_stride + i + 1] = CLIP(0, PIXEL_MAX, ((eight_tap_filter_hor_16bit_generic(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 1 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c1, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 2 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 3 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
 
         }
 
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = CLIP(0, PIXEL_MAX, (temp[0][3] + offset3) >> shift3);
-        dst[dst_pos + 2] = CLIP(0, PIXEL_MAX, (temp[1][3] + offset3) >> shift3);
-        dst[dst_pos + 3] = CLIP(0, PIXEL_MAX, (temp[2][3] + offset3) >> shift3);
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[0][3] + offset3) >> shift3);
+        dst[dst_pos + 2] = fast_clip_32bit_to_pixel((temp[1][3] + offset3) >> shift3);
+        dst[dst_pos + 3] = fast_clip_32bit_to_pixel((temp[2][3] + offset3) >> shift3);
       }
 
 
