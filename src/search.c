@@ -862,7 +862,7 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
 #if SEARCH_MV_FULL_RADIUS
     temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
-    temp_cost += hexagon_search(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost += TZ_search(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #endif
     if (encoder_state->encoder_control->cfg->fme_level > 0) {
       temp_cost = search_frac(encoder_state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
