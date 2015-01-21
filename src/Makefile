@@ -100,6 +100,7 @@ OBJS = interface_main.o \
   strategies/strategies-picture.o \
   strategies/strategies-nal.o \
   strategies/strategies-dct.o \
+  strategies/strategies-ipol.o \
   strategies/generic/nal-generic.o \
   strategies/generic/picture-generic.o \
   strategies/sse2/picture-sse2.o \
@@ -108,7 +109,9 @@ OBJS = interface_main.o \
   strategies/avx2/picture-avx2.o \
   strategies/x86_asm/picture-x86-asm.o \
   strategies/generic/dct-generic.o \
-  strategies/avx2/dct-avx2.o
+  strategies/avx2/dct-avx2.o \
+  strategies/generic/ipol-generic.o \
+  strategies/avx2/ipol-avx2.o \
 
 TEST_OBJS = $(filter-out encmain.o interface_main.o, $(OBJS)) \
   ../tests/dct_tests.o \
