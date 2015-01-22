@@ -176,7 +176,7 @@ typedef struct encoder_state {
 void encode_one_frame(encoder_state *encoder_state);
 int read_one_frame(FILE* file, const encoder_state *encoder);
 
-void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3]);
+void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length);
 void encoder_next_frame(encoder_state *encoder_state);
 
 

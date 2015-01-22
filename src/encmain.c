@@ -345,6 +345,8 @@ int main(int argc, char *argv[])
     GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
 
+    uint64_t bitstream_length = 0;
+
     // Start coding cycle while data on input and not on the last frame
     while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames - 1) {
       // Skip '--seek' frames before input.
@@ -373,7 +375,7 @@ int main(int argc, char *argv[])
       }
       
       //Compute stats
-      encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr);
+      encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr, &bitstream_length);
       
       //Clear encoder
       encoder_next_frame(&encoder_states[current_encoder_state]);
@@ -409,7 +411,7 @@ int main(int argc, char *argv[])
       int first_enc = current_encoder_state;
       do {
         current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
-        encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr);
+        encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr, &bitstream_length);
       } while (current_encoder_state != first_enc);
     }
     
@@ -423,8 +425,9 @@ int main(int argc, char *argv[])
     fgetpos(output,(fpos_t*)&curpos);
 
     // Print statistics of the coding
-    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", stat_frames, (long long unsigned int) curpos<<3,
-          psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
+    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", 
+            stat_frames, bitstream_length * 8,
+            psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
     
     {
