@@ -296,6 +296,9 @@ int main(int argc, char *argv[])
   // AUD
   encoder.aud_enable = (int8_t)encoder.cfg->aud_enable;
 
+  // TODO: Add config option for vps_period.
+  encoder.vps_period = (encoder.cfg->rdo == 0 ? encoder.cfg->intra_period : 0);
+
   encoder.in.file = input;
 
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);

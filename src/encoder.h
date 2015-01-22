@@ -142,6 +142,9 @@ typedef struct encoder_control
     uint8_t max;
   } pu_depth_inter, pu_depth_intra;
   
+  // How often Video Parameter Set is re-sent.
+  uint32_t vps_period;
+
 } encoder_control;
 
 int encoder_control_init(encoder_control *encoder, const config *cfg);

@@ -697,32 +697,32 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     encoder_state_write_bitstream_aud(main_state);
   }
   
-  if (main_state->global->is_radl_frame) {
-    // Only write the parameter sets in the first frame.
-    // TODO: Add option to include parameter sets before intra frames.
-    if (main_state->global->frame == 0) {
-      first_nal_in_au = false;
+  if ((encoder->vps_period > 0 && main_state->global->frame % encoder->vps_period == 0)
+      || main_state->global->frame == 0)
+  {
+    first_nal_in_au = false;
 
-      // Video Parameter Set (VPS)
-      nal_write(stream, NAL_VPS_NUT, 0, 1);
-      encoder_state_write_bitstream_vid_parameter_set(main_state);
-      bitstream_align(stream);
+    // Video Parameter Set (VPS)
+    nal_write(stream, NAL_VPS_NUT, 0, 1);
+    encoder_state_write_bitstream_vid_parameter_set(main_state);
+    bitstream_align(stream);
 
-      // Sequence Parameter Set (SPS)
-      nal_write(stream, NAL_SPS_NUT, 0, 1);
-      encoder_state_write_bitstream_seq_parameter_set(main_state);
-      bitstream_align(stream);
+    // Sequence Parameter Set (SPS)
+    nal_write(stream, NAL_SPS_NUT, 0, 1);
+    encoder_state_write_bitstream_seq_parameter_set(main_state);
+    bitstream_align(stream);
 
-      // Picture Parameter Set (PPS)
-      nal_write(stream, NAL_PPS_NUT, 0, 1);
-      encoder_state_write_bitstream_pic_parameter_set(main_state);
-      bitstream_align(stream);
+    // Picture Parameter Set (PPS)
+    nal_write(stream, NAL_PPS_NUT, 0, 1);
+    encoder_state_write_bitstream_pic_parameter_set(main_state);
+    bitstream_align(stream);
+  }
 
-      // Prefix SEI
-      nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
-      encoder_state_write_bitstream_prefix_sei_version(main_state);
-      bitstream_align(stream);
-    }
+  // Send Kvazaar version information only in the first frame.
+  if (main_state->global->frame == 0) {
+    nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
+    encoder_state_write_bitstream_prefix_sei_version(main_state);
+    bitstream_align(stream);
   }
 
   {
