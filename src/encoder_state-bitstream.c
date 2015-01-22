@@ -762,6 +762,9 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     assert(0);
     main_state->stats_bitstream_length = 0;
   }
+
+  // Flush the output in case someone is reading the file on the other end.
+  fflush(main_state->stream.file.output);
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
