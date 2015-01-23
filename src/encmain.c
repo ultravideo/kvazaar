@@ -429,7 +429,7 @@ int main(int argc, char *argv[])
 
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", 
-            stat_frames, bitstream_length * 8,
+            stat_frames, (long long unsigned int)bitstream_length * 8,
             psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
     
