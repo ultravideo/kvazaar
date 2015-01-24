@@ -299,6 +299,8 @@ int main(int argc, char *argv[])
   // TODO: Add config option for vps_period.
   encoder.vps_period = (encoder.cfg->rdo == 0 ? encoder.cfg->intra_period : 0);
 
+  encoder.sign_hiding = ENABLE_SIGN_HIDING;
+
   encoder.in.file = input;
 
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);

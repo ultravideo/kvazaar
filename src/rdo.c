@@ -434,6 +434,113 @@ static void calc_last_bits(encoder_state * const encoder_state, int32_t width, i
   last_y_bits[ctx] = bits_y;
 }
 
+void rdoq_sign_hiding(const encoder_state *const encoder_state,
+                      const int32_t qp_scaled,
+                      const uint32_t *const scan,
+                      const int32_t delta_u[32 * 32],
+                      const int32_t rate_inc_up[32 * 32],
+                      const int32_t rate_inc_down[32 * 32],
+                      const int32_t sig_rate_delta[32 * 32],
+                      const int32_t width,
+                      const coefficient *const coef,
+                      coefficient *const dest_coeff)
+{
+  const encoder_control * const encoder = encoder_state->encoder_control;
+  const int32_t size = width * width;
+  
+  int64_t rd_factor = (int64_t)(
+    g_inv_quant_scales[qp_scaled % 6] * g_inv_quant_scales[qp_scaled % 6] * (1 << (2 * (qp_scaled / 6)))
+    / encoder_state->global->cur_lambda_cost / 16 / (1 << (2 * (encoder->bitdepth - 8)))
+    + 0.5);
+  int32_t lastCG = -1;
+  int32_t absSum = 0;
+  int32_t n, subset;
+
+  for (subset = (size - 1) >> LOG2_SCAN_SET_SIZE; subset >= 0; subset--) {
+    int32_t  subPos = subset << LOG2_SCAN_SET_SIZE;
+    int32_t  firstNZPosInCG = SCAN_SET_SIZE, lastNZPosInCG = -1;
+    absSum = 0;
+
+    for (n = SCAN_SET_SIZE - 1; n >= 0; --n) {
+      if (dest_coeff[scan[n + subPos]]) {
+        lastNZPosInCG = n;
+        break;
+      }
+    }
+
+    for (n = 0; n <SCAN_SET_SIZE; n++) {
+      if (dest_coeff[scan[n + subPos]]) {
+        firstNZPosInCG = n;
+        break;
+      }
+    }
+
+    for (n = firstNZPosInCG; n <= lastNZPosInCG; n++) {
+      absSum += dest_coeff[scan[n + subPos]];
+    }
+
+    if (lastNZPosInCG >= 0 && lastCG == -1) lastCG = 1;
+
+    if (lastNZPosInCG - firstNZPosInCG >= SBH_THRESHOLD) {
+      int32_t signbit = (dest_coeff[scan[subPos + firstNZPosInCG]]>0 ? 0 : 1);
+      if (signbit != (absSum & 0x1)) {  // hide but need tune
+        // calculate the cost
+        int64_t minCostInc = MAX_INT64, curCost = MAX_INT64;
+        int32_t minPos = -1, finalChange = 0, curChange = 0;
+
+        for (n = (lastCG == 1 ? lastNZPosInCG : SCAN_SET_SIZE - 1); n >= 0; --n) {
+          uint32_t blkpos = scan[n + subPos];
+          if (dest_coeff[blkpos] != 0) {
+            int64_t costUp = rd_factor * (-delta_u[blkpos]) + rate_inc_up[blkpos];
+            int64_t costDown = rd_factor * (delta_u[blkpos]) + rate_inc_down[blkpos]
+              - (abs(dest_coeff[blkpos]) == 1 ? ((1 << 15) + sig_rate_delta[blkpos]) : 0);
+
+            if (lastCG == 1 && lastNZPosInCG == n && abs(dest_coeff[blkpos]) == 1) {
+              costDown -= (4 << 15);
+            }
+
+            if (costUp<costDown) {
+              curCost = costUp;
+              curChange = 1;
+            } else {
+              curChange = -1;
+              if (n == firstNZPosInCG && abs(dest_coeff[blkpos]) == 1) {
+                curCost = MAX_INT64;
+              } else {
+                curCost = costDown;
+              }
+            }
+          } else {
+            curCost = rd_factor * (-(abs(delta_u[blkpos]))) + (1 << 15) + rate_inc_up[blkpos] + sig_rate_delta[blkpos];
+            curChange = 1;
+
+            if (n<firstNZPosInCG) {
+              if (((coef[blkpos] >= 0) ? 0 : 1) != signbit) curCost = MAX_INT64;
+            }
+          }
+
+          if (curCost<minCostInc) {
+            minCostInc = curCost;
+            finalChange = curChange;
+            minPos = blkpos;
+          }
+        }
+
+        if (dest_coeff[minPos] == 32767 || dest_coeff[minPos] == -32768) {
+          finalChange = -1;
+        }
+
+        if (coef[minPos] >= 0) {
+          dest_coeff[minPos] += (coefficient)finalChange;
+        } else {
+          dest_coeff[minPos] -= (coefficient)finalChange;
+        }
+      }
+    }
+    if (lastCG == 1) lastCG = 0;
+  }
+}
+
 /** RDOQ with CABAC
  * \returns void
  * Rate distortion optimized quantization for entropy
@@ -455,7 +562,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   int32_t qp_scaled = get_scaled_qp(type, encoder_state->global->QP, 0);
   uint32_t abs_sum = 0;
 
-  {
+  
   int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
 
   const int32_t *quant_coeff  = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
@@ -515,10 +622,13 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
 
   memset( cost_coeff,     0, sizeof(double) *  max_num_coeff );
   memset( cost_sig,       0, sizeof(double) *  max_num_coeff );
-  memset( rate_inc_up,    0, sizeof(int32_t) *  max_num_coeff );
-  memset( rate_inc_down,  0, sizeof(int32_t) *  max_num_coeff );
-  memset( sig_rate_delta, 0, sizeof(int32_t) *  max_num_coeff );
-  memset( delta_u,        0, sizeof(int32_t) *  max_num_coeff );
+
+  if (encoder->sign_hiding) {
+    memset(rate_inc_up, 0, sizeof(int32_t) *  max_num_coeff);
+    memset(rate_inc_down, 0, sizeof(int32_t) *  max_num_coeff);
+    memset(sig_rate_delta, 0, sizeof(int32_t) *  max_num_coeff);
+    memset(delta_u, 0, sizeof(int32_t) *  max_num_coeff);
+  }
 
   memset( cost_coeffgroup_sig,   0, sizeof(double)   * 64 );
   memset( sig_coeffgroup_flag,   0, sizeof(uint32_t) * 64 );
@@ -577,16 +687,22 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
           level              = get_coded_level(encoder_state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
                                                c1_idx, c2_idx, q_bits, temp, 0, type );
-          sig_rate_delta[ blkpos ] = CTX_ENTROPY_BITS(&baseCtx[ctx_sig],1) - CTX_ENTROPY_BITS(&baseCtx[ctx_sig],0);
+          if (encoder->sign_hiding) {
+            sig_rate_delta[blkpos] = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 1) - CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 0);
+          }
         }
-        delta_u[ blkpos ] = (level_double - ((int32_t)level << q_bits)) >> (q_bits-8);
-        if( level > 0 ) {
-          int32_t rate_now = get_ic_rate( encoder_state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
-          rate_inc_up  [blkpos] = get_ic_rate( encoder_state, level+1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
-          rate_inc_down[blkpos] = get_ic_rate( encoder_state, level-1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
-        } else { // level == 0
-          rate_inc_up[blkpos] = CTX_ENTROPY_BITS(&base_one_ctx[one_ctx],0);
+
+        if (encoder->sign_hiding) {
+          delta_u[blkpos] = (level_double - ((int32_t)level << q_bits)) >> (q_bits - 8);
+          if (level > 0) {
+            int32_t rate_now = get_ic_rate(encoder_state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
+            rate_inc_up[blkpos] = get_ic_rate(encoder_state, level + 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
+            rate_inc_down[blkpos] = get_ic_rate(encoder_state, level - 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
+          } else { // level == 0
+            rate_inc_up[blkpos] = CTX_ENTROPY_BITS(&base_one_ctx[one_ctx], 0);
+          }
         }
+
         dest_coeff[blkpos] = (coefficient)level;
         base_cost         += cost_coeff[scanpos];
 
@@ -759,100 +875,10 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   for ( scanpos = best_last_idx_p1; scanpos <= last_scanpos; scanpos++ ) {
     dest_coeff[ scan[ scanpos ] ] = 0;
   }
-#if ENABLE_SIGN_HIDING == 1
-  if(abs_sum >= 2) {
-    int64_t rd_factor = (int64_t) (
-                     g_inv_quant_scales[qp_scaled%6] * g_inv_quant_scales[qp_scaled%6] * (1<<(2*(qp_scaled/6)))
-                   /  encoder_state->global->cur_lambda_cost / 16 / (1<<(2*(encoder->bitdepth-8)))
-                   + 0.5);
-    int32_t lastCG = -1;
-    int32_t absSum = 0;
-    int32_t n,subset;
 
-    for (subset = (width*height-1) >> LOG2_SCAN_SET_SIZE; subset >= 0; subset--) {
-      int32_t  subPos     = subset << LOG2_SCAN_SET_SIZE;
-      int32_t  firstNZPosInCG=SCAN_SET_SIZE, lastNZPosInCG = -1;
-      absSum = 0;
-
-      for(n = SCAN_SET_SIZE-1; n >= 0; --n ) {
-        if( dest_coeff[ scan[ n + subPos ]] ) {
-          lastNZPosInCG = n;
-          break;
-        }
-      }
-
-      for(n = 0; n <SCAN_SET_SIZE; n++ ) {
-        if( dest_coeff[ scan[ n + subPos ]] ) {
-          firstNZPosInCG = n;
-          break;
-        }
-      }
-
-      for(n = firstNZPosInCG; n <=lastNZPosInCG; n++ ) {
-        absSum += dest_coeff[ scan[ n + subPos ]];
-      }
-
-      if(lastNZPosInCG>=0 && lastCG==-1) lastCG = 1;
-
-      if (lastNZPosInCG-firstNZPosInCG >= SBH_THRESHOLD ) {
-        int32_t signbit = (dest_coeff[scan[subPos+firstNZPosInCG]]>0?0:1);
-        if( signbit!=(absSum&0x1) ) {  // hide but need tune
-          // calculate the cost
-          int64_t minCostInc = MAX_INT64, curCost=MAX_INT64;
-          int32_t minPos =-1, finalChange=0, curChange=0;
-
-          for( n = (lastCG==1?lastNZPosInCG:SCAN_SET_SIZE-1) ; n >= 0; --n ) {
-            uint32_t blkpos   = scan[ n + subPos ];
-            if(dest_coeff[ blkpos ] != 0 ) {
-              int64_t costUp   = rd_factor * (-delta_u[blkpos]) + rate_inc_up[blkpos];
-              int64_t costDown = rd_factor * ( delta_u[blkpos]) + rate_inc_down[blkpos]
-                                 - ( abs(dest_coeff[blkpos])==1?((1<<15)+sig_rate_delta[blkpos]):0 );
-
-              if(lastCG==1 && lastNZPosInCG==n && abs(dest_coeff[blkpos])==1) {
-                costDown -= (4<<15);
-              }
-
-              if(costUp<costDown) {
-                curCost = costUp;
-                curChange =  1;
-              } else {
-                curChange = -1;
-                if(n==firstNZPosInCG && abs(dest_coeff[blkpos])==1) {
-                  curCost = MAX_INT64;
-                } else {
-                  curCost = costDown;
-                }
-              }
-            } else {
-              curCost = rd_factor * ( - (abs(delta_u[blkpos])) ) + (1<<15) + rate_inc_up[blkpos] + sig_rate_delta[blkpos];
-              curChange = 1;
-
-              if(n<firstNZPosInCG) {
-                if( ((coef[blkpos] >= 0) ? 0 : 1) != signbit ) curCost = MAX_INT64;
-              }
-            }
-
-            if( curCost<minCostInc) {
-              minCostInc  = curCost;
-              finalChange = curChange;
-              minPos      = blkpos;
-            }
-          }
-
-          if(dest_coeff[minPos] == 32767 || dest_coeff[minPos] == -32768) {
-            finalChange = -1;
-          }
-
-          if(coef[minPos]>=0) {
-            dest_coeff[minPos] += (coefficient)finalChange;
-          } else {
-            dest_coeff[minPos] -= (coefficient)finalChange;
-          }
-        }
-      }
-      if(lastCG==1) lastCG = 0;
-    }
-  }
-#endif
+  if (encoder->sign_hiding && abs_sum >= 2) {
+    rdoq_sign_hiding(encoder_state, qp_scaled, scan,
+                     delta_u, rate_inc_up, rate_inc_down, sig_rate_delta,
+                     width, coef, dest_coeff);
   }
 }

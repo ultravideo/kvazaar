@@ -1572,7 +1572,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
   int32_t scan_pos_last = -1;
   int32_t pos_last = 0;
   int32_t shift   = 4>>1;
-  int8_t be_valid = ENABLE_SIGN_HIDING;
+  int8_t be_valid = encoder->sign_hiding;
   int32_t scan_pos_sig;
   int32_t last_scan_set;
   uint32_t go_rice_param = 0;

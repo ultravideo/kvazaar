@@ -145,6 +145,8 @@ typedef struct encoder_control
   // How often Video Parameter Set is re-sent.
   uint32_t vps_period;
 
+  bool sign_hiding;
+
 } encoder_control;
 
 int encoder_control_init(encoder_control *encoder, const config *cfg);
