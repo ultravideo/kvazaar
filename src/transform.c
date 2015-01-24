@@ -141,8 +141,6 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 
   int32_t qp_scaled = get_scaled_qp(type, encoder_state->global->QP, 0);
 
-  //New block for variable definitions
-  {
   const uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
@@ -151,6 +149,8 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
   const int32_t add = ((encoder_state->global->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
+  uint32_t ac_sum = 0;
+
   for (int32_t n = 0; n < width * height; n++) {
     int32_t level;
     int32_t  sign;
@@ -158,22 +158,22 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
     level = coef[n];
     sign  = (level < 0 ? -1: 1);
 
-    level = ((int64_t)abs(level) * quant_coeff[n] + add ) >> q_bits;
+    level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
+    ac_sum += level;
 
     level *= sign;
     q_coef[n] = (int16_t)(CLIP( -32768, 32767, level));
   }
 
-#if ENABLE_SIGN_HIDING == 1
+  if (!(encoder->sign_hiding && ac_sum >= 2)) return;
+
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
-  uint32_t ac_sum = 0;
 
   for (int32_t n = 0; n < width * height; n++) {
     int32_t level;
     level = coef[n];
     level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
     delta_u[n] = (int32_t)(((int64_t)abs(coef[n]) * quant_coeff[n] - (level << q_bits)) >> q_bits8);
-    ac_sum += level;
   }
 
   if(ac_sum >= 2) {
@@ -254,8 +254,6 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 
     #undef SCAN_SET_SIZE
     #undef LOG2_SCAN_SET_SIZE
-  }
-#endif // SIGN_HIDING
   }
 }
 
