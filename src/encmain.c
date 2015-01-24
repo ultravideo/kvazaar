@@ -109,6 +109,7 @@ int main(int argc, char *argv[])
             "                                   beta and tc range is -6..6 [0:0]\n"
             "          --no-sao               : Disable sample adaptive offset\n"
             "          --no-rdoq              : Disable RDO quantization\n"
+            "          --no-signhide          : Disable sign hiding in quantization\n"
             "          --rd <integer>         : Rate-Distortion Optimization level [1]\n"
             "                                     0: no RDO\n"
             "                                     1: estimated RDO\n"
@@ -277,6 +278,7 @@ int main(int argc, char *argv[])
   // RDO
   encoder.rdoq_enable = (int8_t)encoder.cfg->rdoq_enable;
   encoder.rdo         = (int8_t)encoder.cfg->rdo;
+  encoder.sign_hiding = encoder.cfg->signhide_enable;
   encoder.full_intra_search = (int8_t)encoder.cfg->full_intra_search;
   // TR SKIP
   encoder.trskip_enable = (int8_t)encoder.cfg->trskip_enable;
@@ -298,8 +300,6 @@ int main(int argc, char *argv[])
 
   // TODO: Add config option for vps_period.
   encoder.vps_period = (encoder.cfg->rdo == 0 ? encoder.cfg->intra_period : 0);
-
-  encoder.sign_hiding = ENABLE_SIGN_HIDING;
 
   encoder.in.file = input;
 
