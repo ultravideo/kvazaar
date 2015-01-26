@@ -31,6 +31,7 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
                                        beta and tc range is -6..6 [0:0]
               --no-sao               : Disable sample adaptive offset
               --no-rdoq              : Disable RDO quantization
+              --no-signhide          : Disable sign hiding in quantization
               --rd <integer>         : Rate-Distortion Optimization level [1]
                                          0: no RDO
                                          1: estimated RDO

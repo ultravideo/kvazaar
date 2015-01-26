@@ -394,7 +394,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
-  WRITE_U(stream, ENABLE_SIGN_HIDING, 1, "sign_data_hiding_flag");
+  WRITE_U(stream, encoder->sign_hiding, 1, "sign_data_hiding_flag");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");

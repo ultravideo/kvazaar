@@ -76,7 +76,6 @@ typedef int16_t coefficient;
 #define TR_DEPTH_INTER 2 /*!< spec: max_transform_hierarchy_depth_inter */
 
 #define ENABLE_PCM 0 /*!< spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
-#define ENABLE_SIGN_HIDING 1 /*!< spec: sign_data_hiding_enabled_flag */
 
 #define ENABLE_TEMPORAL_MVP 0 /*!< Enable usage of temporal Motion Vector Prediction */
 

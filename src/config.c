@@ -65,6 +65,7 @@ int config_init(config *cfg)
   cfg->deblock_tc      = 0;
   cfg->sao_enable      = 1;
   cfg->rdoq_enable     = 1;
+  cfg->signhide_enable = true;
   cfg->rdo             = 1;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 1;
@@ -372,6 +373,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->sao_enable = atobool(value);
   else if OPT("rdoq")
     cfg->rdoq_enable = atobool(value);
+  else if OPT("signhide")
+    cfg->signhide_enable = (bool)atobool(value);
   else if OPT("rd")
   {
     int rdo = 0;
@@ -524,6 +527,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
     { "no-rdoq",                  no_argument, NULL, 0 },
+    { "no-signhide",              no_argument, NULL, 0 },
     { "rd",                 required_argument, NULL, 0 },
     { "full-intra-search",        no_argument, NULL, 0 },
     { "no-transform-skip",        no_argument, NULL, 0 },
