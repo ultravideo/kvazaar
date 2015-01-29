@@ -1,5 +1,8 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
+#Disable default rules
+.SUFFIXES:
+
 ifeq (, $(ARCH))
   ARCH = $(shell uname -m)
 endif
@@ -63,8 +66,11 @@ WARNINGS = -Wall -Wtype-limits -Wvla
 
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
-ifndef CC
-  CC = gcc
+#Detect if cc is gcc for the link time optimization flag
+GCCVERSION = $(shell $(CC) --version | grep GCC)
+ifneq (, $(GCCVERSION))
+  CFLAGS += -flto
+  LDFLAGS += -flto -O3
 endif
 CFLAGS += -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm -pthread
@@ -158,17 +164,17 @@ tests: build_tests
 $(GREATEST):
 	git submodule init
 	git submodule update
-	
+
 # Compile files in strategy directories with appropriate flags.
 EXTRA_FLAGS =
 ifeq ($(ARCH), ppc64)
-  strategies/altivec/%.o: EXTRA_FLAGS += -maltivec
+  strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto
 else
-  strategies/sse2/%.o: EXTRA_FLAGS += -msse2
-  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1
+  strategies/sse2/%.o: EXTRA_FLAGS += -msse2 -fno-lto
+  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1 -fno-lto
   #Needs to be defined on Travis
   ifndef KVZ_DISABLE_AVX2
-    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2
+    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2 -fno-lto
   endif
 endif
 
@@ -196,7 +202,7 @@ $(TESTS): $(TEST_OBJS) $(ASMOBJS)
 
 %.d: %.c Makefile
 	$(CC) $(CFLAGS) -MF"$@" -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
-	
+
 ../tests/%.c: ../tests/%.h Makefile
 	touch $@
 
