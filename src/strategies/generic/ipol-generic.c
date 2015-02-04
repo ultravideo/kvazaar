@@ -75,6 +75,50 @@ int32_t eight_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_
   return temp;
 }
 
+int16_t four_tap_filter_hor_generic(int8_t *filter, pixel *data)
+{
+  int16_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[i];
+  }
+
+  return temp;
+}
+
+int32_t four_tap_filter_hor_16bit_generic(int8_t *filter, int16_t *data)
+{
+  int32_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[i];
+  }
+
+  return temp;
+}
+
+int16_t four_tap_filter_ver_generic(int8_t *filter, pixel *data, int16_t stride)
+{
+  int16_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[stride * i];
+  }
+
+  return temp;
+}
+
+int32_t four_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_t stride)
+{
+  int32_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[stride * i];
+  }
+
+  return temp;
+}
+
 void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
@@ -183,6 +227,9 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
+  int8_t* c = g_chroma_filter[4];
+  int16_t temp[4];
+
   // Loop source pixels and generate four filtered half-pel pixels on each round
   for (y = 0; y < height; y++) {
     int dst_pos_y = (y << 1)*dst_stride;
@@ -192,39 +239,33 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
       int dst_pos = dst_pos_y + (x << 1);
       int src_pos = src_pos_y + x;
 
-      // Temporary variables..
-      int32_t ae_temp = 0;
-
       // Original pixel (not really needed)
       dst[dst_pos] = src[src_pos]; //B0,0
 
       // ae0,0 - We need this only when hor_flag and for ee0,0
       if (hor_flag) {
-        ae_temp = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,0
+        temp[1] = four_tap_filter_hor_generic(c, &src[src_pos - 1]) >> shift1; // ae0,0
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = fast_clip_32bit_to_pixel((((-4 * src[src_pos - src_stride] + 36 * src[src_pos] + 36 * src[src_pos + src_stride]
-          - 4 * src[src_pos + 2 * src_stride]) >> shift1) + (1 << (shift3 - 1))) >> shift3); // ea0,0
+        dst[dst_pos + 1 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_generic(c, &src[src_pos - src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3); // ea0,0
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
       if (hor_flag && ver_flag) {
-        int32_t ae_temp1, ae_temp2, ae_temp3;
         // Calculate temporary values..
-        //TODO: optimization, store these values
         src_pos -= src_stride;  //0,-1
-        ae_temp1 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,-1
+        temp[0] = (four_tap_filter_hor_generic(c, &src[src_pos - 1]) >> shift1); // ae0,-1
         src_pos += 2 * src_stride;  //0,1
-        ae_temp2 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,1
+        temp[2] = (four_tap_filter_hor_generic(c, &src[src_pos - 1]) >> shift1); // ae0,1
         src_pos += src_stride;  //0,2
-        ae_temp3 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,2
-
-        dst[dst_pos + 1 * dst_stride + 1] = fast_clip_32bit_to_pixel((((-4 * ae_temp1 + 36 * ae_temp + 36 * ae_temp2 - 4 * ae_temp3) + offset23) >> shift2) >> shift3); // ee0,0
+        temp[3] = (four_tap_filter_hor_generic(c, &src[src_pos - 1]) >> shift1); // ae0,2
+        
+        dst[dst_pos + 1 * dst_stride + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_generic(c, temp) + offset23) >> shift2) >> shift3); // ee0,0
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((ae_temp + offset3) >> shift3);
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[1] + offset3) >> shift3);
       }
     }
   }
