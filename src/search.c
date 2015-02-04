@@ -1306,16 +1306,23 @@ static int8_t search_intra_chroma(encoder_state * const encoder_state,
 }
 
 
-static void sort_modes(int8_t *modes, double *costs, int length)
+/**
+ * \brief Sort modes and costs to ascending order according to costs.
+ */
+static void sort_modes(int8_t *modes, double *costs, uint8_t length)
 {
-  int i, j;
-  for (i = 0; i < length; ++i) {
-    j = i;
-    while (j > 0 && costs[j] < costs[j - 1]) {
-      SWAP(costs[j], costs[j - 1], double);
-      SWAP(modes[j], modes[j - 1], int8_t);
+  // Length is usually 5-23, so just use insertion sort.
+  for (uint8_t i = 1; i < length; ++i) {
+    const double cur_cost = costs[i];
+    const int8_t cur_mode = modes[i];
+    uint8_t j = i;
+    while (j > 0 && cur_cost < costs[j - 1]) {
+      costs[j] = costs[j - 1];
+      modes[j] = modes[j - 1];
       --j;
     }
+    costs[j] = cur_cost;
+    modes[j] = cur_mode;
   }
 }
 
