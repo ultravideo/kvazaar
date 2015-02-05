@@ -26,32 +26,118 @@
 #include "ipol-avx2.h"
 #include "strategyselector.h"
 #include "encoder.h"
-
-#if COMPILE_INTEL_AVX2
-#include <immintrin.h>
+#include "strategies/generic/picture-generic.h"
 
 extern int8_t g_luma_filter[4][8];
 extern int8_t g_chroma_filter[8][4];
 
-void filter_inter_quarterpel_luma_avx2(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+int16_t eight_tap_filter_hor_avx2(int8_t *filter, pixel *data)
+{
+  int16_t temp = 0;
+  for (int i = 0; i < 8; ++i)
+  {
+    temp += filter[i] * data[i];
+  }
+
+  return temp;
+}
+
+int32_t eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
+{
+  int32_t temp = 0;
+  for (int i = 0; i < 8; ++i)
+  {
+    temp += filter[i] * data[i];
+  }
+
+  return temp;
+}
+
+int16_t eight_tap_filter_ver_avx2(int8_t *filter, pixel *data, int16_t stride)
+{
+  int16_t temp = 0;
+  for (int i = 0; i < 8; ++i)
+  {
+    temp += filter[i] * data[stride * i];
+  }
+
+  return temp;
+}
+
+int32_t eight_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride)
+{
+  int32_t temp = 0;
+  for (int i = 0; i < 8; ++i)
+  {
+    temp += filter[i] * data[stride * i];
+  }
+
+  return temp;
+}
+
+int16_t four_tap_filter_hor_avx2(int8_t *filter, pixel *data)
+{
+  int16_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[i];
+  }
+
+  return temp;
+}
+
+int32_t four_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
+{
+  int32_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[i];
+  }
+
+  return temp;
+}
+
+int16_t four_tap_filter_ver_avx2(int8_t *filter, pixel *data, int16_t stride)
+{
+  int16_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[stride * i];
+  }
+
+  return temp;
+}
+
+int32_t four_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride)
+{
+  int32_t temp = 0;
+  for (int i = 0; i < 4; ++i)
+  {
+    temp += filter[i] * data[stride * i];
+  }
+
+  return temp;
+}
+
+void filter_inter_quarterpel_luma_avx2(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
-  int32_t shift1 = encoder->bitdepth - 8;
+  int32_t shift1 = BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - encoder->bitdepth;
+  int32_t shift3 = 14 - BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
-  int16_t c1[8], c2[8], c3[8];
+  int8_t *c1, *c2, *c3;
 
   int i;
-  for (i = 0; i < 8; ++i) {
-    c1[i] = g_luma_filter[1][i];
-    c2[i] = g_luma_filter[2][i];
-    c3[i] = g_luma_filter[3][i];
-  }
+  c1 = g_luma_filter[1];
+  c2 = g_luma_filter[2];
+  c3 = g_luma_filter[3];
+
+  int16_t temp[3][8];
 
   // Loop source pixels and generate sixteen filtered quarter-pel pixels on each round
   for (y = 0; y < height; y++) {
@@ -62,155 +148,69 @@ void filter_inter_quarterpel_luma_avx2(const encoder_control * const encoder, in
       int dst_pos = dst_pos_y + (x << 2);
       int src_pos = src_pos_y + x;
 
-      // Temporary variables..
-      int32_t h_temp[3] = { 0, 0, 0 };
-
       // Original pixel
       dst[dst_pos] = src[src_pos];
 
       //
-      if (hor_flag) {
+      if (hor_flag && !ver_flag) {
 
-        h_temp[0] = ((c1[0] * src[src_pos - 3]
-          + c1[1] * src[src_pos - 2]
-          + c1[2] * src[src_pos - 1]
-          + c1[3] * src[src_pos]
-          + c1[4] * src[src_pos + 1]
-          + c1[5] * src[src_pos + 2]
-          + c1[6] * src[src_pos + 3]
-          + c1[7] * src[src_pos + 4]) >> shift1);
-
-
-
-        h_temp[1] = ((c2[0] * src[src_pos - 3]
-          + c2[1] * src[src_pos - 2]
-          + c2[2] * src[src_pos - 1]
-          + c2[3] * src[src_pos]
-          + c2[4] * src[src_pos + 1]
-          + c2[5] * src[src_pos + 2]
-          + c2[6] * src[src_pos + 3]
-          + c2[7] * src[src_pos + 4]) >> shift1);
-
-        h_temp[2] = ((c3[0] * src[src_pos - 3]
-          + c3[1] * src[src_pos - 2]
-          + c3[2] * src[src_pos - 1]
-          + c3[3] * src[src_pos]
-          + c3[4] * src[src_pos + 1]
-          + c3[5] * src[src_pos + 2]
-          + c3[6] * src[src_pos + 3]
-          + c3[7] * src[src_pos + 4]) >> shift1);
+        temp[0][3] = eight_tap_filter_hor_avx2(c1, &src[src_pos - 3]) >> shift1;
+        temp[1][3] = eight_tap_filter_hor_avx2(c2, &src[src_pos - 3]) >> shift1;
+        temp[2][3] = eight_tap_filter_hor_avx2(c3, &src[src_pos - 3]) >> shift1;
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = (((c1[0] * src[src_pos - 3 * src_stride]
-          + c1[1] * src[src_pos - 2 * src_stride]
-          + c1[2] * src[src_pos - 1 * src_stride]
-          + c1[3] * src[src_pos]
-          + c1[4] * src[src_pos + 1 * src_stride]
-          + c1[5] * src[src_pos + 2 * src_stride]
-          + c1[6] * src[src_pos + 3 * src_stride]
-          + c1[7] * src[src_pos + 4 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3;
-
-        dst[dst_pos + 2 * dst_stride] = (((c2[0] * src[src_pos - 3 * src_stride]
-          + c2[1] * src[src_pos - 2 * src_stride]
-          + c2[2] * src[src_pos - 1 * src_stride]
-          + c2[3] * src[src_pos]
-          + c2[4] * src[src_pos + 1 * src_stride]
-          + c2[5] * src[src_pos + 2 * src_stride]
-          + c2[6] * src[src_pos + 3 * src_stride]
-          + c2[7] * src[src_pos + 4 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3;
-
-        dst[dst_pos + 3 * dst_stride] = (((c3[0] * src[src_pos - 3 * src_stride]
-          + c3[1] * src[src_pos - 2 * src_stride]
-          + c3[2] * src[src_pos - 1 * src_stride]
-          + c3[3] * src[src_pos]
-          + c3[4] * src[src_pos + 1 * src_stride]
-          + c3[5] * src[src_pos + 2 * src_stride]
-          + c3[6] * src[src_pos + 3 * src_stride]
-          + c3[7] * src[src_pos + 4 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3;
+        dst[dst_pos + 1 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_avx2(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 2 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_avx2(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 3 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_avx2(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
       if (hor_flag && ver_flag) {
 
-        int32_t temp[7][3];
-
         // Calculate temporary values..
         src_pos -= 3 * src_stride;  //0,-3
-        for (i = 0; i < 7; ++i) {
+        for (i = 0; i < 8; ++i) {
 
-          temp[i][0] = ((c1[0] * src[src_pos - 3] + c1[1] * src[src_pos - 2]
-            + c1[2] * src[src_pos - 1] + c1[3] * src[src_pos]
-            + c1[4] * src[src_pos + 1] + c1[5] * src[src_pos + 2]
-            + c1[6] * src[src_pos + 3] + c1[7] * src[src_pos + 4])
-            >> shift1); // h0(0,-3+i)
-
-          temp[i][1] = ((c2[0] * src[src_pos - 3] + c2[1] * src[src_pos - 2]
-            + c2[2] * src[src_pos - 1] + c2[3] * src[src_pos]
-            + c2[4] * src[src_pos + 1] + c2[5] * src[src_pos + 2]
-            + c2[6] * src[src_pos + 3] + c2[7] * src[src_pos + 4])
-            >> shift1); // h1(0,-3+i)
-
-          temp[i][2] = ((c3[0] * src[src_pos - 3] + c3[1] * src[src_pos - 2]
-            + c3[2] * src[src_pos - 1] + c3[3] * src[src_pos]
-            + c3[4] * src[src_pos + 1] + c3[5] * src[src_pos + 2]
-            + c3[6] * src[src_pos + 3] + c3[7] * src[src_pos + 4])
-            >> shift1); // h2(0,-3+i)
-
-          if (i == 2) {
-            //Skip calculating h_temp again
-            src_pos += 2 * src_stride;
-          }
-          else {
-            src_pos += src_stride;
-          }
+          temp[0][i] = eight_tap_filter_hor_avx2(c1, &src[src_pos + i * src_stride - 3]) >> shift1; // h0(0,-3+i)
+          temp[1][i] = eight_tap_filter_hor_avx2(c2, &src[src_pos + i * src_stride - 3]) >> shift1; // h1(0,-3+i)
+          temp[2][i] = eight_tap_filter_hor_avx2(c3, &src[src_pos + i * src_stride - 3]) >> shift1; // h2(0,-3+i)
         }
 
 
 
         for (i = 0; i<3; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = (((c1[0] * temp[0][i] + c1[1] * temp[1][i]
-            + c1[2] * temp[2][i] + c1[3] * h_temp[i]
-            + c1[4] * temp[3][i] + c1[5] * temp[4][i]
-            + c1[6] * temp[5][i] + c1[7] * temp[6][i])
-            + offset23) >> shift2) >> shift3;
-
-          dst[dst_pos + 2 * dst_stride + i + 1] = (((c2[0] * temp[0][i] + c2[1] * temp[1][i]
-            + c2[2] * temp[2][i] + c2[3] * h_temp[i]
-            + c2[4] * temp[3][i] + c2[5] * temp[4][i]
-            + c2[6] * temp[5][i] + c2[7] * temp[6][i])
-            + offset23) >> shift2) >> shift3;
-
-          dst[dst_pos + 3 * dst_stride + i + 1] = (((c3[0] * temp[0][i] + c3[1] * temp[1][i]
-            + c3[2] * temp[2][i] + c3[3] * h_temp[i]
-            + c3[4] * temp[3][i] + c3[5] * temp[4][i]
-            + c3[6] * temp[5][i] + c3[7] * temp[6][i])
-            + offset23) >> shift2) >> shift3;
+          dst[dst_pos + 1 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_avx2(c1, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 2 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_avx2(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 3 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_avx2(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
 
         }
 
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = (h_temp[0] + offset3) >> shift3;
-        dst[dst_pos + 2] = (h_temp[1] + offset3) >> shift3;
-        dst[dst_pos + 3] = (h_temp[2] + offset3) >> shift3;
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[0][3] + offset3) >> shift3);
+        dst[dst_pos + 2] = fast_clip_32bit_to_pixel((temp[1][3] + offset3) >> shift3);
+        dst[dst_pos + 3] = fast_clip_32bit_to_pixel((temp[2][3] + offset3) >> shift3);
       }
 
 
     }
   }
 
-  //Clamp values to bitdepth
-  for (i = 0; i < width*height * 16; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (int16_t)((1 << encoder->bitdepth) - 1);
-    if (dst[i] < 0) dst[i] = 0;
-  }
 }
-void filter_inter_halfpel_chroma_avx2(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+
+/**
+* \brief Interpolation for chroma half-pixel
+* \param src source image in integer pels (-2..width+3, -2..height+3)
+* \param src_stride stride of source image
+* \param width width of source image block
+* \param height height of source image block
+* \param dst destination image in half-pixel resolution
+* \param dst_stride stride of destination image
+*
+*/
+void filter_inter_halfpel_chroma_avx2(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
   * | B0,0|ae0,0|
@@ -220,13 +220,15 @@ void filter_inter_halfpel_chroma_avx2(const encoder_control * const encoder, int
   * ea0,0 = (-4*B0,-1  + 36*B0,0  + 36*B0,1  - 4*B0,2)  >> shift1
   * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
   */
-  int i = 0;
   int32_t x, y;
-  int32_t shift1 = encoder->bitdepth - 8;
+  int32_t shift1 = BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - encoder->bitdepth;
+  int32_t shift3 = 14 - BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
+
+  int8_t* c = g_chroma_filter[4];
+  int16_t temp[4];
 
   // Loop source pixels and generate four filtered half-pel pixels on each round
   for (y = 0; y < height; y++) {
@@ -237,72 +239,62 @@ void filter_inter_halfpel_chroma_avx2(const encoder_control * const encoder, int
       int dst_pos = dst_pos_y + (x << 1);
       int src_pos = src_pos_y + x;
 
-      // Temporary variables..
-      int32_t ae_temp = 0;
-
       // Original pixel (not really needed)
       dst[dst_pos] = src[src_pos]; //B0,0
 
       // ae0,0 - We need this only when hor_flag and for ee0,0
       if (hor_flag) {
-        ae_temp = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,0
+        temp[1] = four_tap_filter_hor_avx2(c, &src[src_pos - 1]) >> shift1; // ae0,0
       }
       // ea0,0 - needed only when ver_flag
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = (((-4 * src[src_pos - src_stride] + 36 * src[src_pos] + 36 * src[src_pos + src_stride]
-          - 4 * src[src_pos + 2 * src_stride]) >> shift1) + (1 << (shift3 - 1))) >> shift3; // ea0,0
+        dst[dst_pos + 1 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c, &src[src_pos - src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3); // ea0,0
       }
 
       // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
       if (hor_flag && ver_flag) {
-        int32_t ae_temp1, ae_temp2, ae_temp3;
         // Calculate temporary values..
-        //TODO: optimization, store these values
         src_pos -= src_stride;  //0,-1
-        ae_temp1 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,-1
+        temp[0] = (four_tap_filter_hor_avx2(c, &src[src_pos - 1]) >> shift1); // ae0,-1
         src_pos += 2 * src_stride;  //0,1
-        ae_temp2 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,1
+        temp[2] = (four_tap_filter_hor_avx2(c, &src[src_pos - 1]) >> shift1); // ae0,1
         src_pos += src_stride;  //0,2
-        ae_temp3 = ((-4 * src[src_pos - 1] + 36 * src[src_pos] + 36 * src[src_pos + 1] - 4 * src[src_pos + 2]) >> shift1); // ae0,2
+        temp[3] = (four_tap_filter_hor_avx2(c, &src[src_pos - 1]) >> shift1); // ae0,2
 
-        dst[dst_pos + 1 * dst_stride + 1] = (((-4 * ae_temp1 + 36 * ae_temp + 36 * ae_temp2 - 4 * ae_temp3) + offset23) >> shift2) >> shift3; // ee0,0
+        dst[dst_pos + 1 * dst_stride + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c, temp) + offset23) >> shift2) >> shift3); // ee0,0
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = (ae_temp + offset3) >> shift3;
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[1] + offset3) >> shift3);
       }
     }
   }
-  //Clamp values to bitdepth
-  for (i = 0; i < width*height * 4; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (int16_t)((1 << encoder->bitdepth) - 1);
-    if (dst[i] < 0) dst[i] = 0;
-  }
 }
 
-void filter_inter_octpel_chroma_avx2(const encoder_control * const encoder, int16_t *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_octpel_chroma_avx2(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
-  int32_t shift1 = encoder->bitdepth - 8;
+  int32_t shift1 = BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - encoder->bitdepth;
+  int32_t shift3 = 14 - BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/8, 2/8, 3/8, 4/8, 5/8, 6/8 and 7/8 positions
-  int16_t c1[4], c2[4], c3[4], c4[4], c5[4], c6[4], c7[4];
+  int8_t *c1, *c2, *c3, *c4, *c5, *c6, *c7;
 
   int i;
-  for (i = 0; i < 4; ++i) {
-    c1[i] = g_chroma_filter[1][i];
-    c2[i] = g_chroma_filter[2][i];
-    c3[i] = g_chroma_filter[3][i];
-    c4[i] = g_chroma_filter[4][i];
-    c5[i] = g_chroma_filter[5][i];
-    c6[i] = g_chroma_filter[6][i];
-    c7[i] = g_chroma_filter[7][i];
-  }
+  c1 = g_chroma_filter[1];
+  c2 = g_chroma_filter[2];
+  c3 = g_chroma_filter[3];
+  c4 = g_chroma_filter[4];
+  c5 = g_chroma_filter[5];
+  c6 = g_chroma_filter[6];
+  c7 = g_chroma_filter[7];
+
+  int16_t temp[7][4]; // Temporary horizontal values calculated from integer pixels
+
 
   // Loop source pixels and generate 64 filtered 1/8-pel pixels on each round
   for (y = 0; y < height; y++) {
@@ -313,195 +305,77 @@ void filter_inter_octpel_chroma_avx2(const encoder_control * const encoder, int1
       int dst_pos = dst_pos_y + (x << 3);
       int src_pos = src_pos_y + x;
 
-      // Temporary horizontally interpolated postions
-      int32_t h_temp[7] = { 0, 0, 0, 0, 0, 0, 0 };
-
       // Original pixel
       dst[dst_pos] = src[src_pos];
 
       // Horizontal 1/8-values
-      if (hor_flag) {
+      if (hor_flag && !ver_flag) {
 
-        h_temp[0] = ((c1[0] * src[src_pos - 1]
-          + c1[1] * src[src_pos]
-          + c1[2] * src[src_pos + 1]
-          + c1[3] * src[src_pos + 2]) >> shift1); // ae0,0 h0
+        temp[0][1] = (four_tap_filter_hor_avx2(c1, &src[src_pos - 1]) >> shift1); // ae0,0 h0
+        temp[1][1] = (four_tap_filter_hor_avx2(c2, &src[src_pos - 1]) >> shift1);
+        temp[2][1] = (four_tap_filter_hor_avx2(c3, &src[src_pos - 1]) >> shift1);
+        temp[3][1] = (four_tap_filter_hor_avx2(c4, &src[src_pos - 1]) >> shift1);
+        temp[4][1] = (four_tap_filter_hor_avx2(c5, &src[src_pos - 1]) >> shift1);
+        temp[5][1] = (four_tap_filter_hor_avx2(c6, &src[src_pos - 1]) >> shift1);
+        temp[6][1] = (four_tap_filter_hor_avx2(c7, &src[src_pos - 1]) >> shift1);
 
-        h_temp[1] = ((c2[0] * src[src_pos - 1]
-          + c2[1] * src[src_pos]
-          + c2[2] * src[src_pos + 1]
-          + c2[3] * src[src_pos + 2]) >> shift1); // ae0,0 h1
-
-        h_temp[2] = ((c3[0] * src[src_pos - 1]
-          + c3[1] * src[src_pos]
-          + c3[2] * src[src_pos + 1]
-          + c3[3] * src[src_pos + 2]) >> shift1); // ae0,0 h2
-
-        h_temp[3] = ((c4[0] * src[src_pos - 1]
-          + c4[1] * src[src_pos]
-          + c4[2] * src[src_pos + 1]
-          + c4[3] * src[src_pos + 2]) >> shift1); // ae0,0 h2
-
-        h_temp[4] = ((c5[0] * src[src_pos - 1]
-          + c5[1] * src[src_pos]
-          + c5[2] * src[src_pos + 1]
-          + c5[3] * src[src_pos + 2]) >> shift1); // ae0,0 h2
-
-        h_temp[5] = ((c6[0] * src[src_pos - 1]
-          + c6[1] * src[src_pos]
-          + c6[2] * src[src_pos + 1]
-          + c6[3] * src[src_pos + 2]) >> shift1); // ae0,0 h2
-
-        h_temp[6] = ((c7[0] * src[src_pos - 1]
-          + c7[1] * src[src_pos]
-          + c7[2] * src[src_pos + 1]
-          + c7[3] * src[src_pos + 2]) >> shift1); // ae0,0 h2
       }
 
       // Vertical 1/8-values
       if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = (((c1[0] * src[src_pos - 1 * src_stride]
-          + c1[1] * src[src_pos]
-          + c1[2] * src[src_pos + 1 * src_stride]
-          + c1[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
-
-        dst[dst_pos + 2 * dst_stride] = (((c2[0] * src[src_pos - 1 * src_stride]
-          + c2[1] * src[src_pos]
-          + c2[2] * src[src_pos + 1 * src_stride]
-          + c2[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
-
-        dst[dst_pos + 3 * dst_stride] = (((c3[0] * src[src_pos - 1 * src_stride]
-          + c3[1] * src[src_pos]
-          + c3[2] * src[src_pos + 1 * src_stride]
-          + c3[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
-
-        dst[dst_pos + 4 * dst_stride] = (((c4[0] * src[src_pos - 1 * src_stride]
-          + c4[1] * src[src_pos]
-          + c4[2] * src[src_pos + 1 * src_stride]
-          + c4[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
-
-        dst[dst_pos + 5 * dst_stride] = (((c5[0] * src[src_pos - 1 * src_stride]
-          + c5[1] * src[src_pos]
-          + c5[2] * src[src_pos + 1 * src_stride]
-          + c5[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
-
-        dst[dst_pos + 6 * dst_stride] = (((c6[0] * src[src_pos - 1 * src_stride]
-          + c6[1] * src[src_pos]
-          + c6[2] * src[src_pos + 1 * src_stride]
-          + c6[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
-
-        dst[dst_pos + 7 * dst_stride] = (((c7[0] * src[src_pos - 1 * src_stride]
-          + c7[1] * src[src_pos]
-          + c7[2] * src[src_pos + 1 * src_stride]
-          + c7[3] * src[src_pos + 2 * src_stride]) >> shift1)
-          + (1 << (shift3 - 1))) >> shift3; //
+        dst[dst_pos + 1 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c1, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3); //
+        dst[dst_pos + 2 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c2, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 3 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c3, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 4 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c4, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 5 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c5, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 6 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c6, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
+        dst[dst_pos + 7 * dst_stride] = fast_clip_32bit_to_pixel(((four_tap_filter_ver_avx2(c7, &src[src_pos - 1 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
       }
 
       // When both flags, interpolate values from temporary horizontal values
       if (hor_flag && ver_flag) {
 
-        int32_t temp[3][7]; // Temporary horizontal values calculated from integer pixels
-
         // Calculate temporary values
         src_pos -= 1 * src_stride;  //0,-3
-        for (i = 0; i < 3; ++i) {
+        for (i = 0; i < 4; ++i) {
 
-          temp[i][0] = ((c1[0] * src[src_pos - 1] + c1[1] * src[src_pos]
-            + c1[2] * src[src_pos + 1] + c1[3] * src[src_pos + 2])
-            >> shift1); // h0(0,-3+i)
+          temp[0][i] = (four_tap_filter_hor_avx2(c1, &src[src_pos + i * src_stride - 1]) >> shift1);
+          temp[1][i] = (four_tap_filter_hor_avx2(c2, &src[src_pos + i * src_stride - 1]) >> shift1);
+          temp[2][i] = (four_tap_filter_hor_avx2(c3, &src[src_pos + i * src_stride - 1]) >> shift1);
+          temp[3][i] = (four_tap_filter_hor_avx2(c4, &src[src_pos + i * src_stride - 1]) >> shift1);
+          temp[4][i] = (four_tap_filter_hor_avx2(c5, &src[src_pos + i * src_stride - 1]) >> shift1);
+          temp[5][i] = (four_tap_filter_hor_avx2(c6, &src[src_pos + i * src_stride - 1]) >> shift1);
+          temp[6][i] = (four_tap_filter_hor_avx2(c7, &src[src_pos + i * src_stride - 1]) >> shift1);
 
-          temp[i][1] = ((c2[0] * src[src_pos - 1] + c2[1] * src[src_pos]
-            + c2[2] * src[src_pos + 1] + c2[3] * src[src_pos + 2])
-            >> shift1); // h1(0,-3+i)
-
-          temp[i][2] = ((c3[0] * src[src_pos - 1] + c3[1] * src[src_pos]
-            + c3[2] * src[src_pos + 1] + c3[3] * src[src_pos + 2])
-            >> shift1); // h2(0,-3+i)
-
-          temp[i][3] = ((c4[0] * src[src_pos - 1] + c4[1] * src[src_pos]
-            + c4[2] * src[src_pos + 1] + c4[3] * src[src_pos + 2])
-            >> shift1); // h2(0,-3+i)
-
-          temp[i][4] = ((c5[0] * src[src_pos - 1] + c5[1] * src[src_pos]
-            + c5[2] * src[src_pos + 1] + c5[3] * src[src_pos + 2])
-            >> shift1); // h2(0,-3+i)
-
-          temp[i][5] = ((c6[0] * src[src_pos - 1] + c6[1] * src[src_pos]
-            + c6[2] * src[src_pos + 1] + c6[3] * src[src_pos + 2])
-            >> shift1); // h2(0,-3+i)
-
-          temp[i][6] = ((c7[0] * src[src_pos - 1] + c7[1] * src[src_pos]
-            + c7[2] * src[src_pos + 1] + c7[3] * src[src_pos + 2])
-            >> shift1); // h2(0,-3+i)
-
-          if (i == 0) {
-            //Skip calculating h_temp again
-            src_pos += 2 * src_stride;
-          }
-          else {
-            src_pos += src_stride;
-          }
         }
 
 
         //Calculate values from temporary horizontal 1/8-values
         for (i = 0; i<7; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = (((c1[0] * temp[0][i] + c1[1] * h_temp[i]
-            + c1[2] * temp[1][i] + c1[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
-
-          dst[dst_pos + 2 * dst_stride + i + 1] = (((c2[0] * temp[0][i] + c2[1] * h_temp[i]
-            + c2[2] * temp[1][i] + c2[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
-
-          dst[dst_pos + 3 * dst_stride + i + 1] = (((c3[0] * temp[0][i] + c3[1] * h_temp[i]
-            + c3[2] * temp[1][i] + c3[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
-
-          dst[dst_pos + 4 * dst_stride + i + 1] = (((c4[0] * temp[0][i] + c4[1] * h_temp[i]
-            + c4[2] * temp[1][i] + c4[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
-
-          dst[dst_pos + 5 * dst_stride + i + 1] = (((c5[0] * temp[0][i] + c5[1] * h_temp[i]
-            + c5[2] * temp[1][i] + c5[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
-
-          dst[dst_pos + 6 * dst_stride + i + 1] = (((c6[0] * temp[0][i] + c6[1] * h_temp[i]
-            + c6[2] * temp[1][i] + c6[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
-
-          dst[dst_pos + 7 * dst_stride + i + 1] = (((c7[0] * temp[0][i] + c7[1] * h_temp[i]
-            + c7[2] * temp[1][i] + c7[3] * temp[2][i])
-            + offset23) >> shift2) >> shift3; // ee0,0
+          dst[dst_pos + 1 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c1, &temp[i][0]) + offset23) >> shift2) >> shift3); // ee0,0
+          dst[dst_pos + 2 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 3 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 4 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c4, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 5 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c5, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 6 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c6, &temp[i][0]) + offset23) >> shift2) >> shift3);
+          dst[dst_pos + 7 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_avx2(c7, &temp[i][0]) + offset23) >> shift2) >> shift3);
 
         }
 
       }
 
       if (hor_flag) {
-        dst[dst_pos + 1] = (h_temp[0] + offset3) >> shift3;
-        dst[dst_pos + 2] = (h_temp[1] + offset3) >> shift3;
-        dst[dst_pos + 3] = (h_temp[2] + offset3) >> shift3;
-        dst[dst_pos + 4] = (h_temp[3] + offset3) >> shift3;
-        dst[dst_pos + 5] = (h_temp[4] + offset3) >> shift3;
-        dst[dst_pos + 6] = (h_temp[5] + offset3) >> shift3;
-        dst[dst_pos + 7] = (h_temp[6] + offset3) >> shift3;
+        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[0][1] + offset3) >> shift3);
+        dst[dst_pos + 2] = fast_clip_32bit_to_pixel((temp[1][1] + offset3) >> shift3);
+        dst[dst_pos + 3] = fast_clip_32bit_to_pixel((temp[2][1] + offset3) >> shift3);
+        dst[dst_pos + 4] = fast_clip_32bit_to_pixel((temp[3][1] + offset3) >> shift3);
+        dst[dst_pos + 5] = fast_clip_32bit_to_pixel((temp[4][1] + offset3) >> shift3);
+        dst[dst_pos + 6] = fast_clip_32bit_to_pixel((temp[5][1] + offset3) >> shift3);
+        dst[dst_pos + 7] = fast_clip_32bit_to_pixel((temp[6][1] + offset3) >> shift3);
       }
 
 
     }
-  }
-
-  //Clamp values to bitdepth
-  for (i = 0; i < width*height * 64; ++i) {
-    if (dst[i] >((1 << encoder->bitdepth) - 1)) dst[i] = (int16_t)((1 << encoder->bitdepth) - 1);
-    if (dst[i] < 0) dst[i] = 0;
   }
 }
 
@@ -542,16 +416,14 @@ void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int 
 }
 
 
-#endif //COMPILE_INTEL_AVX2
-
 int strategy_register_ipol_avx2(void* opaque)
 {
   bool success = true;
-#if COMPILE_INTEL_AVX2
-  //success &= strategyselector_register(opaque, "filter_inter_quarterpel_luma", "avx2", 40, &filter_inter_quarterpel_luma_avx2);
-  //success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 40, &filter_inter_halfpel_chroma_avx2);
-  //success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 40, &filter_inter_octpel_chroma_avx2);
-  //success &= strategyselector_register(opaque, "extend_borders", "avx2", 40, &extend_borders_avx2);
-#endif //COMPILE_INTEL_AVX2  
+
+  success &= strategyselector_register(opaque, "filter_inter_quarterpel_luma", "avx2", 0, &filter_inter_quarterpel_luma_avx2);
+  success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 0, &filter_inter_halfpel_chroma_avx2);
+  success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 0, &filter_inter_octpel_chroma_avx2);
+  success &= strategyselector_register(opaque, "extend_borders", "avx2", 0, &extend_borders_avx2);
+
   return success;
 }
