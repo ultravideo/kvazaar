@@ -63,6 +63,11 @@ int strategyselector_init(int32_t cpuid) {
     fprintf(stderr, "strategy_register_partial_butterfly failed!\n");
     return 0;
   }
+
+  if (!strategy_register_ipol(&strategies)) {
+    fprintf(stderr, "strategy_register_ipol failed!\n");
+    return 0;
+  }
   
   while(cur_strategy_to_select->fptr) {
     *(cur_strategy_to_select->fptr) = strategyselector_choose_for(&strategies, cur_strategy_to_select->strategy_type);

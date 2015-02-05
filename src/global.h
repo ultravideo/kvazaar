@@ -44,7 +44,7 @@
 
 #define BIT_DEPTH 8
 #define PIXEL_MIN 0
-#define PIXEL_MAX (1 << BIT_DEPTH)
+#define PIXEL_MAX ((1 << BIT_DEPTH) - 1)
 
 #if BIT_DEPTH == 8
 typedef uint8_t pixel;

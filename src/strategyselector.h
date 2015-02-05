@@ -147,11 +147,13 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 #include "strategies/strategies-nal.h"
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-dct.h"
+#include "strategies/strategies-ipol.h"
 
 static const strategy_to_select strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
   STRATEGIES_PICTURE_EXPORTS
   STRATEGIES_DCT_EXPORTS
+  STRATEGIES_IPOL_EXPORTS
   { NULL, NULL },
 };
 

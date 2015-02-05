@@ -38,6 +38,4 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
                                         cu_info **b2,cu_info **a0,cu_info **a1, lcu_t *lcu);
 void inter_get_mv_cand(const encoder_state *encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu);
 uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], lcu_t *lcu);
-void extend_borders(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel *ref, int ref_width, int ref_height,
-                    int filterSize, int width, int height, int16_t *dst);
 #endif

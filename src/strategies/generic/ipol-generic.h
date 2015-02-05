@@ -1,5 +1,5 @@
-#ifndef STRATEGIES_PICTURE_GENERIC_H_
-#define STRATEGIES_PICTURE_GENERIC_H_
+#ifndef STRATEGIES_IPOL_GENERIC_H_
+#define STRATEGIES_IPOL_GENERIC_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -19,14 +19,6 @@
  * along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_picture_generic(void* opaque);
+int strategy_register_ipol_generic(void* opaque);
 
-// Function to clip int16_t to pixel. (0-255 or 0-1023)
-// Assumes PIXEL_MAX to be 2^n-1
-pixel fast_clip_16bit_to_pixel(int16_t value);
-
-// Function to clip int32_t to pixel. (0-255 or 0-1023)
-// Assumes PIXEL_MAX to be 2^n-1
-pixel fast_clip_32bit_to_pixel(int32_t value);
-
-#endif //STRATEGIES_PICTURE_GENERIC_H_
+#endif //STRATEGIES_IPOL_GENERIC_H_
