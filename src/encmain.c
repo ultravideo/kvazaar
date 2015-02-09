@@ -109,6 +109,7 @@ int main(int argc, char *argv[])
             "                                   beta and tc range is -6..6 [0:0]\n"
             "          --no-sao               : Disable sample adaptive offset\n"
             "          --no-rdoq              : Disable RDO quantization\n"
+            "          --no-signhide          : Disable sign hiding in quantization\n"
             "          --rd <integer>         : Rate-Distortion Optimization level [1]\n"
             "                                     0: no RDO\n"
             "                                     1: estimated RDO\n"
@@ -122,6 +123,10 @@ int main(int argc, char *argv[])
             "          --subme <integer>      : Set fractional pixel motion estimation level [1].\n"
             "                                     0: only integer motion estimation\n"
             "                                     1: fractional pixel motion estimation enabled\n"
+            "          --pu-depth-inter <int>-<int> : Range for sizes of inter prediction units to try.\n"
+            "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8\n"
+            "          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.\n"
+            "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
@@ -144,7 +149,7 @@ int main(int argc, char *argv[])
             "                                       smpte240m, GBR, YCgCo, bt2020nc, bt2020c\n"
             "          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]\n"
             "\n"
-            "  Parallel processing :\n"
+            "  Parallel processing:\n"
             "          --threads <integer>    : Maximum number of threads to use.\n"
             "                                   Disable threads if set to 0.\n"
             "\n"
@@ -273,6 +278,7 @@ int main(int argc, char *argv[])
   // RDO
   encoder.rdoq_enable = (int8_t)encoder.cfg->rdoq_enable;
   encoder.rdo         = (int8_t)encoder.cfg->rdo;
+  encoder.sign_hiding = encoder.cfg->signhide_enable;
   encoder.full_intra_search = (int8_t)encoder.cfg->full_intra_search;
   // TR SKIP
   encoder.trskip_enable = (int8_t)encoder.cfg->trskip_enable;
@@ -291,6 +297,9 @@ int main(int argc, char *argv[])
   encoder.vui.chroma_loc  = (int8_t)encoder.cfg->vui.chroma_loc;
   // AUD
   encoder.aud_enable = (int8_t)encoder.cfg->aud_enable;
+
+  // TODO: Add config option for vps_period.
+  encoder.vps_period = (encoder.cfg->rdo == 0 ? encoder.cfg->intra_period : 0);
 
   encoder.in.file = input;
 
@@ -341,6 +350,8 @@ int main(int argc, char *argv[])
     GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
 
+    uint64_t bitstream_length = 0;
+
     // Start coding cycle while data on input and not on the last frame
     while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames - 1) {
       // Skip '--seek' frames before input.
@@ -369,7 +380,7 @@ int main(int argc, char *argv[])
       }
       
       //Compute stats
-      encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr);
+      encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr, &bitstream_length);
       
       //Clear encoder
       encoder_next_frame(&encoder_states[current_encoder_state]);
@@ -405,7 +416,7 @@ int main(int argc, char *argv[])
       int first_enc = current_encoder_state;
       do {
         current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
-        encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr);
+        encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr, &bitstream_length);
       } while (current_encoder_state != first_enc);
     }
     
@@ -419,8 +430,9 @@ int main(int argc, char *argv[])
     fgetpos(output,(fpos_t*)&curpos);
 
     // Print statistics of the coding
-    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", stat_frames, (long long unsigned int) curpos<<3,
-          psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
+    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", 
+            stat_frames, (long long unsigned int)bitstream_length * 8,
+            psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
     
     {

@@ -60,7 +60,12 @@ int strategyselector_init(int32_t cpuid) {
   }
 
   if (!strategy_register_dct(&strategies)) {
-    fprintf(stderr, "strategy_register_partial_butterfly failed!\n");
+    fprintf(stderr, "strategy_register_dct failed!\n");
+    return 0;
+  }
+
+  if (!strategy_register_ipol(&strategies)) {
+    fprintf(stderr, "strategy_register_ipol failed!\n");
     return 0;
   }
   

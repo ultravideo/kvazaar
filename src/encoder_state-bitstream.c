@@ -394,7 +394,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
-  WRITE_U(stream, ENABLE_SIGN_HIDING, 1, "sign_data_hiding_flag");
+  WRITE_U(stream, encoder->sign_hiding, 1, "sign_data_hiding_flag");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
@@ -688,48 +688,48 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     curpos = 0;
   }
 
-  if (main_state->global->is_radl_frame) {
-    if (main_state->global->frame == 0) {
-      // Access Unit Delimiter (AUD)
-      if (encoder->aud_enable)
-        encoder_state_write_bitstream_aud(main_state);
+  // The first NAL unit of the access unit must use a long start code.
+  bool first_nal_in_au = true;
 
-      // Video Parameter Set (VPS)
-      nal_write(stream, NAL_VPS_NUT, 0, 1);
-      encoder_state_write_bitstream_vid_parameter_set(main_state);
-      bitstream_align(stream);
+  // Access Unit Delimiter (AUD)
+  if (encoder->aud_enable) {
+    first_nal_in_au = false;
+    encoder_state_write_bitstream_aud(main_state);
+  }
+  
+  if ((encoder->vps_period > 0 && main_state->global->frame % encoder->vps_period == 0)
+      || main_state->global->frame == 0)
+  {
+    first_nal_in_au = false;
 
-      // Sequence Parameter Set (SPS)
-      nal_write(stream, NAL_SPS_NUT, 0, 1);
-      encoder_state_write_bitstream_seq_parameter_set(main_state);
-      bitstream_align(stream);
+    // Video Parameter Set (VPS)
+    nal_write(stream, NAL_VPS_NUT, 0, 1);
+    encoder_state_write_bitstream_vid_parameter_set(main_state);
+    bitstream_align(stream);
 
-      // Picture Parameter Set (PPS)
-      nal_write(stream, NAL_PPS_NUT, 0, 1);
-      encoder_state_write_bitstream_pic_parameter_set(main_state);
-      bitstream_align(stream);
-    }
+    // Sequence Parameter Set (SPS)
+    nal_write(stream, NAL_SPS_NUT, 0, 1);
+    encoder_state_write_bitstream_seq_parameter_set(main_state);
+    bitstream_align(stream);
 
-    if (main_state->global->frame == 0) {
-      // Prefix SEI
-      nal_write(stream, PREFIX_SEI_NUT, 0, 0);
-      encoder_state_write_bitstream_prefix_sei_version(main_state);
-      bitstream_align(stream);
-    }
-  } else {
-    // Access Unit Delimiter (AUD)
-    if (encoder->aud_enable)
-      encoder_state_write_bitstream_aud(main_state);
+    // Picture Parameter Set (PPS)
+    nal_write(stream, NAL_PPS_NUT, 0, 1);
+    encoder_state_write_bitstream_pic_parameter_set(main_state);
+    bitstream_align(stream);
+  }
+
+  // Send Kvazaar version information only in the first frame.
+  if (main_state->global->frame == 0) {
+    nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
+    encoder_state_write_bitstream_prefix_sei_version(main_state);
+    bitstream_align(stream);
   }
 
   {
-    // Not quite sure if this is correct, but it seems to have worked so far
-    // so I tried to not change it's behavior.
-    int long_start_code = main_state->global->is_radl_frame || encoder->aud_enable ? 0 : 1;
-
-    nal_write(stream,
-              main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R, 0, long_start_code);
+    uint8_t nal_type = (main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
+    nal_write(stream, nal_type, 0, first_nal_in_au);
   }
+
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
   for (i = 0; main_state->children[i].encoder_control; ++i) {
@@ -762,6 +762,9 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
     assert(0);
     main_state->stats_bitstream_length = 0;
   }
+
+  // Flush the output in case someone is reading the file on the other end.
+  fflush(main_state->stream.file.output);
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {

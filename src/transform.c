@@ -138,46 +138,44 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
   const encoder_control * const encoder = encoder_state->encoder_control;
   const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   const uint32_t * const scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
-  uint32_t ac_sum = 0;
-
-  #if ENABLE_SIGN_HIDING == 1
-  int32_t delta_u[LCU_WIDTH*LCU_WIDTH>>2];
-  #endif
 
   int32_t qp_scaled = get_scaled_qp(type, encoder_state->global->QP, 0);
 
-  //New block for variable definitions
-  {
-  int32_t n;
-  uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
-  int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-
+  const uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
+  const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+  const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
+  const int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
+  const int32_t add = ((encoder_state->global->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
+  const int32_t q_bits8 = q_bits - 8;
 
-  int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
-  int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
-  int32_t add = ((encoder_state->global->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
+  uint32_t ac_sum = 0;
 
-  int32_t q_bits8 = q_bits - 8;
-  for (n = 0; n < width * height; n++) {
+  for (int32_t n = 0; n < width * height; n++) {
     int32_t level;
     int32_t  sign;
 
     level = coef[n];
     sign  = (level < 0 ? -1: 1);
 
-    level = ((int64_t)abs(level) * quant_coeff[n] + add ) >> q_bits;
-
-    #if ENABLE_SIGN_HIDING == 1
-    delta_u[n] = (int32_t)( ((int64_t)abs(coef[n]) * quant_coeff[n] - (level<<q_bits) )>> q_bits8 );
+    level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
     ac_sum += level;
-    #endif
 
     level *= sign;
     q_coef[n] = (int16_t)(CLIP( -32768, 32767, level));
   }
 
-  #if ENABLE_SIGN_HIDING == 1
+  if (!(encoder->sign_hiding && ac_sum >= 2)) return;
+
+  int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
+
+  for (int32_t n = 0; n < width * height; n++) {
+    int32_t level;
+    level = coef[n];
+    level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
+    delta_u[n] = (int32_t)(((int64_t)abs(coef[n]) * quant_coeff[n] - (level << q_bits)) >> q_bits8);
+  }
+
   if(ac_sum >= 2) {
     #define SCAN_SET_SIZE 16
     #define LOG2_SCAN_SET_SIZE 4
@@ -256,8 +254,6 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
 
     #undef SCAN_SET_SIZE
     #undef LOG2_SCAN_SET_SIZE
-  }
-  #endif
   }
 }
 
@@ -460,32 +456,9 @@ int quantize_residual_trskip(
       0, in_stride, 4,
       ref_in, pred_in, noskip.rec, noskip.coeff);
   noskip.cost = pixels_calc_ssd(ref_in, noskip.rec, in_stride, 4, 4);
-  if (encoder_state->encoder_control->rdo == 1) {
-    // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum).
-    unsigned abs_coeffs = coefficients_calc_abs(noskip.coeff, 4, 4);
-    noskip.cost += (abs_coeffs + (abs_coeffs / 2)) * bit_cost;
-  } else if (encoder_state->encoder_control->rdo >= 2) {
-    noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
-  }
+  noskip.cost += get_coeff_cost(encoder_state, noskip.coeff, 4, 0, scan_order) * bit_cost;
 
-  if (encoder_state->encoder_control->rdo == 0) {
-    // Evaluating whether to use transform skip or not requires doing the
-    // transform. So if rdo is off, it's probably better to not use trskip.
-    skip.cost = UINT32_MAX;
-  } else {
-    skip.has_coeffs = quantize_residual(
-        encoder_state, cur_cu, width, color, scan_order,
-        1, in_stride, 4,
-        ref_in, pred_in, skip.rec, skip.coeff);
-    skip.cost = pixels_calc_ssd(ref_in, skip.rec, in_stride, 4, 4);
-    if (encoder_state->encoder_control->rdo == 1) {
-      // Estimate bit cost of encoding the coeffs as ~(1.5 * abs_sum + 1).
-      unsigned abs_coeffs = coefficients_calc_abs(skip.coeff, 4, 4);
-      skip.cost += (1 + abs_coeffs + (abs_coeffs / 2)) * bit_cost;
-    } else if (encoder_state->encoder_control->rdo >= 2) {
-      skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
-    }
-  }
+  skip.cost += get_coeff_cost(encoder_state, skip.coeff, 4, 0, scan_order) * bit_cost;
 
   if (noskip.cost <= skip.cost) {
     *trskip_out = 0;

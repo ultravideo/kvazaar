@@ -12,8 +12,6 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
 [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
 
 ##Using Kvazaar
-Currently most of the features are turned on/off from the code on compile time, but they are
-meant to be user configurable later.
 
     Usage:
     kvazaar -i <input> --input-res <width>x<height> -o <output>
@@ -33,6 +31,7 @@ meant to be user configurable later.
                                        beta and tc range is -6..6 [0:0]
               --no-sao               : Disable sample adaptive offset
               --no-rdoq              : Disable RDO quantization
+              --no-signhide          : Disable sign hiding in quantization
               --rd <integer>         : Rate-Distortion Optimization level [1]
                                          0: no RDO
                                          1: estimated RDO
@@ -46,6 +45,10 @@ meant to be user configurable later.
               --subme <integer>      : Set fractional pixel motion estimation level [1].
                                          0: only integer motion estimation
                                          1: fractional pixel motion estimation enabled
+              --pu-depth-inter <int>-<int> : Range for sizes of inter prediction units to try.
+                                         0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8
+              --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.
+                                         0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio
@@ -67,25 +70,25 @@ meant to be user configurable later.
                                          - undef, bt709, fcc, bt470bg, smpte170m,
                                            smpte240m, GBR, YCgCo, bt2020nc, bt2020c
               --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
-      
+
       Parallel processing:
               --threads <integer>    : Maximum number of threads to use.
                                        Disable threads if set to 0.
-      
+
       Tiles:
-              --tiles-width-split <string>|u<int>: 
+              --tiles-width-split <string>|u<int> : 
                                        Specifies a comma separated list of pixel
                                        positions of tiles columns separation coordinates.
                                        Can also be u followed by and a single int n,
                                        in which case it produces columns of uniform width.
-              --tiles-height-split <string>|u<int>: 
+              --tiles-height-split <string>|u<int> : 
                                        Specifies a comma separated list of pixel
                                        positions of tiles rows separation coordinates.
                                        Can also be u followed by and a single int n,
                                        in which case it produces rows of uniform height.
 
       Wpp:
-              --wpp:                   Enable wavefront parallel processing
+              --wpp                  : Enable wavefront parallel processing
               --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.
 
       Slices:
@@ -101,7 +104,6 @@ meant to be user configurable later.
            -h, --height              : Height of input in pixels
 
 Example:
-
     kvazaar -i <INPUT_YUV> --input-res <WIDTH>x<HEIGHT> -o <OUTPUT.BIN> -n <NUMBER_OF_FRAMES> -q <QP>
 
 eg. `kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.bin -n 600 -q 32`

@@ -826,7 +826,7 @@ int read_one_frame(FILE* file, const encoder_state * const encoder_state)
   return 1;
 }
 
-void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3]) {
+void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   
   if (encoder_state->stats_done) return;
@@ -875,6 +875,8 @@ void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, ui
     psnr[1] += temp_psnr[1];
     psnr[2] += temp_psnr[2];
   }
+
+  *bitstream_length += encoder_state->stats_bitstream_length;
 }
 
 
@@ -1570,7 +1572,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
   int32_t scan_pos_last = -1;
   int32_t pos_last = 0;
   int32_t shift   = 4>>1;
-  int8_t be_valid = ENABLE_SIGN_HIDING;
+  int8_t be_valid = encoder->sign_hiding;
   int32_t scan_pos_sig;
   int32_t last_scan_set;
   uint32_t go_rice_param = 0;

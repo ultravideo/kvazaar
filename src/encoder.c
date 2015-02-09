@@ -287,11 +287,17 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
     }
     printf("\n");
 #endif //_DEBUG
-
-    
-
   }
   
+  assert(WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
+  assert(WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
+  assert(WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
+  assert(WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
+  encoder->pu_depth_inter.min = cfg->pu_depth_inter.min;
+  encoder->pu_depth_inter.max = cfg->pu_depth_inter.max;
+  encoder->pu_depth_intra.min = cfg->pu_depth_intra.min;
+  encoder->pu_depth_intra.max = cfg->pu_depth_intra.max;
+
   return 1;
 }
 

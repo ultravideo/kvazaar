@@ -372,15 +372,33 @@ static unsigned image_interpolated_sad(const image *pic, const image *ref,
 }
 
 
+/**
+* \brief Calculate interpolated SAD between two blocks.
+*
+* \param pic        Image for the block we are trying to find.
+* \param ref        Image where we are trying to find the block.
+*
+* \returns  
+*/
 unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
   
-  if ((((ref_y + block_height)/LCU_WIDTH) > (pic_y/LCU_WIDTH) + max_lcu_below) && max_lcu_below >= 0) {
-    //printf("OOB %d %d -> %d\n", ref_y + block_height, pic_y, ref_y + block_height - pic_y);
-    return INT_MAX;
+  // Check that we are not referencing pixels that are not final.
+  if (max_lcu_below >= 0) {
+    // When SAO is off, row is considered reconstructed when the last LCU
+    // is done, although the bottom 2 pixels might still need deblocking.
+    // To work around this, add 2 luma pixels to the reach of the mv
+    // in order to avoid referencing those possibly non-deblocked pixels.
+    int mv_lcu_row_reach = (ref_y + block_height - 1 + 2) / LCU_WIDTH;
+    int cur_lcu_row = pic_y / LCU_WIDTH;
+    if (mv_lcu_row_reach > cur_lcu_row + max_lcu_below) {
+      //printf("OOB %d %d -> %d\n", ref_y + block_height, pic_y, ref_y + block_height - pic_y);
+      return INT_MAX;
+    }
   }
+
   if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
       ref_y >= 0 && ref_y <= ref->height - block_height)
   {

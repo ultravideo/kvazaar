@@ -31,8 +31,17 @@
 
 #ifdef __MACH__
 // Workaround Mac OS not having clock_gettime.
-// ToDo: Use mach_absolute_time or something to implement GET_TIME.
-#define GET_TIME(clock_t) memset((clock_t), 0, sizeof(CLOCK_T))
+#include <mach/clock.h>
+#include <mach/mach.h>
+#define GET_TIME(clock_t) { \
+  clock_serv_t cclock; \
+  mach_timespec_t mts; \
+  host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock); \
+  clock_get_time(cclock, &mts); \
+  mach_port_deallocate(mach_task_self(), cclock); \
+  (clock_t)->tv_sec = mts.tv_sec; \
+  (clock_t)->tv_nsec = mts.tv_nsec; \
+}
 #else
 #define GET_TIME(clock_t) clock_gettime(CLOCK_MONOTONIC, (clock_t))
 #endif

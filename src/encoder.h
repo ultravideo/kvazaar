@@ -136,7 +136,17 @@ typedef struct encoder_control
   const int* slice_addresses_in_ts;
   
   threadqueue_queue *threadqueue;
+
+  struct {
+    uint8_t min;
+    uint8_t max;
+  } pu_depth_inter, pu_depth_intra;
   
+  // How often Video Parameter Set is re-sent.
+  uint32_t vps_period;
+
+  bool sign_hiding;
+
 } encoder_control;
 
 int encoder_control_init(encoder_control *encoder, const config *cfg);
