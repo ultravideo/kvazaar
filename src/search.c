@@ -1305,13 +1305,14 @@ static int8_t search_intra_chroma(encoder_state * const encoder_state,
   return 100;
 }
 
-
 /**
  * \brief Sort modes and costs to ascending order according to costs.
  */
-static void sort_modes(int8_t *modes, double *costs, uint8_t length)
+static INLINE void sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length)
 {
-  // Length is usually 5-23, so just use insertion sort.
+  // Length is always between 5 and 23, and is either 21, 17, 9 or 8 about
+  // 60% of the time, so there should be no need for anything more complex
+  // than insertion sort.
   for (uint8_t i = 1; i < length; ++i) {
     const double cur_cost = costs[i];
     const int8_t cur_mode = modes[i];
@@ -1324,6 +1325,25 @@ static void sort_modes(int8_t *modes, double *costs, uint8_t length)
     costs[j] = cur_cost;
     modes[j] = cur_mode;
   }
+}
+
+
+/**
+* \brief Select mode with the smallest cost.
+*/
+static INLINE int8_t select_best_mode(const int8_t *modes, const double *costs, uint8_t length)
+{
+  double best_mode = modes[0];
+  double best_cost = costs[0];
+  
+  for (uint8_t i = 1; i < length; ++i) {
+    if (costs[i] < best_cost) {
+      best_cost = costs[i];
+      best_mode = modes[i];
+    }
+  }
+
+  return best_mode;
 }
 
 /**
@@ -1505,6 +1525,9 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
     ++modes_selected;
   }
+
+  int8_t best_mode = select_best_mode(modes, costs, modes_selected);
+  double best_cost = min_cost;
   
   // Skip recursive search if all modes have the same cost.
   if (min_cost != max_cost) {
@@ -1512,21 +1535,29 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     // current best mode.
     while (offset > 1) {
       offset >>= 1;
-      sort_modes(modes, costs, modes_selected);
 
-      int8_t mode = modes[0] - offset;
+      int8_t center_node = best_mode;
+      int8_t mode = center_node - offset;
       if (mode >= 2) {
         intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
         costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
+        if (costs[modes_selected] < best_cost) {
+          best_cost = costs[modes_selected];
+          best_mode = modes[modes_selected];
+        }
         ++modes_selected;
       }
 
-      mode = modes[0] + offset;
+      mode = center_node + offset;
       if (mode <= 34) {
         intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
         costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
+        if (costs[modes_selected] < best_cost) {
+          best_cost = costs[modes_selected];
+          best_mode = modes[modes_selected];
+        }
         ++modes_selected;
       }
     }
@@ -1561,7 +1592,6 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     costs[mode_i] += lambda_cost * luma_mode_bits(encoder_state, modes[mode_i], intra_preds);
   }
 
-  sort_modes(modes, costs, modes_selected);
   return modes_selected;
 }
 
@@ -1592,7 +1622,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
  * \param[out] lcu  If transform split searching is used, the transform split
  *     information for the best mode is saved in lcu.cu structure.
  */
-static void search_intra_rdo(encoder_state * const encoder_state, 
+static int8_t search_intra_rdo(encoder_state * const encoder_state, 
                              int x_px, int y_px, int depth,
                              pixel *orig, int32_t origstride,
                              pixel *rec, int16_t recstride,
@@ -1678,8 +1708,6 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     }
   }
 
-  sort_modes(modes, costs, modes_to_check);
-
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
   // best mode.
@@ -1696,6 +1724,8 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     FILL(pred_cu.cbf, 0);
     search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
+
+  return modes_to_check;
 }
 
 
@@ -1781,7 +1811,9 @@ static double search_cu_intra(encoder_state * const encoder_state,
         number_of_modes_to_search = 0;
       }
       int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
-      search_intra_rdo(encoder_state, 
+
+      sort_modes(modes, costs, number_of_modes);
+      number_of_modes = search_intra_rdo(encoder_state,
                        x_px, y_px, depth,
                        ref_pixels, LCU_WIDTH,
                        cu_in_rec_buffer, cu_width * 2 + 8,
@@ -1790,7 +1822,9 @@ static double search_cu_intra(encoder_state * const encoder_state,
                        modes, costs, lcu);
     }
 
-    cur_cu->intra[pu_index].mode = modes[0];
+    int8_t best_mode = select_best_mode(modes, costs, number_of_modes);
+
+    cur_cu->intra[pu_index].mode = best_mode;
   }
 
   return costs[0];
