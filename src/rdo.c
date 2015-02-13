@@ -620,18 +620,19 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   int32_t last_x_bits[32],last_y_bits[32];
   calc_last_bits(encoder_state, width, height, type,last_x_bits, last_y_bits);
 
-  memset( cost_coeff,     0, sizeof(double) *  max_num_coeff );
-  memset( cost_sig,       0, sizeof(double) *  max_num_coeff );
+  FILL_ARRAY(cost_coeff, 0, max_num_coeff);
+  FILL_ARRAY(cost_sig, 0, max_num_coeff);
+  
 
   if (encoder->sign_hiding) {
-    memset(rate_inc_up, 0, sizeof(int32_t) *  max_num_coeff);
-    memset(rate_inc_down, 0, sizeof(int32_t) *  max_num_coeff);
-    memset(sig_rate_delta, 0, sizeof(int32_t) *  max_num_coeff);
-    memset(delta_u, 0, sizeof(int32_t) *  max_num_coeff);
+    FILL_ARRAY(rate_inc_up, 0, max_num_coeff);
+    FILL_ARRAY(rate_inc_down, 0, max_num_coeff);
+    FILL_ARRAY(sig_rate_delta, 0, max_num_coeff);
+    FILL_ARRAY(delta_u, 0, max_num_coeff);
   }
 
-  memset( cost_coeffgroup_sig,   0, sizeof(double)   * 64 );
-  memset( sig_coeffgroup_flag,   0, sizeof(uint32_t) * 64 );
+  FILL(cost_coeffgroup_sig, 0);
+  FILL(sig_coeffgroup_flag, 0);
 
   for (cg_scanpos = cg_num-1; cg_scanpos >= 0; cg_scanpos--) {
     uint32_t cg_blkpos = scan_cg[ cg_scanpos ];
@@ -642,7 +643,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
     int32_t pattern_sig_ctx = context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
                                                            cg_pos_x, cg_pos_y, width);
 
-    memset( &rd_stats, 0, sizeof (coeffgroup_rd_stats));
+    FILL(rd_stats, 0);
     for (scanpos_in_cg = cg_size-1; scanpos_in_cg >= 0; scanpos_in_cg--)  {
       uint32_t blkpos;
       int32_t q;

@@ -239,7 +239,7 @@ out_close:
 #endif //COMPILE_POWERPC
 
 static void set_hardware_flags(int32_t cpuid) {
-  memset(&g_hardware_flags, 0, sizeof(g_hardware_flags));
+  FILL(g_hardware_flags, 0);
   
   g_hardware_flags.arm = COMPILE_ARM;
   g_hardware_flags.intel = COMPILE_INTEL;

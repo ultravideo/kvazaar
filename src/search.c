@@ -1661,7 +1661,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
       pred_cu.intra[2].mode = modes[rdo_mode];
       pred_cu.intra[3].mode = modes[rdo_mode];
       pred_cu.intra[0].mode_chroma = modes[rdo_mode];
-      memset(&pred_cu.cbf, 0, sizeof(pred_cu.cbf));
+      FILL(pred_cu.cbf, 0);
 
       // Reset transform split data in lcu.cu for this area.
       lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
@@ -1686,7 +1686,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     pred_cu.intra[2].mode = modes[0];
     pred_cu.intra[3].mode = modes[0];
     pred_cu.intra[0].mode_chroma = modes[0];
-    memset(&pred_cu.cbf, 0, sizeof(pred_cu.cbf));
+    FILL(pred_cu.cbf, 0);
     search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
 }
@@ -2252,7 +2252,7 @@ void search_lcu(encoder_state * const encoder_state, const int x, const int y, c
   int depth;
   // Initialize work tree.
   for (depth = 0; depth <= MAX_PU_DEPTH; ++depth) {
-    memset(&work_tree[depth], 0, sizeof(work_tree[depth]));
+    FILL(work_tree[depth], 0);
     init_lcu_t(encoder_state, x, y, &work_tree[depth], hor_buf, ver_buf);
   }
 

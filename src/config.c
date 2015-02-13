@@ -41,7 +41,8 @@ config *config_alloc(void)
     return cfg;
   }
 
-  memset(cfg, 0, sizeof(config));
+  FILL(*cfg, 0);
+
   return cfg;
 }
 
