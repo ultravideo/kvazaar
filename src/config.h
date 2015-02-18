@@ -38,6 +38,7 @@ typedef struct
   char *debug;      /*!< \brief Pointer to debug output    */
   int32_t qp;        /*!< \brief Quantization parameter */
   int32_t intra_period; /*!< \brief the period of intra frames in stream */
+  int32_t vps_period; /*!< \brief how often the vps is re-sent */
   int32_t frames;  /*!< \brief Number of frames to decode */
   int32_t width;   /*!< \brief frame width */
   int32_t height;  /*!< \brief frame height */

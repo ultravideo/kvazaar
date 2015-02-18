@@ -103,6 +103,11 @@ int main(int argc, char *argv[])
             "                                     0: only first picture is intra\n"
             "                                     1: all pictures are intra\n"
             "                                     2-N: every Nth picture is intra\n"
+            "          --vps-period <integer> : Specify how often the video parameter set is\n"
+            "                                   re-sent. [0]\n"
+            "                                     0: only send VPS with the first frame\n"
+            "                                     1: send VPS with every intra frame\n"
+            "                                     N: send VPS with every Nth intra frame\n"
             "      -r, --ref <integer>        : Reference frames, range 1..15 [3]\n"
             "          --no-deblock           : Disable deblocking filter\n"
             "          --deblock <beta:tc>    : Deblocking filter parameters\n"
@@ -298,8 +303,7 @@ int main(int argc, char *argv[])
   // AUD
   encoder.aud_enable = (int8_t)encoder.cfg->aud_enable;
 
-  // TODO: Add config option for vps_period.
-  encoder.vps_period = (encoder.cfg->rdo == 0 ? encoder.cfg->intra_period : 0);
+  encoder.vps_period = encoder.cfg->vps_period * encoder.cfg->intra_period;
 
   encoder.in.file = input;
 

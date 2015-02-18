@@ -25,6 +25,11 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
                                          0: only first picture is intra
                                          1: all pictures are intra
                                          2-N: every Nth picture is intra
+              --vps-period <integer> : Specify how often the video parameter set is
+                                       re-sent. [0]
+                                         0: only send VPS with the first frame
+                                         1: send VPS with every intra frame
+                                         N: send VPS with every Nth intra frame
           -r, --ref <integer>        : Reference frames, range 1..15 [3]
               --no-deblock           : Disable deblocking filter
               --deblock <beta:tc>    : Deblocking filter parameters
