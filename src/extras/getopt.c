@@ -1,5 +1,3 @@
-/*	$NetBSD: getopt_long.c,v 1.4 2011/09/07 00:56:17 joerg Exp $	*/
-
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -85,6 +83,12 @@ static const char illoptstring[] = "illegal option -- %s";
 
 static const char *progname;
 
+/* These are used to replace unistd.h include. */
+char *optarg = 0;
+int optind = 0;
+int opterr = 0;
+int optopt = 0;
+int optreset = 0;
 
 /* Replacement for warnx(3) for systems without it. */
 static void xwarnx(const char *fmt, ...) {

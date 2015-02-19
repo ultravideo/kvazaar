@@ -1,5 +1,3 @@
-/*	$NetBSD: getopt.h,v 1.9 2014/09/11 21:48:34 jperkin Exp $	*/
-
 /*-
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -32,7 +30,9 @@
 #ifndef _GETOPT_H_
 #define _GETOPT_H_
 
-#include <unistd.h>
+/* These are used to replace unistd.h include. */
+extern char *optarg;
+extern int optind, opterr, optopt, optreset;
 
 /*
  * Gnu like getopt_long() and BSD4.4 getsubopt()/optreset extensions
