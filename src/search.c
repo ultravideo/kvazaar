@@ -206,7 +206,7 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
 }
 
 
-unsigned tz_8point_search(const encoder_state * const encoder_state, const image *pic, const image *ref, unsigned pattern_type,
+unsigned tz_pattern_search(const encoder_state * const encoder_state, const image *pic, const image *ref, unsigned pattern_type,
                            const vector2d *orig, const int iDist, const vector2d mv_start, unsigned best_cost, vector2d *mv_best, int *best_dist,
                            int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                            int block_width, int max_lcu_below)
@@ -215,14 +215,9 @@ unsigned tz_8point_search(const encoder_state * const encoder_state, const image
   int best_index = -1;
   int i;
 
-  //make sure parameter pattern_type is within correct range
-  if (pattern_type > 2)
-  {
-    pattern_type = 2;
-  }
-
-  vector2d pattern[3][8] = {
-      //diamond
+  //implemented search patterns
+  vector2d pattern[4][8] = {
+      //diamond (8 points)
       //[ ][ ][ ][ ][1][ ][ ][ ][ ]
       //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
       //[ ][ ][8][ ][ ][ ][5][ ][ ]
@@ -237,7 +232,7 @@ unsigned tz_8point_search(const encoder_state * const encoder_state, const image
         { iDist / 2, iDist / 2 }, { iDist / 2, -iDist / 2 }, { -iDist / 2, -iDist / 2 }, { -iDist / 2, iDist / 2 }
       },
 
-      //square
+      //square (8 points)
       //[8][ ][ ][ ][1][ ][ ][ ][2]
       //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
       //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
@@ -252,7 +247,7 @@ unsigned tz_8point_search(const encoder_state * const encoder_state, const image
         { -iDist, -iDist }, { -iDist, 0 }, { -iDist, iDist }
       },
 
-      //hexagon
+      //octagon (8 points)
       //[ ][ ][1][ ][ ][ ][5][ ][ ]
       //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
       //[ ][ ][ ][ ][ ][ ][ ][ ][2]
@@ -263,28 +258,72 @@ unsigned tz_8point_search(const encoder_state * const encoder_state, const image
       //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
       //[ ][ ][7][ ][ ][ ][3][ ][ ]
       {
-        { iDist / 2, iDist }, { iDist, iDist / 2 }, { iDist / 2, -iDist }, { -iDist, iDist / 2 },
-        { -iDist / 2, iDist }, { iDist, -iDist / 2 }, { -iDist / 2, -iDist }, { -iDist, -iDist / 2 }
+        { -iDist / 2, iDist }, { iDist, iDist / 2 }, { iDist / 2, -iDist }, { -iDist, -iDist / 2 },
+        { iDist / 2, iDist }, { iDist, -iDist / 2 }, { -iDist / 2, -iDist }, { -iDist, iDist / 2 }
       },
+
+      //hexagon (6 points)
+      //[ ][ ][1][ ][ ][ ][5][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[4][ ][ ][ ][o][ ][ ][ ][2]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][6][ ][ ][ ][3][ ][ ]
+      {
+        { -iDist / 2, iDist }, { iDist, 0 }, { iDist / 2, -iDist }, { -iDist, 0 },
+        { iDist / 2, iDist }, { -iDist / 2, -iDist }, { 0, 0 }, { 0, 0 }
+      }
+
   };
 
-  //if the search pattern is diamond or hexagon, the final search has only 4 points
-  if (iDist == 1 && (pattern_type == 0 || pattern_type == 2))
+  //make sure parameter pattern_type is within correct range
+  if (pattern_type > sizeof pattern - 1)
   {
-    n_points = 4;
+    pattern_type = sizeof pattern - 1;
+  }
+
+  //set the number of points to be checked
+  if (iDist == 1)
+  {
+    switch (pattern_type)
+    {
+      case 0:
+        n_points = 4;
+        break;
+      case 2:
+        n_points = 4;
+        break;
+      case 3:
+        n_points = 4;
+        break;
+      default:
+        n_points = 8;
+        break;
+    };
   }
   else
   {
-    n_points = 8;
+    switch (pattern_type)
+    {
+      case 3:
+        n_points = 6;
+        break;
+      default:
+        n_points = 8;
+        break;
+    };
   }
 
+  //compute SAD values for all chosen points
   for (i = 0; i < n_points; i++)
   {
     vector2d *current = &pattern[pattern_type][i];
     unsigned cost;
     uint32_t bitcost;
 
-    //compute SAD for the current point
     {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
       cost = image_calc_sad(pic, ref, orig->x, orig->y,
@@ -327,6 +366,7 @@ unsigned tz_raster_search(const encoder_state * const encoder_state, const image
   int i;
   int k;
 
+  //compute SAD values for every point in the iRaster downsampled version of the current search area
   for (i = iSearchRange; i >= -iSearchRange; i -= iRaster)
   {
     for (k = -iSearchRange; k <= iSearchRange; k += iRaster)
@@ -335,7 +375,6 @@ unsigned tz_raster_search(const encoder_state * const encoder_state, const image
       unsigned cost;
       uint32_t bitcost;
 
-      //compute SAD for current point
       {
         PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
         cost = image_calc_sad(pic, ref, orig->x, orig->y,
@@ -373,8 +412,8 @@ static unsigned tz_search(const encoder_state * const encoder_state, unsigned de
 {
 
   //TZ parameters
-  int iSearchRange = 32;  // search range for each stage
-  int iRaster = 16;  // search distance limit and downsampling factor for step 3                   
+  int iSearchRange = 96;  // search range for each stage
+  int iRaster = 5;  // search distance limit and downsampling factor for step 3                   
   unsigned step2_type = 2;  // search patterns for steps 2 and 4
   unsigned step4_type = 2;  // diamond, square or hexagon (0,1 or 2+)
   bool bRasterRefinementEnable = true;  // enable step 4 mode 1
@@ -390,6 +429,10 @@ static unsigned tz_search(const encoder_state * const encoder_state, unsigned de
   int iDist;
   int best_dist = 0;
   int max_lcu_below = -1;
+
+  if (encoder_state->encoder_control->owf) {
+    max_lcu_below = 1;
+  }
 
   //step 1, compare (0,0) vector to prediction
   {
@@ -436,7 +479,7 @@ static unsigned tz_search(const encoder_state * const encoder_state, unsigned de
   //step 2, diamond grid search
   for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
   {
-    best_cost = tz_8point_search(encoder_state, pic, ref, step2_type, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
+    best_cost = tz_pattern_search(encoder_state, pic, ref, step2_type, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_lcu_below);
   }
   mv_start.x += mv_best.x;
@@ -466,7 +509,7 @@ static unsigned tz_search(const encoder_state * const encoder_state, unsigned de
     iDist = best_dist >> 1;
     while (iDist > 0)
     {
-      best_cost = tz_8point_search(encoder_state, pic, ref, step4_type, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
+      best_cost = tz_pattern_search(encoder_state, pic, ref, step4_type, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
                                    mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_lcu_below);
 
       mv_start.x += mv_best.x;
@@ -486,7 +529,7 @@ static unsigned tz_search(const encoder_state * const encoder_state, unsigned de
 
     for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
     {
-      best_cost = tz_8point_search(encoder_state, pic, ref, step4_type, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
+      best_cost = tz_pattern_search(encoder_state, pic, ref, step4_type, orig, iDist, mv_start, best_cost, &mv_best, &best_dist,
                                    mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_lcu_below);
     }
 
