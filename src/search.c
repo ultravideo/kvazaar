@@ -414,14 +414,14 @@ static unsigned tz_search(const encoder_state * const encoder_state, unsigned de
   //TZ parameters
   int iSearchRange = 96;  // search range for each stage
   int iRaster = 5;  // search distance limit and downsampling factor for step 3                   
-  unsigned step2_type = 2;  // search patterns for steps 2 and 4
-  unsigned step4_type = 2;  // diamond, square or hexagon (0,1 or 2+)
+  unsigned step2_type = 0;  // search patterns for steps 2 and 4
+  unsigned step4_type = 0;
   bool bRasterRefinementEnable = true;  // enable step 4 mode 1
   bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
   
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
 
-  vector2d mv_start = { orig->x, orig->y };
+  vector2d mv_start = { 0, 0 };
   vector2d mv_best = { 0, 0 };
 
   unsigned best_cost = UINT32_MAX;
