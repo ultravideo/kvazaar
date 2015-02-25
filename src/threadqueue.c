@@ -482,7 +482,7 @@ int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job *
     threadqueue->queue_count -= i;
     threadqueue->queue_start = 0;
     memmove(threadqueue->queue, &threadqueue->queue[i], threadqueue->queue_count * sizeof(*threadqueue->queue));
-    memset(&threadqueue->queue[threadqueue->queue_count], 0, i * sizeof(*threadqueue->queue));
+    FILL_ARRAY(&threadqueue->queue[threadqueue->queue_count], 0, i);
   }
 
   PTHREAD_UNLOCK(&threadqueue->lock);

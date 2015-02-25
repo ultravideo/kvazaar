@@ -583,8 +583,62 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
   if (encoder_state->encoder_control->owf) {
     max_lcu_below = 1;
   }
+
+  // Check whatever input vector we got, unless its (0, 0) which will be checked later.
+  if (mv.x && mv.y) {
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+
+    best_cost = image_calc_sad(pic, ref, orig->x, orig->y,
+                                        (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                                        (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                        block_width, block_width, max_lcu_below);
+    best_cost += calc_mvd_cost(encoder_state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+    best_bitcost = bitcost;
+    best_index = num_cand; 
+
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+                            (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                            (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                            (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+  }
+
+  // Select starting point from among merge candidates. These should include
+  // both mv_cand vectors and (0, 0).
+  for (i = 0; i < num_cand; ++i) {
+    mv.x = merge_cand[i][0] >> 2;
+    mv.y = merge_cand[i][1] >> 2;
+
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+
+    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+                                   (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                                   (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                   block_width, block_width, max_lcu_below);
+    cost += calc_mvd_cost(encoder_state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+                            (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                            (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                            (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+
+    if (cost < best_cost) {
+      best_cost = cost;
+      best_index = i;
+      best_bitcost = bitcost;
+    }
+  }
+  if (best_index < num_cand) {
+    mv.x = merge_cand[best_index][0] >> 2;
+    mv.y = merge_cand[best_index][1] >> 2;
+  } else {
+    mv.x = mv_in_out->x >> 2;
+    mv.y = mv_in_out->y >> 2;
+  }
   
   // Search the initial 7 points of the hexagon.
+  best_index = 0;
   for (i = 0; i < 7; ++i) {
     const vector2d *pattern = &large_hexbs[i];
     unsigned cost;
@@ -607,57 +661,6 @@ static unsigned hexagon_search(const encoder_state * const encoder_state, unsign
       best_cost    = cost;
       best_index   = i;
       best_bitcost = bitcost;
-    }
-  }
-
-  // Try the 0,0 vector.
-  if (!(mv.x == 0 && mv.y == 0)) {
-    unsigned cost;
-    {
-      PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
-      cost = image_calc_sad(pic, ref, orig->x, orig->y,
-                             (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
-                             (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
-                             block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(encoder_state, 0, 0, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
-      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=00vector,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
-                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x, 
-                              (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + block_width, 
-                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y, 
-                              (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + block_width);
-    }
-
-    // If the 0,0 is better, redo the hexagon around that point.
-    if (cost < best_cost) {
-      best_cost    = cost;
-      best_bitcost = bitcost;
-      best_index   = 0;
-      mv.x = 0;
-      mv.y = 0;
-
-      for (i = 1; i < 7; ++i) {
-        const vector2d *pattern = &large_hexbs[i];
-        unsigned cost;
-        {
-          PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
-          cost = image_calc_sad(pic, ref, orig->x, orig->y,
-                                 (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x,
-                                 (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y,
-                                 block_width, block_width, max_lcu_below);
-          cost += calc_mvd_cost(encoder_state, pattern->x, pattern->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
-          PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, encoder_state->encoder_control->threadqueue, "type=sad,step=large_hexbs_around00,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, ref->poc - encoder_state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width, 
-                        (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x, 
-                        (encoder_state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + pattern->x + block_width, 
-                        (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y, 
-                        (encoder_state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + pattern->y + block_width);
-        }
-
-        if (cost < best_cost) {
-          best_cost    = cost;
-          best_index   = i;
-          best_bitcost = bitcost;
-        }
-      }
     }
   }
 
@@ -1645,18 +1648,45 @@ static int8_t search_intra_chroma(encoder_state * const encoder_state,
   return 100;
 }
 
-
-static void sort_modes(int8_t *modes, double *costs, int length)
+/**
+ * \brief Sort modes and costs to ascending order according to costs.
+ */
+static INLINE void sort_modes(int8_t *__restrict modes, double *__restrict costs, uint8_t length)
 {
-  int i, j;
-  for (i = 0; i < length; ++i) {
-    j = i;
-    while (j > 0 && costs[j] < costs[j - 1]) {
-      SWAP(costs[j], costs[j - 1], double);
-      SWAP(modes[j], modes[j - 1], int8_t);
+  // Length is always between 5 and 23, and is either 21, 17, 9 or 8 about
+  // 60% of the time, so there should be no need for anything more complex
+  // than insertion sort.
+  for (uint8_t i = 1; i < length; ++i) {
+    const double cur_cost = costs[i];
+    const int8_t cur_mode = modes[i];
+    uint8_t j = i;
+    while (j > 0 && cur_cost < costs[j - 1]) {
+      costs[j] = costs[j - 1];
+      modes[j] = modes[j - 1];
       --j;
     }
+    costs[j] = cur_cost;
+    modes[j] = cur_mode;
   }
+}
+
+
+/**
+* \brief Select mode with the smallest cost.
+*/
+static INLINE int8_t select_best_mode(const int8_t *modes, const double *costs, uint8_t length)
+{
+  double best_mode = modes[0];
+  double best_cost = costs[0];
+  
+  for (uint8_t i = 1; i < length; ++i) {
+    if (costs[i] < best_cost) {
+      best_cost = costs[i];
+      best_mode = modes[i];
+    }
+  }
+
+  return best_mode;
 }
 
 /**
@@ -1838,6 +1868,9 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
 
     ++modes_selected;
   }
+
+  int8_t best_mode = select_best_mode(modes, costs, modes_selected);
+  double best_cost = min_cost;
   
   // Skip recursive search if all modes have the same cost.
   if (min_cost != max_cost) {
@@ -1845,21 +1878,29 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     // current best mode.
     while (offset > 1) {
       offset >>= 1;
-      sort_modes(modes, costs, modes_selected);
 
-      int8_t mode = modes[0] - offset;
+      int8_t center_node = best_mode;
+      int8_t mode = center_node - offset;
       if (mode >= 2) {
         intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
         costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
+        if (costs[modes_selected] < best_cost) {
+          best_cost = costs[modes_selected];
+          best_mode = modes[modes_selected];
+        }
         ++modes_selected;
       }
 
-      mode = modes[0] + offset;
+      mode = center_node + offset;
       if (mode <= 34) {
         intra_get_pred(encoder_state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
         costs[modes_selected] = get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
+        if (costs[modes_selected] < best_cost) {
+          best_cost = costs[modes_selected];
+          best_mode = modes[modes_selected];
+        }
         ++modes_selected;
       }
     }
@@ -1894,7 +1935,6 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
     costs[mode_i] += lambda_cost * luma_mode_bits(encoder_state, modes[mode_i], intra_preds);
   }
 
-  sort_modes(modes, costs, modes_selected);
   return modes_selected;
 }
 
@@ -1925,7 +1965,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
  * \param[out] lcu  If transform split searching is used, the transform split
  *     information for the best mode is saved in lcu.cu structure.
  */
-static void search_intra_rdo(encoder_state * const encoder_state, 
+static int8_t search_intra_rdo(encoder_state * const encoder_state, 
                              int x_px, int y_px, int depth,
                              pixel *orig, int32_t origstride,
                              pixel *rec, int16_t recstride,
@@ -2001,7 +2041,7 @@ static void search_intra_rdo(encoder_state * const encoder_state,
       pred_cu.intra[2].mode = modes[rdo_mode];
       pred_cu.intra[3].mode = modes[rdo_mode];
       pred_cu.intra[0].mode_chroma = modes[rdo_mode];
-      memset(&pred_cu.cbf, 0, sizeof(pred_cu.cbf));
+      FILL(pred_cu.cbf, 0);
 
       // Reset transform split data in lcu.cu for this area.
       lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
@@ -2010,8 +2050,6 @@ static void search_intra_rdo(encoder_state * const encoder_state,
       costs[rdo_mode] += mode_cost;
     }
   }
-
-  sort_modes(modes, costs, modes_to_check);
 
   // The best transform split hierarchy is not saved anywhere, so to get the
   // transform split hierarchy the search has to be performed again with the
@@ -2026,9 +2064,11 @@ static void search_intra_rdo(encoder_state * const encoder_state,
     pred_cu.intra[2].mode = modes[0];
     pred_cu.intra[3].mode = modes[0];
     pred_cu.intra[0].mode_chroma = modes[0];
-    memset(&pred_cu.cbf, 0, sizeof(pred_cu.cbf));
+    FILL(pred_cu.cbf, 0);
     search_intra_trdepth(encoder_state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
+
+  return modes_to_check;
 }
 
 
@@ -2114,7 +2154,9 @@ static double search_cu_intra(encoder_state * const encoder_state,
         number_of_modes_to_search = 0;
       }
       int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
-      search_intra_rdo(encoder_state, 
+
+      sort_modes(modes, costs, number_of_modes);
+      number_of_modes = search_intra_rdo(encoder_state,
                        x_px, y_px, depth,
                        ref_pixels, LCU_WIDTH,
                        cu_in_rec_buffer, cu_width * 2 + 8,
@@ -2123,7 +2165,9 @@ static double search_cu_intra(encoder_state * const encoder_state,
                        modes, costs, lcu);
     }
 
-    cur_cu->intra[pu_index].mode = modes[0];
+    int8_t best_mode = select_best_mode(modes, costs, number_of_modes);
+
+    cur_cu->intra[pu_index].mode = best_mode;
   }
 
   return costs[0];
@@ -2592,7 +2636,7 @@ void search_lcu(encoder_state * const encoder_state, const int x, const int y, c
   int depth;
   // Initialize work tree.
   for (depth = 0; depth <= MAX_PU_DEPTH; ++depth) {
-    memset(&work_tree[depth], 0, sizeof(work_tree[depth]));
+    FILL(work_tree[depth], 0);
     init_lcu_t(encoder_state, x, y, &work_tree[depth], hor_buf, ver_buf);
   }
 

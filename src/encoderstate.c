@@ -1589,7 +1589,7 @@ void encode_coeff_nxn(encoder_state * const encoder_state, coefficient *coeff, u
   cabac_ctx *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
   cabac_ctx *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
                                  &(cabac->ctx.cu_sig_model_chroma[0]);
-  memset(sig_coeffgroup_flag,0,sizeof(uint32_t)*64);
+  FILL(sig_coeffgroup_flag, 0);
 
   // Count non-zero coeffs
   for (i = 0; i < width * width; i++) {

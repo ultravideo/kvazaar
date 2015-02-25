@@ -60,8 +60,8 @@ static void setup_tests()
   int test = 0;
   for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
     unsigned size = 1 << (w * 2);
-    memset(bufs[test][w][0], 0, size);
-    memset(bufs[test][w][1], 255, size);
+    FILL_ARRAY(bufs[test][w][0], 0, size);
+    FILL_ARRAY(bufs[test][w][1], 255, size);
   }
 
   test = 1;
@@ -70,7 +70,7 @@ static void setup_tests()
     unsigned size = 1 << (w * 2);
     init_gradient(3, 1, width, 1, bufs[test][w][0]);
     //init_gradient(width / 2, 0, width, 1, bufs[test][w][1]);
-    memset(bufs[test][w][1], 128, size);
+    FILL_ARRAY(bufs[test][w][1], 128, size);
   }
 }
 

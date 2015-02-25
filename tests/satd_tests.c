@@ -43,8 +43,8 @@ static void setup_tests()
   int test = 0;
   for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
     unsigned size = 1 << (w * 2);
-    memset(satd_bufs[test][w][0], 0, size);
-    memset(satd_bufs[test][w][1], 255, size);
+    FILL_ARRAY(satd_bufs[test][w][0], 0, size);
+    FILL_ARRAY(satd_bufs[test][w][1], 255, size);
   }
 
   //Checker patterns, buffer 1 is negative of buffer 2

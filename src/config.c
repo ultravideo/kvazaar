@@ -41,7 +41,8 @@ config *config_alloc(void)
     return cfg;
   }
 
-  memset(cfg, 0, sizeof(config));
+  FILL(*cfg, 0);
+
   return cfg;
 }
 
@@ -60,6 +61,7 @@ int config_init(config *cfg)
   cfg->height          = 0;
   cfg->qp              = 32;
   cfg->intra_period    = 0;
+  cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
   cfg->deblock_beta    = 0;
   cfg->deblock_tc      = 0;
@@ -340,6 +342,8 @@ static int config_parse(config *cfg, const char *name, const char *value)
     cfg->qp = atoi(value);
   else if OPT("period")
     cfg->intra_period = atoi(value);
+  else if OPT("vps-period")
+    cfg->vps_period = atoi(value);
   else if OPT("ref") {
     cfg->ref_frames = atoi(value);
     if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
@@ -522,6 +526,7 @@ int config_read(config *cfg,int argc, char *argv[])
     { "qp",                 required_argument, NULL, 'q' },
     { "period",             required_argument, NULL, 'p' },
     { "ref",                required_argument, NULL, 'r' },
+    { "vps-period",         required_argument, NULL, 0 },
     { "input-res",          required_argument, NULL, 0 },
     { "no-deblock",               no_argument, NULL, 0 },
     { "deblock",            required_argument, NULL, 0 },

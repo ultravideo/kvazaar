@@ -159,6 +159,15 @@ typedef int16_t coefficient;
   #define MALLOC(type, num) malloc(sizeof(type) * (num))
 #endif
 
+// Use memset through FILL and FILL_ARRAY when appropriate, such as when
+// initializing whole structures or arrays. It's still ok to use memset
+// directly when doing something more complicated.
+
+// Fill a structure or a static array with val bytes.
+#define FILL(var, val) memset(&(var), (val), sizeof(var))
+// Fill a number of elements in an array with val bytes.
+#define FILL_ARRAY(ar, val, size) memset((ar), (val), (size) * sizeof(*(ar)))
+
 #define FREE_POINTER(pointer) { free((void*)pointer); pointer = NULL; }
 #define MOVE_POINTER(dst_pointer,src_pointer) { dst_pointer = src_pointer; src_pointer = NULL; }
 

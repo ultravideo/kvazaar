@@ -39,7 +39,7 @@ videoframe *videoframe_alloc(const int32_t width, const int32_t height, const in
 
   if (!frame) return 0;
 
-  memset(frame, 0, sizeof(videoframe));
+  FILL(*frame, 0);
 
   frame->width  = width;
   frame->height = height;

@@ -278,8 +278,8 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
   int temp_rate[32];
   int best_dist_pos = 0;
 
-  memset(dist, 0, 32*sizeof(int));
-  memset(temp_rate, 0, 32*sizeof(int));
+  FILL(dist, 0);
+  FILL(temp_rate, 0);
 
   // Calculate distortion for each band using N*h^2 - 2*h*E
   for (band = 0; band < 32; band++) {
@@ -614,7 +614,7 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
 
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
-      memset(cat_sum_cnt, 0, sizeof(int) * 2 * NUM_SAO_EDGE_CATEGORIES);
+      FILL(cat_sum_cnt, 0);
       calc_sao_edge_dir(data[i], recdata[i], edge_class,
                         block_width, block_height, cat_sum_cnt);
     
@@ -689,7 +689,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
     float temp_rate = 0.0;
     
     for (i = 0; i < buf_cnt; ++i) {
-      memset(sao_bands, 0, 2 * 32 * sizeof(int));
+      FILL(sao_bands, 0);
       calc_sao_bands(encoder_state, data[i], recdata[i],block_width,
                      block_height,sao_bands);
     
@@ -733,8 +733,6 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   band_sao.offsets[0] = 0;
   band_sao.offsets[5] = 0;
   band_sao.eo_class = SAO_EO0;
-  //memset(&edge_sao, 0, sizeof(sao_info));
-  //memset(&band_sao, 0, sizeof(sao_info));
 
   sao_search_edge_sao(encoder_state, data, recdata, block_width, block_height, buf_cnt, &edge_sao, sao_top, sao_left);
   sao_search_band_sao(encoder_state, data, recdata, block_width, block_height, buf_cnt, &band_sao, sao_top, sao_left);
