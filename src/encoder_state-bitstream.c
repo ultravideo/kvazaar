@@ -735,17 +735,10 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
   uint64_t curpos;
+  uint64_t newpos;
   int i;
   
-  if (state->stream.base.type == BITSTREAM_TYPE_FILE) {
-    fgetpos(state->stream.file.output,(fpos_t*)&curpos);
-  } else if (state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
-    curpos = stream->mem.output_length;
-  } else {
-    //Should not happen
-    assert(0);
-    curpos = 0;
-  }
+  curpos = bitstream_tell(stream) >> 3;
 
   // The first NAL unit of the access unit must use a long start code.
   bool first_nal_in_au = true;
@@ -810,17 +803,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   assert(state->tile->frame->poc == state->global->poc);
   
   //Get bitstream length for stats
-  if (state->stream.base.type == BITSTREAM_TYPE_FILE) {
-    uint64_t newpos;
-    fgetpos(state->stream.file.output,(fpos_t*)&newpos);
-    state->stats_bitstream_length = newpos - curpos;
-  } else if (state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
-    state->stats_bitstream_length = stream->mem.output_length - curpos;
-  } else {
-    //Should not happen
-    assert(0);
-    state->stats_bitstream_length = 0;
-  }
+  newpos = bitstream_tell(stream) >> 3;
+  state->stats_bitstream_length = newpos - curpos;
 
   // Flush the output in case someone is reading the file on the other end.
   fflush(state->stream.file.output);
