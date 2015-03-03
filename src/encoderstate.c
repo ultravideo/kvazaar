@@ -57,12 +57,12 @@
 void encoder_state_init_lambda(encoder_state * const encoder_state)
 {
   double qp = encoder_state->global->QP;
-  double lambda_scale = 1.0;
+  double lambda_scale = 1.0 - CLIP(0.0, 0.5, 0.05*(double)encoder_state->encoder_control->cfg->gop_len);
   double qp_temp      = qp - 12;
   double lambda;
 
   // Default QP-factor from HM config
-  double qp_factor = 0.4624;
+  double qp_factor = encoder_state->encoder_control->cfg->gop_len ? encoder_state->global->QP_factor : 0.4624;
 
   if (encoder_state->global->slicetype == SLICE_I) {
     qp_factor=0.57*lambda_scale;
@@ -673,6 +673,19 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
       main_state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
       main_state->global->pictype = NAL_TRAIL_R;
     }
+    if (main_state->encoder_control->cfg->gop_len) {
+      if (main_state->global->slicetype == SLICE_I) {
+        main_state->global->QP = main_state->encoder_control->cfg->qp;
+        main_state->global->QP_factor = 0.4624;
+      }
+      else {
+        main_state->global->QP = main_state->encoder_control->cfg->qp +
+          main_state->encoder_control->cfg->gop[main_state->global->frame % 8].qp_offset;
+        main_state->global->QP_factor = main_state->encoder_control->cfg->gop[main_state->global->frame % 8].qp_factor;
+      }
+        
+    }
+
   } else {
     //Clear the bitstream if it's not the main encoder
     bitstream_clear(&main_state->stream);
@@ -794,35 +807,88 @@ int read_one_frame(FILE* file, const encoder_state * const encoder_state)
   unsigned array_width = encoder_state->tile->frame->width;
   unsigned array_height = encoder_state->tile->frame->height;
 
-  if (width != array_width) {
-    // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-    if (!read_and_fill_frame_data(file, width, height, array_width,
-                                  encoder_state->tile->frame->source->y) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  encoder_state->tile->frame->source->u) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  encoder_state->tile->frame->source->v))
-      return 0;
-  } else {
-    // Otherwise the data can be read directly to the array.
-    unsigned y_size = width * height;
-    unsigned uv_size = (width >> 1) * (height >> 1);
-    if (y_size  != fread(encoder_state->tile->frame->source->y, sizeof(unsigned char),
-                         y_size, file) ||
-        uv_size != fread(encoder_state->tile->frame->source->u, sizeof(unsigned char),
-                         uv_size, file) ||
-        uv_size != fread(encoder_state->tile->frame->source->v, sizeof(unsigned char),
-                         uv_size, file))
-      return 0;
+  // storing GOP pictures
+  static int8_t gop_pictures_available = 0;
+  static videoframe gop_pictures[MAX_GOP];
+
+  // On first frame, init structures
+  if (!encoder_state->global->frame) {
+    int i;
+    for (i = 0; i < encoder_state->encoder_control->cfg->gop_len; i++) {
+      gop_pictures[i].source = image_alloc(array_width, array_height, 0);
+    }
   }
 
-  if (height != array_height) {
-    fill_after_frame(height, array_width, array_height,
-                     encoder_state->tile->frame->source->y);
-    fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     encoder_state->tile->frame->source->u);
-    fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     encoder_state->tile->frame->source->v);
+  // If GOP is present but no pictures found
+  if (encoder_state->global->frame && 
+      encoder_state->encoder_control->cfg->gop_len &&
+      !gop_pictures_available) {
+    int i;
+    unsigned y_size = width * height;
+    unsigned uv_size = (width >> 1) * (height >> 1);
+
+    for (i = 0; i < encoder_state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
+      if (width != array_width) {
+       // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
+        if (!read_and_fill_frame_data(file, width, height, array_width, gop_pictures[i].source->y) ||
+          !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->u) ||
+          !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->v))
+          return 0;
+      } else {
+        // Otherwise the data can be read directly to the array.
+        if (y_size != fread(gop_pictures[i].source->y, sizeof(unsigned char), y_size, file) ||
+           uv_size != fread(gop_pictures[i].source->u, sizeof(unsigned char), uv_size, file) ||
+           uv_size != fread(gop_pictures[i].source->v, sizeof(unsigned char), uv_size, file))
+          return 0;
+      }
+
+      if (height != array_height) {
+        fill_after_frame(height, array_width, array_height, gop_pictures[i].source->y);
+        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->u);
+        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->v);
+      }
+    }  
+  }
+
+  // If GOP is present, fetch the data from our GOP picture buffer
+  if (encoder_state->global->frame && encoder_state->encoder_control->cfg->gop_len) {
+    int cur_gop_idx = encoder_state->encoder_control->cfg->gop_len - gop_pictures_available;
+    int cur_gop = encoder_state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
+    memcpy(encoder_state->tile->frame->source->y, gop_pictures[cur_gop].source->y, width * height);
+    memcpy(encoder_state->tile->frame->source->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
+    memcpy(encoder_state->tile->frame->source->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
+    gop_pictures_available--;
+  } else {
+    if (width != array_width) {
+      // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
+      if (!read_and_fill_frame_data(file, width, height, array_width,
+        encoder_state->tile->frame->source->y) ||
+        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
+        encoder_state->tile->frame->source->u) ||
+        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
+        encoder_state->tile->frame->source->v))
+        return 0;
+    } else {
+      // Otherwise the data can be read directly to the array.
+      unsigned y_size = width * height;
+      unsigned uv_size = (width >> 1) * (height >> 1);
+      if (y_size != fread(encoder_state->tile->frame->source->y, sizeof(unsigned char),
+        y_size, file) ||
+        uv_size != fread(encoder_state->tile->frame->source->u, sizeof(unsigned char),
+        uv_size, file) ||
+        uv_size != fread(encoder_state->tile->frame->source->v, sizeof(unsigned char),
+        uv_size, file))
+        return 0;
+    }
+
+    if (height != array_height) {
+      fill_after_frame(height, array_width, array_height,
+        encoder_state->tile->frame->source->y);
+      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
+        encoder_state->tile->frame->source->u);
+      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
+        encoder_state->tile->frame->source->v);
+    }
   }
   return 1;
 }
@@ -867,7 +933,8 @@ void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, ui
     
     videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
     
-    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
+    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
+          encoder_state->global->QP,
           "BPI"[encoder_state->global->slicetype%3], encoder_state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
