@@ -66,6 +66,9 @@ typedef int16_t coefficient;
 #define PU_DEPTH_INTRA_MIN 0
 #define PU_DEPTH_INTRA_MAX 4
 
+// Maximum length of GoP (for allocating structures)
+#define MAX_GOP 32
+
 // Maximum CU depth when descending form LCU level.
 #define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */
 // Minimum log2 size of CUs.

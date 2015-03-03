@@ -66,6 +66,7 @@ typedef struct {
   int32_t poc; /*!< \brief picture order count */
   
   int8_t QP;   //!< \brief Quantization parameter
+  double QP_factor; //!< \brief Quantization factor
   
   //Current picture available references
   image_list *ref;
