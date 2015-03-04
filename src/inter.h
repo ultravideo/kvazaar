@@ -33,7 +33,7 @@
 
 
 //void inter_set_block(image* im,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
-void inter_recon_lcu(const encoder_state_t * const encoder_state, const image * ref, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2], lcu_t* lcu);
+void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t * ref, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2], lcu_t* lcu);
 
 void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
                                         cu_info_t **b2, cu_info_t **a0, cu_info_t **a1, lcu_t *lcu);

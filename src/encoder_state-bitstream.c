@@ -775,7 +775,7 @@ void encoder_state_write_bitstream_leaf(encoder_state_t * const encoder_state) {
   
   //Last LCU
   {
-    const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
+    const lcu_order_element_t * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
     const int lcu_addr_in_ts = lcu->id + encoder_state->tile->lcu_offset_in_ts;
     const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
   

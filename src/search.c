@@ -228,7 +228,7 @@ static int calc_mvd_cost(const encoder_state_t * const encoder_state, int x, int
  * points like 0,0 might be used, such as vectors from top or left.
  */
 static unsigned hexagon_search(const encoder_state_t * const encoder_state, unsigned depth,
-                               const image *pic, const image *ref,
+                               const image_t *pic, const image_t *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
@@ -481,7 +481,7 @@ static unsigned search_mv_full(unsigned depth,
  */
 static unsigned search_frac( const encoder_state_t * const encoder_state,
         unsigned depth,
-        const image *pic, const image *ref,
+        const image_t *pic, const image_t *ref,
         const vector2d_t *orig, vector2d_t *mv_in_out,
         int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
         int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out) {
@@ -635,7 +635,7 @@ static int search_cu_inter(const encoder_state_t * const encoder_state, int x, i
   cur_cu->inter.cost = UINT_MAX;
 
   for (ref_idx = 0; ref_idx < encoder_state->global->ref->used_size; ref_idx++) {
-    image *ref_image = encoder_state->global->ref->images[ref_idx];
+    image_t *ref_image = encoder_state->global->ref->images[ref_idx];
     const cu_info_t *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx]->data[x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;

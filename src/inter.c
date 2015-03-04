@@ -75,7 +75,7 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state_t * const encoder_state, const image * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };

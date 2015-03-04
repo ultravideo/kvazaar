@@ -30,7 +30,7 @@
 /**
  * \brief Struct which contains all picture data
  */
-typedef struct image
+typedef struct image_t
 {
   pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
 
@@ -44,11 +44,11 @@ typedef struct image
   
   int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
   
-  struct image * base_image; //!< \brief Pointer to the image to which the pixels belong
+  struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
   int32_t refcount;        //!< \brief Number of references in reflist to the picture
   
   int32_t poc;             //!< \brief Picture order count
-} image;
+} image_t;
 
 typedef struct {
   pixel y[LCU_LUMA_SIZE];
@@ -64,15 +64,15 @@ typedef struct {
 } yuv_t;
 
 
-image *image_alloc(const int32_t width, const int32_t height, const int32_t poc);
-int image_free(image * im);
-image *image_make_subimage(image * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height);
+image_t *image_alloc(const int32_t width, const int32_t height, const int32_t poc);
+int image_free(image_t * im);
+image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height);
 
 yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);
 
 //Algorithms
-unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below);
 
 

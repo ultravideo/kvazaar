@@ -36,8 +36,8 @@ struct sao_info_struct;
  */
 typedef struct videoframe
 {
-  image* source;         //!< \brief Source image.
-  image* rec;            //!< \brief Reconstructed image.
+  image_t* source;         //!< \brief Source image.
+  image_t* rec;            //!< \brief Reconstructed image.
   
   coefficient* coeff_y;   //!< \brief coefficient pointer Y
   coefficient* coeff_u;   //!< \brief coefficient pointer U

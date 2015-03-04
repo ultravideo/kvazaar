@@ -39,9 +39,9 @@
  * \brief Allocate new image
  * \return image pointer
  */
-image *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
+image_t *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
 {
-  image *im = MALLOC(image, 1);
+  image_t *im = MALLOC(image_t, 1);
   
   unsigned int luma_size = width * height;
   unsigned int chroma_size = luma_size / 4;
@@ -76,7 +76,7 @@ image *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
-int image_free(image * const im)
+int image_free(image_t * const im)
 {
   //Nothing to do
   if (!im) return 1;
@@ -101,9 +101,9 @@ int image_free(image * const im)
 }
 
 
-image *image_make_subimage(image * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height)
+image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height)
 {
-  image *im = MALLOC(image, 1);
+  image_t *im = MALLOC(image_t, 1);
   if (!im) return NULL;
   
   im->base_image = orig_image->base_image;
@@ -246,7 +246,7 @@ static unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-static unsigned image_interpolated_sad(const image *pic, const image *ref,
+static unsigned image_interpolated_sad(const image_t *pic, const image_t *ref,
                                  int pic_x, int pic_y, int ref_x, int ref_y,
                                  int block_width, int block_height)
 {
@@ -381,7 +381,7 @@ static unsigned image_interpolated_sad(const image *pic, const image *ref,
 *
 * \returns  
 */
-unsigned image_calc_sad(const image *pic, const image *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);

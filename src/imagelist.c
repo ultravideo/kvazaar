@@ -42,7 +42,7 @@ image_list * image_list_alloc(int size)
   image_list *list = (image_list *)malloc(sizeof(image_list));
   list->size = size;
   if (size > 0) {
-    list->images = (image**)malloc(sizeof(image*) * size);
+    list->images = (image_t**)malloc(sizeof(image_t*) * size);
     list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*) * size);
   }
 
@@ -60,7 +60,7 @@ image_list * image_list_alloc(int size)
 int image_list_resize(image_list *list, unsigned size)
 {
   unsigned int i;
-  image** old_images = NULL;
+  image_t** old_images = NULL;
   cu_array_t** old_cu_arrays = NULL;
   
   //FIXME This could be done in a simple way using realloc...
@@ -77,7 +77,7 @@ int image_list_resize(image_list *list, unsigned size)
   }
 
   // allocate space for the new list
-  list->images = (image**)malloc(sizeof(image*)*size);
+  list->images = (image_t**)malloc(sizeof(image_t*)*size);
   list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*)*size);
 
   // Copy everything from the old list to the new if needed.
@@ -125,7 +125,7 @@ int image_list_destroy(image_list *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int image_list_add(image_list *list, image* im, cu_array_t* cua)
+int image_list_add(image_list *list, image_t* im, cu_array_t* cua)
 {
   int i = 0;
   if (ATOMIC_INC(&(im->refcount)) == 1) {
