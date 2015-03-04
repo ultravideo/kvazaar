@@ -134,9 +134,9 @@ typedef struct {
   struct {
     int neon;
   } arm_flags;
-} hardware_flags;
+} hardware_flags_t;
 
-extern hardware_flags g_hardware_flags;
+extern hardware_flags_t g_hardware_flags;
 
 
 int strategyselector_init(int32_t cpuid);

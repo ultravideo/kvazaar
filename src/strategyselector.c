@@ -31,7 +31,7 @@
 #include <immintrin.h>
 #endif
 
-hardware_flags g_hardware_flags;
+hardware_flags_t g_hardware_flags;
 
 static void set_hardware_flags(int32_t cpuid);
 static void* strategyselector_choose_for(const strategy_list_t * const strategies, const char * const strategy_type);
