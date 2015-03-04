@@ -891,7 +891,7 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *
         cu->tr_depth = cur_cu->tr_depth;
         cu->merged   = cur_cu->merged;
         cu->skipped  = cur_cu->skipped;
-        memcpy(&cu->inter, &cur_cu->inter, sizeof(cu_info_inter));
+        memcpy(&cu->inter, &cur_cu->inter, sizeof(cur_cu->inter));
       }
     }
   }

@@ -42,31 +42,6 @@ typedef struct {
   int y;
 } vector2d_t;
 
-/**
- * \brief Struct for CU intra info
- */
-typedef struct
-{
-  int8_t mode;
-  int8_t mode_chroma;
-  int8_t tr_skip;    //!< \brief transform skip flag
-} cu_info_intra;
-
-/**
- * \brief Struct for CU inter info
- */
-typedef struct
-{
-  double cost;
-  uint32_t bitcost;
-  int16_t mv[2];
-  int16_t mvd[2];
-  uint8_t mv_cand; // \brief selected MV candidate
-  uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
-  uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
-  int8_t mode;
-} cu_info_inter;
-
 typedef struct
 {
   uint8_t y;
@@ -89,8 +64,21 @@ typedef struct
   int8_t merge_idx;  //!< \brief merge index
 
   cu_cbf_t cbf;
-  cu_info_intra intra[4];
-  cu_info_inter inter;
+  struct {
+    int8_t mode;
+    int8_t mode_chroma;
+    int8_t tr_skip;    //!< \brief transform skip flag
+  } intra[4];
+  struct {
+    double cost;
+    uint32_t bitcost;
+    int16_t mv[2];
+    int16_t mvd[2];
+    uint8_t mv_cand; // \brief selected MV candidate
+    uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
+    uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
+    int8_t mode;
+  } inter;
 } cu_info_t;
 
 #define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
