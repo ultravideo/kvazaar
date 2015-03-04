@@ -660,7 +660,7 @@ void intra_get_planar_pred(const pixel* src, int32_t srcstride, uint32_t width, 
 void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   if (cur_cu == NULL) {
     cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
   }
@@ -709,7 +709,7 @@ void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, i
 void intra_recon_lcu_chroma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 

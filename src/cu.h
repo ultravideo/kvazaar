@@ -40,7 +40,7 @@ typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu
 typedef struct {
   int x;
   int y;
-} vector2d;
+} vector2d_t;
 
 /**
  * \brief Struct for CU intra info

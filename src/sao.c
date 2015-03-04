@@ -34,7 +34,7 @@
 // |       |   a   | a     |     a |
 // | a c b |   c   |   c   |   c   |
 // |       |   b   |     b | b     |
-static const vector2d g_sao_edge_offsets[SAO_NUM_EO][2] = {
+static const vector2d_t g_sao_edge_offsets[SAO_NUM_EO][2] = {
   { { -1, 0 }, { 1, 0 } },
   { { 0, -1 }, { 0, 1 } },
   { { -1, -1 }, { 1, 1 } },
@@ -88,8 +88,8 @@ int sao_edge_ddistortion(const pixel *orig_data, const pixel *rec_data,
 {
   int y, x;
   int sum = 0;
-  vector2d a_ofs = g_sao_edge_offsets[eo_class][0];
-  vector2d b_ofs = g_sao_edge_offsets[eo_class][1];
+  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
+  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
   for (y = 1; y < block_height - 1; ++y) {
     for (x = 1; x < block_width - 1; ++x) {
@@ -354,8 +354,8 @@ static void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
                               int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
 {
   int y, x;
-  vector2d a_ofs = g_sao_edge_offsets[eo_class][0];
-  vector2d b_ofs = g_sao_edge_offsets[eo_class][1];
+  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
+  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
   // Arrays orig_data and rec_data are quarter size for chroma.
 
   // Don't sample the edge pixels because this function doesn't have access to
@@ -399,8 +399,8 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
     // their neighbours.
     for (y = 0; y < block_height; ++y) {
       for (x = 0; x < block_width; ++x) {
-        vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-        vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
+        vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
+        vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
         const pixel *c_data = &rec_data[y * stride + x];
         pixel *new_data = &new_rec_data[y * new_stride + x];
         pixel a = c_data[a_ofs.y * stride + a_ofs.x];
@@ -423,7 +423,7 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
  * \param rec  Top-left corner of the LCU
  */
 static void sao_calc_band_block_dims(const videoframe_t *frame, color_index color_i,
-                                     vector2d *rec, vector2d *block)
+                                     vector2d_t *rec, vector2d_t *block)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
   int width = frame->width >> is_chroma;
@@ -478,12 +478,12 @@ static void sao_calc_band_block_dims(const videoframe_t *frame, color_index colo
  * \param rec  Top-left corner of the LCU, modified to be top-left corner of
  */
 static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_index color_i,
-                                     const sao_info *sao, vector2d *rec,
-                                     vector2d *tl, vector2d *br,
-                                     vector2d *block)
+                                     const sao_info *sao, vector2d_t *rec,
+                                     vector2d_t *tl, vector2d_t *br,
+                                     vector2d_t *block)
 {
-  vector2d a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-  vector2d b_ofs = g_sao_edge_offsets[sao->eo_class][1];
+  vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
+  vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
   int width = frame->width >> is_chroma;
   int height = frame->height >> is_chroma;
@@ -543,10 +543,10 @@ void sao_reconstruct(const encoder_control_t * const encoder, videoframe_t * fra
   pixel *lcu_rec = &recdata[CU_TO_PIXEL(x_ctb, y_ctb, is_chroma, frame->rec->stride>>is_chroma)];
   const pixel *old_lcu_rec = &old_rec[CU_TO_PIXEL(x_ctb, y_ctb, is_chroma, pic_stride)];
 
-  vector2d ofs;
-  vector2d tl = { 1, 1 };
-  vector2d br = { 1, 1 };
-  vector2d block;
+  vector2d_t ofs;
+  vector2d_t tl = { 1, 1 };
+  vector2d_t br = { 1, 1 };
+  vector2d_t block;
 
   if (sao->type == SAO_TYPE_NONE) {
     return;
@@ -892,7 +892,7 @@ void sao_search_luma(const encoder_state_t * const encoder_state, const videofra
 
 void sao_reconstruct_frame(encoder_state_t * const encoder_state)
 {
-  vector2d lcu;
+  vector2d_t lcu;
   videoframe_t * const frame = encoder_state->tile->frame;
 
   // These are needed because SAO needs the pre-SAO pixels form left and

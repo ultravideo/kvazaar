@@ -91,7 +91,7 @@
  *    \   /
  *   4 o-o 3
  */
-const vector2d large_hexbs[10] = {
+const vector2d_t large_hexbs[10] = {
   { 0, 0 },
   { 1, -2 }, { 2, 0 }, { 1, 2 }, { -1, 2 }, { -2, 0 }, { -1, -2 },
   { 1, -2 }, { 2, 0 }
@@ -100,7 +100,7 @@ const vector2d large_hexbs[10] = {
 /**
  * This is used as the last step of the hexagon search.
  */
-const vector2d small_hexbs[5] = {
+const vector2d_t small_hexbs[5] = {
   { 0, 0 },
   { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
 };
@@ -110,7 +110,7 @@ const vector2d small_hexbs[5] = {
  *  3 4 5
  *  0 1 2
  */
-const vector2d square[9] = {
+const vector2d_t square[9] = {
   { -1, 1 },
   { 0, 1 }, { 1, 1 }, { -1, 0 }, { 0, 0 }, { 1, 0 }, { -1, -1 },
   { 0, -1 }, { 1, -1 }
@@ -129,7 +129,7 @@ static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
   return num_bins;
 }
 
-static uint32_t get_mvd_coding_cost(vector2d *mvd)
+static uint32_t get_mvd_coding_cost(vector2d_t *mvd)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -168,7 +168,7 @@ static int calc_mvd_cost(const encoder_state_t * const encoder_state, int x, int
   uint32_t temp_bitcost = 0;
   uint32_t merge_idx;
   int cand1_cost,cand2_cost;
-  vector2d mvd_temp1, mvd_temp2;
+  vector2d_t mvd_temp1, mvd_temp2;
   int8_t merged      = 0;
   int8_t cur_mv_cand = 0;
 
@@ -229,11 +229,11 @@ static int calc_mvd_cost(const encoder_state_t * const encoder_state, int x, int
  */
 static unsigned hexagon_search(const encoder_state_t * const encoder_state, unsigned depth,
                                const image *pic, const image *ref,
-                               const vector2d *orig, vector2d *mv_in_out,
+                               const vector2d_t *orig, vector2d_t *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
-  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
@@ -301,7 +301,7 @@ static unsigned hexagon_search(const encoder_state_t * const encoder_state, unsi
   // Search the initial 7 points of the hexagon.
   best_index = 0;
   for (i = 0; i < 7; ++i) {
-    const vector2d *pattern = &large_hexbs[i];
+    const vector2d_t *pattern = &large_hexbs[i];
     unsigned cost;
     {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
@@ -344,7 +344,7 @@ static unsigned hexagon_search(const encoder_state_t * const encoder_state, unsi
 
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
-      const vector2d *offset = &large_hexbs[start + i];
+      const vector2d_t *offset = &large_hexbs[start + i];
       unsigned cost;
       {
         PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
@@ -376,7 +376,7 @@ static unsigned hexagon_search(const encoder_state_t * const encoder_state, unsi
 
   // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
-    const vector2d *offset = &small_hexbs[i];
+    const vector2d_t *offset = &small_hexbs[i];
     unsigned cost;
     {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
@@ -482,12 +482,12 @@ static unsigned search_mv_full(unsigned depth,
 static unsigned search_frac( const encoder_state_t * const encoder_state,
         unsigned depth,
         const image *pic, const image *ref,
-        const vector2d *orig, vector2d *mv_in_out,
+        const vector2d_t *orig, vector2d_t *mv_in_out,
         int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
         int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out) {
 
   //Set mv to halfpel precision
-  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
@@ -498,7 +498,7 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
 
   cost_pixel_nxn_func *satd = pixels_get_satd_func(block_width);
 
-  vector2d halfpel_offset;
+  vector2d_t halfpel_offset;
 
   #define FILTER_SIZE 8
   #define HALF_FILTER (FILTER_SIZE>>1)
@@ -528,7 +528,7 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
 
   // Search halfpel positions around best integer mv
   for (i = 0; i < 9; ++i) {
-    const vector2d *pattern = &square[i];
+    const vector2d_t *pattern = &square[i];
 
     pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
     pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
@@ -568,7 +568,7 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
 
   //Search quarterpel points around best halfpel mv
   for (i = 0; i < 9; ++i) {
-    const vector2d *pattern = &square[i];
+    const vector2d_t *pattern = &square[i];
 
     pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
     pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
@@ -639,7 +639,7 @@ static int search_cu_inter(const encoder_state_t * const encoder_state, int x, i
     const cu_info_t *ref_cu = &encoder_state->global->ref->cu_arrays[ref_idx]->data[x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
-    vector2d orig, mv, mvd;
+    vector2d_t orig, mv, mvd;
     int32_t merged = 0;
     uint8_t cu_mv_cand = 0;
     int8_t merge_idx = 0;
@@ -679,7 +679,7 @@ static int search_cu_inter(const encoder_state_t * const encoder_state, int x, i
 
     // Only check when candidates are different
     if (!merged && (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
-      vector2d mvd_temp1, mvd_temp2;
+      vector2d_t mvd_temp1, mvd_temp2;
       int cand1_cost,cand2_cost;
 
       mvd_temp1.x = mv.x - mv_cand[0][0];
@@ -819,7 +819,7 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
 static void lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
-  const vector2d lcu_cu = { (x_px & (LCU_WIDTH - 1)) / 8, (y_px & (LCU_WIDTH - 1)) / 8 };
+  const vector2d_t lcu_cu = { (x_px & (LCU_WIDTH - 1)) / 8, (y_px & (LCU_WIDTH - 1)) / 8 };
   cu_info_t *const cur_cu = &lcu->cu[lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH + LCU_CU_OFFSET];
   int x, y;
 
@@ -1012,7 +1012,7 @@ static double cu_rd_cost_chroma(const encoder_state_t *const encoder_state,
                                 const cu_info_t *const pred_cu,
                                 lcu_t *const lcu)
 {
-  const vector2d lcu_px = { x_px / 2, y_px / 2 };
+  const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
   cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x / 4) + (lcu_px.y / 4)*LCU_T_CU_WIDTH];
 
@@ -1106,7 +1106,7 @@ static double search_intra_trdepth(encoder_state_t * const encoder_state,
   const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
 
   const int offset = width / 2;
-  const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
   cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
 
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
@@ -1278,7 +1278,7 @@ static int8_t search_intra_chroma(encoder_state_t * const encoder_state,
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
 
   if (reconstruct_chroma) {
-    const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
+    const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
     cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
 
     struct {
@@ -1742,8 +1742,8 @@ static double search_cu_intra(encoder_state_t * const encoder_state,
                            const int depth, lcu_t *lcu)
 {
   const videoframe_t * const frame = encoder_state->tile->frame;
-  const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
-  const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
+  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
   const int cu_index = LCU_CU_OFFSET + lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH;
 
@@ -1862,7 +1862,7 @@ static double calc_mode_bits(const encoder_state_t *encoder_state,
 
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
-  vector2d lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
+  vector2d_t lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
   const cu_info_t *cu_array = &(lcu)->cu[LCU_CU_OFFSET];
   bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
   bool condL = y >= 8 && cu_array[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
@@ -1887,7 +1887,7 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
   double cost = MAX_INT;
   cu_info_t *cur_cu;
 
-  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   lcu_t *const lcu = &work_tree[depth];
 
   int x_local = (x&0x3f), y_local = (y&0x3f);
@@ -1996,7 +1996,7 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
                                          frame->width / 2, frame->height / 2,
                                          lcu);
 
-            vector2d lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
+            vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
             pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
             pixel *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
 
@@ -2087,7 +2087,7 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame->width && y + cu_width <= frame->height)
     {
-      vector2d lcu_cu = { x_local / 8, y_local / 8 };
+      vector2d_t lcu_cu = { x_local / 8, y_local / 8 };
       cu_info_t *cu_array_d1 = &(&work_tree[depth + 1])->cu[LCU_CU_OFFSET];
       cu_info_t *cu_d1 = &cu_array_d1[(lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH)];
 

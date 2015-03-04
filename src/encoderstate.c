@@ -1222,7 +1222,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
     // it can be signaled with two EP's. Otherwise we can send
     // 5 EP bins with the full predmode
     for (j = 0; j < num_pred_units; ++j) {
-      static const vector2d offset[4] = {{0,0},{1,0},{0,1},{1,1}};
+      static const vector2d_t offset[4] = {{0,0},{1,0},{0,1},{1,1}};
       const cu_info_t *left_cu = NULL;
       const cu_info_t *above_cu = NULL;
 

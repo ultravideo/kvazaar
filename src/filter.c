@@ -216,7 +216,7 @@ void filter_deblock_edge_luma(encoder_state_t * const encoder_state,
       int32_t dp0, dq0, dp3, dq3, d0, d3, dp, dq, d;
 
       {
-        vector2d px = {
+        vector2d_t px = {
           (dir == EDGE_HOR ? xpos + block_idx * 4 : xpos),
           (dir == EDGE_VER ? ypos + block_idx * 4 : ypos)
         };
@@ -343,7 +343,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
 
     for (blk_idx = 0; blk_idx < blocks_in_part; ++blk_idx)
     {
-      vector2d px = {
+      vector2d_t px = {
         (dir == EDGE_HOR ? x + blk_idx * 4 : x),
         (dir == EDGE_VER ? y + blk_idx * 4 : y)
       };
@@ -438,7 +438,7 @@ void filter_deblock_cu(encoder_state_t * const encoder_state, int32_t x, int32_t
  */
 void filter_deblock_lcu(encoder_state_t * const encoder_state, int x_px, int y_px)
 {
-  const vector2d lcu = { x_px / LCU_WIDTH, y_px / LCU_WIDTH };
+  const vector2d_t lcu = { x_px / LCU_WIDTH, y_px / LCU_WIDTH };
 
   filter_deblock_cu(encoder_state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_VER);
 

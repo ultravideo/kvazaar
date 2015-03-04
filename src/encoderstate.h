@@ -126,9 +126,9 @@ typedef struct lcu_order_element {
   int id;
   int index;
   struct encoder_state_t *encoder_state;
-  vector2d position;
-  vector2d position_px; //Top-left
-  vector2d size;
+  vector2d_t position;
+  vector2d_t position_px; //Top-left
+  vector2d_t size;
   int first_column;
   int first_row;
   int last_column;

@@ -502,7 +502,7 @@ int quantize_residual_trskip(
 void quantize_lcu_luma_residual(encoder_state_t * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
-  const vector2d lcu_px = {x & 0x3f, y & 0x3f};
+  const vector2d_t lcu_px = {x & 0x3f, y & 0x3f};
   const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
   if (cur_cu == NULL) {
     cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
@@ -586,7 +586,7 @@ void quantize_lcu_luma_residual(encoder_state_t * const encoder_state, int32_t x
 void quantize_lcu_chroma_residual(encoder_state_t * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
-  const vector2d lcu_px = {x & 0x3f, y & 0x3f};
+  const vector2d_t lcu_px = {x & 0x3f, y & 0x3f};
   const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
   const int8_t width = LCU_WIDTH>>depth;
   if (cur_cu == NULL) {
