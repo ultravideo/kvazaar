@@ -31,15 +31,6 @@
 #include "encoderstate.h"
 
 
-typedef struct
-{
-  double coded_level_and_dist;
-  double uncoded_dist;
-  double sig_cost;
-  double sig_cost_0;
-  int32_t nnz_before_pos0;
-} coeffgroup_rd_stats;
-
 extern const uint32_t g_go_rice_range[5];
 extern const uint32_t g_go_rice_prefix_len[5];
 

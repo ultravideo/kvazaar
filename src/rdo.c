@@ -616,7 +616,13 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
   int8_t found_last        = 0;
   int32_t cg_scanpos, scanpos_in_cg;
 
-  coeffgroup_rd_stats rd_stats;
+  struct {
+    double coded_level_and_dist;
+    double uncoded_dist;
+    double sig_cost;
+    double sig_cost_0;
+    int32_t nnz_before_pos0;
+  } rd_stats;
 
   int32_t last_x_bits[32],last_y_bits[32];
   calc_last_bits(encoder_state, width, height, type,last_x_bits, last_y_bits);
