@@ -55,7 +55,7 @@
  */
 int main(int argc, char *argv[])
 {
-  config *cfg  = NULL; //!< Global configuration
+  config_t *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   encoder_control_t encoder;

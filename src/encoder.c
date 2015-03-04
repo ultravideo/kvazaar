@@ -44,7 +44,7 @@
 #include "rdo.h"
 
 
-int encoder_control_init(encoder_control_t * const encoder, const config * const cfg) {
+int encoder_control_init(encoder_control_t * const encoder, const config_t * const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
     return 0;

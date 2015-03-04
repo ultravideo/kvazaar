@@ -471,7 +471,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  const config * const cfg = encoder_state->encoder_control->cfg;
+  const config_t * const cfg = encoder_state->encoder_control->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
