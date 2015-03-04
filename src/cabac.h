@@ -45,7 +45,7 @@ typedef struct
   int32_t    num_buffered_bytes;
   int32_t    bits_left;
   int8_t     only_count;
-  bitstream *stream;
+  bitstream_t *stream;
 
   // CONTEXTS
   struct {

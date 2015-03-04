@@ -58,7 +58,7 @@ typedef union
   bitstream_base base;
   bitstream_file file;
   bitstream_mem mem;
-} bitstream;
+} bitstream_t;
 
 typedef struct
 {
@@ -68,22 +68,22 @@ typedef struct
 
 extern const bit_table *g_exp_table;
 
-int bitstream_init(bitstream * stream, bitstream_type type);
-int bitstream_finalize(bitstream * stream);
-void bitstream_put(bitstream *stream, uint32_t data, uint8_t bits);
-int bitstream_writebyte(bitstream *stream_abstract, uint8_t byte);
-long long unsigned int bitstream_tell(const bitstream * stream);
+int bitstream_init(bitstream_t * stream, bitstream_type type);
+int bitstream_finalize(bitstream_t * stream);
+void bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
+int bitstream_writebyte(bitstream_t *stream_abstract, uint8_t byte);
+long long unsigned int bitstream_tell(const bitstream_t * stream);
 
-int bitstream_append(bitstream *dst, const bitstream *src);
-int bitstream_clear(bitstream *stream);
+int bitstream_append(bitstream_t *dst, const bitstream_t *src);
+int bitstream_clear(bitstream_t *stream);
 
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
                                          bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
 
-void bitstream_align(bitstream *stream);
-void bitstream_align_zero(bitstream *stream);
+void bitstream_align(bitstream_t *stream);
+void bitstream_align_zero(bitstream_t *stream);
 int init_exp_golomb(uint32_t len);
 void free_exp_golomb();
 

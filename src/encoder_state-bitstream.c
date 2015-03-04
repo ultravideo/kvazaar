@@ -29,7 +29,7 @@
 
 static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   uint8_t pic_type = encoder_state->global->slicetype == SLICE_I ? 0
                    : encoder_state->global->slicetype == SLICE_P ? 1
                    :                                             2;
@@ -38,7 +38,7 @@ static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state_t 
 
 static void encoder_state_write_bitstream_aud(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   encoder_state_write_bitstream_access_unit_delimiter(encoder_state);
   nal_write(stream, AUD_NUT, 0, 1);
   bitstream_align(stream);
@@ -46,7 +46,7 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const encoder_st
 
 static void encoder_state_write_bitstream_PTL(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   int i;
   // PTL
   // Profile Tier
@@ -86,7 +86,7 @@ static void encoder_state_write_bitstream_PTL(encoder_state_t * const encoder_st
 
 static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   int i;
 #ifdef _DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
@@ -123,7 +123,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
 static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const encoder_state)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
@@ -180,7 +180,7 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const e
 
 static void encoder_state_write_bitstream_VUI(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   const encoder_control_t * const encoder = encoder_state->encoder_control;
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
@@ -281,7 +281,7 @@ static void encoder_state_write_bitstream_VUI(encoder_state_t * const encoder_st
 
 static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   const encoder_control_t * encoder = encoder_state->encoder_control;
 
 #ifdef _DEBUG
@@ -386,7 +386,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
 static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const encoder_state)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
@@ -467,7 +467,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * co
 static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const encoder_state)
 {
 #define STR_BUF_LEN 1000
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
@@ -526,7 +526,7 @@ static void encoder_state_entry_points_explore(const encoder_state_t * const enc
   }
 }
 
-static void encoder_state_write_bitstream_entry_points_write(bitstream * const stream, const encoder_state_t * const encoder_state, const int num_entry_points, const int write_length, int * const r_count) {
+static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const stream, const encoder_state_t * const encoder_state, const int num_entry_points, const int write_length, int * const r_count) {
   int i;
   for (i = 0; encoder_state->children[i].encoder_control; ++i) {
     if (encoder_state->children[i].is_leaf) {
@@ -555,7 +555,7 @@ static int num_bitcount(unsigned int n) {
 void encoder_state_write_bitstream_slice_header(encoder_state_t * const encoder_state)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
 
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
@@ -647,7 +647,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const encoder_
  */
 static void add_checksum(encoder_state_t * const encoder_state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &encoder_state->stream;
   const videoframe_t * const frame = encoder_state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
@@ -675,7 +675,7 @@ static void add_checksum(encoder_state_t * const encoder_state)
 
 static void encoder_state_write_bitstream_main(encoder_state_t * const main_state) {
   const encoder_control_t * const encoder = main_state->encoder_control;
-  bitstream * const stream = &main_state->stream;
+  bitstream_t * const stream = &main_state->stream;
   uint64_t curpos;
   int i;
   

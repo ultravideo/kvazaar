@@ -113,7 +113,7 @@ void free_exp_golomb()
 /**
  * \brief Initialize a new bitstream
  */
-int bitstream_init(bitstream * const stream, const bitstream_type type) {
+int bitstream_init(bitstream_t * const stream, const bitstream_type type) {
   switch (type) {
     case BITSTREAM_TYPE_MEMORY:
       stream->mem.allocated_length = 0;
@@ -142,7 +142,7 @@ int bitstream_init(bitstream * const stream, const bitstream_type type) {
  * \brief Finalize bitstream internal structures
  */
 
-int bitstream_finalize(bitstream * const stream) {
+int bitstream_finalize(bitstream_t * const stream) {
   switch (stream->base.type) {
     case BITSTREAM_TYPE_MEMORY:
       FREE_POINTER(stream->mem.output_data);
@@ -170,7 +170,7 @@ int bitstream_finalize(bitstream * const stream) {
  * \param byte byte to write
  * \return 1 on success, 0 on failure
  */
-int bitstream_writebyte(bitstream * const stream, const uint8_t byte) {
+int bitstream_writebyte(bitstream_t * const stream, const uint8_t byte) {
   switch (stream->base.type) {
     case BITSTREAM_TYPE_FILE:
       if (fwrite(&byte, 1, 1, stream->file.output) != 1) {
@@ -209,7 +209,7 @@ int bitstream_writebyte(bitstream * const stream, const uint8_t byte) {
  * \param stream pointer bitstream
  * \return position
  */
-long long unsigned int bitstream_tell(const bitstream * const stream) {
+long long unsigned int bitstream_tell(const bitstream_t * const stream) {
   long long unsigned int position;
   
   switch (stream->base.type) {
@@ -229,7 +229,7 @@ long long unsigned int bitstream_tell(const bitstream * const stream) {
   return position*8 + stream->base.cur_bit;
 }
 
-int bitstream_append(bitstream * const dst, const bitstream * const src) {
+int bitstream_append(bitstream_t * const dst, const bitstream_t * const src) {
   int i;
   
   switch(src->base.type) {
@@ -246,7 +246,7 @@ int bitstream_append(bitstream * const dst, const bitstream * const src) {
   return 1;
 }
 
-int bitstream_clear(bitstream * const bitstream) {
+int bitstream_clear(bitstream_t * const bitstream) {
   switch(bitstream->base.type) {
     case BITSTREAM_TYPE_MEMORY:
       bitstream->mem.output_length = 0;
@@ -265,7 +265,7 @@ int bitstream_clear(bitstream * const bitstream) {
  * \param data input data
  * \param bits number of bits to write from data to stream
  */
-void bitstream_put(bitstream * const stream, const uint32_t data, uint8_t bits)
+void bitstream_put(bitstream_t * const stream, const uint32_t data, uint8_t bits)
 {
   const uint8_t emulation_prevention_three_byte = 0x03;
   while(bits--) {
@@ -296,7 +296,7 @@ void bitstream_put(bitstream * const stream, const uint32_t data, uint8_t bits)
 /**
  * \brief Align the bitstream with one-bit padding
  */
-void bitstream_align(bitstream * const stream)
+void bitstream_align(bitstream_t * const stream)
 {
   bitstream_put(stream, 1, 1);
   if ((stream->base.cur_bit & 7) != 0) {
@@ -307,7 +307,7 @@ void bitstream_align(bitstream * const stream)
 /**
  * \brief Align the bitstream with zero
  */
-void bitstream_align_zero(bitstream * const stream)
+void bitstream_align_zero(bitstream_t * const stream)
 {
   if ((stream->base.cur_bit & 7) != 0) {
     bitstream_put(stream, 0, 8 - (stream->base.cur_bit & 7));

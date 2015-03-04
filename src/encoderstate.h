@@ -161,7 +161,7 @@ typedef struct encoder_state_t {
   lcu_order_element *lcu_order;
   uint32_t lcu_order_count;
   
-  bitstream stream;
+  bitstream_t stream;
   cabac_data cabac;
   
   int stats_done;

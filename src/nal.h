@@ -94,7 +94,7 @@ enum {
 
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
-void nal_write(bitstream * const bitstream, const uint8_t nal_type,
+void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
                const uint8_t temporal_id, const int long_start_code);
 void image_checksum(const image *im,
                       unsigned char checksum_out[][SEI_HASH_MAX_LENGTH]);
