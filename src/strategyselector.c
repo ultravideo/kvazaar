@@ -34,14 +34,14 @@
 hardware_flags g_hardware_flags;
 
 static void set_hardware_flags(int32_t cpuid);
-static void* strategyselector_choose_for(const strategy_list * const strategies, const char * const strategy_type);
+static void* strategyselector_choose_for(const strategy_list_t * const strategies, const char * const strategy_type);
 
 //Strategies to include (add new file here)
 
 //Returns 1 if successful
 int strategyselector_init(int32_t cpuid) {
   const strategy_to_select *cur_strategy_to_select = strategies_to_select;
-  strategy_list strategies;
+  strategy_list_t strategies;
   
   strategies.allocated = 0;
   strategies.count = 0;
@@ -94,7 +94,7 @@ void strategyselector_free() {
 
 //Returns 1 if successful, 0 otherwise
 int strategyselector_register(void * const opaque, const char * const type, const char * const strategy_name, int priority, void * const fptr) {
-  strategy_list * const strategies = opaque;
+  strategy_list_t * const strategies = opaque;
   
   if (strategies->allocated == strategies->count) {
     strategy_t* new_strategies = realloc(strategies->strategies, sizeof(strategy_t) * (strategies->allocated + STRATEGY_LIST_ALLOC_SIZE));
@@ -120,7 +120,7 @@ int strategyselector_register(void * const opaque, const char * const type, cons
   return 1;
 }
 
-static void* strategyselector_choose_for(const strategy_list * const strategies, const char * const strategy_type) {
+static void* strategyselector_choose_for(const strategy_list_t * const strategies, const char * const strategy_type) {
   unsigned int max_priority = 0;
   int max_priority_i = -1;
   char buffer[256];

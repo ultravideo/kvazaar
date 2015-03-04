@@ -102,7 +102,7 @@ typedef struct {
   unsigned int count;
   unsigned int allocated;
   strategy_t* strategies;
-} strategy_list;
+} strategy_list_t;
 
 #define STRATEGY_LIST_ALLOC_SIZE 16
 

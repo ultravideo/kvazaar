@@ -22,7 +22,7 @@
 #include "src/strategyselector.h"
 
 
-strategy_list strategies;
+strategy_list_t strategies;
 
 
 void init_test_strategies()
