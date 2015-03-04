@@ -51,13 +51,13 @@ typedef struct
   uint8_t* output_data;
   uint32_t output_length;
   uint32_t allocated_length;
-} bitstream_mem;
+} bitstream_mem_t;
 
 typedef union
 {
   bitstream_base_t base;
   bitstream_file file;
-  bitstream_mem mem;
+  bitstream_mem_t mem;
 } bitstream_t;
 
 typedef struct
