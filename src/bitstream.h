@@ -64,9 +64,9 @@ typedef struct
 {
   uint8_t len;
   uint32_t value;
-} bit_table;
+} bit_table_t;
 
-extern const bit_table *g_exp_table;
+extern const bit_table_t *g_exp_table;
 
 int bitstream_init(bitstream_t * stream, bitstream_type type);
 int bitstream_finalize(bitstream_t * stream);
