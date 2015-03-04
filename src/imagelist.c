@@ -37,13 +37,13 @@
  * \param size  initial array size
  * \return image_list pointer, NULL on failure
  */
-image_list * image_list_alloc(int size)
+image_list_t * image_list_alloc(int size)
 {
-  image_list *list = (image_list *)malloc(sizeof(image_list));
+  image_list_t *list = (image_list_t *)malloc(sizeof(image_list_t));
   list->size = size;
   if (size > 0) {
-    list->images = (image**)malloc(sizeof(image*) * size);
-    list->cu_arrays = (cu_array**)malloc(sizeof(cu_array*) * size);
+    list->images = (image_t**)malloc(sizeof(image_t*) * size);
+    list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*) * size);
   }
 
   list->used_size = 0;
@@ -57,11 +57,11 @@ image_list * image_list_alloc(int size)
  * \param size  new array size
  * \return 1 on success, 0 on failure
  */
-int image_list_resize(image_list *list, unsigned size)
+int image_list_resize(image_list_t *list, unsigned size)
 {
   unsigned int i;
-  image** old_images = NULL;
-  cu_array** old_cu_arrays = NULL;
+  image_t** old_images = NULL;
+  cu_array_t** old_cu_arrays = NULL;
   
   //FIXME This could be done in a simple way using realloc...
 
@@ -77,8 +77,8 @@ int image_list_resize(image_list *list, unsigned size)
   }
 
   // allocate space for the new list
-  list->images = (image**)malloc(sizeof(image*)*size);
-  list->cu_arrays = (cu_array**)malloc(sizeof(cu_array*)*size);
+  list->images = (image_t**)malloc(sizeof(image_t*)*size);
+  list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*)*size);
 
   // Copy everything from the old list to the new if needed.
   if (old_images != NULL) {
@@ -99,7 +99,7 @@ int image_list_resize(image_list *list, unsigned size)
  * \param list image_list pointer
  * \return 1 on success, 0 on failure
  */
-int image_list_destroy(image_list *list)
+int image_list_destroy(image_list_t *list)
 {
   unsigned int i;
   if (list->used_size > 0) {
@@ -125,7 +125,7 @@ int image_list_destroy(image_list *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int image_list_add(image_list *list, image* im, cu_array* cua)
+int image_list_add(image_list_t *list, image_t* im, cu_array_t* cua)
 {
   int i = 0;
   if (ATOMIC_INC(&(im->refcount)) == 1) {
@@ -162,7 +162,7 @@ int image_list_add(image_list *list, image* im, cu_array* cua)
  * \param n index to remove
  * \return 1 on success
  */
-int image_list_rem(image_list * const list, const unsigned n)
+int image_list_rem(image_list_t * const list, const unsigned n)
 {
   // Must be within list boundaries
   if (n >= list->used_size)
@@ -202,7 +202,7 @@ int image_list_rem(image_list * const list, const unsigned n)
   return 1;
 }
 
-int image_list_copy_contents(image_list *target, image_list *source) {
+int image_list_copy_contents(image_list_t *target, image_list_t *source) {
   int i;
   while (target->used_size > 0) {
     image_list_rem(target, 0);

@@ -170,13 +170,13 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 
  ** Only for luma
  */
-uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
+uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel_t *pred, pixel_t *orig_block, int width, int8_t mode, int tr_depth)
 {
-    const encoder_control * const encoder = encoder_state->encoder_control;
-    coefficient pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    const encoder_control_t * const encoder = encoder_state->encoder_control;
+    coeff_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
-    coefficient temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    coeff_t temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
     int8_t luma_scan_mode = SCAN_DIAG;
 
     int i = 0,x,y;
@@ -225,12 +225,12 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode)
+int32_t get_coeff_cost(const encoder_state_t * const current_encoder_state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode)
 {
   int32_t cost = 0;
   int i;
   int found = 0;
-  encoder_state temp_encoder;
+  encoder_state_t temp_encoder;
 
   // Make sure there are coeffs present
   for(i = 0; i < width*width; i++) {
@@ -243,7 +243,7 @@ int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coeffi
   if(!found) return 0;
 
   // Store cabac state and contexts
-  memcpy(&temp_encoder,current_encoder_state,sizeof(encoder_state));
+  memcpy(&temp_encoder,current_encoder_state,sizeof(encoder_state_t));
 
   // Clear bytes and bits and set mode to "count"
   temp_encoder.cabac.only_count = 1;
@@ -270,7 +270,7 @@ int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coeffi
  * \returns cost of given absolute transform level
  * From HM 12.0
  */
-int32_t get_ic_rate  (encoder_state * const encoder_state,
+int32_t get_ic_rate  (encoder_state_t * const encoder_state,
                           uint32_t abs_level,
                           uint16_t ctx_num_one,
                           uint16_t ctx_num_abs,
@@ -280,11 +280,11 @@ int32_t get_ic_rate  (encoder_state * const encoder_state,
                           int8_t type
                           )
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   int32_t rate = 32768;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
-  cabac_ctx *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
+  cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
+  cabac_ctx_t *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
@@ -335,19 +335,19 @@ int32_t get_ic_rate  (encoder_state * const encoder_state,
  * This method calculates the best quantized transform level for a given scan position.
  * From HM 12.0
  */
-uint32_t get_coded_level ( encoder_state * const encoder_state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
+uint32_t get_coded_level ( encoder_state_t * const encoder_state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                            uint16_t abs_go_rice,
                            uint32_t c1_idx, uint32_t c2_idx,
                            int32_t q_bits,double temp, int8_t last, int8_t type)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   double cur_cost_sig   = 0;
   uint32_t best_abs_level = 0;
   int32_t abs_level;
   int32_t min_abs_level;
-  cabac_ctx* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma):(cabac->ctx.cu_sig_model_luma);
+  cabac_ctx_t* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma):(cabac->ctx.cu_sig_model_luma);
 
   if( !last && max_abs_level < 3 ) {
     *coded_cost_sig = encoder_state->global->cur_lambda_cost * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 0);
@@ -388,7 +388,7 @@ uint32_t get_coded_level ( encoder_state * const encoder_state, double *coded_co
  *
  * From HM 12.0
 */
-static double get_rate_last(const encoder_state * const encoder_state,
+static double get_rate_last(const encoder_state_t * const encoder_state,
                             const uint32_t  pos_x, const uint32_t pos_y,
                             int32_t* last_x_bits, int32_t* last_y_bits)
 {
@@ -404,16 +404,16 @@ static double get_rate_last(const encoder_state * const encoder_state,
   return encoder_state->global->cur_lambda_cost*uiCost;
 }
 
-static void calc_last_bits(encoder_state * const encoder_state, int32_t width, int32_t height, int8_t type,
+static void calc_last_bits(encoder_state_t * const encoder_state, int32_t width, int32_t height, int8_t type,
                            int32_t* last_x_bits, int32_t* last_y_bits)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   int32_t bits_x = 0, bits_y = 0;
   int32_t blk_size_offset_x, blk_size_offset_y, shiftX, shiftY;
   int32_t ctx;
 
-  cabac_ctx *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
-  cabac_ctx *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
+  cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
+  cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
   blk_size_offset_x = type ? 0: (g_convert_to_bit[ width ] *3 + ((g_convert_to_bit[ width ] +1)>>2));
   blk_size_offset_y = type ? 0: (g_convert_to_bit[ height ]*3 + ((g_convert_to_bit[ height ]+1)>>2));
@@ -435,7 +435,7 @@ static void calc_last_bits(encoder_state * const encoder_state, int32_t width, i
   last_y_bits[ctx] = bits_y;
 }
 
-void rdoq_sign_hiding(const encoder_state *const encoder_state,
+void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
                       const int32_t qp_scaled,
                       const uint32_t *const scan,
                       const int32_t delta_u[32 * 32],
@@ -443,10 +443,10 @@ void rdoq_sign_hiding(const encoder_state *const encoder_state,
                       const int32_t rate_inc_down[32 * 32],
                       const int32_t sig_rate_delta[32 * 32],
                       const int32_t width,
-                      const coefficient *const coef,
-                      coefficient *const dest_coeff)
+                      const coeff_t *const coef,
+                      coeff_t *const dest_coeff)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   const int32_t size = width * width;
   
   int64_t rd_factor = (int64_t)(
@@ -532,9 +532,9 @@ void rdoq_sign_hiding(const encoder_state *const encoder_state,
         }
 
         if (coef[minPos] >= 0) {
-          dest_coeff[minPos] += (coefficient)finalChange;
+          dest_coeff[minPos] += (coeff_t)finalChange;
         } else {
-          dest_coeff[minPos] -= (coefficient)finalChange;
+          dest_coeff[minPos] -= (coeff_t)finalChange;
         }
       }
     }
@@ -548,11 +548,11 @@ void rdoq_sign_hiding(const encoder_state *const encoder_state,
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
-void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
+void  rdoq(encoder_state_t * const encoder_state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  cabac_data * const cabac = &encoder_state->cabac;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;
   int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param   = 0;
@@ -606,9 +606,9 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   uint32_t cg_num = width * height >> 4;
   int32_t  scanpos;
 
-  cabac_ctx *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
-  cabac_ctx *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) : &(cabac->ctx.cu_sig_model_chroma[0]);
-  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) : &(cabac->ctx.cu_sig_model_chroma[0]);
+  cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
 
   double  best_cost        = 0;
   int32_t ctx_cbf          = 0;
@@ -616,7 +616,13 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
   int8_t found_last        = 0;
   int32_t cg_scanpos, scanpos_in_cg;
 
-  coeffgroup_rd_stats rd_stats;
+  struct {
+    double coded_level_and_dist;
+    double uncoded_dist;
+    double sig_cost;
+    double sig_cost_0;
+    int32_t nnz_before_pos0;
+  } rd_stats;
 
   int32_t last_x_bits[32],last_y_bits[32];
   calc_last_bits(encoder_state, width, height, type,last_x_bits, last_y_bits);
@@ -663,7 +669,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
       err               = (double)level_double;
       cost_coeff0[ scanpos ]  = err * err * temp;
       block_uncoded_cost      += cost_coeff0[ scanpos ];
-      dest_coeff[ blkpos ] = (coefficient)max_abs_level;
+      dest_coeff[ blkpos ] = (coeff_t)max_abs_level;
 
       if ( max_abs_level > 0 && last_scanpos < 0 ) {
         last_scanpos             = scanpos;
@@ -705,7 +711,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
           }
         }
 
-        dest_coeff[blkpos] = (coefficient)level;
+        dest_coeff[blkpos] = (coeff_t)level;
         base_cost         += cost_coeff[scanpos];
 
         base_level = (c1_idx < C1FLAG_NUMBER) ? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
@@ -824,7 +830,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
     best_cost  = block_uncoded_cost +   encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
     base_cost +=   encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
-    cabac_ctx* base_cbf_model = type?(cabac->ctx.qt_cbf_model_chroma):(cabac->ctx.qt_cbf_model_luma);
+    cabac_ctx_t* base_cbf_model = type?(cabac->ctx.qt_cbf_model_chroma):(cabac->ctx.qt_cbf_model_luma);
     ctx_cbf   = ( type ? tr_depth : !tr_depth);
     best_cost  = block_uncoded_cost +  encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
@@ -870,7 +876,7 @@ void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *
     int32_t blkPos = scan[ scanpos ];
     int32_t level  = dest_coeff[ blkPos ];
     abs_sum += level;
-    dest_coeff[ blkPos ] = (coefficient)(( coef[ blkPos ] < 0 ) ? -level : level);
+    dest_coeff[ blkPos ] = (coeff_t)(( coef[ blkPos ] < 0 ) ? -level : level);
   }
 
   //===== clean uncoded coefficients =====

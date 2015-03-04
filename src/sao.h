@@ -37,7 +37,7 @@ typedef enum { SAO_EO0 = 0, SAO_EO1, SAO_EO2, SAO_EO3, SAO_NUM_EO } sao_eo_class
 typedef enum { SAO_EO_CAT0 = 0, SAO_EO_CAT1, SAO_EO_CAT2, SAO_EO_CAT3, SAO_EO_CAT4, NUM_SAO_EDGE_CATEGORIES } sao_eo_cat;
 
 
-typedef struct sao_info_struct {
+typedef struct sao_info_t {
   sao_type type;
   sao_eo_class eo_class;
   int ddistortion;
@@ -45,7 +45,7 @@ typedef struct sao_info_struct {
   int merge_up_flag;
   int band_position[2];
   int offsets[NUM_SAO_EDGE_CATEGORIES * 2];
-} sao_info;
+} sao_info_t;
 
 #define CHECKPOINT_SAO_INFO(prefix_str, sao) CHECKPOINT(prefix_str " type=%d eo_class=%d ddistortion=%d " \
   "merge_left_flag=%d merge_up_flag=%d band_position=%d " \
@@ -55,12 +55,12 @@ typedef struct sao_info_struct {
   (sao).offsets[0], (sao).offsets[1], (sao).offsets[2], (sao).offsets[3], (sao).offsets[4])
 
 
-void init_sao_info(sao_info *sao);
-void sao_search_chroma(const encoder_state * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
-void sao_search_luma(const encoder_state * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
-void sao_reconstruct(const encoder_control * encoder, videoframe *frame, const pixel *old_rec,
+void init_sao_info(sao_info_t *sao);
+void sao_search_chroma(const encoder_state_t * encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3]);
+void sao_search_luma(const encoder_state_t * encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3]);
+void sao_reconstruct(const encoder_control_t * encoder, videoframe_t *frame, const pixel_t *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
-                     const sao_info *sao, color_index color_i);
-void sao_reconstruct_frame(encoder_state *encoder_state);
+                     const sao_info_t *sao, color_t color_i);
+void sao_reconstruct_frame(encoder_state_t *encoder_state);
 
 #endif

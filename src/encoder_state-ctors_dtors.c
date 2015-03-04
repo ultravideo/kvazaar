@@ -25,7 +25,7 @@
 #include "encoderstate.h"
 
 
-static int encoder_state_config_global_init(encoder_state * const encoder_state) {
+static int encoder_state_config_global_init(encoder_state_t * const encoder_state) {
   encoder_state->global->ref = image_list_alloc(MAX_REF_PIC_COUNT);
   if(!encoder_state->global->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
@@ -37,15 +37,15 @@ static int encoder_state_config_global_init(encoder_state * const encoder_state)
   return 1;
 }
 
-static void encoder_state_config_global_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_global_finalize(encoder_state_t * const encoder_state) {
   image_list_destroy(encoder_state->global->ref);
 }
 
-static int encoder_state_config_tile_init(encoder_state * const encoder_state, 
+static int encoder_state_config_tile_init(encoder_state_t * const encoder_state, 
                                           const int lcu_offset_x, const int lcu_offset_y,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   encoder_state->tile->frame = videoframe_alloc(width, height, 0);
   
   encoder_state->tile->frame->rec = NULL;
@@ -64,9 +64,9 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   
   // Init coeff data table
   //FIXME: move them
-  encoder_state->tile->frame->coeff_y = MALLOC(coefficient, width * height);
-  encoder_state->tile->frame->coeff_u = MALLOC(coefficient, (width * height) >> 2);
-  encoder_state->tile->frame->coeff_v = MALLOC(coefficient, (width * height) >> 2);
+  encoder_state->tile->frame->coeff_y = MALLOC(coeff_t, width * height);
+  encoder_state->tile->frame->coeff_u = MALLOC(coeff_t, (width * height) >> 2);
+  encoder_state->tile->frame->coeff_v = MALLOC(coeff_t, (width * height) >> 2);
   
   encoder_state->tile->lcu_offset_x = lcu_offset_x;
   encoder_state->tile->lcu_offset_y = lcu_offset_y;
@@ -86,7 +86,8 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   }
   
   if (encoder->wpp) {
-    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job*, encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
+    int num_jobs = encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu;
+    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
     if (!encoder_state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
       return 0;
@@ -99,7 +100,7 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   return 1;
 }
 
-static void encoder_state_config_tile_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_tile_finalize(encoder_state_t * const encoder_state) {
   if (encoder_state->tile->hor_buf_before_sao) yuv_t_free(encoder_state->tile->hor_buf_before_sao);
   
   yuv_t_free(encoder_state->tile->hor_buf_search);
@@ -114,7 +115,7 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
   FREE_POINTER(encoder_state->tile->wf_jobs);
 }
 
-static int encoder_state_config_slice_init(encoder_state * const encoder_state, 
+static int encoder_state_config_slice_init(encoder_state_t * const encoder_state, 
                                           const int start_address_in_ts, const int end_address_in_ts) {
   int i = 0, slice_found=0;
   for (i = 0; i < encoder_state->encoder_control->slice_count; ++i) {
@@ -134,27 +135,27 @@ static int encoder_state_config_slice_init(encoder_state * const encoder_state,
   return 1;
 }
 
-static void encoder_state_config_slice_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_slice_finalize(encoder_state_t * const encoder_state) {
   //Nothing to do (yet?)
 }
 
-static int encoder_state_config_wfrow_init(encoder_state * const encoder_state, 
+static int encoder_state_config_wfrow_init(encoder_state_t * const encoder_state, 
                                           const int lcu_offset_y) {
   
   encoder_state->wfrow->lcu_offset_y = lcu_offset_y;
   return 1;
 }
 
-static void encoder_state_config_wfrow_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_wfrow_finalize(encoder_state_t * const encoder_state) {
   //Nothing to do (yet?)
 }
 
 #ifdef _DEBUG
-static void encoder_state_dump_graphviz(const encoder_state * const encoder_state) {
+static void encoder_state_dump_graphviz(const encoder_state_t * const encoder_state) {
   int i;
   
   if (!encoder_state->parent) {
-    const encoder_control * const encoder = encoder_state->encoder_control;
+    const encoder_control_t * const encoder = encoder_state->encoder_control;
     int y,x;
     //Empty lines (easier to copy-paste)
     printf("\n\n\n\n\n");
@@ -272,7 +273,7 @@ static void encoder_state_dump_graphviz(const encoder_state * const encoder_stat
 }
 #endif //_DEBUG
 
-int encoder_state_init(encoder_state * const child_state, encoder_state * const parent_state) {
+int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
   //We require that, if parent_state is NULL:
   //child_state->encoder_control is set
   //
@@ -284,32 +285,32 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   //child_state->wfrow
   
   child_state->parent = parent_state;
-  child_state->children = MALLOC(encoder_state, 1);
+  child_state->children = MALLOC(encoder_state_t, 1);
   child_state->children[0].encoder_control = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
   child_state->stats_done = 1; //It avoids printing meaningless stats at the beginning
   
   if (!parent_state) {
-    const encoder_control * const encoder = child_state->encoder_control;
+    const encoder_control_t * const encoder = child_state->encoder_control;
     child_state->type = ENCODER_STATE_TYPE_MAIN;
     assert(child_state->encoder_control);
-    child_state->global = MALLOC(encoder_state_config_global, 1);
+    child_state->global = MALLOC(encoder_state_config_global_t, 1);
     if (!child_state->global || !encoder_state_config_global_init(child_state)) {
       fprintf(stderr, "Could not initialize encoder_state->global!\n");
       return 0;
     }
-    child_state->tile = MALLOC(encoder_state_config_tile, 1);
+    child_state->tile = MALLOC(encoder_state_config_tile_t, 1);
     if (!child_state->tile || !encoder_state_config_tile_init(child_state, 0, 0, encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu)) {
       fprintf(stderr, "Could not initialize encoder_state->tile!\n");
       return 0;
     }
-    child_state->slice = MALLOC(encoder_state_config_slice, 1);
+    child_state->slice = MALLOC(encoder_state_config_slice_t, 1);
     if (!child_state->slice || !encoder_state_config_slice_init(child_state, 0, encoder->in.width_in_lcu * encoder->in.height_in_lcu - 1)) {
       fprintf(stderr, "Could not initialize encoder_state->slice!\n");
       return 0;
     }
-    child_state->wfrow = MALLOC(encoder_state_config_wfrow, 1);
+    child_state->wfrow = MALLOC(encoder_state_config_wfrow_t, 1);
     if (!child_state->wfrow || !encoder_state_config_wfrow_init(child_state, 0)) {
       fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
       return 0;
@@ -343,7 +344,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   
   //Create sub-encoders
   {
-    const encoder_control * const encoder = child_state->encoder_control;
+    const encoder_control_t * const encoder = child_state->encoder_control;
     int child_count = 0;
     //We first check the type of this element.
     //If it's a MAIN, it can allow both slices or tiles as child
@@ -392,7 +393,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
     range_start = start_in_ts;
     //printf("%c-%p: start_in_ts=%d, end_in_ts=%d\n",child_state->type, child_state, start_in_ts, end_in_ts);
     while (range_start < end_in_ts && (children_allow_slice || children_allow_tile)) {
-      encoder_state *new_child = NULL;
+      encoder_state_t *new_child = NULL;
       int range_end_slice = range_start; //Will be incremented to get the range of the "thing"
       int range_end_tile = range_start; //Will be incremented to get the range of the "thing"
       
@@ -422,7 +423,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         new_child->global = child_state->global;
         new_child->tile = child_state->tile;
         new_child->wfrow = child_state->wfrow;
-        new_child->slice = MALLOC(encoder_state_config_slice, 1);
+        new_child->slice = MALLOC(encoder_state_config_slice_t, 1);
         if (!new_child->slice || !encoder_state_config_slice_init(new_child, range_start, range_end_slice)) {
           fprintf(stderr, "Could not initialize encoder_state->slice!\n");
           return 0;
@@ -446,7 +447,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
         new_child->encoder_control = encoder;
         new_child->type = ENCODER_STATE_TYPE_TILE;
         new_child->global = child_state->global;
-        new_child->tile = MALLOC(encoder_state_config_tile, 1);
+        new_child->tile = MALLOC(encoder_state_config_tile_t, 1);
         new_child->slice = child_state->slice;
         new_child->wfrow = child_state->wfrow;
         
@@ -457,7 +458,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       }
       
       if (new_child) {
-        child_state->children = realloc(child_state->children, sizeof(encoder_state) * (2+child_count));
+        child_state->children = realloc(child_state->children, sizeof(encoder_state_t) * (2+child_count));
         child_state->children[1+child_count].encoder_control = NULL;
         if (!child_state->children) {
           fprintf(stderr, "Failed to allocate memory for children...\n");
@@ -520,18 +521,18 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       //FIXME Do the same kind of check if we implement slice segments
     
       child_count = num_rows;
-      child_state->children = realloc(child_state->children, sizeof(encoder_state) * (num_rows + 1));
+      child_state->children = realloc(child_state->children, sizeof(encoder_state_t) * (num_rows + 1));
       child_state->children[num_rows].encoder_control = NULL;
       
       for (i=0; i < num_rows; ++i) {
-        encoder_state *new_child = &child_state->children[i];
+        encoder_state_t *new_child = &child_state->children[i];
         
         new_child->encoder_control = encoder;
         new_child->type = ENCODER_STATE_TYPE_WAVEFRONT_ROW;
         new_child->global = child_state->global;
         new_child->tile = child_state->tile;
         new_child->slice = child_state->slice;
-        new_child->wfrow = MALLOC(encoder_state_config_wfrow, 1);
+        new_child->wfrow = MALLOC(encoder_state_config_wfrow_t, 1);
         
         if (!new_child->wfrow || !encoder_state_config_wfrow_init(new_child, i)) {
           fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
@@ -569,7 +570,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       }
       
       child_state->lcu_order_count = lcu_end - lcu_start;
-      child_state->lcu_order = MALLOC(lcu_order_element, child_state->lcu_order_count);
+      child_state->lcu_order = MALLOC(lcu_order_element_t, child_state->lcu_order_count);
       assert(child_state->lcu_order);
       
       for (i = 0; i < child_state->lcu_order_count; ++i) {
@@ -656,7 +657,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   return 1;
 }
 
-void encoder_state_finalize(encoder_state * const encoder_state) {
+void encoder_state_finalize(encoder_state_t * const encoder_state) {
   if (encoder_state->children) {
     int i=0;
     for (i = 0; encoder_state->children[i].encoder_control; ++i) {

@@ -29,12 +29,12 @@
 
 // Forward declare because including the header would lead  to a cyclic
 // dependency.
-struct encoder_state;
+struct encoder_state_t;
 
 
-int encoder_state_init(struct encoder_state * child_state, struct encoder_state * parent_state);
-void encoder_state_finalize(struct encoder_state *encoder_state);
-void encoder_state_init_lambda(struct encoder_state *encoder_state);
+int encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
+void encoder_state_finalize(struct encoder_state_t *encoder_state);
+void encoder_state_init_lambda(struct encoder_state_t *encoder_state);
 
 
 #endif // ENCODER_STATE_CTORS_DTORS_H_

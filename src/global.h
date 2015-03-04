@@ -48,11 +48,11 @@
 #define PIXEL_MAX ((1 << BIT_DEPTH) - 1)
 
 #if BIT_DEPTH == 8
-typedef uint8_t pixel;
+typedef uint8_t pixel_t;
 #else
-typedef uint16_t pixel;
+typedef uint16_t pixel_t;
 #endif
-typedef int16_t coefficient;
+typedef int16_t coeff_t;
 
 //#define VERBOSE 1
 
@@ -205,7 +205,7 @@ typedef int16_t coefficient;
 #define _DEBUG_PERF_SEARCH_PIXELS 0x0040
 
 //Constants
-typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_index;
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_t;
 enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
 
 #endif
