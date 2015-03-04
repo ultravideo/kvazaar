@@ -161,7 +161,7 @@ static uint32_t get_mvd_coding_cost(vector2d *mvd)
   return bitcost;
 }
 
-static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y, int mv_shift,
+static int calc_mvd_cost(const encoder_state_t * const encoder_state, int x, int y, int mv_shift,
                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
@@ -227,7 +227,7 @@ static int calc_mvd_cost(const encoder_state * const encoder_state, int x, int y
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static unsigned hexagon_search(const encoder_state * const encoder_state, unsigned depth,
+static unsigned hexagon_search(const encoder_state_t * const encoder_state, unsigned depth,
                                const image *pic, const image *ref,
                                const vector2d *orig, vector2d *mv_in_out,
                                int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
@@ -479,7 +479,7 @@ static unsigned search_mv_full(unsigned depth,
  * Algoritm first searches 1/2-pel positions around integer mv and after best match is found,
  * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
  */
-static unsigned search_frac( const encoder_state * const encoder_state,
+static unsigned search_frac( const encoder_state_t * const encoder_state,
         unsigned depth,
         const image *pic, const image *ref,
         const vector2d *orig, vector2d *mv_in_out,
@@ -612,7 +612,7 @@ static unsigned search_frac( const encoder_state * const encoder_state,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static int search_cu_inter(const encoder_state * const encoder_state, int x, int y, int depth, lcu_t *lcu)
+static int search_cu_inter(const encoder_state_t * const encoder_state, int x, int y, int depth, lcu_t *lcu)
 {
   const videoframe * const frame = encoder_state->tile->frame;
   uint32_t ref_idx = 0;
@@ -932,7 +932,7 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info *cu
 * Takes into account SSD of reconstruction and the cost of encoding whatever
 * prediction unit data needs to be coded.
 */
-static double cu_rd_cost_luma(const encoder_state *const encoder_state,
+static double cu_rd_cost_luma(const encoder_state_t *const encoder_state,
   const int x_px, const int y_px, const int depth,
   const cu_info *const pred_cu,
   lcu_t *const lcu)
@@ -1007,7 +1007,7 @@ static double cu_rd_cost_luma(const encoder_state *const encoder_state,
 }
 
 
-static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
+static double cu_rd_cost_chroma(const encoder_state_t *const encoder_state,
   const int x_px, const int y_px, const int depth,
   const cu_info *const pred_cu,
   lcu_t *const lcu)
@@ -1096,7 +1096,7 @@ static double cu_rd_cost_chroma(const encoder_state *const encoder_state,
 * \param intra_mode  Intra prediction mode.
 * \param cost_treshold  RD cost at which search can be stopped.
 */
-static double search_intra_trdepth(encoder_state * const encoder_state,
+static double search_intra_trdepth(encoder_state_t * const encoder_state,
   int x_px, int y_px, int depth, int max_depth,
   int intra_mode, int cost_treshold,
   cu_info *const pred_cu,
@@ -1231,7 +1231,7 @@ static double search_intra_trdepth(encoder_state * const encoder_state,
 }
 
 
-static double luma_mode_bits(const encoder_state *encoder_state, int8_t luma_mode, const int8_t *intra_preds)
+static double luma_mode_bits(const encoder_state_t *encoder_state, int8_t luma_mode, const int8_t *intra_preds)
 {
   double mode_bits;
 
@@ -1255,7 +1255,7 @@ static double luma_mode_bits(const encoder_state *encoder_state, int8_t luma_mod
 }
 
 
-static double chroma_mode_bits(const encoder_state *encoder_state, int8_t chroma_mode, int8_t luma_mode)
+static double chroma_mode_bits(const encoder_state_t *encoder_state, int8_t chroma_mode, int8_t luma_mode)
 {
   const cabac_ctx *ctx = &(encoder_state->cabac.ctx.chroma_pred_model[0]);
   double mode_bits;
@@ -1269,7 +1269,7 @@ static double chroma_mode_bits(const encoder_state *encoder_state, int8_t chroma
 }
 
 
-static int8_t search_intra_chroma(encoder_state * const encoder_state,
+static int8_t search_intra_chroma(encoder_state_t * const encoder_state,
                                 int x_px, int y_px, int depth,
                                 int8_t intra_mode,
                                 int8_t modes[5], int8_t num_modes,
@@ -1362,7 +1362,7 @@ static INLINE int8_t select_best_mode(const int8_t *modes, const double *costs, 
  * \return  Estimated RD cost of the reconstruction and signaling the
  *     coefficients of the residual.
  */
-static double get_cost(encoder_state * const encoder_state, 
+static double get_cost(encoder_state_t * const encoder_state, 
                        pixel *pred, pixel *orig_block,
                        cost_pixel_nxn_func *satd_func,
                        cost_pixel_nxn_func *sad_func,
@@ -1390,7 +1390,7 @@ static double get_cost(encoder_state * const encoder_state,
 }
 
 
-static void search_intra_chroma_rough(encoder_state * const encoder_state,
+static void search_intra_chroma_rough(encoder_state_t * const encoder_state,
                                       int x_px, int y_px, int depth,
                                       const pixel *orig_u, const pixel *orig_v, int16_t origstride,
                                       const pixel *rec_u, const pixel *rec_v, int16_t recstride,
@@ -1463,7 +1463,7 @@ static void search_intra_chroma_rough(encoder_state * const encoder_state,
  *
  * \return  Number of prediction modes in param modes.
  */
-static int8_t search_intra_rough(encoder_state * const encoder_state, 
+static int8_t search_intra_rough(encoder_state_t * const encoder_state, 
                                  pixel *orig, int32_t origstride,
                                  pixel *rec, int16_t recstride,
                                  int width, int8_t *intra_preds,
@@ -1626,7 +1626,7 @@ static int8_t search_intra_rough(encoder_state * const encoder_state,
  * \param[out] lcu  If transform split searching is used, the transform split
  *     information for the best mode is saved in lcu.cu structure.
  */
-static int8_t search_intra_rdo(encoder_state * const encoder_state, 
+static int8_t search_intra_rdo(encoder_state_t * const encoder_state, 
                              int x_px, int y_px, int depth,
                              pixel *orig, int32_t origstride,
                              pixel *rec, int16_t recstride,
@@ -1737,7 +1737,7 @@ static int8_t search_intra_rdo(encoder_state * const encoder_state,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-static double search_cu_intra(encoder_state * const encoder_state,
+static double search_cu_intra(encoder_state_t * const encoder_state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
@@ -1835,7 +1835,7 @@ static double search_cu_intra(encoder_state * const encoder_state,
 }
 
 // Return estimate of bits used to code prediction mode of cur_cu.
-static double calc_mode_bits(const encoder_state *encoder_state,
+static double calc_mode_bits(const encoder_state_t *encoder_state,
                              const cu_info * cur_cu,
                              int x, int y)
 {
@@ -1879,7 +1879,7 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
  * - All the final data for the LCU gets eventually copied to depth 0, which
  *   will be the final output of the recursion.
  */
-static double search_cu(encoder_state * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
+static double search_cu(encoder_state_t * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
   const encoder_control* ctrl = encoder_state->encoder_control;
   const videoframe * const frame = encoder_state->tile->frame;
@@ -2147,7 +2147,7 @@ static double search_cu(encoder_state * const encoder_state, int x, int y, int d
  * - Copy reference pixels from neighbouring LCUs.
  * - Copy reference pixels from this LCU.
  */
-static void init_lcu_t(const encoder_state * const encoder_state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
+static void init_lcu_t(const encoder_state_t * const encoder_state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
   const videoframe * const frame = encoder_state->tile->frame;
   
@@ -2239,7 +2239,7 @@ static void init_lcu_t(const encoder_state * const encoder_state, const int x, c
 /**
  * Copy CU and pixel data to it's place in picture datastructure.
  */
-static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x_px, int y_px, const lcu_t *lcu)
+static void copy_lcu_to_cu_data(const encoder_state_t * const encoder_state, int x_px, int y_px, const lcu_t *lcu)
 {
   // Copy non-reference CUs to picture.
   {
@@ -2291,7 +2291,7 @@ static void copy_lcu_to_cu_data(const encoder_state * const encoder_state, int x
  * Search LCU for modes.
  * - Best mode gets copied to current picture.
  */
-void search_lcu(encoder_state * const encoder_state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
+void search_lcu(encoder_state_t * const encoder_state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
 {
   lcu_t work_tree[MAX_PU_DEPTH + 1];
   int depth;

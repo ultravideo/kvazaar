@@ -200,7 +200,7 @@ void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
  * \param slice type of slice we are coding (P/B/I)
  */
 
-void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
+void init_contexts(encoder_state_t *encoder_state, int8_t QP, int8_t slice)
 {
   cabac_data * const cabac = &encoder_state->cabac;
   uint16_t i;
@@ -276,7 +276,7 @@ void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
   }
 }
 
-void context_copy(encoder_state * const target_encoder_state, const encoder_state * const source_encoder_state) {
+void context_copy(encoder_state_t * const target_encoder_state, const encoder_state_t * const source_encoder_state) {
   cabac_data * const target_cabac = &target_encoder_state->cabac;
   const cabac_data * const source_cabac = &source_encoder_state->cabac;
   

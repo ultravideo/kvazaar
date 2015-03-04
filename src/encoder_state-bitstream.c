@@ -27,7 +27,7 @@
 #include "nal.h"
 
 
-static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   uint8_t pic_type = encoder_state->global->slicetype == SLICE_I ? 0
@@ -36,7 +36,7 @@ static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state * 
   WRITE_U(stream, pic_type, 3, "pic_type");
 }
 
-static void encoder_state_write_bitstream_aud(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_aud(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   encoder_state_write_bitstream_access_unit_delimiter(encoder_state);
@@ -44,7 +44,7 @@ static void encoder_state_write_bitstream_aud(encoder_state * const encoder_stat
   bitstream_align(stream);
 }
 
-static void encoder_state_write_bitstream_PTL(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_PTL(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   int i;
@@ -84,7 +84,7 @@ static void encoder_state_write_bitstream_PTL(encoder_state * const encoder_stat
   // end PTL
 }
 
-static void encoder_state_write_bitstream_vid_parameter_set(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   int i;
@@ -120,7 +120,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "vps_extension_flag");
 }
 
-static void encoder_state_write_bitstream_scaling_list(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
@@ -178,7 +178,7 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state * const enc
 }
 
 
-static void encoder_state_write_bitstream_VUI(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_VUI(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -279,7 +279,7 @@ static void encoder_state_write_bitstream_VUI(encoder_state * const encoder_stat
   //ENDIF
 }
 
-static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   const encoder_control * encoder = encoder_state->encoder_control;
@@ -383,7 +383,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "sps_extension_flag");
 }
 
-static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
@@ -464,7 +464,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "pps_extension_flag");
 }
 
-static void encoder_state_write_bitstream_prefix_sei_version(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const encoder_state)
 {
 #define STR_BUF_LEN 1000
   bitstream * const stream = &encoder_state->stream;
@@ -511,7 +511,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state * con
 #undef STR_BUF_LEN
 }
 
-static void encoder_state_entry_points_explore(const encoder_state * const encoder_state, int * const r_count, int * const r_max_length) {
+static void encoder_state_entry_points_explore(const encoder_state_t * const encoder_state, int * const r_count, int * const r_max_length) {
   int i;
   for (i = 0; encoder_state->children[i].encoder_control; ++i) {
     if (encoder_state->children[i].is_leaf) {
@@ -526,7 +526,7 @@ static void encoder_state_entry_points_explore(const encoder_state * const encod
   }
 }
 
-static void encoder_state_write_bitstream_entry_points_write(bitstream * const stream, const encoder_state * const encoder_state, const int num_entry_points, const int write_length, int * const r_count) {
+static void encoder_state_write_bitstream_entry_points_write(bitstream * const stream, const encoder_state_t * const encoder_state, const int num_entry_points, const int write_length, int * const r_count) {
   int i;
   for (i = 0; encoder_state->children[i].encoder_control; ++i) {
     if (encoder_state->children[i].is_leaf) {
@@ -552,7 +552,7 @@ static int num_bitcount(unsigned int n) {
   return ((n == 0) ? (-1) : pos);
 }
 
-void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_state)
+void encoder_state_write_bitstream_slice_header(encoder_state_t * const encoder_state)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
@@ -645,7 +645,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
  * \param encoder The encoder.
  * \returns Void
  */
-static void add_checksum(encoder_state * const encoder_state)
+static void add_checksum(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
   const videoframe * const frame = encoder_state->tile->frame;
@@ -673,7 +673,7 @@ static void add_checksum(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
-static void encoder_state_write_bitstream_main(encoder_state * const main_state) {
+static void encoder_state_write_bitstream_main(encoder_state_t * const main_state) {
   const encoder_control * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
   uint64_t curpos;
@@ -768,7 +768,7 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   fflush(main_state->stream.file.output);
 }
 
-void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
+void encoder_state_write_bitstream_leaf(encoder_state_t * const encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
   //Write terminator of the leaf
   assert(encoder_state->is_leaf);
@@ -794,10 +794,10 @@ void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
 
 
 void encoder_state_worker_write_bitstream_leaf(void * opaque) {
-  encoder_state_write_bitstream_leaf((encoder_state *) opaque);
+  encoder_state_write_bitstream_leaf((encoder_state_t *) opaque);
 }
 
-static void encoder_state_write_bitstream_tile(encoder_state * const main_state) {
+static void encoder_state_write_bitstream_tile(encoder_state_t * const main_state) {
   //If it's not a leaf, a tile is "nothing". We only have to write sub elements
   int i;
   for (i = 0; main_state->children[i].encoder_control; ++i) {
@@ -806,7 +806,7 @@ static void encoder_state_write_bitstream_tile(encoder_state * const main_state)
   }
 }
 
-static void encoder_state_write_bitstream_slice(encoder_state * const main_state) {
+static void encoder_state_write_bitstream_slice(encoder_state_t * const main_state) {
   int i;
   encoder_state_write_bitstream_slice_header(main_state);
   bitstream_align(&main_state->stream); 
@@ -818,11 +818,11 @@ static void encoder_state_write_bitstream_slice(encoder_state * const main_state
 }
 
 
-void encoder_state_write_bitstream(encoder_state * const main_state) {
+void encoder_state_write_bitstream(encoder_state_t * const main_state) {
   int i;
   if (!main_state->is_leaf) {
     for (i=0; main_state->children[i].encoder_control; ++i) {
-      encoder_state *sub_state = &(main_state->children[i]);
+      encoder_state_t *sub_state = &(main_state->children[i]);
       encoder_state_write_bitstream(sub_state);
     }
     
@@ -844,6 +844,6 @@ void encoder_state_write_bitstream(encoder_state * const main_state) {
 }
 
 void encoder_state_worker_write_bitstream(void * opaque) {
-  encoder_state_write_bitstream((encoder_state *) opaque);
+  encoder_state_write_bitstream((encoder_state_t *) opaque);
 }
 

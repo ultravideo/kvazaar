@@ -164,7 +164,7 @@ INLINE void filter_deblock_chroma(const encoder_control * const encoder, pixel *
 /**
  * \brief
  */
-void filter_deblock_edge_luma(encoder_state * const encoder_state,
+void filter_deblock_edge_luma(encoder_state_t * const encoder_state,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
@@ -289,7 +289,7 @@ void filter_deblock_edge_luma(encoder_state * const encoder_state,
 /**
  * \brief
  */
-void filter_deblock_edge_chroma(encoder_state * const encoder_state,
+void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
                                 int32_t x, int32_t y,
                                 int8_t depth, int8_t dir)
 {
@@ -384,7 +384,7 @@ void filter_deblock_edge_chroma(encoder_state * const encoder_state,
  * until the coded block size has been achived. Calls luma and chroma filtering
  * functions for each coded CU size.
  */
-void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y, int8_t depth, int32_t edge)
+void filter_deblock_cu(encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
   const videoframe * const frame = encoder_state->tile->frame;
   const cu_info *cur_cu = videoframe_get_cu_const(frame, x, y);
@@ -436,7 +436,7 @@ void filter_deblock_cu(encoder_state * const encoder_state, int32_t x, int32_t y
  * - After vertical filtering the left edge, filter the last 4 pixels of
  *   horizontal edges in the LCU to the left.
  */
-void filter_deblock_lcu(encoder_state * const encoder_state, int x_px, int y_px)
+void filter_deblock_lcu(encoder_state_t * const encoder_state, int x_px, int y_px)
 {
   const vector2d lcu = { x_px / LCU_WIDTH, y_px / LCU_WIDTH };
 

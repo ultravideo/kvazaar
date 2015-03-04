@@ -315,7 +315,7 @@ int main(int argc, char *argv[])
   
   //Now, do the real stuff
   {
-    encoder_state *encoder_states = malloc((encoder.owf + 1) * sizeof(encoder_state));
+    encoder_state_t *encoder_states = malloc((encoder.owf + 1) * sizeof(encoder_state_t));
     if (encoder_states == NULL) {
       fprintf(stderr, "Failed to allocate memory.");
       goto exit_failure;

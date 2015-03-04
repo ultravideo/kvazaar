@@ -170,7 +170,7 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 
  ** Only for luma
  */
-uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
+uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
 {
     const encoder_control * const encoder = encoder_state->encoder_control;
     coefficient pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
@@ -225,12 +225,12 @@ uint32_t rdo_cost_intra(encoder_state * const encoder_state, pixel *pred, pixel 
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode)
+int32_t get_coeff_cost(const encoder_state_t * const current_encoder_state, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode)
 {
   int32_t cost = 0;
   int i;
   int found = 0;
-  encoder_state temp_encoder;
+  encoder_state_t temp_encoder;
 
   // Make sure there are coeffs present
   for(i = 0; i < width*width; i++) {
@@ -243,7 +243,7 @@ int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coeffi
   if(!found) return 0;
 
   // Store cabac state and contexts
-  memcpy(&temp_encoder,current_encoder_state,sizeof(encoder_state));
+  memcpy(&temp_encoder,current_encoder_state,sizeof(encoder_state_t));
 
   // Clear bytes and bits and set mode to "count"
   temp_encoder.cabac.only_count = 1;
@@ -270,7 +270,7 @@ int32_t get_coeff_cost(const encoder_state * const current_encoder_state, coeffi
  * \returns cost of given absolute transform level
  * From HM 12.0
  */
-int32_t get_ic_rate  (encoder_state * const encoder_state,
+int32_t get_ic_rate  (encoder_state_t * const encoder_state,
                           uint32_t abs_level,
                           uint16_t ctx_num_one,
                           uint16_t ctx_num_abs,
@@ -335,7 +335,7 @@ int32_t get_ic_rate  (encoder_state * const encoder_state,
  * This method calculates the best quantized transform level for a given scan position.
  * From HM 12.0
  */
-uint32_t get_coded_level ( encoder_state * const encoder_state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
+uint32_t get_coded_level ( encoder_state_t * const encoder_state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                            uint16_t abs_go_rice,
@@ -388,7 +388,7 @@ uint32_t get_coded_level ( encoder_state * const encoder_state, double *coded_co
  *
  * From HM 12.0
 */
-static double get_rate_last(const encoder_state * const encoder_state,
+static double get_rate_last(const encoder_state_t * const encoder_state,
                             const uint32_t  pos_x, const uint32_t pos_y,
                             int32_t* last_x_bits, int32_t* last_y_bits)
 {
@@ -404,7 +404,7 @@ static double get_rate_last(const encoder_state * const encoder_state,
   return encoder_state->global->cur_lambda_cost*uiCost;
 }
 
-static void calc_last_bits(encoder_state * const encoder_state, int32_t width, int32_t height, int8_t type,
+static void calc_last_bits(encoder_state_t * const encoder_state, int32_t width, int32_t height, int8_t type,
                            int32_t* last_x_bits, int32_t* last_y_bits)
 {
   cabac_data * const cabac = &encoder_state->cabac;
@@ -435,7 +435,7 @@ static void calc_last_bits(encoder_state * const encoder_state, int32_t width, i
   last_y_bits[ctx] = bits_y;
 }
 
-void rdoq_sign_hiding(const encoder_state *const encoder_state,
+void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
                       const int32_t qp_scaled,
                       const uint32_t *const scan,
                       const int32_t delta_u[32 * 32],
@@ -548,7 +548,7 @@ void rdoq_sign_hiding(const encoder_state *const encoder_state,
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
-void  rdoq(encoder_state * const encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
+void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;

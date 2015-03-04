@@ -75,7 +75,7 @@ void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t de
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state * const encoder_state, const image * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_state_t * const encoder_state, const image * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -398,7 +398,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(const encoder_state * const encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
+void inter_get_mv_cand(const encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;

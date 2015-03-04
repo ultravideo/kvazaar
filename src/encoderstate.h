@@ -125,7 +125,7 @@ typedef struct lcu_order_element {
   //This it used for leaf of the encoding tree. All is relative to the tile.
   int id;
   int index;
-  struct encoder_state *encoder_state;
+  struct encoder_state_t *encoder_state;
   vector2d position;
   vector2d position_px; //Top-left
   vector2d size;
@@ -140,17 +140,17 @@ typedef struct lcu_order_element {
   struct lcu_order_element *right;
 } lcu_order_element;
 
-typedef struct encoder_state {
+typedef struct encoder_state_t {
   const encoder_control *encoder_control;
   encoder_state_type type;
 
   //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
   //Use for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-  struct encoder_state *children;
-  struct encoder_state *parent;
+  struct encoder_state_t *children;
+  struct encoder_state_t *parent;
   
   //Pointer to the encoder_state of the previous frame
-  struct encoder_state *previous_encoder_state;
+  struct encoder_state_t *previous_encoder_state;
   
   encoder_state_config_global *global;
   encoder_state_config_tile   *tile;
@@ -170,32 +170,32 @@ typedef struct encoder_state {
   //Jobs to wait for
   threadqueue_job * tqj_recon_done; //Reconstruction is done
   threadqueue_job * tqj_bitstream_written; //Bitstream is written
-} encoder_state;
+} encoder_state_t;
 
 
 
-void encode_one_frame(encoder_state *encoder_state);
-int read_one_frame(FILE* file, const encoder_state *encoder);
+void encode_one_frame(encoder_state_t *encoder_state);
+int read_one_frame(FILE* file, const encoder_state_t *encoder);
 
-void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length);
-void encoder_next_frame(encoder_state *encoder_state);
+void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length);
+void encoder_next_frame(encoder_state_t *encoder_state);
 
 
-void encode_coding_tree(encoder_state *encoder, uint16_t x_ctb,
+void encode_coding_tree(encoder_state_t *encoder, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
-void encode_last_significant_xy(encoder_state *encoder,
+void encode_last_significant_xy(encoder_state_t *encoder,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan);
-void encode_coeff_nxn(encoder_state *encoder, int16_t *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state_t *encoder, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void encode_transform_coeff(encoder_state *encoder_state, int32_t x_cu, int32_t y_cu,
+void encode_transform_coeff(encoder_state_t *encoder_state, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
-int encoder_state_match_children_of_previous_frame(encoder_state * const encoder_state);
+int encoder_state_match_children_of_previous_frame(encoder_state_t * const encoder_state);
 
 coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth);
 

@@ -133,7 +133,7 @@ void itransform2d(const encoder_control * const encoder, int16_t *block, int16_t
  * \brief quantize transformed coefficents
  *
  */
-void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
+void quant(const encoder_state_t * const encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
            int32_t height, int8_t type, int8_t scan_idx, int8_t block_type )
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
@@ -262,7 +262,7 @@ void quant(const encoder_state * const encoder_state, int16_t *coef, int16_t *q_
  * \brief inverse quantize transformed and quantized coefficents
  *
  */
-void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
+void dequant(const encoder_state_t * const encoder_state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
   const encoder_control * const encoder = encoder_state->encoder_control;
   int32_t shift,add,coeff_q;
@@ -322,7 +322,7 @@ void dequant(const encoder_state * const encoder_state, int16_t *q_coef, int16_t
  *
  * \returns  Whether coeff_out contains any non-zero coefficients.
  */
-int quantize_residual(encoder_state *const encoder_state,
+int quantize_residual(encoder_state_t *const encoder_state,
                       const cu_info *const cur_cu, const int width, const color_index color,
                       const coeff_scan_order_t scan_order, const int use_trskip, 
                       const int in_stride, const int out_stride,
@@ -436,7 +436,7 @@ int quantize_residual(encoder_state *const encoder_state,
  * \returns  Whether coeff_out contains any non-zero coefficients.
  */
 int quantize_residual_trskip(
-    encoder_state *const encoder_state,
+    encoder_state_t *const encoder_state,
     const cu_info *const cur_cu, const int width, const color_index color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
@@ -499,7 +499,7 @@ int quantize_residual_trskip(
  * - lcu->cbf  coded block flags for the area
  * - lcu->cu.intra[].tr_skip  for the area
  */
-void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info *cur_cu, lcu_t* lcu)
+void quantize_lcu_luma_residual(encoder_state_t * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info *cur_cu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};
@@ -583,7 +583,7 @@ void quantize_lcu_luma_residual(encoder_state * const encoder_state, int32_t x, 
 }
 
 
-void quantize_lcu_chroma_residual(encoder_state * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info *cur_cu, lcu_t* lcu)
+void quantize_lcu_chroma_residual(encoder_state_t * const encoder_state, int32_t x, int32_t y, const uint8_t depth, cu_info *cur_cu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   const vector2d lcu_px = {x & 0x3f, y & 0x3f};

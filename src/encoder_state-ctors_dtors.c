@@ -25,7 +25,7 @@
 #include "encoderstate.h"
 
 
-static int encoder_state_config_global_init(encoder_state * const encoder_state) {
+static int encoder_state_config_global_init(encoder_state_t * const encoder_state) {
   encoder_state->global->ref = image_list_alloc(MAX_REF_PIC_COUNT);
   if(!encoder_state->global->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
@@ -37,11 +37,11 @@ static int encoder_state_config_global_init(encoder_state * const encoder_state)
   return 1;
 }
 
-static void encoder_state_config_global_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_global_finalize(encoder_state_t * const encoder_state) {
   image_list_destroy(encoder_state->global->ref);
 }
 
-static int encoder_state_config_tile_init(encoder_state * const encoder_state, 
+static int encoder_state_config_tile_init(encoder_state_t * const encoder_state, 
                                           const int lcu_offset_x, const int lcu_offset_y,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
@@ -99,7 +99,7 @@ static int encoder_state_config_tile_init(encoder_state * const encoder_state,
   return 1;
 }
 
-static void encoder_state_config_tile_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_tile_finalize(encoder_state_t * const encoder_state) {
   if (encoder_state->tile->hor_buf_before_sao) yuv_t_free(encoder_state->tile->hor_buf_before_sao);
   
   yuv_t_free(encoder_state->tile->hor_buf_search);
@@ -114,7 +114,7 @@ static void encoder_state_config_tile_finalize(encoder_state * const encoder_sta
   FREE_POINTER(encoder_state->tile->wf_jobs);
 }
 
-static int encoder_state_config_slice_init(encoder_state * const encoder_state, 
+static int encoder_state_config_slice_init(encoder_state_t * const encoder_state, 
                                           const int start_address_in_ts, const int end_address_in_ts) {
   int i = 0, slice_found=0;
   for (i = 0; i < encoder_state->encoder_control->slice_count; ++i) {
@@ -134,23 +134,23 @@ static int encoder_state_config_slice_init(encoder_state * const encoder_state,
   return 1;
 }
 
-static void encoder_state_config_slice_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_slice_finalize(encoder_state_t * const encoder_state) {
   //Nothing to do (yet?)
 }
 
-static int encoder_state_config_wfrow_init(encoder_state * const encoder_state, 
+static int encoder_state_config_wfrow_init(encoder_state_t * const encoder_state, 
                                           const int lcu_offset_y) {
   
   encoder_state->wfrow->lcu_offset_y = lcu_offset_y;
   return 1;
 }
 
-static void encoder_state_config_wfrow_finalize(encoder_state * const encoder_state) {
+static void encoder_state_config_wfrow_finalize(encoder_state_t * const encoder_state) {
   //Nothing to do (yet?)
 }
 
 #ifdef _DEBUG
-static void encoder_state_dump_graphviz(const encoder_state * const encoder_state) {
+static void encoder_state_dump_graphviz(const encoder_state_t * const encoder_state) {
   int i;
   
   if (!encoder_state->parent) {
@@ -272,7 +272,7 @@ static void encoder_state_dump_graphviz(const encoder_state * const encoder_stat
 }
 #endif //_DEBUG
 
-int encoder_state_init(encoder_state * const child_state, encoder_state * const parent_state) {
+int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
   //We require that, if parent_state is NULL:
   //child_state->encoder_control is set
   //
@@ -284,7 +284,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   //child_state->wfrow
   
   child_state->parent = parent_state;
-  child_state->children = MALLOC(encoder_state, 1);
+  child_state->children = MALLOC(encoder_state_t, 1);
   child_state->children[0].encoder_control = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
@@ -392,7 +392,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
     range_start = start_in_ts;
     //printf("%c-%p: start_in_ts=%d, end_in_ts=%d\n",child_state->type, child_state, start_in_ts, end_in_ts);
     while (range_start < end_in_ts && (children_allow_slice || children_allow_tile)) {
-      encoder_state *new_child = NULL;
+      encoder_state_t *new_child = NULL;
       int range_end_slice = range_start; //Will be incremented to get the range of the "thing"
       int range_end_tile = range_start; //Will be incremented to get the range of the "thing"
       
@@ -457,7 +457,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       }
       
       if (new_child) {
-        child_state->children = realloc(child_state->children, sizeof(encoder_state) * (2+child_count));
+        child_state->children = realloc(child_state->children, sizeof(encoder_state_t) * (2+child_count));
         child_state->children[1+child_count].encoder_control = NULL;
         if (!child_state->children) {
           fprintf(stderr, "Failed to allocate memory for children...\n");
@@ -520,11 +520,11 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
       //FIXME Do the same kind of check if we implement slice segments
     
       child_count = num_rows;
-      child_state->children = realloc(child_state->children, sizeof(encoder_state) * (num_rows + 1));
+      child_state->children = realloc(child_state->children, sizeof(encoder_state_t) * (num_rows + 1));
       child_state->children[num_rows].encoder_control = NULL;
       
       for (i=0; i < num_rows; ++i) {
-        encoder_state *new_child = &child_state->children[i];
+        encoder_state_t *new_child = &child_state->children[i];
         
         new_child->encoder_control = encoder;
         new_child->type = ENCODER_STATE_TYPE_WAVEFRONT_ROW;
@@ -656,7 +656,7 @@ int encoder_state_init(encoder_state * const child_state, encoder_state * const 
   return 1;
 }
 
-void encoder_state_finalize(encoder_state * const encoder_state) {
+void encoder_state_finalize(encoder_state_t * const encoder_state) {
   if (encoder_state->children) {
     int i=0;
     for (i = 0; encoder_state->children[i].encoder_control; ++i) {

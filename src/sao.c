@@ -55,7 +55,7 @@ static int sao_calc_eo_cat(pixel a, pixel b, pixel c)
 }
 
 
-int sao_band_ddistortion(const encoder_state * const encoder_state, const pixel *orig_data, const pixel *rec_data,
+int sao_band_ddistortion(const encoder_state_t * const encoder_state, const pixel *orig_data, const pixel *rec_data,
                          int block_width, int block_height,
                          int band_pos, int sao_bands[4])
 {
@@ -119,7 +119,7 @@ void init_sao_info(sao_info *sao) {
 }
 
 
-static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_info *sao_top, sao_info *sao_left)
+static float sao_mode_bits_none(const encoder_state_t * const encoder_state, sao_info *sao_top, sao_info *sao_left)
 {
   float mode_bits = 0.0;
   const cabac_data * const cabac = &encoder_state->cabac;
@@ -141,7 +141,7 @@ static float sao_mode_bits_none(const encoder_state * const encoder_state, sao_i
   return mode_bits;
 }
 
-static float sao_mode_bits_merge(const encoder_state * const encoder_state,
+static float sao_mode_bits_merge(const encoder_state_t * const encoder_state,
                                  int8_t merge_cand) {
   float mode_bits = 0.0;
   const cabac_data * const cabac = &encoder_state->cabac;
@@ -156,7 +156,7 @@ static float sao_mode_bits_merge(const encoder_state * const encoder_state,
 }
 
 
-static float sao_mode_bits_edge(const encoder_state * const encoder_state,
+static float sao_mode_bits_edge(const encoder_state_t * const encoder_state,
                               int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
@@ -196,7 +196,7 @@ static float sao_mode_bits_edge(const encoder_state * const encoder_state,
 }
 
 
-static float sao_mode_bits_band(const encoder_state * const encoder_state,
+static float sao_mode_bits_band(const encoder_state_t * const encoder_state,
                               int band_position[2], int offsets[10],
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
@@ -326,7 +326,7 @@ static int calc_sao_band_offsets(int sao_bands[2][32], int offsets[4],
  * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
  * \param sao_bands an array of bands for original and reconstructed block
  */
-static void calc_sao_bands(const encoder_state * const encoder_state, const pixel *orig_data, const pixel *rec_data,
+static void calc_sao_bands(const encoder_state_t * const encoder_state, const pixel *orig_data, const pixel *rec_data,
                            int block_width, int block_height,
                            int sao_bands[2][32])
 {
@@ -592,7 +592,7 @@ void sao_reconstruct(const encoder_control * const encoder, videoframe * frame, 
 
 
 
-static void sao_search_edge_sao(const encoder_state * const encoder_state, 
+static void sao_search_edge_sao(const encoder_state_t * const encoder_state, 
                                 const pixel * data[], const pixel * recdata[],
                                 int block_width, int block_height,
                                 unsigned buf_cnt,
@@ -671,7 +671,7 @@ static void sao_search_edge_sao(const encoder_state * const encoder_state,
 }
 
 
-static void sao_search_band_sao(const encoder_state * const encoder_state, const pixel * data[], const pixel * recdata[],
+static void sao_search_band_sao(const encoder_state_t * const encoder_state, const pixel * data[], const pixel * recdata[],
                                int block_width, int block_height,
                                unsigned buf_cnt,
                                sao_info *sao_out, sao_info *sao_top,
@@ -719,7 +719,7 @@ static void sao_search_band_sao(const encoder_state * const encoder_state, const
  * \param buf_cnt  Number of pointers data and recdata have.
  * \param sao_out  Output parameter for the best sao parameters.
  */
-static void sao_search_best_mode(const encoder_state * const encoder_state, const pixel * data[], const pixel * recdata[],
+static void sao_search_best_mode(const encoder_state_t * const encoder_state, const pixel * data[], const pixel * recdata[],
                                  int block_width, int block_height,
                                  unsigned buf_cnt,
                                  sao_info *sao_out, sao_info *sao_top,
@@ -824,7 +824,7 @@ static void sao_search_best_mode(const encoder_state * const encoder_state, cons
   return;
 }
 
-void sao_search_chroma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
+void sao_search_chroma(const encoder_state_t * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -860,7 +860,7 @@ void sao_search_chroma(const encoder_state * const encoder_state, const videofra
   sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
 }
 
-void sao_search_luma(const encoder_state * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
+void sao_search_luma(const encoder_state_t * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
@@ -890,7 +890,7 @@ void sao_search_luma(const encoder_state * const encoder_state, const videoframe
   sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left, merge_cost);
 }
 
-void sao_reconstruct_frame(encoder_state * const encoder_state)
+void sao_reconstruct_frame(encoder_state_t * const encoder_state)
 {
   vector2d lcu;
   videoframe * const frame = encoder_state->tile->frame;

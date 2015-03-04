@@ -63,7 +63,7 @@ int lcu_at_tile_end(const encoder_control * const encoder, int lcu_addr_in_ts) {
 }
 
 //Return 1 if the LCU is at the first row of a structure (tile or slice)
-int lcu_in_first_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+int lcu_in_first_row(const encoder_state_t * const encoder_state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y) {
@@ -83,7 +83,7 @@ int lcu_in_first_row(const encoder_state * const encoder_state, int lcu_addr_in_
 }
 
 //Return 1 if the LCU is at the first row of a structure (tile or slice)
-int lcu_in_last_row(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+int lcu_in_last_row(const encoder_state_t * const encoder_state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   if (lcu_addr_in_rs / encoder_state->encoder_control->in.width_in_lcu == encoder_state->tile->lcu_offset_y + encoder_state->tile->frame->height_in_lcu - 1) {
@@ -104,7 +104,7 @@ int lcu_in_last_row(const encoder_state * const encoder_state, int lcu_addr_in_t
 
 
 //Return 1 if the LCU is at the first column of a structure (tile or slice)
-int lcu_in_first_column(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+int lcu_in_first_column(const encoder_state_t * const encoder_state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   //First column of tile?
@@ -121,7 +121,7 @@ int lcu_in_first_column(const encoder_state * const encoder_state, int lcu_addr_
 }
 
 //Return 1 if the LCU is at the last column of a structure (tile or slice)
-int lcu_in_last_column(const encoder_state * const encoder_state, int lcu_addr_in_ts) {
+int lcu_in_last_column(const encoder_state_t * const encoder_state, int lcu_addr_in_ts) {
   const int lcu_addr_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[lcu_addr_in_ts];
 
   //First column of tile?
