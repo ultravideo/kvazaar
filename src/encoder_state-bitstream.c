@@ -122,7 +122,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
 
 static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const encoder_state)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
@@ -181,7 +181,7 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const e
 static void encoder_state_write_bitstream_VUI(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
@@ -282,7 +282,7 @@ static void encoder_state_write_bitstream_VUI(encoder_state_t * const encoder_st
 static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
-  const encoder_control * encoder = encoder_state->encoder_control;
+  const encoder_control_t * encoder = encoder_state->encoder_control;
 
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
@@ -385,7 +385,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
 
 static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const encoder_state)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
@@ -554,7 +554,7 @@ static int num_bitcount(unsigned int n) {
 
 void encoder_state_write_bitstream_slice_header(encoder_state_t * const encoder_state)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   bitstream * const stream = &encoder_state->stream;
 
 #ifdef _DEBUG
@@ -674,7 +674,7 @@ static void add_checksum(encoder_state_t * const encoder_state)
 }
 
 static void encoder_state_write_bitstream_main(encoder_state_t * const main_state) {
-  const encoder_control * const encoder = main_state->encoder_control;
+  const encoder_control_t * const encoder = main_state->encoder_control;
   bitstream * const stream = &main_state->stream;
   uint64_t curpos;
   int i;
@@ -769,7 +769,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const main_stat
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state_t * const encoder_state) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   //Write terminator of the leaf
   assert(encoder_state->is_leaf);
   

@@ -24,7 +24,7 @@
 
 
 
-int lcu_at_slice_start(const encoder_control * const encoder, int lcu_addr_in_ts) {
+int lcu_at_slice_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   int i;
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == 0) return 1;
@@ -34,7 +34,7 @@ int lcu_at_slice_start(const encoder_control * const encoder, int lcu_addr_in_ts
   return 0;
 }
 
-int lcu_at_slice_end(const encoder_control * const encoder, int lcu_addr_in_ts) {
+int lcu_at_slice_end(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   int i;
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
@@ -44,7 +44,7 @@ int lcu_at_slice_end(const encoder_control * const encoder, int lcu_addr_in_ts) 
   return 0;
 }
 
-int lcu_at_tile_start(const encoder_control * const encoder, int lcu_addr_in_ts) {
+int lcu_at_tile_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == 0) return 1;
   if (encoder->tiles_tile_id[lcu_addr_in_ts - 1] != encoder->tiles_tile_id[lcu_addr_in_ts]) {
@@ -53,7 +53,7 @@ int lcu_at_tile_start(const encoder_control * const encoder, int lcu_addr_in_ts)
   return 0;
 }
 
-int lcu_at_tile_end(const encoder_control * const encoder, int lcu_addr_in_ts) {
+int lcu_at_tile_end(const encoder_control_t * const encoder, int lcu_addr_in_ts) {
   assert(lcu_addr_in_ts >= 0 && lcu_addr_in_ts < encoder->in.height_in_lcu * encoder->in.width_in_lcu);
   if (lcu_addr_in_ts == encoder->in.height_in_lcu * encoder->in.width_in_lcu - 1) return 1;
   if (encoder->tiles_tile_id[lcu_addr_in_ts + 1] != encoder->tiles_tile_id[lcu_addr_in_ts]) {

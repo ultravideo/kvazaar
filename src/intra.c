@@ -222,7 +222,7 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
  * \param recstride  Stride for rec pixel arrays.
  * \param dst
  */
-void intra_get_pred(const encoder_control * const encoder, const pixel *rec, const pixel *rec_filtered, int recstride, pixel *dst, int width, int mode, int is_chroma)
+void intra_get_pred(const encoder_control_t * const encoder, const pixel *rec, const pixel *rec_filtered, int recstride, pixel *dst, int width, int mode, int is_chroma)
 {
   const pixel *ref_pixels = rec;
   if (is_chroma || mode == 1 || width == 4) {
@@ -271,7 +271,7 @@ void intra_get_pred(const encoder_control * const encoder, const pixel *rec, con
  * \param chroma chroma-block flag
 
 */
-void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(const encoder_control_t * const encoder, pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
 {
   pixel pred[LCU_WIDTH * LCU_WIDTH];
   pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
@@ -303,7 +303,7 @@ void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recs
  * The end result is 2*width+8 x 2*width+8 array, with only the top and left
  * edge pixels filled with the reconstructed pixels.
  */
-void intra_build_reference_border(const encoder_control * const encoder, int32_t x_luma, int32_t y_luma, int16_t out_width,
+void intra_build_reference_border(const encoder_control_t * const encoder, int32_t x_luma, int32_t y_luma, int16_t out_width,
                                       pixel *dst, int32_t dst_stride, int8_t chroma,
                                       int32_t pic_width, int32_t pic_height,
                                       lcu_t *lcu)
@@ -484,7 +484,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(const encoder_control * const encoder, const pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
+void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
 {
   int32_t k,l;
   int32_t blk_size        = width;
@@ -659,7 +659,7 @@ void intra_get_planar_pred(const pixel* src, int32_t srcstride, uint32_t width, 
 
 void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
   if (cur_cu == NULL) {
     cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
@@ -708,7 +708,7 @@ void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, i
 
 void intra_recon_lcu_chroma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);

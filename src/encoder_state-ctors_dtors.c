@@ -45,7 +45,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const encoder_state,
                                           const int lcu_offset_x, const int lcu_offset_y,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   encoder_state->tile->frame = videoframe_alloc(width, height, 0);
   
   encoder_state->tile->frame->rec = NULL;
@@ -154,7 +154,7 @@ static void encoder_state_dump_graphviz(const encoder_state_t * const encoder_st
   int i;
   
   if (!encoder_state->parent) {
-    const encoder_control * const encoder = encoder_state->encoder_control;
+    const encoder_control_t * const encoder = encoder_state->encoder_control;
     int y,x;
     //Empty lines (easier to copy-paste)
     printf("\n\n\n\n\n");
@@ -291,7 +291,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
   child_state->stats_done = 1; //It avoids printing meaningless stats at the beginning
   
   if (!parent_state) {
-    const encoder_control * const encoder = child_state->encoder_control;
+    const encoder_control_t * const encoder = child_state->encoder_control;
     child_state->type = ENCODER_STATE_TYPE_MAIN;
     assert(child_state->encoder_control);
     child_state->global = MALLOC(encoder_state_config_global, 1);
@@ -343,7 +343,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
   
   //Create sub-encoders
   {
-    const encoder_control * const encoder = child_state->encoder_control;
+    const encoder_control_t * const encoder = child_state->encoder_control;
     int child_count = 0;
     //We first check the type of this element.
     //If it's a MAIN, it can allow both slices or tiles as child

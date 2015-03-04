@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
   config *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
-  encoder_control encoder;
+  encoder_control_t encoder;
   double psnr[3] = { 0.0, 0.0, 0.0 };
   uint32_t stat_frames = 0;
   uint64_t curpos = 0;

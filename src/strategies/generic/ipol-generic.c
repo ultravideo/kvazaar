@@ -120,7 +120,7 @@ int32_t four_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_t
   return temp;
 }
 
-void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
@@ -211,7 +211,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control * const encoder,
  * \param dst_stride stride of destination image
  *
  */
-void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_halfpel_chroma_generic(const encoder_control_t * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
   * | B0,0|ae0,0|
@@ -272,7 +272,7 @@ void filter_inter_halfpel_chroma_generic(const encoder_control * const encoder, 
   }
 }
 
-void filter_inter_octpel_chroma_generic(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_octpel_chroma_generic(const encoder_control_t * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;

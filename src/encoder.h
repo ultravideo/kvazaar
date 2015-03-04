@@ -47,7 +47,7 @@ typedef struct
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 
 /* Encoder control options, the main struct */
-typedef struct encoder_control
+typedef struct encoder_control_t
 {
   /* Configuration */
   const config *cfg;
@@ -148,10 +148,10 @@ typedef struct encoder_control
 
   bool sign_hiding;
 
-} encoder_control;
+} encoder_control_t;
 
-int encoder_control_init(encoder_control *encoder, const config *cfg);
-int encoder_control_finalize(encoder_control *encoder);
+int encoder_control_init(encoder_control_t *encoder, const config *cfg);
+int encoder_control_finalize(encoder_control_t *encoder);
 
-void encoder_control_input_init(encoder_control *encoder, int32_t width, int32_t height);
+void encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
 #endif

@@ -29,14 +29,14 @@
 
 // Forward declare because including the header would lead  to a cyclic
 // dependency.
-struct encoder_control;
+struct encoder_control_t;
 struct encoder_state_t;
 
 
-int lcu_at_slice_start(const struct  encoder_control * const encoder, int lcu_addr_in_ts);
-int lcu_at_slice_end(const struct  encoder_control * const encoder, int lcu_addr_in_ts);
-int lcu_at_tile_start(const struct  encoder_control * const encoder, int lcu_addr_in_ts);
-int lcu_at_tile_end(const struct  encoder_control * const encoder, int lcu_addr_in_ts);
+int lcu_at_slice_start(const struct  encoder_control_t * const encoder, int lcu_addr_in_ts);
+int lcu_at_slice_end(const struct  encoder_control_t * const encoder, int lcu_addr_in_ts);
+int lcu_at_tile_start(const struct  encoder_control_t * const encoder, int lcu_addr_in_ts);
+int lcu_at_tile_end(const struct  encoder_control_t * const encoder, int lcu_addr_in_ts);
 int lcu_in_first_row(const struct encoder_state_t * const encoder_state, int lcu_addr_in_ts);
 int lcu_in_last_row(const struct encoder_state_t * const encoder_state, int lcu_addr_in_ts);
 int lcu_in_first_column(const struct encoder_state_t * const encoder_state, int lcu_addr_in_ts);

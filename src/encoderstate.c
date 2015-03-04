@@ -221,7 +221,7 @@ static void encode_sao(encoder_state_t * const encoder_state,
 static void encoder_state_worker_encode_lcu(void * opaque) {
   const lcu_order_element * const lcu = opaque;
   encoder_state_t *encoder_state = lcu->encoder_state;
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   videoframe* const frame = encoder_state->tile->frame;
   
   //This part doesn't write to bitstream, it's only search, deblock and sao
@@ -333,7 +333,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
 }
 
 static void encoder_state_encode_leaf(encoder_state_t * const encoder_state) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   
   int i = 0;
   
@@ -656,7 +656,7 @@ static void encoder_state_new_frame(encoder_state_t * const main_state) {
   int i;
   //FIXME Move this somewhere else!
   if (main_state->type == ENCODER_STATE_TYPE_MAIN) {
-    const encoder_control * const encoder = main_state->encoder_control;
+    const encoder_control_t * const encoder = main_state->encoder_control;
     
     const int is_first_frame = (main_state->global->frame == 0);
     const int is_i_radl = (encoder->cfg->intra_period == 1 && main_state->global->frame % 2 == 0);
@@ -828,7 +828,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const encoder_state)
 }
 
 void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   
   if (encoder_state->stats_done) return;
   encoder_state->stats_done = 1;
@@ -882,7 +882,7 @@ void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, 
 
 
 void encoder_next_frame(encoder_state_t *encoder_state) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
@@ -1561,7 +1561,7 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
 void encode_coeff_nxn(encoder_state_t * const encoder_state, coefficient *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   cabac_data * const cabac = &encoder_state->cabac;
   int c1 = 1;
   uint8_t last_coeff_x = 0;

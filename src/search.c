@@ -1881,7 +1881,7 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
  */
 static double search_cu(encoder_state_t * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
-  const encoder_control* ctrl = encoder_state->encoder_control;
+  const encoder_control_t* ctrl = encoder_state->encoder_control;
   const videoframe * const frame = encoder_state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_INT;

@@ -243,7 +243,7 @@ static float sao_mode_bits_band(const encoder_state_t * const encoder_state,
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
-static void calc_sao_offset_array(const encoder_control * const encoder, const sao_info *sao, int *offset, color_index color_i)
+static void calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info *sao, int *offset, color_index color_i)
 {
   int val;
   int values = (1<<encoder->bitdepth);
@@ -375,7 +375,7 @@ static void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
   }
 }
 
-static void sao_reconstruct_color(const encoder_control * const encoder, 
+static void sao_reconstruct_color(const encoder_control_t * const encoder, 
                                   const pixel *rec_data, pixel *new_rec_data,
                                   const sao_info *sao,
                                   int stride, int new_stride,
@@ -527,7 +527,7 @@ static void sao_calc_edge_block_dims(const videoframe * const frame, color_index
   rec->x = (rec->x == 0 ? 0 : -1);
 }
 
-void sao_reconstruct(const encoder_control * const encoder, videoframe * frame, const pixel *old_rec,
+void sao_reconstruct(const encoder_control_t * const encoder, videoframe * frame, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i)
 {

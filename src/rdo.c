@@ -172,7 +172,7 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
  */
 uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
 {
-    const encoder_control * const encoder = encoder_state->encoder_control;
+    const encoder_control_t * const encoder = encoder_state->encoder_control;
     coefficient pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
@@ -446,7 +446,7 @@ void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
                       const coefficient *const coef,
                       coefficient *const dest_coeff)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   const int32_t size = width * width;
   
   int64_t rd_factor = (int64_t)(
@@ -551,7 +551,7 @@ void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
 void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   cabac_data * const cabac = &encoder_state->cabac;
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;
   int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform

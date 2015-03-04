@@ -77,7 +77,7 @@ int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset)
  * \param block output data (residual)
  * \param block_size input data (width of transform)
  */
-void transformskip(const encoder_control * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void transformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   uint32_t log2_tr_size =  g_convert_to_bit[block_size] + 2;
   int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
@@ -95,7 +95,7 @@ void transformskip(const encoder_control * const encoder, int16_t *block,int16_t
  * \param block output data (residual)
  * \param block_size width of transform
  */
-void itransformskip(const encoder_control * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
+void itransformskip(const encoder_control_t * const encoder, int16_t *block,int16_t *coeff, int8_t block_size)
 {
   uint32_t log2_tr_size =  g_convert_to_bit[block_size] + 2;
   int32_t  shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;
@@ -115,13 +115,13 @@ void itransformskip(const encoder_control * const encoder, int16_t *block,int16_
  * \param coeff transform coefficients
  * \param block_size width of transform
  */
-void transform2d(const encoder_control * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
+void transform2d(const encoder_control_t * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
 {
   dct_func *dct_func = get_dct_func(block_size, mode);  
   dct_func(encoder->bitdepth, block, coeff);
 }
 
-void itransform2d(const encoder_control * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
+void itransform2d(const encoder_control_t * const encoder, int16_t *block, int16_t *coeff, int8_t block_size, int32_t mode)
 {
   dct_func *idct_func = get_idct_func(block_size, mode);
   idct_func(encoder->bitdepth, coeff, block);
@@ -136,7 +136,7 @@ void itransform2d(const encoder_control * const encoder, int16_t *block, int16_t
 void quant(const encoder_state_t * const encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
            int32_t height, int8_t type, int8_t scan_idx, int8_t block_type )
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   const uint32_t * const scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
 
@@ -264,7 +264,7 @@ void quant(const encoder_state_t * const encoder_state, int16_t *coef, int16_t *
  */
 void dequant(const encoder_state_t * const encoder_state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   int32_t shift,add,coeff_q;
   int32_t n;
   int32_t transform_shift = 15 - encoder->bitdepth - (g_convert_to_bit[ width ] + 2);

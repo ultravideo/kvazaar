@@ -141,7 +141,7 @@ typedef struct lcu_order_element {
 } lcu_order_element;
 
 typedef struct encoder_state_t {
-  const encoder_control *encoder_control;
+  const encoder_control_t *encoder_control;
   encoder_state_type type;
 
   //List of children, the last item of this list is a pseudo-encoder with encoder_control = NULL
@@ -192,7 +192,7 @@ void encode_coeff_nxn(encoder_state_t *encoder, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
 void encode_transform_coeff(encoder_state_t *encoder_state, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
-void encode_block_residual(const encoder_control * const encoder,
+void encode_block_residual(const encoder_control_t * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const encoder_state);

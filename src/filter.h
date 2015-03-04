@@ -43,11 +43,11 @@ void filter_deblock_edge_chroma(encoder_state_t *encoder_state,
                                 int32_t xpos, int32_t ypos,
                                 int8_t depth, int8_t dir);
 void filter_deblock_lcu(encoder_state_t *encoder_state, int x_px, int y_px);
-void filter_deblock_luma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc , int8_t sw,
+void filter_deblock_luma(const encoder_control_t * const encoder, pixel *src, int32_t offset, int32_t tc , int8_t sw,
                          int8_t part_p_nofilter, int8_t part_q_nofilter,
                          int32_t thr_cut,
                          int8_t filter_second_p, int8_t filter_second_q);
-void filter_deblock_chroma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc,
+void filter_deblock_chroma(const encoder_control_t * const encoder, pixel *src, int32_t offset, int32_t tc,
                            int8_t part_p_nofilter, int8_t part_q_nofilter);
 
 // SAO

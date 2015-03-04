@@ -83,7 +83,7 @@ const int8_t g_chroma_filter[8][4] =
 /**
  * \brief
  */
-INLINE void filter_deblock_luma(const encoder_control * const encoder, pixel *src, int32_t offset,
+INLINE void filter_deblock_luma(const encoder_control_t * const encoder, pixel *src, int32_t offset,
                                 int32_t tc, int8_t sw,
                                 int8_t part_P_nofilter, int8_t part_Q_nofilter,
                                 int32_t thr_cut,
@@ -143,7 +143,7 @@ INLINE void filter_deblock_luma(const encoder_control * const encoder, pixel *sr
 /**
  * \brief
  */
-INLINE void filter_deblock_chroma(const encoder_control * const encoder, pixel *src, int32_t offset, int32_t tc,
+INLINE void filter_deblock_chroma(const encoder_control_t * const encoder, pixel *src, int32_t offset, int32_t tc,
                                   int8_t part_P_nofilter, int8_t part_Q_nofilter)
 {
   int32_t delta;
@@ -169,7 +169,7 @@ void filter_deblock_edge_luma(encoder_state_t * const encoder_state,
                               int8_t depth, int8_t dir)
 {
   const videoframe * const frame = encoder_state->tile->frame;
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   
   const cu_info *cu_q = videoframe_get_cu_const(frame, xpos>>MIN_SIZE, ypos>>MIN_SIZE);
 
@@ -293,7 +293,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
                                 int32_t x, int32_t y,
                                 int8_t depth, int8_t dir)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  const encoder_control_t * const encoder = encoder_state->encoder_control;
   const videoframe * const frame = encoder_state->tile->frame;
   const cu_info *cu_q = videoframe_get_cu_const(frame, x>>(MIN_SIZE-1), y>>(MIN_SIZE-1));
   
