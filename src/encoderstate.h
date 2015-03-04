@@ -68,7 +68,7 @@ typedef struct {
   int8_t QP;   //!< \brief Quantization parameter
   
   //Current picture available references
-  image_list *ref;
+  image_list_t *ref;
   int8_t ref_list;
   //int8_t ref_idx_num[2];
   
