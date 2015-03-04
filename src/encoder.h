@@ -104,7 +104,7 @@ typedef struct encoder_control_t
   int8_t aud_enable;
 
   //scaling list
-  scaling_list scaling_list;
+  scaling_list_t scaling_list;
   
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */
