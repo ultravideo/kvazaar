@@ -327,12 +327,12 @@ int quantize_residual(encoder_state_t *const encoder_state,
                       const coeff_scan_order_t scan_order, const int use_trskip, 
                       const int in_stride, const int out_stride,
                       const pixel *const ref_in, const pixel *const pred_in, 
-                      pixel *rec_out, coefficient *coeff_out)
+                      pixel *rec_out, coeff_t *coeff_out)
 {
   // Temporary arrays to pass data to and from quant and transform functions.
   int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  coefficient quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  coefficient coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coeff_t quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
   int has_coeffs = 0;
 
@@ -441,11 +441,11 @@ int quantize_residual_trskip(
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const pixel *const ref_in, const pixel *const pred_in, 
-    pixel *rec_out, coefficient *coeff_out)
+    pixel *rec_out, coeff_t *coeff_out)
 {
   struct {
     pixel rec[4*4];
-    coefficient coeff[4*4];
+    coeff_t coeff[4*4];
     uint32_t cost;
     int has_coeffs;
   } skip, noskip, *best;
@@ -542,7 +542,7 @@ void quantize_lcu_luma_residual(encoder_state_t * const encoder_state, int32_t x
     // Pointers to current location in arrays with reference.
     const pixel *base_y = &lcu->ref.y[luma_offset];
     // Pointers to current location in arrays with kvantized coefficients.
-    coefficient *orig_coeff_y = &lcu->coeff.y[luma_offset];
+    coeff_t *orig_coeff_y = &lcu->coeff.y[luma_offset];
 
     coeff_scan_order_t scan_idx_luma = get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
 
@@ -632,8 +632,8 @@ void quantize_lcu_chroma_residual(encoder_state_t * const encoder_state, int32_t
     pixel *recbase_v = &lcu->rec.v[chroma_offset];
     const pixel *base_u = &lcu->ref.u[chroma_offset];
     const pixel *base_v = &lcu->ref.v[chroma_offset];
-    coefficient *orig_coeff_u = &lcu->coeff.u[chroma_offset];
-    coefficient *orig_coeff_v = &lcu->coeff.v[chroma_offset];
+    coeff_t *orig_coeff_u = &lcu->coeff.u[chroma_offset];
+    coeff_t *orig_coeff_v = &lcu->coeff.v[chroma_offset];
     coeff_scan_order_t scan_idx_chroma;
     int tr_skip = 0;
     int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);

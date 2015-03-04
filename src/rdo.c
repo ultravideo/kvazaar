@@ -173,10 +173,10 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
 {
     const encoder_control_t * const encoder = encoder_state->encoder_control;
-    coefficient pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    coeff_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t block[LCU_WIDTH*LCU_WIDTH>>2];
     int16_t temp_block[LCU_WIDTH*LCU_WIDTH>>2];
-    coefficient temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
+    coeff_t temp_coeff[LCU_WIDTH*LCU_WIDTH>>2];
     int8_t luma_scan_mode = SCAN_DIAG;
 
     int i = 0,x,y;
@@ -225,7 +225,7 @@ uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel *pred, pixe
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t get_coeff_cost(const encoder_state_t * const current_encoder_state, coefficient *coeff, int32_t width, int32_t type, int8_t scan_mode)
+int32_t get_coeff_cost(const encoder_state_t * const current_encoder_state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode)
 {
   int32_t cost = 0;
   int i;
@@ -443,8 +443,8 @@ void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
                       const int32_t rate_inc_down[32 * 32],
                       const int32_t sig_rate_delta[32 * 32],
                       const int32_t width,
-                      const coefficient *const coef,
-                      coefficient *const dest_coeff)
+                      const coeff_t *const coef,
+                      coeff_t *const dest_coeff)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   const int32_t size = width * width;
@@ -532,9 +532,9 @@ void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
         }
 
         if (coef[minPos] >= 0) {
-          dest_coeff[minPos] += (coefficient)finalChange;
+          dest_coeff[minPos] += (coeff_t)finalChange;
         } else {
-          dest_coeff[minPos] -= (coefficient)finalChange;
+          dest_coeff[minPos] -= (coeff_t)finalChange;
         }
       }
     }
@@ -548,7 +548,7 @@ void rdoq_sign_hiding(const encoder_state_t *const encoder_state,
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
-void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient *dest_coeff, int32_t width,
+void  rdoq(encoder_state_t * const encoder_state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
@@ -669,7 +669,7 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
       err               = (double)level_double;
       cost_coeff0[ scanpos ]  = err * err * temp;
       block_uncoded_cost      += cost_coeff0[ scanpos ];
-      dest_coeff[ blkpos ] = (coefficient)max_abs_level;
+      dest_coeff[ blkpos ] = (coeff_t)max_abs_level;
 
       if ( max_abs_level > 0 && last_scanpos < 0 ) {
         last_scanpos             = scanpos;
@@ -711,7 +711,7 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
           }
         }
 
-        dest_coeff[blkpos] = (coefficient)level;
+        dest_coeff[blkpos] = (coeff_t)level;
         base_cost         += cost_coeff[scanpos];
 
         base_level = (c1_idx < C1FLAG_NUMBER) ? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
@@ -876,7 +876,7 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
     int32_t blkPos = scan[ scanpos ];
     int32_t level  = dest_coeff[ blkPos ];
     abs_sum += level;
-    dest_coeff[ blkPos ] = (coefficient)(( coef[ blkPos ] < 0 ) ? -level : level);
+    dest_coeff[ blkPos ] = (coeff_t)(( coef[ blkPos ] < 0 ) ? -level : level);
   }
 
   //===== clean uncoded coefficients =====

@@ -52,7 +52,7 @@ typedef uint8_t pixel;
 #else
 typedef uint16_t pixel;
 #endif
-typedef int16_t coefficient;
+typedef int16_t coeff_t;
 
 //#define VERBOSE 1
 

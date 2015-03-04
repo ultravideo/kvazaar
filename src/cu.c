@@ -29,18 +29,18 @@
 #include "threads.h"
 
 
-void coefficients_blit(const coefficient * const orig, coefficient * const dst,
+void coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
   unsigned y;
 
   for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coefficient));
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coeff_t));
   }
 }
 
-unsigned coefficients_calc_abs(const coefficient *const buf, const int buf_stride,
+unsigned coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
                         const int width)
 {
   int sum = 0;

@@ -128,9 +128,9 @@ typedef struct {
 } lcu_ref_px_t;
 
 typedef struct {
-  coefficient y[LCU_LUMA_SIZE];
-  coefficient u[LCU_CHROMA_SIZE];
-  coefficient v[LCU_CHROMA_SIZE];
+  coeff_t y[LCU_LUMA_SIZE];
+  coeff_t u[LCU_CHROMA_SIZE];
+  coeff_t v[LCU_CHROMA_SIZE];
 } lcu_coeff_t;
 
 
@@ -242,11 +242,11 @@ typedef struct {
 } while(0)
 
 
-void coefficients_blit(const coefficient *orig, coefficient *dst,
+void coefficients_blit(const coeff_t *orig, coeff_t *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
-unsigned coefficients_calc_abs(const coefficient *const buf, const int buf_stride,
+unsigned coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
                         const int width);
 
 

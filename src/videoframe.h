@@ -39,9 +39,9 @@ typedef struct videoframe
   image_t* source;         //!< \brief Source image.
   image_t* rec;            //!< \brief Reconstructed image.
   
-  coefficient* coeff_y;   //!< \brief coefficient pointer Y
-  coefficient* coeff_u;   //!< \brief coefficient pointer U
-  coefficient* coeff_v;   //!< \brief coefficient pointer V
+  coeff_t* coeff_y;   //!< \brief coefficient pointer Y
+  coeff_t* coeff_u;   //!< \brief coefficient pointer U
+  coeff_t* coeff_v;   //!< \brief coefficient pointer V
 
   int32_t width;          //!< \brief Luma pixel array width.
   int32_t height;         //!< \brief Luma pixel array height.

@@ -994,7 +994,7 @@ static double cu_rd_cost_luma(const encoder_state_t *const encoder_state,
   }
 
   {
-    coefficient coeff_temp[32 * 32];
+    coeff_t coeff_temp[32 * 32];
     int8_t luma_scan_mode = get_scan_order(pred_cu->type, pred_cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode, depth);
 
     // Code coeffs using cabac to get a better estimate of real coding costs.
@@ -1067,7 +1067,7 @@ static double cu_rd_cost_chroma(const encoder_state_t *const encoder_state,
   }
 
   {
-    coefficient coeff_temp[16 * 16];
+    coeff_t coeff_temp[16 * 16];
     int8_t scan_order = get_scan_order(pred_cu->type, pred_cu->intra[0].mode_chroma, depth);
     
     coefficients_blit(&lcu->coeff.u[(lcu_px.y*(LCU_WIDTH_C)) + lcu_px.x],

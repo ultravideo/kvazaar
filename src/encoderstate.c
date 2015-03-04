@@ -1403,9 +1403,9 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
   int y_cu = y_pu / 2;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
 
-  coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];
-  coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
-  coefficient coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
+  coeff_t coeff_y[LCU_WIDTH*LCU_WIDTH+1];
+  coeff_t coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
+  coeff_t coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
   int32_t coeff_stride = frame->width;
 
   int8_t scan_idx = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
@@ -1415,7 +1415,7 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
   if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
     int y = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
-    coefficient *orig_pos = &frame->coeff_y[x + y * frame->width];
+    coeff_t *orig_pos = &frame->coeff_y[x + y * frame->width];
     for (y = 0; y < width; y++) {
       for (x = 0; x < width; x++) {
         coeff_y[x+y*width] = orig_pos[x];
@@ -1439,7 +1439,7 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
 
   if (cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth)) {
     int x, y;
-    coefficient *orig_pos_u, *orig_pos_v;
+    coeff_t *orig_pos_u, *orig_pos_v;
 
     if (depth <= MAX_DEPTH) {
       x = x_pu * (LCU_WIDTH >> (MAX_PU_DEPTH + 1));
@@ -1558,7 +1558,7 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
   }
 }
 
-void encode_coeff_nxn(encoder_state_t * const encoder_state, coefficient *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state_t * const encoder_state, coeff_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
