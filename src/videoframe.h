@@ -29,7 +29,7 @@
 #include "cu.h"
 #include "image.h"
 
-struct sao_info_struct;
+struct sao_info_t;
 
 /**
  * \brief Struct which contains all picture data
@@ -49,8 +49,8 @@ typedef struct videoframe
   int32_t width_in_lcu;   //!< \brief Picture height in number of LCU's.
 
   cu_array_t* cu_array;     //!< \brief Info for each CU at each depth.
-  struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
-  struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
+  struct sao_info_t *sao_luma;   //!< \brief Array of sao parameters for every LCU.
+  struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count
 } videoframe_t;
 

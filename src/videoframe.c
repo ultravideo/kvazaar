@@ -62,8 +62,8 @@ videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const 
 
   frame->coeff_y = NULL; frame->coeff_u = NULL; frame->coeff_v = NULL;
 
-  frame->sao_luma = MALLOC(sao_info, frame->width_in_lcu * frame->height_in_lcu);
-  frame->sao_chroma = MALLOC(sao_info, frame->width_in_lcu * frame->height_in_lcu);
+  frame->sao_luma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
+  frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
 
   return frame;
 }

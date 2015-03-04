@@ -132,7 +132,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state,
 }
 
 
-static void encode_sao_color(encoder_state_t * const encoder_state, sao_info *sao,
+static void encode_sao_color(encoder_state_t * const encoder_state, sao_info_t *sao,
                              color_index color_i)
 {
   cabac_data_t * const cabac = &encoder_state->cabac;
@@ -184,7 +184,7 @@ static void encode_sao_color(encoder_state_t * const encoder_state, sao_info *sa
   }
 }
 
-static void encode_sao_merge_flags(encoder_state_t * const encoder_state, sao_info *sao, unsigned x_ctb, unsigned y_ctb)
+static void encode_sao_merge_flags(encoder_state_t * const encoder_state, sao_info_t *sao, unsigned x_ctb, unsigned y_ctb)
 {
   cabac_data_t * const cabac = &encoder_state->cabac;
   // SAO merge flags are not present for the first row and column.
@@ -204,7 +204,7 @@ static void encode_sao_merge_flags(encoder_state_t * const encoder_state, sao_in
  */
 static void encode_sao(encoder_state_t * const encoder_state,
                        unsigned x_lcu, uint16_t y_lcu,
-                       sao_info *sao_luma, sao_info *sao_chroma)
+                       sao_info_t *sao_luma, sao_info_t *sao_chroma)
 {
   // TODO: transmit merge flags outside sao_info
   encode_sao_merge_flags(encoder_state, sao_luma, x_lcu, y_lcu);
@@ -238,14 +238,14 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     const int stride = frame->width_in_lcu;
     int32_t merge_cost_luma[3] = { INT32_MAX };
     int32_t merge_cost_chroma[3] = { INT32_MAX };
-    sao_info *sao_luma = &frame->sao_luma[lcu->position.y * stride + lcu->position.x];
-    sao_info *sao_chroma = &frame->sao_chroma[lcu->position.y * stride + lcu->position.x];
+    sao_info_t *sao_luma = &frame->sao_luma[lcu->position.y * stride + lcu->position.x];
+    sao_info_t *sao_chroma = &frame->sao_chroma[lcu->position.y * stride + lcu->position.x];
 
     // Merge candidates
-    sao_info *sao_top_luma = lcu->position.y != 0 ? &frame->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-    sao_info *sao_left_luma = lcu->position.x != 0 ? &frame->sao_luma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
-    sao_info *sao_top_chroma = lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-    sao_info *sao_left_chroma = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
+    sao_info_t *sao_top_luma = lcu->position.y != 0 ? &frame->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+    sao_info_t *sao_left_luma = lcu->position.x != 0 ? &frame->sao_luma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
+    sao_info_t *sao_top_chroma = lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
+    sao_info_t *sao_left_chroma = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
 
     init_sao_info(sao_luma);
     init_sao_info(sao_chroma);
@@ -482,8 +482,8 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
 
   for (x = 0; x < frame->width_in_lcu; x++) {
   // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
-    sao_info *sao_luma = &frame->sao_luma[data->y * stride + x];
-    sao_info *sao_chroma = &frame->sao_chroma[data->y * stride + x];
+    sao_info_t *sao_luma = &frame->sao_luma[data->y * stride + x];
+    sao_info_t *sao_chroma = &frame->sao_chroma[data->y * stride + x];
     sao_reconstruct(data->encoder_state->encoder_control, frame, new_y_data, x, data->y, sao_luma, COLOR_Y);
     sao_reconstruct(data->encoder_state->encoder_control, frame, new_u_data, x, data->y, sao_chroma, COLOR_U);
     sao_reconstruct(data->encoder_state->encoder_control, frame, new_v_data, x, data->y, sao_chroma, COLOR_V);

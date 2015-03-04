@@ -112,14 +112,14 @@ int sao_edge_ddistortion(const pixel *orig_data, const pixel *rec_data,
 }
 
 
-void init_sao_info(sao_info *sao) {
+void init_sao_info(sao_info_t *sao) {
   sao->type = SAO_TYPE_NONE;
   sao->merge_left_flag = 0;
   sao->merge_up_flag = 0;
 }
 
 
-static float sao_mode_bits_none(const encoder_state_t * const encoder_state, sao_info *sao_top, sao_info *sao_left)
+static float sao_mode_bits_none(const encoder_state_t * const encoder_state, sao_info_t *sao_top, sao_info_t *sao_left)
 {
   float mode_bits = 0.0;
   const cabac_data_t * const cabac = &encoder_state->cabac;
@@ -158,7 +158,7 @@ static float sao_mode_bits_merge(const encoder_state_t * const encoder_state,
 
 static float sao_mode_bits_edge(const encoder_state_t * const encoder_state,
                               int edge_class, int offsets[NUM_SAO_EDGE_CATEGORIES],
-                              sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
+                              sao_info_t *sao_top, sao_info_t *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
   const cabac_data_t * const cabac = &encoder_state->cabac;
@@ -198,7 +198,7 @@ static float sao_mode_bits_edge(const encoder_state_t * const encoder_state,
 
 static float sao_mode_bits_band(const encoder_state_t * const encoder_state,
                               int band_position[2], int offsets[10],
-                              sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
+                              sao_info_t *sao_top, sao_info_t *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
   const cabac_data_t * const cabac = &encoder_state->cabac;
@@ -243,7 +243,7 @@ static float sao_mode_bits_band(const encoder_state_t * const encoder_state,
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
-static void calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info *sao, int *offset, color_index color_i)
+static void calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_index color_i)
 {
   int val;
   int values = (1<<encoder->bitdepth);
@@ -377,7 +377,7 @@ static void calc_sao_edge_dir(const pixel *orig_data, const pixel *rec_data,
 
 static void sao_reconstruct_color(const encoder_control_t * const encoder, 
                                   const pixel *rec_data, pixel *new_rec_data,
-                                  const sao_info *sao,
+                                  const sao_info_t *sao,
                                   int stride, int new_stride,
                                   int block_width, int block_height,
                                   color_index color_i)
@@ -478,7 +478,7 @@ static void sao_calc_band_block_dims(const videoframe_t *frame, color_index colo
  * \param rec  Top-left corner of the LCU, modified to be top-left corner of
  */
 static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_index color_i,
-                                     const sao_info *sao, vector2d_t *rec,
+                                     const sao_info_t *sao, vector2d_t *rec,
                                      vector2d_t *tl, vector2d_t *br,
                                      vector2d_t *block)
 {
@@ -529,7 +529,7 @@ static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_ind
 
 void sao_reconstruct(const encoder_control_t * const encoder, videoframe_t * frame, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
-                     const sao_info *sao, color_index color_i)
+                     const sao_info_t *sao, color_index color_i)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
   const int pic_stride = frame->width >> is_chroma;
@@ -596,8 +596,8 @@ static void sao_search_edge_sao(const encoder_state_t * const encoder_state,
                                 const pixel * data[], const pixel * recdata[],
                                 int block_width, int block_height,
                                 unsigned buf_cnt,
-                                sao_info *sao_out, sao_info *sao_top,
-                                sao_info *sao_left)
+                                sao_info_t *sao_out, sao_info_t *sao_top,
+                                sao_info_t *sao_left)
 {
   sao_eo_class edge_class;
   // This array is used to calculate the mean offset used to minimize distortion.
@@ -674,8 +674,8 @@ static void sao_search_edge_sao(const encoder_state_t * const encoder_state,
 static void sao_search_band_sao(const encoder_state_t * const encoder_state, const pixel * data[], const pixel * recdata[],
                                int block_width, int block_height,
                                unsigned buf_cnt,
-                               sao_info *sao_out, sao_info *sao_top,
-                               sao_info *sao_left)
+                               sao_info_t *sao_out, sao_info_t *sao_top,
+                               sao_info_t *sao_left)
 {
   unsigned i;
 
@@ -722,11 +722,11 @@ static void sao_search_band_sao(const encoder_state_t * const encoder_state, con
 static void sao_search_best_mode(const encoder_state_t * const encoder_state, const pixel * data[], const pixel * recdata[],
                                  int block_width, int block_height,
                                  unsigned buf_cnt,
-                                 sao_info *sao_out, sao_info *sao_top,
-                                 sao_info *sao_left, int32_t merge_cost[3])
+                                 sao_info_t *sao_out, sao_info_t *sao_top,
+                                 sao_info_t *sao_left, int32_t merge_cost[3])
 {
-  sao_info edge_sao;
-  sao_info band_sao;
+  sao_info_t edge_sao;
+  sao_info_t band_sao;
   
   //Avoid "random" uninitialized value
   edge_sao.band_position[0] = edge_sao.band_position[1] = 0;
@@ -786,10 +786,10 @@ static void sao_search_best_mode(const encoder_state_t * const encoder_state, co
 
   // Calculate merge costs
   if (sao_top || sao_left) {
-    sao_info* merge_sao[2] = { sao_left, sao_top};
+    sao_info_t* merge_sao[2] = { sao_left, sao_top};
     int i;
     for (i = 0; i < 2; i++) {
-      sao_info* merge_cand = merge_sao[i];
+      sao_info_t* merge_cand = merge_sao[i];
 
       if (merge_cand) {
         unsigned buf_i;
@@ -824,7 +824,7 @@ static void sao_search_best_mode(const encoder_state_t * const encoder_state, co
   return;
 }
 
-void sao_search_chroma(const encoder_state_t * const encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
+void sao_search_chroma(const encoder_state_t * const encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -860,7 +860,7 @@ void sao_search_chroma(const encoder_state_t * const encoder_state, const videof
   sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
 }
 
-void sao_search_luma(const encoder_state_t * const encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
+void sao_search_luma(const encoder_state_t * const encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
@@ -909,8 +909,8 @@ void sao_reconstruct_frame(encoder_state_t * const encoder_state)
   for (lcu.y = 0; lcu.y < frame->height_in_lcu; lcu.y++) {
     for (lcu.x = 0; lcu.x < frame->width_in_lcu; lcu.x++) {
       unsigned stride = frame->width_in_lcu;
-      sao_info *sao_luma = &frame->sao_luma[lcu.y * stride + lcu.x];
-      sao_info *sao_chroma = &frame->sao_chroma[lcu.y * stride + lcu.x];
+      sao_info_t *sao_luma = &frame->sao_luma[lcu.y * stride + lcu.x];
+      sao_info_t *sao_chroma = &frame->sao_chroma[lcu.y * stride + lcu.x];
 
       // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
       sao_reconstruct(encoder_state->encoder_control, frame, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
