@@ -25,137 +25,137 @@
 #include "encoderstate.h"
 
 
-static int encoder_state_config_global_init(encoder_state_t * const encoder_state) {
-  encoder_state->global->ref = image_list_alloc(MAX_REF_PIC_COUNT);
-  if(!encoder_state->global->ref) {
+static int encoder_state_config_global_init(encoder_state_t * const state) {
+  state->global->ref = image_list_alloc(MAX_REF_PIC_COUNT);
+  if(!state->global->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
     return 0;
   }
-  encoder_state->global->ref_list = REF_PIC_LIST_0;
-  encoder_state->global->frame = 0;
-  encoder_state->global->poc = 0;
+  state->global->ref_list = REF_PIC_LIST_0;
+  state->global->frame = 0;
+  state->global->poc = 0;
   return 1;
 }
 
-static void encoder_state_config_global_finalize(encoder_state_t * const encoder_state) {
-  image_list_destroy(encoder_state->global->ref);
+static void encoder_state_config_global_finalize(encoder_state_t * const state) {
+  image_list_destroy(state->global->ref);
 }
 
-static int encoder_state_config_tile_init(encoder_state_t * const encoder_state, 
+static int encoder_state_config_tile_init(encoder_state_t * const state, 
                                           const int lcu_offset_x, const int lcu_offset_y,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
-  const encoder_control_t * const encoder = encoder_state->encoder_control;
-  encoder_state->tile->frame = videoframe_alloc(width, height, 0);
+  const encoder_control_t * const encoder = state->encoder_control;
+  state->tile->frame = videoframe_alloc(width, height, 0);
   
-  encoder_state->tile->frame->rec = NULL;
+  state->tile->frame->rec = NULL;
   
-  if (encoder_state->type == ENCODER_STATE_TYPE_MAIN) {
+  if (state->type == ENCODER_STATE_TYPE_MAIN) {
     //If not a parent, then we can avoid keeping a copy of the image
-    encoder_state->tile->frame->source = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, 0);
+    state->tile->frame->source = image_alloc(state->tile->frame->width, state->tile->frame->height, 0);
   } else {
-    encoder_state->tile->frame->source = NULL;
+    state->tile->frame->source = NULL;
   }
 
-  if (!encoder_state->tile->frame) {
+  if (!state->tile->frame) {
     printf("Error allocating videoframe!\r\n");
     return 0;
   }
   
   // Init coeff data table
   //FIXME: move them
-  encoder_state->tile->frame->coeff_y = MALLOC(coeff_t, width * height);
-  encoder_state->tile->frame->coeff_u = MALLOC(coeff_t, (width * height) >> 2);
-  encoder_state->tile->frame->coeff_v = MALLOC(coeff_t, (width * height) >> 2);
+  state->tile->frame->coeff_y = MALLOC(coeff_t, width * height);
+  state->tile->frame->coeff_u = MALLOC(coeff_t, (width * height) >> 2);
+  state->tile->frame->coeff_v = MALLOC(coeff_t, (width * height) >> 2);
   
-  encoder_state->tile->lcu_offset_x = lcu_offset_x;
-  encoder_state->tile->lcu_offset_y = lcu_offset_y;
+  state->tile->lcu_offset_x = lcu_offset_x;
+  state->tile->lcu_offset_y = lcu_offset_y;
   
-  encoder_state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
+  state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
   
   //Allocate buffers
   //order by row of (LCU_WIDTH * frame->width_in_lcu) pixels
-  encoder_state->tile->hor_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
+  state->tile->hor_buf_search = yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
-  encoder_state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->frame->height_in_lcu * encoder_state->tile->frame->width_in_lcu);
+  state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu);
   
   if (encoder->sao_enable) {
-    encoder_state->tile->hor_buf_before_sao = yuv_t_alloc(LCU_WIDTH * encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
+    state->tile->hor_buf_before_sao = yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
   } else {
-    encoder_state->tile->hor_buf_before_sao = NULL;
+    state->tile->hor_buf_before_sao = NULL;
   }
   
   if (encoder->wpp) {
-    int num_jobs = encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu;
-    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
-    if (!encoder_state->tile->wf_jobs) {
+    int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
+    state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    if (!state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
       return 0;
     }
   } else {
-    encoder_state->tile->wf_jobs = NULL;
+    state->tile->wf_jobs = NULL;
   }
   
-  encoder_state->tile->id = encoder->tiles_tile_id[encoder_state->tile->lcu_offset_in_ts];
+  state->tile->id = encoder->tiles_tile_id[state->tile->lcu_offset_in_ts];
   return 1;
 }
 
-static void encoder_state_config_tile_finalize(encoder_state_t * const encoder_state) {
-  if (encoder_state->tile->hor_buf_before_sao) yuv_t_free(encoder_state->tile->hor_buf_before_sao);
+static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
+  if (state->tile->hor_buf_before_sao) yuv_t_free(state->tile->hor_buf_before_sao);
   
-  yuv_t_free(encoder_state->tile->hor_buf_search);
-  yuv_t_free(encoder_state->tile->ver_buf_search);
+  yuv_t_free(state->tile->hor_buf_search);
+  yuv_t_free(state->tile->ver_buf_search);
   
-  if (encoder_state->tile->frame->source) image_free(encoder_state->tile->frame->source);
-  if (encoder_state->tile->frame->rec) image_free(encoder_state->tile->frame->rec);
+  if (state->tile->frame->source) image_free(state->tile->frame->source);
+  if (state->tile->frame->rec) image_free(state->tile->frame->rec);
 
-  videoframe_free(encoder_state->tile->frame);
-  encoder_state->tile->frame = NULL;
+  videoframe_free(state->tile->frame);
+  state->tile->frame = NULL;
   
-  FREE_POINTER(encoder_state->tile->wf_jobs);
+  FREE_POINTER(state->tile->wf_jobs);
 }
 
-static int encoder_state_config_slice_init(encoder_state_t * const encoder_state, 
+static int encoder_state_config_slice_init(encoder_state_t * const state, 
                                           const int start_address_in_ts, const int end_address_in_ts) {
   int i = 0, slice_found=0;
-  for (i = 0; i < encoder_state->encoder_control->slice_count; ++i) {
-    if (encoder_state->encoder_control->slice_addresses_in_ts[i] == start_address_in_ts) {
-      encoder_state->slice->id = i;
+  for (i = 0; i < state->encoder_control->slice_count; ++i) {
+    if (state->encoder_control->slice_addresses_in_ts[i] == start_address_in_ts) {
+      state->slice->id = i;
       slice_found = 1;
       break;
     }
   }
   assert(slice_found);
   if (!slice_found) return 0;
-  encoder_state->slice->start_in_ts = start_address_in_ts;
-  encoder_state->slice->end_in_ts = end_address_in_ts;
+  state->slice->start_in_ts = start_address_in_ts;
+  state->slice->end_in_ts = end_address_in_ts;
   
-  encoder_state->slice->start_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
-  encoder_state->slice->end_in_rs = encoder_state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
+  state->slice->start_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[start_address_in_ts];
+  state->slice->end_in_rs = state->encoder_control->tiles_ctb_addr_ts_to_rs[end_address_in_ts];
   return 1;
 }
 
-static void encoder_state_config_slice_finalize(encoder_state_t * const encoder_state) {
+static void encoder_state_config_slice_finalize(encoder_state_t * const state) {
   //Nothing to do (yet?)
 }
 
-static int encoder_state_config_wfrow_init(encoder_state_t * const encoder_state, 
+static int encoder_state_config_wfrow_init(encoder_state_t * const state, 
                                           const int lcu_offset_y) {
   
-  encoder_state->wfrow->lcu_offset_y = lcu_offset_y;
+  state->wfrow->lcu_offset_y = lcu_offset_y;
   return 1;
 }
 
-static void encoder_state_config_wfrow_finalize(encoder_state_t * const encoder_state) {
+static void encoder_state_config_wfrow_finalize(encoder_state_t * const state) {
   //Nothing to do (yet?)
 }
 
 #ifdef _DEBUG
-static void encoder_state_dump_graphviz(const encoder_state_t * const encoder_state) {
+static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
   int i;
   
-  if (!encoder_state->parent) {
-    const encoder_control_t * const encoder = encoder_state->encoder_control;
+  if (!state->parent) {
+    const encoder_control_t * const encoder = state->encoder_control;
     int y,x;
     //Empty lines (easier to copy-paste)
     printf("\n\n\n\n\n");
@@ -229,43 +229,43 @@ static void encoder_state_dump_graphviz(const encoder_state_t * const encoder_st
     printf("</table>>\n ]\n");
   }
   
-  printf(" \"%p\" [\n", encoder_state);
+  printf(" \"%p\" [\n", state);
   printf("  label = \"{encoder_state|");
-  printf("+ type=%c\\l", encoder_state->type);
-  if (!encoder_state->parent || encoder_state->global != encoder_state->parent->global) {
+  printf("+ type=%c\\l", state->type);
+  if (!state->parent || state->global != state->parent->global) {
     printf("|+ global\\l");
   }
-  if (!encoder_state->parent || encoder_state->tile != encoder_state->parent->tile) {
+  if (!state->parent || state->tile != state->parent->tile) {
     printf("|+ tile\\l");
-    printf(" - id = %d\\l", encoder_state->tile->id);
-    printf(" - lcu_offset_x = %d\\l", encoder_state->tile->lcu_offset_x);
-    printf(" - lcu_offset_y = %d\\l", encoder_state->tile->lcu_offset_y);
-    printf(" - lcu_offset_in_ts = %d\\l", encoder_state->tile->lcu_offset_in_ts);
+    printf(" - id = %d\\l", state->tile->id);
+    printf(" - lcu_offset_x = %d\\l", state->tile->lcu_offset_x);
+    printf(" - lcu_offset_y = %d\\l", state->tile->lcu_offset_y);
+    printf(" - lcu_offset_in_ts = %d\\l", state->tile->lcu_offset_in_ts);
   }
-  if (!encoder_state->parent || encoder_state->slice != encoder_state->parent->slice) {
+  if (!state->parent || state->slice != state->parent->slice) {
     printf("|+ slice\\l");
-    printf(" - id = %d\\l", encoder_state->slice->id);
-    printf(" - start_in_ts = %d\\l", encoder_state->slice->start_in_ts);
-    printf(" - end_in_ts = %d\\l", encoder_state->slice->end_in_ts);
-    printf(" - start_in_rs = %d\\l", encoder_state->slice->start_in_rs);
-    printf(" - end_in_rs = %d\\l", encoder_state->slice->end_in_rs);
+    printf(" - id = %d\\l", state->slice->id);
+    printf(" - start_in_ts = %d\\l", state->slice->start_in_ts);
+    printf(" - end_in_ts = %d\\l", state->slice->end_in_ts);
+    printf(" - start_in_rs = %d\\l", state->slice->start_in_rs);
+    printf(" - end_in_rs = %d\\l", state->slice->end_in_rs);
   }
-  if (!encoder_state->parent || encoder_state->wfrow != encoder_state->parent->wfrow) {
+  if (!state->parent || state->wfrow != state->parent->wfrow) {
     printf("|+ wfrow\\l");
-    printf(" - lcu_offset_y = %d\\l", encoder_state->wfrow->lcu_offset_y);
+    printf(" - lcu_offset_y = %d\\l", state->wfrow->lcu_offset_y);
   }
   printf("}\"\n");
   printf(" ]\n");
   
-  if (encoder_state->parent) {
-    printf(" \"%p\" -> \"%p\"\n", encoder_state->parent, encoder_state);
+  if (state->parent) {
+    printf(" \"%p\" -> \"%p\"\n", state->parent, state);
   }
   
-  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-    encoder_state_dump_graphviz(&encoder_state->children[i]);
+  for (i = 0; state->children[i].encoder_control; ++i) {
+    encoder_state_dump_graphviz(&state->children[i]);
   }
   
-  if (!encoder_state->parent) {
+  if (!state->parent) {
     printf("}\n");
     //Empty lines (easier to copy-paste)
     printf("\n\n\n\n\n");
@@ -657,38 +657,38 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
   return 1;
 }
 
-void encoder_state_finalize(encoder_state_t * const encoder_state) {
-  if (encoder_state->children) {
+void encoder_state_finalize(encoder_state_t * const state) {
+  if (state->children) {
     int i=0;
-    for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-      encoder_state_finalize(&encoder_state->children[i]);
+    for (i = 0; state->children[i].encoder_control; ++i) {
+      encoder_state_finalize(&state->children[i]);
     }
     
-    FREE_POINTER(encoder_state->children);
+    FREE_POINTER(state->children);
   }
   
-  FREE_POINTER(encoder_state->lcu_order);
-  encoder_state->lcu_order_count = 0;
+  FREE_POINTER(state->lcu_order);
+  state->lcu_order_count = 0;
   
-  if (!encoder_state->parent || (encoder_state->parent->wfrow != encoder_state->wfrow)) {
-    encoder_state_config_wfrow_finalize(encoder_state);
-    FREE_POINTER(encoder_state->wfrow);
+  if (!state->parent || (state->parent->wfrow != state->wfrow)) {
+    encoder_state_config_wfrow_finalize(state);
+    FREE_POINTER(state->wfrow);
   }
   
-  if (!encoder_state->parent || (encoder_state->parent->slice != encoder_state->slice)) {
-    encoder_state_config_slice_finalize(encoder_state);
-    FREE_POINTER(encoder_state->slice);
+  if (!state->parent || (state->parent->slice != state->slice)) {
+    encoder_state_config_slice_finalize(state);
+    FREE_POINTER(state->slice);
   }
   
-  if (!encoder_state->parent || (encoder_state->parent->tile != encoder_state->tile)) {
-    encoder_state_config_tile_finalize(encoder_state);
-    FREE_POINTER(encoder_state->tile);
+  if (!state->parent || (state->parent->tile != state->tile)) {
+    encoder_state_config_tile_finalize(state);
+    FREE_POINTER(state->tile);
   }
   
-  if (!encoder_state->parent || (encoder_state->parent->global != encoder_state->global)) {
-    encoder_state_config_global_finalize(encoder_state);
-    FREE_POINTER(encoder_state->global);
+  if (!state->parent || (state->parent->global != state->global)) {
+    encoder_state_config_global_finalize(state);
+    FREE_POINTER(state->global);
   }
   
-  bitstream_finalize(&encoder_state->stream);
+  bitstream_finalize(&state->stream);
 }

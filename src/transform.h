@@ -35,9 +35,9 @@ extern const int16_t g_inv_quant_scales[6];
 
 
 
-void quant(const encoder_state_t *encoder_state, int16_t *coef, int16_t *q_coef, int32_t width,
+void quant(const encoder_state_t *state, int16_t *coef, int16_t *q_coef, int32_t width,
            int32_t height, int8_t type, int8_t scan_idx, int8_t block_type);
-void dequant(const encoder_state_t *encoder_state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type);
+void dequant(const encoder_state_t *state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height, int8_t type, int8_t block_type);
 
 void transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
 void itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
@@ -47,7 +47,7 @@ void itransform2d(const encoder_control_t *encoder, int16_t *block,int16_t *coef
 
 int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
 
-void quantize_lcu_luma_residual(encoder_state_t *encoder_state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
-void quantize_lcu_chroma_residual(encoder_state_t *encoder_state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
+void quantize_lcu_luma_residual(encoder_state_t *state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
+void quantize_lcu_chroma_residual(encoder_state_t *state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
 
 #endif

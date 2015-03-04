@@ -33,8 +33,8 @@ struct encoder_state_t;
 
 
 int encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void encoder_state_finalize(struct encoder_state_t *encoder_state);
-void encoder_state_init_lambda(struct encoder_state_t *encoder_state);
+void encoder_state_finalize(struct encoder_state_t *state);
+void encoder_state_init_lambda(struct encoder_state_t *state);
 
 
 #endif // ENCODER_STATE_CTORS_DTORS_H_

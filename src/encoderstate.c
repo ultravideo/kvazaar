@@ -54,9 +54,9 @@
   Implementation closer to HM (Used HM12 as reference)
    - Still missing functionality when GOP and B-pictures are used
  */
-void encoder_state_init_lambda(encoder_state_t * const encoder_state)
+void encoder_state_init_lambda(encoder_state_t * const state)
 {
-  double qp = encoder_state->global->QP;
+  double qp = state->global->QP;
   double lambda_scale = 1.0;
   double qp_temp      = qp - 12;
   double lambda;
@@ -64,35 +64,35 @@ void encoder_state_init_lambda(encoder_state_t * const encoder_state)
   // Default QP-factor from HM config
   double qp_factor = 0.4624;
 
-  if (encoder_state->global->slicetype == SLICE_I) {
+  if (state->global->slicetype == SLICE_I) {
     qp_factor=0.57*lambda_scale;
   }
 
   lambda = qp_factor*pow( 2.0, qp_temp/3.0 );
 
-  if (encoder_state->global->slicetype != SLICE_I ) {
+  if (state->global->slicetype != SLICE_I ) {
     lambda *= 0.95;
   }
 
   lambda *= LMBD;
 
-  encoder_state->global->cur_lambda_cost = lambda;
-  encoder_state->global->cur_lambda_cost_sqrt = sqrt(lambda);
+  state->global->cur_lambda_cost = lambda;
+  state->global->cur_lambda_cost_sqrt = sqrt(lambda);
 }
 
-int encoder_state_match_children_of_previous_frame(encoder_state_t * const encoder_state) {
+int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
-  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
+  for (i = 0; state->children[i].encoder_control; ++i) {
     //Child should also exist for previous encoder
-    assert(encoder_state->previous_encoder_state->children[i].encoder_control);
-    encoder_state->children[i].previous_encoder_state = &encoder_state->previous_encoder_state->children[i];
-    encoder_state_match_children_of_previous_frame(&encoder_state->children[i]);
+    assert(state->previous_encoder_state->children[i].encoder_control);
+    state->children[i].previous_encoder_state = &state->previous_encoder_state->children[i];
+    encoder_state_match_children_of_previous_frame(&state->children[i]);
   }
   return 1;
 }
 
-static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state, const lcu_order_element_t * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
-  videoframe_t* const frame = encoder_state->tile->frame;
+static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const lcu_order_element_t * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
+  videoframe_t* const frame = state->tile->frame;
   
   if (hor_buf) {
     const int rdpx = lcu->position_px.x;
@@ -132,10 +132,10 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state,
 }
 
 
-static void encode_sao_color(encoder_state_t * const encoder_state, sao_info_t *sao,
+static void encode_sao_color(encoder_state_t * const state, sao_info_t *sao,
                              color_t color_i)
 {
-  cabac_data_t * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &state->cabac;
   sao_eo_cat i;
   int offset_index = (color_i == COLOR_V) ? 5 : 0;
 
@@ -184,9 +184,9 @@ static void encode_sao_color(encoder_state_t * const encoder_state, sao_info_t *
   }
 }
 
-static void encode_sao_merge_flags(encoder_state_t * const encoder_state, sao_info_t *sao, unsigned x_ctb, unsigned y_ctb)
+static void encode_sao_merge_flags(encoder_state_t * const state, sao_info_t *sao, unsigned x_ctb, unsigned y_ctb)
 {
-  cabac_data_t * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &state->cabac;
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
     cabac->cur_ctx = &(cabac->ctx.sao_merge_flag_model);
@@ -202,36 +202,36 @@ static void encode_sao_merge_flags(encoder_state_t * const encoder_state, sao_in
 /**
  * \brief Encode SAO information.
  */
-static void encode_sao(encoder_state_t * const encoder_state,
+static void encode_sao(encoder_state_t * const state,
                        unsigned x_lcu, uint16_t y_lcu,
                        sao_info_t *sao_luma, sao_info_t *sao_chroma)
 {
   // TODO: transmit merge flags outside sao_info
-  encode_sao_merge_flags(encoder_state, sao_luma, x_lcu, y_lcu);
+  encode_sao_merge_flags(state, sao_luma, x_lcu, y_lcu);
 
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
-    encode_sao_color(encoder_state, sao_luma, COLOR_Y);
-    encode_sao_color(encoder_state, sao_chroma, COLOR_U);
-    encode_sao_color(encoder_state, sao_chroma, COLOR_V);
+    encode_sao_color(state, sao_luma, COLOR_Y);
+    encode_sao_color(state, sao_chroma, COLOR_U);
+    encode_sao_color(state, sao_chroma, COLOR_V);
   }
 }
 
 
 static void encoder_state_worker_encode_lcu(void * opaque) {
   const lcu_order_element_t * const lcu = opaque;
-  encoder_state_t *encoder_state = lcu->encoder_state;
-  const encoder_control_t * const encoder = encoder_state->encoder_control;
-  videoframe_t* const frame = encoder_state->tile->frame;
+  encoder_state_t *state = lcu->encoder_state;
+  const encoder_control_t * const encoder = state->encoder_control;
+  videoframe_t* const frame = state->tile->frame;
   
   //This part doesn't write to bitstream, it's only search, deblock and sao
   
-  search_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
+  search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
     
-  encoder_state_recdata_to_bufs(encoder_state, lcu, encoder_state->tile->hor_buf_search, encoder_state->tile->ver_buf_search);
+  encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
   if (encoder->deblock_enable) {
-    filter_deblock_lcu(encoder_state, lcu->position_px.x, lcu->position_px.y);
+    filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
   if (encoder->sao_enable) {
@@ -250,8 +250,8 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     init_sao_info(sao_luma);
     init_sao_info(sao_chroma);
 
-    sao_search_luma(encoder_state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
-    sao_search_chroma(encoder_state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
+    sao_search_luma(state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
+    sao_search_chroma(state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
 
     sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
     // Check merge costs
@@ -288,34 +288,34 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   //Now write data to bitstream (required to have a correct CABAC state)
   
   //First LCU, and we are in a slice. We need a slice header
-  if (encoder_state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
-    encoder_state_write_bitstream_slice_header(encoder_state);
-    bitstream_align(&encoder_state->stream); 
+  if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
+    encoder_state_write_bitstream_slice_header(state);
+    bitstream_align(&state->stream); 
   }
   
   //Encode SAO
   if (encoder->sao_enable) {
-    encode_sao(encoder_state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
+    encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
   
   //Encode coding tree
-  encode_coding_tree(encoder_state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
+  encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
   //Terminator
-  if (lcu->index < encoder_state->lcu_order_count - 1) {
+  if (lcu->index < state->lcu_order_count - 1) {
     //Since we don't handle slice segments, end of slice segment == end of slice
     //Always 0 since otherwise it would be split
-    cabac_encode_bin_trm(&encoder_state->cabac, 0);  // end_of_slice_segment_flag
+    cabac_encode_bin_trm(&state->cabac, 0);  // end_of_slice_segment_flag
   }
   
   //Wavefronts need the context to be copied to the next row
-  if (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
+  if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
     int j;
     //Find next encoder (next row)
-    for (j=0; encoder_state->parent->children[j].encoder_control; ++j) {
-      if (encoder_state->parent->children[j].wfrow->lcu_offset_y == encoder_state->wfrow->lcu_offset_y + 1) {
+    for (j=0; state->parent->children[j].encoder_control; ++j) {
+      if (state->parent->children[j].wfrow->lcu_offset_y == state->wfrow->lcu_offset_y + 1) {
         //And copy context
-        context_copy(&encoder_state->parent->children[j], encoder_state);
+        context_copy(&state->parent->children[j], state);
       }
     }
   }
@@ -323,92 +323,92 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   if (encoder->sao_enable && lcu->above) {
     //If we're not the first in the row
     if (lcu->above->left) {
-      encoder_state_recdata_to_bufs(encoder_state, lcu->above->left, encoder_state->tile->hor_buf_before_sao, NULL);
+      encoder_state_recdata_to_bufs(state, lcu->above->left, state->tile->hor_buf_before_sao, NULL);
     }
     //Latest LCU in the row, copy the data from the one above also
     if (!lcu->right) {
-      encoder_state_recdata_to_bufs(encoder_state, lcu->above, encoder_state->tile->hor_buf_before_sao, NULL);
+      encoder_state_recdata_to_bufs(state, lcu->above, state->tile->hor_buf_before_sao, NULL);
     }
   }
 }
 
-static void encoder_state_encode_leaf(encoder_state_t * const encoder_state) {
-  const encoder_control_t * const encoder = encoder_state->encoder_control;
+static void encoder_state_encode_leaf(encoder_state_t * const state) {
+  const encoder_control_t * const encoder = state->encoder_control;
   
   int i = 0;
   
-  assert(encoder_state->is_leaf);
-  assert(encoder_state->lcu_order_count > 0);
+  assert(state->is_leaf);
+  assert(state->lcu_order_count > 0);
   
   //If we're not using wavefronts, or we have a WAVEFRONT_ROW which is the single child of its parent, than we should not use parallelism
-  if (encoder_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (encoder_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !encoder_state->parent->children[1].encoder_control)) {
-    for (i = 0; i < encoder_state->lcu_order_count; ++i) {
+  if (state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !state->parent->children[1].encoder_control)) {
+    for (i = 0; i < state->lcu_order_count; ++i) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_ENCODE_LCU);
 
-      encoder_state_worker_encode_lcu(&encoder_state->lcu_order[i]);
+      encoder_state_worker_encode_lcu(&state->lcu_order[i]);
 
 #ifdef _DEBUG
       {
-        const lcu_order_element_t * const lcu = &encoder_state->lcu_order[i];
-        PERFORMANCE_MEASURE_END(_DEBUG_PERF_ENCODE_LCU, encoder_state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
+        const lcu_order_element_t * const lcu = &state->lcu_order[i];
+        PERFORMANCE_MEASURE_END(_DEBUG_PERF_ENCODE_LCU, state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
       }
 #endif //_DEBUG
     }
     
     if (encoder->sao_enable) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME);
-      sao_reconstruct_frame(encoder_state);
-      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, encoder_state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, encoder_state->lcu_order[0].position.y + encoder_state->tile->lcu_offset_y, encoder_state->lcu_order[encoder_state->lcu_order_count-1].position.y + encoder_state->tile->lcu_offset_y,
-        encoder_state->tile->lcu_offset_x * LCU_WIDTH, encoder_state->tile->frame->width + encoder_state->tile->lcu_offset_x * LCU_WIDTH - 1,
-        encoder_state->tile->lcu_offset_y * LCU_WIDTH, encoder_state->tile->frame->height + encoder_state->tile->lcu_offset_y * LCU_WIDTH - 1
+      sao_reconstruct_frame(state);
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count-1].position.y + state->tile->lcu_offset_y,
+        state->tile->lcu_offset_x * LCU_WIDTH, state->tile->frame->width + state->tile->lcu_offset_x * LCU_WIDTH - 1,
+        state->tile->lcu_offset_y * LCU_WIDTH, state->tile->frame->height + state->tile->lcu_offset_y * LCU_WIDTH - 1
       );
     }
   } else {
-    for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-      const lcu_order_element_t * const lcu = &encoder_state->lcu_order[i];
+    for (i = 0; i < state->lcu_order_count; ++i) {
+      const lcu_order_element_t * const lcu = &state->lcu_order[i];
 #ifdef _DEBUG
       char job_description[256];
-      sprintf(job_description, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
+      sprintf(job_description, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
 #else
       char* job_description = NULL;
 #endif
-      encoder_state->tile->wf_jobs[lcu->id] = threadqueue_submit(encoder_state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
-      if (encoder_state->previous_encoder_state != encoder_state && encoder_state->previous_encoder_state->tqj_recon_done && !encoder_state->global->is_radl_frame) {
+      state->tile->wf_jobs[lcu->id] = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
         
         //Only for the first in the row (we reconstruct row-wise)
         if (!lcu->left) {
           //If we have a row below, then we wait till it's completed
           if (lcu->below) {
-            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
           }
           //Also add always a dep on current line
-          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
           if (lcu->above) {
-            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], lcu->above->encoder_state->previous_encoder_state->tqj_recon_done);
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->above->encoder_state->previous_encoder_state->tqj_recon_done);
           }
         }
       }
-      if (encoder_state->tile->wf_jobs[lcu->id]) {
+      if (state->tile->wf_jobs[lcu->id]) {
         if (lcu->position.x > 0) {
           // Wait for the LCU on the left.
-          threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - 1]);
+          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
         }
         if (lcu->position.y > 0) {
-          if (lcu->position.x < encoder_state->tile->frame->width_in_lcu - 1) {
+          if (lcu->position.x < state->tile->frame->width_in_lcu - 1) {
             // Wait for the LCU to the top-right of this one.
-            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - encoder_state->tile->frame->width_in_lcu + 1]);
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
           } else {
             // If there is no top-right LCU, wait for the one above.
-            threadqueue_job_dep_add(encoder_state->tile->wf_jobs[lcu->id], encoder_state->tile->wf_jobs[lcu->id - encoder_state->tile->frame->width_in_lcu]);
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
           }
         }
-        threadqueue_job_unwait_job(encoder_state->encoder_control->threadqueue, encoder_state->tile->wf_jobs[lcu->id]);
+        threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
-      if (lcu->position.x == encoder_state->tile->frame->width_in_lcu - 1) {
+      if (lcu->position.x == state->tile->frame->width_in_lcu - 1) {
         if (!encoder->sao_enable) {
           //No SAO + last LCU: the row is reconstructed
-          assert(!encoder_state->tqj_recon_done);
-          encoder_state->tqj_recon_done = encoder_state->tile->wf_jobs[lcu->id];
+          assert(!state->tqj_recon_done);
+          state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
         }
       }
     }
@@ -497,10 +497,10 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
 }
 
 
-static int encoder_state_tree_is_a_chain(const encoder_state_t * const encoder_state) {
-  if (!encoder_state->children[0].encoder_control) return 1;
-  if (encoder_state->children[1].encoder_control) return 0;
-  return encoder_state_tree_is_a_chain(&encoder_state->children[0]);
+static int encoder_state_tree_is_a_chain(const encoder_state_t * const state) {
+  if (!state->children[0].encoder_control) return 1;
+  if (state->children[1].encoder_control) return 0;
+  return encoder_state_tree_is_a_chain(&state->children[0]);
 }
 
 static void encoder_state_encode(encoder_state_t * const main_state) {
@@ -637,113 +637,113 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
   }
 }
 
-static void encoder_state_clear_refs(encoder_state_t *main_state) {
+static void encoder_state_clear_refs(encoder_state_t *state) {
   int i;
-  while (main_state->global->ref->used_size) {
-    image_list_rem(main_state->global->ref, main_state->global->ref->used_size - 1);
+  while (state->global->ref->used_size) {
+    image_list_rem(state->global->ref, state->global->ref->used_size - 1);
   }
 
-  main_state->global->poc = 0;
-  videoframe_set_poc(main_state->tile->frame, 0);
+  state->global->poc = 0;
+  videoframe_set_poc(state->tile->frame, 0);
   
-  for (i=0; main_state->children[i].encoder_control; ++i) {
-    encoder_state_t *sub_state = &(main_state->children[i]);
+  for (i=0; state->children[i].encoder_control; ++i) {
+    encoder_state_t *sub_state = &(state->children[i]);
     encoder_state_clear_refs(sub_state);
   }
 }
 
-static void encoder_state_new_frame(encoder_state_t * const main_state) {
+static void encoder_state_new_frame(encoder_state_t * const state) {
   int i;
   //FIXME Move this somewhere else!
-  if (main_state->type == ENCODER_STATE_TYPE_MAIN) {
-    const encoder_control_t * const encoder = main_state->encoder_control;
+  if (state->type == ENCODER_STATE_TYPE_MAIN) {
+    const encoder_control_t * const encoder = state->encoder_control;
     
-    const int is_first_frame = (main_state->global->frame == 0);
-    const int is_i_radl = (encoder->cfg->intra_period == 1 && main_state->global->frame % 2 == 0);
-    const int is_p_radl = (encoder->cfg->intra_period > 1 && (main_state->global->frame % encoder->cfg->intra_period) == 0);
-    main_state->global->is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
+    const int is_first_frame = (state->global->frame == 0);
+    const int is_i_radl = (encoder->cfg->intra_period == 1 && state->global->frame % 2 == 0);
+    const int is_p_radl = (encoder->cfg->intra_period > 1 && (state->global->frame % encoder->cfg->intra_period) == 0);
+    state->global->is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
     
-    if (main_state->global->is_radl_frame) {
+    if (state->global->is_radl_frame) {
       // Clear the reference list
-      encoder_state_clear_refs(main_state);
+      encoder_state_clear_refs(state);
 
-      main_state->global->slicetype = SLICE_I;
-      main_state->global->pictype = NAL_IDR_W_RADL;
+      state->global->slicetype = SLICE_I;
+      state->global->pictype = NAL_IDR_W_RADL;
     } else {
-      main_state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
-      main_state->global->pictype = NAL_TRAIL_R;
+      state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+      state->global->pictype = NAL_TRAIL_R;
     }
   } else {
     //Clear the bitstream if it's not the main encoder
-    bitstream_clear(&main_state->stream);
+    bitstream_clear(&state->stream);
   }
   
-  if (main_state->is_leaf) {
+  if (state->is_leaf) {
     //Leaf states have cabac and context
-    cabac_start(&main_state->cabac);
-    init_contexts(main_state, main_state->global->QP, main_state->global->slicetype);
+    cabac_start(&state->cabac);
+    init_contexts(state, state->global->QP, state->global->slicetype);
 
     // Initialize lambda value(s) to use in search
-    encoder_state_init_lambda(main_state);
+    encoder_state_init_lambda(state);
   }
   
   //Clear the jobs
-  main_state->tqj_bitstream_written = NULL;
-  main_state->tqj_recon_done = NULL;
+  state->tqj_bitstream_written = NULL;
+  state->tqj_recon_done = NULL;
   
-  for (i = 0; main_state->children[i].encoder_control; ++i) {
-    encoder_state_new_frame(&main_state->children[i]);
+  for (i = 0; state->children[i].encoder_control; ++i) {
+    encoder_state_new_frame(&state->children[i]);
   }
   
 
 }
 
-static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const encoder_state, threadqueue_job_t * const job) {
+static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const state, threadqueue_job_t * const job) {
   int i;
-  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-    _encode_one_frame_add_bitstream_deps(&encoder_state->children[i], job);
+  for (i = 0; state->children[i].encoder_control; ++i) {
+    _encode_one_frame_add_bitstream_deps(&state->children[i], job);
   }
-  if (encoder_state->tqj_bitstream_written) {
-    threadqueue_job_dep_add(job, encoder_state->tqj_bitstream_written);
+  if (state->tqj_bitstream_written) {
+    threadqueue_job_dep_add(job, state->tqj_bitstream_written);
   }
-  if (encoder_state->tqj_recon_done) {
-    threadqueue_job_dep_add(job, encoder_state->tqj_recon_done);
+  if (state->tqj_recon_done) {
+    threadqueue_job_dep_add(job, state->tqj_recon_done);
   }
 }
 
 
-void encode_one_frame(encoder_state_t * const main_state)
+void encode_one_frame(encoder_state_t * const state)
 {
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
-    encoder_state_new_frame(main_state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", main_state->global->frame, main_state->global->poc);
+    encoder_state_new_frame(state);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", state->global->frame, state->global->poc);
   }
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
-    encoder_state_encode(main_state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=encode,frame=%d", main_state->global->frame);
+    encoder_state_encode(state);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=encode,frame=%d", state->global->frame);
   }
   //threadqueue_flush(main_state->encoder_control->threadqueue);
   {
     threadqueue_job_t *job;
 #ifdef _DEBUG
     char job_description[256];
-    sprintf(job_description, "type=write_bitstream,frame=%d", main_state->global->frame);
+    sprintf(job_description, "type=write_bitstream,frame=%d", state->global->frame);
 #else
     char* job_description = NULL;
 #endif
           
-    job = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) main_state, 1, job_description);
+    job = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
     
-    _encode_one_frame_add_bitstream_deps(main_state, job);
-    if (main_state->previous_encoder_state != main_state && main_state->previous_encoder_state->tqj_bitstream_written) {
+    _encode_one_frame_add_bitstream_deps(state, job);
+    if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
       //We need to depend on previous bitstream generation
-      threadqueue_job_dep_add(job, main_state->previous_encoder_state->tqj_bitstream_written);
+      threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
     }
-    threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
-    assert(!main_state->tqj_bitstream_written);
-    main_state->tqj_bitstream_written = job;
+    threadqueue_job_unwait_job(state->encoder_control->threadqueue, job);
+    assert(!state->tqj_bitstream_written);
+    state->tqj_bitstream_written = job;
   }
   //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
@@ -787,59 +787,59 @@ static int read_and_fill_frame_data(FILE *file,
   return 1;
 }
 
-int read_one_frame(FILE* file, const encoder_state_t * const encoder_state)
+int read_one_frame(FILE* file, const encoder_state_t * const state)
 {
-  unsigned width = encoder_state->encoder_control->in.real_width;
-  unsigned height = encoder_state->encoder_control->in.real_height;
-  unsigned array_width = encoder_state->tile->frame->width;
-  unsigned array_height = encoder_state->tile->frame->height;
+  unsigned width = state->encoder_control->in.real_width;
+  unsigned height = state->encoder_control->in.real_height;
+  unsigned array_width = state->tile->frame->width;
+  unsigned array_height = state->tile->frame->height;
 
   if (width != array_width) {
     // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
     if (!read_and_fill_frame_data(file, width, height, array_width,
-                                  encoder_state->tile->frame->source->y) ||
+                                  state->tile->frame->source->y) ||
         !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  encoder_state->tile->frame->source->u) ||
+                                  state->tile->frame->source->u) ||
         !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  encoder_state->tile->frame->source->v))
+                                  state->tile->frame->source->v))
       return 0;
   } else {
     // Otherwise the data can be read directly to the array.
     unsigned y_size = width * height;
     unsigned uv_size = (width >> 1) * (height >> 1);
-    if (y_size  != fread(encoder_state->tile->frame->source->y, sizeof(unsigned char),
+    if (y_size  != fread(state->tile->frame->source->y, sizeof(unsigned char),
                          y_size, file) ||
-        uv_size != fread(encoder_state->tile->frame->source->u, sizeof(unsigned char),
+        uv_size != fread(state->tile->frame->source->u, sizeof(unsigned char),
                          uv_size, file) ||
-        uv_size != fread(encoder_state->tile->frame->source->v, sizeof(unsigned char),
+        uv_size != fread(state->tile->frame->source->v, sizeof(unsigned char),
                          uv_size, file))
       return 0;
   }
 
   if (height != array_height) {
     fill_after_frame(height, array_width, array_height,
-                     encoder_state->tile->frame->source->y);
+                     state->tile->frame->source->y);
     fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     encoder_state->tile->frame->source->u);
+                     state->tile->frame->source->u);
     fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     encoder_state->tile->frame->source->v);
+                     state->tile->frame->source->v);
   }
   return 1;
 }
 
-void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length) {
-  const encoder_control_t * const encoder = encoder_state->encoder_control;
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length) {
+  const encoder_control_t * const encoder = state->encoder_control;
   
-  if (encoder_state->stats_done) return;
-  encoder_state->stats_done = 1;
+  if (state->stats_done) return;
+  state->stats_done = 1;
   
   ++(*stat_frames);
   
   //Blocking call
-  threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
+  threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
   if (recout) {
-    const videoframe_t * const frame = encoder_state->tile->frame;
+    const videoframe_t * const frame = state->tile->frame;
     // Write reconstructed frame out.
     // Use conformance-window dimensions instead of internal ones.
     const int width = frame->width;
@@ -865,10 +865,10 @@ void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, 
   {
     double temp_psnr[3];
     
-    videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
+    videoframe_compute_psnr(state->tile->frame, temp_psnr);
     
-    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
-          "BPI"[encoder_state->global->slicetype%3], encoder_state->stats_bitstream_length<<3,
+    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", state->global->frame,
+          "BPI"[state->global->slicetype%3], state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
 
     // Increment total PSNR
@@ -877,89 +877,89 @@ void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, 
     psnr[2] += temp_psnr[2];
   }
 
-  *bitstream_length += encoder_state->stats_bitstream_length;
+  *bitstream_length += state->stats_bitstream_length;
 }
 
 
-void encoder_next_frame(encoder_state_t *encoder_state) {
-  const encoder_control_t * const encoder = encoder_state->encoder_control;
+void encoder_next_frame(encoder_state_t *state) {
+  const encoder_control_t * const encoder = state->encoder_control;
   
   //Blocking call
-  threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
+  threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
-  encoder_state->stats_done = 0;
+  state->stats_done = 0;
 
-  if (encoder_state->global->frame == -1) {
+  if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
-    encoder_state->global->frame = 0;
-    encoder_state->global->poc = 0;
-    assert(!encoder_state->tile->frame->rec);
-    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+    state->global->frame = 0;
+    state->global->poc = 0;
+    assert(!state->tile->frame->rec);
+    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
     return;
   }
   
-  if (encoder_state->previous_encoder_state != encoder_state) {
+  if (state->previous_encoder_state != state) {
     //We have a "real" previous encoder
-    encoder_state->global->frame = encoder_state->previous_encoder_state->global->frame + 1;
-    encoder_state->global->poc = encoder_state->previous_encoder_state->global->poc + 1;
+    state->global->frame = state->previous_encoder_state->global->frame + 1;
+    state->global->poc = state->previous_encoder_state->global->poc + 1;
     
-    image_free(encoder_state->tile->frame->rec);
-    cu_array_free(encoder_state->tile->frame->cu_array);
+    image_free(state->tile->frame->rec);
+    cu_array_free(state->tile->frame->cu_array);
     
-    encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
+    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
     {
       // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
-      unsigned height_in_scu = encoder_state->tile->frame->height_in_lcu << MAX_DEPTH;
-      unsigned width_in_scu = encoder_state->tile->frame->width_in_lcu << MAX_DEPTH;
-      encoder_state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
+      unsigned height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
+      unsigned width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
+      state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
     }
-    videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
+    videoframe_set_poc(state->tile->frame, state->global->poc);
     
-    image_list_copy_contents(encoder_state->global->ref, encoder_state->previous_encoder_state->global->ref);
-    image_list_add(encoder_state->global->ref, encoder_state->previous_encoder_state->tile->frame->rec, encoder_state->previous_encoder_state->tile->frame->cu_array);
+    image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
+    image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
     // Remove the ref pics in excess
-    while (encoder_state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
-      image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
+    while (state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
+      image_list_rem(state->global->ref, state->global->ref->used_size-1);
     }
     return; //FIXME reference frames
   }
 
   // Remove the ref pic (if present)
-  if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
-    image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
+  if (state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
+    image_list_rem(state->global->ref, state->global->ref->used_size-1);
   }
   // Add current reconstructed picture as reference
-  image_list_add(encoder_state->global->ref, encoder_state->tile->frame->rec, encoder_state->tile->frame->cu_array);
+  image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
   
   //Remove current reconstructed picture, and alloc a new one
-  image_free(encoder_state->tile->frame->rec);
+  image_free(state->tile->frame->rec);
   
-  encoder_state->global->frame++;
-  encoder_state->global->poc++;
+  state->global->frame++;
+  state->global->poc++;
   
-  encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
-  videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
+  state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+  videoframe_set_poc(state->tile->frame, state->global->poc);
 }
 
 
-void encode_coding_tree(encoder_state_t * const encoder_state,
+void encode_coding_tree(encoder_state_t * const state,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  cabac_data_t * const cabac = &encoder_state->cabac;
-  const videoframe_t * const frame = encoder_state->tile->frame;
+  cabac_data_t * const cabac = &state->cabac;
+  const videoframe_t * const frame = state->tile->frame;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
   
   //Absolute ctb
-  uint16_t abs_x_ctb = x_ctb + (encoder_state->tile->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
-  uint16_t abs_y_ctb = y_ctb + (encoder_state->tile->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
+  uint16_t abs_x_ctb = x_ctb + (state->tile->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
+  uint16_t abs_y_ctb = y_ctb + (state->tile->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
 
   // Check for slice border FIXME
-  uint8_t border_x = ((encoder_state->encoder_control->in.width) < (abs_x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_y = ((encoder_state->encoder_control->in.height) < (abs_y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_split_x = ((encoder_state->encoder_control->in.width)  < ((abs_x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border_split_y = ((encoder_state->encoder_control->in.height) < ((abs_y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
+  uint8_t border_x = ((state->encoder_control->in.width) < (abs_x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
+  uint8_t border_y = ((state->encoder_control->in.height) < (abs_y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
+  uint8_t border_split_x = ((state->encoder_control->in.width)  < ((abs_x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
+  uint8_t border_split_y = ((state->encoder_control->in.height) < ((abs_y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
@@ -982,17 +982,17 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
-      encode_coding_tree(encoder_state, x_ctb, y_ctb, depth + 1); // x,y
+      encode_coding_tree(state, x_ctb, y_ctb, depth + 1); // x,y
 
       // TODO: fix when other half of the block would not be completely over the border
       if (!border_x || border_split_x) {
-        encode_coding_tree(encoder_state, x_ctb + change, y_ctb, depth + 1);
+        encode_coding_tree(state, x_ctb + change, y_ctb, depth + 1);
       }
       if (!border_y || border_split_y) {
-        encode_coding_tree(encoder_state, x_ctb, y_ctb + change, depth + 1);
+        encode_coding_tree(state, x_ctb, y_ctb + change, depth + 1);
       }
       if (!border || (border_split_x && border_split_y)) {
-        encode_coding_tree(encoder_state, x_ctb + change, y_ctb + change, depth + 1);
+        encode_coding_tree(state, x_ctb + change, y_ctb + change, depth + 1);
       }
       return;
     }
@@ -1001,7 +1001,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
 
 
     // Encode skip flag
-  if (encoder_state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != SLICE_I) {
     int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
@@ -1040,7 +1040,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
   // ENDIF SKIP
 
   // Prediction mode
-  if (encoder_state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != SLICE_I) {
     cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }
@@ -1108,7 +1108,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
             //if(encoder_state->ref_idx_num[uiRefListIdx] > 0)
             {
           if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-            if (encoder_state->global->ref->used_size != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
+            if (state->global->ref->used_size != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
               // parseRefFrmIdx
               int32_t ref_frame = cur_cu->inter.mv_ref;
 
@@ -1117,7 +1117,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
 
               if (ref_frame > 0) {
                 int32_t i;
-                int32_t ref_num = encoder_state->global->ref->used_size - 2;
+                int32_t ref_num = state->global->ref->used_size - 2;
 
                 cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
                 ref_frame--;
@@ -1135,7 +1135,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
               }
             }
 
-            if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ encoder_state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
+            if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
               const int32_t mvd_hor = cur_cu->inter.mvd[0];
               const int32_t mvd_ver = cur_cu->inter.mvd[1];
               const int8_t hor_abs_gr0 = mvd_hor != 0;
@@ -1196,7 +1196,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(encoder_state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+        encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
       }
     }
 
@@ -1322,7 +1322,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
       }
     }  // end intra chroma pred mode coding
 
-    encode_transform_coeff(encoder_state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+    encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
   }
 
     #if ENABLE_PCM == 1
@@ -1392,10 +1392,10 @@ coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth)
 }
 
 
-static void encode_transform_unit(encoder_state_t * const encoder_state,
+static void encode_transform_unit(encoder_state_t * const state,
                                   int x_pu, int y_pu, int depth)
 {
-  const videoframe_t * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = state->tile->frame;
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
@@ -1427,7 +1427,7 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
   // CoeffNxN
   // Residual Coding
   if (cbf_y) {
-    encode_coeff_nxn(encoder_state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
+    encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
@@ -1463,11 +1463,11 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
     scan_idx = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
 
     if (cbf_is_set(cur_cu->cbf.u, depth)) {
-      encode_coeff_nxn(encoder_state, coeff_u, width_c, 2, scan_idx, 0);
+      encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
     }
 
     if (cbf_is_set(cur_cu->cbf.v, depth)) {
-      encode_coeff_nxn(encoder_state, coeff_v, width_c, 2, scan_idx, 0);
+      encode_coeff_nxn(state, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
 }
@@ -1481,13 +1481,13 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
  * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
-void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,int32_t y_pu,
+void encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
-  cabac_data_t * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &state->cabac;
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
-  const videoframe_t * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = state->tile->frame;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
@@ -1496,7 +1496,7 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
   int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
-  int tr_depth_intra = encoder_state->encoder_control->tr_depth_intra;
+  int tr_depth_intra = state->encoder_control->tr_depth_intra;
   int max_tr_depth = (cur_cu->type == CU_INTRA ? tr_depth_intra + intra_split_flag : TR_DEPTH_INTER);
 
   int8_t split = (cur_cu->tr_depth > depth);
@@ -1536,10 +1536,10 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
 
   if (split) {
     uint8_t pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
-    encode_transform_coeff(encoder_state, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder_state, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder_state, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(encoder_state, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 
@@ -1554,15 +1554,15 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
-    encode_transform_unit(encoder_state, x_pu, y_pu, depth);
+    encode_transform_unit(state, x_pu, y_pu, depth);
   }
 }
 
-void encode_coeff_nxn(encoder_state_t * const encoder_state, coeff_t *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
-  const encoder_control_t * const encoder = encoder_state->encoder_control;
-  cabac_data_t * const cabac = &encoder_state->cabac;
+  const encoder_control_t * const encoder = state->encoder_control;
+  cabac_data_t * const cabac = &state->cabac;
   int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
@@ -1629,7 +1629,7 @@ void encode_coeff_nxn(encoder_state_t * const encoder_state, coeff_t *coeff, uin
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
-  encode_last_significant_xy(encoder_state, last_coeff_x, last_coeff_y, width, width,
+  encode_last_significant_xy(state, last_coeff_x, last_coeff_y, width, width,
                              type, scan_mode);
 
   scan_pos_sig  = scan_pos_last;
@@ -1786,12 +1786,12 @@ void encode_coeff_nxn(encoder_state_t * const encoder_state, coeff_t *coeff, uin
 
  This method encodes the X and Y component within a block of the last significant coefficient.
 */
-void encode_last_significant_xy(encoder_state_t * const encoder_state,
+void encode_last_significant_xy(encoder_state_t * const state,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan)
 {
-  cabac_data_t * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &state->cabac;
   uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
   uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
   int group_idx_x;

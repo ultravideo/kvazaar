@@ -30,6 +30,6 @@
 #include "encoderstate.h"
 
 
-void search_lcu(encoder_state_t *encoder_state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
+void search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
 
 #endif

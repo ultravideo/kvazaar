@@ -75,7 +75,7 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_state_t * const state, const image_t * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -84,12 +84,12 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
   int32_t ref_width_c = ref->width>>1; //!< Reference picture width in chroma pixels
 
   // negative overflow flag
-  int8_t overflow_neg_x = (encoder_state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) < 0)?1:0;
-  int8_t overflow_neg_y = (encoder_state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) < 0)?1:0;
+  int8_t overflow_neg_x = (state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) < 0)?1:0;
+  int8_t overflow_neg_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) < 0)?1:0;
 
   // positive overflow flag
-  int8_t overflow_pos_x = (encoder_state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) + width > ref->width )?1:0;
-  int8_t overflow_pos_y = (encoder_state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) + width > ref->height)?1:0;
+  int8_t overflow_pos_x = (state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) + width > ref->width )?1:0;
+  int8_t overflow_pos_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) + width > ref->height)?1:0;
 
   // Chroma half-pel
   #define HALFPEL_CHROMA_WIDTH ((LCU_WIDTH>>1) + 8)
@@ -132,24 +132,24 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
       pixel_t octpel_dst_v[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
 
       // Fractional luma
-      extend_borders(xpos, ypos, mv[0]>>2, mv[1]>>2, encoder_state->tile->lcu_offset_x * LCU_WIDTH, encoder_state->tile->lcu_offset_y * LCU_WIDTH,
+      extend_borders(xpos, ypos, mv[0]>>2, mv[1]>>2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
           ref->y, ref->width, ref->height, FILTER_SIZE_Y, width, width, qpel_src_y);
 
-      filter_inter_quarterpel_luma(encoder_state->encoder_control, qpel_src_off_y, width+FILTER_SIZE_Y, width,
+      filter_inter_quarterpel_luma(state->encoder_control, qpel_src_off_y, width+FILTER_SIZE_Y, width,
                                    width, qpel_dst_y, width*4, y_off_x, y_off_y);
 
       //Fractional chroma U
-      extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1), encoder_state->tile->lcu_offset_y * (LCU_WIDTH>>1),
+      extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, state->tile->lcu_offset_x * (LCU_WIDTH>>1), state->tile->lcu_offset_y * (LCU_WIDTH>>1),
           ref->u, ref->width>>1, ref->height>>1, FILTER_SIZE_C, width_c, width_c, octpel_src_u);
 
-      filter_inter_octpel_chroma(encoder_state->encoder_control, octpel_src_off_u, width_c+FILTER_SIZE_C, width_c,
+      filter_inter_octpel_chroma(state->encoder_control, octpel_src_off_u, width_c+FILTER_SIZE_C, width_c,
                                  width_c, octpel_dst_u, width_c*8, c_off_x, c_off_y);
 
       //Fractional chroma V
-      extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1), encoder_state->tile->lcu_offset_y * (LCU_WIDTH>>1),
+      extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, state->tile->lcu_offset_x * (LCU_WIDTH>>1), state->tile->lcu_offset_y * (LCU_WIDTH>>1),
           ref->v, ref->width>>1, ref->height>>1, FILTER_SIZE_C, width_c, width_c, octpel_src_v);
 
-      filter_inter_octpel_chroma(encoder_state->encoder_control, octpel_src_off_v, width_c+FILTER_SIZE_C, width_c,
+      filter_inter_octpel_chroma(state->encoder_control, octpel_src_off_v, width_c+FILTER_SIZE_C, width_c,
                    width_c, octpel_dst_v, width_c*8, c_off_x, c_off_y);
 
       //Sample fractional pixels for luma
@@ -189,7 +189,7 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
       // Fill source blocks with data from reference, -4...width+4
       for (halfpel_y = 0, y = (ypos>>1) - 4; y < ((ypos + width)>>1) + 4; halfpel_y++, y++) {
         // calculate y-pixel offset
-        coord_y = (y + encoder_state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1);
+        coord_y = (y + state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1);
 
         // On y-overflow set coord_y accordingly
         overflow_neg_y_temp = (coord_y < 0) ? 1 : 0;
@@ -199,7 +199,7 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
         coord_y *= ref_width_c;
 
         for (halfpel_x = 0, x = (xpos>>1) - 4; x < ((xpos + width)>>1) + 4; halfpel_x++, x++) {
-          coord_x = (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1);
+          coord_x = (x + state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1);
 
           // On x-overflow set coord_x accordingly
           overflow_neg_x_temp = (coord_x < 0) ? 1 : 0;
@@ -214,8 +214,8 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
       }
 
       // Filter the block to half-pel resolution
-      filter_inter_halfpel_chroma(encoder_state->encoder_control, halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH, abs_mv_x, abs_mv_y);
-      filter_inter_halfpel_chroma(encoder_state->encoder_control, halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
+      filter_inter_halfpel_chroma(state->encoder_control, halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH, abs_mv_x, abs_mv_y);
+      filter_inter_halfpel_chroma(state->encoder_control, halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
 
       // Assign filtered pixels to output, take every second half-pel sample with offset of abs_mv_y/x
       for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {
@@ -236,8 +236,8 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
           int x_in_lcu = (x & ((LCU_WIDTH)-1));
           int y_in_lcu = (y & ((LCU_WIDTH)-1));
 
-          coord_x = (x + encoder_state->tile->lcu_offset_x * LCU_WIDTH) + mv[0];
-          coord_y = (y + encoder_state->tile->lcu_offset_y * LCU_WIDTH) + mv[1];
+          coord_x = (x + state->tile->lcu_offset_x * LCU_WIDTH) + mv[0];
+          coord_y = (y + state->tile->lcu_offset_y * LCU_WIDTH) + mv[1];
           overflow_neg_x = (coord_x < 0)?1:0;
           overflow_neg_y = (coord_y < 0)?1:0;
 
@@ -271,8 +271,8 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
             int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
             int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
 
-            coord_x = (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH >> 1)) + (mv[0]>>1);
-            coord_y = (y + encoder_state->tile->lcu_offset_y * (LCU_WIDTH >> 1)) + (mv[1]>>1);
+            coord_x = (x + state->tile->lcu_offset_x * (LCU_WIDTH >> 1)) + (mv[0]>>1);
+            coord_y = (y + state->tile->lcu_offset_y * (LCU_WIDTH >> 1)) + (mv[1]>>1);
 
             overflow_neg_x = (coord_x < 0)?1:0;
             overflow_neg_y = (y + (mv[1]>>1) < 0)?1:0;
@@ -304,11 +304,11 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
       // Copy Luma
       for (y = ypos; y < ypos + width; y++) {
         int y_in_lcu = (y & ((LCU_WIDTH)-1));
-        coord_y = ((y + encoder_state->tile->lcu_offset_y * LCU_WIDTH) + mv[1]) * ref->width; // pre-calculate
+        coord_y = ((y + state->tile->lcu_offset_y * LCU_WIDTH) + mv[1]) * ref->width; // pre-calculate
         for (x = xpos; x < xpos + width; x++) {
           int x_in_lcu = (x & ((LCU_WIDTH)-1));
 
-          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y[coord_y + (x + encoder_state->tile->lcu_offset_x * LCU_WIDTH) + mv[0]];
+          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y[coord_y + (x + state->tile->lcu_offset_x * LCU_WIDTH) + mv[0]];
         }
       }
 
@@ -317,11 +317,11 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
         // TODO: chroma fractional pixel interpolation
         for (y = ypos>>1; y < (ypos + width)>>1; y++) {
           int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-          coord_y = ((y + encoder_state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1)) * ref_width_c; // pre-calculate
+          coord_y = ((y + state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1)) * ref_width_c; // pre-calculate
           for (x = xpos>>1; x < (xpos + width)>>1; x++) {
             int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
-            lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u[coord_y + (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
-            lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v[coord_y + (x + encoder_state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
+            lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u[coord_y + (x + state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
+            lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v[coord_y + (x + state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
           }
         }
       }
@@ -398,7 +398,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(const encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu)
+void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
@@ -408,8 +408,8 @@ void inter_get_mv_cand(const encoder_state_t * const encoder_state, int32_t x, i
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand) {int td = encoder_state->global->poc - encoder_state->global->ref->images[(cu)->inter.mv_ref]->poc;\
-                                   int tb = encoder_state->global->poc - encoder_state->global->ref->images[cur_cu->inter.mv_ref]->poc;\
+#define APPLY_MV_SCALING(cu, cand) {int td = state->global->poc - state->global->ref->images[(cu)->inter.mv_ref]->poc;\
+                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref]->poc;\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[0] + 127 + (scale * (cu)->inter.mv[0] < 0)) >> 8 ); \

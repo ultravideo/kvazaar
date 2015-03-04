@@ -174,28 +174,28 @@ typedef struct encoder_state_t {
 
 
 
-void encode_one_frame(encoder_state_t *encoder_state);
-int read_one_frame(FILE* file, const encoder_state_t *encoder);
+void encode_one_frame(encoder_state_t *state);
+int read_one_frame(FILE* file, const encoder_state_t *state);
 
-void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length);
-void encoder_next_frame(encoder_state_t *encoder_state);
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length);
+void encoder_next_frame(encoder_state_t *state);
 
 
-void encode_coding_tree(encoder_state_t *encoder, uint16_t x_ctb,
+void encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
-void encode_last_significant_xy(encoder_state_t *encoder,
+void encode_last_significant_xy(encoder_state_t *state,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan);
-void encode_coeff_nxn(encoder_state_t *encoder, int16_t *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state_t *state, int16_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void encode_transform_coeff(encoder_state_t *encoder_state, int32_t x_cu, int32_t y_cu,
+void encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control_t * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
-int encoder_state_match_children_of_previous_frame(encoder_state_t * const encoder_state);
+int encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
 
 coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth);
 

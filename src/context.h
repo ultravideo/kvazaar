@@ -34,9 +34,9 @@
 
 // Functions
 void ctx_init(cabac_ctx_t* ctx, uint32_t qp, uint32_t init_value);
-void init_contexts(encoder_state_t *encoder_state, int8_t QP, int8_t slice);
+void init_contexts(encoder_state_t *state, int8_t QP, int8_t slice);
 
-void context_copy(encoder_state_t * target_encoder_state, const encoder_state_t * source_encoder_state);
+void context_copy(encoder_state_t * target_state, const encoder_state_t * source_state);
 int32_t context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
 
 uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
