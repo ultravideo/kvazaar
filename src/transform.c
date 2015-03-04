@@ -323,7 +323,7 @@ void dequant(const encoder_state_t * const encoder_state, int16_t *q_coef, int16
  * \returns  Whether coeff_out contains any non-zero coefficients.
  */
 int quantize_residual(encoder_state_t *const encoder_state,
-                      const cu_info_t *const cur_cu, const int width, const color_index color,
+                      const cu_info_t *const cur_cu, const int width, const color_t color,
                       const coeff_scan_order_t scan_order, const int use_trskip, 
                       const int in_stride, const int out_stride,
                       const pixel_t *const ref_in, const pixel_t *const pred_in, 
@@ -437,7 +437,7 @@ int quantize_residual(encoder_state_t *const encoder_state,
  */
 int quantize_residual_trskip(
     encoder_state_t *const encoder_state,
-    const cu_info_t *const cur_cu, const int width, const color_index color,
+    const cu_info_t *const cur_cu, const int width, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
     const pixel_t *const ref_in, const pixel_t *const pred_in, 

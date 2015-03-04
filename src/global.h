@@ -205,7 +205,7 @@ typedef int16_t coeff_t;
 #define _DEBUG_PERF_SEARCH_PIXELS 0x0040
 
 //Constants
-typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_index;
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_t;
 enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
 
 #endif

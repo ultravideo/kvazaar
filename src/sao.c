@@ -243,7 +243,7 @@ static float sao_mode_bits_band(const encoder_state_t * const encoder_state,
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
-static void calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_index color_i)
+static void calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
 {
   int val;
   int values = (1<<encoder->bitdepth);
@@ -380,7 +380,7 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
                                   const sao_info_t *sao,
                                   int stride, int new_stride,
                                   int block_width, int block_height,
-                                  color_index color_i)
+                                  color_t color_i)
 {
   int y, x;
   // Arrays orig_data and rec_data are quarter size for chroma.
@@ -422,7 +422,7 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU
  */
-static void sao_calc_band_block_dims(const videoframe_t *frame, color_index color_i,
+static void sao_calc_band_block_dims(const videoframe_t *frame, color_t color_i,
                                      vector2d_t *rec, vector2d_t *block)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
@@ -477,7 +477,7 @@ static void sao_calc_band_block_dims(const videoframe_t *frame, color_index colo
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU, modified to be top-left corner of
  */
-static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_index color_i,
+static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_t color_i,
                                      const sao_info_t *sao, vector2d_t *rec,
                                      vector2d_t *tl, vector2d_t *br,
                                      vector2d_t *block)
@@ -529,7 +529,7 @@ static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_ind
 
 void sao_reconstruct(const encoder_control_t * const encoder, videoframe_t * frame, const pixel_t *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
-                     const sao_info_t *sao, color_index color_i)
+                     const sao_info_t *sao, color_t color_i)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
   const int pic_stride = frame->width >> is_chroma;
@@ -832,7 +832,7 @@ void sao_search_chroma(const encoder_state_t * const encoder_state, const videof
   const pixel_t *rec_list[2];
   pixel_t orig[2][LCU_CHROMA_SIZE];
   pixel_t rec[2][LCU_CHROMA_SIZE];
-  color_index color_i;
+  color_t color_i;
 
   // Check for right and bottom boundaries.
   if (x_ctb * (LCU_WIDTH / 2) + (LCU_WIDTH / 2) >= (unsigned)frame->width / 2) {

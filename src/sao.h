@@ -60,7 +60,7 @@ void sao_search_chroma(const encoder_state_t * encoder_state, const videoframe_t
 void sao_search_luma(const encoder_state_t * encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3]);
 void sao_reconstruct(const encoder_control_t * encoder, videoframe_t *frame, const pixel_t *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
-                     const sao_info_t *sao, color_index color_i);
+                     const sao_info_t *sao, color_t color_i);
 void sao_reconstruct_frame(encoder_state_t *encoder_state);
 
 #endif

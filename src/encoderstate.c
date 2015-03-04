@@ -133,7 +133,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state,
 
 
 static void encode_sao_color(encoder_state_t * const encoder_state, sao_info_t *sao,
-                             color_index color_i)
+                             color_t color_i)
 {
   cabac_data_t * const cabac = &encoder_state->cabac;
   sao_eo_cat i;
