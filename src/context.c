@@ -202,7 +202,7 @@ void ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
 
 void init_contexts(encoder_state_t *encoder_state, int8_t QP, int8_t slice)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   uint16_t i;
 
   // Initialize contexts
@@ -277,8 +277,8 @@ void init_contexts(encoder_state_t *encoder_state, int8_t QP, int8_t slice)
 }
 
 void context_copy(encoder_state_t * const target_encoder_state, const encoder_state_t * const source_encoder_state) {
-  cabac_data * const target_cabac = &target_encoder_state->cabac;
-  const cabac_data * const source_cabac = &source_encoder_state->cabac;
+  cabac_data_t * const target_cabac = &target_encoder_state->cabac;
+  const cabac_data_t * const source_cabac = &source_encoder_state->cabac;
   
   if (target_cabac == source_cabac) return;
 

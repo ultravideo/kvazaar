@@ -135,7 +135,7 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state,
 static void encode_sao_color(encoder_state_t * const encoder_state, sao_info *sao,
                              color_index color_i)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   sao_eo_cat i;
   int offset_index = (color_i == COLOR_V) ? 5 : 0;
 
@@ -186,7 +186,7 @@ static void encode_sao_color(encoder_state_t * const encoder_state, sao_info *sa
 
 static void encode_sao_merge_flags(encoder_state_t * const encoder_state, sao_info *sao, unsigned x_ctb, unsigned y_ctb)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   // SAO merge flags are not present for the first row and column.
   if (x_ctb > 0) {
     cabac->cur_ctx = &(cabac->ctx.sao_merge_flag_model);
@@ -945,7 +945,7 @@ void encoder_next_frame(encoder_state_t *encoder_state) {
 void encode_coding_tree(encoder_state_t * const encoder_state,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   const videoframe_t * const frame = encoder_state->tile->frame;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
@@ -1484,7 +1484,7 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
 void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   const videoframe_t * const frame = encoder_state->tile->frame;
@@ -1562,7 +1562,7 @@ void encode_coeff_nxn(encoder_state_t * const encoder_state, coefficient *coeff,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   int c1 = 1;
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
@@ -1791,7 +1791,7 @@ void encode_last_significant_xy(encoder_state_t * const encoder_state,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
   uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
   int group_idx_x;

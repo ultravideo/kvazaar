@@ -162,7 +162,7 @@ typedef struct encoder_state_t {
   uint32_t lcu_order_count;
   
   bitstream_t stream;
-  cabac_data cabac;
+  cabac_data_t cabac;
   
   int stats_done;
   uint32_t stats_bitstream_length; //Bitstream length written in bytes

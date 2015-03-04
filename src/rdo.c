@@ -280,7 +280,7 @@ int32_t get_ic_rate  (encoder_state_t * const encoder_state,
                           int8_t type
                           )
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   int32_t rate = 32768;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
   cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
@@ -342,7 +342,7 @@ uint32_t get_coded_level ( encoder_state_t * const encoder_state, double *coded_
                            uint32_t c1_idx, uint32_t c2_idx,
                            int32_t q_bits,double temp, int8_t last, int8_t type)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   double cur_cost_sig   = 0;
   uint32_t best_abs_level = 0;
   int32_t abs_level;
@@ -407,7 +407,7 @@ static double get_rate_last(const encoder_state_t * const encoder_state,
 static void calc_last_bits(encoder_state_t * const encoder_state, int32_t width, int32_t height, int8_t type,
                            int32_t* last_x_bits, int32_t* last_y_bits)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   int32_t bits_x = 0, bits_y = 0;
   int32_t blk_size_offset_x, blk_size_offset_y, shiftX, shiftY;
   int32_t ctx;
@@ -552,7 +552,7 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &encoder_state->cabac;
   uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;
   int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param   = 0;

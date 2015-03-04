@@ -122,7 +122,7 @@ void init_sao_info(sao_info *sao) {
 static float sao_mode_bits_none(const encoder_state_t * const encoder_state, sao_info *sao_top, sao_info *sao_left)
 {
   float mode_bits = 0.0;
-  const cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data_t * const cabac = &encoder_state->cabac;
   const cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
@@ -144,7 +144,7 @@ static float sao_mode_bits_none(const encoder_state_t * const encoder_state, sao
 static float sao_mode_bits_merge(const encoder_state_t * const encoder_state,
                                  int8_t merge_cand) {
   float mode_bits = 0.0;
-  const cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data_t * const cabac = &encoder_state->cabac;
   const cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   ctx = &(cabac->ctx.sao_merge_flag_model);
@@ -161,7 +161,7 @@ static float sao_mode_bits_edge(const encoder_state_t * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
-  const cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data_t * const cabac = &encoder_state->cabac;
   const cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
@@ -201,7 +201,7 @@ static float sao_mode_bits_band(const encoder_state_t * const encoder_state,
                               sao_info *sao_top, sao_info *sao_left, unsigned buf_cnt)
 {
   float mode_bits = 0.0;
-  const cabac_data * const cabac = &encoder_state->cabac;
+  const cabac_data_t * const cabac = &encoder_state->cabac;
   const cabac_ctx_t *ctx = NULL;
   // FL coded merges.
   if (sao_left != NULL) {
