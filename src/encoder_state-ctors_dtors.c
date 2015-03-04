@@ -86,7 +86,8 @@ static int encoder_state_config_tile_init(encoder_state_t * const encoder_state,
   }
   
   if (encoder->wpp) {
-    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job*, encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu);
+    int num_jobs = encoder_state->tile->frame->width_in_lcu * encoder_state->tile->frame->height_in_lcu;
+    encoder_state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
     if (!encoder_state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
       return 0;

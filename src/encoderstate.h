@@ -101,7 +101,7 @@ typedef struct {
   yuv_t *ver_buf_before_sao;
   
   //Job pointers for wavefronts
-  threadqueue_job **wf_jobs;
+  threadqueue_job_t **wf_jobs;
 } encoder_state_config_tile_t;
 
 typedef struct {
@@ -168,8 +168,8 @@ typedef struct encoder_state_t {
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
   
   //Jobs to wait for
-  threadqueue_job * tqj_recon_done; //Reconstruction is done
-  threadqueue_job * tqj_bitstream_written; //Bitstream is written
+  threadqueue_job_t * tqj_recon_done; //Reconstruction is done
+  threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
 } encoder_state_t;
 
 

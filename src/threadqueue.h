@@ -31,14 +31,14 @@ typedef enum {
   THREADQUEUE_JOB_STATE_DONE = 2
 } threadqueue_job_state;
 
-typedef struct threadqueue_job {
+typedef struct threadqueue_job_t {
   pthread_mutex_t lock;
   
   threadqueue_job_state state;
   
   unsigned int ndepends; //Number of active dependencies that this job wait for
   
-  struct threadqueue_job **rdepends; //array of pointer to jobs that depend on this one. They have to exist when the thread finishes, because they cannot be run before.
+  struct threadqueue_job_t **rdepends; //array of pointer to jobs that depend on this one. They have to exist when the thread finishes, because they cannot be run before.
   unsigned int rdepends_count; //number of rdepends
   unsigned int rdepends_size; //allocated size of rdepends
   
@@ -56,7 +56,7 @@ typedef struct threadqueue_job {
   CLOCK_T debug_clock_stop;
   CLOCK_T debug_clock_dequeue;
 #endif
-} threadqueue_job;
+} threadqueue_job_t;
 
 
   
@@ -74,7 +74,7 @@ typedef struct {
   
   int fifo;
   
-  threadqueue_job **queue;
+  threadqueue_job_t **queue;
   unsigned int queue_start;
   unsigned int queue_count;
   unsigned int queue_size;
@@ -100,18 +100,18 @@ typedef struct {
 int threadqueue_init(threadqueue_queue * threadqueue, int thread_count, int fifo);
 
 //Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run threadqueue_job_unwait_job in order to have it run
-threadqueue_job * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
+threadqueue_job_t * threadqueue_submit(threadqueue_queue * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
 
-int threadqueue_job_unwait_job(threadqueue_queue * threadqueue, threadqueue_job *job);
+int threadqueue_job_unwait_job(threadqueue_queue * threadqueue, threadqueue_job_t *job);
 
 //Add a dependency between two jobs.
-int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on);
+int threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on);
 
 //Blocking call until the queue is empty. Previously set threadqueue_job handles should not be used anymore
 int threadqueue_flush(threadqueue_queue * threadqueue);
 
 //Blocking call until job is executed. Job handles submitted before job should not be used any more as they are removed from the queue.
-int threadqueue_waitfor(threadqueue_queue * threadqueue, threadqueue_job * job);
+int threadqueue_waitfor(threadqueue_queue * threadqueue, threadqueue_job_t * job);
 
 //Free ressources in a threadqueue
 int threadqueue_finalize(threadqueue_queue * threadqueue);

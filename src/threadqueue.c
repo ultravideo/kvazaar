@@ -79,7 +79,7 @@ const struct timespec time_to_wait = {1, 0};
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   threadqueue_worker_spec * const threadqueue_worker_spec = threadqueue_worker_spec_opaque;
   threadqueue_queue * const threadqueue = threadqueue_worker_spec->threadqueue;
-  threadqueue_job * next_job = NULL;
+  threadqueue_job_t * next_job = NULL;
   
 #ifdef _DEBUG
   GET_TIME(&threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]);
@@ -87,7 +87,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
 
   for(;;) {
     int i = 0;
-    threadqueue_job * job = NULL;
+    threadqueue_job_t * job = NULL;
     
     PTHREAD_LOCK(&threadqueue->lock);
 
@@ -118,7 +118,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       for (i = (threadqueue->fifo ? threadqueue->queue_start : threadqueue->queue_count - 1);
            (threadqueue->fifo ? i < threadqueue->queue_count : i >= threadqueue->queue_start); 
            (threadqueue->fifo ? ++i : --i)) {
-        threadqueue_job * const i_job = threadqueue->queue[i];
+        threadqueue_job_t * const i_job = threadqueue->queue[i];
         
         if (i_job->state == THREADQUEUE_JOB_STATE_QUEUED && i_job->ndepends == 0) {
           PTHREAD_LOCK(&i_job->lock);
@@ -175,7 +175,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       queue_waiting_execution_incr = 0;
       //Decrease counter of dependencies
       for (i = 0; i < job->rdepends_count; ++i) {
-        threadqueue_job * const depjob = job->rdepends[i];
+        threadqueue_job_t * const depjob = job->rdepends[i];
         //Note that we lock the dependency AFTER locking the source. This avoids a deadlock in dep_add
         PTHREAD_LOCK(&depjob->lock);
         
@@ -461,7 +461,7 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
   return 1;
 }
 
-int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job * const job) {
+int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job_t * const job) {
   int job_done = 0;
   
   //NULL job is clearly OK :-)
@@ -509,8 +509,8 @@ int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job *
   return 1;
 }
 
-threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
-  threadqueue_job *job;
+threadqueue_job_t * threadqueue_submit(threadqueue_queue * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
+  threadqueue_job_t *job;
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
     //FIXME: This should be improved in order to handle dependencies
@@ -522,7 +522,7 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
   
   assert(wait == 0 || wait == 1);
   
-  job = MALLOC(threadqueue_job, 1);
+  job = MALLOC(threadqueue_job_t, 1);
   
 #ifdef _DEBUG
   if (debug_description) {
@@ -569,7 +569,7 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
   
   //Add the reverse dependency
   if (threadqueue->queue_count >= threadqueue->queue_size) {
-    threadqueue->queue = realloc(threadqueue->queue, sizeof(threadqueue_job *) * (threadqueue->queue_size + THREADQUEUE_LIST_REALLOC_SIZE));
+    threadqueue->queue = realloc(threadqueue->queue, sizeof(threadqueue_job_t *) * (threadqueue->queue_size + THREADQUEUE_LIST_REALLOC_SIZE));
     if (!threadqueue->queue) {
       fprintf(stderr, "Could not realloc queue!\n");
       assert(0);
@@ -592,7 +592,7 @@ threadqueue_job * threadqueue_submit(threadqueue_queue * const threadqueue, void
   return job;
 }
 
-int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
+int threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on) {
   //If we are not using threads, job are NULL pointers, so we can skip that
   if (!job && !depends_on) return 1;
   
@@ -608,7 +608,7 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
   
   //Add the reverse dependency (FIXME: this may be moved in the if above... but we would lose ability to track)
   if (depends_on->rdepends_count >= depends_on->rdepends_size) {
-    depends_on->rdepends = realloc(depends_on->rdepends, sizeof(threadqueue_job *) * (depends_on->rdepends_size + THREADQUEUE_LIST_REALLOC_SIZE));
+    depends_on->rdepends = realloc(depends_on->rdepends, sizeof(threadqueue_job_t *) * (depends_on->rdepends_size + THREADQUEUE_LIST_REALLOC_SIZE));
     if (!depends_on->rdepends) {
       fprintf(stderr, "Could not realloc rdepends!\n");
       assert(0);
@@ -624,7 +624,7 @@ int threadqueue_job_dep_add(threadqueue_job *job, threadqueue_job *depends_on) {
   return 1;
 }
 
-int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueue_job *job) {
+int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueue_job_t *job) {
   int ndepends = 0;
   
   //NULL job =>  no threads, nothing to do

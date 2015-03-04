@@ -426,7 +426,7 @@ static void encoder_state_worker_encode_children(void * opaque) {
       encoder_state_write_bitstream_leaf(sub_state);
       PERFORMANCE_MEASURE_END(_DEBUG_PERF_WRITE_BITSTREAM_LEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
     } else {
-      threadqueue_job *job;
+      threadqueue_job_t *job;
 #ifdef _DEBUG
       char job_description[256];
       sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
@@ -579,11 +579,11 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
         int y;
         videoframe_t * const frame = main_state->tile->frame;
-        threadqueue_job *previous_job = NULL;
+        threadqueue_job_t *previous_job = NULL;
         
         for (y = 0; y < frame->height_in_lcu; ++y) {
           worker_sao_reconstruct_lcu_data *data = MALLOC(worker_sao_reconstruct_lcu_data, 1);
-          threadqueue_job *job;
+          threadqueue_job_t *job;
 #ifdef _DEBUG
           char job_description[256];
           sprintf(job_description, "type=sao,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d", main_state->global->frame, main_state->tile->id, main_state->tile->lcu_offset_x * LCU_WIDTH, main_state->tile->lcu_offset_x * LCU_WIDTH + main_state->tile->frame->width - 1, (main_state->tile->lcu_offset_y + y) * LCU_WIDTH, MIN(main_state->tile->lcu_offset_y * LCU_WIDTH + main_state->tile->frame->height, (main_state->tile->lcu_offset_y + y + 1) * LCU_WIDTH)-1);
@@ -698,7 +698,7 @@ static void encoder_state_new_frame(encoder_state_t * const main_state) {
 
 }
 
-static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const encoder_state, threadqueue_job * const job) {
+static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const encoder_state, threadqueue_job_t * const job) {
   int i;
   for (i = 0; encoder_state->children[i].encoder_control; ++i) {
     _encode_one_frame_add_bitstream_deps(&encoder_state->children[i], job);
@@ -726,7 +726,7 @@ void encode_one_frame(encoder_state_t * const main_state)
   }
   //threadqueue_flush(main_state->encoder_control->threadqueue);
   {
-    threadqueue_job *job;
+    threadqueue_job_t *job;
 #ifdef _DEBUG
     char job_description[256];
     sprintf(job_description, "type=write_bitstream,frame=%d", main_state->global->frame);
