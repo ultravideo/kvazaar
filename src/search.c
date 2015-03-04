@@ -958,7 +958,7 @@ static double cu_rd_cost_luma(const encoder_state_t *const encoder_state,
       && width > TR_MIN_WIDTH
       && !intra_split_flag)
   {
-    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+    const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, tr_depth > 0);
   }
 
@@ -980,7 +980,7 @@ static double cu_rd_cost_luma(const encoder_state_t *const encoder_state,
       cbf_is_set(tr_cu->cbf.u, depth) ||
       cbf_is_set(tr_cu->cbf.v, depth))
   {
-    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
+    const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.y, depth + pu_index));
   }
 
@@ -1030,7 +1030,7 @@ static double cu_rd_cost_chroma(const encoder_state_t *const encoder_state,
 
   if (depth < MAX_PU_DEPTH) {
     const int tr_depth = depth - pred_cu->depth;
-    const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+    const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
     if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
       tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
     }
@@ -1183,7 +1183,7 @@ static double search_intra_trdepth(encoder_state_t * const encoder_state,
     // Add bits for split_transform_flag = 1, because transform depth search bypasses
     // the normal recursion in the cost functions.
     if (depth >= 1 && depth <= 3) {
-      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
+      const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.trans_subdiv_model[5 - (6 - depth)]);
       tr_split_bit += CTX_ENTROPY_FBITS(ctx, 1);
     }
 
@@ -1196,7 +1196,7 @@ static double search_intra_trdepth(encoder_state_t * const encoder_state,
     {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
-      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
+      const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
       if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
         cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
       }
@@ -1242,7 +1242,7 @@ static double luma_mode_bits(const encoder_state_t *encoder_state, int8_t luma_m
     }
   }
 
-  const cabac_ctx *ctx = &(encoder_state->cabac.ctx.intra_mode_model);
+  const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.intra_mode_model);
   mode_bits = CTX_ENTROPY_FBITS(ctx, mode_in_preds);
 
   if (mode_in_preds) {
@@ -1257,7 +1257,7 @@ static double luma_mode_bits(const encoder_state_t *encoder_state, int8_t luma_m
 
 static double chroma_mode_bits(const encoder_state_t *encoder_state, int8_t chroma_mode, int8_t luma_mode)
 {
-  const cabac_ctx *ctx = &(encoder_state->cabac.ctx.chroma_pred_model[0]);
+  const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.chroma_pred_model[0]);
   double mode_bits;
   if (chroma_mode == luma_mode) {
     mode_bits = CTX_ENTROPY_FBITS(ctx, 0);
@@ -1376,7 +1376,7 @@ static double get_cost(encoder_state_t * const encoder_state,
 
     // Add the offset bit costs of signaling 'luma and chroma use trskip',
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
-    const cabac_ctx *ctx = &encoder_state->cabac.ctx.transform_skip_model_luma;
+    const cabac_ctx_t *ctx = &encoder_state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
     ctx = &encoder_state->cabac.ctx.transform_skip_model_chroma;
     trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
@@ -2057,13 +2057,13 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
     if (depth < MAX_DEPTH) {
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
 
-      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
+      const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
       cost += CTX_ENTROPY_FBITS(ctx, 0);
       split_cost += CTX_ENTROPY_FBITS(ctx, 1);
     }
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
-      const cabac_ctx *ctx = &(encoder_state->cabac.ctx.part_size_model[0]);
+      const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.part_size_model[0]);
       cost += CTX_ENTROPY_FBITS(ctx, 1);  // 2Nx2N
       split_cost += CTX_ENTROPY_FBITS(ctx, 0);  // NxN
     }
@@ -2108,7 +2108,7 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
         cost += cu_rd_cost_chroma(encoder_state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
 
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-        const cabac_ctx *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
+        const cabac_ctx_t *ctx = &(encoder_state->cabac.ctx.split_flag_model[split_model]);
         cost += CTX_ENTROPY_FBITS(ctx, 0);
 
         double mode_bits = calc_mode_bits(encoder_state, cur_cu, x, y);

@@ -1587,8 +1587,8 @@ void encode_coeff_nxn(encoder_state_t * const encoder_state, coefficient *coeff,
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
 
   // Init base contexts according to block type
-  cabac_ctx *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
-  cabac_ctx *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx_t *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
                                  &(cabac->ctx.cu_sig_model_chroma[0]);
   FILL(sig_coeffgroup_flag, 0);
 
@@ -1705,7 +1705,7 @@ void encode_coeff_nxn(encoder_state_t * const encoder_state, coefficient *coeff,
       int8_t sign_hidden = (last_nz_pos_in_cg - first_nz_pos_in_cg >=
                             4 /*SBH_THRESHOLD*/) ? 1 : 0;
       uint32_t ctx_set  = (i > 0 && type == 0) ? 2 : 0;
-      cabac_ctx *base_ctx_mod;
+      cabac_ctx_t *base_ctx_mod;
       int32_t num_c1_flag, first_c2_flag_idx, idx, first_coeff2;
 
       if (c1 == 0) {
@@ -1797,8 +1797,8 @@ void encode_last_significant_xy(encoder_state_t * const encoder_state,
   int group_idx_x;
   int group_idx_y;
   int last_x,last_y,i;
-  cabac_ctx *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
-  cabac_ctx *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
+  cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
+  cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
   if (scan == SCAN_VER) {
     SWAP( lastpos_x, lastpos_y,uint8_t );

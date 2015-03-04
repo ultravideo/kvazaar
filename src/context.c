@@ -181,7 +181,7 @@ static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
 /**
  * \brief Initialize struct cabac_ctx.
  */
-void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
+void ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
 {
   int slope = (init_value >> 4) * 5 - 45;
   int offset = ((init_value & 15) << 3) - 16;

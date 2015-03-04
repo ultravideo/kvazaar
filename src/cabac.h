@@ -34,11 +34,11 @@
 typedef struct
 {
   uint8_t  uc_state;
-} cabac_ctx;
+} cabac_ctx_t;
 
 typedef struct
 {
-  cabac_ctx *cur_ctx;
+  cabac_ctx_t *cur_ctx;
   uint32_t   low;
   uint32_t   range;
   uint32_t   buffered_byte;
@@ -49,36 +49,36 @@ typedef struct
 
   // CONTEXTS
   struct {
-    cabac_ctx sao_merge_flag_model;
-    cabac_ctx sao_type_idx_model;
-    cabac_ctx split_flag_model[3]; //!< \brief split flag context models
-    cabac_ctx intra_mode_model;    //!< \brief intra mode context models
-    cabac_ctx chroma_pred_model[2];
-    cabac_ctx trans_subdiv_model[3]; //!< \brief intra mode context models
-    cabac_ctx qt_cbf_model_luma[4];
-    cabac_ctx qt_cbf_model_chroma[4];
-    cabac_ctx part_size_model[4];
-    cabac_ctx cu_sig_coeff_group_model[4];
-    cabac_ctx cu_sig_model_luma[27];
-    cabac_ctx cu_sig_model_chroma[15];
-    cabac_ctx cu_ctx_last_y_luma[15];
-    cabac_ctx cu_ctx_last_y_chroma[15];
-    cabac_ctx cu_ctx_last_x_luma[15];
-    cabac_ctx cu_ctx_last_x_chroma[15];
-    cabac_ctx cu_one_model_luma[16];
-    cabac_ctx cu_one_model_chroma[8];
-    cabac_ctx cu_abs_model_luma[4];
-    cabac_ctx cu_abs_model_chroma[2];
-    cabac_ctx cu_pred_mode_model;
-    cabac_ctx cu_skip_flag_model[3];
-    cabac_ctx cu_merge_idx_ext_model;
-    cabac_ctx cu_merge_flag_ext_model;
-    cabac_ctx cu_mvd_model[2];
-    cabac_ctx cu_ref_pic_model[2];
-    cabac_ctx mvp_idx_model[2];
-    cabac_ctx cu_qt_root_cbf_model;
-    cabac_ctx transform_skip_model_luma;
-    cabac_ctx transform_skip_model_chroma;
+    cabac_ctx_t sao_merge_flag_model;
+    cabac_ctx_t sao_type_idx_model;
+    cabac_ctx_t split_flag_model[3]; //!< \brief split flag context models
+    cabac_ctx_t intra_mode_model;    //!< \brief intra mode context models
+    cabac_ctx_t chroma_pred_model[2];
+    cabac_ctx_t trans_subdiv_model[3]; //!< \brief intra mode context models
+    cabac_ctx_t qt_cbf_model_luma[4];
+    cabac_ctx_t qt_cbf_model_chroma[4];
+    cabac_ctx_t part_size_model[4];
+    cabac_ctx_t cu_sig_coeff_group_model[4];
+    cabac_ctx_t cu_sig_model_luma[27];
+    cabac_ctx_t cu_sig_model_chroma[15];
+    cabac_ctx_t cu_ctx_last_y_luma[15];
+    cabac_ctx_t cu_ctx_last_y_chroma[15];
+    cabac_ctx_t cu_ctx_last_x_luma[15];
+    cabac_ctx_t cu_ctx_last_x_chroma[15];
+    cabac_ctx_t cu_one_model_luma[16];
+    cabac_ctx_t cu_one_model_chroma[8];
+    cabac_ctx_t cu_abs_model_luma[4];
+    cabac_ctx_t cu_abs_model_chroma[2];
+    cabac_ctx_t cu_pred_mode_model;
+    cabac_ctx_t cu_skip_flag_model[3];
+    cabac_ctx_t cu_merge_idx_ext_model;
+    cabac_ctx_t cu_merge_flag_ext_model;
+    cabac_ctx_t cu_mvd_model[2];
+    cabac_ctx_t cu_ref_pic_model[2];
+    cabac_ctx_t mvp_idx_model[2];
+    cabac_ctx_t cu_qt_root_cbf_model;
+    cabac_ctx_t transform_skip_model_luma;
+    cabac_ctx_t transform_skip_model_chroma;
   } ctx;
 } cabac_data;
 
@@ -103,7 +103,7 @@ void cabac_write_coeff_remain(cabac_data *cabac, uint32_t symbol,
                               uint32_t r_param);
 void cabac_write_ep_ex_golomb(cabac_data *data, uint32_t symbol,
                               uint32_t count);
-void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx *ctx,
+void cabac_write_unary_max_symbol(cabac_data *data, cabac_ctx_t *ctx,
                                   uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
 void cabac_write_unary_max_symbol_ep(cabac_data *data, unsigned int symbol, unsigned int max_symbol);

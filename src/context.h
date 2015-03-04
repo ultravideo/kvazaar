@@ -33,7 +33,7 @@
 
 
 // Functions
-void ctx_init(cabac_ctx* ctx, uint32_t qp, uint32_t init_value);
+void ctx_init(cabac_ctx_t* ctx, uint32_t qp, uint32_t init_value);
 void init_contexts(encoder_state_t *encoder_state, int8_t QP, int8_t slice);
 
 void context_copy(encoder_state_t * target_encoder_state, const encoder_state_t * source_encoder_state);

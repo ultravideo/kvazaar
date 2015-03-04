@@ -299,7 +299,7 @@ void cabac_write_coeff_remain(cabac_data * const cabac, const uint32_t symbol, c
 /**
  * \brief
  */
-void cabac_write_unary_max_symbol(cabac_data * const data, cabac_ctx * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
+void cabac_write_unary_max_symbol(cabac_data * const data, cabac_ctx_t * const ctx, uint32_t symbol, const int32_t offset, const uint32_t max_symbol)
 {
   int8_t code_last = max_symbol > symbol;
 

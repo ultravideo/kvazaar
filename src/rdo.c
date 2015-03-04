@@ -283,8 +283,8 @@ int32_t get_ic_rate  (encoder_state_t * const encoder_state,
   cabac_data * const cabac = &encoder_state->cabac;
   int32_t rate = 32768;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
-  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
-  cabac_ctx *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
+  cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
+  cabac_ctx_t *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
 
   if ( abs_level >= base_level ) {
     int32_t symbol     = abs_level - base_level;
@@ -347,7 +347,7 @@ uint32_t get_coded_level ( encoder_state_t * const encoder_state, double *coded_
   uint32_t best_abs_level = 0;
   int32_t abs_level;
   int32_t min_abs_level;
-  cabac_ctx* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma):(cabac->ctx.cu_sig_model_luma);
+  cabac_ctx_t* base_sig_model = type?(cabac->ctx.cu_sig_model_chroma):(cabac->ctx.cu_sig_model_luma);
 
   if( !last && max_abs_level < 3 ) {
     *coded_cost_sig = encoder_state->global->cur_lambda_cost * CTX_ENTROPY_BITS(&base_sig_model[ctx_num_sig], 0);
@@ -412,8 +412,8 @@ static void calc_last_bits(encoder_state_t * const encoder_state, int32_t width,
   int32_t blk_size_offset_x, blk_size_offset_y, shiftX, shiftY;
   int32_t ctx;
 
-  cabac_ctx *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
-  cabac_ctx *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
+  cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
+  cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
   blk_size_offset_x = type ? 0: (g_convert_to_bit[ width ] *3 + ((g_convert_to_bit[ width ] +1)>>2));
   blk_size_offset_y = type ? 0: (g_convert_to_bit[ height ]*3 + ((g_convert_to_bit[ height ]+1)>>2));
@@ -606,9 +606,9 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
   uint32_t cg_num = width * height >> 4;
   int32_t  scanpos;
 
-  cabac_ctx *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
-  cabac_ctx *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) : &(cabac->ctx.cu_sig_model_chroma[0]);
-  cabac_ctx *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
+  cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
+  cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) : &(cabac->ctx.cu_sig_model_chroma[0]);
+  cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
 
   double  best_cost        = 0;
   int32_t ctx_cbf          = 0;
@@ -824,7 +824,7 @@ void  rdoq(encoder_state_t * const encoder_state, coefficient *coef, coefficient
     best_cost  = block_uncoded_cost +   encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),0);
     base_cost +=   encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&(cabac->ctx.cu_qt_root_cbf_model),1);
   } else {
-    cabac_ctx* base_cbf_model = type?(cabac->ctx.qt_cbf_model_chroma):(cabac->ctx.qt_cbf_model_luma);
+    cabac_ctx_t* base_cbf_model = type?(cabac->ctx.qt_cbf_model_chroma):(cabac->ctx.qt_cbf_model_luma);
     ctx_cbf   = ( type ? tr_depth : !tr_depth);
     best_cost  = block_uncoded_cost +  encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],0);
     base_cost +=   encoder_state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&base_cbf_model[ctx_cbf],1);
