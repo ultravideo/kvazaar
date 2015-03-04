@@ -94,12 +94,12 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
   // Chroma half-pel
   #define HALFPEL_CHROMA_WIDTH ((LCU_WIDTH>>1) + 8)
   int8_t chroma_halfpel = ((mv[0]>>2)&1) || ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
-  pixel halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< U source block for interpolation
-  pixel halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< V source block for interpolation
-  pixel *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_u with offset (4,4)
-  pixel *halfpel_src_off_v = &halfpel_src_v[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_v with offset (4,4)
-  pixel halfpel_u[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (u)
-  pixel halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
+  pixel_t halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< U source block for interpolation
+  pixel_t halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< V source block for interpolation
+  pixel_t *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_u with offset (4,4)
+  pixel_t *halfpel_src_off_v = &halfpel_src_v[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_v with offset (4,4)
+  pixel_t halfpel_u[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (u)
+  pixel_t halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
 
   // Luma quarter-pel
     int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
@@ -117,19 +117,19 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
       #define FILTER_SIZE_C 4 //Chroma filter size
 
       // Fractional luma 1/4-pel
-      pixel qpel_src_y[(LCU_WIDTH+FILTER_SIZE_Y) * (LCU_WIDTH+FILTER_SIZE_Y)];
-      pixel* qpel_src_off_y = &qpel_src_y[(width+FILTER_SIZE_Y)*(FILTER_SIZE_Y>>1)+(FILTER_SIZE_Y>>1)];
-      pixel qpel_dst_y[LCU_WIDTH*LCU_WIDTH*16];
+      pixel_t qpel_src_y[(LCU_WIDTH+FILTER_SIZE_Y) * (LCU_WIDTH+FILTER_SIZE_Y)];
+      pixel_t* qpel_src_off_y = &qpel_src_y[(width+FILTER_SIZE_Y)*(FILTER_SIZE_Y>>1)+(FILTER_SIZE_Y>>1)];
+      pixel_t qpel_dst_y[LCU_WIDTH*LCU_WIDTH*16];
 
       // Fractional chroma 1/8-pel
       int width_c = width>>1;
-      pixel octpel_src_u[((LCU_WIDTH>>1)+FILTER_SIZE_C) * ((LCU_WIDTH>>1)+FILTER_SIZE_C)];
-      pixel* octpel_src_off_u = &octpel_src_u[(width_c+FILTER_SIZE_C)*(FILTER_SIZE_C>>1)+(FILTER_SIZE_C>>1)];
-      pixel octpel_dst_u[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
+      pixel_t octpel_src_u[((LCU_WIDTH>>1)+FILTER_SIZE_C) * ((LCU_WIDTH>>1)+FILTER_SIZE_C)];
+      pixel_t* octpel_src_off_u = &octpel_src_u[(width_c+FILTER_SIZE_C)*(FILTER_SIZE_C>>1)+(FILTER_SIZE_C>>1)];
+      pixel_t octpel_dst_u[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
 
-      pixel octpel_src_v[((LCU_WIDTH >> 1) + FILTER_SIZE_C) * ((LCU_WIDTH >> 1) + FILTER_SIZE_C)];
-      pixel* octpel_src_off_v = &octpel_src_v[(width_c + FILTER_SIZE_C)*(FILTER_SIZE_C >> 1) + (FILTER_SIZE_C >> 1)];
-      pixel octpel_dst_v[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
+      pixel_t octpel_src_v[((LCU_WIDTH >> 1) + FILTER_SIZE_C) * ((LCU_WIDTH >> 1) + FILTER_SIZE_C)];
+      pixel_t* octpel_src_off_v = &octpel_src_v[(width_c + FILTER_SIZE_C)*(FILTER_SIZE_C >> 1) + (FILTER_SIZE_C >> 1)];
+      pixel_t octpel_dst_v[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
 
       // Fractional luma
       extend_borders(xpos, ypos, mv[0]>>2, mv[1]>>2, encoder_state->tile->lcu_offset_x * LCU_WIDTH, encoder_state->tile->lcu_offset_y * LCU_WIDTH,
@@ -159,7 +159,7 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
         for(x = 0; x < width; ++x) {
           int x_in_lcu = ((x+xpos) & ((LCU_WIDTH)-1));
           int qpel_x = x*4+y_off_x;
-          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel)qpel_dst_y[qpel_y*(width*4)+qpel_x];
+          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel_t)qpel_dst_y[qpel_y*(width*4)+qpel_x];
         }
       }
       //Sample fractional pixels for chroma
@@ -169,8 +169,8 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
         for(x = 0; x < width_c; ++x) {
           int x_in_lcu = ((x+(xpos>>1)) & ((LCU_WIDTH>>1)-1));
           int qpel_x = x*8+c_off_x;
-          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (pixel)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
-          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (pixel)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
+          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (pixel_t)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
+          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (pixel_t)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
         }
       }
     }
@@ -222,8 +222,8 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image_t 
         for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
           int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
           int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (pixel)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
-          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (pixel)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (pixel_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (pixel_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
         }
       }
     }

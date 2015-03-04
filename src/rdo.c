@@ -170,7 +170,7 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 
  ** Only for luma
  */
-uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel *pred, pixel *orig_block, int width, int8_t mode, int tr_depth)
+uint32_t rdo_cost_intra(encoder_state_t * const encoder_state, pixel_t *pred, pixel_t *orig_block, int width, int8_t mode, int tr_depth)
 {
     const encoder_control_t * const encoder = encoder_state->encoder_control;
     coeff_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];

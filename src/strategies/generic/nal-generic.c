@@ -29,7 +29,7 @@
 #include "nal.h"
 
 
-static void array_checksum_generic(const pixel* data,
+static void array_checksum_generic(const pixel_t* data,
                                    const int height, const int width,
                                    const int stride,
                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH]) {
@@ -52,7 +52,7 @@ static void array_checksum_generic(const pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-static void array_checksum_generic4(const pixel* data,
+static void array_checksum_generic4(const pixel_t* data,
                                    const int height, const int width,
                                    const int stride,
                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH]) {
@@ -95,7 +95,7 @@ static void array_checksum_generic4(const pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-static void array_checksum_generic8(const pixel* data,
+static void array_checksum_generic8(const pixel_t* data,
                                    const int height, const int width,
                                    const int stride,
                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH]) {

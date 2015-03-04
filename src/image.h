@@ -32,12 +32,12 @@
  */
 typedef struct image_t
 {
-  pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
+  pixel_t *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
 
-  pixel *y;                //!< \brief Pointer to luma pixel array.
-  pixel *u;                //!< \brief Pointer to chroma U pixel array.
-  pixel *v;                //!< \brief Pointer to chroma V pixel array.
-  pixel *data[NUM_COLORS]; //!< \brief Alternate access method to same data.
+  pixel_t *y;                //!< \brief Pointer to luma pixel array.
+  pixel_t *u;                //!< \brief Pointer to chroma U pixel array.
+  pixel_t *v;                //!< \brief Pointer to chroma V pixel array.
+  pixel_t *data[NUM_COLORS]; //!< \brief Alternate access method to same data.
 
   int32_t width;           //!< \brief Luma pixel array width.
   int32_t height;          //!< \brief Luma pixel array height.
@@ -51,16 +51,16 @@ typedef struct image_t
 } image_t;
 
 typedef struct {
-  pixel y[LCU_LUMA_SIZE];
-  pixel u[LCU_CHROMA_SIZE];
-  pixel v[LCU_CHROMA_SIZE];
+  pixel_t y[LCU_LUMA_SIZE];
+  pixel_t u[LCU_CHROMA_SIZE];
+  pixel_t v[LCU_CHROMA_SIZE];
 } lcu_yuv_t;
 
 typedef struct {
   int size;
-  pixel *y;
-  pixel *u;
-  pixel *v;
+  pixel_t *y;
+  pixel_t *u;
+  pixel_t *v;
 } yuv_t;
 
 
@@ -76,12 +76,12 @@ unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int p
                         int block_width, int block_height, int max_lcu_below);
 
 
-unsigned pixels_calc_ssd(const pixel *const ref, const pixel *const rec,
+unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
                   const int ref_stride, const int rec_stride,
                   const int width);
 
 
-void pixels_blit(const pixel* orig, pixel *dst,
+void pixels_blit(const pixel_t* orig, pixel_t *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 

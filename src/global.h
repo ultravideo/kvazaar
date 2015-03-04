@@ -48,9 +48,9 @@
 #define PIXEL_MAX ((1 << BIT_DEPTH) - 1)
 
 #if BIT_DEPTH == 8
-typedef uint8_t pixel;
+typedef uint8_t pixel_t;
 #else
-typedef uint16_t pixel;
+typedef uint16_t pixel_t;
 #endif
 typedef int16_t coeff_t;
 

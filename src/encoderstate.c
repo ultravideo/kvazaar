@@ -457,9 +457,9 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   int x;
   
   //TODO: copy only needed data
-  pixel *new_y_data = MALLOC(pixel, frame->width * frame->height);
-  pixel *new_u_data = MALLOC(pixel, (frame->width * frame->height) >> 2);
-  pixel *new_v_data = MALLOC(pixel, (frame->width * frame->height) >> 2);
+  pixel_t *new_y_data = MALLOC(pixel_t, frame->width * frame->height);
+  pixel_t *new_u_data = MALLOC(pixel_t, (frame->width * frame->height) >> 2);
+  pixel_t *new_v_data = MALLOC(pixel_t, (frame->width * frame->height) >> 2);
   
   const int offset = frame->width * (data->y*LCU_WIDTH);
   const int offset_c = frame->width/2 * (data->y*LCU_WIDTH_C);
@@ -469,15 +469,15 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
     num_pixels = frame->width * frame->height - offset;
   }
   
-  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(pixel) * num_pixels);
-  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(pixel) * num_pixels >> 2);
-  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(pixel) * num_pixels >> 2);
+  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(pixel_t) * num_pixels);
+  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(pixel_t) * num_pixels >> 2);
+  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(pixel_t) * num_pixels >> 2);
   
   if (data->y>0) {
     //copy first row from buffer
-    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(pixel));
-    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel));
-    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel));
+    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(pixel_t));
+    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel_t));
+    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel_t));
   }
 
   for (x = 0; x < frame->width_in_lcu; x++) {
@@ -749,10 +749,10 @@ void encode_one_frame(encoder_state_t * const main_state)
 }
 
 static void fill_after_frame(unsigned height, unsigned array_width,
-                             unsigned array_height, pixel *data)
+                             unsigned array_height, pixel_t *data)
 {
-  pixel* p = data + height * array_width;
-  pixel* end = data + array_width * array_height;
+  pixel_t* p = data + height * array_width;
+  pixel_t* end = data + array_width * array_height;
 
   while (p < end) {
     // Fill the line by copying the line above.
@@ -763,11 +763,11 @@ static void fill_after_frame(unsigned height, unsigned array_width,
 
 static int read_and_fill_frame_data(FILE *file,
                                     unsigned width, unsigned height,
-                                    unsigned array_width, pixel *data)
+                                    unsigned array_width, pixel_t *data)
 {
-  pixel* p = data;
-  pixel* end = data + array_width * height;
-  pixel fill_char;
+  pixel_t* p = data;
+  pixel_t* end = data + array_width * height;
+  pixel_t fill_char;
   unsigned i;
 
   while (p < end) {
@@ -846,9 +846,9 @@ void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, 
     const int out_width = encoder->in.real_width;
     const int out_height = encoder->in.real_height;
     int y;
-    const pixel *y_rec = frame->rec->y;
-    const pixel *u_rec = frame->rec->u;
-    const pixel *v_rec = frame->rec->v;
+    const pixel_t *y_rec = frame->rec->y;
+    const pixel_t *u_rec = frame->rec->u;
+    const pixel_t *v_rec = frame->rec->v;
 
     for (y = 0; y < out_height; ++y) {
       fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);

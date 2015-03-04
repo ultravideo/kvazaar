@@ -22,7 +22,7 @@
 
 #include "generic/nal-generic.h"
 
-void (*array_checksum)(const pixel* data,
+void (*array_checksum)(const pixel_t* data,
                        const int height, const int width,
                        const int stride,
                        unsigned char checksum_out[SEI_HASH_MAX_LENGTH]);

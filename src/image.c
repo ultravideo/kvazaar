@@ -63,7 +63,7 @@ image_t *image_alloc(const int32_t width, const int32_t height, const int32_t po
   im->poc = poc;
   
   //Allocate memory
-  im->fulldata = MALLOC(pixel, (luma_size + 2*chroma_size));
+  im->fulldata = MALLOC(pixel_t, (luma_size + 2 * chroma_size));
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
   im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
   im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
@@ -137,9 +137,9 @@ yuv_t * yuv_t_alloc(int luma_size)
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
   yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
-  yuv->y = (pixel *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (pixel *)malloc(luma_size / 2 * sizeof(*yuv->u));
-  yuv->v = (pixel *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->y = (pixel_t *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (pixel_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (pixel_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   return yuv;
@@ -164,10 +164,10 @@ void yuv_t_free(yuv_t * yuv)
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
+static unsigned cor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
-  pixel ref = *ref_data;
+  pixel_t ref = *ref_data;
   int x, y;
   unsigned sad = 0;
 
@@ -191,7 +191,7 @@ static unsigned cor_sad(const pixel *pic_data, const pixel *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
+static unsigned ver_sad(const pixel_t *pic_data, const pixel_t *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
   int x, y;
@@ -217,7 +217,7 @@ static unsigned ver_sad(const pixel *pic_data, const pixel *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned hor_sad(const pixel *pic_data, const pixel *ref_data,
+static unsigned hor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
                         int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
 {
   int x, y;
@@ -250,7 +250,7 @@ static unsigned image_interpolated_sad(const image_t *pic, const image_t *ref,
                                  int pic_x, int pic_y, int ref_x, int ref_y,
                                  int block_width, int block_height)
 {
-  pixel *pic_data, *ref_data;
+  pixel_t *pic_data, *ref_data;
 
   int left, right, top, bottom;
   int result = 0;
@@ -405,8 +405,8 @@ unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int p
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    const pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
-    const pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    const pixel_t *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const pixel_t *ref_data = &ref->y[ref_y * ref->stride + ref_x];
     return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
@@ -415,7 +415,7 @@ unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int p
 }
 
 
-unsigned pixels_calc_ssd(const pixel *const ref, const pixel *const rec,
+unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
@@ -448,7 +448,7 @@ unsigned pixels_calc_ssd(const pixel *const ref, const pixel *const rec,
  * This should be inlined, but it's defined here for now to see if Visual
  * Studios LTCG will inline it.
  */
-void pixels_blit(const pixel * const orig, pixel * const dst,
+void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
@@ -477,7 +477,7 @@ void pixels_blit(const pixel * const orig, pixel * const dst,
   assert(orig != dst || orig_stride == dst_stride);
 
   for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel));
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel_t));
   }
 }
 

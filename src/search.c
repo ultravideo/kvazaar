@@ -505,13 +505,13 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
 
   //create buffer for block + extra for filter
   int src_stride = block_width+FILTER_SIZE+1;
-  pixel src[(LCU_WIDTH+FILTER_SIZE+1) * (LCU_WIDTH+FILTER_SIZE+1)];
-  pixel* src_off = &src[HALF_FILTER+HALF_FILTER*(block_width+FILTER_SIZE+1)];
+  pixel_t src[(LCU_WIDTH+FILTER_SIZE+1) * (LCU_WIDTH+FILTER_SIZE+1)];
+  pixel_t* src_off = &src[HALF_FILTER+HALF_FILTER*(block_width+FILTER_SIZE+1)];
 
   //destination buffer for interpolation
   int dst_stride = (block_width+1)*4;
-  pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
-  pixel* dst_off = &dst[dst_stride*4+4];
+  pixel_t dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
+  pixel_t* dst_off = &dst[dst_stride*4+4];
 
   extend_borders(orig->x, orig->y, mv.x-1, mv.y-1,
                 encoder_state->tile->lcu_offset_x * LCU_WIDTH,
@@ -530,8 +530,8 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
 
-    pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
-    pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
+    pixel_t tmp_filtered[LCU_WIDTH*LCU_WIDTH];
+    pixel_t tmp_pic[LCU_WIDTH*LCU_WIDTH];
 
     int y,x;
     for(y = 0; y < block_width; ++y) {
@@ -570,8 +570,8 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
 
-    pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
-    pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
+    pixel_t tmp_filtered[LCU_WIDTH*LCU_WIDTH];
+    pixel_t tmp_pic[LCU_WIDTH*LCU_WIDTH];
 
     int y,x;
     for(y = 0; y < block_width; ++y) {
@@ -1112,9 +1112,9 @@ static double search_intra_trdepth(encoder_state_t * const encoder_state,
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
 
   struct {
-    pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
-    pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
-    pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
+    pixel_t y[TR_MAX_WIDTH*TR_MAX_WIDTH];
+    pixel_t u[TR_MAX_WIDTH*TR_MAX_WIDTH];
+    pixel_t v[TR_MAX_WIDTH*TR_MAX_WIDTH];
   } nosplit_pixels;
   cu_cbf_t nosplit_cbf;
 
@@ -1363,7 +1363,7 @@ static INLINE int8_t select_best_mode(const int8_t *modes, const double *costs, 
  *     coefficients of the residual.
  */
 static double get_cost(encoder_state_t * const encoder_state, 
-                       pixel *pred, pixel *orig_block,
+                       pixel_t *pred, pixel_t *orig_block,
                        cost_pixel_nxn_func *satd_func,
                        cost_pixel_nxn_func *sad_func,
                        int width)
@@ -1392,8 +1392,8 @@ static double get_cost(encoder_state_t * const encoder_state,
 
 static void search_intra_chroma_rough(encoder_state_t * const encoder_state,
                                       int x_px, int y_px, int depth,
-                                      const pixel *orig_u, const pixel *orig_v, int16_t origstride,
-                                      const pixel *rec_u, const pixel *rec_v, int16_t recstride,
+                                      const pixel_t *orig_u, const pixel_t *orig_v, int16_t origstride,
+                                      const pixel_t *rec_u, const pixel_t *rec_v, int16_t recstride,
                                       int8_t luma_mode,
                                       int8_t modes[5], double costs[5])
 {
@@ -1409,11 +1409,11 @@ static void search_intra_chroma_rough(encoder_state_t * const encoder_state,
   cost_pixel_nxn_func *const satd_func = pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = pixels_get_sad_func(width);
 
-  pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
-  pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
+  pixel_t _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel_t *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
 
-  pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
-  pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+  pixel_t _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel_t *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
   pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
@@ -1464,8 +1464,8 @@ static void search_intra_chroma_rough(encoder_state_t * const encoder_state,
  * \return  Number of prediction modes in param modes.
  */
 static int8_t search_intra_rough(encoder_state_t * const encoder_state, 
-                                 pixel *orig, int32_t origstride,
-                                 pixel *rec, int16_t recstride,
+                                 pixel_t *orig, int32_t origstride,
+                                 pixel_t *rec, int16_t recstride,
                                  int width, int8_t *intra_preds,
                                  int8_t modes[35], double costs[35])
 {
@@ -1473,15 +1473,15 @@ static int8_t search_intra_rough(encoder_state_t * const encoder_state,
   cost_pixel_nxn_func *sad_func = pixels_get_sad_func(width);
 
   // Temporary block arrays
-  pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
-  pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
+  pixel_t _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel_t *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
   
-  pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
-  pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
+  pixel_t _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  pixel_t *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
   
-  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  pixel_t rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
 
-  pixel *recf = &rec_filtered_temp[recstride + 1];
+  pixel_t *recf = &rec_filtered_temp[recstride + 1];
 
   assert(width == 4 || width == 8 || width == 16 || width == 32);
 
@@ -1628,8 +1628,8 @@ static int8_t search_intra_rough(encoder_state_t * const encoder_state,
  */
 static int8_t search_intra_rdo(encoder_state_t * const encoder_state, 
                              int x_px, int y_px, int depth,
-                             pixel *orig, int32_t origstride,
-                             pixel *rec, int16_t recstride,
+                             pixel_t *orig, int32_t origstride,
+                             pixel_t *rec, int16_t recstride,
                              int8_t *intra_preds,
                              int modes_to_check,
                              int8_t modes[35], double costs[35],
@@ -1638,13 +1638,13 @@ static int8_t search_intra_rdo(encoder_state_t * const encoder_state,
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + encoder_state->encoder_control->tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
 
-  pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
-  pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
+  pixel_t pred[LCU_WIDTH * LCU_WIDTH + 1];
+  pixel_t orig_block[LCU_WIDTH * LCU_WIDTH + 1];
   int rdo_mode;
   int pred_mode;
 
-  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-  pixel *recf = &rec_filtered_temp[recstride + 1];
+  pixel_t rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  pixel_t *recf = &rec_filtered_temp[recstride + 1];
 
   // Generate filtered reference pixels.
   {
@@ -1749,8 +1749,8 @@ static double search_cu_intra(encoder_state_t * const encoder_state,
 
   cu_info_t *cur_cu = &lcu->cu[cu_index];
 
-  pixel rec_buffer[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
-  pixel *cu_in_rec_buffer = &rec_buffer[cu_width * 2 + 8 + 1];
+  pixel_t rec_buffer[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
+  pixel_t *cu_in_rec_buffer = &rec_buffer[cu_width * 2 + 8 + 1];
 
   int8_t candidate_modes[3];
 
@@ -1781,7 +1781,7 @@ static double search_cu_intra(encoder_state_t * const encoder_state,
 
   // Find best intra mode for 2Nx2N.
   {
-    pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+    pixel_t *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
     unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
 
     int8_t number_of_modes;
@@ -1978,8 +1978,8 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
           }
 
           if (num_modes != 1 && num_modes != 5) {
-            pixel rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
-            pixel rec_v[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
+            pixel_t rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
+            pixel_t rec_v[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
 
             const int16_t width_c = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
             const int16_t rec_stride = width_c * 2 + 8;
@@ -1997,8 +1997,8 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
                                          lcu);
 
             vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
-            pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
-            pixel *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+            pixel_t *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+            pixel_t *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
 
             search_intra_chroma_rough(encoder_state, x, y, depth,
                                       ref_u, ref_v, LCU_WIDTH_C,
