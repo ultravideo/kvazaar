@@ -33,7 +33,7 @@
 #include "threads.h"
 
 typedef struct {
-  threadqueue_queue * threadqueue;
+  threadqueue_queue_t * threadqueue;
   int worker_id;
 } threadqueue_worker_spec;
 
@@ -78,7 +78,7 @@ const struct timespec time_to_wait = {1, 0};
 
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   threadqueue_worker_spec * const threadqueue_worker_spec = threadqueue_worker_spec_opaque;
-  threadqueue_queue * const threadqueue = threadqueue_worker_spec->threadqueue;
+  threadqueue_queue_t * const threadqueue = threadqueue_worker_spec->threadqueue;
   threadqueue_job_t * next_job = NULL;
   
 #ifdef _DEBUG
@@ -233,7 +233,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   
   return NULL;
 }
-int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count, int fifo) {
+int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, int fifo) {
   int i;
   if (pthread_mutex_init(&threadqueue->lock, NULL) != 0) {
     fprintf(stderr, "pthread_mutex_init failed!\n");
@@ -306,7 +306,7 @@ int threadqueue_init(threadqueue_queue * const threadqueue, int thread_count, in
 /**
  * \brief Free a single job from the threadqueue index i, destroying it.
  */
-static void threadqueue_free_job(threadqueue_queue * const threadqueue, int i)
+static void threadqueue_free_job(threadqueue_queue_t * const threadqueue, int i)
 {
 #ifdef _DEBUG
 #if _DEBUG & _DEBUG_PERF_JOB
@@ -328,7 +328,7 @@ static void threadqueue_free_job(threadqueue_queue * const threadqueue, int i)
   FREE_POINTER(threadqueue->queue[i]);
 }
 
-static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
+static void threadqueue_free_jobs(threadqueue_queue_t * const threadqueue) {
   int i;
   for (i=0; i < threadqueue->queue_count; ++i) {
     threadqueue_free_job(threadqueue, i);
@@ -347,7 +347,7 @@ static void threadqueue_free_jobs(threadqueue_queue * const threadqueue) {
 #endif
 }
 
-int threadqueue_finalize(threadqueue_queue * const threadqueue) {
+int threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
   int i;
   
   //Flush the queue
@@ -428,7 +428,7 @@ int threadqueue_finalize(threadqueue_queue * const threadqueue) {
   return 1;
 }
 
-int threadqueue_flush(threadqueue_queue * const threadqueue) {
+int threadqueue_flush(threadqueue_queue_t * const threadqueue) {
   int notdone = 1;
   
   //Lock the queue
@@ -461,7 +461,7 @@ int threadqueue_flush(threadqueue_queue * const threadqueue) {
   return 1;
 }
 
-int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job_t * const job) {
+int threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job_t * const job) {
   int job_done = 0;
   
   //NULL job is clearly OK :-)
@@ -509,7 +509,7 @@ int threadqueue_waitfor(threadqueue_queue * const threadqueue, threadqueue_job_t
   return 1;
 }
 
-threadqueue_job_t * threadqueue_submit(threadqueue_queue * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
+threadqueue_job_t * threadqueue_submit(threadqueue_queue_t * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
   threadqueue_job_t *job;
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
@@ -624,7 +624,7 @@ int threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_o
   return 1;
 }
 
-int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueue_job_t *job) {
+int threadqueue_job_unwait_job(threadqueue_queue_t * const threadqueue, threadqueue_job_t *job) {
   int ndepends = 0;
   
   //NULL job =>  no threads, nothing to do
@@ -649,7 +649,7 @@ int threadqueue_job_unwait_job(threadqueue_queue * const threadqueue, threadqueu
 }
 
 #ifdef _DEBUG
-int threadqueue_log(threadqueue_queue * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description) {
+int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description) {
   int i, thread_id = -1;
   FILE* output;
   

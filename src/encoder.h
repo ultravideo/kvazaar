@@ -133,7 +133,7 @@ typedef struct encoder_control_t
   int slice_count;
   const int* slice_addresses_in_ts;
   
-  threadqueue_queue *threadqueue;
+  threadqueue_queue_t *threadqueue;
 
   struct {
     uint8_t min;

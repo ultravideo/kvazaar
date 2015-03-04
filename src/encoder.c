@@ -50,7 +50,7 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
     return 0;
   }
   
-  encoder->threadqueue = MALLOC(threadqueue_queue, 1);
+  encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
   
   encoder->owf = cfg->owf;
     
