@@ -113,10 +113,10 @@ typedef struct
 typedef struct {
   cu_info *data;           //!< \brief cu_info data
   int32_t refcount;        //!< \brief number of references in reflists to this cu_array
-} cu_array;
+} cu_array_t;
 
-cu_array * cu_array_alloc(int width_in_scu, int height_in_scu);
-int cu_array_free(cu_array *cua);
+cu_array_t * cu_array_alloc(int width_in_scu, int height_in_scu);
+int cu_array_free(cu_array_t *cua);
   
 
 #define SUB_SCU_BIT_MASK (64 - 1)
