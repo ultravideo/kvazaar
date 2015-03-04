@@ -37,7 +37,7 @@ typedef enum {BITSTREAM_TYPE_FILE, BITSTREAM_TYPE_MEMORY} bitstream_type;
 typedef struct
 {
   BASE_BITSTREAM
-} bitstream_base;
+} bitstream_base_t;
 
 typedef struct
 {
@@ -55,7 +55,7 @@ typedef struct
 
 typedef union
 {
-  bitstream_base base;
+  bitstream_base_t base;
   bitstream_file file;
   bitstream_mem mem;
 } bitstream_t;
