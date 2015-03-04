@@ -92,7 +92,7 @@ int encoder_state_match_children_of_previous_frame(encoder_state_t * const encod
 }
 
 static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state, const lcu_order_element * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
-  videoframe* const frame = encoder_state->tile->frame;
+  videoframe_t* const frame = encoder_state->tile->frame;
   
   if (hor_buf) {
     const int rdpx = lcu->position_px.x;
@@ -222,7 +222,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   const lcu_order_element * const lcu = opaque;
   encoder_state_t *encoder_state = lcu->encoder_state;
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  videoframe* const frame = encoder_state->tile->frame;
+  videoframe_t* const frame = encoder_state->tile->frame;
   
   //This part doesn't write to bitstream, it's only search, deblock and sao
   
@@ -452,7 +452,7 @@ typedef struct {
 
 static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   worker_sao_reconstruct_lcu_data *data = opaque;
-  videoframe * const frame = data->encoder_state->tile->frame;
+  videoframe_t * const frame = data->encoder_state->tile->frame;
   unsigned stride = frame->width_in_lcu;
   int x;
   
@@ -578,7 +578,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       //If children are wavefront, we need to reconstruct SAO
       if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
         int y;
-        videoframe * const frame = main_state->tile->frame;
+        videoframe_t * const frame = main_state->tile->frame;
         threadqueue_job *previous_job = NULL;
         
         for (y = 0; y < frame->height_in_lcu; ++y) {
@@ -839,7 +839,7 @@ void encoder_compute_stats(encoder_state_t *encoder_state, FILE * const recout, 
   threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
   
   if (recout) {
-    const videoframe * const frame = encoder_state->tile->frame;
+    const videoframe_t * const frame = encoder_state->tile->frame;
     // Write reconstructed frame out.
     // Use conformance-window dimensions instead of internal ones.
     const int width = frame->width;
@@ -946,7 +946,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
   cabac_data * const cabac = &encoder_state->cabac;
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
@@ -1395,7 +1395,7 @@ coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth)
 static void encode_transform_unit(encoder_state_t * const encoder_state,
                                   int x_pu, int y_pu, int depth)
 {
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
@@ -1487,7 +1487,7 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
   cabac_data * const cabac = &encoder_state->cabac;
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.

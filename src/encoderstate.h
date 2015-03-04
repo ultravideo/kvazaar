@@ -80,7 +80,7 @@ typedef struct {
 
 typedef struct {
   //Current sub-frame
-  videoframe *frame;
+  videoframe_t *frame;
   
   int32_t id;
   

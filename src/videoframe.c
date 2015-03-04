@@ -35,8 +35,8 @@
  * \param pic picture pointer
  * \return picture pointer
  */
-videoframe *videoframe_alloc(const int32_t width, const int32_t height, const int32_t poc) {
-  videoframe *frame = MALLOC(videoframe, 1);
+videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const int32_t poc) {
+  videoframe_t *frame = MALLOC(videoframe_t, 1);
 
   if (!frame) return 0;
 
@@ -73,7 +73,7 @@ videoframe *videoframe_alloc(const int32_t width, const int32_t height, const in
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
-int videoframe_free(videoframe * const frame)
+int videoframe_free(videoframe_t * const frame)
 {
   //image_free(frame->source);
   //image_free(frame->rec);
@@ -92,13 +92,13 @@ int videoframe_free(videoframe * const frame)
   return 1;
 }
 
-void videoframe_set_poc(videoframe * const frame, const int32_t poc) {
+void videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
   if (frame->source) frame->source->poc = poc;
   if (frame->rec) frame->rec->poc = poc;
   frame->poc = poc;
 }
 
-const cu_info_t* videoframe_get_cu_const(const videoframe * const frame, unsigned int x_in_scu, unsigned int y_in_scu)
+const cu_info_t* videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu)
 {
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
@@ -106,7 +106,7 @@ const cu_info_t* videoframe_get_cu_const(const videoframe * const frame, unsigne
   return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
 }
 
-cu_info_t* videoframe_get_cu(videoframe * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
+cu_info_t* videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
 {
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
@@ -119,7 +119,7 @@ cu_info_t* videoframe_get_cu(videoframe * const frame, const unsigned int x_in_s
 /**
  * \brief Calculates image PSNR value
  */
-void videoframe_compute_psnr(const videoframe * const frame, double psnr[NUM_COLORS])
+void videoframe_compute_psnr(const videoframe_t * const frame, double psnr[NUM_COLORS])
 {
   int32_t pixels = frame->width * frame->height;
   int32_t i, c;

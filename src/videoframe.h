@@ -52,17 +52,17 @@ typedef struct videoframe
   struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
   struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count
-} videoframe;
+} videoframe_t;
 
 
-videoframe *videoframe_alloc(int32_t width, int32_t height, int32_t poc);
-int videoframe_free(videoframe * const frame);
+videoframe_t *videoframe_alloc(int32_t width, int32_t height, int32_t poc);
+int videoframe_free(videoframe_t * const frame);
 
-void videoframe_set_poc(videoframe * frame, int32_t poc);
+void videoframe_set_poc(videoframe_t * frame, int32_t poc);
 
-const cu_info_t* videoframe_get_cu_const(const videoframe * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
-cu_info_t* videoframe_get_cu(videoframe * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);
-void videoframe_compute_psnr(const videoframe * const frame, double psnr[NUM_COLORS]);
+const cu_info_t* videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
+cu_info_t* videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);
+void videoframe_compute_psnr(const videoframe_t * const frame, double psnr[NUM_COLORS]);
 
 
 #endif

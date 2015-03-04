@@ -422,7 +422,7 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU
  */
-static void sao_calc_band_block_dims(const videoframe *frame, color_index color_i,
+static void sao_calc_band_block_dims(const videoframe_t *frame, color_index color_i,
                                      vector2d *rec, vector2d *block)
 {
   const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
@@ -477,7 +477,7 @@ static void sao_calc_band_block_dims(const videoframe *frame, color_index color_
  * \param sao  Sao parameters.
  * \param rec  Top-left corner of the LCU, modified to be top-left corner of
  */
-static void sao_calc_edge_block_dims(const videoframe * const frame, color_index color_i,
+static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_index color_i,
                                      const sao_info *sao, vector2d *rec,
                                      vector2d *tl, vector2d *br,
                                      vector2d *block)
@@ -527,7 +527,7 @@ static void sao_calc_edge_block_dims(const videoframe * const frame, color_index
   rec->x = (rec->x == 0 ? 0 : -1);
 }
 
-void sao_reconstruct(const encoder_control_t * const encoder, videoframe * frame, const pixel *old_rec,
+void sao_reconstruct(const encoder_control_t * const encoder, videoframe_t * frame, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i)
 {
@@ -824,7 +824,7 @@ static void sao_search_best_mode(const encoder_state_t * const encoder_state, co
   return;
 }
 
-void sao_search_chroma(const encoder_state_t * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
+void sao_search_chroma(const encoder_state_t * const encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -860,7 +860,7 @@ void sao_search_chroma(const encoder_state_t * const encoder_state, const videof
   sao_search_best_mode(encoder_state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
 }
 
-void sao_search_luma(const encoder_state_t * const encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
+void sao_search_luma(const encoder_state_t * const encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3])
 {
   pixel orig[LCU_LUMA_SIZE];
   pixel rec[LCU_LUMA_SIZE];
@@ -893,7 +893,7 @@ void sao_search_luma(const encoder_state_t * const encoder_state, const videofra
 void sao_reconstruct_frame(encoder_state_t * const encoder_state)
 {
   vector2d lcu;
-  videoframe * const frame = encoder_state->tile->frame;
+  videoframe_t * const frame = encoder_state->tile->frame;
 
   // These are needed because SAO needs the pre-SAO pixels form left and
   // top LCUs. Single pixel wide buffers, like what search_lcu takes, would

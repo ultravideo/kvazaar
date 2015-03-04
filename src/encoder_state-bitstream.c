@@ -648,7 +648,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const encoder_
 static void add_checksum(encoder_state_t * const encoder_state)
 {
   bitstream * const stream = &encoder_state->stream;
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
   unsigned int i;

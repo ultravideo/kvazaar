@@ -168,7 +168,7 @@ void filter_deblock_edge_luma(encoder_state_t * const encoder_state,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   
   const cu_info_t *cu_q = videoframe_get_cu_const(frame, xpos >> MIN_SIZE, ypos >> MIN_SIZE);
@@ -294,7 +294,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
                                 int8_t depth, int8_t dir)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   const cu_info_t *cu_q = videoframe_get_cu_const(frame, x >> (MIN_SIZE - 1), y >> (MIN_SIZE - 1));
   
   // Chroma edges that do not lay on a 8x8 grid are not deblocked.
@@ -386,7 +386,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
  */
 void filter_deblock_cu(encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x, y);
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
   uint8_t tr_split = (cur_cu->tr_depth > depth) ? 1 : 0;

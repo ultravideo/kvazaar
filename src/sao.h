@@ -56,9 +56,9 @@ typedef struct sao_info_struct {
 
 
 void init_sao_info(sao_info *sao);
-void sao_search_chroma(const encoder_state_t * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
-void sao_search_luma(const encoder_state_t * encoder_state, const videoframe *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
-void sao_reconstruct(const encoder_control_t * encoder, videoframe *frame, const pixel *old_rec,
+void sao_search_chroma(const encoder_state_t * encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
+void sao_search_luma(const encoder_state_t * encoder_state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info *sao, sao_info *sao_top, sao_info *sao_left, int32_t merge_cost[3]);
+void sao_reconstruct(const encoder_control_t * encoder, videoframe_t *frame, const pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info *sao, color_index color_i);
 void sao_reconstruct_frame(encoder_state_t *encoder_state);

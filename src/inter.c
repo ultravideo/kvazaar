@@ -41,7 +41,7 @@
  * \param cur_cu CU to take the settings from
  * \returns Void
 */
-void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info_t* cur_cu)
+void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info_t* cur_cu)
 {
   uint32_t x, y;
   // Width in smallest CU

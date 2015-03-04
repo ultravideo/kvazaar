@@ -48,7 +48,7 @@ const uint8_t intra_hor_ver_dist_thres[5] = {0,7,1,0,0};
  * \param mode mode to set
  * \returns Void
  */
-void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
+void intra_set_block_mode(videoframe_t *frame,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
 {
   uint32_t x, y;
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);

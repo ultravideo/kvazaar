@@ -614,7 +614,7 @@ static unsigned search_frac( const encoder_state_t * const encoder_state,
  */
 static int search_cu_inter(const encoder_state_t * const encoder_state, int x, int y, int depth, lcu_t *lcu)
 {
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   uint32_t ref_idx = 0;
   int x_local = (x&0x3f), y_local = (y&0x3f);
   int x_cu = x>>3;
@@ -1741,7 +1741,7 @@ static double search_cu_intra(encoder_state_t * const encoder_state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   const vector2d lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
@@ -1882,7 +1882,7 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 static double search_cu(encoder_state_t * const encoder_state, int x, int y, int depth, lcu_t work_tree[MAX_PU_DEPTH])
 {
   const encoder_control_t* ctrl = encoder_state->encoder_control;
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_INT;
   cu_info_t *cur_cu;
@@ -1958,7 +1958,7 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
         if (encoder_state->encoder_control->rdo == 3) {
-          const videoframe * const frame = encoder_state->tile->frame;
+          const videoframe_t * const frame = encoder_state->tile->frame;
 
           double costs[5];
           int8_t modes[5] = { 0, 26, 10, 1, 34 };
@@ -2149,7 +2149,7 @@ static double search_cu(encoder_state_t * const encoder_state, int x, int y, int
  */
 static void init_lcu_t(const encoder_state_t * const encoder_state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
-  const videoframe * const frame = encoder_state->tile->frame;
+  const videoframe_t * const frame = encoder_state->tile->frame;
   
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -2217,7 +2217,7 @@ static void init_lcu_t(const encoder_state_t * const encoder_state, const int x,
 
   // Copy LCU pixels.
   {
-    const videoframe * const frame = encoder_state->tile->frame;
+    const videoframe_t * const frame = encoder_state->tile->frame;
     int x_max = MIN(x + LCU_WIDTH, frame->width) - x;
     int y_max = MIN(y + LCU_WIDTH, frame->height) - y;
 
@@ -2245,7 +2245,7 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const encoder_state, int
   {
     const int x_cu = x_px >> MAX_DEPTH;
     const int y_cu = y_px >> MAX_DEPTH;
-    videoframe * const frame = encoder_state->tile->frame;
+    videoframe_t * const frame = encoder_state->tile->frame;
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
@@ -2263,7 +2263,7 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const encoder_state, int
 
   // Copy pixels to picture.
   {
-    videoframe * const pic = encoder_state->tile->frame;
+    videoframe_t * const pic = encoder_state->tile->frame;
     const int pic_width = pic->width;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
