@@ -36,14 +36,6 @@
 #include "threadqueue.h"
 
 
-/* TODO: add ME data */
-typedef struct
-{
-  void (*IME)();
-  void (*FME)();
-  int range;
-} encoder_me;
-
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 
 /* Encoder control options, the main struct */
@@ -70,7 +62,12 @@ typedef struct encoder_control_t
     FILE *file;
   } out;
   
-  encoder_me me;
+  /* TODO: add ME data */
+  struct {
+    void(*IME)();
+    void(*FME)();
+    int range;
+  } me;
   
   int8_t bitdepth;
   int8_t tr_depth_intra;
