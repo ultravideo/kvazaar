@@ -43,7 +43,7 @@ typedef struct
 {
   BASE_BITSTREAM
   FILE*    output;
-} bitstream_file;
+} bitstream_file_t;
 
 typedef struct
 {
@@ -56,7 +56,7 @@ typedef struct
 typedef union
 {
   bitstream_base_t base;
-  bitstream_file file;
+  bitstream_file_t file;
   bitstream_mem_t mem;
 } bitstream_t;
 
