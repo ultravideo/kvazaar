@@ -40,7 +40,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
 
 //Returns 1 if successful
 int strategyselector_init(int32_t cpuid) {
-  const strategy_to_select *cur_strategy_to_select = strategies_to_select;
+  const strategy_to_select_t *cur_strategy_to_select = strategies_to_select;
   strategy_list_t strategies;
   
   strategies.allocated = 0;
