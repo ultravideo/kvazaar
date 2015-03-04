@@ -294,22 +294,22 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
     const encoder_control_t * const encoder = child_state->encoder_control;
     child_state->type = ENCODER_STATE_TYPE_MAIN;
     assert(child_state->encoder_control);
-    child_state->global = MALLOC(encoder_state_config_global, 1);
+    child_state->global = MALLOC(encoder_state_config_global_t, 1);
     if (!child_state->global || !encoder_state_config_global_init(child_state)) {
       fprintf(stderr, "Could not initialize encoder_state->global!\n");
       return 0;
     }
-    child_state->tile = MALLOC(encoder_state_config_tile, 1);
+    child_state->tile = MALLOC(encoder_state_config_tile_t, 1);
     if (!child_state->tile || !encoder_state_config_tile_init(child_state, 0, 0, encoder->in.width, encoder->in.height, encoder->in.width_in_lcu, encoder->in.height_in_lcu)) {
       fprintf(stderr, "Could not initialize encoder_state->tile!\n");
       return 0;
     }
-    child_state->slice = MALLOC(encoder_state_config_slice, 1);
+    child_state->slice = MALLOC(encoder_state_config_slice_t, 1);
     if (!child_state->slice || !encoder_state_config_slice_init(child_state, 0, encoder->in.width_in_lcu * encoder->in.height_in_lcu - 1)) {
       fprintf(stderr, "Could not initialize encoder_state->slice!\n");
       return 0;
     }
-    child_state->wfrow = MALLOC(encoder_state_config_wfrow, 1);
+    child_state->wfrow = MALLOC(encoder_state_config_wfrow_t, 1);
     if (!child_state->wfrow || !encoder_state_config_wfrow_init(child_state, 0)) {
       fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
       return 0;
@@ -422,7 +422,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
         new_child->global = child_state->global;
         new_child->tile = child_state->tile;
         new_child->wfrow = child_state->wfrow;
-        new_child->slice = MALLOC(encoder_state_config_slice, 1);
+        new_child->slice = MALLOC(encoder_state_config_slice_t, 1);
         if (!new_child->slice || !encoder_state_config_slice_init(new_child, range_start, range_end_slice)) {
           fprintf(stderr, "Could not initialize encoder_state->slice!\n");
           return 0;
@@ -446,7 +446,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
         new_child->encoder_control = encoder;
         new_child->type = ENCODER_STATE_TYPE_TILE;
         new_child->global = child_state->global;
-        new_child->tile = MALLOC(encoder_state_config_tile, 1);
+        new_child->tile = MALLOC(encoder_state_config_tile_t, 1);
         new_child->slice = child_state->slice;
         new_child->wfrow = child_state->wfrow;
         
@@ -531,7 +531,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
         new_child->global = child_state->global;
         new_child->tile = child_state->tile;
         new_child->slice = child_state->slice;
-        new_child->wfrow = MALLOC(encoder_state_config_wfrow, 1);
+        new_child->wfrow = MALLOC(encoder_state_config_wfrow_t, 1);
         
         if (!new_child->wfrow || !encoder_state_config_wfrow_init(new_child, i)) {
           fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");

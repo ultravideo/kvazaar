@@ -76,7 +76,7 @@ typedef struct {
   uint8_t pictype;
   uint8_t slicetype;
   
-} encoder_state_config_global;
+} encoder_state_config_global_t;
 
 typedef struct {
   //Current sub-frame
@@ -102,7 +102,7 @@ typedef struct {
   
   //Job pointers for wavefronts
   threadqueue_job **wf_jobs;
-} encoder_state_config_tile;
+} encoder_state_config_tile_t;
 
 typedef struct {
   int32_t id;
@@ -114,12 +114,12 @@ typedef struct {
   //Global coordinates
   int32_t start_in_rs;
   int32_t end_in_rs;
-} encoder_state_config_slice;
+} encoder_state_config_slice_t;
 
 typedef struct {
   //Row in tile coordinates of the wavefront
   int32_t lcu_offset_y;
-} encoder_state_config_wfrow;
+} encoder_state_config_wfrow_t;
 
 typedef struct lcu_order_element {
   //This it used for leaf of the encoding tree. All is relative to the tile.
@@ -152,10 +152,10 @@ typedef struct encoder_state_t {
   //Pointer to the encoder_state of the previous frame
   struct encoder_state_t *previous_encoder_state;
   
-  encoder_state_config_global *global;
-  encoder_state_config_tile   *tile;
-  encoder_state_config_slice  *slice;
-  encoder_state_config_wfrow  *wfrow;
+  encoder_state_config_global_t *global;
+  encoder_state_config_tile_t   *tile;
+  encoder_state_config_slice_t  *slice;
+  encoder_state_config_wfrow_t  *wfrow;
   
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
   lcu_order_element *lcu_order;
