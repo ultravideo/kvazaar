@@ -138,7 +138,7 @@ typedef struct lcu_order_element {
   struct lcu_order_element *below;
   struct lcu_order_element *left;
   struct lcu_order_element *right;
-} lcu_order_element;
+} lcu_order_element_t;
 
 typedef struct encoder_state_t {
   const encoder_control_t *encoder_control;
@@ -158,7 +158,7 @@ typedef struct encoder_state_t {
   encoder_state_config_wfrow_t  *wfrow;
   
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
-  lcu_order_element *lcu_order;
+  lcu_order_element_t *lcu_order;
   uint32_t lcu_order_count;
   
   bitstream_t stream;

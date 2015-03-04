@@ -91,7 +91,7 @@ int encoder_state_match_children_of_previous_frame(encoder_state_t * const encod
   return 1;
 }
 
-static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state, const lcu_order_element * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
+static void encoder_state_recdata_to_bufs(encoder_state_t * const encoder_state, const lcu_order_element_t * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
   videoframe_t* const frame = encoder_state->tile->frame;
   
   if (hor_buf) {
@@ -219,7 +219,7 @@ static void encode_sao(encoder_state_t * const encoder_state,
 
 
 static void encoder_state_worker_encode_lcu(void * opaque) {
-  const lcu_order_element * const lcu = opaque;
+  const lcu_order_element_t * const lcu = opaque;
   encoder_state_t *encoder_state = lcu->encoder_state;
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   videoframe_t* const frame = encoder_state->tile->frame;
@@ -349,7 +349,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const encoder_state) {
 
 #ifdef _DEBUG
       {
-        const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+        const lcu_order_element_t * const lcu = &encoder_state->lcu_order[i];
         PERFORMANCE_MEASURE_END(_DEBUG_PERF_ENCODE_LCU, encoder_state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
       }
 #endif //_DEBUG
@@ -365,7 +365,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const encoder_state) {
     }
   } else {
     for (i = 0; i < encoder_state->lcu_order_count; ++i) {
-      const lcu_order_element * const lcu = &encoder_state->lcu_order[i];
+      const lcu_order_element_t * const lcu = &encoder_state->lcu_order[i];
 #ifdef _DEBUG
       char job_description[256];
       sprintf(job_description, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", encoder_state->global->frame, encoder_state->tile->id, encoder_state->slice->id, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + encoder_state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + encoder_state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);

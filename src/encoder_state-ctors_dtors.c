@@ -569,7 +569,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
       }
       
       child_state->lcu_order_count = lcu_end - lcu_start;
-      child_state->lcu_order = MALLOC(lcu_order_element, child_state->lcu_order_count);
+      child_state->lcu_order = MALLOC(lcu_order_element_t, child_state->lcu_order_count);
       assert(child_state->lcu_order);
       
       for (i = 0; i < child_state->lcu_order_count; ++i) {
