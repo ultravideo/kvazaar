@@ -41,7 +41,7 @@
  * \param cur_cu CU to take the settings from
  * \returns Void
 */
-void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info* cur_cu)
+void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info_t* cur_cu)
 {
   uint32_t x, y;
   // Width in smallest CU
@@ -50,7 +50,7 @@ void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t de
   // Loop through all the block in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info * const cu = videoframe_get_cu(frame, x, y);
+      cu_info_t * const cu = videoframe_get_cu(frame, x, y);
       // Set all SCU's to this blocks values at the bottom most depth.
       cu->depth = depth;
       cu->type  = CU_INTER;
@@ -341,8 +341,8 @@ void inter_recon_lcu(const encoder_state_t * const encoder_state, const image * 
  * \param a0 candidate a0
  * \param a1 candidate a1
  */
-void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info **b0, cu_info **b1,
-                                        cu_info **b2,cu_info **a0,cu_info **a1, lcu_t *lcu)
+void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
+                                        cu_info_t **b2,cu_info_t **a0,cu_info_t **a1, lcu_t *lcu)
 {
   uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS; //!< the width of the current block on SCU
   /*
@@ -357,7 +357,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
   */
   int32_t x_cu = (x & (LCU_WIDTH - 1)) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
   int32_t y_cu = (y & (LCU_WIDTH - 1)) >> MAX_DEPTH;
-  cu_info* cu = &lcu->cu[LCU_CU_OFFSET];
+  cu_info_t* cu = &lcu->cu[LCU_CU_OFFSET];
   // A0 and A1 availability testing
   if (x != 0) {
     *a1 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
@@ -398,12 +398,12 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(const encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info* cur_cu, lcu_t *lcu)
+void inter_get_mv_cand(const encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
 
-  cu_info *b0, *b1, *b2, *a0, *a1;
+  cu_info_t *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
@@ -518,7 +518,7 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand
   uint8_t candidates = 0;
   int8_t duplicate = 0;
 
-  cu_info *b0, *b1, *b2, *a0, *a1;
+  cu_info_t *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);

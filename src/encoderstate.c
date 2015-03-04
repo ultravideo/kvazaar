@@ -947,7 +947,7 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
 {
   cabac_data * const cabac = &encoder_state->cabac;
   const videoframe * const frame = encoder_state->tile->frame;
-  const cu_info *cur_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb);
+  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
   
@@ -1223,8 +1223,8 @@ void encode_coding_tree(encoder_state_t * const encoder_state,
     // 5 EP bins with the full predmode
     for (j = 0; j < num_pred_units; ++j) {
       static const vector2d offset[4] = {{0,0},{1,0},{0,1},{1,1}};
-      const cu_info *left_cu = NULL;
-      const cu_info *above_cu = NULL;
+      const cu_info_t *left_cu = NULL;
+      const cu_info_t *above_cu = NULL;
 
       if (x_ctb > 0) {
         left_cu = videoframe_get_cu_const(frame, x_ctb - 1, y_ctb);
@@ -1401,7 +1401,7 @@ static void encode_transform_unit(encoder_state_t * const encoder_state,
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
-  const cu_info *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
+  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
 
   coefficient coeff_y[LCU_WIDTH*LCU_WIDTH+1];
   coefficient coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
@@ -1488,7 +1488,7 @@ void encode_transform_coeff(encoder_state_t * const encoder_state, int32_t x_pu,
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   const videoframe * const frame = encoder_state->tile->frame;
-  const cu_info *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
+  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when

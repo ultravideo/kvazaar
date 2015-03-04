@@ -54,7 +54,7 @@ void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
 
   if (part_mode == SIZE_NxN) {
-    cu_info *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
+    cu_info_t *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
     // Modes are already set.
     cur_cu->depth = depth;
     cur_cu->type = CU_INTRA;
@@ -65,7 +65,7 @@ void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_
   // Loop through all the blocks in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
+      cu_info_t *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
       cur_cu->depth = depth;
       cur_cu->type = CU_INTRA;
       cur_cu->intra[0].mode = mode;
@@ -112,7 +112,7 @@ pixel intra_get_dc_pred(const pixel *pic, uint16_t picwidth, uint8_t width)
  * \returns (predictions are found)?1:0
  */
 int8_t intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8_t* preds,
-                                    const cu_info * const cur_cu, const cu_info * const left_cu, const cu_info * const above_cu)
+                                    const cu_info_t * const cur_cu, const cu_info_t * const left_cu, const cu_info_t * const above_cu)
 {
   int y_cu = y>>3;
 
@@ -657,7 +657,7 @@ void intra_get_planar_pred(const pixel* src, int32_t srcstride, uint32_t width, 
   }
 }
 
-void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
+void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
@@ -675,9 +675,9 @@ void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, i
     intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
-      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
-      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
-      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_a = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + (lcu_px.y >> 3)        *LCU_T_CU_WIDTH];
+      cu_info_t *cu_b = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_c = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
         cbf_set(&cur_cu->cbf.y, depth);
       }
@@ -706,7 +706,7 @@ void intra_recon_lcu_luma(encoder_state_t * const encoder_state, int x, int y, i
   }
 }
 
-void intra_recon_lcu_chroma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
+void intra_recon_lcu_chroma(encoder_state_t * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   const vector2d lcu_px = { x & 0x3f, y & 0x3f };
@@ -726,9 +726,9 @@ void intra_recon_lcu_chroma(encoder_state_t * const encoder_state, int x, int y,
     intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
-      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
-      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
-      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_a = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + (lcu_px.y >> 3)        *LCU_T_CU_WIDTH];
+      cu_info_t *cu_b = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_c = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
         cbf_set(&cur_cu->cbf.u, depth);
       }

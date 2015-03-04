@@ -59,7 +59,7 @@ cu_array_t * cu_array_alloc(const int width_in_scu, const int height_in_scu) {
   unsigned cu_array_size = height_in_scu * width_in_scu;
   cu_array_t *cua;
   cua = MALLOC(cu_array_t, 1);
-  cua->data = (cu_info*)malloc(sizeof(cu_info) * cu_array_size);
+  cua->data = (cu_info_t*)malloc(sizeof(cu_info_t) * cu_array_size);
   cua->refcount = 1;
   FILL_ARRAY(cua->data, 0, cu_array_size);
   return cua;

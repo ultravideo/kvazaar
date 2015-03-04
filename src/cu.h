@@ -91,7 +91,7 @@ typedef struct
   cu_cbf_t cbf;
   cu_info_intra intra[4];
   cu_info_inter inter;
-} cu_info;
+} cu_info_t;
 
 #define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
   "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \
@@ -111,7 +111,7 @@ typedef struct
   (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
 
 typedef struct {
-  cu_info *data;           //!< \brief cu_info data
+  cu_info_t *data;           //!< \brief cu_info data
   int32_t refcount;        //!< \brief number of references in reflists to this cu_array
 } cu_array_t;
 
@@ -165,7 +165,7 @@ typedef struct {
    * - All of LCUs CUs on 1:9, 1:9.
    * - Top right reference CU on the last slot.
    */
-  cu_info cu[9*9+1];
+  cu_info_t cu[9*9+1];
 } lcu_t;
 
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \

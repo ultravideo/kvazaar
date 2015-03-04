@@ -171,7 +171,7 @@ void filter_deblock_edge_luma(encoder_state_t * const encoder_state,
   const videoframe * const frame = encoder_state->tile->frame;
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   
-  const cu_info *cu_q = videoframe_get_cu_const(frame, xpos>>MIN_SIZE, ypos>>MIN_SIZE);
+  const cu_info_t *cu_q = videoframe_get_cu_const(frame, xpos >> MIN_SIZE, ypos >> MIN_SIZE);
 
   {
     // Return if called with a coordinate which is not at CU or TU boundary.
@@ -191,7 +191,7 @@ void filter_deblock_edge_luma(encoder_state_t * const encoder_state,
     pixel *orig_src = &frame->rec->y[xpos + ypos*stride];
     pixel *src = orig_src;
     int32_t step = 1;
-    const cu_info *cu_p = NULL;
+    const cu_info_t *cu_p = NULL;
     int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
     int8_t strength = 0;
 
@@ -295,7 +295,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
 {
   const encoder_control_t * const encoder = encoder_state->encoder_control;
   const videoframe * const frame = encoder_state->tile->frame;
-  const cu_info *cu_q = videoframe_get_cu_const(frame, x>>(MIN_SIZE-1), y>>(MIN_SIZE-1));
+  const cu_info_t *cu_q = videoframe_get_cu_const(frame, x >> (MIN_SIZE - 1), y >> (MIN_SIZE - 1));
   
   // Chroma edges that do not lay on a 8x8 grid are not deblocked.
   if (depth >= MAX_DEPTH) {
@@ -322,7 +322,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
     // Init offset and step to EDGE_HOR
     int32_t offset = stride;
     int32_t step = 1;
-    const cu_info *cu_p = NULL;
+    const cu_info_t *cu_p = NULL;
     int16_t x_cu = x>>(MIN_SIZE-1),y_cu = y>>(MIN_SIZE-1);
     int8_t strength = 2;
 
@@ -387,7 +387,7 @@ void filter_deblock_edge_chroma(encoder_state_t * const encoder_state,
 void filter_deblock_cu(encoder_state_t * const encoder_state, int32_t x, int32_t y, int8_t depth, int32_t edge)
 {
   const videoframe * const frame = encoder_state->tile->frame;
-  const cu_info *cur_cu = videoframe_get_cu_const(frame, x, y);
+  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x, y);
   uint8_t split_flag = (cur_cu->depth > depth) ? 1 : 0;
   uint8_t tr_split = (cur_cu->tr_depth > depth) ? 1 : 0;
   uint8_t border_x = (frame->width  < x*(LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth)) ? 1 : 0;
