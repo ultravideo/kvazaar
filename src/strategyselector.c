@@ -97,7 +97,7 @@ int strategyselector_register(void * const opaque, const char * const type, cons
   strategy_list * const strategies = opaque;
   
   if (strategies->allocated == strategies->count) {
-    strategy* new_strategies = realloc(strategies->strategies, sizeof(strategy) * (strategies->allocated + STRATEGY_LIST_ALLOC_SIZE));
+    strategy_t* new_strategies = realloc(strategies->strategies, sizeof(strategy_t) * (strategies->allocated + STRATEGY_LIST_ALLOC_SIZE));
     if (!new_strategies) {
       fprintf(stderr, "Could not increase strategies list size!\n");
       return 0;
@@ -107,7 +107,7 @@ int strategyselector_register(void * const opaque, const char * const type, cons
   }
   
   {
-    strategy *new_strategy = &strategies->strategies[strategies->count++];
+    strategy_t *new_strategy = &strategies->strategies[strategies->count++];
     new_strategy->type = type;
     new_strategy->strategy_name = strategy_name;
     new_strategy->priority = priority;

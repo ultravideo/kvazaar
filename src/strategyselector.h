@@ -96,12 +96,12 @@ typedef struct {
   const char *strategy_name; //Name of the strategy (e.g. sse2)
   unsigned int priority; //Priority. 0 = lowest (default strategy)
   void *fptr; //Pointer to the function
-} strategy;
+} strategy_t;
 
 typedef struct {
   unsigned int count;
   unsigned int allocated;
-  strategy* strategies;
+  strategy_t* strategies;
 } strategy_list;
 
 #define STRATEGY_LIST_ALLOC_SIZE 16

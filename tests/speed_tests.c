@@ -46,7 +46,7 @@ pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
 static struct test_env_t {
   int log_width; // for selecting dim from bufs
   void * tested_func;
-  const strategy * strategy;
+  const strategy_t * strategy;
   char msg[1024];
 } test_env;
 
@@ -274,7 +274,7 @@ SUITE(speed_tests)
   // Loop through all strategies picking out the intra sad ones and run
   // selectec strategies though all tests
   for (unsigned i = 0; i < strategies.count; ++i) {
-    const strategy * strategy = &strategies.strategies[i];
+    const strategy_t * strategy = &strategies.strategies[i];
 
     // Select buffer width according to function name for intra cost functions.
     if (strcmp(strategy->type, "sad_8bit_4x4") == 0) {
