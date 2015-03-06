@@ -699,10 +699,26 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
     mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
     if(temp_cost < cur_cu->inter.cost) {
+      int j, ref_list[2] = { 0, 0 };
+      for (j = 0; j < encoder_state->global->ref->used_size; j++) {
+        if (encoder_state->global->ref->images[j]->poc < encoder_state->global->poc) {
+          ref_list[0]++;
+          if (ref_idx == j) {
+            cur_cu->inter.mv_dir = 1;
+            cur_cu->inter.mv_ref = ref_list[0];
+          }
+        } else {
+          ref_list[1]++;
+          if (ref_idx == j) {
+            cur_cu->inter.mv_dir = 2;
+            cur_cu->inter.mv_ref = ref_list[1];
+          }
+        }
+      }
       cur_cu->merged        = merged;
       cur_cu->merge_idx     = merge_idx;
       cur_cu->inter.mv_ref  = ref_idx;
-      cur_cu->inter.mv_dir  = 1;
+      //cur_cu->inter.mv_dir  = 1;
       cur_cu->inter.mv[0]   = (int16_t)mv.x;
       cur_cu->inter.mv[1]   = (int16_t)mv.y;
       cur_cu->inter.mvd[0]  = (int16_t)mvd.x;
