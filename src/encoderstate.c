@@ -670,7 +670,8 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
       main_state->global->slicetype = SLICE_I;
       main_state->global->pictype = NAL_IDR_W_RADL;
     } else {
-      main_state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+      main_state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : 
+        (main_state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
       main_state->global->pictype = NAL_TRAIL_R;
     }
     if (main_state->encoder_control->cfg->gop_len) {
@@ -680,8 +681,8 @@ static void encoder_state_new_frame(encoder_state * const main_state) {
       }
       else {
         main_state->global->QP = main_state->encoder_control->cfg->qp +
-          main_state->encoder_control->cfg->gop[main_state->global->frame % 8].qp_offset;
-        main_state->global->QP_factor = main_state->encoder_control->cfg->gop[main_state->global->frame % 8].qp_factor;
+          main_state->encoder_control->cfg->gop[(main_state->global->frame-1) % 8].qp_offset;
+        main_state->global->QP_factor = main_state->encoder_control->cfg->gop[(main_state->global->frame-1) % 8].qp_factor;
       }
         
     }
@@ -933,7 +934,7 @@ void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, ui
     
     videoframe_compute_psnr(encoder_state->tile->frame, temp_psnr);
     
-    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->frame,
+    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", encoder_state->global->poc,
           encoder_state->global->QP,
           "BPI"[encoder_state->global->slicetype%3], encoder_state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
@@ -969,7 +970,12 @@ void encoder_next_frame(encoder_state *encoder_state) {
     //We have a "real" previous encoder
     encoder_state->global->frame = encoder_state->previous_encoder_state->global->frame + 1;
     encoder_state->global->poc = encoder_state->previous_encoder_state->global->poc + 1;
-    
+    if (encoder_state->encoder_control->cfg->gop_len) {
+      // Calculate POC according to the global frame counter and GOP structure
+      encoder_state->global->poc = encoder_state->previous_encoder_state->global->frame - 
+         (encoder_state->previous_encoder_state->global->frame % 8) + 
+         encoder_state->encoder_control->cfg->gop[(encoder_state->global->frame - 1) % 8].poc_offset;
+    }
     image_free(encoder_state->tile->frame->rec);
     cu_array_free(encoder_state->tile->frame->cu_array);
     
@@ -991,18 +997,22 @@ void encoder_next_frame(encoder_state *encoder_state) {
     return; //FIXME reference frames
   }
 
-  // Remove the ref pic (if present)
-  if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
-    image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
+  int8_t use_as_ref[8] = {1, 1, 1, 0, 0, 1, 0, 0 };
+
+  if (!encoder->cfg->gop_len || use_as_ref[(encoder_state->global->poc - 1) % 8]) {
+
+    // Remove the ref pic (if present)
+    if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
+      image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size - 1);
+    }
+    // Add current reconstructed picture as reference
+    image_list_add(encoder_state->global->ref, encoder_state->tile->frame->rec, encoder_state->tile->frame->cu_array);
   }
-  // Add current reconstructed picture as reference
-  image_list_add(encoder_state->global->ref, encoder_state->tile->frame->rec, encoder_state->tile->frame->cu_array);
-  
   //Remove current reconstructed picture, and alloc a new one
   image_free(encoder_state->tile->frame->rec);
   
   encoder_state->global->frame++;
-  encoder_state->global->poc++;
+  //encoder_state->global->poc++;
   
   encoder_state->tile->frame->rec = image_alloc(encoder_state->tile->frame->width, encoder_state->tile->frame->height, encoder_state->global->poc);
   videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
