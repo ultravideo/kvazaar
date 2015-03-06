@@ -108,6 +108,11 @@ const uint8_t INIT_CHROMA_PRED_MODE[3][2] = {
   {  63,  139 },
 };
 
+const uint8_t INIT_INTER_DIR[3][5] = {
+  {  95,  79,  63,  31,  31, },
+  {  95,  79,  63,  31,  31, },
+  { CNU, CNU, CNU, CNU, CNU, },
+};
 
 const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
   { 224,  167,  122 },
@@ -253,6 +258,10 @@ void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
   for (i = 0; i < 4; i++) {
     ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
     ctx_init(&cabac->ctx.qt_cbf_model_chroma[i], QP, INIT_QT_CBF[slice][i + 4]);
+  }
+
+  for (i = 0; i < 5; i++) {
+    ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i]);
   }
 
   for (i = 0; i < 8; i++) {
