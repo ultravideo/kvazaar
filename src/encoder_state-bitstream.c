@@ -585,19 +585,63 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
   if (encoder_state->global->pictype != NAL_IDR_W_RADL
       && encoder_state->global->pictype != NAL_IDR_N_LP) {
       int j;
-      int ref_negative = encoder_state->global->ref->used_size;
+      int ref_negative = 0;
       int ref_positive = 0;
+      for (j = 0; j < encoder_state->global->ref->used_size; j++) {
+        if (encoder_state->global->ref->images[j]->poc < encoder_state->global->poc) {
+          ref_negative++;
+        }
+        else {
+          ref_positive++;
+        }
+      }
+
       WRITE_U(stream, encoder_state->global->poc&0xf, 4, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
-
+      fprintf(stderr, "POC: %d [L0 ", encoder_state->global->poc);
     for (j = 0; j < ref_negative; j++) {
-      int32_t delta_poc_minus1 = 0;
+      /*
+      int8_t reflist[4][8] = {
+            { 1, 2, 1, 4, 1, 2, 1, 8 },
+            { 0, 4, 3, 6, 5, 4, 3, 10 },
+            { 0, 0, 0, 0, 0, 6, 7, 12 },
+            { 0, 0, 0, 0, 0, 0, 0, 16 } 
+      };*/
+      int8_t reflist[4][8] = {
+          { 1, 2, 1, 4, 1, 4, 1, 8 },
+          { 0, 4, 3, 6, 5, 4, 3, 10 },
+          { 0, 0, 0, 0, 0, 6, 7, 12 },
+          { 0, 0, 0, 0, 0, 0, 0, 16 }
+      };
+      int32_t delta_poc_minus1 = reflist[j][(encoder_state->global->poc-1)%8] - 1;
+      fprintf(stderr, "%d ", delta_poc_minus1+1);
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s0_minus1");
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
     }
+    fprintf(stderr, "] [L1 ");
 
+    for (j = 0; j < ref_positive; j++) {
+      /*
+      int8_t reflist[3][8] = {
+          { 1, 2, 1, 4, 1, 2, 1, 0 },
+          { 3, 6, 5, 0, 3, 0, 0, 0 },
+          { 7, 0, 0, 0, 0, 0, 0, 0 }
+      };
+      */
+      int8_t reflist[3][8] = {
+          { 1, 2, 1, 4, 1, 2, 1, 0 },
+          { 3, 6, 5, 0, 3, 0, 0, 0 },
+          { 7, 0, 0, 0, 0, 0, 0, 0 }
+      };
+      // TODO: fix reference pictures
+      int32_t delta_poc_minus1 = reflist[j][(encoder_state->global->poc - 1) % 8] - 1;
+      fprintf(stderr, "%d ", delta_poc_minus1 + 1);
+      WRITE_UE(stream, delta_poc_minus1, "delta_poc_s1_minus1");
+      WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
+    }
+    fprintf(stderr, "]\r\n");
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
   }
 
