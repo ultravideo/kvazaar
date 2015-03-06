@@ -1152,30 +1152,41 @@ void encode_coding_tree(encoder_state * const encoder_state,
       }
     } else {
       uint32_t ref_list_idx;
-      /*
-      // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-      if(cur_pic->slicetype == SLICE_B)
-      {
-        // Code Inter Dir
-        const UInt uiInterDir = pcCU->getInterDir( uiAbsPartIdx ) - 1;
-        const UInt uiCtx      = pcCU->getCtxInterDir( uiAbsPartIdx );
-        ContextModel *pCtx    = m_cCUInterDirSCModel.get( 0 );
-        if (pcCU->getPartitionSize(uiAbsPartIdx) == SIZE_2Nx2N || pcCU->getHeight(uiAbsPartIdx) != 8 )
-        {
-          m_pcBinIf->encodeBin( uiInterDir == 2 ? 1 : 0, *( pCtx + uiCtx ) );
-        }
-        if (uiInterDir < 2)
-        {
-          m_pcBinIf->encodeBin( uiInterDir, *( pCtx + 4 ) );
+      uint32_t j;
+      int ref_list[2] = { 0, 0 };
+      for (j = 0; j < encoder_state->global->ref->used_size; j++) {
+        if (encoder_state->global->ref->images[j]->poc < encoder_state->global->poc) {
+          ref_list[0]++;
+        } else {
+          ref_list[1]++;
         }
       }
-      */
+
+      // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
+      if (encoder_state->global->slicetype == SLICE_B)
+      {
+        // Code Inter Dir
+        uint8_t inter_dir = cur_cu->inter.mv_dir-1;
+        uint8_t ctx = depth;
+        
+
+        if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8)
+        {
+          cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
+          CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
+        }
+        if (inter_dir < 2)
+        {
+          cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
+          CABAC_BIN(cabac, inter_dir, "ref_idx_l0");
+        }
+      }
 
       for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
             //if(encoder_state->ref_idx_num[uiRefListIdx] > 0)
             {
           if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-            if (encoder_state->global->ref->used_size != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
+            if (ref_list[ref_list_idx] != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
               // parseRefFrmIdx
               int32_t ref_frame = cur_cu->inter.mv_ref;
 
@@ -1184,7 +1195,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
 
               if (ref_frame > 0) {
                 int32_t i;
-                int32_t ref_num = encoder_state->global->ref->used_size - 2;
+                int32_t ref_num = ref_list[ref_list_idx] - 2;
 
                 cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
                 ref_frame--;
