@@ -611,11 +611,11 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
   if (encoder_state->global->slicetype != SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
         WRITE_UE(stream, encoder_state->global->ref->used_size-1, "num_ref_idx_l0_active_minus1");
+        if (encoder_state->global->slicetype == SLICE_B) {
+          WRITE_UE(stream, 0, "num_ref_idx_l1_active_minus1");
+          WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+        }
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
-  }
-
-  if (encoder_state->global->slicetype == SLICE_B) {
-      WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
   }
 
   {
