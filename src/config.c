@@ -34,9 +34,9 @@
  * \brief Allocate memory for config object
  * \return pointer to allocated memory
  */
-config *config_alloc(void)
+config_t *config_alloc(void)
 {
-  config *cfg = (config *)malloc(sizeof(config));
+  config_t *cfg = (config_t *)malloc(sizeof(config_t));
   if (!cfg) {
     fprintf(stderr, "Failed to allocate a config object!\n");
     return cfg;
@@ -52,7 +52,7 @@ config *config_alloc(void)
  * \param cfg config object
  * \return 1 on success, 0 on failure
  */
-int config_init(config *cfg)
+int config_init(config_t *cfg)
 {
   cfg->input           = NULL;
   cfg->output          = NULL;
@@ -116,7 +116,7 @@ int config_init(config *cfg)
  * \param cfg config object
  * \return 1 on success, 0 on failure
  */
-int config_destroy(config *cfg)
+int config_destroy(config_t *cfg)
 {
   FREE_POINTER(cfg->input);
   FREE_POINTER(cfg->output);
@@ -295,7 +295,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
   return 1;
 }
 
-static int config_parse(config *cfg, const char *name, const char *value)
+static int config_parse(config_t *cfg, const char *name, const char *value)
 {
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
   static const char * const videoformat_names[] = { "component", "pal", "ntsc", "secam", "mac", "undef", NULL };
@@ -513,7 +513,7 @@ static int config_parse(config *cfg, const char *name, const char *value)
  * \param argv argument list
  * \return 1 on success, 0 on failure
  */
-int config_read(config *cfg,int argc, char *argv[])
+int config_read(config_t *cfg,int argc, char *argv[])
 {
   static char short_options[] = "i:o:d:w:h:n:q:p:r:";
   static struct option long_options[] =
@@ -604,7 +604,7 @@ int config_read(config *cfg,int argc, char *argv[])
  *
  * \return 0 if config fails, otherwise 1.
  */
-int config_validate(config *cfg)
+int config_validate(config_t *cfg)
 {
   if (cfg->width == 0 || cfg->height == 0) {
     fprintf(stderr, "Input error: one of the dimensions is 0: dims=%dx%d", cfg->width, cfg->height);
@@ -661,7 +661,7 @@ int size_of_wpp_ends(int threads)
   return 4 * threads * threads - 2 * threads;
 }
 
-int config_set_owf_auto(config *cfg)
+int config_set_owf_auto(config_t *cfg)
 {
   if (cfg->wpp) {
     // If wpp is on, select owf such that less than 15% of the

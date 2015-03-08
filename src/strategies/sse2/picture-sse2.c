@@ -31,7 +31,7 @@
 #  include <stdlib.h>
 
 
-static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data2,
+static unsigned reg_sad_sse2(const pixel_t * const data1, const pixel_t * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -56,7 +56,7 @@ static unsigned reg_sad_sse2(const pixel * const data1, const pixel * const data
   return sad;
 }
 
-static unsigned sad_8bit_4x4_sse2(const pixel *buf1, const pixel *buf2)
+static unsigned sad_8bit_4x4_sse2(const pixel_t *buf1, const pixel_t *buf2)
 {
   const __m128i *const mbuf1 = (const __m128i *)buf1;
   const __m128i *const mbuf2 = (const __m128i *)buf2;

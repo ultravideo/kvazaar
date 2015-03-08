@@ -32,7 +32,7 @@
 extern int8_t g_luma_filter[4][8];
 extern int8_t g_chroma_filter[8][4];
 
-int16_t eight_tap_filter_hor_avx2(int8_t *filter, pixel *data)
+int16_t eight_tap_filter_hor_avx2(int8_t *filter, pixel_t *data)
 {
   int16_t temp = 0;
   for (int i = 0; i < 8; ++i)
@@ -54,7 +54,7 @@ int32_t eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t eight_tap_filter_ver_avx2(int8_t *filter, pixel *data, int16_t stride)
+int16_t eight_tap_filter_ver_avx2(int8_t *filter, pixel_t *data, int16_t stride)
 {
   int16_t temp = 0;
   for (int i = 0; i < 8; ++i)
@@ -76,7 +76,7 @@ int32_t eight_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t s
   return temp;
 }
 
-int16_t four_tap_filter_hor_avx2(int8_t *filter, pixel *data)
+int16_t four_tap_filter_hor_avx2(int8_t *filter, pixel_t *data)
 {
   int16_t temp = 0;
   for (int i = 0; i < 4; ++i)
@@ -98,7 +98,7 @@ int32_t four_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t four_tap_filter_ver_avx2(int8_t *filter, pixel *data, int16_t stride)
+int16_t four_tap_filter_ver_avx2(int8_t *filter, pixel_t *data, int16_t stride)
 {
   int16_t temp = 0;
   for (int i = 0; i < 4; ++i)
@@ -120,7 +120,7 @@ int32_t four_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t st
   return temp;
 }
 
-void filter_inter_quarterpel_luma_avx2(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
@@ -211,7 +211,7 @@ void filter_inter_quarterpel_luma_avx2(const encoder_control * const encoder, pi
 * \param dst_stride stride of destination image
 *
 */
-void filter_inter_halfpel_chroma_avx2(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_halfpel_chroma_avx2(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
   * | B0,0|ae0,0|
@@ -272,7 +272,7 @@ void filter_inter_halfpel_chroma_avx2(const encoder_control * const encoder, pix
   }
 }
 
-void filter_inter_octpel_chroma_avx2(const encoder_control * const encoder, pixel *src, int16_t src_stride, int width, int height, pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_octpel_chroma_avx2(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
@@ -380,8 +380,8 @@ void filter_inter_octpel_chroma_avx2(const encoder_control * const encoder, pixe
   }
 }
 
-void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, pixel *dst) {
+void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel_t *ref, int ref_width, int ref_height,
+  int filterSize, int width, int height, pixel_t *dst) {
 
   int16_t mv[2] = { mv_x, mv_y };
   int halfFilterSize = filterSize >> 1;

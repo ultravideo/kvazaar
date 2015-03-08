@@ -181,7 +181,7 @@ static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
 /**
  * \brief Initialize struct cabac_ctx.
  */
-void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
+void ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
 {
   int slope = (init_value >> 4) * 5 - 45;
   int offset = ((init_value & 15) << 3) - 16;
@@ -200,9 +200,9 @@ void ctx_init(cabac_ctx *ctx, uint32_t qp, uint32_t init_value)
  * \param slice type of slice we are coding (P/B/I)
  */
 
-void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
+void init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 {
-  cabac_data * const cabac = &encoder_state->cabac;
+  cabac_data_t * const cabac = &state->cabac;
   uint16_t i;
 
   // Initialize contexts
@@ -276,9 +276,9 @@ void init_contexts(encoder_state *encoder_state, int8_t QP, int8_t slice)
   }
 }
 
-void context_copy(encoder_state * const target_encoder_state, const encoder_state * const source_encoder_state) {
-  cabac_data * const target_cabac = &target_encoder_state->cabac;
-  const cabac_data * const source_cabac = &source_encoder_state->cabac;
+void context_copy(encoder_state_t * const target_state, const encoder_state_t * const source_state) {
+  cabac_data_t * const target_cabac = &target_state->cabac;
+  const cabac_data_t * const source_cabac = &source_state->cabac;
   
   if (target_cabac == source_cabac) return;
 

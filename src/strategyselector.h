@@ -96,20 +96,20 @@ typedef struct {
   const char *strategy_name; //Name of the strategy (e.g. sse2)
   unsigned int priority; //Priority. 0 = lowest (default strategy)
   void *fptr; //Pointer to the function
-} strategy;
+} strategy_t;
 
 typedef struct {
   unsigned int count;
   unsigned int allocated;
-  strategy* strategies;
-} strategy_list;
+  strategy_t* strategies;
+} strategy_list_t;
 
 #define STRATEGY_LIST_ALLOC_SIZE 16
 
 typedef struct {
   const char *strategy_type;
   void **fptr;
-} strategy_to_select;
+} strategy_to_select_t;
 
 typedef struct {
   int intel;
@@ -134,9 +134,9 @@ typedef struct {
   struct {
     int neon;
   } arm_flags;
-} hardware_flags;
+} hardware_flags_t;
 
-extern hardware_flags g_hardware_flags;
+extern hardware_flags_t g_hardware_flags;
 
 
 int strategyselector_init(int32_t cpuid);
@@ -150,7 +150,7 @@ int strategyselector_register(void *opaque, const char *type, const char *strate
 #include "strategies/strategies-dct.h"
 #include "strategies/strategies-ipol.h"
 
-static const strategy_to_select strategies_to_select[] = {
+static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
   STRATEGIES_PICTURE_EXPORTS
   STRATEGIES_DCT_EXPORTS
@@ -158,7 +158,7 @@ static const strategy_to_select strategies_to_select[] = {
   { NULL, NULL },
 };
 
-unsigned satd_8bit_8x8_generic(const pixel * const block1, const pixel * const block2);
+unsigned satd_8bit_8x8_generic(const pixel_t * const block1, const pixel_t * const block2);
 
 
 #endif //STRATEGYSELECTOR_H_

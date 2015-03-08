@@ -48,13 +48,13 @@ const uint8_t intra_hor_ver_dist_thres[5] = {0,7,1,0,0};
  * \param mode mode to set
  * \returns Void
  */
-void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
+void intra_set_block_mode(videoframe_t *frame,uint32_t x_cu, uint32_t y_cu, uint8_t depth, uint8_t mode, uint8_t part_mode)
 {
   uint32_t x, y;
   int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
 
   if (part_mode == SIZE_NxN) {
-    cu_info *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
+    cu_info_t *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
     // Modes are already set.
     cur_cu->depth = depth;
     cur_cu->type = CU_INTRA;
@@ -65,7 +65,7 @@ void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_
   // Loop through all the blocks in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
+      cu_info_t *cur_cu = videoframe_get_cu(frame, x_cu, y_cu);
       cur_cu->depth = depth;
       cur_cu->type = CU_INTRA;
       cur_cu->intra[0].mode = mode;
@@ -87,7 +87,7 @@ void intra_set_block_mode(videoframe *frame,uint32_t x_cu, uint32_t y_cu, uint8_
  * \param width block width
  * \returns DC prediction
 */
-pixel intra_get_dc_pred(const pixel *pic, uint16_t picwidth, uint8_t width)
+pixel_t intra_get_dc_pred(const pixel_t *pic, uint16_t picwidth, uint8_t width)
 {
   int32_t i, sum = 0;
 
@@ -100,7 +100,7 @@ pixel intra_get_dc_pred(const pixel *pic, uint16_t picwidth, uint8_t width)
   }
 
   // return the average
-  return (pixel)((sum + width) / (width + width));
+  return (pixel_t)((sum + width) / (width + width));
 }
 
 /**
@@ -112,7 +112,7 @@ pixel intra_get_dc_pred(const pixel *pic, uint16_t picwidth, uint8_t width)
  * \returns (predictions are found)?1:0
  */
 int8_t intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8_t* preds,
-                                    const cu_info * const cur_cu, const cu_info * const left_cu, const cu_info * const above_cu)
+                                    const cu_info_t * const cur_cu, const cu_info_t * const left_cu, const cu_info_t * const above_cu)
 {
   int y_cu = y>>3;
 
@@ -175,11 +175,11 @@ int8_t intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8_t* 
  * \param preds output buffer for 3 predictions
  * \returns (predictions are found)?1:0
  */
-void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
+void intra_filter(pixel_t *ref, int32_t stride,int32_t width, int8_t mode)
 {
   #define FWIDTH (LCU_WIDTH*2+1)
-  pixel filtered[FWIDTH * FWIDTH]; //!< temporary buffer for filtered samples
-  pixel *filteredShift = &filtered[FWIDTH+1]; //!< pointer to temporary buffer with offset (1,1)
+  pixel_t filtered[FWIDTH * FWIDTH]; //!< temporary buffer for filtered samples
+  pixel_t *filteredShift = &filtered[FWIDTH+1]; //!< pointer to temporary buffer with offset (1,1)
   int x,y;
 
   if (!mode) {
@@ -222,9 +222,9 @@ void intra_filter(pixel *ref, int32_t stride,int32_t width, int8_t mode)
  * \param recstride  Stride for rec pixel arrays.
  * \param dst
  */
-void intra_get_pred(const encoder_control * const encoder, const pixel *rec, const pixel *rec_filtered, int recstride, pixel *dst, int width, int mode, int is_chroma)
+void intra_get_pred(const encoder_control_t * const encoder, const pixel_t *rec, const pixel_t *rec_filtered, int recstride, pixel_t *dst, int width, int mode, int is_chroma)
 {
-  const pixel *ref_pixels = rec;
+  const pixel_t *ref_pixels = rec;
   if (is_chroma || mode == 1 || width == 4) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
@@ -244,7 +244,7 @@ void intra_get_pred(const encoder_control * const encoder, const pixel *rec, con
     intra_get_planar_pred(ref_pixels, recstride, width, dst, width);
   } else if (mode == 1) {
     int i;
-    pixel val = intra_get_dc_pred(ref_pixels, recstride, width);
+    pixel_t val = intra_get_dc_pred(ref_pixels, recstride, width);
     for (i = 0; i < width * width; i++) {
       dst[i] = val;
     }
@@ -271,11 +271,11 @@ void intra_get_pred(const encoder_control * const encoder, const pixel *rec, con
  * \param chroma chroma-block flag
 
 */
-void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recstride, uint32_t width, pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(const encoder_control_t * const encoder, pixel_t* rec, int32_t recstride, uint32_t width, pixel_t* dst, int32_t dststride, int8_t mode, int8_t chroma)
 {
-  pixel pred[LCU_WIDTH * LCU_WIDTH];
-  pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-  pixel *recf = &rec_filtered_temp[recstride + 1];
+  pixel_t pred[LCU_WIDTH * LCU_WIDTH];
+  pixel_t rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  pixel_t *recf = &rec_filtered_temp[recstride + 1];
 
   // Generate filtered reference pixels.
   {
@@ -303,8 +303,8 @@ void intra_recon(const encoder_control * const encoder, pixel* rec, int32_t recs
  * The end result is 2*width+8 x 2*width+8 array, with only the top and left
  * edge pixels filled with the reconstructed pixels.
  */
-void intra_build_reference_border(const encoder_control * const encoder, int32_t x_luma, int32_t y_luma, int16_t out_width,
-                                      pixel *dst, int32_t dst_stride, int8_t chroma,
+void intra_build_reference_border(const encoder_control_t * const encoder, int32_t x_luma, int32_t y_luma, int16_t out_width,
+                                      pixel_t *dst, int32_t dst_stride, int8_t chroma,
                                       int32_t pic_width, int32_t pic_height,
                                       lcu_t *lcu)
 {
@@ -362,7 +362,7 @@ void intra_build_reference_border(const encoder_control * const encoder, int32_t
     { 64,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4 }
   };
 
-  const pixel dc_val = 1 << (encoder->bitdepth - 1);
+  const pixel_t dc_val = 1 << (encoder->bitdepth - 1);
   const int is_chroma = chroma ? 1 : 0;
 
   // input picture pointer
@@ -377,12 +377,12 @@ void intra_build_reference_border(const encoder_control * const encoder, int32_t
 
   int x_local = (x_luma&0x3f)>>is_chroma, y_local = (y_luma&0x3f)>>is_chroma;
 
-  pixel *left_ref = !chroma ? &lcu->left_ref.y[1] : (chroma == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
-  pixel *top_ref  = !chroma ? &lcu->top_ref.y[1]  : (chroma == 1) ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
-  pixel *rec_ref  = !chroma ? lcu->rec.y : (chroma == 1) ? lcu->rec.u : lcu->rec.v;
+  pixel_t *left_ref = !chroma ? &lcu->left_ref.y[1] : (chroma == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  pixel_t *top_ref  = !chroma ? &lcu->top_ref.y[1]  : (chroma == 1) ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
+  pixel_t *rec_ref  = !chroma ? lcu->rec.y : (chroma == 1) ? lcu->rec.u : lcu->rec.v;
 
-  pixel *left_border = &left_ref[y_local];
-  pixel *top_border = &top_ref[x_local];
+  pixel_t *left_border = &left_ref[y_local];
+  pixel_t *top_border = &top_ref[x_local];
   uint32_t left_stride = 1;
 
   if(x_local) {
@@ -399,7 +399,7 @@ void intra_build_reference_border(const encoder_control * const encoder, int32_t
     // Get the number of reference pixels based on the PU coordinate within the LCU.
     int num_ref_pixels = num_ref_pixels_left[y_in_lcu / 4][x_in_lcu / 4] >> is_chroma;
     int i;
-    pixel nearest_pixel;
+    pixel_t nearest_pixel;
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
@@ -421,7 +421,7 @@ void intra_build_reference_border(const encoder_control * const encoder, int32_t
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
-    pixel nearest_pixel = y > 0 ? top_border[0] : dc_val;
+    pixel_t nearest_pixel = y > 0 ? top_border[0] : dc_val;
     int i;
     for (i = 1; i < out_width - 1; i++) {
       dst[i * dst_stride] = nearest_pixel;
@@ -433,7 +433,7 @@ void intra_build_reference_border(const encoder_control * const encoder, int32_t
     // Get the number of reference pixels based on the PU coordinate within the LCU.
     int num_ref_pixels = num_ref_pixels_top[y_in_lcu / 4][x_in_lcu / 4] >> is_chroma;
     int i;
-    pixel nearest_pixel;
+    pixel_t nearest_pixel;
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
@@ -452,7 +452,7 @@ void intra_build_reference_border(const encoder_control * const encoder, int32_t
     }
   } else {
     // Extend nearest pixel.
-    pixel nearest_pixel = x > 0 ? left_border[0] : dc_val;
+    pixel_t nearest_pixel = x > 0 ? left_border[0] : dc_val;
     int i;
     for(i = 1; i < out_width; i++)
     {
@@ -484,7 +484,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(const encoder_control * const encoder, const pixel* src, int32_t src_stride, pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
+void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel_t* src, int32_t src_stride, pixel_t* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
 {
   int32_t k,l;
   int32_t blk_size        = width;
@@ -500,10 +500,10 @@ void intra_get_angular_pred(const encoder_control * const encoder, const pixel* 
   int32_t inv_angle       = inv_ang_table[abs_ang];
 
   // Do angular predictions
-  pixel *ref_main;
-  pixel *ref_side;
-  pixel  ref_above[2 * LCU_WIDTH + 1];
-  pixel  ref_left[2 * LCU_WIDTH + 1];
+  pixel_t *ref_main;
+  pixel_t *ref_side;
+  pixel_t  ref_above[2 * LCU_WIDTH + 1];
+  pixel_t  ref_left[2 * LCU_WIDTH + 1];
 
   // Tell clang-analyzer that everything is ok.
   assert(width == 4 || width == 8 || width == 16 || width == 32);
@@ -565,7 +565,7 @@ void intra_get_angular_pred(const encoder_control * const encoder, const pixel* 
         // Do linear filtering
         for (l = 0; l < blk_size; l++) {
           ref_main_index        = l + delta_int + 1;
-          dst[k * dst_stride + l] = (pixel) ( (minus_delta_fract * ref_main[ref_main_index]
+          dst[k * dst_stride + l] = (pixel_t) ( (minus_delta_fract * ref_main[ref_main_index]
                                                  + delta_fract * ref_main[ref_main_index + 1] + 16) >> 5);
         }
       } else {
@@ -579,7 +579,7 @@ void intra_get_angular_pred(const encoder_control * const encoder, const pixel* 
 
   // Flip the block if this is the horizontal mode
   if (mode_hor) {
-    pixel tmp;
+    pixel_t tmp;
     for (k=0;k<blk_size-1;k++) {
       for (l=k+1;l<blk_size;l++) {
         tmp                 = dst[k * dst_stride + l];
@@ -593,7 +593,7 @@ void intra_get_angular_pred(const encoder_control * const encoder, const pixel* 
 
 
 
-void intra_dc_pred_filtering(const pixel *src, int32_t src_stride, pixel *dst, int32_t dst_stride, int32_t width, int32_t height )
+void intra_dc_pred_filtering(const pixel_t *src, int32_t src_stride, pixel_t *dst, int32_t dst_stride, int32_t width, int32_t height )
 {
   int32_t x, y, dst_stride2, src_stride2;
 
@@ -620,7 +620,7 @@ void intra_dc_pred_filtering(const pixel *src, int32_t src_stride, pixel *dst, i
 
   This function derives the prediction samples for planar mode (intra coding).
 */
-void intra_get_planar_pred(const pixel* src, int32_t srcstride, uint32_t width, pixel* dst, int32_t dststride)
+void intra_get_planar_pred(const pixel_t* src, int32_t srcstride, uint32_t width, pixel_t* dst, int32_t dststride)
 {
   int32_t k, l, bottom_left, top_right;
   int32_t hor_pred;
@@ -652,15 +652,15 @@ void intra_get_planar_pred(const pixel* src, int32_t srcstride, uint32_t width, 
     for (l = 0; l < (int32_t)blk_size; l++) {
       hor_pred += right_column[k];
       top_row[l] += bottom_row[l];
-      dst[k * dststride + l] = (pixel)((hor_pred + top_row[l]) >> shift_2d);
+      dst[k * dststride + l] = (pixel_t)((hor_pred + top_row[l]) >> shift_2d);
     }
   }
 }
 
-void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
+void intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  const encoder_control_t * const encoder = state->encoder_control;
+  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   if (cur_cu == NULL) {
     cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
   }
@@ -669,15 +669,15 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu_luma(encoder_state, x,          y,          depth+1, intra_mode, NULL, lcu);
-    intra_recon_lcu_luma(encoder_state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
-    intra_recon_lcu_luma(encoder_state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
-    intra_recon_lcu_luma(encoder_state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(state, x,          y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_luma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
-      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
-      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
-      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_a = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + (lcu_px.y >> 3)        *LCU_T_CU_WIDTH];
+      cu_info_t *cu_b = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_c = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
         cbf_set(&cur_cu->cbf.y, depth);
       }
@@ -686,14 +686,14 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
     return;
   }
   {
-    const uint32_t pic_width = encoder_state->tile->frame->width;
-    const uint32_t pic_height = encoder_state->tile->frame->height;
+    const uint32_t pic_width = state->tile->frame->width;
+    const uint32_t pic_height = state->tile->frame->height;
 
     // Pointers to reconstruction arrays
-    pixel *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+    pixel_t *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
-    pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
-    pixel *rec_shift  = &rec[width * 2 + 8 + 1];
+    pixel_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    pixel_t *rec_shift  = &rec[width * 2 + 8 + 1];
 
     int32_t rec_stride = LCU_WIDTH;
 
@@ -702,14 +702,14 @@ void intra_recon_lcu_luma(encoder_state * const encoder_state, int x, int y, int
     intra_recon(encoder, rec_shift, width * 2 + 8,
                 width, recbase_y, rec_stride, intra_mode, 0);
 
-    quantize_lcu_luma_residual(encoder_state, x, y, depth, cur_cu, lcu);
+    quantize_lcu_luma_residual(state, x, y, depth, cur_cu, lcu);
   }
 }
 
-void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, int depth, int8_t intra_mode, cu_info *cur_cu, lcu_t *lcu)
+void intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  const vector2d lcu_px = { x & 0x3f, y & 0x3f };
+  const encoder_control_t * const encoder = state->encoder_control;
+  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
@@ -720,15 +720,15 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
   if (depth == 0 || cur_cu->tr_depth > depth) {
     int offset = width / 2;
 
-    intra_recon_lcu_chroma(encoder_state, x,          y,          depth+1, intra_mode, NULL, lcu);
-    intra_recon_lcu_chroma(encoder_state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
-    intra_recon_lcu_chroma(encoder_state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
-    intra_recon_lcu_chroma(encoder_state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(state, x,          y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
+    intra_recon_lcu_chroma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
-      cu_info *cu_a =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) +  (lcu_px.y>>3)        *LCU_T_CU_WIDTH];
-      cu_info *cu_b =  &lcu->cu[LCU_CU_OFFSET +  (lcu_px.x>>3)           + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
-      cu_info *cu_c =  &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset)>>3) + ((lcu_px.y+offset)>>3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_a = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + (lcu_px.y >> 3)        *LCU_T_CU_WIDTH];
+      cu_info_t *cu_b = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_c = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
       if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
         cbf_set(&cur_cu->cbf.u, depth);
       }
@@ -741,20 +741,20 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
   }
 
   {
-    const uint32_t pic_width = encoder_state->tile->frame->width;
-    const uint32_t pic_height = encoder_state->tile->frame->height;
+    const uint32_t pic_width = state->tile->frame->width;
+    const uint32_t pic_height = state->tile->frame->height;
 
     // Pointers to reconstruction arrays
-    pixel *recbase_u = &lcu->rec.u[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
-    pixel *recbase_v = &lcu->rec.v[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
+    pixel_t *recbase_u = &lcu->rec.u[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
+    pixel_t *recbase_v = &lcu->rec.v[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
 
-    pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    pixel_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
 
     int32_t rec_stride = LCU_WIDTH;
 
     // Reconstruct chroma.
     if (!(x & 4 || y & 4)) {
-      pixel *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
+      pixel_t *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
       intra_build_reference_border(encoder, x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
                                    pic_width/2, pic_height/2, lcu);
       intra_recon(encoder,
@@ -777,7 +777,7 @@ void intra_recon_lcu_chroma(encoder_state * const encoder_state, int x, int y, i
                   intra_mode,
                   2);
 
-      quantize_lcu_chroma_residual(encoder_state, x, y, depth, cur_cu, lcu);
+      quantize_lcu_chroma_residual(state, x, y, depth, cur_cu, lcu);
     }
   }
 }

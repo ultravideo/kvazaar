@@ -69,7 +69,7 @@ const int16_t g_inv_quant_scales[6]    = { 40,45,51,57,64,72 };
  * \brief Initialize scaling lists
  *
  */
-void scalinglist_init(scaling_list * const scaling_list)
+void scalinglist_init(scaling_list_t * const scaling_list)
 {
   uint32_t sizeId,listId,qp;
 
@@ -106,7 +106,7 @@ void scalinglist_init(scaling_list * const scaling_list)
  * \brief Destroy scaling list allocated memory
  *
  */
-void scalinglist_destroy(scaling_list * const scaling_list)
+void scalinglist_destroy(scaling_list_t * const scaling_list)
 {
   uint32_t sizeId,listId,qp;
 
@@ -124,7 +124,7 @@ void scalinglist_destroy(scaling_list * const scaling_list)
   }
 }
 
-int scalinglist_parse(scaling_list * const scaling_list, FILE *fp)
+int scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp)
 {
   #define LINE_BUFSIZE 1024
   static const char matrix_type[4][6][20] =
@@ -333,7 +333,7 @@ void scalinglist_process_enc(const int32_t * const coeff, int32_t* quantcoeff, c
  * \param uiSize Size
  * \param uiQP Quantization parameter
  */
-static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list * const scaling_list, uint32_t list,uint32_t size, uint32_t qp)
+static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list_t * const scaling_list, uint32_t list,uint32_t size, uint32_t qp)
 {
   uint32_t log2_tr_size   = g_convert_to_bit[ g_scaling_list_size_x[size] ] + 2;
   int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - bitdepth - log2_tr_size;  // Represents scaling through forward transform
@@ -357,7 +357,7 @@ static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list * const sca
  * \brief set scaling lists
  *
  */
-void scalinglist_set(scaling_list * const scaling_list, const int32_t * const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
+void scalinglist_set(scaling_list_t * const scaling_list, const int32_t * const coeff, uint32_t listId, uint32_t sizeId, uint32_t qp)
 {
   const uint32_t width  = g_scaling_list_size_x[sizeId];
   const uint32_t height = g_scaling_list_size_x[sizeId];
@@ -389,7 +389,7 @@ void scalinglist_set(scaling_list * const scaling_list, const int32_t * const co
  * \brief
  *
  */
-void scalinglist_process(scaling_list * const scaling_list, uint8_t bitdepth)
+void scalinglist_process(scaling_list_t * const scaling_list, uint8_t bitdepth)
 {
   uint32_t size,list,qp;
 

@@ -29,40 +29,40 @@
 #include "cu.h"
 #include "image.h"
 
-struct sao_info_struct;
+struct sao_info_t;
 
 /**
  * \brief Struct which contains all picture data
  */
 typedef struct videoframe
 {
-  image* source;         //!< \brief Source image.
-  image* rec;            //!< \brief Reconstructed image.
+  image_t* source;         //!< \brief Source image.
+  image_t* rec;            //!< \brief Reconstructed image.
   
-  coefficient* coeff_y;   //!< \brief coefficient pointer Y
-  coefficient* coeff_u;   //!< \brief coefficient pointer U
-  coefficient* coeff_v;   //!< \brief coefficient pointer V
+  coeff_t* coeff_y;   //!< \brief coefficient pointer Y
+  coeff_t* coeff_u;   //!< \brief coefficient pointer U
+  coeff_t* coeff_v;   //!< \brief coefficient pointer V
 
   int32_t width;          //!< \brief Luma pixel array width.
   int32_t height;         //!< \brief Luma pixel array height.
   int32_t height_in_lcu;  //!< \brief Picture width in number of LCU's.
   int32_t width_in_lcu;   //!< \brief Picture height in number of LCU's.
 
-  cu_array* cu_array;     //!< \brief Info for each CU at each depth.
-  struct sao_info_struct *sao_luma;   //!< \brief Array of sao parameters for every LCU.
-  struct sao_info_struct *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
+  cu_array_t* cu_array;     //!< \brief Info for each CU at each depth.
+  struct sao_info_t *sao_luma;   //!< \brief Array of sao parameters for every LCU.
+  struct sao_info_t *sao_chroma;   //!< \brief Array of sao parameters for every LCU.
   int32_t poc;           //!< \brief Picture order count
-} videoframe;
+} videoframe_t;
 
 
-videoframe *videoframe_alloc(int32_t width, int32_t height, int32_t poc);
-int videoframe_free(videoframe * const frame);
+videoframe_t *videoframe_alloc(int32_t width, int32_t height, int32_t poc);
+int videoframe_free(videoframe_t * const frame);
 
-void videoframe_set_poc(videoframe * frame, int32_t poc);
+void videoframe_set_poc(videoframe_t * frame, int32_t poc);
 
-const cu_info* videoframe_get_cu_const(const videoframe * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
-cu_info* videoframe_get_cu(videoframe * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);
-void videoframe_compute_psnr(const videoframe * const frame, double psnr[NUM_COLORS]);
+const cu_info_t* videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
+cu_info_t* videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);
+void videoframe_compute_psnr(const videoframe_t * const frame, double psnr[NUM_COLORS]);
 
 
 #endif

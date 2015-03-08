@@ -40,32 +40,7 @@ typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu
 typedef struct {
   int x;
   int y;
-} vector2d;
-
-/**
- * \brief Struct for CU intra info
- */
-typedef struct
-{
-  int8_t mode;
-  int8_t mode_chroma;
-  int8_t tr_skip;    //!< \brief transform skip flag
-} cu_info_intra;
-
-/**
- * \brief Struct for CU inter info
- */
-typedef struct
-{
-  double cost;
-  uint32_t bitcost;
-  int16_t mv[2];
-  int16_t mvd[2];
-  uint8_t mv_cand; // \brief selected MV candidate
-  uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
-  uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
-  int8_t mode;
-} cu_info_inter;
+} vector2d_t;
 
 typedef struct
 {
@@ -89,9 +64,22 @@ typedef struct
   int8_t merge_idx;  //!< \brief merge index
 
   cu_cbf_t cbf;
-  cu_info_intra intra[4];
-  cu_info_inter inter;
-} cu_info;
+  struct {
+    int8_t mode;
+    int8_t mode_chroma;
+    int8_t tr_skip;    //!< \brief transform skip flag
+  } intra[4];
+  struct {
+    double cost;
+    uint32_t bitcost;
+    int16_t mv[2];
+    int16_t mvd[2];
+    uint8_t mv_cand; // \brief selected MV candidate
+    uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
+    uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
+    int8_t mode;
+  } inter;
+} cu_info_t;
 
 #define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
   "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \
@@ -111,12 +99,12 @@ typedef struct
   (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
 
 typedef struct {
-  cu_info *data;           //!< \brief cu_info data
+  cu_info_t *data;           //!< \brief cu_info data
   int32_t refcount;        //!< \brief number of references in reflists to this cu_array
-} cu_array;
+} cu_array_t;
 
-cu_array * cu_array_alloc(int width_in_scu, int height_in_scu);
-int cu_array_free(cu_array *cua);
+cu_array_t * cu_array_alloc(int width_in_scu, int height_in_scu);
+int cu_array_free(cu_array_t *cua);
   
 
 #define SUB_SCU_BIT_MASK (64 - 1)
@@ -134,15 +122,15 @@ int cu_array_free(cu_array *cua);
  * - First pixel is the top-left pixel.
  */
 typedef struct {
-  pixel y[LCU_REF_PX_WIDTH + 1];
-  pixel u[LCU_REF_PX_WIDTH / 2 + 1];
-  pixel v[LCU_REF_PX_WIDTH / 2 + 1];
+  pixel_t y[LCU_REF_PX_WIDTH + 1];
+  pixel_t u[LCU_REF_PX_WIDTH / 2 + 1];
+  pixel_t v[LCU_REF_PX_WIDTH / 2 + 1];
 } lcu_ref_px_t;
 
 typedef struct {
-  coefficient y[LCU_LUMA_SIZE];
-  coefficient u[LCU_CHROMA_SIZE];
-  coefficient v[LCU_CHROMA_SIZE];
+  coeff_t y[LCU_LUMA_SIZE];
+  coeff_t u[LCU_CHROMA_SIZE];
+  coeff_t v[LCU_CHROMA_SIZE];
 } lcu_coeff_t;
 
 
@@ -165,7 +153,7 @@ typedef struct {
    * - All of LCUs CUs on 1:9, 1:9.
    * - Top right reference CU on the last slot.
    */
-  cu_info cu[9*9+1];
+  cu_info_t cu[9*9+1];
 } lcu_t;
 
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \
@@ -254,11 +242,11 @@ typedef struct {
 } while(0)
 
 
-void coefficients_blit(const coefficient *orig, coefficient *dst,
+void coefficients_blit(const coeff_t *orig, coeff_t *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
-unsigned coefficients_calc_abs(const coefficient *const buf, const int buf_stride,
+unsigned coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
                         const int width);
 
 

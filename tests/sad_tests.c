@@ -57,8 +57,8 @@ const uint8_t pic_data[64] = {
   1,1,1,1,1,1,1,1
 };
 
-image *g_pic = 0;
-image *g_ref = 0;
+image_t *g_pic = 0;
+image_t *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
@@ -226,8 +226,8 @@ TEST test_bottomright_out(void)
 
 
 struct sad_test_env_t {
-  image *g_pic;
-  image *g_ref;
+  image_t *g_pic;
+  image_t *g_ref;
 };
 
 
