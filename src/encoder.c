@@ -44,13 +44,13 @@
 #include "rdo.h"
 
 
-int encoder_control_init(encoder_control * const encoder, const config * const cfg) {
+int encoder_control_init(encoder_control_t * const encoder, const config_t * const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
     return 0;
   }
   
-  encoder->threadqueue = MALLOC(threadqueue_queue, 1);
+  encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
   
   encoder->owf = cfg->owf;
     
@@ -302,7 +302,7 @@ int encoder_control_init(encoder_control * const encoder, const config * const c
   return 1;
 }
 
-int encoder_control_finalize(encoder_control * const encoder) {
+int encoder_control_finalize(encoder_control_t * const encoder) {
   //Slices
   FREE_POINTER(encoder->slice_addresses_in_ts);
   
@@ -330,7 +330,7 @@ int encoder_control_finalize(encoder_control * const encoder) {
   return 1;
 }
 
-void encoder_control_input_init(encoder_control * const encoder,
+void encoder_control_input_init(encoder_control_t * const encoder,
                         const int32_t width, const int32_t height)
 {
   encoder->in.width = width;

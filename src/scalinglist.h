@@ -34,18 +34,18 @@ typedef struct {
   const int32_t *quant_coeff[4][6][6];
   const int32_t *de_quant_coeff  [SCALING_LIST_SIZE_NUM][SCALING_LIST_NUM][SCALING_LIST_REM_NUM];
   const double *error_scale[4][6][6];
-} scaling_list;
+} scaling_list_t;
 
 extern const uint8_t g_scaling_list_num[4];
 extern const uint16_t g_scaling_list_size[4];
 
 const int32_t *scalinglist_get_default(const uint32_t size_id, const uint32_t list_id);
 
-void scalinglist_init(scaling_list * const scaling_list);
-void scalinglist_destroy(scaling_list * const scaling_list);
+void scalinglist_init(scaling_list_t * const scaling_list);
+void scalinglist_destroy(scaling_list_t * const scaling_list);
 
-int  scalinglist_parse(scaling_list * const scaling_list, FILE *fp);
-void scalinglist_process(scaling_list *scaling_list, uint8_t bitdepth);
+int  scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
+void scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
 
 
 

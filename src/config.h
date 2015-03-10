@@ -99,14 +99,15 @@ typedef struct
 
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
   gop_config gop[MAX_GOP];  /*!< \brief Array of GOP settings */
-} config;
+
+} config_t;
 
 /* Function definitions */
-config *config_alloc(void);
-int config_init(config *cfg);
-int config_destroy(config *cfg);
-int config_read(config *cfg,int argc, char *argv[]);
-int config_validate(config *cfg);
-int config_set_owf_auto(config *cfg);
+config_t *config_alloc(void);
+int config_init(config_t *cfg);
+int config_destroy(config_t *cfg);
+int config_read(config_t *cfg,int argc, char *argv[]);
+int config_validate(config_t *cfg);
+int config_set_owf_auto(config_t *cfg);
 
 #endif

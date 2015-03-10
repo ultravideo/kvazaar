@@ -27,26 +27,26 @@
 #include "nal.h"
 
 
-static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
-  uint8_t pic_type = encoder_state->global->slicetype == SLICE_I ? 0
-                   : encoder_state->global->slicetype == SLICE_P ? 1
+  bitstream_t * const stream = &state->stream;
+  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
+                   : state->global->slicetype == SLICE_P ? 1
                    :                                             2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 }
 
-static void encoder_state_write_bitstream_aud(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
-  encoder_state_write_bitstream_access_unit_delimiter(encoder_state);
+  bitstream_t * const stream = &state->stream;
+  encoder_state_write_bitstream_access_unit_delimiter(state);
   nal_write(stream, AUD_NUT, 0, 1);
   bitstream_align(stream);
 }
 
-static void encoder_state_write_bitstream_PTL(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &state->stream;
   int i;
   // PTL
   // Profile Tier
@@ -84,9 +84,9 @@ static void encoder_state_write_bitstream_PTL(encoder_state * const encoder_stat
   // end PTL
 }
 
-static void encoder_state_write_bitstream_vid_parameter_set(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &state->stream;
   int i;
 #ifdef _DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
@@ -99,7 +99,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
-  encoder_state_write_bitstream_PTL(encoder_state);
+  encoder_state_write_bitstream_PTL(state);
 
   WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
@@ -120,10 +120,10 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "vps_extension_flag");
 }
 
-static void encoder_state_write_bitstream_scaling_list(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const state)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
+  const encoder_control_t * const encoder = state->encoder_control;
+  bitstream_t * const stream = &state->stream;
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
@@ -178,10 +178,10 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state * const enc
 }
 
 
-static void encoder_state_write_bitstream_VUI(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_VUI(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
-  const encoder_control * const encoder = encoder_state->encoder_control;
+  bitstream_t * const stream = &state->stream;
+  const encoder_control_t * const encoder = state->encoder_control;
 #ifdef _DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
@@ -279,10 +279,10 @@ static void encoder_state_write_bitstream_VUI(encoder_state * const encoder_stat
   //ENDIF
 }
 
-static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
-  const encoder_control * encoder = encoder_state->encoder_control;
+  bitstream_t * const stream = &state->stream;
+  const encoder_control_t * encoder = state->encoder_control;
 
 #ifdef _DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
@@ -293,13 +293,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
 
-  encoder_state_write_bitstream_PTL(encoder_state);
+  encoder_state_write_bitstream_PTL(state);
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, encoder_state->encoder_control->in.video_format,
+  WRITE_UE(stream, state->encoder_control->in.video_format,
            "chroma_format_idc");
 
-  if (encoder_state->encoder_control->in.video_format == 3) {
+  if (state->encoder_control->in.video_format == 3) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
@@ -332,7 +332,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  WRITE_UE(stream, encoder_state->encoder_control->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
+  WRITE_UE(stream, state->encoder_control->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
   WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
@@ -345,14 +345,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_UE(stream, encoder->tr_depth_intra, "max_transform_hierarchy_depth_intra");
 
   // scaling list
-  WRITE_U(stream, encoder_state->encoder_control->scaling_list.enable, 1, "scaling_list_enable_flag");
-  if (encoder_state->encoder_control->scaling_list.enable) {
+  WRITE_U(stream, state->encoder_control->scaling_list.enable, 1, "scaling_list_enable_flag");
+  if (state->encoder_control->scaling_list.enable) {
     WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
-    encoder_state_write_bitstream_scaling_list(encoder_state);
+    encoder_state_write_bitstream_scaling_list(state);
   }
 
   WRITE_U(stream, 0, 1, "amp_enabled_flag");
-  WRITE_U(stream, encoder_state->encoder_control->sao_enable ? 1 : 0, 1,
+  WRITE_U(stream, state->encoder_control->sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
@@ -378,15 +378,15 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
-  encoder_state_write_bitstream_VUI(encoder_state);
+  encoder_state_write_bitstream_VUI(state);
 
   WRITE_U(stream, 0, 1, "sps_extension_flag");
 }
 
-static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const state)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
+  const encoder_control_t * const encoder = state->encoder_control;
+  bitstream_t * const stream = &state->stream;
 #ifdef _DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
@@ -402,7 +402,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_SE(stream, ((int8_t)encoder->cfg->qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(stream, encoder_state->encoder_control->trskip_enable, 1, "transform_skip_enabled_flag");
+  WRITE_U(stream, state->encoder_control->trskip_enable, 1, "transform_skip_enabled_flag");
   WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
@@ -444,13 +444,13 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
 
   //IF deblocking_filter
     WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
-  WRITE_U(stream, encoder_state->encoder_control->deblock_enable ? 0 : 1, 1,
+  WRITE_U(stream, state->encoder_control->deblock_enable ? 0 : 1, 1,
           "pps_disable_deblocking_filter_flag");
 
     //IF !disabled
-  if (encoder_state->encoder_control->deblock_enable) {
-     WRITE_SE(stream, encoder_state->encoder_control->beta_offset_div2, "beta_offset_div2");
-     WRITE_SE(stream, encoder_state->encoder_control->tc_offset_div2, "tc_offset_div2");
+  if (state->encoder_control->deblock_enable) {
+     WRITE_SE(stream, state->encoder_control->beta_offset_div2, "beta_offset_div2");
+     WRITE_SE(stream, state->encoder_control->tc_offset_div2, "tc_offset_div2");
     }
 
     //ENDIF
@@ -464,14 +464,14 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state * cons
   WRITE_U(stream, 0, 1, "pps_extension_flag");
 }
 
-static void encoder_state_write_bitstream_prefix_sei_version(encoder_state * const encoder_state)
+static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const state)
 {
 #define STR_BUF_LEN 1000
-  bitstream * const stream = &encoder_state->stream;
+  bitstream_t * const stream = &state->stream;
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  const config * const cfg = encoder_state->encoder_control->cfg;
+  const config_t * const cfg = state->encoder_control->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
@@ -511,33 +511,33 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state * con
 #undef STR_BUF_LEN
 }
 
-static void encoder_state_entry_points_explore(const encoder_state * const encoder_state, int * const r_count, int * const r_max_length) {
+static void encoder_state_entry_points_explore(const encoder_state_t * const state, int * const r_count, int * const r_max_length) {
   int i;
-  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-    if (encoder_state->children[i].is_leaf) {
-      const int my_length = bitstream_tell(&encoder_state->children[i].stream)/8;
+  for (i = 0; state->children[i].encoder_control; ++i) {
+    if (state->children[i].is_leaf) {
+      const int my_length = bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       if (my_length > *r_max_length) {
         *r_max_length = my_length;
       }
     } else {
-      encoder_state_entry_points_explore(&encoder_state->children[i], r_count, r_max_length);
+      encoder_state_entry_points_explore(&state->children[i], r_count, r_max_length);
     }
   }
 }
 
-static void encoder_state_write_bitstream_entry_points_write(bitstream * const stream, const encoder_state * const encoder_state, const int num_entry_points, const int write_length, int * const r_count) {
+static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const stream, const encoder_state_t * const state, const int num_entry_points, const int write_length, int * const r_count) {
   int i;
-  for (i = 0; encoder_state->children[i].encoder_control; ++i) {
-    if (encoder_state->children[i].is_leaf) {
-      const int my_length = bitstream_tell(&encoder_state->children[i].stream)/8;
+  for (i = 0; state->children[i].encoder_control; ++i) {
+    if (state->children[i].is_leaf) {
+      const int my_length = bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       //Don't write the last one
       if (*r_count < num_entry_points) {
         WRITE_U(stream, my_length - 1, write_length, "entry_point_offset-minus1")
       }
     } else {
-      encoder_state_write_bitstream_entry_points_write(stream, &encoder_state->children[i], num_entry_points, write_length, r_count);
+      encoder_state_write_bitstream_entry_points_write(stream, &state->children[i], num_entry_points, write_length, r_count);
     }
   }
 }
@@ -552,29 +552,29 @@ static int num_bitcount(unsigned int n) {
   return ((n == 0) ? (-1) : pos);
 }
 
-void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_state)
+void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
 {
-  const encoder_control * const encoder = encoder_state->encoder_control;
-  bitstream * const stream = &encoder_state->stream;
+  const encoder_control_t * const encoder = state->encoder_control;
+  bitstream_t * const stream = &state->stream;
 
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
 #endif
-  WRITE_U(stream, (encoder_state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
+  WRITE_U(stream, (state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
 
-  if (encoder_state->global->pictype >= NAL_BLA_W_LP
-      && encoder_state->global->pictype <= NAL_RSV_IRAP_VCL23) {
+  if (state->global->pictype >= NAL_BLA_W_LP
+      && state->global->pictype <= NAL_RSV_IRAP_VCL23) {
     WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
   }
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
-  if (encoder_state->slice->start_in_rs > 0) {
+  if (state->slice->start_in_rs > 0) {
     //For now, we don't support dependent slice segments
     //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
-    WRITE_UE(stream, encoder_state->slice->start_in_rs, "slice_segment_address");
+    WRITE_UE(stream, state->slice->start_in_rs, "slice_segment_address");
   }
 
-  WRITE_UE(stream, encoder_state->global->slicetype, "slice_type");
+  WRITE_UE(stream, state->global->slicetype, "slice_type");
 
   // if !entropy_slice_flag
 
@@ -582,13 +582,13 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
       //WRITE_U(stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-  if (encoder_state->global->pictype != NAL_IDR_W_RADL
-      && encoder_state->global->pictype != NAL_IDR_N_LP) {
+  if (state->global->pictype != NAL_IDR_W_RADL
+      && state->global->pictype != NAL_IDR_N_LP) {
       int j;
       int ref_negative = 0;
       int ref_positive = 0;
-      for (j = 0; j < encoder_state->global->ref->used_size; j++) {
-        if (encoder_state->global->ref->images[j]->poc < encoder_state->global->poc) {
+      for (j = 0; j < state->global->ref->used_size; j++) {
+        if (state->global->ref->images[j]->poc < state->global->poc) {
           ref_negative++;
         }
         else {
@@ -596,11 +596,11 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
         }
       }
 
-      WRITE_U(stream, encoder_state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
+      WRITE_U(stream, state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
-      fprintf(stderr, "POC: %d [L0 ", encoder_state->global->poc);
+      fprintf(stderr, "POC: %d [L0 ", state->global->poc);
     for (j = 0; j < ref_negative; j++) {
       /*
       int8_t reflist[4][8] = {
@@ -615,8 +615,8 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
           { 0, 0, 0, 0, 0, 6, 7, 12 },
           { 0, 0, 0, 0, 0, 0, 0, 16 }
       };
-      int32_t delta_poc_minus1 = reflist[j][(encoder_state->global->poc-1)%8] - 1;
-      if ((encoder_state->global->poc - 1) % 8 == 7 && (encoder_state->global->poc - 1) > 8) delta_poc_minus1 = 9;
+      int32_t delta_poc_minus1 = reflist[j][(state->global->poc-1)%8] - 1;
+      if ((state->global->poc - 1) % 8 == 7 && (state->global->poc - 1) > 8) delta_poc_minus1 = 9;
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s0_minus1");
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
     }
@@ -636,7 +636,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
           { 7, 0, 0, 0, 0, 0, 0, 0 }
       };
       // TODO: fix reference pictures
-      int32_t delta_poc_minus1 = reflist[j][(encoder_state->global->poc - 1) % 8] - 1;
+      int32_t delta_poc_minus1 = reflist[j][(state->global->poc - 1) % 8] - 1;
       fprintf(stderr, "%d ", delta_poc_minus1 + 1);
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s1_minus1");
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
@@ -652,10 +652,10 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
     WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
   }
 
-  if (encoder_state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
-        WRITE_UE(stream, encoder_state->global->ref->used_size-1, "num_ref_idx_l0_active_minus1");
-        if (encoder_state->global->slicetype == SLICE_B) {
+        WRITE_UE(stream, state->global->ref->used_size-1, "num_ref_idx_l0_active_minus1");
+        if (state->global->slicetype == SLICE_B) {
           WRITE_UE(stream, 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }
@@ -663,7 +663,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
   }
 
   {
-    int slice_qp_delta = encoder_state->global->QP - encoder_state->encoder_control->cfg->qp;
+    int slice_qp_delta = state->global->QP - state->encoder_control->cfg->qp;
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
    
@@ -671,14 +671,14 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
     int num_entry_points = 0;
     int max_length_seen = 0;
     
-    encoder_state_entry_points_explore(encoder_state, &num_entry_points, &max_length_seen);
+    encoder_state_entry_points_explore(state, &num_entry_points, &max_length_seen);
     
     WRITE_UE(stream, num_entry_points - 1, "num_entry_point_offsets");
     if (num_entry_points > 0) {
       int entry_points_written = 0;
       int offset_len = num_bitcount(max_length_seen) + 1;
       WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
-      encoder_state_write_bitstream_entry_points_write(stream, encoder_state, num_entry_points, offset_len, &entry_points_written); 
+      encoder_state_write_bitstream_entry_points_write(stream, state, num_entry_points, offset_len, &entry_points_written); 
     }
   }
 }
@@ -689,10 +689,10 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
  * \param encoder The encoder.
  * \returns Void
  */
-static void add_checksum(encoder_state * const encoder_state)
+static void add_checksum(encoder_state_t * const state)
 {
-  bitstream * const stream = &encoder_state->stream;
-  const videoframe * const frame = encoder_state->tile->frame;
+  bitstream_t * const stream = &state->stream;
+  const videoframe_t * const frame = state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
   uint32_t checksum_val;
   unsigned int i;
@@ -717,15 +717,15 @@ static void add_checksum(encoder_state * const encoder_state)
   bitstream_align(stream);
 }
 
-static void encoder_state_write_bitstream_main(encoder_state * const main_state) {
-  const encoder_control * const encoder = main_state->encoder_control;
-  bitstream * const stream = &main_state->stream;
+static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
+  const encoder_control_t * const encoder = state->encoder_control;
+  bitstream_t * const stream = &state->stream;
   uint64_t curpos;
   int i;
   
-  if (main_state->stream.base.type == BITSTREAM_TYPE_FILE) {
-    fgetpos(main_state->stream.file.output,(fpos_t*)&curpos);
-  } else if (main_state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
+  if (state->stream.base.type == BITSTREAM_TYPE_FILE) {
+    fgetpos(state->stream.file.output,(fpos_t*)&curpos);
+  } else if (state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
     curpos = stream->mem.output_length;
   } else {
     //Should not happen
@@ -739,155 +739,155 @@ static void encoder_state_write_bitstream_main(encoder_state * const main_state)
   // Access Unit Delimiter (AUD)
   if (encoder->aud_enable) {
     first_nal_in_au = false;
-    encoder_state_write_bitstream_aud(main_state);
+    encoder_state_write_bitstream_aud(state);
   }
   
-  if ((encoder->vps_period > 0 && main_state->global->frame % encoder->vps_period == 0)
-      || main_state->global->frame == 0)
+  if ((encoder->vps_period > 0 && state->global->frame % encoder->vps_period == 0)
+      || state->global->frame == 0)
   {
     first_nal_in_au = false;
 
     // Video Parameter Set (VPS)
     nal_write(stream, NAL_VPS_NUT, 0, 1);
-    encoder_state_write_bitstream_vid_parameter_set(main_state);
+    encoder_state_write_bitstream_vid_parameter_set(state);
     bitstream_align(stream);
 
     // Sequence Parameter Set (SPS)
     nal_write(stream, NAL_SPS_NUT, 0, 1);
-    encoder_state_write_bitstream_seq_parameter_set(main_state);
+    encoder_state_write_bitstream_seq_parameter_set(state);
     bitstream_align(stream);
 
     // Picture Parameter Set (PPS)
     nal_write(stream, NAL_PPS_NUT, 0, 1);
-    encoder_state_write_bitstream_pic_parameter_set(main_state);
+    encoder_state_write_bitstream_pic_parameter_set(state);
     bitstream_align(stream);
   }
 
   // Send Kvazaar version information only in the first frame.
-  if (main_state->global->frame == 0) {
+  if (state->global->frame == 0) {
     nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
-    encoder_state_write_bitstream_prefix_sei_version(main_state);
+    encoder_state_write_bitstream_prefix_sei_version(state);
     bitstream_align(stream);
   }
 
   {
-    uint8_t nal_type = (main_state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
+    uint8_t nal_type = (state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
     nal_write(stream, nal_type, 0, first_nal_in_au);
   }
 
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
-  for (i = 0; main_state->children[i].encoder_control; ++i) {
+  for (i = 0; state->children[i].encoder_control; ++i) {
     //Append bitstream to main stream
-    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+    bitstream_append(&state->stream, &state->children[i].stream);
     //FIXME: Move this...
-    bitstream_clear(&main_state->children[i].stream);
+    bitstream_clear(&state->children[i].stream);
   }
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
     // Calculate checksum
-    add_checksum(main_state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, main_state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", main_state->global->frame, main_state->type);
+    add_checksum(state);
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
-  assert(main_state->tile->frame->poc == main_state->global->poc);
+  assert(state->tile->frame->poc == state->global->poc);
   
   //Get bitstream length for stats
-  if (main_state->stream.base.type == BITSTREAM_TYPE_FILE) {
+  if (state->stream.base.type == BITSTREAM_TYPE_FILE) {
     uint64_t newpos;
-    fgetpos(main_state->stream.file.output,(fpos_t*)&newpos);
-    main_state->stats_bitstream_length = newpos - curpos;
-  } else if (main_state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
-    main_state->stats_bitstream_length = stream->mem.output_length - curpos;
+    fgetpos(state->stream.file.output,(fpos_t*)&newpos);
+    state->stats_bitstream_length = newpos - curpos;
+  } else if (state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
+    state->stats_bitstream_length = stream->mem.output_length - curpos;
   } else {
     //Should not happen
     assert(0);
-    main_state->stats_bitstream_length = 0;
+    state->stats_bitstream_length = 0;
   }
 
   // Flush the output in case someone is reading the file on the other end.
-  fflush(main_state->stream.file.output);
+  fflush(state->stream.file.output);
 }
 
-void encoder_state_write_bitstream_leaf(encoder_state * const encoder_state) {
-  const encoder_control * const encoder = encoder_state->encoder_control;
+void encoder_state_write_bitstream_leaf(encoder_state_t * const state) {
+  const encoder_control_t * const encoder = state->encoder_control;
   //Write terminator of the leaf
-  assert(encoder_state->is_leaf);
+  assert(state->is_leaf);
   
   //Last LCU
   {
-    const lcu_order_element * const lcu = &encoder_state->lcu_order[encoder_state->lcu_order_count - 1];
-    const int lcu_addr_in_ts = lcu->id + encoder_state->tile->lcu_offset_in_ts;
+    const lcu_order_element_t * const lcu = &state->lcu_order[state->lcu_order_count - 1];
+    const int lcu_addr_in_ts = lcu->id + state->tile->lcu_offset_in_ts;
     const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
   
-    cabac_encode_bin_trm(&encoder_state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
+    cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
   
     if (!end_of_slice_segment_flag) {
-      assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (encoder_state->tile->frame->width_in_lcu - 1));
-      cabac_encode_bin_trm(&encoder_state->cabac, 1); // end_of_sub_stream_one_bit == 1
-      cabac_flush(&encoder_state->cabac);
+      assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (state->tile->frame->width_in_lcu - 1));
+      cabac_encode_bin_trm(&state->cabac, 1); // end_of_sub_stream_one_bit == 1
+      cabac_flush(&state->cabac);
     } else {
-      cabac_flush(&encoder_state->cabac);
-      bitstream_align(&encoder_state->stream);
+      cabac_flush(&state->cabac);
+      bitstream_align(&state->stream);
     }
   }
 }
 
 
 void encoder_state_worker_write_bitstream_leaf(void * opaque) {
-  encoder_state_write_bitstream_leaf((encoder_state *) opaque);
+  encoder_state_write_bitstream_leaf((encoder_state_t *) opaque);
 }
 
-static void encoder_state_write_bitstream_tile(encoder_state * const main_state) {
+static void encoder_state_write_bitstream_tile(encoder_state_t * const state) {
   //If it's not a leaf, a tile is "nothing". We only have to write sub elements
   int i;
-  for (i = 0; main_state->children[i].encoder_control; ++i) {
+  for (i = 0; state->children[i].encoder_control; ++i) {
     //Append bitstream to main stream
-    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+    bitstream_append(&state->stream, &state->children[i].stream);
   }
 }
 
-static void encoder_state_write_bitstream_slice(encoder_state * const main_state) {
+static void encoder_state_write_bitstream_slice(encoder_state_t * const state) {
   int i;
-  encoder_state_write_bitstream_slice_header(main_state);
-  bitstream_align(&main_state->stream); 
+  encoder_state_write_bitstream_slice_header(state);
+  bitstream_align(&state->stream); 
   
-  for (i = 0; main_state->children[i].encoder_control; ++i) {
+  for (i = 0; state->children[i].encoder_control; ++i) {
     //Append bitstream to main stream
-    bitstream_append(&main_state->stream, &main_state->children[i].stream);
+    bitstream_append(&state->stream, &state->children[i].stream);
   }
 }
 
 
-void encoder_state_write_bitstream(encoder_state * const main_state) {
+void encoder_state_write_bitstream(encoder_state_t * const state) {
   int i;
-  if (!main_state->is_leaf) {
-    for (i=0; main_state->children[i].encoder_control; ++i) {
-      encoder_state *sub_state = &(main_state->children[i]);
+  if (!state->is_leaf) {
+    for (i=0; state->children[i].encoder_control; ++i) {
+      encoder_state_t *sub_state = &(state->children[i]);
       encoder_state_write_bitstream(sub_state);
     }
     
-    switch (main_state->type) {
+    switch (state->type) {
       case ENCODER_STATE_TYPE_MAIN:
-        encoder_state_write_bitstream_main(main_state);
+        encoder_state_write_bitstream_main(state);
         break;
       case ENCODER_STATE_TYPE_TILE:
-        encoder_state_write_bitstream_tile(main_state);
+        encoder_state_write_bitstream_tile(state);
         break;
       case ENCODER_STATE_TYPE_SLICE:
-        encoder_state_write_bitstream_slice(main_state);
+        encoder_state_write_bitstream_slice(state);
         break;
       default:
-        fprintf(stderr, "Unsupported node type %c!\n", main_state->type);
+        fprintf(stderr, "Unsupported node type %c!\n", state->type);
         assert(0);
     }
   }
 }
 
 void encoder_state_worker_write_bitstream(void * opaque) {
-  encoder_state_write_bitstream((encoder_state *) opaque);
+  encoder_state_write_bitstream((encoder_state_t *) opaque);
 }
 

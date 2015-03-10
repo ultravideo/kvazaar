@@ -36,21 +36,13 @@
 #include "threadqueue.h"
 
 
-/* TODO: add ME data */
-typedef struct
-{
-  void (*IME)();
-  void (*FME)();
-  int range;
-} encoder_me;
-
 enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 
 /* Encoder control options, the main struct */
-typedef struct encoder_control
+typedef struct encoder_control_t
 {
   /* Configuration */
-  const config *cfg;
+  const config_t *cfg;
   
   /* Input */
   struct {
@@ -70,7 +62,12 @@ typedef struct encoder_control
     FILE *file;
   } out;
   
-  encoder_me me;
+  /* TODO: add ME data */
+  struct {
+    void(*IME)();
+    void(*FME)();
+    int range;
+  } me;
   
   int8_t bitdepth;
   int8_t tr_depth_intra;
@@ -104,7 +101,7 @@ typedef struct encoder_control
   int8_t aud_enable;
 
   //scaling list
-  scaling_list scaling_list;
+  scaling_list_t scaling_list;
   
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */
@@ -136,7 +133,7 @@ typedef struct encoder_control
   int slice_count;
   const int* slice_addresses_in_ts;
   
-  threadqueue_queue *threadqueue;
+  threadqueue_queue_t *threadqueue;
 
   struct {
     uint8_t min;
@@ -148,10 +145,10 @@ typedef struct encoder_control
 
   bool sign_hiding;
 
-} encoder_control;
+} encoder_control_t;
 
-int encoder_control_init(encoder_control *encoder, const config *cfg);
-int encoder_control_finalize(encoder_control *encoder);
+int encoder_control_init(encoder_control_t *encoder, const config_t *cfg);
+int encoder_control_finalize(encoder_control_t *encoder);
 
-void encoder_control_input_init(encoder_control *encoder, int32_t width, int32_t height);
+void encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
 #endif

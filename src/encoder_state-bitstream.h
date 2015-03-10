@@ -29,12 +29,12 @@
 
 // Forward declare because including the header would lead  to a cyclic
 // dependency.
-struct encoder_state;
+struct encoder_state_t;
 
 
-void encoder_state_write_bitstream_slice_header(struct encoder_state * const encoder_state);
-void encoder_state_write_bitstream(struct encoder_state * const main_state);
-void encoder_state_write_bitstream_leaf(struct encoder_state * const encoder_state);
+void encoder_state_write_bitstream_slice_header(struct encoder_state_t * const state);
+void encoder_state_write_bitstream(struct encoder_state_t * const state);
+void encoder_state_write_bitstream_leaf(struct encoder_state_t * const state);
 void encoder_state_worker_write_bitstream_leaf(void * opaque);
 void encoder_state_worker_write_bitstream(void * opaque);
 

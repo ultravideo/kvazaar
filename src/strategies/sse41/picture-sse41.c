@@ -31,7 +31,7 @@
 #  include <stdlib.h>
 
 
-static unsigned reg_sad_sse41(const pixel * const data1, const pixel * const data2,
+static unsigned reg_sad_sse41(const pixel_t * const data1, const pixel_t * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;

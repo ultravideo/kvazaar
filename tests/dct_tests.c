@@ -45,7 +45,7 @@ static int16_t idct_result[NUM_SIZES][LCU_WIDTH*LCU_WIDTH] = { { 0 } };
 static struct test_env_t {
   int log_width; // for selecting dim from bufs
   dct_func * tested_func;
-  const strategy * strategy;
+  const strategy_t * strategy;
   char msg[1024];
 } test_env;
 
@@ -84,7 +84,7 @@ static void setup_tests()
   int block = 0;
   for (int s = 0; s < strategies.count && block < NUM_SIZES; ++s)
   {
-    strategy *strat = &strategies.strategies[s];
+    strategy_t *strat = &strategies.strategies[s];
     dct_func* dct_generic = 0;
     if (
       (
@@ -108,7 +108,7 @@ static void setup_tests()
   block = 0;
   for (int s = 0; s < strategies.count && block < NUM_SIZES; ++s)
   {
-    strategy *strat = &strategies.strategies[s];
+    strategy_t *strat = &strategies.strategies[s];
     dct_func* idct_generic = 0;
     if (
       (
@@ -187,7 +187,7 @@ SUITE(dct_tests)
   // Loop through all strategies picking out the intra sad ones and run
   // select strategies though all tests
   for (unsigned i = 0; i < strategies.count; ++i) {
-    const strategy * strategy = &strategies.strategies[i];
+    const strategy_t * strategy = &strategies.strategies[i];
 
     // Select buffer width according to function name for dct function.
     if (strcmp(strategy->type, "fast_forward_dst_4x4") == 0) {
