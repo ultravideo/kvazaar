@@ -1002,8 +1002,7 @@ void encoder_next_frame(encoder_state_t *state) {
 
   
 
-  if (!encoder->cfg->gop_len || use_as_ref[(state->global->poc) % 8]) {
-
+  if (!encoder->cfg->gop_len || !state->global->poc || use_as_ref[(state->global->poc) % 8]) {
     // Remove the ref pic (if present)
     if (state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
       image_list_rem(state->global->ref, state->global->ref->used_size - 1);
@@ -1015,7 +1014,13 @@ void encoder_next_frame(encoder_state_t *state) {
   image_free(state->tile->frame->rec);
   
   state->global->frame++;
-  //state->global->poc++;
+  state->global->poc++;
+  if (state->encoder_control->cfg->gop_len) {
+    // Calculate POC according to the global frame counter and GOP structure
+    state->global->poc = state->global->frame -
+      (state->global->frame % 8) +
+      state->encoder_control->cfg->gop[(state->global->frame - 1) % 8].poc_offset;
+  }
   
   state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
   videoframe_set_poc(state->tile->frame, state->global->poc);
