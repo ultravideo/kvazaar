@@ -951,7 +951,8 @@ void encoder_compute_stats(encoder_state *encoder_state, FILE * const recout, ui
 
 void encoder_next_frame(encoder_state *encoder_state) {
   const encoder_control * const encoder = encoder_state->encoder_control;
-  
+  int8_t use_as_ref[8] = { 1, 0, 1, 0, 1, 0, 1, 0 };
+
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, encoder_state->tqj_bitstream_written);
   
@@ -976,6 +977,7 @@ void encoder_next_frame(encoder_state *encoder_state) {
          (encoder_state->previous_encoder_state->global->frame % 8) + 
          encoder_state->encoder_control->cfg->gop[(encoder_state->global->frame - 1) % 8].poc_offset;
     }
+
     image_free(encoder_state->tile->frame->rec);
     cu_array_free(encoder_state->tile->frame->cu_array);
     
@@ -987,19 +989,21 @@ void encoder_next_frame(encoder_state *encoder_state) {
       encoder_state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
     }
     videoframe_set_poc(encoder_state->tile->frame, encoder_state->global->poc);
-    
     image_list_copy_contents(encoder_state->global->ref, encoder_state->previous_encoder_state->global->ref);
-    image_list_add(encoder_state->global->ref, encoder_state->previous_encoder_state->tile->frame->rec, encoder_state->previous_encoder_state->tile->frame->cu_array);
-    // Remove the ref pics in excess
-    while (encoder_state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
-      image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size-1);
+
+    if (!encoder->cfg->gop_len || !encoder_state->previous_encoder_state->global->poc || use_as_ref[(encoder_state->previous_encoder_state->global->poc) % 8]) {
+      image_list_add(encoder_state->global->ref, encoder_state->previous_encoder_state->tile->frame->rec, encoder_state->previous_encoder_state->tile->frame->cu_array);
+      // Remove the ref pics in excess
+      while (encoder_state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
+        image_list_rem(encoder_state->global->ref, encoder_state->global->ref->used_size - 1);
+      }
     }
     return; //FIXME reference frames
   }
 
-  int8_t use_as_ref[8] = {1, 1, 1, 0, 0, 1, 0, 0 };
+  
 
-  if (!encoder->cfg->gop_len || use_as_ref[(encoder_state->global->poc - 1) % 8]) {
+  if (!encoder->cfg->gop_len || use_as_ref[(encoder_state->global->poc) % 8]) {
 
     // Remove the ref pic (if present)
     if (encoder_state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
