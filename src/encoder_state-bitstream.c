@@ -328,12 +328,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state * cons
 
   WRITE_UE(stream, encoder->in.bitdepth-8, "bit_depth_luma_minus8");
   WRITE_UE(stream, encoder->in.bitdepth-8, "bit_depth_chroma_minus8");
-  WRITE_UE(stream, 0, "log2_max_pic_order_cnt_lsb_minus4");
+  WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  WRITE_UE(stream, encoder_state->encoder_control->cfg->ref_frames, "sps_max_dec_pic_buffering");
-  WRITE_UE(stream, 0, "sps_num_reorder_pics");
+  WRITE_UE(stream, encoder_state->encoder_control->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
+  WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
 
@@ -596,7 +596,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
         }
       }
 
-      WRITE_U(stream, encoder_state->global->poc&0xf, 4, "pic_order_cnt_lsb");
+      WRITE_U(stream, encoder_state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
@@ -616,7 +616,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state * const encoder_st
           { 0, 0, 0, 0, 0, 0, 0, 16 }
       };
       int32_t delta_poc_minus1 = reflist[j][(encoder_state->global->poc-1)%8] - 1;
-      fprintf(stderr, "%d ", delta_poc_minus1+1);
+      if ((encoder_state->global->poc - 1) % 8 == 7 && (encoder_state->global->poc - 1) > 8) delta_poc_minus1 = 9;
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s0_minus1");
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
     }
