@@ -587,14 +587,16 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
       int j;
       int ref_negative = 0;
       int ref_positive = 0;
-      for (j = 0; j < state->global->ref->used_size; j++) {
-        if (state->global->ref->images[j]->poc < state->global->poc) {
-          ref_negative++;
-        }
-        else {
-          ref_positive++;
+      if (state->encoder_control->cfg->gop_len) {
+        for (j = 0; j < state->global->ref->used_size; j++) {
+          if (state->global->ref->images[j]->poc < state->global->poc) {
+            ref_negative++;
+          } else {
+            ref_positive++;
+          }
         }
       }
+      else ref_negative = state->global->ref->used_size;
 
       WRITE_U(stream, state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
@@ -615,10 +617,15 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
           { 0, 0, 0, 0, 0, 6, 7, 12 },
           { 0, 0, 0, 0, 0, 0, 0, 16 }
       };
-      int32_t delta_poc_minus1 = reflist[j][(state->global->poc-1)%8] - 1;
+      int32_t delta_poc_minus1 = reflist[j][(state->global->poc-1)%8] - 1;      
       if ((state->global->poc - 1) % 8 == 7 && (state->global->poc - 1) > 8) delta_poc_minus1 = 9;
+
+      if (!state->encoder_control->cfg->gop_len) {
+        delta_poc_minus1 = 0;
+      }
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s0_minus1");
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
+      fprintf(stderr, "%d ", state->global->poc - (delta_poc_minus1+1));
     }
     fprintf(stderr, "] [L1 ");
 
@@ -637,7 +644,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
       };
       // TODO: fix reference pictures
       int32_t delta_poc_minus1 = reflist[j][(state->global->poc - 1) % 8] - 1;
-      fprintf(stderr, "%d ", delta_poc_minus1 + 1);
+      fprintf(stderr, "%d ", state->global->poc + delta_poc_minus1 + 1);
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s1_minus1");
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
