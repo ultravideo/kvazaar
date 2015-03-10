@@ -1017,8 +1017,8 @@ void encoder_next_frame(encoder_state_t *state) {
   state->global->poc++;
   if (state->encoder_control->cfg->gop_len) {
     // Calculate POC according to the global frame counter and GOP structure
-    state->global->poc = state->global->frame -
-      (state->global->frame % 8) +
+    state->global->poc = state->global->frame - 1 -
+      ((state->global->frame-1) % 8) +
       state->encoder_control->cfg->gop[(state->global->frame - 1) % 8].poc_offset;
   }
   
