@@ -60,6 +60,7 @@ void inter_set_block(videoframe* frame, uint32_t x_cu, uint32_t y_cu, uint8_t de
       cu->inter.mv[1]  = cur_cu->inter.mv[1];
       cu->inter.mv_dir = cur_cu->inter.mv_dir;
       cu->inter.mv_ref = cur_cu->inter.mv_ref;
+      cu->inter.mv_ref_coded = cur_cu->inter.mv_ref_coded;
       cu->tr_depth = tr_depth;
     }
   }

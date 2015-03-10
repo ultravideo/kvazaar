@@ -63,6 +63,7 @@ typedef struct
   int16_t mvd[2];
   uint8_t mv_cand; // \brief selected MV candidate
   uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
+  uint8_t mv_ref_coded; // \brief Coded and corrected index of ref picture
   uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
   int8_t mode;
 } cu_info_inter;

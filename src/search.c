@@ -702,17 +702,17 @@ static int search_cu_inter(const encoder_state * const encoder_state, int x, int
       int j, ref_list[2] = { 0, 0 };
       for (j = 0; j < encoder_state->global->ref->used_size; j++) {
         if (encoder_state->global->ref->images[j]->poc < encoder_state->global->poc) {
-          ref_list[0]++;
           if (ref_idx == j) {
-            cur_cu->inter.mv_dir = 1;
-            cur_cu->inter.mv_ref = ref_list[0];
+            cur_cu->inter.mv_dir = 1;            
+            cur_cu->inter.mv_ref_coded = ref_list[0];            
           }
-        } else {
-          ref_list[1]++;
+          ref_list[0]++;
+        } else {          
           if (ref_idx == j) {
             cur_cu->inter.mv_dir = 2;
-            cur_cu->inter.mv_ref = ref_list[1];
+            cur_cu->inter.mv_ref_coded = ref_list[1];
           }
+          ref_list[1]++;
         }
       }
       cur_cu->merged        = merged;

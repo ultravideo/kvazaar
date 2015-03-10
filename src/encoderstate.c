@@ -1198,7 +1198,7 @@ void encode_coding_tree(encoder_state * const encoder_state,
           if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
             if (ref_list[ref_list_idx] != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
               // parseRefFrmIdx
-              int32_t ref_frame = cur_cu->inter.mv_ref;
+              int32_t ref_frame = cur_cu->inter.mv_ref_coded;
 
               cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
               CABAC_BIN(cabac, (ref_frame != 0), "ref_frame_flag");
