@@ -333,16 +333,18 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
 }
 
 static void encoder_state_encode_leaf(encoder_state_t * const state) {
-  const encoder_control_t * const encoder = state->encoder_control;
-  
-  int i = 0;
-  
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
   
-  //If we're not using wavefronts, or we have a WAVEFRONT_ROW which is the single child of its parent, than we should not use parallelism
-  if (state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !state->parent->children[1].encoder_control)) {
-    for (i = 0; i < state->lcu_order_count; ++i) {
+  // Select whether to encode the frame/tile in current thread or to define
+  // wavefront jobs for other threads to handle.
+  bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
+  bool use_parallel_encoding = (wavefront && state->parent->children[1].encoder_control);
+  if (!use_parallel_encoding) {
+    // Encode every LCU in order and perform SAO reconstruction after every
+    // frame is encoded. Deblocking and SAO search is done during LCU encoding.
+
+    for (int i = 0; i < state->lcu_order_count; ++i) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_ENCODE_LCU);
 
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
@@ -355,7 +357,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 #endif //_DEBUG
     }
     
-    if (encoder->sao_enable) {
+    if (state->encoder_control->sao_enable) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME);
       sao_reconstruct_frame(state);
       PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count-1].position.y + state->tile->lcu_offset_y,
@@ -364,7 +366,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       );
     }
   } else {
-    for (i = 0; i < state->lcu_order_count; ++i) {
+    // Add every LCU in the frame as a job to a queue, along with
+    // their dependancies, so they can be processed in parallel.
+
+    for (int i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 #ifdef _DEBUG
       char job_description[256];
@@ -373,40 +378,41 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       char* job_description = NULL;
 #endif
       state->tile->wf_jobs[lcu->id] = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      assert(state->tile->wf_jobs[lcu->id] != NULL);
+
+      // Add dependancy for inter frames to the reconstruction of the row
+      // below current row in the previous frame. This ensures that we can
+      // search for motion vectors in the previous frame as long as we don't
+      // go more than one LCU below current row.
       if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
-        
-        //Only for the first in the row (we reconstruct row-wise)
+        // Only add the dependancy to the first LCU in the row.
         if (!lcu->left) {
-          //If we have a row below, then we wait till it's completed
           if (lcu->below) {
             threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
-          }
-          //Also add always a dep on current line
-          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
-          if (lcu->above) {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->above->encoder_state->previous_encoder_state->tqj_recon_done);
-          }
-        }
-      }
-      if (state->tile->wf_jobs[lcu->id]) {
-        if (lcu->position.x > 0) {
-          // Wait for the LCU on the left.
-          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
-        }
-        if (lcu->position.y > 0) {
-          if (lcu->position.x < state->tile->frame->width_in_lcu - 1) {
-            // Wait for the LCU to the top-right of this one.
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
           } else {
-            // If there is no top-right LCU, wait for the one above.
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
           }
         }
-        threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
+      
+      // Add local WPP dependancy to the LCU on the left.
+      if (lcu->left) {
+        threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
+      }
+      // Add local WPP dependancy to the LCU on the top right.
+      if (lcu->above) {
+        if (lcu->above->right) {
+          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
+        } else {
+          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
+        }
+      }
+
+      threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
+      
       if (lcu->position.x == state->tile->frame->width_in_lcu - 1) {
-        if (!encoder->sao_enable) {
-          //No SAO + last LCU: the row is reconstructed
+        if (!state->encoder_control->sao_enable) {
+          // No SAO + last LCU: the row is reconstructed
           assert(!state->tqj_recon_done);
           state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
         }
