@@ -671,6 +671,9 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       state->global->pictype = NAL_IDR_W_RADL;
     } else {
       state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : (state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
+      if (state->global->slicetype == SLICE_B && (state->global->frame - 1) % 8 == 0) {
+        state->global->slicetype = SLICE_P;
+      }
       state->global->pictype = NAL_TRAIL_R;
     }
     if (state->encoder_control->cfg->gop_len) {
@@ -1179,6 +1182,8 @@ void encode_coding_tree(encoder_state_t * const state,
           ref_list[1]++;
         }
       }
+      if (!ref_list[0]) ref_list[0] = 1;
+      if (!ref_list[1]) ref_list[1] = 1;
 
       // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
       if (state->global->slicetype == SLICE_B)
@@ -1196,7 +1201,7 @@ void encode_coding_tree(encoder_state_t * const state,
         if (inter_dir < 2)
         {
           cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
-          CABAC_BIN(cabac, inter_dir, "ref_idx_l0");
+          CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
         }
       }
 
@@ -1209,7 +1214,7 @@ void encode_coding_tree(encoder_state_t * const state,
               int32_t ref_frame = cur_cu->inter.mv_ref_coded;
 
               cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-              CABAC_BIN(cabac, (ref_frame != 0), "ref_frame_flag");
+              CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
 
               if (ref_frame > 0) {
                 int32_t i;
@@ -1222,9 +1227,9 @@ void encode_coding_tree(encoder_state_t * const state,
                   const uint32_t symbol = (i == ref_frame) ? 0 : 1;
 
                   if (i == 0) {
-                    CABAC_BIN(cabac, symbol, "ref_frame_flag2");
+                    CABAC_BIN(cabac, symbol, "ref_idx_lX");
                   } else {
-                    CABAC_BIN_EP(cabac, symbol, "ref_frame_flag2");
+                    CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
                   }
                   if (symbol == 0) break;
                 }
