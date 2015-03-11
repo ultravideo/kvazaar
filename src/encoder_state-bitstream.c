@@ -556,6 +556,18 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
+  int j;
+  int ref_negative = 0;
+  int ref_positive = 0;
+  if (state->encoder_control->cfg->gop_len) {
+    for (j = 0; j < state->global->ref->used_size; j++) {
+      if (state->global->ref->images[j]->poc < state->global->poc) {
+        ref_negative++;
+      } else {
+        ref_positive++;
+      }
+    }
+  } else ref_negative = state->global->ref->used_size;
 
 #ifdef _DEBUG
   printf("=========== Slice ===========\n");
@@ -584,25 +596,13 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
     //if( IdrPicFlag ) <- nal_unit_type == 5
   if (state->global->pictype != NAL_IDR_W_RADL
       && state->global->pictype != NAL_IDR_N_LP) {
-      int j;
-      int ref_negative = 0;
-      int ref_positive = 0;
-      if (state->encoder_control->cfg->gop_len) {
-        for (j = 0; j < state->global->ref->used_size; j++) {
-          if (state->global->ref->images[j]->poc < state->global->poc) {
-            ref_negative++;
-          } else {
-            ref_positive++;
-          }
-        }
-      }
-      else ref_negative = state->global->ref->used_size;
+    int last_poc = 0;
 
       WRITE_U(stream, state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
-      fprintf(stderr, "POC: %d [L0 ", state->global->poc);
+      fprintf(stderr, "\nPOC: %d [L0 ", state->global->poc);
     for (j = 0; j < ref_negative; j++) {
       /*
       int8_t reflist[4][8] = {
@@ -617,18 +617,19 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
           { 0, 0, 0, 0, 0, 6, 7, 12 },
           { 0, 0, 0, 0, 0, 0, 0, 16 }
       };
-      int32_t delta_poc_minus1 = reflist[j][(state->global->poc-1)%8] - 1;      
+      int32_t delta_poc_minus1 = reflist[j][(state->global->poc - 1) % 8] - last_poc - 1;
       if ((state->global->poc - 1) % 8 == 7 && (state->global->poc - 1) > 8) delta_poc_minus1 = 9;
 
       if (!state->encoder_control->cfg->gop_len) {
         delta_poc_minus1 = 0;
-      }
+      }      
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s0_minus1");
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
-      fprintf(stderr, "%d ", state->global->poc - (delta_poc_minus1+1));
+      fprintf(stderr, "%d ", state->global->poc - (delta_poc_minus1 + last_poc + 1));
+      last_poc = delta_poc_minus1 + 1;
     }
     fprintf(stderr, "] [L1 ");
-
+    last_poc = 0;
     for (j = 0; j < ref_positive; j++) {
       /*
       int8_t reflist[3][8] = {
@@ -642,13 +643,13 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
           { 3, 6, 5, 0, 3, 0, 0, 0 },
           { 7, 0, 0, 0, 0, 0, 0, 0 }
       };
-      // TODO: fix reference pictures
-      int32_t delta_poc_minus1 = reflist[j][(state->global->poc - 1) % 8] - 1;
-      fprintf(stderr, "%d ", state->global->poc + delta_poc_minus1 + 1);
+      int32_t delta_poc_minus1 = reflist[j][(state->global->poc - 1) % 8] - last_poc - 1;
+      fprintf(stderr, "%d ", state->global->poc + delta_poc_minus1 + last_poc + 1);
+      last_poc = delta_poc_minus1 + 1;
       WRITE_UE(stream, delta_poc_minus1, "delta_poc_s1_minus1");
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
-    fprintf(stderr, "]\r\n");
+    fprintf(stderr, "]\n");
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
   }
 
@@ -661,9 +662,9 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
 
   if (state->global->slicetype != SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
-        WRITE_UE(stream, state->global->ref->used_size-1, "num_ref_idx_l0_active_minus1");
+      WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
         if (state->global->slicetype == SLICE_B) {
-          WRITE_UE(stream, 0, "num_ref_idx_l1_active_minus1");
+          WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
