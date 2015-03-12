@@ -122,83 +122,52 @@ int32_t four_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_t
 
 void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
-
+  //TODO: horizontal and vertical only filtering
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int16_t shift1 = BIT_DEPTH - 8;
   int32_t shift2 = 6;
   int32_t shift3 = 14 - BIT_DEPTH;
-  int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
-  int8_t *c1, *c2, *c3;
+  int8_t *c0, *c1, *c2, *c3;
 
-  int i;
+  c0 = g_luma_filter[0];
   c1 = g_luma_filter[1];
   c2 = g_luma_filter[2];
   c3 = g_luma_filter[3];
 
-  int16_t temp[3][8];
+  #define FILTER_OFFSET 3
+  #define FILTER_SIZE 8
 
-  // Loop source pixels and generate sixteen filtered quarter-pel pixels on each round
-  for (y = 0; y < height; y++) {
-    int dst_pos_y = (y << 2)*dst_stride;
-    int src_pos_y = y*src_stride;
-    for (x = 0; x < width; x++) {
-      // Calculate current dst and src pixel positions
-      int dst_pos = dst_pos_y + (x << 2);
-      int src_pos = src_pos_y + x;
+  int16_t flipped_hor_filtered[4 * (LCU_WIDTH + 1) + FILTER_SIZE][(LCU_WIDTH + 1) + FILTER_SIZE];
 
+  // Filter horizontally and flip x and y
+  for (x = 0; x < width; ++x) {
+    for (y = 0; y < height + FILTER_SIZE; ++y) {
+      int ypos = y - FILTER_OFFSET;
+      int xpos = x - FILTER_OFFSET;
       // Original pixel
-      dst[dst_pos] = src[src_pos];
-
-      //
-      if (hor_flag && !ver_flag) {
-
-        temp[0][3] = eight_tap_filter_hor_generic(c1, &src[src_pos - 3]) >> shift1;
-        temp[1][3] = eight_tap_filter_hor_generic(c2, &src[src_pos - 3]) >> shift1;
-        temp[2][3] = eight_tap_filter_hor_generic(c3, &src[src_pos - 3]) >> shift1;
-      }
-      // ea0,0 - needed only when ver_flag
-      if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_generic(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-        dst[dst_pos + 2 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_generic(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-        dst[dst_pos + 3 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_generic(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-      }
-
-      // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
-      if (hor_flag && ver_flag) {
-
-        // Calculate temporary values..
-        src_pos -= 3 * src_stride;  //0,-3
-        for (i = 0; i < 8; ++i) {
-
-          temp[0][i] = eight_tap_filter_hor_generic(c1, &src[src_pos + i * src_stride - 3]) >> shift1; // h0(0,-3+i)
-          temp[1][i] = eight_tap_filter_hor_generic(c2, &src[src_pos + i * src_stride - 3]) >> shift1; // h1(0,-3+i)
-          temp[2][i] = eight_tap_filter_hor_generic(c3, &src[src_pos + i * src_stride - 3]) >> shift1; // h2(0,-3+i)
-        }
-
-
-
-        for (i = 0; i<3; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c1, &temp[i][0]) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 2 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 3 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
-
-        }
-
-      }
-
-      if (hor_flag) {
-        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[0][3] + offset3) >> shift3);
-        dst[dst_pos + 2] = fast_clip_32bit_to_pixel((temp[1][3] + offset3) >> shift3);
-        dst[dst_pos + 3] = fast_clip_32bit_to_pixel((temp[2][3] + offset3) >> shift3);
-      }
-
+      flipped_hor_filtered[4 * x + 0][y] = (c0[FILTER_OFFSET] * src[src_stride*ypos + xpos + FILTER_OFFSET]) << shift1;
+      flipped_hor_filtered[4 * x + 1][y] = eight_tap_filter_hor_generic(c1, &src[src_stride*ypos + xpos]) << shift1;
+      flipped_hor_filtered[4 * x + 2][y] = eight_tap_filter_hor_generic(c2, &src[src_stride*ypos + xpos]) << shift1;
+      flipped_hor_filtered[4 * x + 3][y] = eight_tap_filter_hor_generic(c3, &src[src_stride*ypos + xpos]) << shift1;
 
     }
   }
 
+  // Filter vertically and flip x and y
+  for (x = 0; x < 4 * width; ++x) {
+    for (y = 0; y < height; ++y) {
+      int ypos = y;
+      int xpos = x;
+      dst[(4 * y + 0)*dst_stride + x] = fast_clip_32bit_to_pixel(((c0[FILTER_OFFSET] * flipped_hor_filtered[xpos][ypos + FILTER_OFFSET] + offset23) >> shift2) >> shift3); 
+      dst[(4 * y + 1)*dst_stride + x] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c1, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2) >> shift3);
+      dst[(4 * y + 2)*dst_stride + x] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c2, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2) >> shift3);
+      dst[(4 * y + 3)*dst_stride + x] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_generic(c3, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2) >> shift3);
+
+    }
+  }
 }
 
 /**
