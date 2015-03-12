@@ -447,7 +447,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   //step 1, compare (0,0) vector to predicted vectors
   
   // Check whatever input vector we got, unless its (0, 0) which will be checked later.
-  if (mv.x && mv.y) 
+  if (mv.x || mv.y) 
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
 
