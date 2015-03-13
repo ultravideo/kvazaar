@@ -378,37 +378,40 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       char* job_description = NULL;
 #endif
       state->tile->wf_jobs[lcu->id] = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
-      assert(state->tile->wf_jobs[lcu->id] != NULL);
-
-      // Add dependancy for inter frames to the reconstruction of the row
-      // below current row in the previous frame. This ensures that we can
-      // search for motion vectors in the previous frame as long as we don't
-      // go more than one LCU below current row.
-      if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
-        // Only add the dependancy to the first LCU in the row.
-        if (!lcu->left) {
-          if (lcu->below) {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
-          } else {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+      
+      // If job object was returned, add dependancies and allow it to run.
+      if (state->tile->wf_jobs[lcu->id]) {
+        // Add dependancy for inter frames to the reconstruction of the row
+        // below current row in the previous frame. This ensures that we can
+        // search for motion vectors in the previous frame as long as we don't
+        // go more than one LCU below current row.
+        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
+          // Only add the dependancy to the first LCU in the row.
+          if (!lcu->left) {
+            if (lcu->below) {
+              threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+            } else {
+              threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+            }
           }
         }
+
+        // Add local WPP dependancy to the LCU on the left.
+        if (lcu->left) {
+          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
+        }
+        // Add local WPP dependancy to the LCU on the top right.
+        if (lcu->above) {
+          if (lcu->above->right) {
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
+          } else {
+            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
+          }
+        }
+
+        threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
       
-      // Add local WPP dependancy to the LCU on the left.
-      if (lcu->left) {
-        threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
-      }
-      // Add local WPP dependancy to the LCU on the top right.
-      if (lcu->above) {
-        if (lcu->above->right) {
-          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
-        } else {
-          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
-        }
-      }
-
-      threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       
       if (lcu->position.x == state->tile->frame->width_in_lcu - 1) {
         if (!state->encoder_control->sao_enable) {
