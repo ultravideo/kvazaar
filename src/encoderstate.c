@@ -43,6 +43,7 @@
 #include "search.h"
 #include "sao.h"
 #include "rdo.h"
+#include "rate_control.h"
 
 #ifndef LMBD
 # define LMBD 1.0
@@ -812,6 +813,8 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
         state->global->QP_factor = state->encoder_control->cfg->gop[state->global->gop_offset].qp_factor;
       }
         
+    } else {
+      state->global->QP = select_picture_QP(state);
     }
 
   } else {
