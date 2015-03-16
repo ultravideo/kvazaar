@@ -52,7 +52,6 @@
   \brief Initializes lambda-value for current QP
 
   Implementation closer to HM (Used HM12 as reference)
-   - Still missing functionality when GOP and B-pictures are used
  */
 void encoder_state_init_lambda(encoder_state_t * const state)
 {
@@ -1182,8 +1181,6 @@ void encode_coding_tree(encoder_state_t * const state,
           ref_list[1]++;
         }
       }
-      if (!ref_list[0]) ref_list[0] = 1;
-      if (!ref_list[1]) ref_list[1] = 1;
 
       // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
       if (state->global->slicetype == SLICE_B)
@@ -1206,81 +1203,78 @@ void encode_coding_tree(encoder_state_t * const state,
       }
 
       for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
-            //if(encoder_state->ref_idx_num[uiRefListIdx] > 0)
-            {
-          if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-            if (ref_list[ref_list_idx] != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
-              // parseRefFrmIdx
-              int32_t ref_frame = cur_cu->inter.mv_ref_coded;
+        if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
+          if (ref_list[ref_list_idx] > 1) {
+            // parseRefFrmIdx
+            int32_t ref_frame = cur_cu->inter.mv_ref_coded;
 
-              cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-              CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
+            CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
 
-              if (ref_frame > 0) {
-                int32_t i;
-                int32_t ref_num = ref_list[ref_list_idx] - 2;
+            if (ref_frame > 0) {
+              int32_t i;
+              int32_t ref_num = ref_list[ref_list_idx] - 2;
 
-                cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
-                ref_frame--;
+              cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+              ref_frame--;
 
-                for (i = 0; i < ref_num; ++i) {
-                  const uint32_t symbol = (i == ref_frame) ? 0 : 1;
+              for (i = 0; i < ref_num; ++i) {
+                const uint32_t symbol = (i == ref_frame) ? 0 : 1;
 
-                  if (i == 0) {
-                    CABAC_BIN(cabac, symbol, "ref_idx_lX");
-                  } else {
-                    CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
-                  }
-                  if (symbol == 0) break;
+                if (i == 0) {
+                  CABAC_BIN(cabac, symbol, "ref_idx_lX");
+                } else {
+                  CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
                 }
+                if (symbol == 0) break;
               }
             }
+          }
 
-            if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-              const int32_t mvd_hor = cur_cu->inter.mvd[0];
-              const int32_t mvd_ver = cur_cu->inter.mvd[1];
-              const int8_t hor_abs_gr0 = mvd_hor != 0;
-              const int8_t ver_abs_gr0 = mvd_ver != 0;
-              const uint32_t mvd_hor_abs = abs(mvd_hor);
-              const uint32_t mvd_ver_abs = abs(mvd_ver);
+          if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
+            const int32_t mvd_hor = cur_cu->inter.mvd[0];
+            const int32_t mvd_ver = cur_cu->inter.mvd[1];
+            const int8_t hor_abs_gr0 = mvd_hor != 0;
+            const int8_t ver_abs_gr0 = mvd_ver != 0;
+            const uint32_t mvd_hor_abs = abs(mvd_hor);
+            const uint32_t mvd_ver_abs = abs(mvd_ver);
 
-              cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
-              CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
-              CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+            cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
+            CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+            CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
 
-              cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
+            cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
 
-              if (hor_abs_gr0) {
-                CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
-              }
-
-              if (ver_abs_gr0) {
-                CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
-              }
-
-              if (hor_abs_gr0) {
-                if (mvd_hor_abs > 1) {
-                  cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
-                }
-
-                CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
-              }
-
-              if (ver_abs_gr0) {
-                if (mvd_ver_abs > 1) {
-                  cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
-                }
-
-                CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
-              }
+            if (hor_abs_gr0) {
+              CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
             }
 
-            // Signal which candidate MV to use
-            cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand, 1,
-                                        AMVP_MAX_NUM_CANDS - 1);
+            if (ver_abs_gr0) {
+              CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
+            }
+
+            if (hor_abs_gr0) {
+              if (mvd_hor_abs > 1) {
+                cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
+              }
+
+              CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
+            }
+
+            if (ver_abs_gr0) {
+              if (mvd_ver_abs > 1) {
+                cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
+              }
+
+              CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
+            }
           }
-          }
-        } // for ref_list
+
+          // Signal which candidate MV to use
+          cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand, 1,
+                                      AMVP_MAX_NUM_CANDS - 1);
+        }
+      } // for ref_list
     } // if !merge
 
     {
