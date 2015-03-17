@@ -366,8 +366,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       );
     }
   } else {
-    // Add every LCU in the frame as a job to a queue, along with
-    // their dependancies, so they can be processed in parallel.
+    // Add each LCU in the wavefront row as it's own job to the queue.
 
     for (int i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
@@ -381,12 +380,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       
       // If job object was returned, add dependancies and allow it to run.
       if (state->tile->wf_jobs[lcu->id]) {
-        // Add dependancy for inter frames to the reconstruction of the row
-        // below current row in the previous frame. This ensures that we can
-        // search for motion vectors in the previous frame as long as we don't
-        // go more than one LCU below current row.
+        // Add inter frame dependancies when ecoding more than one frame at
+        // once. The added dependancy is for the first LCU of each wavefront
+        // row to depend on the reconstruction status of the row below in the
+        // previous frame.
         if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
-          // Only add the dependancy to the first LCU in the row.
           if (!lcu->left) {
             if (lcu->below) {
               threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
@@ -412,10 +410,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
       
-      
+      // In the case where SAO is not enabled, the wavefront row is
+      // done when the last LCU in the row is done.
       if (lcu->position.x == state->tile->frame->width_in_lcu - 1) {
         if (!state->encoder_control->sao_enable) {
-          // No SAO + last LCU: the row is reconstructed
           assert(!state->tqj_recon_done);
           state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
         }
