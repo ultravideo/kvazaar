@@ -245,8 +245,16 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
     max_lcu_below = 1;
   }
 
-  // Check whatever input vector we got, unless its (0, 0) which will be checked later.
-  if (mv.x && mv.y) {
+  // Check mv_in, if it's not in merge candidates.
+  bool mv_in_merge_cand = false;
+  for (int i = 0; i < num_cand; ++i) {
+    if (merge_cand[i][0] >> 2 == mv.x && merge_cand[i][1] == mv.y) {
+      mv_in_merge_cand = true;
+      break;
+    }
+  }
+
+  if (!mv_in_merge_cand) {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
 
     best_cost = image_calc_sad(pic, ref, orig->x, orig->y,
@@ -637,26 +645,33 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
     image_t *ref_image = state->global->ref->images[ref_idx];
-    const cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[x_cu + y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
-    vector2d_t orig, mv, mvd;
+    vector2d_t orig, mvd;
     int32_t merged = 0;
     uint8_t cu_mv_cand = 0;
     int8_t merge_idx = 0;
     int8_t temp_ref_idx = cur_cu->inter.mv_ref;
     orig.x = x_cu * CU_MIN_SIZE_PIXELS;
     orig.y = y_cu * CU_MIN_SIZE_PIXELS;
-    mv.x = 0;
-    mv.y = 0;
-    if (ref_cu->type == CU_INTER) {
-      mv.x = ref_cu->inter.mv[0];
-      mv.y = ref_cu->inter.mv[1];
-    }
     // Get MV candidates
     cur_cu->inter.mv_ref = ref_idx;
     inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu);
     cur_cu->inter.mv_ref = temp_ref_idx;
+
+    vector2d_t mv = { 0, 0 };
+    {
+      // Take starting point for MV search from previous frame.
+      // When temporal motion vector candidates are added, there is probably
+      // no point to this anymore, but for now it helps.
+      int mid_x_cu = (x + (LCU_WIDTH >> depth)) / 8;
+      int mid_y_cu = (y + (LCU_WIDTH >> depth)) / 8;
+      cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
+      if (ref_cu->type == CU_INTER) {
+        mv.x = ref_cu->inter.mv[0];
+        mv.y = ref_cu->inter.mv[1];
+      }
+    }
 
 #if SEARCH_MV_FULL_RADIUS
     temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
