@@ -276,7 +276,6 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
         }
       }
     }
-    
     assert(sao_luma->eo_class < SAO_NUM_EO);
     assert(sao_chroma->eo_class < SAO_NUM_EO);
     
@@ -284,6 +283,24 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
   }
   
+  // Copy LCU cu_array to main states cu_array, because that is the only one
+  // which is given to the next frame through image_list_t.
+  {
+    encoder_state_t *main_state = state;
+    while (main_state->parent) main_state = main_state->parent;
+    assert(main_state != state);
+
+    unsigned child_width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
+    unsigned child_height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
+    unsigned main_width_in_scu = main_state->tile->frame->width_in_lcu << MAX_DEPTH;
+    unsigned tile_x = state->tile->lcu_offset_x;
+    unsigned tile_y = state->tile->lcu_offset_y;
+    for (unsigned y = 0; y < child_height_in_scu; ++y) {
+      cu_info_t *main_row = &main_state->tile->frame->cu_array->data[tile_x + (tile_y + y) * main_width_in_scu];
+      cu_info_t *child_row = &state->tile->frame->cu_array->data[y * child_width_in_scu];
+      memcpy(main_row, child_row, sizeof(cu_info_t) * child_width_in_scu);
+    }
+  }
   
   //Now write data to bitstream (required to have a correct CABAC state)
   
