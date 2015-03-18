@@ -162,7 +162,7 @@ static uint32_t get_mvd_coding_cost(vector2d_t *mvd)
 }
 
 static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int mv_shift,
-                         int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                         int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
   uint32_t temp_bitcost = 0;
@@ -177,9 +177,9 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
-    if (merge_cand[merge_idx][0] == x &&
-        merge_cand[merge_idx][1] == y &&
-        merge_cand[merge_idx][2] == ref_idx) {
+    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir-1][0] == x &&
+        merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
+        merge_cand[merge_idx].ref == ref_idx) {
       temp_bitcost += merge_idx;
       merged = 1;
       break;
@@ -230,7 +230,7 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 static unsigned hexagon_search(const encoder_state_t * const state, unsigned depth,
                                const image_t *pic, const image_t *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
-                               int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                               int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
@@ -267,8 +267,8 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   // Select starting point from among merge candidates. These should include
   // both mv_cand vectors and (0, 0).
   for (i = 0; i < num_cand; ++i) {
-    mv.x = merge_cand[i][0] >> 2;
-    mv.y = merge_cand[i][1] >> 2;
+    mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
+    mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
 
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
 
@@ -291,8 +291,8 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
     }
   }
   if (best_index < num_cand) {
-    mv.x = merge_cand[best_index][0] >> 2;
-    mv.y = merge_cand[best_index][1] >> 2;
+    mv.x = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][0] >> 2;
+    mv.y = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][1] >> 2;
   } else {
     mv.x = mv_in_out->x >> 2;
     mv.y = mv_in_out->y >> 2;
@@ -483,7 +483,7 @@ static unsigned search_frac(const encoder_state_t * const state,
                             unsigned depth,
                             const image_t *pic, const image_t *ref,
                             const vector2d_t *orig, vector2d_t *mv_in_out,
-                            int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                            int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                             int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
 
@@ -626,9 +626,9 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 
   int16_t mv_cand[2][2];
   // Search for merge mode candidate
-  int16_t merge_cand[MRG_MAX_NUM_CANDS][3];
+  inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, lcu);
+  int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, lcu, (state->global->pictype == SLICE_B));
 
   // Select better candidate
   cur_cu->inter.mv_cand = 0; // Default to candidate 0
@@ -670,9 +670,10 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     merged = 0;
     // Check every candidate to find a match
     for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
-      if (merge_cand[merge_idx][0] == mv.x &&
-          merge_cand[merge_idx][1] == mv.y &&
-          (uint32_t)merge_cand[merge_idx][2] == ref_idx) {
+      if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
+          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&
+          merge_cand[merge_idx].dir != 3 &&
+          (uint32_t)merge_cand[merge_idx].ref == ref_idx) {
         merged = 1;
         break;
       }
@@ -705,13 +706,15 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
         if (state->global->ref->images[j]->poc < state->global->poc) {
           if (ref_idx == j) {
             cur_cu->inter.mv_dir = 1;            
-            cur_cu->inter.mv_ref_coded = ref_list[0];            
+            cur_cu->inter.mv_ref_coded = ref_list[0]; 
+            break;
           }
           ref_list[0]++;
         } else {          
           if (ref_idx == j) {
             cur_cu->inter.mv_dir = 2;
             cur_cu->inter.mv_ref_coded = ref_list[1];
+            break;
           }
           ref_list[1]++;
         }
@@ -719,13 +722,12 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       cur_cu->merged        = merged;
       cur_cu->merge_idx     = merge_idx;
       cur_cu->inter.mv_ref  = ref_idx;
-      //cur_cu->inter.mv_dir  = 1;
       cur_cu->inter.mv[0]   = (int16_t)mv.x;
       cur_cu->inter.mv[1]   = (int16_t)mv.y;
       cur_cu->inter.mvd[0]  = (int16_t)mvd.x;
       cur_cu->inter.mvd[1]  = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
-      cur_cu->inter.bitcost = temp_bitcost + ref_idx;
+      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded;
       cur_cu->inter.mv_cand = cu_mv_cand;
     }
   }

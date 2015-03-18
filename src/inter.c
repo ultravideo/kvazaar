@@ -514,7 +514,7 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
  * \param depth current block depth
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
-uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], lcu_t *lcu)
+uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu, bool inter_b)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -530,19 +530,21 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand
                                                      (CU1)->inter.mv[1] == (CU2)->inter.mv[1] && \
                                                      (CU1)->inter.mv_ref == (CU2)->inter.mv_ref) duplicate = 1; }
 
-  if (a1 && a1->type == CU_INTER) {
-      mv_cand[candidates][0] = a1->inter.mv[0];
-      mv_cand[candidates][1] = a1->inter.mv[1];
-      mv_cand[candidates][2] = a1->inter.mv_ref;
-      candidates++;
+  if (a1 && a1->type == CU_INTER) {      
+    mv_cand[candidates].mv[a1->inter.mv_dir - 1][0] = a1->inter.mv[0];
+    mv_cand[candidates].mv[a1->inter.mv_dir - 1][1] = a1->inter.mv[1];
+    mv_cand[candidates].ref = a1->inter.mv_ref;
+    mv_cand[candidates].dir = a1->inter.mv_dir;
+    candidates++;
   }
 
   if (b1 && b1->type == CU_INTER) {
     if(candidates) CHECK_DUPLICATE(b1, a1);
     if(!duplicate) {
-      mv_cand[candidates][0] = b1->inter.mv[0];
-      mv_cand[candidates][1] = b1->inter.mv[1];
-      mv_cand[candidates][2] = b1->inter.mv_ref;
+      mv_cand[candidates].mv[b1->inter.mv_dir - 1][0] = b1->inter.mv[0];
+      mv_cand[candidates].mv[b1->inter.mv_dir - 1][1] = b1->inter.mv[1];
+      mv_cand[candidates].ref = b1->inter.mv_ref;
+      mv_cand[candidates].dir = b1->inter.mv_dir;
       candidates++;
     }
   }
@@ -550,9 +552,10 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand
   if (b0 && b0->type == CU_INTER) {
     if(candidates) CHECK_DUPLICATE(b0,b1);
     if(!duplicate) {
-      mv_cand[candidates][0] = b0->inter.mv[0];
-      mv_cand[candidates][1] = b0->inter.mv[1];
-      mv_cand[candidates][2] = b0->inter.mv_ref;
+      mv_cand[candidates].mv[b0->inter.mv_dir - 1][0] = b0->inter.mv[0];
+      mv_cand[candidates].mv[b0->inter.mv_dir - 1][1] = b0->inter.mv[1];
+      mv_cand[candidates].ref = b0->inter.mv_ref;
+      mv_cand[candidates].dir = b0->inter.mv_dir;
       candidates++;
     }
   }
@@ -560,9 +563,10 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand
   if (a0 && a0->type == CU_INTER) {
     if(candidates) CHECK_DUPLICATE(a0,a1);
     if(!duplicate) {
-      mv_cand[candidates][0] = a0->inter.mv[0];
-      mv_cand[candidates][1] = a0->inter.mv[1];
-      mv_cand[candidates][2] = a0->inter.mv_ref;
+      mv_cand[candidates].mv[a0->inter.mv_dir - 1][0] = a0->inter.mv[0];
+      mv_cand[candidates].mv[a0->inter.mv_dir - 1][1] = a0->inter.mv[1];
+      mv_cand[candidates].ref = a0->inter.mv_ref;
+      mv_cand[candidates].dir = a0->inter.mv_dir;
       candidates++;
     }
   }
@@ -573,9 +577,10 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand
       if(!duplicate) {
         CHECK_DUPLICATE(b2,b1);
         if(!duplicate) {
-          mv_cand[candidates][0] = b2->inter.mv[0];
-          mv_cand[candidates][1] = b2->inter.mv[1];
-          mv_cand[candidates][2] = b2->inter.mv_ref;
+          mv_cand[candidates].mv[b2->inter.mv_dir - 1][0] = b2->inter.mv[0];
+          mv_cand[candidates].mv[b2->inter.mv_dir - 1][1] = b2->inter.mv[1];
+          mv_cand[candidates].ref = b2->inter.mv_ref;
+          mv_cand[candidates].dir = b2->inter.mv_dir;
           candidates++;
         }
       }
@@ -589,11 +594,49 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand
   }
 #endif
 
+  if (candidates == MRG_MAX_NUM_CANDS) return MRG_MAX_NUM_CANDS;
+
+  if (inter_b) {
+    #define NUM_PRIORITY_LIST 12;
+    static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
+    static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
+    uint8_t cutoff = candidates;
+    for (int32_t idx = 0; idx<cutoff*(cutoff - 1) && candidates != MRG_MAX_NUM_CANDS; idx++) {
+      uint8_t i = priorityList0[idx];
+      uint8_t j = priorityList1[idx];
+
+      // Find one L0 and L1 candidate according to the priority list
+      if ((mv_cand[i].dir & 0x1) && (mv_cand[j].dir & 0x2)) {
+        mv_cand[candidates].dir = 3;
+
+        // get Mv from cand[i] and cand[j]
+        mv_cand[candidates].mv[0][0] = mv_cand[i].mv[0][0];
+        mv_cand[candidates].mv[0][1] = mv_cand[i].mv[0][1];
+        mv_cand[candidates].mv[1][0] = mv_cand[j].mv[1][0];
+        mv_cand[candidates].mv[1][1] = mv_cand[j].mv[1][1];
+
+        if (mv_cand[i].ref == mv_cand[j].ref &&
+          mv_cand[i].mv[0][0] == mv_cand[j].mv[1][0] && 
+          mv_cand[i].mv[0][1] == mv_cand[j].mv[1][1]) {
+          // Not a candidate
+        } else {
+          candidates++;
+        }
+      }
+    }
+  }
+
   // Add (0,0) prediction
-  if (candidates != 5) {
-    mv_cand[candidates][0] = 0;
-    mv_cand[candidates][1] = 0;
-    mv_cand[candidates][2] = zero_idx;
+  if (candidates != MRG_MAX_NUM_CANDS) {
+    mv_cand[candidates].mv[0][0] = 0;
+    mv_cand[candidates].mv[0][1] = 0;
+    mv_cand[candidates].ref = zero_idx;
+    mv_cand[candidates].dir = 1;
+    if (inter_b) {
+      mv_cand[candidates].mv[1][0] = 0;
+      mv_cand[candidates].mv[1][1] = 0;
+      mv_cand[candidates].dir = 3;
+    }
     zero_idx++;
     candidates++;
   }
