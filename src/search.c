@@ -628,7 +628,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
   // Search for merge mode candidate
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, lcu, (state->global->pictype == SLICE_B));
+  int16_t num_cand = inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
 
   // Select better candidate
   cur_cu->inter.mv_cand = 0; // Default to candidate 0

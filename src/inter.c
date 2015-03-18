@@ -514,7 +514,7 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
  * \param depth current block depth
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
-uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu, bool inter_b)
+uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -596,7 +596,7 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, inter_merge_can
 
   if (candidates == MRG_MAX_NUM_CANDS) return MRG_MAX_NUM_CANDS;
 
-  if (inter_b) {
+  if (state->global->slicetype == SLICE_B) {
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -632,7 +632,7 @@ uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, inter_merge_can
     mv_cand[candidates].mv[0][1] = 0;
     mv_cand[candidates].ref = zero_idx;
     mv_cand[candidates].dir = 1;
-    if (inter_b) {
+    if (state->global->slicetype == SLICE_B) {
       mv_cand[candidates].mv[1][0] = 0;
       mv_cand[candidates].mv[1][1] = 0;
       mv_cand[candidates].dir = 3;
