@@ -949,6 +949,59 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
   *bitstream_length += state->stats_bitstream_length;
 }
 
+static void encoder_ref_insertion_sort(int reflist[16], int length) {
+
+  for (uint8_t i = 1; i < length; ++i) {
+    const int16_t cur_poc = reflist[i];
+    int16_t j = i;
+    while (j > 0 && cur_poc < reflist[j - 1]) {
+      reflist[j] = reflist[j - 1];
+      --j;
+    }
+    reflist[j] = cur_poc;
+  }
+}
+static void encoder_state_ref_sort(encoder_state_t *state) {
+  int j, ref_list[2] = { 0, 0 },ref_list_poc[2][16];
+
+  // List all pocs of lists
+  for (j = 0; j < state->global->ref->used_size; j++) {
+    if (state->global->ref->images[j]->poc < state->global->poc) {
+      ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+      ref_list[0]++;
+    } else {
+      ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+      ref_list[1]++;
+    }
+  }
+
+  encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+  encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
+
+  for (j = 0; j < state->global->ref->used_size; j++) {
+    if (state->global->ref->images[j]->poc < state->global->poc) {
+      int idx = ref_list[0];
+      for (int ref_idx = 0; ref_idx < ref_list[0]; ref_idx++) {
+        if (ref_list_poc[0][ref_idx] == state->global->ref->images[j]->poc) {
+          state->global->refmap[j].idx = ref_list[0] - ref_idx - 1;
+          break;
+        }
+      }
+      state->global->refmap[j].list = 1;
+      
+    } else {
+      int idx = ref_list[1];
+      for (int ref_idx = 0; ref_idx < ref_list[1]; ref_idx++) {
+        if (ref_list_poc[1][ref_idx] == state->global->ref->images[j]->poc) {
+          state->global->refmap[j].idx = ref_idx;
+          break;
+        }
+      }
+      state->global->refmap[j].list = 2;
+    }
+    state->global->refmap[j].poc = state->global->ref->images[j]->poc;
+  }
+}
 
 void encoder_next_frame(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -999,6 +1052,8 @@ void encoder_next_frame(encoder_state_t *state) {
         image_list_rem(state->global->ref, state->global->ref->used_size - 1);
       }
     }
+
+    encoder_state_ref_sort(state);
     return; //FIXME reference frames
   }
 
@@ -1026,6 +1081,7 @@ void encoder_next_frame(encoder_state_t *state) {
   
   state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
   videoframe_set_poc(state->tile->frame, state->global->poc);
+  encoder_state_ref_sort(state);
 }
 
 

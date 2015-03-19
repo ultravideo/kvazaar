@@ -71,7 +71,12 @@ typedef struct {
   //Current picture available references
   image_list_t *ref;
   int8_t ref_list;
-  //int8_t ref_idx_num[2];
+
+  struct {
+    int32_t poc;
+    int8_t list;
+    int8_t idx;
+  } refmap[16];
   
   int is_radl_frame;
   uint8_t pictype;
