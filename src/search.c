@@ -206,6 +206,351 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
   return temp_bitcost*(int32_t)(state->global->cur_lambda_cost_sqrt+0.5);
 }
 
+unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *pic, const image_t *ref, unsigned pattern_type,
+                           const vector2d_t *orig, const int iDist, vector2d_t *mv, unsigned best_cost, int *best_dist,
+                           int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
+                           int block_width, int max_lcu_below)
+{
+  int n_points;
+  int best_index = -1;
+  int i;
+  
+  vector2d_t mv_best = { 0, 0 };
+
+  //implemented search patterns
+  vector2d_t pattern[4][8] = {
+      //diamond (8 points)
+      //[ ][ ][ ][ ][1][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][8][ ][ ][ ][5][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[4][ ][ ][ ][o][ ][ ][ ][2]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][7][ ][ ][ ][6][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][3][ ][ ][ ][ ]
+      {
+        { 0, iDist }, { iDist, 0 }, { 0, -iDist }, { -iDist, 0 },
+        { iDist / 2, iDist / 2 }, { iDist / 2, -iDist / 2 }, { -iDist / 2, -iDist / 2 }, { -iDist / 2, iDist / 2 }
+      },
+
+      //square (8 points)
+      //[8][ ][ ][ ][1][ ][ ][ ][2]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[7][ ][ ][ ][o][ ][ ][ ][3]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[6][ ][ ][ ][5][ ][ ][ ][4]
+      {
+        { 0, iDist }, { iDist, iDist }, { iDist, 0 }, { iDist, -iDist }, { 0, -iDist },
+        { -iDist, -iDist }, { -iDist, 0 }, { -iDist, iDist }
+      },
+
+      //octagon (8 points)
+      //[ ][ ][5][ ][ ][ ][1][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][2]
+      //[4][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][o][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[8][ ][ ][ ][ ][ ][ ][ ][6]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][7][ ][ ][ ][3][ ][ ]
+      {
+        { iDist / 2, iDist }, { iDist, iDist / 2 }, { iDist / 2, -iDist }, { -iDist, iDist / 2 },
+        { -iDist / 2, iDist }, { iDist, -iDist / 2 }, { -iDist / 2, -iDist }, { -iDist, -iDist / 2 }
+      },
+
+      //hexagon (6 points)
+      //[ ][ ][5][ ][ ][ ][1][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[4][ ][ ][ ][o][ ][ ][ ][2]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][ ][ ][ ][ ][ ][ ][ ]
+      //[ ][ ][6][ ][ ][ ][3][ ][ ]
+      {
+        { iDist / 2, iDist }, { iDist, 0 }, { iDist / 2, -iDist }, { -iDist, 0 },
+        { iDist / 2, iDist }, { -iDist / 2, -iDist }, { 0, 0 }, { 0, 0 }
+      }
+
+  };
+
+  //make sure parameter pattern_type is within correct range
+  if (pattern_type > sizeof pattern - 1)
+  {
+    pattern_type = sizeof pattern - 1;
+  }
+
+  //set the number of points to be checked
+  if (iDist == 1)
+  {
+    switch (pattern_type)
+    {
+      case 0:
+        n_points = 4;
+        break;
+      case 2:
+        n_points = 4;
+        break;
+      case 3:
+        n_points = 4;
+        break;
+      default:
+        n_points = 8;
+        break;
+    };
+  }
+  else
+  {
+    switch (pattern_type)
+    {
+      case 3:
+        n_points = 6;
+        break;
+      default:
+        n_points = 8;
+        break;
+    };
+  }
+
+  //compute SAD values for all chosen points
+  for (i = 0; i < n_points; i++)
+  {
+    vector2d_t *current = &pattern[pattern_type][i];
+    unsigned cost;
+    uint32_t bitcost;
+
+    {
+      PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+      cost = image_calc_sad(pic, ref, orig->x, orig->y,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
+                            block_width, block_width, max_lcu_below);
+      cost += calc_mvd_cost(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, ref->poc - state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
+        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x + block_width,
+        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
+        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y + block_width);
+    }
+
+    if (cost < best_cost)
+    {
+      best_cost = cost;
+      *best_bitcost = bitcost;
+      best_index = i;
+    }
+
+  }
+
+  if (best_index >= 0)
+  {
+    mv_best = pattern[pattern_type][best_index];
+    *best_dist = iDist;
+  }
+  
+  mv->x += mv_best.x;
+  mv->y += mv_best.y;
+
+  return best_cost;
+
+}
+
+unsigned tz_raster_search(const encoder_state_t * const state, const image_t *pic, const image_t *ref,
+                          const vector2d_t *orig, vector2d_t *mv, unsigned best_cost,
+                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
+                          int block_width, int iSearchRange, int iRaster, int max_lcu_below)
+{
+  int i;
+  int k;
+
+  vector2d_t mv_best = { 0, 0 };
+  
+  //compute SAD values for every point in the iRaster downsampled version of the current search area
+  for (i = iSearchRange; i >= -iSearchRange; i -= iRaster)
+  {
+    for (k = -iSearchRange; k <= iSearchRange; k += iRaster)
+    {
+      vector2d_t current = { k, i };
+      unsigned cost;
+      uint32_t bitcost;
+
+      {
+        PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+        cost = image_calc_sad(pic, ref, orig->x, orig->y,
+          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
+          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
+          block_width, block_width, max_lcu_below);
+        cost += calc_mvd_cost(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+        PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, ref->poc - state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
+          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k + block_width,
+          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
+          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i + block_width);
+      }
+
+      if (cost < best_cost)
+      {
+        best_cost = cost;
+        *best_bitcost = bitcost;
+        mv_best = current;
+      }
+
+    }
+  }
+  
+  mv->x += mv_best.x;
+  mv->y += mv_best.y;
+
+  return best_cost;
+
+}
+
+static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
+                          const image_t *pic, const image_t *ref,
+                          const vector2d_t *orig, vector2d_t *mv_in_out,
+                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                          int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
+{
+
+  //TZ parameters
+  int iSearchRange = 96;  // search range for each stage
+  int iRaster = 5;  // search distance limit and downsampling factor for step 3                   
+  unsigned step2_type = 0;  // search patterns for steps 2 and 4
+  unsigned step4_type = 0;
+  bool bRasterRefinementEnable = true;  // enable step 4 mode 1
+  bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
+  
+  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+
+  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
+
+  unsigned best_cost = UINT32_MAX;
+  uint32_t best_bitcost = 0;
+  int iDist;
+  int best_dist = 0;
+  unsigned best_index = num_cand;
+  int max_lcu_below = -1;
+
+  if (state->encoder_control->owf) {
+    max_lcu_below = 1;
+  }
+
+  //step 1, compare (0,0) vector to predicted vectors
+  
+  // Check whatever input vector we got, unless its (0, 0) which will be checked later.
+  if (mv.x || mv.y) 
+  {
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+
+    best_cost = image_calc_sad(pic, ref, orig->x, orig->y,
+                                        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                                        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                        block_width, block_width, max_lcu_below);
+    best_cost += calc_mvd_cost(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
+
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, ref->poc - state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+  }
+
+  int i;
+  // Select starting point from among merge candidates. These should include
+  // both mv_cand vectors and (0, 0).
+  for (i = 0; i < num_cand; ++i) 
+  {
+    mv.x = merge_cand[i][0] >> 2;
+    mv.y = merge_cand[i][1] >> 2;
+
+    PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
+
+	  uint32_t bitcost;
+    unsigned cost = image_calc_sad(pic, ref, orig->x, orig->y,
+                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                   block_width, block_width, max_lcu_below);
+    cost += calc_mvd_cost(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+    PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_PIXELS, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,ref=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, ref->poc - state->global->poc, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+
+    if (cost < best_cost) {
+      best_cost = cost;
+      best_index = i;
+      best_bitcost = bitcost;
+    }
+  }
+  
+  if (best_index < (unsigned)num_cand) {
+    mv.x = merge_cand[best_index][0] >> 2;
+    mv.y = merge_cand[best_index][1] >> 2;
+  } else {
+    mv.x = mv_in_out->x >> 2;
+    mv.y = mv_in_out->y >> 2;
+  }
+
+  //step 2, grid search
+  for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
+  {
+    best_cost = tz_pattern_search(state, pic, ref, step2_type, orig, iDist, &mv, best_cost, &best_dist,
+                                  mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_lcu_below);
+  }
+
+  //step 3, raster scan
+  if (best_dist > iRaster)
+  {
+    best_dist = iRaster;
+
+    best_cost = tz_raster_search(state, pic, ref, orig, &mv, best_cost, mv_cand, merge_cand, 
+                                 num_cand, ref_idx, &best_bitcost, block_width, iSearchRange, iRaster, max_lcu_below);
+  }
+
+  //step 4
+
+  //raster refinement
+  if (bRasterRefinementEnable && best_dist > 0)
+  {
+    iDist = best_dist >> 1;
+    while (iDist > 0)
+    {
+      best_cost = tz_pattern_search(state, pic, ref, step4_type, orig, iDist, &mv, best_cost, &best_dist,
+                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_lcu_below);
+
+      iDist = iDist >> 1;
+    }
+  }
+
+  //star refinement (repeat step 2 for the current starting point)
+  if (bStarRefinementEnable && best_dist > 0)
+  {
+    for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
+    {
+      best_cost = tz_pattern_search(state, pic, ref, step4_type, orig, iDist, &mv, best_cost, &best_dist,
+                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_lcu_below);
+    }
+  }
+
+  mv.x = mv.x << 2;
+  mv.y = mv.y << 2;
+
+  *mv_in_out = mv;
+  *bitcost_out = best_bitcost;
+
+  return best_cost;
+}
 
 /**
  * \brief Do motion search using the HEXBS algorithm.
@@ -676,7 +1021,15 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 #if SEARCH_MV_FULL_RADIUS
     temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
-    temp_cost += hexagon_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    switch (state->encoder_control->cfg->ime_algorithm) {
+      case IME_TZ :
+        temp_cost += tz_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+        break;
+
+      default:
+        temp_cost += hexagon_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+        break;
+      }
 #endif
     if (state->encoder_control->cfg->fme_level > 0) {
       temp_cost = search_frac(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);

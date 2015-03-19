@@ -47,6 +47,9 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
               --cqmfile <string>     : Custom Quantization Matrices from a file
               --debug <string>       : Output encoders reconstruction.
               --cpuid <integer>      : Disable runtime cpu optimizations with value 0.
+              --me <string>          : Set integer motion estimation algorithm ["hexbs"]
+                                         "hexbs": Hexagon Based Search (faster)
+                                         "tz":    Test Zone Search (better quality)
               --subme <integer>      : Set fractional pixel motion estimation level [1].
                                          0: only integer motion estimation
                                          1: fractional pixel motion estimation enabled
