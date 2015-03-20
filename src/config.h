@@ -30,11 +30,15 @@
 
 typedef struct {
   double qp_factor;
-  int8_t qp_offset;  /*!< \brief QP offset */
-  int8_t poc_offset; /*!< \brief POC offset */
-  int8_t layer;      /*!< \brief Current layer */
-  int8_t is_ref;     /*!< \brief Flag if this picture is used as a reference */
-} gop_config;
+  int8_t qp_offset;    /*!< \brief QP offset */
+  int8_t poc_offset;   /*!< \brief POC offset */
+  int8_t layer;        /*!< \brief Current layer */
+  int8_t is_ref;       /*!< \brief Flag if this picture is used as a reference */
+  int8_t ref_pos_count;/*!< \brief Reference picture count */
+  int8_t ref_pos[16];  /*!< \brief reference picture offset list */
+  int8_t ref_neg_count;/*!< \brief Reference picture count */
+  int8_t ref_neg[16];  /*!< \brief reference picture offset list */
+} gop_config_t;
 
 /*!
     \brief Struct which contains all configuration data
@@ -98,7 +102,7 @@ typedef struct
   } pu_depth_inter, pu_depth_intra;
 
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
-  gop_config gop[MAX_GOP];  /*!< \brief Array of GOP settings */
+  gop_config_t gop[MAX_GOP];  /*!< \brief Array of GOP settings */
 
 } config_t;
 
