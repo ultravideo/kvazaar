@@ -604,6 +604,7 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
     for (int32_t idx = 0; idx<cutoff*(cutoff - 1) && candidates != MRG_MAX_NUM_CANDS; idx++) {
       uint8_t i = priorityList0[idx];
       uint8_t j = priorityList1[idx];
+      if (i >= candidates || j >= candidates) break;
 
       // Find one L0 and L1 candidate according to the priority list
       if ((mv_cand[i].dir & 0x1) && (mv_cand[j].dir & 0x2)) {
@@ -626,11 +627,31 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
     }
   }
 
+  if (candidates == MRG_MAX_NUM_CANDS) return MRG_MAX_NUM_CANDS;
+
+  int num_ref = state->global->ref->used_size;
+
+  if (state->global->slicetype == SLICE_B) {
+    int j;
+    int ref_negative = 0;
+    int ref_positive = 0;
+    for (j = 0; j < state->global->ref->used_size; j++) {
+      if (state->global->ref->images[j]->poc < state->global->poc) {
+        ref_negative++;
+      } else {
+        ref_positive++;
+      }
+      if (!ref_negative) ref_negative = 1;
+      if (!ref_positive) ref_positive = 1;
+    }
+    num_ref = MIN(ref_negative, ref_positive);
+  }
+
   // Add (0,0) prediction
-  if (candidates != MRG_MAX_NUM_CANDS) {
+  while (candidates != MRG_MAX_NUM_CANDS) {
     mv_cand[candidates].mv[0][0] = 0;
     mv_cand[candidates].mv[0][1] = 0;
-    mv_cand[candidates].ref = zero_idx;
+    mv_cand[candidates].ref = (zero_idx>=num_ref-1)?0:zero_idx;
     mv_cand[candidates].dir = 1;
     if (state->global->slicetype == SLICE_B) {
       mv_cand[candidates].mv[1][0] = 0;

@@ -701,6 +701,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
     if(temp_cost < cur_cu->inter.cost) {
+
+      // Map reference index to L0/L1 pictures
       cur_cu->inter.mv_dir = state->global->refmap[ref_idx].list;
       cur_cu->inter.mv_ref_coded = state->global->refmap[ref_idx].idx;
 
