@@ -667,9 +667,6 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       state->global->pictype = NAL_IDR_W_RADL;
     } else {
       state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : (state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
-      if (state->global->slicetype == SLICE_B && (state->global->frame - 1) % 8 == 0) {
-        state->global->slicetype = SLICE_P;
-      }
       state->global->pictype = NAL_TRAIL_R;
     }
     if (state->encoder_control->cfg->gop_len) {
