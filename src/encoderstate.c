@@ -275,7 +275,6 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
         }
       }
     }
-    
     assert(sao_luma->eo_class < SAO_NUM_EO);
     assert(sao_chroma->eo_class < SAO_NUM_EO);
     
@@ -283,6 +282,24 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
   }
   
+  // Copy LCU cu_array to main states cu_array, because that is the only one
+  // which is given to the next frame through image_list_t.
+  {
+    encoder_state_t *main_state = state;
+    while (main_state->parent) main_state = main_state->parent;
+    assert(main_state != state);
+
+    unsigned child_width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
+    unsigned child_height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
+    unsigned main_width_in_scu = main_state->tile->frame->width_in_lcu << MAX_DEPTH;
+    unsigned tile_x = state->tile->lcu_offset_x;
+    unsigned tile_y = state->tile->lcu_offset_y;
+    for (unsigned y = 0; y < child_height_in_scu; ++y) {
+      cu_info_t *main_row = &main_state->tile->frame->cu_array->data[tile_x + (tile_y + y) * main_width_in_scu];
+      cu_info_t *child_row = &state->tile->frame->cu_array->data[y * child_width_in_scu];
+      memcpy(main_row, child_row, sizeof(cu_info_t) * child_width_in_scu);
+    }
+  }
   
   //Now write data to bitstream (required to have a correct CABAC state)
   
@@ -332,16 +349,18 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
 }
 
 static void encoder_state_encode_leaf(encoder_state_t * const state) {
-  const encoder_control_t * const encoder = state->encoder_control;
-  
-  int i = 0;
-  
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
   
-  //If we're not using wavefronts, or we have a WAVEFRONT_ROW which is the single child of its parent, than we should not use parallelism
-  if (state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW || (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && !state->parent->children[1].encoder_control)) {
-    for (i = 0; i < state->lcu_order_count; ++i) {
+  // Select whether to encode the frame/tile in current thread or to define
+  // wavefront jobs for other threads to handle.
+  bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
+  bool use_parallel_encoding = (wavefront && state->parent->children[1].encoder_control);
+  if (!use_parallel_encoding) {
+    // Encode every LCU in order and perform SAO reconstruction after every
+    // frame is encoded. Deblocking and SAO search is done during LCU encoding.
+
+    for (int i = 0; i < state->lcu_order_count; ++i) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_ENCODE_LCU);
 
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
@@ -354,7 +373,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 #endif //_DEBUG
     }
     
-    if (encoder->sao_enable) {
+    if (state->encoder_control->sao_enable) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME);
       sao_reconstruct_frame(state);
       PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count-1].position.y + state->tile->lcu_offset_y,
@@ -363,7 +382,9 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       );
     }
   } else {
-    for (i = 0; i < state->lcu_order_count; ++i) {
+    // Add each LCU in the wavefront row as it's own job to the queue.
+
+    for (int i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
 #ifdef _DEBUG
       char job_description[256];
@@ -372,44 +393,46 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       char* job_description = NULL;
 #endif
       state->tile->wf_jobs[lcu->id] = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
-      if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
-        
-        //Only for the first in the row (we reconstruct row-wise)
-        if (!lcu->left) {
-          //If we have a row below, then we wait till it's completed
-          if (lcu->below) {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
-          }
-          //Also add always a dep on current line
-          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
-          if (lcu->above) {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->above->encoder_state->previous_encoder_state->tqj_recon_done);
+      
+      // If job object was returned, add dependancies and allow it to run.
+      if (state->tile->wf_jobs[lcu->id]) {
+        // Add inter frame dependancies when ecoding more than one frame at
+        // once. The added dependancy is for the first LCU of each wavefront
+        // row to depend on the reconstruction status of the row below in the
+        // previous frame.
+        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
+          if (!lcu->left) {
+            if (lcu->below) {
+              threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+            } else {
+              threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+            }
           }
         }
-      }
-      if (state->tile->wf_jobs[lcu->id]) {
-        if (lcu->position.x > 0) {
-          // Wait for the LCU on the left.
+
+        // Add local WPP dependancy to the LCU on the left.
+        if (lcu->left) {
           threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
         }
-        if (lcu->position.y > 0) {
-          if (lcu->position.x < state->tile->frame->width_in_lcu - 1) {
-            // Wait for the LCU to the top-right of this one.
+        // Add local WPP dependancy to the LCU on the top right.
+        if (lcu->above) {
+          if (lcu->above->right) {
             threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
           } else {
-            // If there is no top-right LCU, wait for the one above.
             threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
           }
         }
+
         threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
-      if (lcu->position.x == state->tile->frame->width_in_lcu - 1) {
-        if (!encoder->sao_enable) {
-          //No SAO + last LCU: the row is reconstructed
-          assert(!state->tqj_recon_done);
-          state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
-        }
-      }
+    }
+
+    // In the case where SAO is not enabled, the wavefront row is
+    // done when the last LCU in the row is done.
+    if (!state->encoder_control->sao_enable) {
+      assert(!state->tqj_recon_done);
+      int last_lcu = state->lcu_order_count - 1;
+      state->tqj_recon_done = state->tile->wf_jobs[last_lcu];
     }
   }
 }

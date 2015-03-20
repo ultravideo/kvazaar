@@ -73,6 +73,7 @@ int config_init(config_t *cfg)
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 1;
   cfg->tr_depth_intra  = 0;
+  cfg->ime_algorithm   = 0; /* hexbs */
   cfg->fme_level       = 1;
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
@@ -297,6 +298,8 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
 
 static int config_parse(config_t *cfg, const char *name, const char *value)
 {
+  static const char * const me_names[]          = { "hexbs", "tz", NULL };
+
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
   static const char * const videoformat_names[] = { "component", "pal", "ntsc", "secam", "mac", "undef", NULL };
   static const char * const range_names[]       = { "tv", "pc", NULL };
@@ -403,6 +406,9 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
       // range is 0 .. CtbLog2SizeY - Log2MinTrafoSize
       error = 1;
     }
+  }
+  else if OPT("me") {
+    error = !parse_enum(value, me_names, &cfg->ime_algorithm);
   }
   else if OPT("subme") {
     cfg->fme_level = atoi(value);
@@ -538,6 +544,7 @@ int config_read(config_t *cfg,int argc, char *argv[])
     { "full-intra-search",        no_argument, NULL, 0 },
     { "no-transform-skip",        no_argument, NULL, 0 },
     { "tr-depth-intra",     required_argument, NULL, 0 },
+    { "me",                 required_argument, NULL, 0 },
     { "subme",              required_argument, NULL, 0 },
     { "sar",                required_argument, NULL, 0 },
     { "overscan",           required_argument, NULL, 0 },

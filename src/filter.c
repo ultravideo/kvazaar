@@ -242,8 +242,6 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
           strength = 1;
         } else if(cu_q->inter.mv_ref != cu_p->inter.mv_ref) {
           strength = 1;
-        } else if (state->global->pictype == SLICE_B) {
-          strength = 1;
         }
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;

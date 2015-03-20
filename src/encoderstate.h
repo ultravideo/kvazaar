@@ -106,7 +106,7 @@ typedef struct {
   yuv_t *hor_buf_before_sao;
   yuv_t *ver_buf_before_sao;
   
-  //Job pointers for wavefronts
+  //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
 } encoder_state_config_tile_t;
 

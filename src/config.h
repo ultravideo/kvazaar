@@ -62,6 +62,7 @@ typedef struct
   bool full_intra_search; /*!< \brief Don't skip modes in intra search.e */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
   int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
+  int8_t  ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
   int32_t fme_level;      /*!< \brief Fractional pixel motion estimation level (0: disabled, 1: enabled). */
   int32_t deblock_beta;   /*!< \brief (deblocking) beta offset (div 2), range -6...6 */
   int32_t deblock_tc;     /*!< \brief (deblocking) tc offset (div 2), range -6...6 */

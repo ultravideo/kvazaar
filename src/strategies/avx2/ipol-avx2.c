@@ -22,25 +22,156 @@
 * \file
 */
 
-#include <stdlib.h>
-
 #include "ipol-avx2.h"
 #include "strategyselector.h"
+
+#if COMPILE_INTEL_AVX2
+#include <stdlib.h>
+
+#include <immintrin.h>
+
+
 #include "encoder.h"
 #include "strategies/generic/picture-generic.h"
+
+
+#define FILTER_OFFSET 3
+#define FILTER_SIZE 8
+
+#define MAX_HEIGHT (4 * (LCU_WIDTH + 1) + FILTER_SIZE)
+#define MAX_WIDTH ((LCU_WIDTH + 1) + FILTER_SIZE)
 
 extern int8_t g_luma_filter[4][8];
 extern int8_t g_chroma_filter[8][4];
 
+void eight_tap_filter_x8_and_flip(__m128i data01, __m128i data23, __m128i data45, __m128i data67, __m128i* filter, __m128i* dst)
+{
+  __m128i a, b, c, d;
+  __m128i fir = _mm_broadcastq_epi64(_mm_loadl_epi64(filter));
+
+  a = _mm_maddubs_epi16(data01, fir);
+  b = _mm_maddubs_epi16(data23, fir);
+  a = _mm_hadd_epi16(a, b);
+
+  c = _mm_maddubs_epi16(data45, fir);
+  d = _mm_maddubs_epi16(data67, fir);
+  c = _mm_hadd_epi16(c, d);
+
+  a = _mm_hadd_epi16(a, c);
+
+  _mm_storeu_si128(dst, a);
+}
+
+__m128i eight_tap_filter_x4_and_flip_16bit(__m128i data0, __m128i data1, __m128i data2, __m128i data3, __m128i* filter)
+{
+  __m128i a, b, c, d;
+  __m128i fir = _mm_cvtepi8_epi16(_mm_loadu_si128((__m128i*)(filter)));
+
+  a = _mm_madd_epi16(data0, fir);
+  b = _mm_madd_epi16(data1, fir);
+  a = _mm_hadd_epi32(a, b);
+
+  c = _mm_madd_epi16(data2, fir);
+  d = _mm_madd_epi16(data3, fir);
+  c = _mm_hadd_epi32(c, d);
+
+  a = _mm_hadd_epi32(a, c);
+
+  return a;
+}
+
+void eight_tap_filter_and_flip_avx2(int8_t filter[4][8], pixel_t *src, int16_t src_stride, int16_t* __restrict dst)
+{
+
+  //Load 2 rows per xmm register
+  __m128i rows01 = _mm_loadl_epi64((__m128i*)(src + 0 * src_stride));
+  rows01 = _mm_castpd_si128(_mm_loadh_pd(_mm_castsi128_pd(rows01), (double*)(src + 1 * src_stride)));
+
+  __m128i rows23 = _mm_loadl_epi64((__m128i*)(src + 2 * src_stride));
+  rows23 = _mm_castpd_si128(_mm_loadh_pd(_mm_castsi128_pd(rows23), (double*)(src + 3 * src_stride)));
+
+  __m128i rows45 = _mm_loadl_epi64((__m128i*)(src + 4 * src_stride));
+  rows45 = _mm_castpd_si128(_mm_loadh_pd(_mm_castsi128_pd(rows45), (double*)(src + 5 * src_stride)));
+
+  __m128i rows67 = _mm_loadl_epi64((__m128i*)(src + 6 * src_stride));
+  rows67 = _mm_castpd_si128(_mm_loadh_pd(_mm_castsi128_pd(rows67), (double*)(src + 7 * src_stride)));
+
+  //Filter rows
+  const int dst_stride = MAX_WIDTH;
+  eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[0]), (__m128i*)(dst + 0));
+  eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[1]), (__m128i*)(dst + 1 * dst_stride));
+  eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[2]), (__m128i*)(dst + 2 * dst_stride));
+  eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[3]), (__m128i*)(dst + 3 * dst_stride));
+}
+
+static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int16_t *src, int16_t src_stride, int offset, int combined_shift, pixel_t* __restrict dst, int16_t dst_stride)
+{
+
+  //Load a row per xmm register
+  __m128i row0 = _mm_loadu_si128((__m128i*)(src + 0 * src_stride));
+  __m128i row1 = _mm_loadu_si128((__m128i*)(src + 1 * src_stride));
+  __m128i row2 = _mm_loadu_si128((__m128i*)(src + 2 * src_stride));
+  __m128i row3 = _mm_loadu_si128((__m128i*)(src + 3 * src_stride));
+
+  //Filter rows
+  union {
+    __m128i vector;
+    int32_t array[4];
+  } temp[4];
+
+  temp[0].vector = eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[0]));
+  temp[1].vector = eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[1]));
+  temp[2].vector = eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[2]));
+  temp[3].vector = eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[3]));
+
+  __m128i packed_offset = _mm_set1_epi32(offset);
+
+  temp[0].vector = _mm_add_epi32(temp[0].vector, packed_offset);
+  temp[0].vector = _mm_srai_epi32(temp[0].vector, combined_shift);
+  temp[1].vector = _mm_add_epi32(temp[1].vector, packed_offset);
+  temp[1].vector = _mm_srai_epi32(temp[1].vector, combined_shift);
+
+  temp[0].vector = _mm_packus_epi32(temp[0].vector, temp[1].vector);
+
+  temp[2].vector = _mm_add_epi32(temp[2].vector, packed_offset);
+  temp[2].vector = _mm_srai_epi32(temp[2].vector, combined_shift);
+  temp[3].vector = _mm_add_epi32(temp[3].vector, packed_offset);
+  temp[3].vector = _mm_srai_epi32(temp[3].vector, combined_shift);
+
+  temp[2].vector = _mm_packus_epi32(temp[2].vector, temp[3].vector);
+
+  temp[0].vector = _mm_packus_epi16(temp[0].vector, temp[2].vector);
+
+  int32_t* four_pixels = (int32_t*)&(dst[0 * dst_stride]);
+  *four_pixels = temp[0].array[0];
+
+  four_pixels = (int32_t*)&(dst[1 * dst_stride]);
+  *four_pixels = _mm_extract_epi32(temp[0].vector, 1);
+
+  four_pixels = (int32_t*)&(dst[2 * dst_stride]);
+  *four_pixels = _mm_extract_epi32(temp[0].vector, 2);
+
+  four_pixels = (int32_t*)&(dst[3 * dst_stride]);
+  *four_pixels = _mm_extract_epi32(temp[0].vector, 3);
+
+
+}
+
 int16_t eight_tap_filter_hor_avx2(int8_t *filter, pixel_t *data)
 {
-  int16_t temp = 0;
-  for (int i = 0; i < 8; ++i)
-  {
-    temp += filter[i] * data[i];
-  }
+  union {
+    __m128i vector;
+    int16_t array[8];
+  } sample;
 
-  return temp;
+  __m128i packed_data = _mm_loadu_si128((__m128i*)data);
+  __m128i packed_filter = _mm_loadu_si128((__m128i*)filter);
+
+  sample.vector = _mm_maddubs_epi16(packed_data, packed_filter);
+  sample.vector = _mm_hadd_epi16(sample.vector, sample.vector);
+  sample.vector = _mm_hadd_epi16(sample.vector, sample.vector);
+
+  return sample.array[0];
 }
 
 int32_t eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
@@ -124,79 +255,49 @@ void filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, 
 {
 
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int16_t shift1 = BIT_DEPTH - 8;
   int32_t shift2 = 6;
   int32_t shift3 = 14 - BIT_DEPTH;
-  int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
-  int8_t *c1, *c2, *c3;
+  int8_t *c0, *c1, *c2, *c3;
 
-  int i;
+  c0 = g_luma_filter[0];
   c1 = g_luma_filter[1];
   c2 = g_luma_filter[2];
   c3 = g_luma_filter[3];
 
-  int16_t temp[3][8];
+  int16_t flipped_hor_filtered[MAX_HEIGHT][MAX_WIDTH];
 
-  // Loop source pixels and generate sixteen filtered quarter-pel pixels on each round
-  for (y = 0; y < height; y++) {
-    int dst_pos_y = (y << 2)*dst_stride;
-    int src_pos_y = y*src_stride;
-    for (x = 0; x < width; x++) {
-      // Calculate current dst and src pixel positions
-      int dst_pos = dst_pos_y + (x << 2);
-      int src_pos = src_pos_y + x;
+  // Filter horizontally and flip x and y
+  for (x = 0; x < width; ++x) {
+    for (y = 0; y < height; y += 8) {
+      int ypos = y - FILTER_OFFSET;
+      int xpos = x - FILTER_OFFSET;
 
-      // Original pixel
-      dst[dst_pos] = src[src_pos];
+      eight_tap_filter_and_flip_avx2(g_luma_filter, &src[src_stride*ypos + xpos], src_stride, (int16_t*)&(flipped_hor_filtered[4 * x + 0][y]));
+    
+    }
 
-      //
-      if (hor_flag && !ver_flag) {
+    for (; y < height + FILTER_SIZE; ++y) {
+      int ypos = y - FILTER_OFFSET;
+      int xpos = x - FILTER_OFFSET;
+      flipped_hor_filtered[4 * x + 0][y] = eight_tap_filter_hor_avx2(c0, &src[src_stride*ypos + xpos]) << shift1;
+      flipped_hor_filtered[4 * x + 1][y] = eight_tap_filter_hor_avx2(c1, &src[src_stride*ypos + xpos]) << shift1;
+      flipped_hor_filtered[4 * x + 2][y] = eight_tap_filter_hor_avx2(c2, &src[src_stride*ypos + xpos]) << shift1;
+      flipped_hor_filtered[4 * x + 3][y] = eight_tap_filter_hor_avx2(c3, &src[src_stride*ypos + xpos]) << shift1;
+    }
+  }
 
-        temp[0][3] = eight_tap_filter_hor_avx2(c1, &src[src_pos - 3]) >> shift1;
-        temp[1][3] = eight_tap_filter_hor_avx2(c2, &src[src_pos - 3]) >> shift1;
-        temp[2][3] = eight_tap_filter_hor_avx2(c3, &src[src_pos - 3]) >> shift1;
-      }
-      // ea0,0 - needed only when ver_flag
-      if (ver_flag) {
-        dst[dst_pos + 1 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_avx2(c1, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-        dst[dst_pos + 2 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_avx2(c2, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-        dst[dst_pos + 3 * dst_stride] = fast_clip_16bit_to_pixel(((eight_tap_filter_ver_avx2(c3, &src[src_pos - 3 * src_stride], src_stride) >> shift1) + (1 << (shift3 - 1))) >> shift3);
-      }
+  // Filter vertically and flip x and y
+  for (y = 0; y < height; ++y) {
+    for (x = 0; x < 4 * width - 3; x += 4) {
 
-      // When both flags, we use _only_ this pixel (but still need ae0,0 for it)
-      if (hor_flag && ver_flag) {
-
-        // Calculate temporary values..
-        src_pos -= 3 * src_stride;  //0,-3
-        for (i = 0; i < 8; ++i) {
-
-          temp[0][i] = eight_tap_filter_hor_avx2(c1, &src[src_pos + i * src_stride - 3]) >> shift1; // h0(0,-3+i)
-          temp[1][i] = eight_tap_filter_hor_avx2(c2, &src[src_pos + i * src_stride - 3]) >> shift1; // h1(0,-3+i)
-          temp[2][i] = eight_tap_filter_hor_avx2(c3, &src[src_pos + i * src_stride - 3]) >> shift1; // h2(0,-3+i)
-        }
-
-
-
-        for (i = 0; i<3; ++i){
-          dst[dst_pos + 1 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_avx2(c1, &temp[i][0]) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 2 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_avx2(c2, &temp[i][0]) + offset23) >> shift2) >> shift3);
-          dst[dst_pos + 3 * dst_stride + i + 1] = fast_clip_32bit_to_pixel(((eight_tap_filter_hor_16bit_avx2(c3, &temp[i][0]) + offset23) >> shift2) >> shift3);
-
-        }
-
-      }
-
-      if (hor_flag) {
-        dst[dst_pos + 1] = fast_clip_32bit_to_pixel((temp[0][3] + offset3) >> shift3);
-        dst[dst_pos + 2] = fast_clip_32bit_to_pixel((temp[1][3] + offset3) >> shift3);
-        dst[dst_pos + 3] = fast_clip_32bit_to_pixel((temp[2][3] + offset3) >> shift3);
-      }
-
+     eight_tap_filter_and_flip_16bit_avx2(g_luma_filter, &flipped_hor_filtered[x][y], MAX_WIDTH, offset23, shift2 + shift3, &(dst[(4 * y + 0)*dst_stride + x]), dst_stride);
 
     }
+
   }
 
 }
@@ -416,15 +517,16 @@ void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int 
   }
 }
 
+#endif //COMPILE_INTEL_AVX2
 
 int strategy_register_ipol_avx2(void* opaque)
 {
   bool success = true;
-
-  success &= strategyselector_register(opaque, "filter_inter_quarterpel_luma", "avx2", 0, &filter_inter_quarterpel_luma_avx2);
-  success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 0, &filter_inter_halfpel_chroma_avx2);
-  success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 0, &filter_inter_octpel_chroma_avx2);
-  success &= strategyselector_register(opaque, "extend_borders", "avx2", 0, &extend_borders_avx2);
-
+#if COMPILE_INTEL_AVX2
+  success &= strategyselector_register(opaque, "filter_inter_quarterpel_luma", "avx2", 40, &filter_inter_quarterpel_luma_avx2);
+  success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 40, &filter_inter_halfpel_chroma_avx2);
+  success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 40, &filter_inter_octpel_chroma_avx2);
+  success &= strategyselector_register(opaque, "extend_borders", "avx2", 40, &extend_borders_avx2);
+#endif //COMPILE_INTEL_AVX2
   return success;
 }
