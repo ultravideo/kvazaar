@@ -1009,8 +1009,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       // Take starting point for MV search from previous frame.
       // When temporal motion vector candidates are added, there is probably
       // no point to this anymore, but for now it helps.
-      int mid_x_cu = (x + (LCU_WIDTH >> depth)) / 8;
-      int mid_y_cu = (y + (LCU_WIDTH >> depth)) / 8;
+      int mid_x_cu = (x + (LCU_WIDTH >> (depth+1))) / 8;
+      int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
       cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
       if (ref_cu->type == CU_INTER) {
         mv.x = ref_cu->inter.mv[0];
