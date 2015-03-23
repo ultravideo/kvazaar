@@ -469,7 +469,8 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   // both mv_cand vectors and (0, 0).
   for (i = 0; i < num_cand; ++i) 
   {
-    mv.x = merge_cand[i].mv[merge_cand[i].dir-1][0] >> 2;
+    if (merge_cand[i].dir == 3) continue;
+    mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
     mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
 
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
@@ -620,6 +621,7 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   // Select starting point from among merge candidates. These should include
   // both mv_cand vectors and (0, 0).
   for (i = 0; i < num_cand; ++i) {
+    if (merge_cand[i].dir == 3) continue;
     mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
     mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
 
