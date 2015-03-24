@@ -699,8 +699,8 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       }
       else {
         state->global->QP = state->encoder_control->cfg->qp +
-          state->encoder_control->cfg->gop[(state->global->frame-1) % 8].qp_offset;
-        state->global->QP_factor = state->encoder_control->cfg->gop[(state->global->frame-1) % 8].qp_factor;
+          state->encoder_control->cfg->gop[(state->global->frame-1) % state->encoder_control->cfg->gop_len].qp_offset;
+        state->global->QP_factor = state->encoder_control->cfg->gop[(state->global->frame-1) % state->encoder_control->cfg->gop_len].qp_factor;
       }
         
     }
@@ -1024,7 +1024,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   int8_t refnumber = encoder->cfg->ref_frames;
   if (encoder->cfg->gop_len) {
-    refnumber = encoder->cfg->gop[(state->global->frame - 1) % 8].ref_neg_count + encoder->cfg->gop[(state->global->frame - 1) % 8].ref_pos_count;
+    refnumber = encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_neg_count + encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_pos_count;
   }
   // Remove the ref pic (if present)
   while (state->global->ref->used_size > (uint32_t)refnumber) {
@@ -1032,15 +1032,15 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
     if (encoder->cfg->gop_len) {
       for (int ref = 0; ref < state->global->ref->used_size; ref++) {
         uint8_t found = 0;
-        for (int i = 0; i < encoder->cfg->gop[(state->global->frame - 1) % 8].ref_neg_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[(state->global->frame - 1) % 8].ref_neg[i]) {
+        for (int i = 0; i < encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_neg_count; i++) {
+          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_neg[i]) {
             found = 1;
             break;
           }
         }
         if (found) continue;
-        for (int i = 0; i < encoder->cfg->gop[(state->global->frame - 1) % 8].ref_pos_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[(state->global->frame - 1) % 8].ref_pos[i]) {
+        for (int i = 0; i < encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_pos_count; i++) {
+          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_pos[i]) {
             found = 1;
             break;
           }
@@ -1078,11 +1078,11 @@ void encoder_next_frame(encoder_state_t *state) {
     //We have a "real" previous encoder
     state->global->frame = state->previous_encoder_state->global->frame + 1;
     state->global->poc = state->previous_encoder_state->global->poc + 1;
-    if (state->encoder_control->cfg->gop_len) {
+    if (encoder->cfg->gop_len) {
       // Calculate POC according to the global frame counter and GOP structure
       state->global->poc = state->previous_encoder_state->global->frame - 
-         (state->previous_encoder_state->global->frame % 8) + 
-         state->encoder_control->cfg->gop[(state->global->frame - 1) % 8].poc_offset;
+        (state->previous_encoder_state->global->frame % encoder->cfg->gop_len) +
+        encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].poc_offset;
     }
 
     image_free(state->tile->frame->rec);
@@ -1098,7 +1098,7 @@ void encoder_next_frame(encoder_state_t *state) {
     videoframe_set_poc(state->tile->frame, state->global->poc);
     image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
 
-    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[(state->global->frame - 2) % 8].is_ref) {
+    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[(state->global->frame - 2) % encoder->cfg->gop_len].is_ref) {
       image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
     }
     encoder_state_remove_refs(state);
@@ -1109,14 +1109,14 @@ void encoder_next_frame(encoder_state_t *state) {
   
   state->global->frame++;
   state->global->poc++;
-  if (state->encoder_control->cfg->gop_len) {
+  if (encoder->cfg->gop_len) {
     // Calculate POC according to the global frame counter and GOP structure
     state->global->poc = state->global->frame - 1 -
-      ((state->global->frame-1) % 8) +
-      state->encoder_control->cfg->gop[(state->global->frame - 1) % 8].poc_offset;
+      ((state->global->frame - 1) % encoder->cfg->gop_len) +
+      encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].poc_offset;
   }
 
-  if (!encoder->cfg->gop_len || !lastpoc || encoder->cfg->gop[(state->global->frame - 2) % 8].is_ref) {
+  if (!encoder->cfg->gop_len || !lastpoc || encoder->cfg->gop[(state->global->frame - 2) % encoder->cfg->gop_len].is_ref) {
     // Add current reconstructed picture as reference
     image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
   }

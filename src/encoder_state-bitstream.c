@@ -605,7 +605,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
       fprintf(stderr, "\nPOC: %d [L0 ", state->global->poc);
     for (j = 0; j < ref_negative; j++) {
 
-      int8_t delta_poc = state->encoder_control->cfg->gop[(state->global->frame - 1) % 8].ref_neg[j];
+      int8_t delta_poc = state->encoder_control->cfg->gop[(state->global->frame - 1) % state->encoder_control->cfg->gop_len].ref_neg[j];
 
       WRITE_UE(stream, state->encoder_control->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
       last_poc = delta_poc;
@@ -615,7 +615,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
     fprintf(stderr, "] [L1 ");
     last_poc = 0;
     for (j = 0; j < ref_positive; j++) {
-      int8_t delta_poc = state->encoder_control->cfg->gop[(state->global->frame - 1) % 8].ref_pos[j];
+      int8_t delta_poc = state->encoder_control->cfg->gop[(state->global->frame - 1) % state->encoder_control->cfg->gop_len].ref_pos[j];
 
       fprintf(stderr, "%d ", state->global->poc + delta_poc);
       
