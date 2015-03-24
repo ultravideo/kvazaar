@@ -177,7 +177,8 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
-    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir-1][0] == x &&
+    if (merge_cand[merge_idx].dir == 3) continue;
+    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
         merge_cand[merge_idx].ref == ref_idx) {
       temp_bitcost += merge_idx;
@@ -594,7 +595,9 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   // Check mv_in, if it's not in merge candidates.
   bool mv_in_merge_cand = false;
   for (int i = 0; i < num_cand; ++i) {
-    if (merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2 == mv.x && merge_cand[i].mv[merge_cand[i].dir - 1][1] == mv.y) {
+    if (merge_cand[i].dir == 3) continue;
+    if (merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2 == mv.x &&
+        merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2 == mv.y) {
       mv_in_merge_cand = true;
       break;
     }
