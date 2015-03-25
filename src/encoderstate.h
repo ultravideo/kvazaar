@@ -64,6 +64,7 @@ typedef struct {
   
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */
+  int8_t gop_offset; /*!< \brief offset in the gop structure */
   
   int8_t QP;   //!< \brief Quantization parameter
   double QP_factor; //!< \brief Quantization factor

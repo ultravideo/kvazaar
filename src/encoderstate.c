@@ -699,8 +699,8 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       }
       else {
         state->global->QP = state->encoder_control->cfg->qp +
-          state->encoder_control->cfg->gop[(state->global->frame-1) % state->encoder_control->cfg->gop_len].qp_offset;
-        state->global->QP_factor = state->encoder_control->cfg->gop[(state->global->frame-1) % state->encoder_control->cfg->gop_len].qp_factor;
+          state->encoder_control->cfg->gop[state->global->gop_offset].qp_offset;
+        state->global->QP_factor = state->encoder_control->cfg->gop[state->global->gop_offset].qp_factor;
       }
         
     }
@@ -829,6 +829,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
   // storing GOP pictures
   static int8_t gop_pictures_available = 0;
   static videoframe_t gop_pictures[MAX_GOP];
+  static int8_t gop_skip_frames = 0;
 
   // On first frame, init structures
   if (!state->global->frame) {
@@ -847,18 +848,29 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
     unsigned uv_size = (width >> 1) * (height >> 1);
 
     for (i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
+      if (state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
+        if (gop_pictures_available) {
+          gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
+          break;
+        }
+        else return 0;
+      }
       if (width != array_width) {
        // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-        if (!read_and_fill_frame_data(file, width, height, array_width, gop_pictures[i].source->y) ||
-          !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->u) ||
-          !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->v))
-          return 0;
+        if(!read_and_fill_frame_data(file, width, height, array_width, gop_pictures[i].source->y) ||
+           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->u) ||
+           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->v)) {
+          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
+          else return 0;
+        }
       } else {
         // Otherwise the data can be read directly to the array.
-        if (y_size != fread(gop_pictures[i].source->y, sizeof(unsigned char), y_size, file) ||
-           uv_size != fread(gop_pictures[i].source->u, sizeof(unsigned char), uv_size, file) ||
-           uv_size != fread(gop_pictures[i].source->v, sizeof(unsigned char), uv_size, file))
-          return 0;
+        if(y_size != fread(gop_pictures[i].source->y, sizeof(unsigned char), y_size, file) ||
+          uv_size != fread(gop_pictures[i].source->u, sizeof(unsigned char), uv_size, file) ||
+          uv_size != fread(gop_pictures[i].source->v, sizeof(unsigned char), uv_size, file)) {
+          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
+          else return 0;
+        }
       }
 
       if (height != array_height) {
@@ -871,8 +883,15 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
 
   // If GOP is present, fetch the data from our GOP picture buffer
   if (state->global->frame && state->encoder_control->cfg->gop_len) {
-    int cur_gop_idx = state->encoder_control->cfg->gop_len - gop_pictures_available;
+    int cur_gop_idx = state->encoder_control->cfg->gop_len - (gop_pictures_available + gop_skip_frames);
     int cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
+    // Special case when end of the sequence and not all pictures are available
+    if (gop_skip_frames) {
+      for (;cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames; cur_gop_idx++) {
+        cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
+      }
+    }
+    state->global->gop_offset = cur_gop_idx;
     memcpy(state->tile->frame->source->y, gop_pictures[cur_gop].source->y, width * height);
     memcpy(state->tile->frame->source->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
     memcpy(state->tile->frame->source->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
@@ -1024,7 +1043,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   int8_t refnumber = encoder->cfg->ref_frames;
   if (encoder->cfg->gop_len) {
-    refnumber = encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_neg_count + encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_pos_count;
+    refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
   }
   // Remove the ref pic (if present)
   while (state->global->ref->used_size > (uint32_t)refnumber) {
@@ -1032,15 +1051,15 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
     if (encoder->cfg->gop_len) {
       for (int ref = 0; ref < state->global->ref->used_size; ref++) {
         uint8_t found = 0;
-        for (int i = 0; i < encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_neg_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_neg[i]) {
+        for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_neg_count; i++) {
+          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
             found = 1;
             break;
           }
         }
         if (found) continue;
-        for (int i = 0; i < encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_pos_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].ref_pos[i]) {
+        for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_pos_count; i++) {
+          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
             found = 1;
             break;
           }
@@ -1081,8 +1100,8 @@ void encoder_next_frame(encoder_state_t *state) {
     if (encoder->cfg->gop_len) {
       // Calculate POC according to the global frame counter and GOP structure
       state->global->poc = state->previous_encoder_state->global->frame - 
-        (state->previous_encoder_state->global->frame % encoder->cfg->gop_len) +
-        encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].poc_offset;
+        state->global->gop_offset +
+        encoder->cfg->gop[state->global->gop_offset].poc_offset;
     }
 
     image_free(state->tile->frame->rec);
@@ -1098,7 +1117,7 @@ void encoder_next_frame(encoder_state_t *state) {
     videoframe_set_poc(state->tile->frame, state->global->poc);
     image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
 
-    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[(state->global->frame - 2) % encoder->cfg->gop_len].is_ref) {
+    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
       image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
     }
     encoder_state_remove_refs(state);
@@ -1112,11 +1131,11 @@ void encoder_next_frame(encoder_state_t *state) {
   if (encoder->cfg->gop_len) {
     // Calculate POC according to the global frame counter and GOP structure
     state->global->poc = state->global->frame - 1 -
-      ((state->global->frame - 1) % encoder->cfg->gop_len) +
-      encoder->cfg->gop[(state->global->frame - 1) % encoder->cfg->gop_len].poc_offset;
+      (state->global->gop_offset) +
+      encoder->cfg->gop[state->global->gop_offset].poc_offset;
   }
 
-  if (!encoder->cfg->gop_len || !lastpoc || encoder->cfg->gop[(state->global->frame - 2) % encoder->cfg->gop_len].is_ref) {
+  if (!encoder->cfg->gop_len || !lastpoc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
     // Add current reconstructed picture as reference
     image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
   }
