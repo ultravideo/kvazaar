@@ -787,7 +787,7 @@ void encoder_state_write_bitstream_leaf(encoder_state_t * const state) {
       cabac_flush(&state->cabac);
     } else {
       cabac_flush(&state->cabac);
-      bitstream_align(&state->stream);
+      bitstream_align_zero(&state->stream);
     }
   }
 }
