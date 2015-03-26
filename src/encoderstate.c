@@ -1080,11 +1080,37 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
     
     videoframe_compute_psnr(state->tile->frame, temp_psnr);
     
-    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", state->global->poc,
+    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f", state->global->poc,
           state->global->QP,
           "BPI"[state->global->slicetype%3], state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
+    // Print reference picture lists
+    if (state->global->slicetype != SLICE_I) {
+      int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
+      // List all pocs of lists
+      for (j = 0; j < state->global->ref->used_size; j++) {
+        if (state->global->ref->images[j]->poc < state->global->poc) {
+          ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+          ref_list[0]++;
+        } else {
+          ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+          ref_list[1]++;
+        }
+      }
+      encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+      encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
 
+      fprintf(stderr, " [L0 ");
+      for (j = ref_list[0]-1; j >= 0; j--) {
+        fprintf(stderr, "%d ", ref_list_poc[0][j]);
+      }
+      fprintf(stderr, "] [L1 ");
+      for (j = 0; j < ref_list[1]; j++) {
+        fprintf(stderr, "%d ", ref_list_poc[1][j]);
+      }
+      fprintf(stderr, "]");
+    }
+    fprintf(stderr, "\n");
     // Increment total PSNR
     psnr[0] += temp_psnr[0];
     psnr[1] += temp_psnr[1];
