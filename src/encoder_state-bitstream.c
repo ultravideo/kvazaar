@@ -21,6 +21,7 @@
 #include "encoder_state-bitstream.h"
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "checkpoint.h"
 #include "encoderstate.h"
@@ -611,13 +612,17 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
         int8_t found = 0;
         do {
           delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
-          for (j = 0; j < state->global->ref->used_size; j++) {
-            if (state->global->ref->images[j]->poc == state->global->poc - delta_poc) {
+          for (int i = 0; i < state->global->ref->used_size; i++) {
+            if (state->global->ref->images[i]->poc == state->global->poc - delta_poc) {
               found = 1;
               break;
             }
           }
-          poc_shift++;
+          if (!found) poc_shift++;
+          if (j + poc_shift == ref_negative) {
+            fprintf(stderr, "Failure, reference not found!");
+            exit(EXIT_FAILURE);
+          }
         } while (!found);
       }
 
@@ -636,13 +641,17 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
         int8_t found = 0;
         do {
           delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
-          for (j = 0; j < state->global->ref->used_size; j++) {
-            if (state->global->ref->images[j]->poc == state->global->poc + delta_poc) {
+          for (int i = 0; i < state->global->ref->used_size; i++) {
+            if (state->global->ref->images[i]->poc == state->global->poc + delta_poc) {
               found = 1;
               break;
             }
           }
-          poc_shift++;
+          if (!found) poc_shift++;
+          if (j + poc_shift == ref_positive) {
+            fprintf(stderr, "Failure, reference not found!");
+            exit(EXIT_FAILURE);
+          }
         } while (!found);
       }
 
