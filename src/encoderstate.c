@@ -1097,7 +1097,6 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
 void encoder_next_frame(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   int8_t use_as_ref[8] = { 1, 0, 1, 0, 1, 0, 1, 0 };
-  int16_t lastpoc = state->global->poc;
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
@@ -1113,7 +1112,6 @@ void encoder_next_frame(encoder_state_t *state) {
   }
   
   if (state->previous_encoder_state != state) {
-    int16_t lastpoc = state->previous_encoder_state->global->poc;
     //We have a "real" previous encoder
     state->global->frame = state->previous_encoder_state->global->frame + 1;
     state->global->poc = state->previous_encoder_state->global->poc + 1;
@@ -1130,7 +1128,7 @@ void encoder_next_frame(encoder_state_t *state) {
     }
     videoframe_set_poc(state->tile->frame, state->global->poc);
     image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
-    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
+    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->previous_encoder_state->global->gop_offset].is_ref) {
       image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
     }
 
