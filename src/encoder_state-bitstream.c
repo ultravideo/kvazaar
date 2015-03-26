@@ -597,15 +597,29 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
   if (state->global->pictype != NAL_IDR_W_RADL
       && state->global->pictype != NAL_IDR_N_LP) {
     int last_poc = 0;
+    int poc_shift = 0;
 
       WRITE_U(stream, state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
       fprintf(stderr, "\nPOC: %d [L0 ", state->global->poc);
-    for (j = 0; j < ref_negative; j++) {
-
-      int8_t delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_neg[j];
+    for (j = 0; j < ref_negative; j++) {      
+      int8_t delta_poc = 0;
+      
+      if (state->encoder_control->cfg->gop_len) {
+        int8_t found = 0;
+        do {
+          delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
+          for (j = 0; j < state->global->ref->used_size; j++) {
+            if (state->global->ref->images[j]->poc == state->global->poc - delta_poc) {
+              found = 1;
+              break;
+            }
+          }
+          poc_shift++;
+        } while (!found);
+      }
 
       WRITE_UE(stream, state->encoder_control->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
       last_poc = delta_poc;
@@ -614,8 +628,23 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
     }
     fprintf(stderr, "] [L1 ");
     last_poc = 0;
-    for (j = 0; j < ref_positive; j++) {
-      int8_t delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_pos[j];
+    poc_shift = 0;
+    for (j = 0; j < ref_positive; j++) {      
+      int8_t delta_poc = 0;
+      
+      if (state->encoder_control->cfg->gop_len) {
+        int8_t found = 0;
+        do {
+          delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
+          for (j = 0; j < state->global->ref->used_size; j++) {
+            if (state->global->ref->images[j]->poc == state->global->poc + delta_poc) {
+              found = 1;
+              break;
+            }
+          }
+          poc_shift++;
+        } while (!found);
+      }
 
       fprintf(stderr, "%d ", state->global->poc + delta_poc);
       
