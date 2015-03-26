@@ -954,7 +954,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
     unsigned uv_size = (width >> 1) * (height >> 1);
 
     for (i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
-      if (state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
+      if (state->encoder_control->cfg->frames && state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
         if (gop_pictures_available) {
           gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
           break;
