@@ -717,11 +717,13 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   int8_t refnumber = encoder->cfg->ref_frames;
+  int8_t check_refs = 0;
   if (encoder->cfg->gop_len) {
     refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
+    check_refs = 1;
   }
   // Remove the ref pic (if present)
-  while (state->global->ref->used_size > (uint32_t)refnumber) {
+  while (check_refs || state->global->ref->used_size > (uint32_t)refnumber) {
     int8_t ref_to_remove = state->global->ref->used_size - 1;
     if (encoder->cfg->gop_len) {
       for (int ref = 0; ref < state->global->ref->used_size; ref++) {
@@ -744,8 +746,10 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
           ref--;
         }
       }
+      check_refs = 0;
     } else image_list_rem(state->global->ref, ref_to_remove);
   }
+
 }
 
 static void encoder_state_clear_refs(encoder_state_t *state) {
@@ -1132,14 +1136,16 @@ void encoder_next_frame(encoder_state_t *state) {
 
     return;
   }
-  
-  state->global->frame++;
-  state->global->poc++;
 
-  if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
+
+  if (!encoder->cfg->gop_len || !state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
     // Add current reconstructed picture as reference
     image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
   }
+
+
+  state->global->frame++;
+  state->global->poc++;
 
   //Remove current reconstructed picture, and alloc a new one
   image_free(state->tile->frame->rec);
