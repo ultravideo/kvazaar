@@ -721,6 +721,8 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   if (encoder->cfg->gop_len) {
     refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
     check_refs = 1;
+  } else if (state->global->slicetype == SLICE_I) {
+    refnumber = 1;
   }
   // Remove the ref pic (if present)
   while (check_refs || state->global->ref->used_size > (uint32_t)refnumber) {
