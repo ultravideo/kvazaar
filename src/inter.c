@@ -421,8 +421,10 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
                                        mv_cand[cand][1] = ((scale * (cu)->inter.mv[list][1] + 127 + (scale * (cu)->inter.mv[list][1] < 0)) >> 8 ); }}
 
   // Left predictors
-  if (a0 && a0->type == CU_INTER && a0->inter.mv_ref == cur_cu->inter.mv_ref) {
-    if (a0->inter.mv_dir & 1) {
+  if (a0 && a0->type == CU_INTER && (
+    ((a0->inter.mv_dir & 1) && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
+    ((a0->inter.mv_dir & 2) && a0->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
+    if (a0->inter.mv_dir & 1 && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
       mv_cand[candidates][0] = a0->inter.mv[0][0];
       mv_cand[candidates][1] = a0->inter.mv[0][1];
     } else {
@@ -430,8 +432,10 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
       mv_cand[candidates][1] = a0->inter.mv[1][1];
     }
     candidates++;
-  } else if (a1 && a1->type == CU_INTER && a1->inter.mv_ref == cur_cu->inter.mv_ref) {
-    if (a1->inter.mv_dir & 1) {
+  } else if (a1 && a1->type == CU_INTER && (
+    ((a1->inter.mv_dir & 1) && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
+    ((a1->inter.mv_dir & 2) && a1->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
+    if (a1->inter.mv_dir & 1 && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
       mv_cand[candidates][0] = a1->inter.mv[0][0];
       mv_cand[candidates][1] = a1->inter.mv[0][1];
     } else {
@@ -469,8 +473,10 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
   }
 
   // Top predictors
-  if (b0 && b0->type == CU_INTER && b0->inter.mv_ref == cur_cu->inter.mv_ref) {
-    if (b0->inter.mv_dir & 1) {
+  if (b0 && b0->type == CU_INTER && (
+    ((b0->inter.mv_dir & 1) && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
+    ((b0->inter.mv_dir & 2) && b0->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
+    if (b0->inter.mv_dir & 1 && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
       mv_cand[candidates][0] = b0->inter.mv[0][0];
       mv_cand[candidates][1] = b0->inter.mv[0][1];
     } else {
@@ -478,8 +484,10 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
       mv_cand[candidates][1] = b0->inter.mv[1][1];
     }
     b_candidates++;
-  } else if (b1 && b1->type == CU_INTER && b1->inter.mv_ref == cur_cu->inter.mv_ref) {
-    if (b1->inter.mv_dir & 1) {
+  } else if (b1 && b1->type == CU_INTER && (
+    ((b1->inter.mv_dir & 1) && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
+    ((b1->inter.mv_dir & 2) && b1->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
+    if (b1->inter.mv_dir & 1 && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
       mv_cand[candidates][0] = b1->inter.mv[0][0];
       mv_cand[candidates][1] = b1->inter.mv[0][1];
     } else {
@@ -487,8 +495,10 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
       mv_cand[candidates][1] = b1->inter.mv[1][1];
     }
     b_candidates++;
-  } else if(b2 && b2->type == CU_INTER && b2->inter.mv_ref == cur_cu->inter.mv_ref) {
-    if (b2->inter.mv_dir & 1) {
+  } else if (b2 && b2->type == CU_INTER && (
+    ((b2->inter.mv_dir & 1) && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
+    ((b2->inter.mv_dir & 2) && b2->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
+    if (b2->inter.mv_dir & 1 && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
       mv_cand[candidates][0] = b2->inter.mv[0][0];
       mv_cand[candidates][1] = b2->inter.mv[0][1];
     } else {
