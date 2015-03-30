@@ -180,7 +180,7 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
     if (merge_cand[merge_idx].dir == 3) continue;
     if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
-        merge_cand[merge_idx].ref == ref_idx) {
+        merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
       temp_bitcost += merge_idx;
       merged = 1;
       break;
@@ -1001,13 +1001,17 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     int32_t merged = 0;
     uint8_t cu_mv_cand = 0;
     int8_t merge_idx = 0;
-    int8_t temp_ref_idx = cur_cu->inter.mv_ref;
+    int8_t ref_list = state->global->refmap[ref_idx].list-1;
+    int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
+    int8_t temp_ref_list = cur_cu->inter.mv_dir;
     orig.x = x_cu * CU_MIN_SIZE_PIXELS;
     orig.y = y_cu * CU_MIN_SIZE_PIXELS;
     // Get MV candidates
-    cur_cu->inter.mv_ref = ref_idx;
+    cur_cu->inter.mv_ref[ref_list] = ref_idx;
+    cur_cu->inter.mv_dir = ref_list+1;
     inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu);
-    cur_cu->inter.mv_ref = temp_ref_idx;
+    cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
+    cur_cu->inter.mv_dir = temp_ref_list;
 
     vector2d_t mv = { 0, 0 };
     {
@@ -1018,8 +1022,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
       cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
       if (ref_cu->type == CU_INTER) {
-        mv.x = ref_cu->inter.mv[0];
-        mv.y = ref_cu->inter.mv[1];
+        mv.x = ref_cu->inter.mv[0][0];
+        mv.y = ref_cu->inter.mv[0][1];
       }
     }
 
@@ -1043,9 +1047,9 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     merged = 0;
     // Check every candidate to find a match
     for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
-      if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
-          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&
-          merge_cand[merge_idx].dir != 3 &&
+      if (merge_cand[merge_idx].dir != 3 &&
+          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
+          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&          
           (uint32_t)merge_cand[merge_idx].ref == ref_idx) {
         merged = 1;
         break;
@@ -1076,21 +1080,24 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     if(temp_cost < cur_cu->inter.cost) {
 
       // Map reference index to L0/L1 pictures
-      cur_cu->inter.mv_dir = state->global->refmap[ref_idx].list;
-      cur_cu->inter.mv_ref_coded = state->global->refmap[ref_idx].idx;
+      cur_cu->inter.mv_dir = ref_list+1;
+      cur_cu->inter.mv_ref_coded[ref_list] = state->global->refmap[ref_idx].idx;
 
       cur_cu->merged        = merged;
       cur_cu->merge_idx     = merge_idx;
-      cur_cu->inter.mv_ref  = ref_idx;
-      cur_cu->inter.mv[0]   = (int16_t)mv.x;
-      cur_cu->inter.mv[1]   = (int16_t)mv.y;
-      cur_cu->inter.mvd[0]  = (int16_t)mvd.x;
-      cur_cu->inter.mvd[1]  = (int16_t)mvd.y;
+      cur_cu->inter.mv_ref[ref_list] = ref_idx;
+      cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
+      cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
+      cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
+      cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
-      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded;
+      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[cur_cu->inter.mv_dir - 1];
       cur_cu->inter.mv_cand = cu_mv_cand;
     }
   }
+
+  // Search bi-pred positions
+
 
   return cur_cu->inter.cost;
 }
@@ -2401,7 +2408,41 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int tr_depth = depth > 0 ? depth : 1;
       lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
 
-      inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      if (cur_cu->inter.mv_dir == 3) {
+        pixel_t *temp_lcu_y = MALLOC(pixel_t, 64 * 64);
+        pixel_t *temp_lcu_u = MALLOC(pixel_t, 32 * 32);
+        pixel_t *temp_lcu_v = MALLOC(pixel_t, 32 * 32);
+        int temp_x, temp_y;
+        inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[0]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[0], &work_tree[depth]);   
+        memcpy(temp_lcu_y, work_tree[depth].rec.y, sizeof(pixel_t) * 64 * 64);
+        memcpy(temp_lcu_u, work_tree[depth].rec.u, sizeof(pixel_t) * 32 * 32);
+        memcpy(temp_lcu_v, work_tree[depth].rec.v, sizeof(pixel_t) * 32 * 32);
+        inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[1], &work_tree[depth]);
+        for (temp_y = 0; temp_y < LCU_WIDTH >> depth; ++temp_y) {
+          int y_in_lcu = ((y + temp_y) & ((LCU_WIDTH)-1));
+          for (temp_x = 0; temp_x < LCU_WIDTH >> depth; ++temp_x) {
+            int x_in_lcu = ((x + temp_x) & ((LCU_WIDTH)-1));
+            lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel_t)((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] + 
+                                                                    (int)temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu]) >> 1;
+          }
+        }
+        for (temp_y = 0; temp_y < LCU_WIDTH >> (depth+1); ++temp_y) {
+          int y_in_lcu = ((y + temp_y) & ((LCU_WIDTH>>1)-1));
+          for (temp_x = 0; temp_x < LCU_WIDTH >> (depth+1); ++temp_x) {
+            int x_in_lcu = ((x + temp_x) & ((LCU_WIDTH>>1)-1));
+            lcu->rec.u[y_in_lcu * LCU_WIDTH>>1 + x_in_lcu] = (pixel_t)((int)lcu->rec.u[y_in_lcu * LCU_WIDTH>>1 + x_in_lcu] +
+                                                                       (int)temp_lcu_u[y_in_lcu * LCU_WIDTH>>1 + x_in_lcu]) >> 1;
+            lcu->rec.v[y_in_lcu * LCU_WIDTH >> 1 + x_in_lcu] = (pixel_t)((int)lcu->rec.v[y_in_lcu * LCU_WIDTH >> 1 + x_in_lcu] +
+                                                                         (int)temp_lcu_v[y_in_lcu * LCU_WIDTH >> 1 + x_in_lcu]) >> 1;
+          }
+        }
+        FREE_POINTER(temp_lcu_y);
+        FREE_POINTER(temp_lcu_u);
+        FREE_POINTER(temp_lcu_v);
+      } else {
+        inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[cur_cu->inter.mv_dir - 1], &work_tree[depth]);
+      }
+
       quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
       quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
 

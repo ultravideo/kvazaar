@@ -1364,7 +1364,7 @@ void encode_coding_tree(encoder_state_t * const state,
         if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
           if (ref_list[ref_list_idx] > 1) {
             // parseRefFrmIdx
-            int32_t ref_frame = cur_cu->inter.mv_ref_coded;
+            int32_t ref_frame = cur_cu->inter.mv_ref_coded[ref_list_idx];
 
             cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
             CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
@@ -1390,8 +1390,8 @@ void encode_coding_tree(encoder_state_t * const state,
           }
 
           if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-            const int32_t mvd_hor = cur_cu->inter.mvd[0];
-            const int32_t mvd_ver = cur_cu->inter.mvd[1];
+            const int32_t mvd_hor = cur_cu->inter.mvd[ref_list_idx][0];
+            const int32_t mvd_ver = cur_cu->inter.mvd[ref_list_idx][1];
             const int8_t hor_abs_gr0 = mvd_hor != 0;
             const int8_t ver_abs_gr0 = mvd_ver != 0;
             const uint32_t mvd_hor_abs = abs(mvd_hor);

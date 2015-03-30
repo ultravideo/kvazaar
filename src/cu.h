@@ -72,12 +72,12 @@ typedef struct
   struct {
     double cost;
     uint32_t bitcost;
-    int16_t mv[2];
-    int16_t mvd[2];
+    int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
+    int16_t mvd[2][2]; // \brief Motion vector differences for L0 and L1
     uint8_t mv_cand; // \brief selected MV candidate
-    uint8_t mv_ref; // \brief Index of the encoder_control.ref array.
-    uint8_t mv_ref_coded; // \brief Coded and corrected index of ref picture
-    uint8_t mv_dir; // \brief Probably describes if mv_ref is forward, backward or both. Might not be needed?
+    uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
+    uint8_t mv_ref_coded[2]; // \brief Coded and corrected index of ref picture
+    uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
     int8_t mode;
   } inter;
 } cu_info_t;
