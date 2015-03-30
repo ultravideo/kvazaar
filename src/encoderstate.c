@@ -780,6 +780,7 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       state->global->poc = (state->global->frame - 1) - (state->global->frame - 1) % encoder->cfg->gop_len +
         encoder->cfg->gop[state->global->gop_offset].poc_offset;
       videoframe_set_poc(state->tile->frame, state->global->poc);
+      state->global->is_radl_frame = 0;
     }
    
     if (state->global->is_radl_frame) {
@@ -793,6 +794,11 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       encoder_state_ref_sort(state);
       state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : (state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
       state->global->pictype = NAL_TRAIL_R;
+      if (state->encoder_control->cfg->gop_len) {
+        if (encoder->cfg->intra_period > 1 && (state->global->poc % encoder->cfg->intra_period) == 0) {
+          state->global->slicetype = SLICE_I;
+        }
+      }
     }
     if (state->encoder_control->cfg->gop_len) {
       if (state->global->slicetype == SLICE_I) {
