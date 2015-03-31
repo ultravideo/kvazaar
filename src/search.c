@@ -2367,7 +2367,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
             vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
             pixel_t *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
-            pixel_t *ref_v = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
+            pixel_t *ref_v = &lcu->ref.v[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
 
             search_intra_chroma_rough(state, x, y, depth,
                                       ref_u, ref_v, LCU_WIDTH_C,
