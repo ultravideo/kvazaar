@@ -237,10 +237,10 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
           // Non-zero residual/coeffs and transform boundary
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
           strength = 1;
-        } else if((abs(cu_q->inter.mv[0] - cu_p->inter.mv[0]) >= 4) || (abs(cu_q->inter.mv[1] - cu_p->inter.mv[1]) >= 4)) {
+        } else if ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= 4) || (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= 4)) {
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
           strength = 1;
-        } else if(cu_q->inter.mv_ref != cu_p->inter.mv_ref) {
+        } else if (cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
           strength = 1;
         }
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
