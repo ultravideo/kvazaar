@@ -414,7 +414,7 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->images[(cu)->inter.mv_ref[list]]->poc;\
-                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir-1]]->poc;\
+                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref[(cur_cu->inter.mv_dir-1)&1]]->poc;\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 ); \
@@ -595,11 +595,11 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
 
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
-                                                    (!((CU1)->inter.mv_dir & 1) || \
+                                                    (!(((CU1)->inter.mv_dir & 1) && ((CU2)->inter.mv_dir & 1)) || \
                                                       ((CU1)->inter.mv[0][0] == (CU2)->inter.mv[0][0] && \
                                                       (CU1)->inter.mv[0][1] == (CU2)->inter.mv[0][1] && \
                                                       (CU1)->inter.mv_ref[0] == (CU2)->inter.mv_ref[0]) ) && \
-                                                    (!((CU1)->inter.mv_dir & 2) || \
+                                                    (!(((CU1)->inter.mv_dir & 2) && ((CU2)->inter.mv_dir & 2)) || \
                                                       ((CU1)->inter.mv[1][0] == (CU2)->inter.mv[1][0] && \
                                                       (CU1)->inter.mv[1][1] == (CU2)->inter.mv[1][1] && \
                                                       (CU1)->inter.mv_ref[1] == (CU2)->inter.mv_ref[1])) \

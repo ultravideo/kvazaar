@@ -1130,7 +1130,6 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
 
 void encoder_next_frame(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
-  int8_t use_as_ref[8] = { 1, 0, 1, 0, 1, 0, 1, 0 };
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   

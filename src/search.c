@@ -1022,8 +1022,13 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
       cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
       if (ref_cu->type == CU_INTER) {
-        mv.x = ref_cu->inter.mv[0][0];
-        mv.y = ref_cu->inter.mv[0][1];
+        if (ref_cu->inter.mv_dir & 1) {
+          mv.x = ref_cu->inter.mv[0][0];
+          mv.y = ref_cu->inter.mv[0][1];
+        } else {
+          mv.x = ref_cu->inter.mv[1][0];
+          mv.y = ref_cu->inter.mv[1][1];
+        }
       }
     }
 
@@ -1091,7 +1096,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
       cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
-      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[cur_cu->inter.mv_dir - 1];
+      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
       cur_cu->inter.mv_cand = cu_mv_cand;
     }
   }
@@ -2430,10 +2435,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           int y_in_lcu = ((y + temp_y) & ((LCU_WIDTH>>1)-1));
           for (temp_x = 0; temp_x < LCU_WIDTH >> (depth+1); ++temp_x) {
             int x_in_lcu = ((x + temp_x) & ((LCU_WIDTH>>1)-1));
-            lcu->rec.u[y_in_lcu * LCU_WIDTH>>1 + x_in_lcu] = (pixel_t)((int)lcu->rec.u[y_in_lcu * LCU_WIDTH>>1 + x_in_lcu] +
-                                                                       (int)temp_lcu_u[y_in_lcu * LCU_WIDTH>>1 + x_in_lcu]) >> 1;
-            lcu->rec.v[y_in_lcu * LCU_WIDTH >> 1 + x_in_lcu] = (pixel_t)((int)lcu->rec.v[y_in_lcu * LCU_WIDTH >> 1 + x_in_lcu] +
-                                                                         (int)temp_lcu_v[y_in_lcu * LCU_WIDTH >> 1 + x_in_lcu]) >> 1;
+            lcu->rec.u[y_in_lcu * (LCU_WIDTH >> 1) + x_in_lcu] = (pixel_t)((int)lcu->rec.u[y_in_lcu * (LCU_WIDTH >> 1) + x_in_lcu] +
+                                                                       (int)temp_lcu_u[y_in_lcu * (LCU_WIDTH >> 1) + x_in_lcu]) >> 1;
+            lcu->rec.v[y_in_lcu * (LCU_WIDTH >> 1) + x_in_lcu] = (pixel_t)((int)lcu->rec.v[y_in_lcu * (LCU_WIDTH >> 1) + x_in_lcu] +
+                                                                       (int)temp_lcu_v[y_in_lcu * (LCU_WIDTH >> 1) + x_in_lcu]) >> 1;
           }
         }
         FREE_POINTER(temp_lcu_y);
