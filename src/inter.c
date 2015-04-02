@@ -403,10 +403,11 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu)
+void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu, int8_t reflist)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
+  int8_t reflist2nd = !reflist;
 
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
@@ -414,7 +415,7 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->images[(cu)->inter.mv_ref[list]]->poc;\
-                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref[(cur_cu->inter.mv_dir-1)&1]]->poc;\
+                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref[reflist]]->poc;\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 ); \
@@ -422,25 +423,25 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
 
   // Left predictors
   if (a0 && a0->type == CU_INTER && (
-    ((a0->inter.mv_dir & 1) && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
-    ((a0->inter.mv_dir & 2) && a0->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
-    if (a0->inter.mv_dir & 1 && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
-      mv_cand[candidates][0] = a0->inter.mv[0][0];
-      mv_cand[candidates][1] = a0->inter.mv[0][1];
+    ((a0->inter.mv_dir & 1) && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
+    ((a0->inter.mv_dir & 2) && a0->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
+    if (a0->inter.mv_dir & (1 << reflist) && a0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
+      mv_cand[candidates][0] = a0->inter.mv[reflist][0];
+      mv_cand[candidates][1] = a0->inter.mv[reflist][1];
     } else {
-      mv_cand[candidates][0] = a0->inter.mv[1][0];
-      mv_cand[candidates][1] = a0->inter.mv[1][1];
+      mv_cand[candidates][0] = a0->inter.mv[reflist2nd][0];
+      mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
     }
     candidates++;
   } else if (a1 && a1->type == CU_INTER && (
-    ((a1->inter.mv_dir & 1) && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
-    ((a1->inter.mv_dir & 2) && a1->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
-    if (a1->inter.mv_dir & 1 && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
-      mv_cand[candidates][0] = a1->inter.mv[0][0];
-      mv_cand[candidates][1] = a1->inter.mv[0][1];
+    ((a1->inter.mv_dir & 1) && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
+    ((a1->inter.mv_dir & 2) && a1->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
+    if (a1->inter.mv_dir & (1 << reflist) && a1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
+      mv_cand[candidates][0] = a1->inter.mv[reflist][0];
+      mv_cand[candidates][1] = a1->inter.mv[reflist][1];
     } else {
-      mv_cand[candidates][0] = a1->inter.mv[1][0];
-      mv_cand[candidates][1] = a1->inter.mv[1][1];
+      mv_cand[candidates][0] = a1->inter.mv[reflist2nd][0];
+      mv_cand[candidates][1] = a1->inter.mv[reflist2nd][1];
     }
     candidates++;
   }
@@ -448,25 +449,25 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
   if(!candidates) {
       // Left predictors
     if (a0 && a0->type == CU_INTER) {
-      if (a0->inter.mv_dir & 1) {
-        mv_cand[candidates][0] = a0->inter.mv[0][0];
-        mv_cand[candidates][1] = a0->inter.mv[0][1];
-        APPLY_MV_SCALING(a0, candidates, 0);
+      if (a0->inter.mv_dir & (1 << reflist)) {
+        mv_cand[candidates][0] = a0->inter.mv[reflist][0];
+        mv_cand[candidates][1] = a0->inter.mv[reflist][1];
+        APPLY_MV_SCALING(a0, candidates, reflist);
       } else {
-        mv_cand[candidates][0] = a0->inter.mv[1][0];
-        mv_cand[candidates][1] = a0->inter.mv[1][1];
-        APPLY_MV_SCALING(a0, candidates, 1);
+        mv_cand[candidates][0] = a0->inter.mv[reflist2nd][0];
+        mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
+        APPLY_MV_SCALING(a0, candidates, reflist2nd);
       }
       candidates++;
     } else if (a1 && a1->type == CU_INTER) {
-      if (a1->inter.mv_dir & 1) {
-        mv_cand[candidates][0] = a1->inter.mv[0][0];
-        mv_cand[candidates][1] = a1->inter.mv[0][1];
-        APPLY_MV_SCALING(a1, candidates, 0);
+      if (a1->inter.mv_dir & (1 << reflist)) {
+        mv_cand[candidates][0] = a1->inter.mv[reflist][0];
+        mv_cand[candidates][1] = a1->inter.mv[reflist][1];
+        APPLY_MV_SCALING(a1, candidates, reflist);
       } else {
-        mv_cand[candidates][0] = a1->inter.mv[1][0];
-        mv_cand[candidates][1] = a1->inter.mv[1][1];
-        APPLY_MV_SCALING(a1, candidates, 1);
+        mv_cand[candidates][0] = a1->inter.mv[reflist2nd][0];
+        mv_cand[candidates][1] = a1->inter.mv[reflist2nd][1];
+        APPLY_MV_SCALING(a1, candidates, reflist2nd);
       }
       candidates++;
     }
@@ -474,36 +475,36 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
 
   // Top predictors
   if (b0 && b0->type == CU_INTER && (
-    ((b0->inter.mv_dir & 1) && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
-    ((b0->inter.mv_dir & 2) && b0->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
-    if (b0->inter.mv_dir & 1 && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
-      mv_cand[candidates][0] = b0->inter.mv[0][0];
-      mv_cand[candidates][1] = b0->inter.mv[0][1];
+    ((b0->inter.mv_dir & 1) && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
+    ((b0->inter.mv_dir & 2) && b0->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
+    if (b0->inter.mv_dir & (1 << reflist) && b0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
+      mv_cand[candidates][0] = b0->inter.mv[reflist][0];
+      mv_cand[candidates][1] = b0->inter.mv[reflist][1];
     } else {
-      mv_cand[candidates][0] = b0->inter.mv[1][0];
-      mv_cand[candidates][1] = b0->inter.mv[1][1];
+      mv_cand[candidates][0] = b0->inter.mv[reflist2nd][0];
+      mv_cand[candidates][1] = b0->inter.mv[reflist2nd][1];
     }
     b_candidates++;
   } else if (b1 && b1->type == CU_INTER && (
-    ((b1->inter.mv_dir & 1) && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
-    ((b1->inter.mv_dir & 2) && b1->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
-    if (b1->inter.mv_dir & 1 && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
-      mv_cand[candidates][0] = b1->inter.mv[0][0];
-      mv_cand[candidates][1] = b1->inter.mv[0][1];
+    ((b1->inter.mv_dir & 1) && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
+    ((b1->inter.mv_dir & 2) && b1->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
+    if (b1->inter.mv_dir & (1 << reflist) && b1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
+      mv_cand[candidates][0] = b1->inter.mv[reflist][0];
+      mv_cand[candidates][1] = b1->inter.mv[reflist][1];
     } else {
-      mv_cand[candidates][0] = b1->inter.mv[1][0];
-      mv_cand[candidates][1] = b1->inter.mv[1][1];
+      mv_cand[candidates][0] = b1->inter.mv[reflist2nd][0];
+      mv_cand[candidates][1] = b1->inter.mv[reflist2nd][1];
     }
     b_candidates++;
   } else if (b2 && b2->type == CU_INTER && (
-    ((b2->inter.mv_dir & 1) && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) ||
-    ((b2->inter.mv_dir & 2) && b2->inter.mv_ref[1] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]))) {
-    if (b2->inter.mv_dir & 1 && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]) {
-      mv_cand[candidates][0] = b2->inter.mv[0][0];
-      mv_cand[candidates][1] = b2->inter.mv[0][1];
+    ((b2->inter.mv_dir & 1) && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
+    ((b2->inter.mv_dir & 2) && b2->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
+    if (b2->inter.mv_dir & (1 << reflist) && b2->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
+      mv_cand[candidates][0] = b2->inter.mv[reflist][0];
+      mv_cand[candidates][1] = b2->inter.mv[reflist][1];
     } else {
-      mv_cand[candidates][0] = b2->inter.mv[1][0];
-      mv_cand[candidates][1] = b2->inter.mv[1][1];
+      mv_cand[candidates][0] = b2->inter.mv[reflist2nd][0];
+      mv_cand[candidates][1] = b2->inter.mv[reflist2nd][1];
     }
     b_candidates++;
   }
@@ -519,36 +520,36 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
   if(!b_candidates) {
     // Top predictors
     if (b0 && b0->type == CU_INTER) {
-      if (b0->inter.mv_dir & 1) {
-        mv_cand[candidates][0] = b0->inter.mv[0][0];
-        mv_cand[candidates][1] = b0->inter.mv[0][1];
-        APPLY_MV_SCALING(b0, candidates, 0);
+      if (b0->inter.mv_dir & (1 << reflist)) {
+        mv_cand[candidates][0] = b0->inter.mv[reflist][0];
+        mv_cand[candidates][1] = b0->inter.mv[reflist][1];
+        APPLY_MV_SCALING(b0, candidates, reflist);
       } else {
-        mv_cand[candidates][0] = b0->inter.mv[1][0];
-        mv_cand[candidates][1] = b0->inter.mv[1][1];
-        APPLY_MV_SCALING(b0, candidates, 1);
+        mv_cand[candidates][0] = b0->inter.mv[reflist2nd][0];
+        mv_cand[candidates][1] = b0->inter.mv[reflist2nd][1];
+        APPLY_MV_SCALING(b0, candidates, reflist2nd);
       }
       candidates++;
     } else if (b1 && b1->type == CU_INTER) {
-      if (b1->inter.mv_dir & 1) {
-        mv_cand[candidates][0] = b1->inter.mv[0][0];
-        mv_cand[candidates][1] = b1->inter.mv[0][1];
-        APPLY_MV_SCALING(b1, candidates, 0);
+      if (b1->inter.mv_dir & (1 << reflist)) {
+        mv_cand[candidates][0] = b1->inter.mv[reflist][0];
+        mv_cand[candidates][1] = b1->inter.mv[reflist][1];
+        APPLY_MV_SCALING(b1, candidates, reflist);
       } else {
-        mv_cand[candidates][0] = b1->inter.mv[1][0];
-        mv_cand[candidates][1] = b1->inter.mv[1][1];
-        APPLY_MV_SCALING(b1, candidates, 1);
+        mv_cand[candidates][0] = b1->inter.mv[reflist2nd][0];
+        mv_cand[candidates][1] = b1->inter.mv[reflist2nd][1];
+        APPLY_MV_SCALING(b1, candidates, reflist2nd);
       }
       candidates++;
     } else if(b2 && b2->type == CU_INTER) {
-      if (b2->inter.mv_dir & 1) {
-        mv_cand[candidates][0] = b2->inter.mv[0][0];
-        mv_cand[candidates][1] = b2->inter.mv[0][1];
-        APPLY_MV_SCALING(b2, candidates, 0);
+      if (b2->inter.mv_dir & (1 << reflist)) {
+        mv_cand[candidates][0] = b2->inter.mv[reflist][0];
+        mv_cand[candidates][1] = b2->inter.mv[reflist][1];
+        APPLY_MV_SCALING(b2, candidates, reflist);
       } else {
-        mv_cand[candidates][0] = b2->inter.mv[1][0];
-        mv_cand[candidates][1] = b2->inter.mv[1][1];
-        APPLY_MV_SCALING(b2, candidates, 1);
+        mv_cand[candidates][0] = b2->inter.mv[reflist2nd][0];
+        mv_cand[candidates][1] = b2->inter.mv[reflist2nd][1];
+        APPLY_MV_SCALING(b2, candidates, reflist2nd);
       }
       candidates++;
     }
