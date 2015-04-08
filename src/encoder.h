@@ -92,6 +92,9 @@ typedef struct encoder_control_t
     int8_t transfer;
     int8_t colormatrix;
     int8_t chroma_loc;
+
+    int8_t field_seq_flag;
+    int8_t frame_field_info_present_flag;
   } vui;
 
   int8_t aud_enable;

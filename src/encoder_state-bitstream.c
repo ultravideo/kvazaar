@@ -63,7 +63,7 @@ static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
   WRITE_U(stream, 3<<29, 32, "general_profile_compatibility_flag[]");
 
   WRITE_U(stream, 1, 1, "general_progressive_source_flag");
-  WRITE_U(stream, 0, 1, "general_interlaced_source_flag");
+  WRITE_U(stream, state->encoder_control->in.source_scan_type!= 0, 1, "general_interlaced_source_flag");
   WRITE_U(stream, 0, 1, "general_non_packed_constraint_flag");
   WRITE_U(stream, 0, 1, "general_frame_only_constraint_flag");
 
@@ -262,8 +262,8 @@ static void encoder_state_write_bitstream_VUI(encoder_state_t * const state)
   //ENDIF
 
   WRITE_U(stream, 0, 1, "neutral_chroma_indication_flag");
-  WRITE_U(stream, 0, 1, "field_seq_flag");
-  WRITE_U(stream, 0, 1, "frame_field_info_present_flag");
+  WRITE_U(stream, state->encoder_control->vui.field_seq_flag, 1, "field_seq_flag"); // 0: frames, 1: fields
+  WRITE_U(stream, state->encoder_control->vui.frame_field_info_present_flag, 1, "frame_field_info_present_flag");
   WRITE_U(stream, 0, 1, "default_display_window_flag");
 
   //IF default display window
@@ -511,6 +511,80 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
 
 #undef STR_BUF_LEN
 }
+
+/*
+static void encoder_state_write_active_parameter_sets_sei_message(encoder_state_t * const state) {
+
+  const encoder_control_t * const encoder = state->encoder_control;
+  bitstream_t * const stream = &state->stream;
+
+  int i = 0;
+
+  int active_vps_id = 0;
+  int self_contained_cvs_flag = 0;
+  int no_parameter_set_update_flag = 0;
+  int num_sps_ids_minus1 = 0;
+  int layer_sps_idx = 0;
+  int active_seq_parameter_set_id = 0;
+  int vps_base_layer_internal_flag = 0;
+
+  int max_layers_minus1 = 0;
+
+  WRITE_U(stream, 129, 8, "last_payload_type_byte"); //active_parameter_sets
+  WRITE_U(stream, 2, 8, "last_payload_size_byte");
+  WRITE_U(stream, active_vps_id, 4, "active_video_parameter_set_id");
+  WRITE_U(stream, self_contained_cvs_flag, 1, "self_contained_cvs_flag");
+  WRITE_U(stream, no_parameter_set_update_flag, 1, "no_parameter_set_update_flag");
+  WRITE_UE(stream, num_sps_ids_minus1, "num_sps_ids_minus1");
+  //for (i = 0; i <= num_sps_ids_minus1; ++i) {
+  WRITE_UE(stream, active_seq_parameter_set_id, "active_seq_parameter_set_id");
+  //}
+  // for (i = vps_base_layer_internal_flag; i <= max_layers_minus1; ++i){
+  WRITE_UE(stream, layer_sps_idx, "layer_sps_idx");
+  //}
+
+  bitstream_align(stream); //rbsp_trailing_bits
+}
+*/
+
+static void encoder_state_write_picture_timing_sei_message(encoder_state_t * const state) {
+
+  bitstream_t * const stream = &state->stream;
+
+  if (state->encoder_control->vui.frame_field_info_present_flag){
+
+    int8_t odd_picture = state->global->frame % 2;
+    int8_t pic_struct = 0; //0: progressive picture, 1: top field, 2: bottom field, 3...
+    int8_t source_scan_type = 1; //0: interlaced, 1: progressive
+
+    switch (state->encoder_control->in.source_scan_type){
+    case 0: //Progressive frame
+      pic_struct = 0;
+      source_scan_type = 1;
+      break;
+    case 1: //Top field first
+      pic_struct = odd_picture ? 2 : 1;
+      source_scan_type = 0;
+      break;
+    case 2: //Bottom field first
+      pic_struct = odd_picture ? 1 : 2;
+      source_scan_type = 0;
+      break;
+    default:
+      assert(0); //Should never execute
+      break;
+    }
+
+    WRITE_U(stream, 1, 8, "last_payload_type_byte"); //pic_timing
+    WRITE_U(stream, 1, 8, "last_payload_size_byte");
+    WRITE_U(stream, pic_struct, 4, "pic_struct");
+    WRITE_U(stream, source_scan_type, 2, "source_scan_type");
+    WRITE_U(stream, 0, 1, "duplicate_flag");
+
+    bitstream_align(stream); //rbsp_trailing_bits
+  }
+}
+
 
 static void encoder_state_entry_points_explore(const encoder_state_t * const state, int * const r_count, int * const r_max_length) {
   int i;
@@ -782,6 +856,19 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
     nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
+    bitstream_align(stream);
+  }
+
+  //SEI messages for interlacing
+  if (state->encoder_control->vui.frame_field_info_present_flag){
+    // These should be optional, needed for earlier versions
+    // of HM decoder to accept bitstream
+    //nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    //encoder_state_write_active_parameter_sets_sei_message(state);
+    //bitstream_align(stream);
+
+    nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    encoder_state_write_picture_timing_sei_message(state);
     bitstream_align(stream);
   }
 
