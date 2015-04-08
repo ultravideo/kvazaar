@@ -1704,19 +1704,19 @@ static INLINE void sort_modes(int8_t *__restrict modes, double *__restrict costs
 /**
 * \brief Select mode with the smallest cost.
 */
-static INLINE int8_t select_best_mode(const int8_t *modes, const double *costs, uint8_t length)
+static INLINE uint8_t select_best_mode_index(const int8_t *modes, const double *costs, uint8_t length)
 {
-  double best_mode = modes[0];
+  uint8_t best_index = 0;
   double best_cost = costs[0];
   
   for (uint8_t i = 1; i < length; ++i) {
     if (costs[i] < best_cost) {
       best_cost = costs[i];
-      best_mode = modes[i];
+      best_index = i;
     }
   }
 
-  return best_mode;
+  return best_index;
 }
 
 /**
@@ -1899,7 +1899,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     ++modes_selected;
   }
 
-  int8_t best_mode = select_best_mode(modes, costs, modes_selected);
+  int8_t best_mode = modes[select_best_mode_index(modes, costs, modes_selected)];
   double best_cost = min_cost;
   
   // Skip recursive search if all modes have the same cost.
@@ -2149,58 +2149,55 @@ static double search_cu_intra(encoder_state_t * const state,
   double costs[35];
 
   // Find best intra mode for 2Nx2N.
-  {
-    pixel_t *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
-    unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
+  pixel_t *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+  unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
 
-    int8_t number_of_modes;
-    bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
-    if (!skip_rough_search) {
-      number_of_modes = search_intra_rough(state,
-                                                ref_pixels, LCU_WIDTH,
-                                                cu_in_rec_buffer, cu_width * 2 + 8,
-                                                cu_width, candidate_modes,
-                                                modes, costs);
-    } else {
-      number_of_modes = 35;
-      for (int i = 0; i < number_of_modes; ++i) {
-        modes[i] = i;
-        costs[i] = MAX_INT;
-      }
+  int8_t number_of_modes;
+  bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
+  if (!skip_rough_search) {
+    number_of_modes = search_intra_rough(state,
+                                              ref_pixels, LCU_WIDTH,
+                                              cu_in_rec_buffer, cu_width * 2 + 8,
+                                              cu_width, candidate_modes,
+                                              modes, costs);
+  } else {
+    number_of_modes = 35;
+    for (int i = 0; i < number_of_modes; ++i) {
+      modes[i] = i;
+      costs[i] = MAX_INT;
     }
-
-    // Set transform depth to current depth, meaning no transform splits.
-    lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
-
-    // Refine results with slower search or get some results if rough search was skipped.
-    if (state->encoder_control->rdo >= 2 || skip_rough_search) {
-      int number_of_modes_to_search;
-      if (state->encoder_control->rdo == 3) {
-        number_of_modes_to_search = 35;
-      } else if (state->encoder_control->rdo == 2) {
-        number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
-      } else {
-        // Check only the predicted modes.
-        number_of_modes_to_search = 0;
-      }
-      int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
-
-      sort_modes(modes, costs, number_of_modes);
-      number_of_modes = search_intra_rdo(state,
-                       x_px, y_px, depth,
-                       ref_pixels, LCU_WIDTH,
-                       cu_in_rec_buffer, cu_width * 2 + 8,
-                       candidate_modes,
-                       num_modes_to_check,
-                       modes, costs, lcu);
-    }
-
-    int8_t best_mode = select_best_mode(modes, costs, number_of_modes);
-
-    cur_cu->intra[pu_index].mode = best_mode;
   }
 
-  return costs[0];
+  // Set transform depth to current depth, meaning no transform splits.
+  lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+
+  // Refine results with slower search or get some results if rough search was skipped.
+  if (state->encoder_control->rdo >= 2 || skip_rough_search) {
+    int number_of_modes_to_search;
+    if (state->encoder_control->rdo == 3) {
+      number_of_modes_to_search = 35;
+    } else if (state->encoder_control->rdo == 2) {
+      number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+    } else {
+      // Check only the predicted modes.
+      number_of_modes_to_search = 0;
+    }
+    int num_modes_to_check = MIN(number_of_modes, number_of_modes_to_search);
+
+    sort_modes(modes, costs, number_of_modes);
+    number_of_modes = search_intra_rdo(state,
+                      x_px, y_px, depth,
+                      ref_pixels, LCU_WIDTH,
+                      cu_in_rec_buffer, cu_width * 2 + 8,
+                      candidate_modes,
+                      num_modes_to_check,
+                      modes, costs, lcu);
+  }
+
+  uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
+  cur_cu->intra[pu_index].mode = modes[best_mode_i];
+
+  return costs[best_mode_i];
 }
 
 // Return estimate of bits used to code prediction mode of cur_cu.
