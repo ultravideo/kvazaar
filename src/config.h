@@ -89,6 +89,8 @@ typedef struct
     int32_t min;
     int32_t max;
   } pu_depth_inter, pu_depth_intra;
+
+  bool add_encoder_info;
 } config_t;
 
 /* Function definitions */

@@ -136,6 +136,7 @@ int main(int argc, char *argv[])
             "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8\n"
             "          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.\n"
             "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4\n"
+            "          --no-info              : Don't add information about the encoder to settings.\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

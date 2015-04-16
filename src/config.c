@@ -109,6 +109,8 @@ int config_init(config_t *cfg)
   cfg->pu_depth_intra.min = 1; // 0-4
   cfg->pu_depth_intra.max = 4; // 0-4
 
+  cfg->add_encoder_info = true;
+
   return 1;
 }
 
@@ -505,6 +507,8 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
       }
     }
   }
+  else if OPT("info")
+    cfg->add_encoder_info = atobool(value);
   else
     return 0;
 #undef OPT
@@ -566,6 +570,7 @@ int config_read(config_t *cfg,int argc, char *argv[])
     { "cpuid",              required_argument, NULL, 0 },
     { "pu-depth-inter",     required_argument, NULL, 0 },
     { "pu-depth-intra",     required_argument, NULL, 0 },
+    { "no-info",                  no_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

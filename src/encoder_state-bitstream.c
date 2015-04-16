@@ -720,7 +720,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   }
 
   // Send Kvazaar version information only in the first frame.
-  if (state->global->frame == 0) {
+  if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
     nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
     bitstream_align(stream);
