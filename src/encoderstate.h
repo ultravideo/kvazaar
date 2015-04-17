@@ -82,6 +82,9 @@ typedef struct {
   bool is_idr_frame;
   uint8_t pictype;
   uint8_t slicetype;
+
+  //! Total number of bits written.
+  uint64_t total_bits_coded;
   
 } encoder_state_config_global_t;
 

@@ -738,7 +738,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   uint64_t newpos;
   int i;
   
-  curpos = bitstream_tell(stream) >> 3;
+  curpos = bitstream_tell(stream);
 
   // The first NAL unit of the access unit must use a long start code.
   bool first_nal_in_au = true;
@@ -803,8 +803,12 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   assert(state->tile->frame->poc == state->global->poc);
   
   //Get bitstream length for stats
-  newpos = bitstream_tell(stream) >> 3;
-  state->stats_bitstream_length = newpos - curpos;
+  newpos = bitstream_tell(stream);
+  state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
+  if (state->global->frame > 0) {
+    state->global->total_bits_coded = state->previous_encoder_state->global->total_bits_coded;
+  }
+  state->global->total_bits_coded += newpos - curpos;
 
   // Flush the output in case someone is reading the file on the other end.
   fflush(state->stream.file.output);

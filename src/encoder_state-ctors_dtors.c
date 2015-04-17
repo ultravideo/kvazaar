@@ -34,6 +34,7 @@ static int encoder_state_config_global_init(encoder_state_t * const state) {
   state->global->ref_list = REF_PIC_LIST_0;
   state->global->frame = 0;
   state->global->poc = 0;
+  state->global->total_bits_coded = 0;
   return 1;
 }
 
