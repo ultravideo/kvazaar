@@ -55,16 +55,8 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
       cu->depth = depth;
       cu->type  = CU_INTER;
       cu->part_size = SIZE_2Nx2N;
-      cu->inter.mode   = cur_cu->inter.mode;
-      cu->inter.mv[0][0] = cur_cu->inter.mv[0][0];
-      cu->inter.mv[0][1] = cur_cu->inter.mv[0][1];
-      cu->inter.mv[1][0] = cur_cu->inter.mv[1][0];
-      cu->inter.mv[1][1] = cur_cu->inter.mv[1][1];
-      cu->inter.mv_dir = cur_cu->inter.mv_dir;
-      cu->inter.mv_ref[0] = cur_cu->inter.mv_ref[0];
-      cu->inter.mv_ref[1] = cur_cu->inter.mv_ref[1];
-      cu->inter.mv_ref_coded[0] = cur_cu->inter.mv_ref_coded[0];
-      cu->inter.mv_ref_coded[1] = cur_cu->inter.mv_ref_coded[1];
+      memcpy(&cu->inter, &cur_cu->inter, sizeof(cur_cu->inter));
+      
       cu->tr_depth = tr_depth;
     }
   }
@@ -333,6 +325,55 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
     }
   }
 }
+
+/**
+* \brief Reconstruct bi-pred inter block
+* \param ref1 reference picture to copy the data from
+* \param ref2 other reference picture to copy the data from
+* \param xpos block x position
+* \param ypos block y position
+* \param width block width
+* \param mv[2][2] motion vectors
+* \param lcu destination lcu
+* \returns Void
+*/
+
+void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t * ref1, const image_t * ref2, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2][2], lcu_t* lcu) {
+  pixel_t *temp_lcu_y = MALLOC(pixel_t, 64 * 64);
+  pixel_t *temp_lcu_u = MALLOC(pixel_t, 32 * 32);
+  pixel_t *temp_lcu_v = MALLOC(pixel_t, 32 * 32);
+  int temp_x, temp_y;
+  // TODO: interpolated values require 14-bit accuracy for bi-prediction, current implementation of ipol filters round the value to 8bits
+  inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu);
+  memcpy(temp_lcu_y, lcu->rec.y, sizeof(pixel_t) * 64 * 64);
+  memcpy(temp_lcu_u, lcu->rec.u, sizeof(pixel_t) * 32 * 32);
+  memcpy(temp_lcu_v, lcu->rec.v, sizeof(pixel_t) * 32 * 32);
+  inter_recon_lcu(state, ref2, xpos, ypos, width, mv_param[1], lcu);
+  for (temp_y = 0; temp_y < width; ++temp_y) {
+    int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
+    for (temp_x = 0; temp_x < width; ++temp_x) {
+      int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
+      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel_t)(((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] +
+        (int)temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] + 1) >> 1);
+    }
+  }
+  for (temp_y = 0; temp_y < width>>1; ++temp_y) {
+    int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
+    for (temp_x = 0; temp_x < width>>1; ++temp_x) {
+      int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
+      lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (pixel_t)(((int)lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
+        (int)temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
+
+      lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (pixel_t)(((int)lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
+        (int)temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
+    }
+  }
+  FREE_POINTER(temp_lcu_y);
+  FREE_POINTER(temp_lcu_u);
+  FREE_POINTER(temp_lcu_v);
+}
+
+
 
 /**
  * \brief Get merge candidates for current block

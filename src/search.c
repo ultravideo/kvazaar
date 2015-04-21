@@ -2472,37 +2472,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
 
       if (cur_cu->inter.mv_dir == 3) {
-        pixel_t *temp_lcu_y = MALLOC(pixel_t, 64 * 64);
-        pixel_t *temp_lcu_u = MALLOC(pixel_t, 32 * 32);
-        pixel_t *temp_lcu_v = MALLOC(pixel_t, 32 * 32);
-        int temp_x, temp_y;
-        inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[0]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[0], &work_tree[depth]);   
-        memcpy(temp_lcu_y, lcu->rec.y, sizeof(pixel_t) * 64 * 64);
-        memcpy(temp_lcu_u, lcu->rec.u, sizeof(pixel_t) * 32 * 32);
-        memcpy(temp_lcu_v, lcu->rec.v, sizeof(pixel_t) * 32 * 32);
-        inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[1], &work_tree[depth]);
-        for (temp_y = 0; temp_y < LCU_WIDTH >> depth; ++temp_y) {
-          int y_in_lcu = ((y + temp_y) & ((LCU_WIDTH)-1));
-          for (temp_x = 0; temp_x < LCU_WIDTH >> depth; ++temp_x) {
-            int x_in_lcu = ((x + temp_x) & ((LCU_WIDTH)-1));
-            lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel_t)(((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] + 
-                                                                     (int)temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] + 1) >> 1);
-          }
-        }
-        for (temp_y = 0; temp_y < LCU_WIDTH >> (depth+1); ++temp_y) {
-          int y_in_lcu = (((y >> 1) + temp_y) & (LCU_WIDTH_C - 1));
-          for (temp_x = 0; temp_x < LCU_WIDTH >> (depth+1); ++temp_x) {
-            int x_in_lcu = (((x >> 1) + temp_x) & (LCU_WIDTH_C - 1));
-            lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (pixel_t)(((int)lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
-                                                                            (int)temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
-
-            lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (pixel_t)(((int)lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
-                                                                            (int)temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
-          }
-        }
-        FREE_POINTER(temp_lcu_y);
-        FREE_POINTER(temp_lcu_u);
-        FREE_POINTER(temp_lcu_v);
+        inter_recon_lcu_bipred(state, state->global->ref->images[cur_cu->inter.mv_ref[0]], state->global->ref->images[cur_cu->inter.mv_ref[1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv, &work_tree[depth]);
       } else {
         inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[cur_cu->inter.mv_dir - 1], &work_tree[depth]);
       }
