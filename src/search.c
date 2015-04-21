@@ -1124,10 +1124,10 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
           cur_cu->merged = 0;
           cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
           cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
-          cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0];
-          cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1];
-          cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0];
-          cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1];
+          cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
+          cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
+          cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
+          cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
 
           for (int reflist = 0; reflist < 2; reflist++) {
             cu_mv_cand = 0;
