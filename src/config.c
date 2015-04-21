@@ -89,6 +89,7 @@ int config_init(config_t *cfg)
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
   cfg->seek            = 0;
   cfg->gop_len         = 0;
+  cfg->bipred          = 0;
 
   cfg->tiles_width_count         = 0;
   cfg->tiles_height_count         = 0;
@@ -559,6 +560,8 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
       return 0;
     }
   }
+  else if OPT("bipred")
+    cfg->bipred = atobool(value);
   else
     return 0;
 #undef OPT
@@ -621,6 +624,7 @@ int config_read(config_t *cfg,int argc, char *argv[])
     { "pu-depth-inter",     required_argument, NULL, 0 },
     { "pu-depth-intra",     required_argument, NULL, 0 },
     { "gop",                required_argument, NULL, 0 },
+    { "bipred",                   no_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

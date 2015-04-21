@@ -137,6 +137,7 @@ int main(int argc, char *argv[])
             "          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.\n"
             "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4\n"
             "          --gop <int>           : Length of Group of Pictures, must be 8 or 0 [0]\n"
+            "          --bipred               : Enable bi-prediction search\n"
             "\n"
             "  Video Usability Information:\n"
             "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

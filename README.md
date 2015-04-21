@@ -57,7 +57,8 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
                                          0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8
               --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.
                                          0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4
-							--gop <int>            : Length of Group of Pictures, must be 8 or 0 [0]
+              --gop <int>            : Length of Group of Pictures, must be 8 or 0 [0]
+              --bipred               : Enable bi-prediction search
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio

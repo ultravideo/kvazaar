@@ -1099,7 +1099,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
   }
 
   // Search bi-pred positions
-  if (state->global->slicetype == SLICE_B) {
+  if (state->global->slicetype == SLICE_B && state->encoder_control->cfg->bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
     cost_pixel_nxn_func *satd = pixels_get_satd_func(LCU_WIDTH >> depth);
     #define NUM_PRIORITY_LIST 12;
