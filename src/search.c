@@ -988,8 +988,10 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
   // Get list of candidates
   int16_t num_cand = inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
 
-  // Select better candidate
-  cur_cu->inter.mv_cand = 0; // Default to candidate 0
+
+  // Default to candidate 0
+  cur_cu->inter.mv_cand[0] = 0;
+  cur_cu->inter.mv_cand[1] = 0;
 
   cur_cu->inter.cost = UINT_MAX;
 
@@ -1094,7 +1096,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
       cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
-      cur_cu->inter.mv_cand = cu_mv_cand;
+      cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
     }
   }
 
@@ -1176,16 +1178,15 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 
                 // Select candidate 1 if it has lower cost
                 if (cand2_cost < cand1_cost) {
-                  //cu_mv_cand = 1;
-                  cu_mv_cand = 0;
+                  cu_mv_cand = 1;                  
                 }
               }
               cur_cu->inter.mvd[reflist][0] = cur_cu->inter.mv[reflist][0] - mv_cand[cu_mv_cand][0];
               cur_cu->inter.mvd[reflist][1] = cur_cu->inter.mv[reflist][1] - mv_cand[cu_mv_cand][1];
+              cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
             }
             cur_cu->inter.cost = cost;
             cur_cu->inter.bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[0] + cur_cu->inter.mv_ref_coded[1];
-            cur_cu->inter.mv_cand = cu_mv_cand;
           }
         }
       }

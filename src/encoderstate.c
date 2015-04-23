@@ -1428,7 +1428,7 @@ void encode_coding_tree(encoder_state_t * const state,
           }
 
           // Signal which candidate MV to use
-          cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand, 1,
+          cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
                                       AMVP_MAX_NUM_CANDS - 1);
         }
       } // for ref_list
