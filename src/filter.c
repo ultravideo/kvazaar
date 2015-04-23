@@ -171,7 +171,7 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
   const videoframe_t * const frame = state->tile->frame;
   const encoder_control_t * const encoder = state->encoder_control;
   
-  const cu_info_t *cu_q = videoframe_get_cu_const(frame, xpos >> MIN_SIZE, ypos >> MIN_SIZE);
+  cu_info_t *cu_q = videoframe_get_cu(frame, xpos >> MIN_SIZE, ypos >> MIN_SIZE);
 
   {
     // Return if called with a coordinate which is not at CU or TU boundary.
@@ -191,7 +191,7 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
     pixel_t *orig_src = &frame->rec->y[xpos + ypos*stride];
     pixel_t *src = orig_src;
     int32_t step = 1;
-    const cu_info_t *cu_p = NULL;
+    cu_info_t *cu_p = NULL;
     int16_t x_cu = xpos>>MIN_SIZE,y_cu = ypos>>MIN_SIZE;
     int8_t strength = 0;
 
@@ -228,7 +228,8 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
         }
 
         // CU in the side we are filtering, update every 8-pixels
-        cu_p = videoframe_get_cu_const(frame, x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx>>1 : 0), y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx>>1 : 0));
+        cu_p = videoframe_get_cu(frame, x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx>>1 : 0), y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx>>1 : 0));
+
         // Filter strength
         strength = 0;
         if(cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
@@ -236,13 +237,76 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
         } else if(cbf_is_set(cu_q->cbf.y, cu_q->tr_depth) || cbf_is_set(cu_p->cbf.y, cu_p->tr_depth)) {
           // Non-zero residual/coeffs and transform boundary
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
-          strength = 1;
-        } else if ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= 4) || (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= 4)) {
+          strength = 1;       
+        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 && ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= 4) || (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= 4))) {
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
           strength = 1;
-        } else if (cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
+        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 && cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
           strength = 1;
         }
+        
+        // B-slice related checks
+        if(!strength && state->global->slicetype == SLICE_B) {
+
+          // Zero all undefined motion vectors for easier usage
+          if(!(cu_q->inter.mv_dir & 1)) {
+            cu_q->inter.mv[0][0] = 0;
+            cu_q->inter.mv[0][1] = 0;
+          }
+          if(!(cu_q->inter.mv_dir & 2)) {
+            cu_q->inter.mv[1][0] = 0;
+            cu_q->inter.mv[1][1] = 0;
+          }
+
+          if(!(cu_p->inter.mv_dir & 1)) {
+            cu_p->inter.mv[0][0] = 0;
+            cu_p->inter.mv[0][1] = 0;
+          }
+          if(!(cu_p->inter.mv_dir & 2)) {
+            cu_p->inter.mv[1][0] = 0;
+            cu_p->inter.mv[1][1] = 0;
+          }
+          const int refP0 = (cu_p->inter.mv_dir & 1) ? cu_p->inter.mv_ref[0] : -1;
+          const int refP1 = (cu_p->inter.mv_dir & 2) ? cu_p->inter.mv_ref[1] : -1;
+          const int refQ0 = (cu_q->inter.mv_dir & 1) ? cu_q->inter.mv_ref[0] : -1;
+          const int refQ1 = (cu_q->inter.mv_dir & 2) ? cu_q->inter.mv_ref[1] : -1;
+          const int16_t* mvQ0 = cu_q->inter.mv[0];
+          const int16_t* mvQ1 = cu_q->inter.mv[1];
+
+          const int16_t* mvP0 = cu_p->inter.mv[0];
+          const int16_t* mvP1 = cu_p->inter.mv[1];
+
+          if(( refP0 == refQ0 &&  refP1 == refQ1 ) || ( refP0 == refQ1 && refP1==refQ0 ))
+          {
+            // Different L0 & L1
+            if ( refP0 != refP1 ) {          
+              if ( refP0 == refQ0 ) {
+                strength  = ((abs(mvQ0[0] - mvP0[0]) >= 4) ||
+                             (abs(mvQ0[1] - mvP0[1]) >= 4) ||
+                             (abs(mvQ1[0] - mvP1[0]) >= 4) ||
+                             (abs(mvQ1[1] - mvP1[1]) >= 4)) ? 1 : 0;
+              } else {
+                strength  = ((abs(mvQ1[0] - mvP0[0]) >= 4) ||
+                             (abs(mvQ1[1] - mvP0[1]) >= 4) ||
+                             (abs(mvQ0[0] - mvP1[0]) >= 4) ||
+                             (abs(mvQ0[1] - mvP1[1]) >= 4)) ? 1 : 0;
+              }
+            // Same L0 & L1
+            } else {  
+              strength  = ((abs(mvQ0[0] - mvP0[0]) >= 4) ||
+                           (abs(mvQ0[1] - mvP0[1]) >= 4) ||
+                           (abs(mvQ1[0] - mvP1[0]) >= 4) ||
+                           (abs(mvQ1[1] - mvP1[1]) >= 4)) &&
+                          ((abs(mvQ1[0] - mvP0[0]) >= 4) ||
+                           (abs(mvQ1[1] - mvP0[1]) >= 4) ||
+                           (abs(mvQ0[0] - mvP1[0]) >= 4) ||
+                           (abs(mvQ0[1] - mvP1[1]) >= 4)) ? 1 : 0;
+            }
+          } else {
+            strength = 1;
+          }
+        }
+
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = g_tc_table_8x8[tc_index] * bitdepth_scale;
         thr_cut         = tc * 10;
