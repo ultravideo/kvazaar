@@ -691,7 +691,6 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 
   for (j = 0; j < state->global->ref->used_size; j++) {
     if (state->global->ref->images[j]->poc < state->global->poc) {
-      int idx = ref_list[0];
       for (int ref_idx = 0; ref_idx < ref_list[0]; ref_idx++) {
         if (ref_list_poc[0][ref_idx] == state->global->ref->images[j]->poc) {
           state->global->refmap[j].idx = ref_list[0] - ref_idx - 1;
@@ -701,7 +700,6 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
       state->global->refmap[j].list = 1;
 
     } else {
-      int idx = ref_list[1];
       for (int ref_idx = 0; ref_idx < ref_list[1]; ref_idx++) {
         if (ref_list_poc[1][ref_idx] == state->global->ref->images[j]->poc) {
           state->global->refmap[j].idx = ref_idx;

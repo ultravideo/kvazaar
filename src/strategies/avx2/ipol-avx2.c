@@ -330,7 +330,7 @@ void filter_inter_halfpel_chroma_avx2(const encoder_control_t * const encoder, p
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   int8_t* c = g_chroma_filter[4];
-  int16_t temp[4];
+  int16_t temp[4] = {0,0,0,0};
 
   // Loop source pixels and generate four filtered half-pel pixels on each round
   for (y = 0; y < height; y++) {

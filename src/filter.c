@@ -168,7 +168,7 @@ void filter_deblock_edge_luma(encoder_state_t * const state,
                               int32_t xpos, int32_t ypos,
                               int8_t depth, int8_t dir)
 {
-  const videoframe_t * const frame = state->tile->frame;
+  videoframe_t * const frame = state->tile->frame;
   const encoder_control_t * const encoder = state->encoder_control;
   
   cu_info_t *cu_q = videoframe_get_cu(frame, xpos >> MIN_SIZE, ypos >> MIN_SIZE);
