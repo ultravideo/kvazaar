@@ -373,7 +373,18 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t *
   FREE_POINTER(temp_lcu_v);
 }
 
-
+static void inter_clear_cu_unused(cu_info_t* cu) {
+  if(!(cu->inter.mv_dir & 1)) {
+    cu->inter.mv[0][0] = 0;
+    cu->inter.mv[0][1] = 0;
+    cu->inter.mv_ref[0] = 255;
+  }
+  if(!(cu->inter.mv_dir & 2)) {
+    cu->inter.mv[1][0] = 0;
+    cu->inter.mv[1][1] = 0;
+    cu->inter.mv_ref[1] = 255;
+  }
+}
 
 /**
  * \brief Get merge candidates for current block
@@ -408,11 +419,13 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
   if (x != 0) {
     *a1 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
     if (!(*a1)->coded) *a1 = NULL;
+    if(*a1) inter_clear_cu_unused(*a1);
 
     if (y_cu + cur_block_in_scu < LCU_WIDTH>>3) {
       *a0 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu) * LCU_T_CU_WIDTH];
       if (!(*a0)->coded) *a0 = NULL;
     }
+    if(*a0) inter_clear_cu_unused(*a0);
   }
 
   // B0, B1 and B2 availability testing
@@ -425,14 +438,17 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
       *b0 = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
       if (!(*b0)->coded) *b0 = NULL;
     }
+    if(*b0) inter_clear_cu_unused(*b0);
 
     *b1 = &cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
     if (!(*b1)->coded) *b1 = NULL;
+    if(*b1) inter_clear_cu_unused(*b1);
 
     if (x != 0) {
       *b2 = &cu[x_cu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
       if(!(*b2)->coded) *b2 = NULL;
     }
+    if(*b2) inter_clear_cu_unused(*b2);
   }
 }
 
@@ -637,14 +653,15 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
 
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
+                                                     (CU1)->inter.mv_dir == (CU2)->inter.mv_dir && \
                                                     (!(((CU1)->inter.mv_dir & 1) && ((CU2)->inter.mv_dir & 1)) || \
                                                       ((CU1)->inter.mv[0][0] == (CU2)->inter.mv[0][0] && \
-                                                      (CU1)->inter.mv[0][1] == (CU2)->inter.mv[0][1] && \
-                                                      (CU1)->inter.mv_ref[0] == (CU2)->inter.mv_ref[0]) ) && \
-                                                    (!(((CU1)->inter.mv_dir & 2) && ((CU2)->inter.mv_dir & 2)) || \
+                                                       (CU1)->inter.mv[0][1] ==  (CU2)->inter.mv[0][1] && \
+                                                       (CU1)->inter.mv_ref[0] == (CU2)->inter.mv_ref[0]) ) && \
+                                                    (!(((CU1)->inter.mv_dir & 2) && ((CU2)->inter.mv_dir & 2) )  || \
                                                       ((CU1)->inter.mv[1][0] == (CU2)->inter.mv[1][0] && \
-                                                      (CU1)->inter.mv[1][1] == (CU2)->inter.mv[1][1] && \
-                                                      (CU1)->inter.mv_ref[1] == (CU2)->inter.mv_ref[1])) \
+                                                       (CU1)->inter.mv[1][1] == (CU2)->inter.mv[1][1] && \
+                                                       (CU1)->inter.mv_ref[1] == (CU2)->inter.mv_ref[1]) ) \
                                                       ) duplicate = 1; }
 
   if (a1 && a1->type == CU_INTER) {
@@ -775,12 +792,10 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
       } else {
         ref_positive++;
       }
-      if (!ref_negative) ref_negative = 1;
-      if (!ref_positive) ref_positive = 1;
     }
     num_ref = MIN(ref_negative, ref_positive);
   }
-
+  
   // Add (0,0) prediction
   while (candidates != MRG_MAX_NUM_CANDS) {
     mv_cand[candidates].mv[0][0] = 0;

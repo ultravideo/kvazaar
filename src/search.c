@@ -1054,7 +1054,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       if (merge_cand[merge_idx].dir != 3 &&
           merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
           merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&          
-          (uint32_t)merge_cand[merge_idx].ref == ref_idx) {
+          (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
         merged = 1;
         break;
       }
@@ -1153,13 +1153,31 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
             cur_cu->inter.mv_ref_coded[0] = state->global->refmap[merge_cand[i].ref[0]].idx;
             cur_cu->inter.mv_ref_coded[1] = state->global->refmap[merge_cand[j].ref[1]].idx;
 
-            cur_cu->merged = 0;
+
+
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
             cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
             cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
             cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
             cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
+            cur_cu->merged = 0;
+                        
+            // Check every candidate to find a match
+            for(int merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+              if (
+                  merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
+                  merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&     
+                  merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
+                  merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&    
+                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] && 
+                  merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1]) {
+                cur_cu->merged = 1;
+                cur_cu->merge_idx = merge_idx;
+                break;
+              }
+            }
+
 
             for (int reflist = 0; reflist < 2; reflist++) {
               cu_mv_cand = 0;
