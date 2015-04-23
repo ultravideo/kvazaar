@@ -1127,11 +1127,12 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
           // Force L0 and L1 references
           if (state->global->refmap[merge_cand[i].ref[0]].list == 2 || state->global->refmap[merge_cand[j].ref[1]].list == 1) continue;
 
+          // TODO: enable fractional pixel bipred search
           mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
           mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
           mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
           mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
-          memset(templcu->rec.y, 0, 64 * 64);
+
           inter_recon_lcu_bipred(state, state->global->ref->images[merge_cand[i].ref[0]], state->global->ref->images[merge_cand[j].ref[1]], x, y, LCU_WIDTH >> depth, mv, templcu);
 
           for (int ypos = 0; ypos < LCU_WIDTH >> depth; ++ypos) {
@@ -1144,6 +1145,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 
           cost = satd(tmp_pic, tmp_block);
 
+          // TODO: enable fractional pixel bipred search
           cost += calc_mvd_cost(state, merge_cand[i].mv[0][0] & 0xfff8, merge_cand[i].mv[0][1] & 0xfff8, 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd_cost(state, merge_cand[i].mv[1][0] & 0xfff8, merge_cand[i].mv[1][1] & 0xfff8, 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
@@ -1157,6 +1159,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
+
+            // TODO: enable fractional pixel bipred search
             cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
             cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
             cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
@@ -1178,7 +1182,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
               }
             }
 
-
+            // Each motion vector has its own candidate
             for (int reflist = 0; reflist < 2; reflist++) {
               cu_mv_cand = 0;
               inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, reflist);

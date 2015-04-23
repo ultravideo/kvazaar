@@ -339,16 +339,20 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
 */
 
 void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t * ref1, const image_t * ref2, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2][2], lcu_t* lcu) {
-  pixel_t *temp_lcu_y = MALLOC(pixel_t, 64 * 64);
-  pixel_t *temp_lcu_u = MALLOC(pixel_t, 32 * 32);
-  pixel_t *temp_lcu_v = MALLOC(pixel_t, 32 * 32);
+  pixel_t temp_lcu_y[64 * 64];
+  pixel_t temp_lcu_u[32 * 32];
+  pixel_t temp_lcu_v[32 * 32];
   int temp_x, temp_y;
   // TODO: interpolated values require 14-bit accuracy for bi-prediction, current implementation of ipol filters round the value to 8bits
+
+  //Reconstruct both predictors
   inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu);
   memcpy(temp_lcu_y, lcu->rec.y, sizeof(pixel_t) * 64 * 64);
   memcpy(temp_lcu_u, lcu->rec.u, sizeof(pixel_t) * 32 * 32);
   memcpy(temp_lcu_v, lcu->rec.v, sizeof(pixel_t) * 32 * 32);
   inter_recon_lcu(state, ref2, xpos, ypos, width, mv_param[1], lcu);
+
+  // After reconstruction, merge the predictors by taking an average of each pixel
   for (temp_y = 0; temp_y < width; ++temp_y) {
     int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
     for (temp_x = 0; temp_x < width; ++temp_x) {
@@ -368,11 +372,12 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t *
         (int)temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
     }
   }
-  FREE_POINTER(temp_lcu_y);
-  FREE_POINTER(temp_lcu_u);
-  FREE_POINTER(temp_lcu_v);
 }
 
+/**
+ * \brief Set unused L0/L1 motion vectors and reference
+ * \param cu coding unit to clear
+ */
 static void inter_clear_cu_unused(cu_info_t* cu) {
   if(!(cu->inter.mv_dir & 1)) {
     cu->inter.mv[0][0] = 0;
