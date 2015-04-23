@@ -52,17 +52,16 @@
   \brief Initializes lambda-value for current QP
 
   Implementation closer to HM (Used HM12 as reference)
-   - Still missing functionality when GOP and B-pictures are used
  */
 void encoder_state_init_lambda(encoder_state_t * const state)
 {
   double qp = state->global->QP;
-  double lambda_scale = 1.0;
+  double lambda_scale = 1.0 - CLIP(0.0, 0.5, 0.05*(double)state->encoder_control->cfg->gop_len);
   double qp_temp      = qp - 12;
   double lambda;
 
   // Default QP-factor from HM config
-  double qp_factor = 0.4624;
+  double qp_factor = state->encoder_control->cfg->gop_len ? state->global->QP_factor : 0.4624;
 
   if (state->global->slicetype == SLICE_I) {
     qp_factor=0.57*lambda_scale;
@@ -660,11 +659,103 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
   }
 }
 
+
+static void encoder_ref_insertion_sort(int reflist[16], int length) {
+
+  for (uint8_t i = 1; i < length; ++i) {
+    const int16_t cur_poc = reflist[i];
+    int16_t j = i;
+    while (j > 0 && cur_poc < reflist[j - 1]) {
+      reflist[j] = reflist[j - 1];
+      --j;
+    }
+    reflist[j] = cur_poc;
+  }
+}
+static void encoder_state_ref_sort(encoder_state_t *state) {
+  int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
+
+  // List all pocs of lists
+  for (j = 0; j < state->global->ref->used_size; j++) {
+    if (state->global->ref->images[j]->poc < state->global->poc) {
+      ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+      ref_list[0]++;
+    } else {
+      ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+      ref_list[1]++;
+    }
+  }
+
+  encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+  encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
+
+  for (j = 0; j < state->global->ref->used_size; j++) {
+    if (state->global->ref->images[j]->poc < state->global->poc) {
+      int idx = ref_list[0];
+      for (int ref_idx = 0; ref_idx < ref_list[0]; ref_idx++) {
+        if (ref_list_poc[0][ref_idx] == state->global->ref->images[j]->poc) {
+          state->global->refmap[j].idx = ref_list[0] - ref_idx - 1;
+          break;
+        }
+      }
+      state->global->refmap[j].list = 1;
+
+    } else {
+      int idx = ref_list[1];
+      for (int ref_idx = 0; ref_idx < ref_list[1]; ref_idx++) {
+        if (ref_list_poc[1][ref_idx] == state->global->ref->images[j]->poc) {
+          state->global->refmap[j].idx = ref_idx;
+          break;
+        }
+      }
+      state->global->refmap[j].list = 2;
+    }
+    state->global->refmap[j].poc = state->global->ref->images[j]->poc;
+  }
+}
+
+static void encoder_state_remove_refs(encoder_state_t *state) {
+  const encoder_control_t * const encoder = state->encoder_control;
+  int8_t refnumber = encoder->cfg->ref_frames;
+  int8_t check_refs = 0;
+  if (encoder->cfg->gop_len) {
+    refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
+    check_refs = 1;
+  } else if (state->global->slicetype == SLICE_I) {
+    refnumber = 1;
+  }
+  // Remove the ref pic (if present)
+  while (check_refs || state->global->ref->used_size > (uint32_t)refnumber) {
+    int8_t ref_to_remove = state->global->ref->used_size - 1;
+    if (encoder->cfg->gop_len) {
+      for (int ref = 0; ref < state->global->ref->used_size; ref++) {
+        uint8_t found = 0;
+        for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_neg_count; i++) {
+          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
+            found = 1;
+            break;
+          }
+        }
+        if (found) continue;
+        for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_pos_count; i++) {
+          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
+            found = 1;
+            break;
+          }
+        }
+        if (!found) {
+          image_list_rem(state->global->ref, ref);
+          ref--;
+        }
+      }
+      check_refs = 0;
+    } else image_list_rem(state->global->ref, ref_to_remove);
+  }
+
+}
+
 static void encoder_state_clear_refs(encoder_state_t *state) {
   int i;
-  while (state->global->ref->used_size) {
-    image_list_rem(state->global->ref, state->global->ref->used_size - 1);
-  }
 
   state->global->poc = 0;
   videoframe_set_poc(state->tile->frame, 0);
@@ -685,7 +776,15 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     const int is_i_radl = (encoder->cfg->intra_period == 1 && state->global->frame % 2 == 0);
     const int is_p_radl = (encoder->cfg->intra_period > 1 && (state->global->frame % encoder->cfg->intra_period) == 0);
     state->global->is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
-    
+
+    if (state->global->frame && encoder->cfg->gop_len) {
+      // Calculate POC according to the global frame counter and GOP structure
+      state->global->poc = (state->global->frame - 1) - (state->global->frame - 1) % encoder->cfg->gop_len +
+        encoder->cfg->gop[state->global->gop_offset].poc_offset;
+      videoframe_set_poc(state->tile->frame, state->global->poc);
+      state->global->is_radl_frame = 0;
+    }
+   
     if (state->global->is_radl_frame) {
       // Clear the reference list
       encoder_state_clear_refs(state);
@@ -693,9 +792,29 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       state->global->slicetype = SLICE_I;
       state->global->pictype = NAL_IDR_W_RADL;
     } else {
-      state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : SLICE_P;
+      encoder_state_remove_refs(state);
+      encoder_state_ref_sort(state);
+      state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : (state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
       state->global->pictype = NAL_TRAIL_R;
+      if (state->encoder_control->cfg->gop_len) {
+        if (encoder->cfg->intra_period > 1 && (state->global->poc % encoder->cfg->intra_period) == 0) {
+          state->global->slicetype = SLICE_I;
+        }
+      }
     }
+    if (state->encoder_control->cfg->gop_len) {
+      if (state->global->slicetype == SLICE_I) {
+        state->global->QP = state->encoder_control->cfg->qp;
+        state->global->QP_factor = 0.4624;
+      }
+      else {
+        state->global->QP = state->encoder_control->cfg->qp +
+          state->encoder_control->cfg->gop[state->global->gop_offset].qp_offset;
+        state->global->QP_factor = state->encoder_control->cfg->gop[state->global->gop_offset].qp_factor;
+      }
+        
+    }
+
   } else {
     //Clear the bitstream if it's not the main encoder
     bitstream_clear(&state->stream);
@@ -817,35 +936,114 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
   unsigned array_width = state->tile->frame->width;
   unsigned array_height = state->tile->frame->height;
 
-  if (width != array_width) {
-    // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-    if (!read_and_fill_frame_data(file, width, height, array_width,
-                                  state->tile->frame->source->y) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  state->tile->frame->source->u) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-                                  state->tile->frame->source->v))
-      return 0;
-  } else {
-    // Otherwise the data can be read directly to the array.
-    unsigned y_size = width * height;
-    unsigned uv_size = (width >> 1) * (height >> 1);
-    if (y_size  != fread(state->tile->frame->source->y, sizeof(unsigned char),
-                         y_size, file) ||
-        uv_size != fread(state->tile->frame->source->u, sizeof(unsigned char),
-                         uv_size, file) ||
-        uv_size != fread(state->tile->frame->source->v, sizeof(unsigned char),
-                         uv_size, file))
-      return 0;
+  // storing GOP pictures
+  static int8_t gop_init = 0;
+  static int8_t gop_pictures_available = 0;
+  static videoframe_t gop_pictures[MAX_GOP];
+  static int8_t gop_skip_frames = 0;
+  static int8_t gop_skipped = 0;
+
+  // Initialize GOP structure when gop is enabled and not initialized
+  if (state->encoder_control->cfg->gop_len && !gop_init) {
+    int i;
+    for (i = 0; i < state->encoder_control->cfg->gop_len; i++) {
+      gop_pictures[i].source = image_alloc(array_width, array_height, 0);
+    }
+    state->global->gop_offset = 0;
+    gop_init = 1;
   }
 
-  if (height != array_height) {
-    fill_after_frame(height, array_width, array_height,
-                     state->tile->frame->source->y);
-    fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     state->tile->frame->source->u);
-    fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-                     state->tile->frame->source->v);
+  // If GOP is present but no pictures found
+  if (state->global->frame && 
+      state->encoder_control->cfg->gop_len &&
+      !gop_pictures_available) {
+    int i;
+    unsigned y_size = width * height;
+    unsigned uv_size = (width >> 1) * (height >> 1);
+
+    for (i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
+      if (state->encoder_control->cfg->frames && state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
+        if (gop_pictures_available) {
+          gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
+          break;
+        }
+        else return 0;
+      }
+      if (width != array_width) {
+       // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
+        if(!read_and_fill_frame_data(file, width, height, array_width, gop_pictures[i].source->y) ||
+           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->u) ||
+           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->v)) {
+          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
+          else return 0;
+        }
+      } else {
+        // Otherwise the data can be read directly to the array.
+        if(y_size != fread(gop_pictures[i].source->y, sizeof(unsigned char), y_size, file) ||
+          uv_size != fread(gop_pictures[i].source->u, sizeof(unsigned char), uv_size, file) ||
+          uv_size != fread(gop_pictures[i].source->v, sizeof(unsigned char), uv_size, file)) {
+          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
+          else return 0;
+        }
+      }
+
+      if (height != array_height) {
+        fill_after_frame(height, array_width, array_height, gop_pictures[i].source->y);
+        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->u);
+        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->v);
+      }
+    }  
+  }
+
+  // If GOP is present, fetch the data from our GOP picture buffer
+  if (state->global->frame && state->encoder_control->cfg->gop_len) {
+    int cur_gop_idx = state->encoder_control->cfg->gop_len - (gop_pictures_available + gop_skip_frames) + gop_skipped;
+    int cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
+    // Special case when end of the sequence and not all pictures are available
+    if (gop_skip_frames && cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames) {
+      for (; cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames; cur_gop_idx++) {
+        cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
+        gop_skipped++;
+      }
+      cur_gop_idx--;
+      gop_skipped--;
+    }
+    state->global->gop_offset = cur_gop_idx;
+    memcpy(state->tile->frame->source->y, gop_pictures[cur_gop].source->y, width * height);
+    memcpy(state->tile->frame->source->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
+    memcpy(state->tile->frame->source->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
+    gop_pictures_available--;
+  } else {
+    if (width != array_width) {
+      // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
+      if (!read_and_fill_frame_data(file, width, height, array_width,
+        state->tile->frame->source->y) ||
+        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
+        state->tile->frame->source->u) ||
+        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
+        state->tile->frame->source->v))
+        return 0;
+    } else {
+      // Otherwise the data can be read directly to the array.
+      unsigned y_size = width * height;
+      unsigned uv_size = (width >> 1) * (height >> 1);
+      if (y_size != fread(state->tile->frame->source->y, sizeof(unsigned char),
+        y_size, file) ||
+        uv_size != fread(state->tile->frame->source->u, sizeof(unsigned char),
+        uv_size, file) ||
+        uv_size != fread(state->tile->frame->source->v, sizeof(unsigned char),
+        uv_size, file))
+        return 0;
+    }
+
+    if (height != array_height) {
+      fill_after_frame(height, array_width, array_height,
+        state->tile->frame->source->y);
+      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
+        state->tile->frame->source->u);
+      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
+        state->tile->frame->source->v);
+    }
   }
   return 1;
 }
@@ -890,10 +1088,37 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
     
     videoframe_compute_psnr(state->tile->frame, temp_psnr);
     
-    fprintf(stderr, "POC %4d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f\n", state->global->frame,
+    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f", state->global->poc,
+          state->global->QP,
           "BPI"[state->global->slicetype%3], state->stats_bitstream_length<<3,
           temp_psnr[0], temp_psnr[1], temp_psnr[2]);
+    // Print reference picture lists
+    if (state->global->slicetype != SLICE_I) {
+      int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
+      // List all pocs of lists
+      for (j = 0; j < state->global->ref->used_size; j++) {
+        if (state->global->ref->images[j]->poc < state->global->poc) {
+          ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+          ref_list[0]++;
+        } else {
+          ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+          ref_list[1]++;
+        }
+      }
+      encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+      encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
 
+      fprintf(stderr, " [L0 ");
+      for (j = ref_list[0]-1; j >= 0; j--) {
+        fprintf(stderr, "%d ", ref_list_poc[0][j]);
+      }
+      fprintf(stderr, "] [L1 ");
+      for (j = 0; j < ref_list[1]; j++) {
+        fprintf(stderr, "%d ", ref_list_poc[1][j]);
+      }
+      fprintf(stderr, "]");
+    }
+    fprintf(stderr, "\n");
     // Increment total PSNR
     psnr[0] += temp_psnr[0];
     psnr[1] += temp_psnr[1];
@@ -903,10 +1128,8 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
   *bitstream_length += state->stats_bitstream_length;
 }
 
-
 void encoder_next_frame(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
-  
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
@@ -925,7 +1148,7 @@ void encoder_next_frame(encoder_state_t *state) {
     //We have a "real" previous encoder
     state->global->frame = state->previous_encoder_state->global->frame + 1;
     state->global->poc = state->previous_encoder_state->global->poc + 1;
-    
+
     image_free(state->tile->frame->rec);
     cu_array_free(state->tile->frame->cu_array);
     
@@ -937,29 +1160,27 @@ void encoder_next_frame(encoder_state_t *state) {
       state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
     }
     videoframe_set_poc(state->tile->frame, state->global->poc);
-    
     image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
-    image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
-    // Remove the ref pics in excess
-    while (state->global->ref->used_size > (uint32_t)encoder->cfg->ref_frames) {
-      image_list_rem(state->global->ref, state->global->ref->used_size-1);
+    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->previous_encoder_state->global->gop_offset].is_ref) {
+      image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
     }
-    return; //FIXME reference frames
+
+    return;
   }
 
-  // Remove the ref pic (if present)
-  if (state->global->ref->used_size == (uint32_t)encoder->cfg->ref_frames) {
-    image_list_rem(state->global->ref, state->global->ref->used_size-1);
+
+  if (!encoder->cfg->gop_len || !state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
+    // Add current reconstructed picture as reference
+    image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
   }
-  // Add current reconstructed picture as reference
-  image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
-  
-  //Remove current reconstructed picture, and alloc a new one
-  image_free(state->tile->frame->rec);
-  
+
+
   state->global->frame++;
   state->global->poc++;
-  
+
+  //Remove current reconstructed picture, and alloc a new one
+  image_free(state->tile->frame->rec);
+
   state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
   videoframe_set_poc(state->tile->frame, state->global->poc);
 }
@@ -1108,101 +1329,109 @@ void encode_coding_tree(encoder_state_t * const state,
       }
     } else {
       uint32_t ref_list_idx;
-      /*
-      // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-      if(cur_pic->slicetype == SLICE_B)
-      {
-        // Code Inter Dir
-        const UInt uiInterDir = pcCU->getInterDir( uiAbsPartIdx ) - 1;
-        const UInt uiCtx      = pcCU->getCtxInterDir( uiAbsPartIdx );
-        ContextModel *pCtx    = m_cCUInterDirSCModel.get( 0 );
-        if (pcCU->getPartitionSize(uiAbsPartIdx) == SIZE_2Nx2N || pcCU->getHeight(uiAbsPartIdx) != 8 )
-        {
-          m_pcBinIf->encodeBin( uiInterDir == 2 ? 1 : 0, *( pCtx + uiCtx ) );
-        }
-        if (uiInterDir < 2)
-        {
-          m_pcBinIf->encodeBin( uiInterDir, *( pCtx + 4 ) );
+      uint32_t j;
+      int ref_list[2] = { 0, 0 };
+      for (j = 0; j < state->global->ref->used_size; j++) {
+        if (state->global->ref->images[j]->poc < state->global->poc) {
+          ref_list[0]++;
+        } else {
+          ref_list[1]++;
         }
       }
-      */
+
+      // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
+      if (state->global->slicetype == SLICE_B)
+      {
+        // Code Inter Dir
+        uint8_t inter_dir = cur_cu->inter.mv_dir-1;
+        uint8_t ctx = depth;
+        
+
+        if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8)
+        {
+          cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
+          CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
+        }
+        if (inter_dir < 2)
+        {
+          cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
+          CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
+        }
+      }
 
       for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
-            //if(encoder_state->ref_idx_num[uiRefListIdx] > 0)
-            {
-          if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-            if (state->global->ref->used_size != 1) { //encoder_state->ref_idx_num[uiRefListIdx] != 1)//NumRefIdx != 1)
-              // parseRefFrmIdx
-              int32_t ref_frame = cur_cu->inter.mv_ref;
+        if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
+          if (ref_list[ref_list_idx] > 1) {
+            // parseRefFrmIdx
+            int32_t ref_frame = cur_cu->inter.mv_ref_coded[ref_list_idx];
 
-              cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-              CABAC_BIN(cabac, (ref_frame != 0), "ref_frame_flag");
+            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
+            CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
 
-              if (ref_frame > 0) {
-                int32_t i;
-                int32_t ref_num = state->global->ref->used_size - 2;
+            if (ref_frame > 0) {
+              int32_t i;
+              int32_t ref_num = ref_list[ref_list_idx] - 2;
 
-                cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
-                ref_frame--;
+              cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+              ref_frame--;
 
-                for (i = 0; i < ref_num; ++i) {
-                  const uint32_t symbol = (i == ref_frame) ? 0 : 1;
+              for (i = 0; i < ref_num; ++i) {
+                const uint32_t symbol = (i == ref_frame) ? 0 : 1;
 
-                  if (i == 0) {
-                    CABAC_BIN(cabac, symbol, "ref_frame_flag2");
-                  } else {
-                    CABAC_BIN_EP(cabac, symbol, "ref_frame_flag2");
-                  }
-                  if (symbol == 0) break;
+                if (i == 0) {
+                  CABAC_BIN(cabac, symbol, "ref_idx_lX");
+                } else {
+                  CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
                 }
+                if (symbol == 0) break;
               }
             }
+          }
 
-            if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-              const int32_t mvd_hor = cur_cu->inter.mvd[0];
-              const int32_t mvd_ver = cur_cu->inter.mvd[1];
-              const int8_t hor_abs_gr0 = mvd_hor != 0;
-              const int8_t ver_abs_gr0 = mvd_ver != 0;
-              const uint32_t mvd_hor_abs = abs(mvd_hor);
-              const uint32_t mvd_ver_abs = abs(mvd_ver);
+          if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
+            const int32_t mvd_hor = cur_cu->inter.mvd[ref_list_idx][0];
+            const int32_t mvd_ver = cur_cu->inter.mvd[ref_list_idx][1];
+            const int8_t hor_abs_gr0 = mvd_hor != 0;
+            const int8_t ver_abs_gr0 = mvd_ver != 0;
+            const uint32_t mvd_hor_abs = abs(mvd_hor);
+            const uint32_t mvd_ver_abs = abs(mvd_ver);
 
-              cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
-              CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
-              CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+            cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
+            CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+            CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
 
-              cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
+            cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
 
-              if (hor_abs_gr0) {
-                CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
-              }
-
-              if (ver_abs_gr0) {
-                CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
-              }
-
-              if (hor_abs_gr0) {
-                if (mvd_hor_abs > 1) {
-                  cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
-                }
-
-                CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
-              }
-
-              if (ver_abs_gr0) {
-                if (mvd_ver_abs > 1) {
-                  cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
-                }
-
-                CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
-              }
+            if (hor_abs_gr0) {
+              CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
             }
 
-            // Signal which candidate MV to use
-            cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand, 1,
-                                        AMVP_MAX_NUM_CANDS - 1);
+            if (ver_abs_gr0) {
+              CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
+            }
+
+            if (hor_abs_gr0) {
+              if (mvd_hor_abs > 1) {
+                cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
+              }
+
+              CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
+            }
+
+            if (ver_abs_gr0) {
+              if (mvd_ver_abs > 1) {
+                cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
+              }
+
+              CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
+            }
           }
-          }
-        } // for ref_list
+
+          // Signal which candidate MV to use
+          cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
+                                      AMVP_MAX_NUM_CANDS - 1);
+        }
+      } // for ref_list
     } // if !merge
 
     {

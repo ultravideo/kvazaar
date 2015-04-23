@@ -162,7 +162,7 @@ static uint32_t get_mvd_coding_cost(vector2d_t *mvd)
 }
 
 static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int mv_shift,
-                         int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                         int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
   uint32_t temp_bitcost = 0;
@@ -177,9 +177,10 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
-    if (merge_cand[merge_idx][0] == x &&
-        merge_cand[merge_idx][1] == y &&
-        merge_cand[merge_idx][2] == ref_idx) {
+    if (merge_cand[merge_idx].dir == 3) continue;
+    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
+        merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
+        merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
       temp_bitcost += merge_idx;
       merged = 1;
       break;
@@ -208,7 +209,7 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 
 unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *pic, const image_t *ref, unsigned pattern_type,
                            const vector2d_t *orig, const int iDist, vector2d_t *mv, unsigned best_cost, int *best_dist,
-                           int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
+                           int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                            int block_width, int max_lcu_below)
 {
   int n_points;
@@ -365,7 +366,7 @@ unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *p
 
 unsigned tz_raster_search(const encoder_state_t * const state, const image_t *pic, const image_t *ref,
                           const vector2d_t *orig, vector2d_t *mv, unsigned best_cost,
-                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
+                          int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                           int block_width, int iSearchRange, int iRaster, int max_lcu_below)
 {
   int i;
@@ -417,7 +418,7 @@ unsigned tz_raster_search(const encoder_state_t * const state, const image_t *pi
 static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
                           const image_t *pic, const image_t *ref,
                           const vector2d_t *orig, vector2d_t *mv_in_out,
-                          int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                          int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                           int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
 
@@ -469,8 +470,9 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   // both mv_cand vectors and (0, 0).
   for (i = 0; i < num_cand; ++i) 
   {
-    mv.x = merge_cand[i][0] >> 2;
-    mv.y = merge_cand[i][1] >> 2;
+    if (merge_cand[i].dir == 3) continue;
+    mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
+    mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
 
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
 
@@ -495,8 +497,8 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   }
   
   if (best_index < (unsigned)num_cand) {
-    mv.x = merge_cand[best_index][0] >> 2;
-    mv.y = merge_cand[best_index][1] >> 2;
+    mv.x = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][0] >> 2;
+    mv.y = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][1] >> 2;
   } else {
     mv.x = mv_in_out->x >> 2;
     mv.y = mv_in_out->y >> 2;
@@ -575,7 +577,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
 static unsigned hexagon_search(const encoder_state_t * const state, unsigned depth,
                                const image_t *pic, const image_t *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
-                               int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                               int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
@@ -593,7 +595,9 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   // Check mv_in, if it's not in merge candidates.
   bool mv_in_merge_cand = false;
   for (int i = 0; i < num_cand; ++i) {
-    if (merge_cand[i][0] >> 2 == mv.x && merge_cand[i][1] == mv.y) {
+    if (merge_cand[i].dir == 3) continue;
+    if (merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2 == mv.x &&
+        merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2 == mv.y) {
       mv_in_merge_cand = true;
       break;
     }
@@ -620,8 +624,9 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   // Select starting point from among merge candidates. These should include
   // both mv_cand vectors and (0, 0).
   for (i = 0; i < num_cand; ++i) {
-    mv.x = merge_cand[i][0] >> 2;
-    mv.y = merge_cand[i][1] >> 2;
+    if (merge_cand[i].dir == 3) continue;
+    mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
+    mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
 
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_PIXELS);
 
@@ -644,8 +649,8 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
     }
   }
   if (best_index < num_cand) {
-    mv.x = merge_cand[best_index][0] >> 2;
-    mv.y = merge_cand[best_index][1] >> 2;
+    mv.x = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][0] >> 2;
+    mv.y = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][1] >> 2;
   } else {
     mv.x = mv_in_out->x >> 2;
     mv.y = mv_in_out->y >> 2;
@@ -836,7 +841,7 @@ static unsigned search_frac(const encoder_state_t * const state,
                             unsigned depth,
                             const image_t *pic, const image_t *ref,
                             const vector2d_t *orig, vector2d_t *mv_in_out,
-                            int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+                            int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                             int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
 
@@ -979,12 +984,14 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
 
   int16_t mv_cand[2][2];
   // Search for merge mode candidate
-  int16_t merge_cand[MRG_MAX_NUM_CANDS][3];
+  inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = inter_get_merge_cand(x, y, depth, merge_cand, lcu);
+  int16_t num_cand = inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
 
-  // Select better candidate
-  cur_cu->inter.mv_cand = 0; // Default to candidate 0
+
+  // Default to candidate 0
+  cur_cu->inter.mv_cand[0] = 0;
+  cur_cu->inter.mv_cand[1] = 0;
 
   cur_cu->inter.cost = UINT_MAX;
 
@@ -996,13 +1003,14 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     int32_t merged = 0;
     uint8_t cu_mv_cand = 0;
     int8_t merge_idx = 0;
-    int8_t temp_ref_idx = cur_cu->inter.mv_ref;
+    int8_t ref_list = state->global->refmap[ref_idx].list-1;
+    int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
     orig.x = x_cu * CU_MIN_SIZE_PIXELS;
     orig.y = y_cu * CU_MIN_SIZE_PIXELS;
     // Get MV candidates
-    cur_cu->inter.mv_ref = ref_idx;
-    inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu);
-    cur_cu->inter.mv_ref = temp_ref_idx;
+    cur_cu->inter.mv_ref[ref_list] = ref_idx;
+    inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, ref_list);
+    cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
     vector2d_t mv = { 0, 0 };
     {
@@ -1013,8 +1021,13 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
       int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
       cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
       if (ref_cu->type == CU_INTER) {
-        mv.x = ref_cu->inter.mv[0];
-        mv.y = ref_cu->inter.mv[1];
+        if (ref_cu->inter.mv_dir & 1) {
+          mv.x = ref_cu->inter.mv[0][0];
+          mv.y = ref_cu->inter.mv[0][1];
+        } else {
+          mv.x = ref_cu->inter.mv[1][0];
+          mv.y = ref_cu->inter.mv[1][1];
+        }
       }
     }
 
@@ -1038,9 +1051,10 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     merged = 0;
     // Check every candidate to find a match
     for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
-      if (merge_cand[merge_idx][0] == mv.x &&
-          merge_cand[merge_idx][1] == mv.y &&
-          (uint32_t)merge_cand[merge_idx][2] == ref_idx) {
+      if (merge_cand[merge_idx].dir != 3 &&
+          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
+          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&          
+          (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
         merged = 1;
         break;
       }
@@ -1068,18 +1082,138 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
     if(temp_cost < cur_cu->inter.cost) {
+
+      // Map reference index to L0/L1 pictures
+      cur_cu->inter.mv_dir = ref_list+1;
+      cur_cu->inter.mv_ref_coded[ref_list] = state->global->refmap[ref_idx].idx;
+
       cur_cu->merged        = merged;
       cur_cu->merge_idx     = merge_idx;
-      cur_cu->inter.mv_ref  = ref_idx;
-      cur_cu->inter.mv_dir  = 1;
-      cur_cu->inter.mv[0]   = (int16_t)mv.x;
-      cur_cu->inter.mv[1]   = (int16_t)mv.y;
-      cur_cu->inter.mvd[0]  = (int16_t)mvd.x;
-      cur_cu->inter.mvd[1]  = (int16_t)mvd.y;
+      cur_cu->inter.mv_ref[ref_list] = ref_idx;
+      cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
+      cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
+      cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
+      cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
       cur_cu->inter.cost    = temp_cost;
-      cur_cu->inter.bitcost = temp_bitcost + ref_idx;
-      cur_cu->inter.mv_cand = cu_mv_cand;
+      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
+      cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
     }
+  }
+
+  // Search bi-pred positions
+  if (state->global->slicetype == SLICE_B && state->encoder_control->cfg->bipred) {
+    lcu_t *templcu = MALLOC(lcu_t, 1);
+    cost_pixel_nxn_func *satd = pixels_get_satd_func(LCU_WIDTH >> depth);
+    #define NUM_PRIORITY_LIST 12;
+    static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
+    static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
+    uint8_t cutoff = num_cand;
+    for (int32_t idx = 0; idx<cutoff*(cutoff - 1); idx++) {
+      uint8_t i = priorityList0[idx];
+      uint8_t j = priorityList1[idx];
+      if (i >= num_cand || j >= num_cand) break;
+
+      // Find one L0 and L1 candidate according to the priority list
+      if ((merge_cand[i].dir & 0x1) && (merge_cand[j].dir & 0x2)) {
+        if (merge_cand[i].ref[0] != merge_cand[j].ref[1] ||
+          merge_cand[i].mv[0][0] != merge_cand[j].mv[1][0] ||
+          merge_cand[i].mv[0][1] != merge_cand[j].mv[1][1]) {
+          uint32_t bitcost[2];
+          uint32_t cost = 0;
+          int8_t cu_mv_cand = 0;
+          int16_t mv[2][2];
+          pixel_t tmp_block[64 * 64];
+          pixel_t tmp_pic[64 * 64];
+          // Force L0 and L1 references
+          if (state->global->refmap[merge_cand[i].ref[0]].list == 2 || state->global->refmap[merge_cand[j].ref[1]].list == 1) continue;
+
+          // TODO: enable fractional pixel bipred search
+          mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
+          mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
+          mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
+          mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
+
+          inter_recon_lcu_bipred(state, state->global->ref->images[merge_cand[i].ref[0]], state->global->ref->images[merge_cand[j].ref[1]], x, y, LCU_WIDTH >> depth, mv, templcu);
+
+          for (int ypos = 0; ypos < LCU_WIDTH >> depth; ++ypos) {
+            int dst_y = ypos*(LCU_WIDTH >> depth);
+            for (int xpos = 0; xpos < (LCU_WIDTH >> depth); ++xpos) {
+              tmp_block[dst_y + xpos] = templcu->rec.y[((y + ypos)&(LCU_WIDTH - 1))*LCU_WIDTH + ((x + xpos)&(LCU_WIDTH - 1))];              
+              tmp_pic[dst_y + xpos] = frame->source->y[x + xpos + (y + ypos)*frame->source->width];
+            }
+          }
+
+          cost = satd(tmp_pic, tmp_block);
+
+          // TODO: enable fractional pixel bipred search
+          cost += calc_mvd_cost(state, merge_cand[i].mv[0][0] & 0xfff8, merge_cand[i].mv[0][1] & 0xfff8, 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
+          cost += calc_mvd_cost(state, merge_cand[i].mv[1][0] & 0xfff8, merge_cand[i].mv[1][1] & 0xfff8, 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
+
+          if (cost < cur_cu->inter.cost) {
+
+            cur_cu->inter.mv_dir = 3;
+            cur_cu->inter.mv_ref_coded[0] = state->global->refmap[merge_cand[i].ref[0]].idx;
+            cur_cu->inter.mv_ref_coded[1] = state->global->refmap[merge_cand[j].ref[1]].idx;
+
+
+
+            cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
+            cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
+
+            // TODO: enable fractional pixel bipred search
+            cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
+            cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
+            cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
+            cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
+            cur_cu->merged = 0;
+                        
+            // Check every candidate to find a match
+            for(int merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+              if (
+                  merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
+                  merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&     
+                  merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
+                  merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&    
+                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] && 
+                  merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1]) {
+                cur_cu->merged = 1;
+                cur_cu->merge_idx = merge_idx;
+                break;
+              }
+            }
+
+            // Each motion vector has its own candidate
+            for (int reflist = 0; reflist < 2; reflist++) {
+              cu_mv_cand = 0;
+              inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, reflist);
+              if ((mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
+                vector2d_t mvd_temp1, mvd_temp2;
+                int cand1_cost, cand2_cost;
+
+                mvd_temp1.x = cur_cu->inter.mv[reflist][0] - mv_cand[0][0];
+                mvd_temp1.y = cur_cu->inter.mv[reflist][1] - mv_cand[0][1];
+                cand1_cost = get_mvd_coding_cost(&mvd_temp1);
+
+                mvd_temp2.x = cur_cu->inter.mv[reflist][0] - mv_cand[1][0];
+                mvd_temp2.y = cur_cu->inter.mv[reflist][1] - mv_cand[1][1];
+                cand2_cost = get_mvd_coding_cost(&mvd_temp2);
+
+                // Select candidate 1 if it has lower cost
+                if (cand2_cost < cand1_cost) {
+                  cu_mv_cand = 1;                  
+                }
+              }
+              cur_cu->inter.mvd[reflist][0] = cur_cu->inter.mv[reflist][0] - mv_cand[cu_mv_cand][0];
+              cur_cu->inter.mvd[reflist][1] = cur_cu->inter.mv[reflist][1] - mv_cand[cu_mv_cand][1];
+              cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
+            }
+            cur_cu->inter.cost = cost;
+            cur_cu->inter.bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[0] + cur_cu->inter.mv_ref_coded[1];
+          }
+        }
+      }
+    }
+    FREE_POINTER(templcu);
   }
 
   return cur_cu->inter.cost;
@@ -2388,7 +2522,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int tr_depth = depth > 0 ? depth : 1;
       lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
 
-      inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref], x, y, LCU_WIDTH>>depth, cur_cu->inter.mv, &work_tree[depth]);
+      if (cur_cu->inter.mv_dir == 3) {
+        inter_recon_lcu_bipred(state, state->global->ref->images[cur_cu->inter.mv_ref[0]], state->global->ref->images[cur_cu->inter.mv_ref[1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv, &work_tree[depth]);
+      } else {
+        inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[cur_cu->inter.mv_dir - 1], &work_tree[depth]);
+      }
+
       quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
       quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
 

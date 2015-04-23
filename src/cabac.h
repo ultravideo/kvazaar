@@ -54,6 +54,7 @@ typedef struct
     cabac_ctx_t split_flag_model[3]; //!< \brief split flag context models
     cabac_ctx_t intra_mode_model;    //!< \brief intra mode context models
     cabac_ctx_t chroma_pred_model[2];
+    cabac_ctx_t inter_dir[5];
     cabac_ctx_t trans_subdiv_model[3]; //!< \brief intra mode context models
     cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_chroma[4];

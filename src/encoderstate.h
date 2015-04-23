@@ -64,13 +64,20 @@ typedef struct {
   
   int32_t frame;
   int32_t poc; /*!< \brief picture order count */
+  int8_t gop_offset; /*!< \brief offset in the gop structure */
   
   int8_t QP;   //!< \brief Quantization parameter
+  double QP_factor; //!< \brief Quantization factor
   
   //Current picture available references
   image_list_t *ref;
   int8_t ref_list;
-  //int8_t ref_idx_num[2];
+
+  struct {
+    int32_t poc;
+    int8_t list;
+    int8_t idx;
+  } refmap[16];
   
   int is_radl_frame;
   uint8_t pictype;

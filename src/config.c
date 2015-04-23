@@ -88,6 +88,8 @@ int config_init(config_t *cfg)
   cfg->cqmfile         = NULL;
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
   cfg->seek            = 0;
+  cfg->gop_len         = 0;
+  cfg->bipred          = 0;
 
   cfg->tiles_width_count         = 0;
   cfg->tiles_height_count         = 0;
@@ -346,8 +348,13 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
     cfg->frames = atoi(value);
   else if OPT("qp")
     cfg->qp = atoi(value);
-  else if OPT("period")
+  else if OPT("period") {
     cfg->intra_period = atoi(value);
+    if (cfg->gop_len && cfg->intra_period && cfg->intra_period%cfg->gop_len != 0) {
+      fprintf(stderr, "Input error: Intra period (%d) not equal to goplen (%d)\n", cfg->intra_period, atoi(value));
+      return 0;
+    }
+  }
   else if OPT("vps-period")
     cfg->vps_period = atoi(value);
   else if OPT("ref") {
@@ -509,6 +516,56 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
   }
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
+  else if OPT("gop") {
+    // ToDo: Defining the whole GOp structure via parameters
+
+    // Check for intra period, must be equal to goplen
+    if (atoi(value) && cfg->intra_period && cfg->intra_period%atoi(value) != 0) {
+      fprintf(stderr, "Input error: Intra period (%d) not equal to goplen (%d)\n", cfg->intra_period, atoi(value));
+      return 0;
+    }
+
+    if(atoi(value) == 8) {
+      // GOP
+      cfg->gop_len = 8;
+      cfg->gop[0].poc_offset = 8; cfg->gop[0].qp_offset = 1; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.442;  cfg->gop[0].is_ref = 1;
+      cfg->gop[0].ref_pos_count = 0;
+      cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16;
+
+      cfg->gop[1].poc_offset = 4; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.3536; cfg->gop[1].is_ref = 1;
+      cfg->gop[1].ref_neg_count = 2; cfg->gop[1].ref_neg[0] = 4; cfg->gop[1].ref_neg[1] = 8;
+      cfg->gop[1].ref_pos_count = 1; cfg->gop[1].ref_pos[0] = 4;
+
+      cfg->gop[2].poc_offset = 2; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.3536; cfg->gop[2].is_ref = 1;
+      cfg->gop[2].ref_neg_count = 2; cfg->gop[2].ref_neg[0] = 2; cfg->gop[2].ref_neg[1] = 6;
+      cfg->gop[2].ref_pos_count = 2; cfg->gop[2].ref_pos[0] = 2; cfg->gop[2].ref_pos[1] = 6;
+
+      cfg->gop[3].poc_offset = 1; cfg->gop[3].qp_offset = 4; cfg->gop[3].layer = 4; cfg->gop[3].qp_factor = 0.68;   cfg->gop[3].is_ref = 0;
+      cfg->gop[3].ref_neg_count = 1; cfg->gop[3].ref_neg[0] = 1;
+      cfg->gop[3].ref_pos_count = 3; cfg->gop[3].ref_pos[0] = 1; cfg->gop[3].ref_pos[1] = 3; cfg->gop[3].ref_pos[2] = 7;
+
+      cfg->gop[4].poc_offset = 3; cfg->gop[4].qp_offset = 4; cfg->gop[4].layer = 4; cfg->gop[4].qp_factor = 0.68;   cfg->gop[4].is_ref = 0;
+      cfg->gop[4].ref_neg_count = 2; cfg->gop[4].ref_neg[0] = 1; cfg->gop[4].ref_neg[1] = 3;
+      cfg->gop[4].ref_pos_count = 2; cfg->gop[4].ref_pos[0] = 1; cfg->gop[4].ref_pos[1] = 5;
+
+      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 3; cfg->gop[5].layer = 3; cfg->gop[5].qp_factor = 0.3536; cfg->gop[5].is_ref = 1;
+      cfg->gop[5].ref_neg_count = 2; cfg->gop[5].ref_neg[0] = 2; cfg->gop[5].ref_neg[1] = 6;
+      cfg->gop[5].ref_pos_count = 1; cfg->gop[5].ref_pos[0] = 2;
+
+      cfg->gop[6].poc_offset = 5; cfg->gop[6].qp_offset = 4; cfg->gop[6].layer = 4; cfg->gop[6].qp_factor = 0.68;   cfg->gop[6].is_ref = 0;
+      cfg->gop[6].ref_neg_count = 2;  cfg->gop[6].ref_neg[0] = 1; cfg->gop[6].ref_neg[1] = 5;
+      cfg->gop[6].ref_pos_count = 2; cfg->gop[6].ref_pos[0] = 1; cfg->gop[6].ref_pos[1] = 3;
+
+      cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
+      cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
+      cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
+    } else if(atoi(value)) {
+      fprintf(stderr, "Input error: goplen must be 8\n");
+      return 0;
+    }
+  }
+  else if OPT("bipred")
+    cfg->bipred = atobool(value);
   else
     return 0;
 #undef OPT
@@ -571,6 +628,8 @@ int config_read(config_t *cfg,int argc, char *argv[])
     { "pu-depth-inter",     required_argument, NULL, 0 },
     { "pu-depth-intra",     required_argument, NULL, 0 },
     { "no-info",                  no_argument, NULL, 0 },
+    { "gop",                required_argument, NULL, 0 },
+    { "bipred",                   no_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

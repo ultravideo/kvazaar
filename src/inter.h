@@ -31,12 +31,20 @@
 #include "encoder.h"
 #include "encoderstate.h"
 
+typedef struct {
+  uint8_t dir;
+  uint8_t ref[2];
+  int16_t mv[2][2];
+
+} inter_merge_cand_t;
+
 
 //void inter_set_block(image* im,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
 void inter_recon_lcu(const encoder_state_t * const state, const image_t * ref, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2], lcu_t* lcu);
+void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t * ref1, const image_t * ref2, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2][2], lcu_t* lcu);
 
 void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
                                         cu_info_t **b2, cu_info_t **a0, cu_info_t **a1, lcu_t *lcu);
-void inter_get_mv_cand(const encoder_state_t *state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu);
-uint8_t inter_get_merge_cand(int32_t x, int32_t y, int8_t depth, int16_t mv_cand[MRG_MAX_NUM_CANDS][3], lcu_t *lcu);
+void inter_get_mv_cand(const encoder_state_t *state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu, int8_t reflist);
+uint8_t inter_get_merge_cand(const encoder_state_t *state, int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu);
 #endif
