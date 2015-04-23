@@ -13,10 +13,20 @@ before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -y yasm
   - sudo apt-get install -qq gcc-4.8
+  - sudo apt-get install -qq valgrind
+  - sudo apt-get install -qq p7zip-full
+  - wget http://johnvansickle.com/ffmpeg/releases/ffmpeg-release-32bit-static.tar.xz
+  - 7z x ffmpeg-release-32bit-static.tar.xz
+  - 7z x ffmpeg-release-32bit-static.tar
+  - chmod +x ./ffmpeg-2.6.2-32bit-static/ffmpeg
 
 script: 
   - cd src
   - export KVZ_DISABLE_AVX2=1 
-  - make && make tests
-  - if [ "$CC" = "gcc" ]; then make clean && unset KVZ_DISABLE_AVX2 && export CC=gcc-4.8 && make && make tests; fi
-  
+  - make && make debug && make tests
+  - ../ffmpeg-2.6.2-32bit-static/ffmpeg -f lavfi -i mandelbrot=s=320x240 -vframes 25 -r 5 -pix_fmt yuv420p test.yuv
+  - if [ "$CC" = "gcc" ]; then valgrind --leak-check=full --error-exitcode=1 ./kvazaar_debug -i test.yuv --input-res=320x240 -n 16 -o test1.bin; fi
+  - if [ "$CC" = "gcc" ]; then valgrind --leak-check=full --error-exitcode=1 ./kvazaar_debug -i test.yuv --input-res=320x240 -n 16 -o test2.bin --threads 4 --wpp --owf 3 --cpuid=0; fi
+  - if [ "$CC" = "gcc" ]; then valgrind --leak-check=full --error-exitcode=1 ./kvazaar_debug -i test.yuv --input-res=320x240 -n 16 -o test3.bin --threads 4 --wpp --owf 3; fi
+  - if [ "$CC" = "gcc" ]; then make clean && unset KVZ_DISABLE_AVX2 && export CC=gcc-4.8 && make && make debug && make tests; fi
+ 
