@@ -784,14 +784,9 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     }
    
     if (state->global->is_radl_frame) {
-      // Clear the reference list
-      encoder_state_clear_refs(state);
-
       state->global->slicetype = SLICE_I;
       state->global->pictype = NAL_IDR_W_RADL;
     } else {
-      encoder_state_remove_refs(state);
-      encoder_state_ref_sort(state);
       state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : (state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
       state->global->pictype = NAL_TRAIL_R;
       if (state->encoder_control->cfg->gop_len) {
@@ -800,6 +795,14 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
         }
       }
     }
+
+    if (state->global->is_radl_frame) {
+      encoder_state_clear_refs(state);
+    } else {
+      encoder_state_remove_refs(state);
+      encoder_state_ref_sort(state);
+    }
+
     if (state->encoder_control->cfg->gop_len) {
       if (state->global->slicetype == SLICE_I) {
         state->global->QP = state->encoder_control->cfg->qp;
