@@ -66,6 +66,8 @@ WARNINGS = -Wall -Wtype-limits -Wvla
 
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
+STRATEGIES = generic sse2 sse41 avx2 x86_asm altivec
+
 #Detect if cc is gcc for the link time optimization flag
 GCCVERSION = $(shell $(CC) --version | grep GCC)
 ifneq (, $(GCCVERSION))
@@ -75,8 +77,7 @@ endif
 CFLAGS += -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm -pthread
 LD = gcc
-OBJS = interface_main.o \
-  encmain.o \
+OBJS = \
   bitstream.o \
   cabac.o \
   checkpoint.o \
@@ -117,19 +118,21 @@ OBJS = interface_main.o \
   strategies/generic/dct-generic.o \
   strategies/avx2/dct-avx2.o \
   strategies/generic/ipol-generic.o \
-  strategies/avx2/ipol-avx2.o \
+  strategies/avx2/ipol-avx2.o
 
-TEST_OBJS = $(filter-out encmain.o interface_main.o, $(OBJS)) \
-  ../tests/dct_tests.o \
-  ../tests/intra_sad_tests.o \
-  ../tests/sad_tests.o \
-  ../tests/satd_tests.o \
-  ../tests/speed_tests.o \
-  ../tests/tests_main.o \
-  ../tests/test_strategies.o \
+MAIN_OBJS := encmain.o interface_main.o
 
+TESTDIR := ../tests
+TEST_OBJS := \
+  $(TESTDIR)/dct_tests.o \
+  $(TESTDIR)/intra_sad_tests.o \
+  $(TESTDIR)/sad_tests.o \
+  $(TESTDIR)/satd_tests.o \
+  $(TESTDIR)/speed_tests.o \
+  $(TESTDIR)/tests_main.o \
+  $(TESTDIR)/test_strategies.o
 
-
+  
 ASMFLAGS += $(INCLUDEDIRS)
 ASMOBJS =
 
@@ -145,28 +148,25 @@ endif
 
 
 PROG  = ./kvazaar
-PROGS = $(PROG)
-
+DEBUG = ./kvazaar_debug
 TESTS = ./kvazaar_tests
 
-DEPS = $(OBJS:.o=.d)
+PROGS = $(PROG) $(DEBUG) $(TESTS)
+
+RELEASE_OBJS = $(MAIN_OBJS) $(OBJS) $(ASMOBJS)
+DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
+TESTS_OBJS = $(TEST_OBJS) $(OBJS) $(ASMOBJS)
+
+
+DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
 GREATEST = ../greatest/greatest.h
 
-all: $(PROGS)
-.PHONY: all clean build_tests tests
+all: $(PROG)
+.PHONY: all clean build_tests tests debug
 
-build_tests: $(GREATEST) $(TESTS)
-
-tests: build_tests
-	$(TESTS)
-
-$(GREATEST):
-	git submodule init
-	git submodule update
 
 # Compile files in strategy directories with appropriate flags.
-EXTRA_FLAGS =
 ifeq ($(ARCH), ppc64)
   strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto
 else
@@ -184,32 +184,40 @@ ifndef KVZ_DISABLE_ASM
   strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
 endif
 
+debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
+debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
+debug: $(DEBUG)
 
-$(PROG): $(OBJS) $(ASMOBJS)
+tests: build_tests
+	$(TESTS)
+
+build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
+build_tests: init_submodules $(TESTS)
+
+REMOVE_FILES = $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS) $(PROGS)
+ 
+$(PROG): $(RELEASE_OBJS)
+	$(LD) $^ $(LDFLAGS) -o $@
+	
+$(DEBUG): $(DEBUG_OBJS)
+	$(LD) $^ $(LDFLAGS) -o $@
+	
+$(TESTS): $(TESTS_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
-$(TESTS): $(TEST_OBJS) $(ASMOBJS)
-	$(LD) $^ $(LDFLAGS) -o $@
-
-%.o: %.asm Makefile
+%.o %_debug.o: %.asm Makefile
 	$(AS) $(ASMFLAGS) -o $@ $<
+	
+%.o %_debug.o: %.c Makefile
+	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
-%.d: %.asm Makefile
-	$(AS) $(ASMFLAGS) -M -o $@ > $<
-
-%.o: %.c Makefile
-	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -c $< -o $@
-
-%.d: %.c Makefile
-	$(CC) $(CFLAGS) -MF"$@" -MM -MP -MT"$@" -MT"$(<:.c=.o)" "$<"
-
-../tests/%.c: ../tests/%.h Makefile
-	touch $@
-
+init_submodules:
+	git submodule init
+	git submodule update
 
 clean:
-	rm -f $(OBJS) $(PROGS) $(TESTS) $(ASMOBJS) $(TEST_OBJS) $(DEPS)
+	rm -f $(REMOVE_FILES)
 
 ifneq ($(MAKECMDGOALS),clean)
-	-include $(DEPS)
+-include $(DEPS)
 endif
