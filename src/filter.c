@@ -129,14 +129,14 @@ INLINE void filter_deblock_luma(const encoder_control_t * const encoder, kvz_pix
   }
 
   if(part_P_nofilter) {
-    src[-offset]   = (uint8_t)m3;
-    src[-offset*2] = (uint8_t)m2;
-    src[-offset*3] = (uint8_t)m1;
+    src[-offset]   = (pixel_t)m3;
+    src[-offset*2] = (pixel_t)m2;
+    src[-offset*3] = (pixel_t)m1;
   }
   if(part_Q_nofilter) {
-    src[0]        = (uint8_t)m4;
-    src[offset]   = (uint8_t)m5;
-    src[offset*2] = (uint8_t)m6;
+    src[0]        = (pixel_t)m4;
+    src[offset]   = (pixel_t)m5;
+    src[offset*2] = (pixel_t)m6;
   }
 }
 

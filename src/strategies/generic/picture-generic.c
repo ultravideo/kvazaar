@@ -35,7 +35,7 @@ kvz_pixel fast_clip_16bit_to_pixel(int16_t value)
 
   if (value & ~PIXEL_MAX) {
     int16_t temp = (-value) >> 15;
-#if BITDEPTH == 10
+#if BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
     return temp;
@@ -57,7 +57,7 @@ kvz_pixel fast_clip_32bit_to_pixel(int32_t value)
 
   if (value & ~PIXEL_MAX) {
     int32_t temp = (-value) >> 31;
-#if BITDEPTH == 10
+#if BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
     return temp;

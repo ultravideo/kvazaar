@@ -208,7 +208,7 @@ uint32_t rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixe
     // SSD between original and reconstructed
     for (i = 0; i < width*width; i++) {
       //int diff = temp_block[i]-block[i];
-      int diff = orig_block[i] - CLIP(0, 255, pred[i] + temp_block[i]);
+      int diff = orig_block[i] - CLIP(0, PIXEL_MAX, pred[i] + temp_block[i]);
 
       ssd += diff*diff;
     }

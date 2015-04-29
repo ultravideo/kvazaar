@@ -110,7 +110,11 @@ cu_info_t* videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in
   return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
 }
 
+#if BIT_DEPTH == 8
 #define PSNRMAX (255.0 * 255.0)
+#else
+  #define PSNRMAX ((double)PIXEL_MAX * (double)PIXEL_MAX)
+#endif
 
 /**
  * \brief Calculates image PSNR value

@@ -906,6 +906,17 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
     }
   }
 
+int frame_8bit_to_10bit(pixel_t* input, int width, int height) {
+  uint8_t* temp_buffer = malloc(width*height);
+  const uint32_t pixels = width*height;
+  memcpy(temp_buffer, (void *)input, pixels);
+  for(int i = 0; i < pixels; i++) {
+    input[i] = temp_buffer[i]<<2;
+  }
+  free(temp_buffer);
+  return 1;
+}
+
   if (gop_pictures_available < cfg->gop_len) {
     if (img_in != NULL || gop_pictures_available == 0) {
       // Either start of the sequence with no full GOP available yet, or the
@@ -940,6 +951,12 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
     gop_pictures_available = MAX(0, gop_pictures_available - cfg->gop_len);
     gop_buf_read_idx = (gop_buf_read_idx + cfg->gop_len) % gop_buf_size;
   }
+#if BIT_DEPTH == 10
+  frame_8bit_to_10bit(state->tile->frame->source->y, width, height);
+  
+  frame_8bit_to_10bit(state->tile->frame->source->u, width>>1, height>>1);
+  frame_8bit_to_10bit(state->tile->frame->source->v, width>>1, height>>1);
+#endif
   return 1;
 }
 

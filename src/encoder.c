@@ -141,7 +141,7 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
 
   // Config pointer to config struct
   encoder->cfg = cfg;
-  encoder->bitdepth = 8;
+  encoder->bitdepth = BIT_DEPTH;
 
   // deblocking filter
   encoder->deblock_enable    = 1;
