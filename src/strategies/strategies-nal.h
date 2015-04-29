@@ -33,7 +33,7 @@
 typedef void (*array_checksum_func)(const kvz_pixel* data,
                                     const int height, const int width,
                                     const int stride,
-                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH]);
+                                    unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
 extern array_checksum_func array_checksum;
 
 

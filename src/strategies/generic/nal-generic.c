@@ -32,7 +32,7 @@
 static void array_checksum_generic(const kvz_pixel* data,
                                    const int height, const int width,
                                    const int stride,
-                                   unsigned char checksum_out[SEI_HASH_MAX_LENGTH]) {
+                                   unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth) {
   int x, y;
   int checksum = 0;
   
@@ -42,6 +42,9 @@ static void array_checksum_generic(const kvz_pixel* data,
     for (x = 0; x < width; ++x) {
       const uint8_t mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
       checksum += (data[(y * stride) + x] & 0xff) ^ mask;
+      if(bitdepth > 8) {
+        checksum += ((data[(y * stride) + x]>>8) & 0xff) ^ mask;
+      }
     }
   }
 
@@ -55,13 +58,18 @@ static void array_checksum_generic(const kvz_pixel* data,
 static void array_checksum_generic4(const kvz_pixel* data,
                                    const int height, const int width,
                                    const int stride,
-                                   unsigned char checksum_out[SEI_HASH_MAX_LENGTH]) {
+                                   unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth) {
   uint32_t checksum = 0;
   int y, x, xp;
   
   static uint8_t ckmap_initialized = 0;
   static uint32_t ckmap[64*256];
-  
+
+  //TODO: add 10-bit support
+  if(bitdepth != 8) {
+    array_checksum_generic(data, height, width, stride,checksum_out, bitdepth);
+    return;
+  }
   if (!ckmap_initialized) {
     uint8_t * const ckmap_uint8 = (uint8_t*)&ckmap;
     int x, y;
@@ -98,13 +106,18 @@ static void array_checksum_generic4(const kvz_pixel* data,
 static void array_checksum_generic8(const kvz_pixel* data,
                                    const int height, const int width,
                                    const int stride,
-                                   unsigned char checksum_out[SEI_HASH_MAX_LENGTH]) {
+                                   unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth) {
   uint32_t checksum = 0;
   int y, x, xp;
   
   static uint8_t ckmap_initialized = 0;
   static uint64_t ckmap[32*256];
   
+  //TODO: add 10-bit support
+  if(bitdepth != 8) {
+    array_checksum_generic(data, height, width, stride,checksum_out, bitdepth);
+    return;
+  }
   if (!ckmap_initialized) {
     uint8_t * const ckmap_uint8 = (uint8_t*)&ckmap;
     int x, y;

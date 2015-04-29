@@ -72,11 +72,11 @@ void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
  \param checksum_out Result of the calculation.
  \returns Void
 */
-void image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
+void image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
 {
-  array_checksum(im->y, im->height, im->width, im->width, checksum_out[0]);
+  array_checksum(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
-  array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1]);
-  array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2]);
+  array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
+  array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
 }
