@@ -85,7 +85,10 @@ typedef struct {
 
   //! Total number of bits written.
   uint64_t total_bits_coded;
-  
+
+  //! Number of bits written in the current GOP.
+  uint64_t cur_gop_bits_coded;
+
 } encoder_state_config_global_t;
 
 typedef struct {

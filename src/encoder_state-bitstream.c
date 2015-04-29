@@ -805,10 +805,18 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   //Get bitstream length for stats
   newpos = bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
+
   if (state->global->frame > 0) {
     state->global->total_bits_coded = state->previous_encoder_state->global->total_bits_coded;
   }
   state->global->total_bits_coded += newpos - curpos;
+
+  if (encoder->cfg->gop_len > 0 && state->global->gop_offset > 0) {
+    state->global->cur_gop_bits_coded = state->previous_encoder_state->global->cur_gop_bits_coded;
+  } else {
+    state->global->cur_gop_bits_coded = 0;
+  }
+  state->global->cur_gop_bits_coded += newpos - curpos;
 
   // Flush the output in case someone is reading the file on the other end.
   fflush(state->stream.file.output);
