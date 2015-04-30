@@ -32,9 +32,9 @@
 extern int8_t g_luma_filter[4][8];
 extern int8_t g_chroma_filter[8][4];
 
-int16_t eight_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
+int32_t eight_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
 {
-  int16_t temp = 0;
+  int32_t temp = 0;
   for (int i = 0; i < 8; ++i)
   {
     temp += filter[i] * data[i];
@@ -54,9 +54,9 @@ int32_t eight_tap_filter_hor_16bit_generic(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t eight_tap_filter_ver_generic(int8_t *filter, kvz_pixel *data, int16_t stride)
+int32_t eight_tap_filter_ver_generic(int8_t *filter, kvz_pixel *data, int16_t stride)
 {
-  int16_t temp = 0;
+  int32_t temp = 0;
   for (int i = 0; i < 8; ++i)
   {
     temp += filter[i] * data[stride * i];
@@ -76,9 +76,9 @@ int32_t eight_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_
   return temp;
 }
 
-int16_t four_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
+int32_t four_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
 {
-  int16_t temp = 0;
+  int32_t temp = 0;
   for (int i = 0; i < 4; ++i)
   {
     temp += filter[i] * data[i];
@@ -98,9 +98,9 @@ int32_t four_tap_filter_hor_16bit_generic(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t four_tap_filter_ver_generic(int8_t *filter, kvz_pixel *data, int16_t stride)
+int32_t four_tap_filter_ver_generic(int8_t *filter, kvz_pixel *data, int16_t stride)
 {
-  int16_t temp = 0;
+  int32_t temp = 0;
   for (int i = 0; i < 4; ++i)
   {
     temp += filter[i] * data[stride * i];
