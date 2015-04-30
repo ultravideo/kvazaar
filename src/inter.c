@@ -32,6 +32,7 @@
 #include "filter.h"
 #include "strategies/strategies-ipol.h"
 #include "strategies/generic/ipol-generic.h"
+#include "strategies/generic/picture-generic.h"
 
 /**
  * \brief Set block info to the CU structure
@@ -242,7 +243,6 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
 
       if(!chroma_halfpel) {
         // Copy Chroma with boundary checking
-        // TODO: chroma fractional pixel interpolation
         for (y = ypos>>1; y < (ypos + width)>>1; y++) {
           for (x = xpos>>1; x < (xpos + width)>>1; x++) {
             int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
@@ -323,7 +323,8 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
   kvz_pixel temp_lcu_u[32 * 32];
   kvz_pixel temp_lcu_v[32 * 32];
   int temp_x, temp_y;
-  // TODO: interpolated values require 14-bit accuracy for bi-prediction, current implementation of ipol filters round the value to 8bits
+  int shift = 15 - BIT_DEPTH;
+  int offset = 1 << (shift - 1);
 
   //Reconstruct both predictors
   inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu);
@@ -337,8 +338,8 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
     int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
     for (temp_x = 0; temp_x < width; ++temp_x) {
       int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)(((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] +
-        (int)temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] + 1) >> 1);
+      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)fast_clip_32bit_to_pixel(((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] +
+        (int)temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] + offset) >> shift);
     }
   }
   for (temp_y = 0; temp_y < width>>1; ++temp_y) {
