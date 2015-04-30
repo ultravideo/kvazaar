@@ -296,7 +296,7 @@ unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
   sum += satd_16bit_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
   } \
   } \
-  return sum; \
+  return sum>>(BIT_DEPTH-8); \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
@@ -323,7 +323,7 @@ static unsigned sad_ ## suffix ## _ ##  n ## x ## n ## _generic( \
   for (i = 0; i < (n)*(n); ++i) { \
   sum += abs(block1[i] - block2[i]); \
   } \
-  return sum; \
+  return sum>>(BIT_DEPTH-8); \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
