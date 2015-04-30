@@ -148,11 +148,10 @@ void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encode
       int ypos = y - FILTER_OFFSET;
       int xpos = x - FILTER_OFFSET;
       // Original pixel
-      flipped_hor_filtered[4 * x + 0][y] = (c0[FILTER_OFFSET] * src[src_stride*ypos + xpos + FILTER_OFFSET]) << shift1;
-      flipped_hor_filtered[4 * x + 1][y] = eight_tap_filter_hor_generic(c1, &src[src_stride*ypos + xpos]) << shift1;
-      flipped_hor_filtered[4 * x + 2][y] = eight_tap_filter_hor_generic(c2, &src[src_stride*ypos + xpos]) << shift1;
-      flipped_hor_filtered[4 * x + 3][y] = eight_tap_filter_hor_generic(c3, &src[src_stride*ypos + xpos]) << shift1;
-
+      flipped_hor_filtered[4 * x + 0][y] = (c0[FILTER_OFFSET] * src[src_stride*ypos + xpos + FILTER_OFFSET]) >> shift1;
+      flipped_hor_filtered[4 * x + 1][y] = eight_tap_filter_hor_generic(c1, &src[src_stride*ypos + xpos]) >> shift1;
+      flipped_hor_filtered[4 * x + 2][y] = eight_tap_filter_hor_generic(c2, &src[src_stride*ypos + xpos]) >> shift1;
+      flipped_hor_filtered[4 * x + 3][y] = eight_tap_filter_hor_generic(c3, &src[src_stride*ypos + xpos]) >> shift1;
     }
   }
 

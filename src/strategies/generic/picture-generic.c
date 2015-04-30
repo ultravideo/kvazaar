@@ -44,7 +44,7 @@ kvz_pixel fast_clip_16bit_to_pixel(int16_t value)
     return value;
   }
 #else
-  CLIP(PIXEL_MIN, PIXEL_MAX, value);
+  return CLIP(PIXEL_MIN, PIXEL_MAX, value);
 #endif
 }
 
@@ -66,7 +66,7 @@ kvz_pixel fast_clip_32bit_to_pixel(int32_t value)
     return value;
   }
 #else
-  CLIP(PIXEL_MIN, PIXEL_MAX, value);
+  return CLIP(PIXEL_MIN, PIXEL_MAX, value);
 #endif
 }
 
