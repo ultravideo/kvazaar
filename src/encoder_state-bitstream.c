@@ -785,7 +785,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   }
 
   {
-    uint8_t nal_type = (state->global->is_radl_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
+    uint8_t nal_type = (state->global->is_idr_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
     nal_write(stream, nal_type, 0, first_nal_in_au);
   }
 

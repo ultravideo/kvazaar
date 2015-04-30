@@ -400,7 +400,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         // once. The added dependancy is for the first LCU of each wavefront
         // row to depend on the reconstruction status of the row below in the
         // previous frame.
-        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_radl_frame) {
+        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_idr_frame) {
           if (!lcu->left) {
             if (lcu->below) {
               threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
@@ -583,7 +583,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           char* job_description = NULL;
 #endif
           main_state->children[i].tqj_recon_done = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
-          if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_radl_frame) {
+          if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_idr_frame) {
             //Add dependencies to the previous frame
             //FIXME is this correct?
             threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);
@@ -752,7 +752,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
 
 }
 
-static void encoder_state_clear_refs(encoder_state_t *state) {
+static void encoder_state_reset_poc(encoder_state_t *state) {
   int i;
 
   state->global->poc = 0;
@@ -760,7 +760,7 @@ static void encoder_state_clear_refs(encoder_state_t *state) {
   
   for (i=0; state->children[i].encoder_control; ++i) {
     encoder_state_t *sub_state = &(state->children[i]);
-    encoder_state_clear_refs(sub_state);
+    encoder_state_reset_poc(sub_state);
   }
 }
 
@@ -769,21 +769,26 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
   //FIXME Move this somewhere else!
   if (state->type == ENCODER_STATE_TYPE_MAIN) {
     const encoder_control_t * const encoder = state->encoder_control;
-    
-    const int is_first_frame = (state->global->frame == 0);
-    const int is_i_radl = (encoder->cfg->intra_period == 1 && state->global->frame % 2 == 0);
-    const int is_p_radl = (encoder->cfg->intra_period > 1 && (state->global->frame % encoder->cfg->intra_period) == 0);
-    state->global->is_radl_frame = is_first_frame || is_i_radl || is_p_radl;
 
-    if (state->global->frame && encoder->cfg->gop_len) {
+    if (state->global->frame == 0) {
+      state->global->is_idr_frame = true;
+    }  else if (encoder->cfg->gop_len) {
+      // Closed GOP / CRA is not yet supported.
+      state->global->is_idr_frame = false;
+    
       // Calculate POC according to the global frame counter and GOP structure
-      state->global->poc = (state->global->frame - 1) - (state->global->frame - 1) % encoder->cfg->gop_len +
-        encoder->cfg->gop[state->global->gop_offset].poc_offset;
+      int32_t poc = state->global->frame - 1;
+      int32_t poc_offset = encoder->cfg->gop[state->global->gop_offset].poc_offset;
+      state->global->poc = poc - poc % encoder->cfg->gop_len + poc_offset;
       videoframe_set_poc(state->tile->frame, state->global->poc);
-      state->global->is_radl_frame = 0;
+    } else {
+      bool is_i_idr = (encoder->cfg->intra_period == 1 && state->global->frame % 2 == 0);
+      bool is_p_idr = (encoder->cfg->intra_period > 1 && (state->global->frame % encoder->cfg->intra_period) == 0);
+      state->global->is_idr_frame = is_i_idr || is_p_idr;
     }
    
-    if (state->global->is_radl_frame) {
+    if (state->global->is_idr_frame) {
+      encoder_state_reset_poc(state);
       state->global->slicetype = SLICE_I;
       state->global->pictype = NAL_IDR_W_RADL;
     } else {
@@ -794,10 +799,6 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
           state->global->slicetype = SLICE_I;
         }
       }
-    }
-
-    if (state->global->is_radl_frame) {
-      encoder_state_clear_refs(state);
     }
 
     encoder_state_remove_refs(state);
