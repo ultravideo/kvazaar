@@ -79,7 +79,7 @@ typedef struct {
     int8_t idx;
   } refmap[16];
   
-  int is_radl_frame;
+  bool is_idr_frame;
   uint8_t pictype;
   uint8_t slicetype;
   
