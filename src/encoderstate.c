@@ -907,13 +907,11 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
   }
 
 int frame_8bit_to_10bit(pixel_t* input, int width, int height) {
-  uint8_t* temp_buffer = malloc(width*height);
+  uint8_t* temp_buffer = (uint8_t*)input;
   const uint32_t pixels = width*height;
-  memcpy(temp_buffer, (void *)input, pixels);
-  for(int i = 0; i < pixels; i++) {
+  for(int i = pixels-1; i >= 0; i--) {
     input[i] = temp_buffer[i]<<2;
   }
-  free(temp_buffer);
   return 1;
 }
 
