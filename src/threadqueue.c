@@ -294,6 +294,7 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
       threadqueue->threads_running++;
     } else {
       fprintf(stderr, "Could not allocate threadqueue_worker_spec structure!\n");
+      PTHREAD_UNLOCK(&threadqueue->lock);
       return 0;
     }
   }
