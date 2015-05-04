@@ -218,6 +218,8 @@ unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *p
   
   vector2d_t mv_best = { 0, 0 };
 
+  assert(pattern_type < 4);
+
   //implemented search patterns
   vector2d_t pattern[4][8] = {
       //diamond (8 points)
@@ -281,12 +283,6 @@ unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *p
       }
 
   };
-
-  //make sure parameter pattern_type is within correct range
-  if (pattern_type > sizeof pattern - 1)
-  {
-    pattern_type = sizeof pattern - 1;
-  }
 
   //set the number of points to be checked
   if (iDist == 1)
