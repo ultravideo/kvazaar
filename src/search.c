@@ -2164,18 +2164,20 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   pixels_blit(orig, orig_block, width, width, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
-  for(pred_mode = 0; pred_mode < 3; pred_mode++) {
-    int mode_found = 0;
-    for(rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
-      if(intra_preds[pred_mode] == modes[rdo_mode]) {
-        mode_found = 1;
-        break;
+  if (modes_to_check < 35) {
+    for (pred_mode = 0; pred_mode < 3; pred_mode++) {
+      int mode_found = 0;
+      for (rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode++) {
+        if (intra_preds[pred_mode] == modes[rdo_mode]) {
+          mode_found = 1;
+          break;
+        }
       }
-    }
-    // Add this prediction mode to RDO checking
-    if(!mode_found) {
-      modes[modes_to_check] = intra_preds[pred_mode];
-      modes_to_check++;
+      // Add this prediction mode to RDO checking
+      if (!mode_found) {
+        modes[modes_to_check] = intra_preds[pred_mode];
+        modes_to_check++;
+      }
     }
   }
 
