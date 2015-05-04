@@ -49,37 +49,6 @@
 # define LMBD 1.0
 #endif
 
-/*!
-  \brief Initializes lambda-value for current QP
-
-  Implementation closer to HM (Used HM12 as reference)
- */
-void encoder_state_init_lambda(encoder_state_t * const state)
-{
-  double qp = state->global->QP;
-  double lambda_scale = 1.0 - CLIP(0.0, 0.5, 0.05*(double)state->encoder_control->cfg->gop_len);
-  double qp_temp      = qp - 12;
-  double lambda;
-
-  // Default QP-factor from HM config
-  double qp_factor = state->encoder_control->cfg->gop_len ? state->global->QP_factor : 0.4624;
-
-  if (state->global->slicetype == SLICE_I) {
-    qp_factor=0.57*lambda_scale;
-  }
-
-  lambda = qp_factor*pow( 2.0, qp_temp/3.0 );
-
-  if (state->global->slicetype != SLICE_I ) {
-    lambda *= 0.95;
-  }
-
-  lambda *= LMBD;
-
-  state->global->cur_lambda_cost = lambda;
-  state->global->cur_lambda_cost_sqrt = sqrt(lambda);
-}
-
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
@@ -802,20 +771,10 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       encoder_state_ref_sort(state);
     }
 
-    if (state->encoder_control->cfg->gop_len) {
-      if (state->global->slicetype == SLICE_I) {
-        state->global->QP = state->encoder_control->cfg->qp;
-        state->global->QP_factor = 0.4624;
-      }
-      else {
-        state->global->QP = state->encoder_control->cfg->qp +
-          state->encoder_control->cfg->gop[state->global->gop_offset].qp_offset;
-        state->global->QP_factor = state->encoder_control->cfg->gop[state->global->gop_offset].qp_factor;
-      }
-        
-    } else {
-      state->global->QP = select_picture_QP(state);
-    }
+    double lambda = select_picture_lambda(state);
+    state->global->cur_lambda_cost = lambda;
+    state->global->cur_lambda_cost_sqrt = sqrt(lambda);
+    state->global->QP = lambda_to_QP(lambda);
 
   } else {
     //Clear the bitstream if it's not the main encoder
@@ -826,9 +785,6 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     //Leaf states have cabac and context
     cabac_start(&state->cabac);
     init_contexts(state, state->global->QP, state->global->slicetype);
-
-    // Initialize lambda value(s) to use in search
-    encoder_state_init_lambda(state);
   }
   
   //Clear the jobs

@@ -27,6 +27,8 @@
 
 #include "encoderstate.h"
 
-int8_t select_picture_QP(const encoder_state_t * const state);
+double select_picture_lambda(encoder_state_t * const state);
+
+int8_t lambda_to_QP(const double lambda);
 
 #endif // RATE_CONTROL_H_

@@ -25,42 +25,77 @@
 static const int SMOOTHING_WINDOW = 40;
 
 /**
- * \brief Select a QP for encoding the next picture
+ * \brief Allocate bits for the current GOP.
  * \param state the main encoder state
- * \return the QP for the next picture, in range [0, 51]
+ *
+ * If GOPs are not used, allocates bits for a single picture.
+ *
+ * Sets the cur_gop_target_bits of the encoder state.
  */
-int8_t select_picture_QP(const encoder_state_t * const state)
+static void gop_allocate_bits(encoder_state_t * const state)
+{
+  const encoder_control_t * const encoder = state->encoder_control;
+
+  const double avg_bits_per_picture =
+    encoder->cfg->target_bitrate / encoder->cfg->framerate;
+
+  // At this point, total_bits_coded of the current state contains the
+  // number of bits written encoder->owf frames before the current frame.
+  int bits_coded = state->global->total_bits_coded;
+  int pictures_coded = MAX(0, state->global->frame - encoder->owf);
+
+  int gop_offset = (state->global->gop_offset - encoder->owf) % MAX(1, encoder->cfg->gop_len);
+  // Only take fully coded GOPs into account.
+  if (encoder->cfg->gop_len > 0 && gop_offset != encoder->cfg->gop_len - 1) {
+    // Subtract number of bits in the partially coded GOP.
+    bits_coded -= state->global->cur_gop_bits_coded;
+    // Subtract number of pictures in the partially coded GOP.
+    pictures_coded -= gop_offset + 1;
+  }
+
+  double gop_target_bits =
+    (avg_bits_per_picture * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
+    * MAX(1, encoder->cfg->gop_len) / SMOOTHING_WINDOW;
+  state->global->cur_gop_target_bits = MAX(200, gop_target_bits);
+}
+
+/**
+ * \brief Select a lambda value for encoding the next picture
+ * \param state the main encoder state
+ * \return lambda for the next picture
+ */
+double select_picture_lambda(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
   if (encoder->cfg->target_bitrate <= 0) {
     // Rate control disabled.
-    return encoder->cfg->qp;
+    return exp((encoder->cfg->qp - 13.7223 - 0.5) / 4.2005);
   }
 
-  // At this point, total_bits_coded of the current state contains the
-  // number of bits written encoder->owf frames before the current frame.
-  const int bits_coded = state->global->total_bits_coded;
-  const int pictures_coded = MAX(0, state->global->frame - encoder->owf);
+  if (encoder->cfg->gop_len == 0 || state->global->gop_offset == 0) {
+    // a new GOP begins at this frame
+    gop_allocate_bits(state);
+  } else {
+    state->global->cur_gop_target_bits =
+      state->previous_encoder_state->global->cur_gop_target_bits;
+  }
 
-  const double avg_bits_per_picture =
-    encoder->cfg->target_bitrate / encoder->cfg->framerate;
-
-  // TODO: use picture weights
-  const double target_bits_current_picture =
-    (avg_bits_per_picture * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
-    / SMOOTHING_WINDOW;
+  const double target_bits_current_picture = (encoder->cfg->gop_len > 0)
+    ? (state->global->cur_gop_target_bits * encoder->cfg->gop[state->global->gop_offset].weight / 22.0)
+    : state->global->cur_gop_target_bits
+  ;
 
   // TODO: take the picture headers into account
   const int pixels_per_picture = encoder->in.width * encoder->in.height;
   const double target_bits_per_pixel = target_bits_current_picture / pixels_per_picture;
 
-  // The following magical constants, -5.7420835 and 18.598408755005686 are
-  // based on the values given in
-  //
-  //   K. McCann et al., "High Effiency Video Coding (HEVC) Test Model 16
-  //   (HM 16) Improved Encoder Description", JCTVC-S1002, October 2014,
-  //   (p. 52 - 54)
-  const int QP = (int)(-5.7420835 * log(MAX(target_bits_per_pixel, 0.001)) + 18.598408755005686);
-  return CLIP(0, 51, QP);
+  const double lambda = 3.2003 * pow(target_bits_per_pixel, -1.367);
+  return CLIP(0.1, 10000, lambda);
+}
+
+int8_t lambda_to_QP(const double lambda)
+{
+  int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
+  return CLIP(0, 51, qp);
 }
