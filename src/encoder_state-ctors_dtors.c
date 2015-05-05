@@ -126,7 +126,7 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
     }
   }
   assert(slice_found);
-  if (!slice_found) return 0;
+
   state->slice->start_in_ts = start_address_in_ts;
   state->slice->end_in_ts = end_address_in_ts;
   
