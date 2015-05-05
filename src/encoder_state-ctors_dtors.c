@@ -126,7 +126,7 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
     }
   }
   assert(slice_found);
-  if (!slice_found) return 0;
+
   state->slice->start_in_ts = start_address_in_ts;
   state->slice->end_in_ts = end_address_in_ts;
   
@@ -459,11 +459,12 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
       
       if (new_child) {
         child_state->children = realloc(child_state->children, sizeof(encoder_state_t) * (2+child_count));
-        child_state->children[1+child_count].encoder_control = NULL;
         if (!child_state->children) {
           fprintf(stderr, "Failed to allocate memory for children...\n");
           return 0;
         }
+
+        child_state->children[1 + child_count].encoder_control = NULL;
 
         //Fix children parent (since we changed the address), except for the last one which is not ready yet
         {

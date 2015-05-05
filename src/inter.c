@@ -741,16 +741,13 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
     }
   }
 
-
 #if ENABLE_TEMPORAL_MVP
   if(candidates < AMVP_MAX_NUM_CANDS) {
     //TODO: add temporal mv predictor
   }
 #endif
 
-  if (candidates == MRG_MAX_NUM_CANDS) return MRG_MAX_NUM_CANDS;
-
-  if (state->global->slicetype == SLICE_B) {
+  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == SLICE_B) {
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -783,11 +780,9 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
     }
   }
 
-  if (candidates == MRG_MAX_NUM_CANDS) return MRG_MAX_NUM_CANDS;
-
   int num_ref = state->global->ref->used_size;
 
-  if (state->global->slicetype == SLICE_B) {
+  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == SLICE_B) {
     int j;
     int ref_negative = 0;
     int ref_positive = 0;

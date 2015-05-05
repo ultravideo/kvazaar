@@ -419,14 +419,14 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
 {
 
   //TZ parameters
-  int iSearchRange = 96;  // search range for each stage
-  int iRaster = 5;  // search distance limit and downsampling factor for step 3                   
-  unsigned step2_type = 0;  // search patterns for steps 2 and 4
-  unsigned step4_type = 0;
-  bool bRasterRefinementEnable = true;  // enable step 4 mode 1
-  bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
+  const int iSearchRange = 96;  // search range for each stage
+  const int iRaster = 5;  // search distance limit and downsampling factor for step 3                   
+  const unsigned step2_type = 0;  // search patterns for steps 2 and 4
+  const unsigned step4_type = 0;
+  const bool bRasterRefinementEnable = true;  // enable step 4 mode 1
+  const bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
   
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+  const int block_width = CU_WIDTH_FROM_DEPTH(depth);
 
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
 
@@ -1221,6 +1221,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
  */
 static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
+  assert(depth >= 0 && depth < MAX_PU_DEPTH);
+
   // Copy non-reference CUs.
   {
     const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
@@ -1274,6 +1276,8 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
  */
 static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
+  assert(depth >= 0 && depth < MAX_PU_DEPTH);
+
   // TODO: clean up to remove the copy pasta
   const int width_px = LCU_WIDTH >> depth;
 
@@ -1601,6 +1605,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
                                    cu_info_t *const pred_cu,
                                    lcu_t *const lcu)
 {
+  assert(depth >= 0 && depth <= MAX_PU_DEPTH);
+
   const int width = LCU_WIDTH >> depth;
   const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
 
@@ -1619,8 +1625,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
-
-  assert(width >= TR_MIN_WIDTH);
 
   if (depth > 0) {
     tr_cu->tr_depth = depth;
