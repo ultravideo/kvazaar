@@ -1221,6 +1221,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
  */
 static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
+  assert(depth >= 0 && depth < MAX_PU_DEPTH);
+
   // Copy non-reference CUs.
   {
     const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
@@ -1274,6 +1276,8 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
  */
 static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
+  assert(depth >= 0 && depth < MAX_PU_DEPTH);
+
   // TODO: clean up to remove the copy pasta
   const int width_px = LCU_WIDTH >> depth;
 
