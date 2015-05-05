@@ -1601,6 +1601,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
                                    cu_info_t *const pred_cu,
                                    lcu_t *const lcu)
 {
+  assert(depth >= 0 && depth <= MAX_PU_DEPTH);
+
   const int width = LCU_WIDTH >> depth;
   const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
 
@@ -1619,8 +1621,6 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
-
-  assert(width >= TR_MIN_WIDTH);
 
   if (depth > 0) {
     tr_cu->tr_depth = depth;
