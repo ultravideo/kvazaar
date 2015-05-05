@@ -1649,6 +1649,8 @@ coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth)
 static void encode_transform_unit(encoder_state_t * const state,
                                   int x_pu, int y_pu, int depth)
 {
+  assert(depth >= 1 && depth <= MAX_PU_DEPTH);
+
   const videoframe_t * const frame = state->tile->frame;
   uint8_t width = LCU_WIDTH >> depth;
   uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
