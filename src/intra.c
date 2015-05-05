@@ -490,9 +490,8 @@ void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel
   int32_t blk_size        = width;
 
   // Map the mode index to main prediction direction and angle
-  int8_t mode_hor       = dir_mode < 18;
-  int8_t mode_ver       = !mode_hor;
-  int32_t intra_pred_angle = mode_ver ? (int32_t)dir_mode - 26 : mode_hor ? -((int32_t)dir_mode - 10) : 0;
+  bool mode_ver       = dir_mode >= 18;
+  int32_t intra_pred_angle = mode_ver ? dir_mode - 26 : 10 - dir_mode;
   int32_t abs_ang       = abs(intra_pred_angle);
   int32_t sign_ang      = intra_pred_angle < 0 ? -1 : 1;
 
@@ -578,7 +577,7 @@ void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel
   }
 
   // Flip the block if this is the horizontal mode
-  if (mode_hor) {
+  if (!mode_ver) {
     pixel_t tmp;
     for (k=0;k<blk_size-1;k++) {
       for (l=k+1;l<blk_size;l++) {
