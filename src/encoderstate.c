@@ -246,9 +246,6 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     sao_info_t *sao_top_chroma = lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
     sao_info_t *sao_left_chroma = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
 
-    init_sao_info(sao_luma);
-    init_sao_info(sao_chroma);
-
     sao_search_luma(state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
     sao_search_chroma(state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
 

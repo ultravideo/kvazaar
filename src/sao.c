@@ -727,6 +727,9 @@ static void sao_search_best_mode(const encoder_state_t * const state, const pixe
 {
   sao_info_t edge_sao;
   sao_info_t band_sao;
+
+  init_sao_info(&edge_sao);
+  init_sao_info(&band_sao);
   
   //Avoid "random" uninitialized value
   edge_sao.band_position[0] = edge_sao.band_position[1] = 0;
