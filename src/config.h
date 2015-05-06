@@ -29,9 +29,6 @@
 
 
 typedef struct {
-  double qp_factor;
-  int8_t qp_offset;    /*!< \brief QP offset */
-  int8_t weight;
   int8_t poc_offset;   /*!< \brief POC offset */
   int8_t layer;        /*!< \brief Current layer */
   int8_t is_ref;       /*!< \brief Flag if this picture is used as a reference */
