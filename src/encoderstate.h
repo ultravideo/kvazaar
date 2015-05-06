@@ -90,7 +90,11 @@ typedef struct {
   uint64_t cur_gop_bits_coded;
 
   //! Number of bits targeted for the current GOP.
-  double  cur_gop_target_bits;
+  double cur_gop_target_bits;
+
+  // Parameters used in rate control
+  double rc_alpha;
+  double rc_beta;
 
 } encoder_state_config_global_t;
 
