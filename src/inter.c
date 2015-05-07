@@ -31,6 +31,7 @@
 #include "config.h"
 #include "filter.h"
 #include "strategies/strategies-ipol.h"
+#include "strategies/generic/ipol-generic.h"
 
 /**
  * \brief Set block info to the CU structure
@@ -131,9 +132,8 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
       // Fractional luma
       extend_borders(xpos, ypos, mv[0]>>2, mv[1]>>2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
           ref->y, ref->width, ref->height, FILTER_SIZE_Y, width, width, qpel_src_y);
-
-      filter_inter_quarterpel_luma(state->encoder_control, qpel_src_off_y, width+FILTER_SIZE_Y, width,
-                                   width, qpel_dst_y, width*4, y_off_x, y_off_y);
+      sample_quarterpel_luma_generic(state->encoder_control, qpel_src_off_y, width + FILTER_SIZE_Y, width,
+        width, lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, y_off_x, y_off_y, mv);
 
       //Fractional chroma U
       extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, state->tile->lcu_offset_x * (LCU_WIDTH>>1), state->tile->lcu_offset_y * (LCU_WIDTH>>1),
@@ -149,16 +149,7 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
       filter_inter_octpel_chroma(state->encoder_control, octpel_src_off_v, width_c+FILTER_SIZE_C, width_c,
                    width_c, octpel_dst_v, width_c*8, c_off_x, c_off_y);
 
-      //Sample fractional pixels for luma
-      for(y = 0; y < width; ++y) {
-        int y_in_lcu = ((y+ypos) & ((LCU_WIDTH)-1));
-        int qpel_y = y*4+y_off_y;
-        for(x = 0; x < width; ++x) {
-          int x_in_lcu = ((x+xpos) & ((LCU_WIDTH)-1));
-          int qpel_x = x*4+y_off_x;
-          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)qpel_dst_y[qpel_y*(width*4)+qpel_x];
-        }
-      }
+
       //Sample fractional pixels for chroma
       for(y = 0; y < width_c; ++y) {
         int y_in_lcu = ((y+(ypos>>1)) & ((LCU_WIDTH>>1)-1));
