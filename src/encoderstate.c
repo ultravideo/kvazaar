@@ -422,14 +422,13 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
         threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
-    }
 
-    // In the case where SAO is not enabled, the wavefront row is
-    // done when the last LCU in the row is done.
-    if (!state->encoder_control->sao_enable) {
-      assert(!state->tqj_recon_done);
-      int last_lcu = state->lcu_order_count - 1;
-      state->tqj_recon_done = state->tile->wf_jobs[last_lcu];
+      // In the case where SAO is not enabled, the wavefront row is
+      // done when the last LCU in the row is done.
+      if (!state->encoder_control->sao_enable && i + 1 == state->lcu_order_count) {
+        assert(!state->tqj_recon_done);
+        state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
+      }
     }
   }
 }
