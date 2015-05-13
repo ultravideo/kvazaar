@@ -81,6 +81,7 @@ OBJS = \
   bitstream.o \
   cabac.o \
   checkpoint.o \
+  cli.o \
   config.o \
   context.o \
   cu.o \

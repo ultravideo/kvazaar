@@ -127,6 +127,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
+    <ClCompile Include="..\..\src\cli.c" />
     <ClCompile Include="..\..\src\config.c" />
     <ClCompile Include="..\..\src\context.c" />
     <ClCompile Include="..\..\src\cu.c" />
@@ -149,6 +150,7 @@
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
+    <ClInclude Include="..\..\src\cli.h" />
     <ClInclude Include="..\..\src\cu.h" />
     <ClInclude Include="..\..\src\image.h" />
     <ClInclude Include="..\..\src\imagelist.h" />

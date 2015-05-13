@@ -186,6 +186,9 @@
     <ClCompile Include="..\..\src\strategies\generic\ipol-generic.c">
       <Filter>Source Files\strategies\generic</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\cli.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\rate_control.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -328,6 +331,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\avx2\ipol-avx2.h">
       <Filter>Header Files\strategies\avx2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\cli.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\rate_control.h">
       <Filter>Header Files</Filter>
