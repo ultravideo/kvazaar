@@ -27,6 +27,8 @@
 
 #include <stdio.h>
 
+#include "encoderstate.h"
+
 
 void print_version(void)
 {
@@ -145,4 +147,43 @@ void print_help(void)
     "     Use --input-res:\n"
     "       -w, --width               : Width of input in pixels\n"
     "       -h, --height              : Height of input in pixels\n");
+}
+
+
+void print_frame_info(encoder_state_t *state, double frame_psnr[3])
+{
+  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
+          state->global->poc,
+          state->global->QP,
+          "BPI"[state->global->slicetype % 3], state->stats_bitstream_length << 3,
+          frame_psnr[0], frame_psnr[1], frame_psnr[2]);
+
+  // Print reference picture lists
+  if (state->global->slicetype != SLICE_I) {
+    int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
+    // List all pocs of lists
+    for (j = 0; j < state->global->ref->used_size; j++) {
+      if (state->global->ref->images[j]->poc < state->global->poc) {
+        ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+        ref_list[0]++;
+      } else {
+        ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+        ref_list[1]++;
+      }
+    }
+    encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+    encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
+
+    fprintf(stderr, " [L0 ");
+    for (j = ref_list[0] - 1; j >= 0; j--) {
+      fprintf(stderr, "%d ", ref_list_poc[0][j]);
+    }
+    fprintf(stderr, "] [L1 ");
+    for (j = 0; j < ref_list[1]; j++) {
+      fprintf(stderr, "%d ", ref_list_poc[1][j]);
+    }
+    fprintf(stderr, "]");
+  }
+
+  fprintf(stderr, "\n");
 }

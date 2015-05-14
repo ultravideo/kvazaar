@@ -30,5 +30,6 @@
 
 void print_version(void);
 void print_help(void);
+void print_frame_info(encoder_state_t *state, double frame_psnr[3]);
 
 #endif

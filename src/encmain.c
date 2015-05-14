@@ -48,6 +48,7 @@
 #include "strategyselector.h"
 #include "cli.h"
 
+
 /**
  * \brief Program main function.
  * \param argc Argument count from commandline
@@ -60,8 +61,6 @@ int main(int argc, char *argv[])
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   encoder_control_t encoder;
-  double psnr[3] = { 0.0, 0.0, 0.0 };
-  uint32_t stat_frames = 0;
   uint64_t curpos = 0;
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
@@ -246,25 +245,22 @@ int main(int argc, char *argv[])
     //Initial frame
     encoder_states[current_encoder_state].global->frame    = -1;
 
-    // Only the code that handles conformance window coding needs to know
-    // the real dimensions. As a quick fix for broken non-multiple of 8 videos,
-    // change the input values here to be the real values. For a real fix
-    // encoder.in probably needs to be merged into cfg.
-    // The real fix would be: never go dig in cfg
-    //cfg->width = encoder.in.width;
-    //cfg->height = encoder.in.height;
-    
     GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
 
     uint64_t bitstream_length = 0;
+    uint32_t frames_started = 0;
+    uint32_t frames_done = 0;
+    double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     // Start coding cycle while data on input and not on the last frame
-    while(!cfg->frames || encoder_states[current_encoder_state].global->frame < cfg->frames - 1) {
+    while (cfg->frames == 0 || frames_started < cfg->frames) {
+      encoder_state_t *state = &encoder_states[current_encoder_state];
+
       // Skip '--seek' frames before input.
       // This block can be moved outside this while loop when there is a
       // mechanism to skip the while loop on error.
-      if (encoder_states[current_encoder_state].global->frame == 0 && cfg->seek > 0) {
+      if (frames_started == 0 && cfg->seek > 0) {
         int frame_bytes = cfg->width * cfg->height * 3 / 2;
         int error = 0;
 
@@ -285,19 +281,23 @@ int main(int argc, char *argv[])
         GET_TIME(&encoding_start_real_time);
         encoding_start_cpu_time = clock();
       }
-      
-      //Compute stats
-      encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr, &bitstream_length);
+
+      // If we have started as many frames as we are going to encode in parallel, wait for the first one we started encoding to finish before
+      // encoding more.
+      if (frames_started > cfg->owf) {
+        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
+        encoder_compute_stats(&encoder_states[current_encoder_state], recout, frame_psnr, &bitstream_length);
+        frames_done += 1;
+        psnr_sum[0] += frame_psnr[0];
+        psnr_sum[1] += frame_psnr[1];
+        psnr_sum[2] += frame_psnr[2];
+
+        print_frame_info(state, frame_psnr);
+      }
+      frames_started += 1;
       
       //Clear encoder
       encoder_next_frame(&encoder_states[current_encoder_state]);
-      
-      //Abort if enough frames
-      if (cfg->frames && encoder_states[current_encoder_state].global->frame >= cfg->frames) {
-        //Ignore this frame, which is not valid...
-        encoder_states[current_encoder_state].stats_done = 1;
-        break;
-      }
       
       CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
@@ -322,8 +322,18 @@ int main(int argc, char *argv[])
     {
       int first_enc = current_encoder_state;
       do {
+        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
-        encoder_compute_stats(&encoder_states[current_encoder_state], recout, &stat_frames, psnr, &bitstream_length);
+        encoder_state_t *state = &encoder_states[current_encoder_state];
+
+        if (!state->stats_done) {
+          encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
+          print_frame_info(state, frame_psnr);
+          frames_done += 1;
+          psnr_sum[0] += frame_psnr[0];
+          psnr_sum[1] += frame_psnr[1];
+          psnr_sum[2] += frame_psnr[2];
+        }
       } while (current_encoder_state != first_enc);
     }
     
@@ -338,8 +348,8 @@ int main(int argc, char *argv[])
 
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", 
-            stat_frames, (long long unsigned int)bitstream_length * 8,
-            psnr[0] / stat_frames, psnr[1] / stat_frames, psnr[2] / stat_frames);
+            frames_done, (long long unsigned int)bitstream_length * 8,
+            psnr_sum[0] / frames_done, psnr_sum[1] / frames_done, psnr_sum[2] / frames_done);
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
     
     {
@@ -348,7 +358,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
-      fprintf(stderr, " FPS: %.2f\n", ((double)stat_frames)/wall_time);
+      fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
 
     fclose(input);

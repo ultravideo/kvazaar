@@ -623,7 +623,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 }
 
 
-static void encoder_ref_insertion_sort(int reflist[16], int length) {
+void encoder_ref_insertion_sort(int reflist[16], int length) {
 
   for (uint8_t i = 1; i < length; ++i) {
     const int16_t cur_poc = reflist[i];
@@ -1016,13 +1016,11 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
   return 1;
 }
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length) {
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3], uint64_t *bitstream_length) {
   const encoder_control_t * const encoder = state->encoder_control;
   
   if (state->stats_done) return;
   state->stats_done = 1;
-  
-  ++(*stat_frames);
   
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
@@ -1050,48 +1048,7 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t
     }
   }
   
-  // PSNR calculations
-  {
-    double temp_psnr[3];
-    
-    videoframe_compute_psnr(state->tile->frame, temp_psnr);
-    
-    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f", state->global->poc,
-          state->global->QP,
-          "BPI"[state->global->slicetype%3], state->stats_bitstream_length<<3,
-          temp_psnr[0], temp_psnr[1], temp_psnr[2]);
-    // Print reference picture lists
-    if (state->global->slicetype != SLICE_I) {
-      int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
-      // List all pocs of lists
-      for (j = 0; j < state->global->ref->used_size; j++) {
-        if (state->global->ref->images[j]->poc < state->global->poc) {
-          ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
-          ref_list[0]++;
-        } else {
-          ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
-          ref_list[1]++;
-        }
-      }
-      encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
-      encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
-
-      fprintf(stderr, " [L0 ");
-      for (j = ref_list[0]-1; j >= 0; j--) {
-        fprintf(stderr, "%d ", ref_list_poc[0][j]);
-      }
-      fprintf(stderr, "] [L1 ");
-      for (j = 0; j < ref_list[1]; j++) {
-        fprintf(stderr, "%d ", ref_list_poc[1][j]);
-      }
-      fprintf(stderr, "]");
-    }
-    fprintf(stderr, "\n");
-    // Increment total PSNR
-    psnr[0] += temp_psnr[0];
-    psnr[1] += temp_psnr[1];
-    psnr[2] += temp_psnr[2];
-  }
+  videoframe_compute_psnr(state->tile->frame, frame_psnr);
 
   *bitstream_length += state->stats_bitstream_length;
 }
