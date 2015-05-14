@@ -244,6 +244,27 @@ int main(int argc, char *argv[])
     
     //Initial frame
     encoder_states[current_encoder_state].global->frame    = -1;
+    
+    // Skip '--seek' frames before input.
+    if (cfg->seek > 0) {
+      int frame_bytes = cfg->width * cfg->height * 3 / 2;
+      int error = 0;
+
+      if (!strcmp(cfg->input, "-")) {
+        // Input is stdin.
+        int i;
+        for (i = 0; !error && i < cfg->seek; ++i) {
+          error = !read_one_frame(input, &encoder_states[current_encoder_state]);
+        }
+      } else {
+        // input is a file. We hope. Proper detection is OS dependent.
+        error = fseek(input, cfg->seek * frame_bytes, SEEK_CUR);
+      }
+      if (error && !feof(input)) {
+        fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
+        goto exit_failure;
+      }
+    }
 
     GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
@@ -256,31 +277,6 @@ int main(int argc, char *argv[])
     // Start coding cycle while data on input and not on the last frame
     while (cfg->frames == 0 || frames_started < cfg->frames) {
       encoder_state_t *state = &encoder_states[current_encoder_state];
-
-      // Skip '--seek' frames before input.
-      // This block can be moved outside this while loop when there is a
-      // mechanism to skip the while loop on error.
-      if (frames_started == 0 && cfg->seek > 0) {
-        int frame_bytes = cfg->width * cfg->height * 3 / 2;
-        int error = 0;
-
-        if (!strcmp(cfg->input, "-")) {
-          // Input is stdin.
-          int i;
-          for (i = 0; !error && i < cfg->seek; ++i) {
-            error = !read_one_frame(input, &encoder_states[current_encoder_state]);
-          }
-        } else {
-          // input is a file. We hope. Proper detection is OS dependent.
-          error = fseek(input, cfg->seek * frame_bytes, SEEK_CUR);
-        }
-        if (error && !feof(input)) {
-          fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
-          break;
-        }
-        GET_TIME(&encoding_start_real_time);
-        encoding_start_cpu_time = clock();
-      }
 
       // If we have started as many frames as we are going to encode in parallel, wait for the first one we started encoding to finish before
       // encoding more.
