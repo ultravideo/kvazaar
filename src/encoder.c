@@ -297,7 +297,7 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
     printf("\n");
 #endif //_DEBUG
   }
-  
+
   assert(WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
   assert(WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
   assert(WITHIN(cfg->pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
@@ -306,6 +306,41 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
   encoder->pu_depth_inter.max = cfg->pu_depth_inter.max;
   encoder->pu_depth_intra.min = cfg->pu_depth_intra.min;
   encoder->pu_depth_intra.max = cfg->pu_depth_intra.max;
+
+  // input init (TODO: read from commandline / config)
+  encoder->bitdepth = 8;
+  encoder->in.video_format = FORMAT_420;
+
+  // deblocking filter
+  encoder->deblock_enable = (int8_t)encoder->cfg->deblock_enable;
+  encoder->beta_offset_div2 = (int8_t)encoder->cfg->deblock_beta;
+  encoder->tc_offset_div2 = (int8_t)encoder->cfg->deblock_tc;
+  // SAO
+  encoder->sao_enable = (int8_t)encoder->cfg->sao_enable;
+  // RDO
+  encoder->rdoq_enable = (int8_t)encoder->cfg->rdoq_enable;
+  encoder->rdo = (int8_t)encoder->cfg->rdo;
+  encoder->sign_hiding = encoder->cfg->signhide_enable;
+  encoder->full_intra_search = (int8_t)encoder->cfg->full_intra_search;
+  // TR SKIP
+  encoder->trskip_enable = (int8_t)encoder->cfg->trskip_enable;
+  encoder->tr_depth_intra = (int8_t)encoder->cfg->tr_depth_intra;
+  // MOTION ESTIMATION
+  encoder->fme_level = (int8_t)encoder->cfg->fme_level;
+  // VUI
+  encoder->vui.sar_width = (int16_t)encoder->cfg->vui.sar_width;
+  encoder->vui.sar_height = (int16_t)encoder->cfg->vui.sar_height;
+  encoder->vui.overscan = encoder->cfg->vui.overscan;
+  encoder->vui.videoformat = encoder->cfg->vui.videoformat;
+  encoder->vui.fullrange = encoder->cfg->vui.fullrange;
+  encoder->vui.colorprim = encoder->cfg->vui.colorprim;
+  encoder->vui.transfer = encoder->cfg->vui.transfer;
+  encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
+  encoder->vui.chroma_loc = (int8_t)encoder->cfg->vui.chroma_loc;
+  // AUD
+  encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
+
+  encoder->vps_period = encoder->cfg->vps_period * encoder->cfg->intra_period;
 
   return 1;
 }

@@ -46,7 +46,6 @@ typedef struct encoder_control_t
   
   /* Input */
   struct {
-    FILE *file;
     int32_t width;
     int32_t height;
     int32_t width_in_lcu;
@@ -57,11 +56,6 @@ typedef struct encoder_control_t
     int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
     int64_t pixels_per_pic;
   } in;
-  
-  /* Output */
-  struct {
-    FILE *file;
-  } out;
   
   /* TODO: add ME data */
   struct {
