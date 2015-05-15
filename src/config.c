@@ -682,6 +682,32 @@ int config_read(config_t *cfg,int argc, char *argv[])
   // Check that the required files were defined
   if(cfg->input == NULL || cfg->output == NULL) return 0;
 
+  if (cfg->owf == -1) {
+    if (!config_set_owf_auto(cfg)) {
+      return 0;
+    }
+  }
+
+  // Add dimensions to the reconstructions file name.
+  if (cfg->debug != NULL) {
+    char dim_str[50]; // log10(2^64) < 20, so this should suffice. I hate C.
+    size_t left_len, right_len;
+    sprintf(dim_str, "_%dx%d.yuv", cfg->width, cfg->height);
+    left_len = strlen(cfg->debug);
+    right_len = strlen(dim_str);
+    cfg->debug = realloc(cfg->debug, left_len + right_len + 1);
+    if (!cfg->debug) {
+      fprintf(stderr, "realloc failed!\n");
+      return 0;
+    }
+    strcpy(cfg->debug + left_len, dim_str);
+  }
+
+  // Do more validation to make sure the parameters we have make sense.
+  if (!config_validate(cfg)) {
+    return 0;
+  }
+
   return 1;
 }
 

@@ -91,32 +91,6 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  // Add dimensions to the reconstructions file name.
-  if (cfg->debug != NULL) {
-    char dim_str[50]; // log10(2^64) < 20, so this should suffice. I hate C.
-    size_t left_len, right_len;
-    sprintf(dim_str, "_%dx%d.yuv", cfg->width, cfg->height);
-    left_len = strlen(cfg->debug);
-    right_len = strlen(dim_str);
-    cfg->debug = realloc(cfg->debug, left_len + right_len + 1);
-    if (!cfg->debug) {
-      fprintf(stderr, "realloc failed!\n");
-      goto exit_failure;
-    }
-    strcpy(cfg->debug + left_len, dim_str);
-  }
-
-  if (cfg->owf == -1) {
-    if (!config_set_owf_auto(cfg)) {
-      goto exit_failure;
-    }
-  }
-
-  // Do more validation to make sure the parameters we have make sense.
-  if (!config_validate(cfg)) {
-    goto exit_failure;
-  }
-
   //Initialize strategies
   if (!strategyselector_init(cfg->cpuid)) {
     fprintf(stderr, "Failed to initialize strategies.\n");
