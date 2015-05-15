@@ -984,6 +984,11 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
   // Get list of candidates
   int16_t num_cand = inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
 
+  int max_lcu_below = -1;
+  
+  if (state->encoder_control->owf) {
+    max_lcu_below = 1;
+  }
 
   // Default to candidate 0
   cur_cu->inter.mv_cand[0] = 0;
@@ -1128,6 +1133,20 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
           mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
           mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
           mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
+
+          // Check boundaries when using owf to process multiple frames at the same time
+          if (max_lcu_below >= 0) {
+            // When SAO is off, row is considered reconstructed when the last LCU
+            // is done, although the bottom 2 pixels might still need deblocking.
+            // To work around this, add 2 luma pixels to the reach of the mv
+            // in order to avoid referencing those possibly non-deblocked pixels.
+            int mv_lcu_row_reach_1 = ((y+(mv[0][1]>>2)) + LCU_WIDTH >> depth - 1 + 2) / LCU_WIDTH;
+            int mv_lcu_row_reach_2 = ((y+(mv[1][1]>>2)) + LCU_WIDTH >> depth - 1 + 2) / LCU_WIDTH;
+            int cur_lcu_row = y / LCU_WIDTH;
+            if (mv_lcu_row_reach_1 > cur_lcu_row + max_lcu_below || mv_lcu_row_reach_2 > cur_lcu_row + max_lcu_below) {
+              continue;
+            }
+          }
 
           inter_recon_lcu_bipred(state, state->global->ref->images[merge_cand[i].ref[0]], state->global->ref->images[merge_cand[j].ref[1]], x, y, LCU_WIDTH >> depth, mv, templcu);
 
