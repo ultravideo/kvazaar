@@ -54,12 +54,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   
   state->tile->frame->rec = NULL;
   
-  if (state->type == ENCODER_STATE_TYPE_MAIN) {
-    //If not a parent, then we can avoid keeping a copy of the image
-    state->tile->frame->source = image_alloc(state->tile->frame->width, state->tile->frame->height, 0);
-  } else {
-    state->tile->frame->source = NULL;
-  }
+  state->tile->frame->source = NULL;
 
   if (!state->tile->frame) {
     printf("Error allocating videoframe!\r\n");

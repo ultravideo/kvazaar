@@ -898,7 +898,7 @@ static int read_and_fill_frame_data(FILE *file,
   return 1;
 }
 
-int read_one_frame(FILE* file, const encoder_state_t * const state)
+int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img_out)
 {
   unsigned width = state->encoder_control->in.real_width;
   unsigned height = state->encoder_control->in.real_height;
@@ -978,46 +978,47 @@ int read_one_frame(FILE* file, const encoder_state_t * const state)
       gop_skipped--;
     }
     state->global->gop_offset = cur_gop_idx;
-    memcpy(state->tile->frame->source->y, gop_pictures[cur_gop].source->y, width * height);
-    memcpy(state->tile->frame->source->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
-    memcpy(state->tile->frame->source->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
+    memcpy(img_out->y, gop_pictures[cur_gop].source->y, width * height);
+    memcpy(img_out->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
+    memcpy(img_out->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
     gop_pictures_available--;
   } else {
     if (width != array_width) {
       // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
       if (!read_and_fill_frame_data(file, width, height, array_width,
-        state->tile->frame->source->y) ||
+        img_out->y) ||
         !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-        state->tile->frame->source->u) ||
+        img_out->u) ||
         !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-        state->tile->frame->source->v))
+        img_out->v))
         return 0;
     } else {
       // Otherwise the data can be read directly to the array.
       unsigned y_size = width * height;
       unsigned uv_size = (width >> 1) * (height >> 1);
-      if (y_size != fread(state->tile->frame->source->y, sizeof(unsigned char),
+      if (y_size != fread(img_out->y, sizeof(unsigned char),
         y_size, file) ||
-        uv_size != fread(state->tile->frame->source->u, sizeof(unsigned char),
+        uv_size != fread(img_out->u, sizeof(unsigned char),
         uv_size, file) ||
-        uv_size != fread(state->tile->frame->source->v, sizeof(unsigned char),
+        uv_size != fread(img_out->v, sizeof(unsigned char),
         uv_size, file))
         return 0;
     }
 
     if (height != array_height) {
       fill_after_frame(height, array_width, array_height,
-        state->tile->frame->source->y);
+        img_out->y);
       fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-        state->tile->frame->source->u);
+        img_out->u);
       fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-        state->tile->frame->source->v);
+        img_out->v);
     }
   }
   return 1;
 }
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3], uint64_t *bitstream_length) {
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3], uint64_t *bitstream_length)
+{
   const encoder_control_t * const encoder = state->encoder_control;
   
   if (state->stats_done) return;
@@ -1054,10 +1055,16 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double f
   *bitstream_length += state->stats_bitstream_length;
 }
 
-void encoder_next_frame(encoder_state_t *state) {
+void encoder_next_frame(encoder_state_t *state, image_t *img_in)
+{
   const encoder_control_t * const encoder = state->encoder_control;
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
+
+  if (state->tile->frame->source) {
+    image_free(state->tile->frame->source);
+  }
+  state->tile->frame->source = image_make_subimage(img_in, 0, 0, state->tile->frame->width, state->tile->frame->height);
   
   state->stats_done = 1;
 

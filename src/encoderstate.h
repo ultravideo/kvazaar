@@ -195,10 +195,10 @@ typedef struct encoder_state_t {
 
 
 void encode_one_frame(encoder_state_t *state);
-int read_one_frame(FILE* file, const encoder_state_t *state);
+int read_one_frame(FILE* file, const encoder_state_t *state, image_t *img_out);
 
 void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double psnr[3], uint64_t *bitstream_length);
-void encoder_next_frame(encoder_state_t *state);
+void encoder_next_frame(encoder_state_t *state, image_t *img_in);
 
 
 void encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,

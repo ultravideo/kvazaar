@@ -26,29 +26,7 @@
  */
 
 #include "global.h"
-
-/**
- * \brief Struct which contains all picture data
- */
-typedef struct image_t
-{
-  pixel_t *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
-
-  pixel_t *y;                //!< \brief Pointer to luma pixel array.
-  pixel_t *u;                //!< \brief Pointer to chroma U pixel array.
-  pixel_t *v;                //!< \brief Pointer to chroma V pixel array.
-  pixel_t *data[NUM_COLORS]; //!< \brief Alternate access method to same data.
-
-  int32_t width;           //!< \brief Luma pixel array width.
-  int32_t height;          //!< \brief Luma pixel array height.
-  
-  int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
-  
-  struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
-  int32_t refcount;        //!< \brief Number of references in reflist to the picture
-  
-  int32_t poc;             //!< \brief Picture order count
-} image_t;
+#include "kvazaar.h"
 
 typedef struct {
   pixel_t y[LCU_LUMA_SIZE];

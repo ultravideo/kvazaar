@@ -173,9 +173,15 @@ int main(int argc, char *argv[])
       if (!strcmp(cfg->input, "-")) {
         // Input is stdin.
         int i;
-        for (i = 0; !error && i < cfg->seek; ++i) {
-          error = !read_one_frame(input, &enc->states[current_encoder_state]);
+        image_t *img_in = image_alloc(encoder->in.width, encoder->in.height, 0);
+        if (!img_in) {
+          fprintf(stderr, "Failed to allocate image.\n");
+          goto exit_failure;
         }
+        for (i = 0; !error && i < cfg->seek; ++i) {
+          error = !read_one_frame(input, &enc->states[current_encoder_state], img_in);
+        }
+        image_free(img_in);
       } else {
         // input is a file. We hope. Proper detection is OS dependent.
         error = fseek(input, cfg->seek * frame_bytes, SEEK_CUR);
@@ -197,22 +203,29 @@ int main(int argc, char *argv[])
     // Start coding cycle while data on input and not on the last frame
     encoder_state_t *state = &enc->states[current_encoder_state];
     while (cfg->frames == 0 || frames_started < cfg->frames) {
+      image_t *img_out = NULL;
       frames_started += 1;
+
       
-      //Clear encoder
-      encoder_next_frame(&enc->states[current_encoder_state]);
-      
-      CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
+      image_t *img_in = image_alloc(state->tile->frame->width, state->tile->frame->height, 0);
+      if (!img_in) {
+        fprintf(stderr, "Failed to allocate image.\n");
+        goto exit_failure;
+      }
 
       // Read one frame from the input
-      if (!read_one_frame(input, &enc->states[current_encoder_state])) {
+      if (!read_one_frame(input, &enc->states[current_encoder_state], img_in)) {
         if (!feof(input))
           fprintf(stderr, "Failed to read a frame %d\n", enc->states[current_encoder_state].global->frame);
+
         
-        //Ignore this frame, which is not valid...
         enc->states[current_encoder_state].stats_done = 1;
         break;
       }
+
+      encoder_next_frame(&enc->states[current_encoder_state], img_in);
+
+      CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
       // The actual coding happens here, after this function we have a coded frame
       encode_one_frame(&enc->states[current_encoder_state]);
@@ -221,10 +234,16 @@ int main(int argc, char *argv[])
       current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);
       state = &enc->states[current_encoder_state];
 
+      if (frames_started >= enc->num_encoder_states && !state->stats_done) {
+        threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
+        img_out = image_make_subimage(state->tile->frame->rec, 0, 0, state->tile->frame->width, state->tile->frame->height);
+      }
+
       // If all frame encoders are in use, wait for the next encoder to finish.
-      if (frames_started >= enc->num_encoder_states) {
+      if (img_out != NULL) {
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
+        
         frames_done += 1;
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
@@ -232,6 +251,9 @@ int main(int argc, char *argv[])
 
         print_frame_info(state, frame_psnr);
       }
+
+      image_free(img_in);
+      image_free(img_out);
     }
     
     //Compute stats for the remaining encoders

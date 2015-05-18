@@ -38,6 +38,16 @@ typedef struct config_t kvz_cfg;
 typedef struct encoder_state_t encoder_state_t;
 typedef struct kvz_payload kvz_payload;
 typedef struct encoder_control_t encoder_control_t;
+typedef struct image_t kvz_picture;
+
+
+#define BIT_DEPTH 8
+#if BIT_DEPTH == 8
+typedef uint8_t pixel_t;
+#else
+typedef uint16_t pixel_t;
+#endif
+
 
 /**
 * A payload unit containing at most a single frame.
@@ -50,12 +60,27 @@ typedef struct kvz_payload {
   kvz_payload *next;
 } kvz_payload;
 
-typedef struct kvz_picture {
-  void*    planes[3];
-  uint32_t stride[3];
-  uint8_t  bit_depth;
-  uint8_t  poc;
-} kvz_picture;
+/**
+* \brief Struct which contains all picture data
+*/
+typedef struct image_t {
+  pixel_t *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
+
+  pixel_t *y;                //!< \brief Pointer to luma pixel array.
+  pixel_t *u;                //!< \brief Pointer to chroma U pixel array.
+  pixel_t *v;                //!< \brief Pointer to chroma V pixel array.
+  pixel_t *data[3]; //!< \brief Alternate access method to same data.
+
+  int32_t width;           //!< \brief Luma pixel array width.
+  int32_t height;          //!< \brief Luma pixel array height.
+
+  int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
+
+  struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
+  int32_t refcount;        //!< \brief Number of references in reflist to the picture
+
+  int32_t poc;             //!< \brief Picture order count
+} image_t;
 
 /**
  * Main datastructure representing one instance of the encoder.

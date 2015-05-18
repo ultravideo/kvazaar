@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <limits.h>
 
+#include "kvazaar.h"
+
 #if defined(_MSC_VER) && defined(_M_AMD64)
   #define X86_64
 #endif
@@ -43,15 +45,9 @@
   #define X86_64
 #endif
 
-#define BIT_DEPTH 8
 #define PIXEL_MIN 0
 #define PIXEL_MAX ((1 << BIT_DEPTH) - 1)
 
-#if BIT_DEPTH == 8
-typedef uint8_t pixel_t;
-#else
-typedef uint16_t pixel_t;
-#endif
 typedef int16_t coeff_t;
 
 //#define VERBOSE 1
