@@ -195,21 +195,8 @@ int main(int argc, char *argv[])
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     // Start coding cycle while data on input and not on the last frame
+    encoder_state_t *state = &enc->states[current_encoder_state];
     while (cfg->frames == 0 || frames_started < cfg->frames) {
-      encoder_state_t *state = &enc->states[current_encoder_state];
-
-      // If we have started as many frames as we are going to encode in parallel, wait for the first one we started encoding to finish before
-      // encoding more.
-      if (frames_started > cfg->owf) {
-        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_compute_stats(&enc->states[current_encoder_state], recout, frame_psnr, &bitstream_length);
-        frames_done += 1;
-        psnr_sum[0] += frame_psnr[0];
-        psnr_sum[1] += frame_psnr[1];
-        psnr_sum[2] += frame_psnr[2];
-
-        print_frame_info(state, frame_psnr);
-      }
       frames_started += 1;
       
       //Clear encoder
@@ -232,6 +219,19 @@ int main(int argc, char *argv[])
       
       //Switch to the next encoder
       current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);
+      state = &enc->states[current_encoder_state];
+
+      // If all frame encoders are in use, wait for the next encoder to finish.
+      if (frames_started >= enc->num_encoder_states) {
+        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
+        encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
+        frames_done += 1;
+        psnr_sum[0] += frame_psnr[0];
+        psnr_sum[1] += frame_psnr[1];
+        psnr_sum[2] += frame_psnr[2];
+
+        print_frame_info(state, frame_psnr);
+      }
     }
     
     //Compute stats for the remaining encoders
