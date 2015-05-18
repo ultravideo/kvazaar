@@ -189,6 +189,9 @@
     <ClCompile Include="..\..\src\cli.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\kvazaar.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\rate_control.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -333,6 +336,12 @@
       <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\cli.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\kvazaar.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\kvazaar_version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\rate_control.h">

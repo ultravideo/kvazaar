@@ -47,6 +47,7 @@
 #include "scalinglist.h"
 #include "strategyselector.h"
 #include "cli.h"
+#include "kvazaar.h"
 
 
 /**
@@ -60,7 +61,6 @@ int main(int argc, char *argv[])
   config_t *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
-  encoder_control_t encoder;
   uint64_t curpos = 0;
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
@@ -139,48 +139,33 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  if (!encoder_control_init(&encoder, cfg)) {
+  const kvz_api *api = kvz_api_get(8);
+
+  kvz_encoder* enc = api->encoder_open(cfg);
+  if (!enc) {
+    fprintf(stderr, "Failed to open encoder.");
     goto exit_failure;
   }
+
+  
+  for (unsigned i = 0; i <= cfg->owf; ++i) {
+    enc->states[i].stream.file.output = output;
+  }
+
+  encoder_control_t *encoder = enc->control;
   
   fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
-         encoder.in.width, encoder.in.height,
-         encoder.in.real_width, encoder.in.real_height);
+         encoder->in.width, encoder->in.height,
+         encoder->in.real_width, encoder->in.real_height);
   
   //Now, do the real stuff
   {
-    encoder_state_t *encoder_states = malloc((encoder.owf + 1) * sizeof(encoder_state_t));
-    if (encoder_states == NULL) {
-      fprintf(stderr, "Failed to allocate memory.");
-      goto exit_failure;
-    }
 
     int i;
     int current_encoder_state = 0;
-    for (i = 0; i <= encoder.owf; ++i) {
-      encoder_states[i].encoder_control = &encoder;
-      if (i > 0) {
-        encoder_states[i].previous_encoder_state = &encoder_states[i-1];
-      } else { 
-        //i == 0, use last encoder as the previous one
-        encoder_states[i].previous_encoder_state = &encoder_states[encoder.owf];
-      }
-      if (!encoder_state_init(&encoder_states[i], NULL)) {
-        goto exit_failure;
-      }
-      encoder_states[i].stream.file.output = output;
-      encoder_states[i].global->QP = (int8_t)encoder.cfg->qp;
-    }
     
-    for (i = 0; i <= encoder.owf; ++i) {
-      encoder_state_match_children_of_previous_frame(&encoder_states[i]);
-    }
     
-    //Initial frame
-    encoder_states[current_encoder_state].global->frame    = -1;
-    
-    // Skip '--seek' frames before input.
     if (cfg->seek > 0) {
       int frame_bytes = cfg->width * cfg->height * 3 / 2;
       int error = 0;
@@ -189,7 +174,7 @@ int main(int argc, char *argv[])
         // Input is stdin.
         int i;
         for (i = 0; !error && i < cfg->seek; ++i) {
-          error = !read_one_frame(input, &encoder_states[current_encoder_state]);
+          error = !read_one_frame(input, &enc->states[current_encoder_state]);
         }
       } else {
         // input is a file. We hope. Proper detection is OS dependent.
@@ -211,13 +196,13 @@ int main(int argc, char *argv[])
 
     // Start coding cycle while data on input and not on the last frame
     while (cfg->frames == 0 || frames_started < cfg->frames) {
-      encoder_state_t *state = &encoder_states[current_encoder_state];
+      encoder_state_t *state = &enc->states[current_encoder_state];
 
       // If we have started as many frames as we are going to encode in parallel, wait for the first one we started encoding to finish before
       // encoding more.
       if (frames_started > cfg->owf) {
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_compute_stats(&encoder_states[current_encoder_state], recout, frame_psnr, &bitstream_length);
+        encoder_compute_stats(&enc->states[current_encoder_state], recout, frame_psnr, &bitstream_length);
         frames_done += 1;
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
@@ -228,25 +213,25 @@ int main(int argc, char *argv[])
       frames_started += 1;
       
       //Clear encoder
-      encoder_next_frame(&encoder_states[current_encoder_state]);
+      encoder_next_frame(&enc->states[current_encoder_state]);
       
       CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
 
       // Read one frame from the input
-      if (!read_one_frame(input, &encoder_states[current_encoder_state])) {
+      if (!read_one_frame(input, &enc->states[current_encoder_state])) {
         if (!feof(input))
-          fprintf(stderr, "Failed to read a frame %d\n", encoder_states[current_encoder_state].global->frame);
+          fprintf(stderr, "Failed to read a frame %d\n", enc->states[current_encoder_state].global->frame);
         
         //Ignore this frame, which is not valid...
-        encoder_states[current_encoder_state].stats_done = 1;
+        enc->states[current_encoder_state].stats_done = 1;
         break;
       }
 
       // The actual coding happens here, after this function we have a coded frame
-      encode_one_frame(&encoder_states[current_encoder_state]);
+      encode_one_frame(&enc->states[current_encoder_state]);
       
       //Switch to the next encoder
-      current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
+      current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);
     }
     
     //Compute stats for the remaining encoders
@@ -254,7 +239,7 @@ int main(int argc, char *argv[])
       int first_enc = current_encoder_state;
       do {
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_state_t *state = &encoder_states[current_encoder_state];
+        encoder_state_t *state = &enc->states[current_encoder_state];
 
         if (!state->stats_done) {
           encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
@@ -265,14 +250,14 @@ int main(int argc, char *argv[])
           psnr_sum[2] += frame_psnr[2];
         }
 
-        current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
+        current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);
       } while (current_encoder_state != first_enc);
     }
     
     GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     
-    threadqueue_flush(encoder.threadqueue);
+    threadqueue_flush(encoder->threadqueue);
     
     
     // Coding finished
@@ -297,16 +282,15 @@ int main(int argc, char *argv[])
     fclose(output);
     if(recout != NULL) fclose(recout);
     
-    for (i = 0; i <= encoder.owf; ++i) {
-      encoder_state_finalize(&encoder_states[i]);
+    for (i = 0; i <= encoder->owf; ++i) {
+      encoder_state_finalize(&enc->states[i]);
     }
 
-    free(encoder_states);
+    api->encoder_close(enc);
   }
 
   // Deallocating
   config_destroy(cfg);
-  encoder_control_finalize(&encoder);
 
   free_exp_golomb();
   

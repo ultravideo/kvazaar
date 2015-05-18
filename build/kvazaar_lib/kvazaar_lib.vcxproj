@@ -125,6 +125,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\kvazaar.c" />
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
     <ClCompile Include="..\..\src\cli.c" />
@@ -205,6 +206,8 @@
     <ClInclude Include="..\..\src\global.h" />
     <ClInclude Include="..\..\src\inter.h" />
     <ClInclude Include="..\..\src\intra.h" />
+    <ClInclude Include="..\..\src\kvazaar.h" />
+    <ClInclude Include="..\..\src\kvazaar_version.h" />
     <ClInclude Include="..\..\src\nal.h" />
     <ClInclude Include="..\..\src\rate_control.h" />
     <ClInclude Include="..\..\src\rdo.h" />

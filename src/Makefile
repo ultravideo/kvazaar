@@ -91,6 +91,7 @@ OBJS = \
   filter.o \
   inter.o \
   intra.o \
+  kvazaar.o \
   nal.o \
   imagelist.o \
   rdo.o \

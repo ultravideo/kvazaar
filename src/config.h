@@ -43,7 +43,7 @@ typedef struct {
 /*!
     \brief Struct which contains all configuration data
 */
-typedef struct
+typedef struct config_t
 {
   char *input;      /*!< \brief Pointer to input filename  */
   char *output;     /*!< \brief Pointer to output filename */
