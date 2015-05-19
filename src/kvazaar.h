@@ -90,8 +90,9 @@ typedef struct image_t {
 typedef struct kvz_encoder {
   encoder_control_t* control;
   encoder_state_t* states;
-  int num_encoder_states;
-  int cur_state_num;
+  unsigned num_encoder_states;
+  unsigned cur_state_num;
+  unsigned frames_started;
 
   size_t bitstream_length;
 } kvz_encoder;
@@ -115,7 +116,7 @@ typedef struct kvz_api {
   // \param pic_out   Picture containing the reconstructed data.
   // \param nals_out  The first NAL containing bitstream generated, or NULL.
   // \return 1 on success, negative on error.
-  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture *pic_out, kvz_payload **payload);
+  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload **payload);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

@@ -203,7 +203,6 @@ int main(int argc, char *argv[])
     // Start coding cycle while data on input and not on the last frame
     encoder_state_t *state = &enc->states[current_encoder_state];
     while (cfg->frames == 0 || frames_started < cfg->frames) {
-      image_t *img_out = NULL;
       frames_started += 1;
 
       
@@ -223,24 +222,11 @@ int main(int argc, char *argv[])
         break;
       }
 
-      encoder_next_frame(&enc->states[current_encoder_state], img_in);
+      image_t *img_out = NULL;
+      api->encoder_encode(enc, img_in, &img_out, NULL);
 
-      CHECKPOINT_MARK("read source frame: %d", encoder_states[current_encoder_state].global->frame + cfg->seek);
-
-      // The actual coding happens here, after this function we have a coded frame
-      encode_one_frame(&enc->states[current_encoder_state]);
-      
-      //Switch to the next encoder
-      current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);
-      state = &enc->states[current_encoder_state];
-
-      if (frames_started >= enc->num_encoder_states && !state->stats_done) {
-        threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
-        img_out = image_make_subimage(state->tile->frame->rec, 0, 0, state->tile->frame->width, state->tile->frame->height);
-      }
-
-      // If all frame encoders are in use, wait for the next encoder to finish.
       if (img_out != NULL) {
+        state = &enc->states[enc->cur_state_num];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
         
@@ -262,14 +248,20 @@ int main(int argc, char *argv[])
       do {
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         encoder_state_t *state = &enc->states[current_encoder_state];
+        image_t *img_out = NULL;
+        api->encoder_encode(enc, NULL, &img_out, NULL);
 
-        if (!state->stats_done) {
+        if (img_out != NULL) {
+          encoder_state_t *state = &enc->states[current_encoder_state];
+
           encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
           print_frame_info(state, frame_psnr);
           frames_done += 1;
           psnr_sum[0] += frame_psnr[0];
           psnr_sum[1] += frame_psnr[1];
           psnr_sum[2] += frame_psnr[2];
+
+          image_free(img_out);
         }
 
         current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);

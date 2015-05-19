@@ -26,6 +26,7 @@
 #include "encoder.h"
 #include "strategyselector.h"
 #include "encoderstate.h"
+#include "checkpoint.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)
@@ -70,6 +71,7 @@ static kvz_encoder * kvazaar_open(config_t *cfg)
 
   encoder->num_encoder_states = cfg->owf + 1;
   encoder->cur_state_num = 0;
+  encoder->frames_started = 0;
   encoder->states = MALLOC(encoder_state_t, encoder->num_encoder_states);
   if (!encoder->states) {
     goto kvazaar_open_failure;
@@ -104,8 +106,29 @@ kvazaar_open_failure:
 }
 
 
-static int kvazaar_encode(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture *pic_out, kvz_payload **payload)
+static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload **payload)
 {
+  // If img_in is NULL, just return the next unfinished frame.
+  if (img_in != NULL) {
+    encoder_state_t *state = &enc->states[enc->cur_state_num];
+
+    enc->frames_started += 1;
+    encoder_next_frame(state, img_in);
+
+    CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
+
+    // The actual coding happens here, after this function we have a coded frame
+    encode_one_frame(state);
+  }
+
+  enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
+  encoder_state_t *state = &enc->states[enc->cur_state_num];
+
+  if (enc->frames_started >= enc->num_encoder_states && !state->stats_done) {
+    threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
+    *img_out = image_make_subimage(state->tile->frame->rec, 0, 0, state->tile->frame->width, state->tile->frame->height);
+  }
+
   return 0;
 }
 
