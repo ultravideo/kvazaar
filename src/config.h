@@ -116,6 +116,7 @@ config_t *config_alloc(void);
 int config_init(config_t *cfg);
 int config_destroy(config_t *cfg);
 int config_read(config_t *cfg,int argc, char *argv[]);
+int config_parse(config_t *cfg, const char *name, const char *value);
 int config_validate(config_t *cfg);
 int config_set_owf_auto(config_t *cfg);
 

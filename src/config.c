@@ -302,7 +302,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
   return 1;
 }
 
-static int config_parse(config_t *cfg, const char *name, const char *value)
+int config_parse(config_t *cfg, const char *name, const char *value)
 {
   static const char * const me_names[]          = { "hexbs", "tz", NULL };
 

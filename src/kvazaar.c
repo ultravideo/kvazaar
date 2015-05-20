@@ -135,11 +135,8 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
 kvz_api kvz_8bit_api = {
   .config_alloc = config_alloc,
   .config_init = config_init,
-  .config_read = config_read,
   .config_destroy = config_destroy,
-
-  .picture_create = NULL,
-  .picture_destroy = NULL,
+  .config_parse = config_parse,
 
   .encoder_open = kvazaar_open,
   .encoder_close = kvazaar_close,

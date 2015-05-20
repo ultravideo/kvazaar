@@ -102,10 +102,7 @@ typedef struct kvz_api {
   kvz_cfg *     (*config_alloc)(void);
   int           (*config_destroy)(kvz_cfg *);
   int           (*config_init)(kvz_cfg *);
-  int           (*config_read)(kvz_cfg *, int argc, char *argv[]);
-
-  kvz_picture * (*picture_create)(void);
-  void          (*picture_destroy)(kvz_picture *);
+  int           (*config_parse)(kvz_cfg *, const char *name, const char *value);
 
   kvz_encoder * (*encoder_open)(kvz_cfg *);
   void          (*encoder_close)(kvz_encoder *);
