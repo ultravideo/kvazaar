@@ -36,7 +36,7 @@ extern "C" {
 
 typedef struct config_t kvz_cfg;
 typedef struct encoder_state_t encoder_state_t;
-typedef struct kvz_payload kvz_payload;
+typedef union bitstream_t kvz_payload;
 typedef struct encoder_control_t encoder_control_t;
 typedef struct image_t kvz_picture;
 
@@ -48,17 +48,6 @@ typedef uint8_t pixel_t;
 typedef uint16_t pixel_t;
 #endif
 
-
-/**
-* A payload unit containing at most a single frame.
-* If next is not NULL, the bytestream continues in that payload unit.
-*/
-typedef struct kvz_payload {
-  uint32_t     type;
-  uint32_t     size_bytes;
-  uint8_t     *payload;
-  kvz_payload *next;
-} kvz_payload;
 
 /**
 * \brief Struct which contains all picture data
@@ -113,7 +102,7 @@ typedef struct kvz_api {
   // \param pic_out   Picture containing the reconstructed data.
   // \param nals_out  The first NAL containing bitstream generated, or NULL.
   // \return 1 on success, negative on error.
-  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload **payload);
+  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload *payload);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

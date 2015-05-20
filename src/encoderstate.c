@@ -786,7 +786,8 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     state->global->cur_lambda_cost = lambda;
     state->global->cur_lambda_cost_sqrt = sqrt(lambda);
 
-  } else {
+  }
+  if (state->stream.base.type == BITSTREAM_TYPE_MEMORY) {
     //Clear the bitstream if it's not the main encoder
     bitstream_clear(&state->stream);
   }

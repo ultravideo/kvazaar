@@ -53,7 +53,7 @@ typedef struct
   uint32_t allocated_length;
 } bitstream_mem_t;
 
-typedef union
+typedef union bitstream_t
 {
   bitstream_base_t base;
   bitstream_file_t file;

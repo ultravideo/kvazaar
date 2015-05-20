@@ -817,9 +817,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
     state->global->cur_gop_bits_coded = 0;
   }
   state->global->cur_gop_bits_coded += newpos - curpos;
-
-  // Flush the output in case someone is reading the file on the other end.
-  fflush(state->stream.file.output);
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state_t * const state) {

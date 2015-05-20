@@ -117,13 +117,19 @@ int main(int argc, char *argv[])
   } else {
     // Otherwise we try to open the output file
     output = fopen(cfg->output, "wb");
+    // Check that output was opened correctly
+    if (output == NULL) {
+      fprintf(stderr, "Could not open output file, shutting down!\n");
+      goto exit_failure;
+    }
   }
 
-  // Check that output was opened correctly
-  if (output == NULL) {
-    fprintf(stderr, "Could not open output file, shutting down!\n");
-    goto exit_failure;
+  bitstream_t output_stream;
+  if (!bitstream_init(&output_stream, BITSTREAM_TYPE_FILE)) {
+    fprintf(stderr, "Could not initialize stream!\n");
+    return 0;
   }
+  output_stream.file.output = output;
 
   if (cfg->debug != NULL) {
     recout = fopen(cfg->debug, "wb");
@@ -145,11 +151,6 @@ int main(int argc, char *argv[])
   if (!enc) {
     fprintf(stderr, "Failed to open encoder.");
     goto exit_failure;
-  }
-
-  
-  for (unsigned i = 0; i <= cfg->owf; ++i) {
-    enc->states[i].stream.file.output = output;
   }
 
   encoder_control_t *encoder = enc->control;
@@ -223,7 +224,7 @@ int main(int argc, char *argv[])
       }
 
       image_t *img_out = NULL;
-      api->encoder_encode(enc, img_in, &img_out, NULL);
+      api->encoder_encode(enc, img_in, &img_out, &output_stream);
 
       if (img_out != NULL) {
         state = &enc->states[enc->cur_state_num];
@@ -247,9 +248,8 @@ int main(int argc, char *argv[])
       int first_enc = current_encoder_state;
       do {
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_state_t *state = &enc->states[current_encoder_state];
         image_t *img_out = NULL;
-        api->encoder_encode(enc, NULL, &img_out, NULL);
+        api->encoder_encode(enc, NULL, &img_out, &output_stream);
 
         if (img_out != NULL) {
           encoder_state_t *state = &enc->states[current_encoder_state];
@@ -291,6 +291,8 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
+
+    bitstream_finalize(&output_stream);
 
     fclose(input);
     fclose(output);

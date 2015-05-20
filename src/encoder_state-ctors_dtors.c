@@ -322,20 +322,9 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
   }
   
-  //Allocate bitstream
-  if (child_state->type == ENCODER_STATE_TYPE_MAIN) {
-    //Main encoder outputs to file
-    if (!bitstream_init(&child_state->stream, BITSTREAM_TYPE_FILE)) {
-      fprintf(stderr, "Could not initialize stream!\n");
-      return 0;
-    }
-    child_state->stream.file.output = NULL;
-  } else {
-    //Other encoders use a memory bitstream
-    if (!bitstream_init(&child_state->stream, BITSTREAM_TYPE_MEMORY)) {
-      fprintf(stderr, "Could not initialize stream!\n");
-      return 0;
-    }
+  if (!bitstream_init(&child_state->stream, BITSTREAM_TYPE_MEMORY)) {
+    fprintf(stderr, "Could not initialize stream!\n");
+    return 0;
   }
   
   // Set CABAC output bitstream

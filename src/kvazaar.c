@@ -27,6 +27,7 @@
 #include "strategyselector.h"
 #include "encoderstate.h"
 #include "checkpoint.h"
+#include "bitstream.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)
@@ -106,7 +107,7 @@ kvazaar_open_failure:
 }
 
 
-static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload **payload)
+static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload *payload)
 {
   // If img_in is NULL, just return the next unfinished frame.
   if (img_in != NULL) {
@@ -126,6 +127,14 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
 
   if (enc->frames_started >= enc->num_encoder_states && !state->stats_done) {
     threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
+    
+    bitstream_append(payload, &state->stream);
+
+    // Flush the output in case someone is reading the file on the other end.
+    if (payload->base.type == BITSTREAM_TYPE_FILE) {
+      fflush(payload->file.output);
+    }
+
     *img_out = image_make_subimage(state->tile->frame->rec, 0, 0, state->tile->frame->width, state->tile->frame->height);
   }
 
