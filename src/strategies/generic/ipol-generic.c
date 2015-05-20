@@ -204,6 +204,40 @@ void sample_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz
   }
 }
 
+void sample_14bit_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+{
+  //TODO: horizontal and vertical only filtering
+  int32_t x, y;
+  int16_t shift1 = KVZ_BIT_DEPTH - 8;
+  int32_t shift2 = 6;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
+  int32_t offset23 = 1 << (shift2 + shift3 - 1);
+
+  //coefficients for 1/4, 2/4 and 3/4 positions
+  int8_t *hor_filter = g_luma_filter[mv[0] & 3];
+  int8_t *ver_filter = g_luma_filter[mv[1] & 3];
+
+  int16_t flipped_hor_filtered[(LCU_WIDTH + 1) + FILTER_SIZE][(LCU_WIDTH + 1) + FILTER_SIZE];
+
+  // Filter horizontally and flip x and y
+  for (x = 0; x < width; ++x) {
+    for (y = 0; y < height + FILTER_SIZE; ++y) {
+      int ypos = y - FILTER_OFFSET;
+      int xpos = x - FILTER_OFFSET;
+      flipped_hor_filtered[x][y] = eight_tap_filter_hor_generic(hor_filter, &src[src_stride*ypos + xpos]) >> shift1;
+    }
+  }
+
+  // Filter vertically and flip x and y
+  for (x = 0; x < width; ++x) {
+    for (y = 0; y < height; ++y) {
+      int ypos = y;
+      int xpos = x;
+      dst[y*dst_stride + x] = (eight_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2;
+    }
+  }
+}
+
 /**
  * \brief Interpolation for chroma half-pixel
  * \param src source image in integer pels (-2..width+3, -2..height+3)
@@ -414,6 +448,41 @@ void sample_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_p
       int ypos = y;
       int xpos = x;
       dst[y*dst_stride + x] = fast_clip_32bit_to_pixel(((four_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2) >> shift3);
+    }
+  }
+}
+
+void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+{
+  //TODO: horizontal and vertical only filtering
+  int32_t x, y;
+  int16_t shift1 = KVZ_BIT_DEPTH - 8;
+  int32_t shift2 = 6;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
+  int32_t offset23 = 1 << (shift2 + shift3 - 1);
+
+  int8_t *hor_filter = g_chroma_filter[mv[0] & 7];
+  int8_t *ver_filter = g_chroma_filter[mv[1] & 7];
+
+#define FILTER_SIZE_C (FILTER_SIZE / 2)
+#define FILTER_OFFSET_C (FILTER_OFFSET / 2)
+  int16_t flipped_hor_filtered[(LCU_WIDTH_C + 1) + FILTER_SIZE_C][(LCU_WIDTH_C + 1) + FILTER_SIZE_C];
+
+  // Filter horizontally and flip x and y
+  for (x = 0; x < width; ++x) {
+    for (y = 0; y < height + FILTER_SIZE_C; ++y) {
+      int ypos = y - FILTER_OFFSET_C;
+      int xpos = x - FILTER_OFFSET_C;
+      flipped_hor_filtered[x][y] = four_tap_filter_hor_generic(hor_filter, &src[src_stride*ypos + xpos]) >> shift1;
+    }
+  }
+
+  // Filter vertically and flip x and y
+  for (x = 0; x < width; ++x) {
+    for (y = 0; y < height; ++y) {
+      int ypos = y;
+      int xpos = x;
+      dst[y*dst_stride + x] = (four_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2;
     }
   }
 }
