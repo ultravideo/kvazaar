@@ -8,7 +8,7 @@ ifeq (, $(ARCH))
 endif
 SYSTEM = $(shell uname -s)
 ASMFLAGS =
-CFLAGS += -O2 -g -Werror -ftree-vectorize
+CFLAGS += -O3 -DNDEBUG -Werror
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
@@ -23,8 +23,8 @@ else
     TARGET_CPU_ARCH := x86
 endif
 
-CFLAGS += -m$(TARGET_CPU_BITS)
-LDFLAGS += -m$(TARGET_CPU_BITS)
+#CFLAGS += -m$(TARGET_CPU_BITS)
+#LDFLAGS += -m$(TARGET_CPU_BITS)
 
 # Windows (cygwin/mingw) specific flags
 ifneq ( ,$(findstring Windows, $(OS)))
@@ -49,9 +49,9 @@ else ifeq ($(SYSTEM),Darwin)
 else
   LDFLAGS += -lrt
   ifeq ($(ARCH), x86_64)
-    ASMFLAGS += -f elf64
+#    ASMFLAGS += -f elf64
   else
-    ASMFLAGS += -f elf32
+#    ASMFLAGS += -f elf32
   endif
 endif
 # Flags shared across systems
@@ -62,7 +62,7 @@ else
 endif
 
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
-WARNINGS = -Wall -Wtype-limits -Wvla
+WARNINGS = -Wall -Wtype-limits
 
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
@@ -76,7 +76,7 @@ ifneq (, $(GCCVERSION))
 endif
 CFLAGS += -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm -pthread
-LD = gcc
+#LD = gcc
 OBJS = \
   bitstream.o \
   cabac.o \
@@ -170,11 +170,11 @@ all: $(PROG)
 ifeq ($(ARCH), ppc64)
   strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto
 else
-  strategies/sse2/%.o: EXTRA_FLAGS += -msse2 -fno-lto
-  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1 -fno-lto
+#  strategies/sse2/%.o: EXTRA_FLAGS += -msse2 -fno-lto
+#  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1 -fno-lto
   #Needs to be defined on Travis
   ifndef KVZ_DISABLE_AVX2
-    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2 -fno-lto
+#    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2 -fno-lto
   endif
 endif
 
