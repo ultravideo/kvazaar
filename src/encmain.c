@@ -23,6 +23,10 @@
  *
  */
 
+#define _GNU_SOURCE
+#include <sched.h>
+
+
 #ifdef _WIN32
 /* The following two defines must be located before the inclusion of any system header files. */
 #define WINVER       0x0500
@@ -55,6 +59,20 @@
  */
 int main(int argc, char *argv[])
 {
+#if XEON_PHI
+  // Force main thread to run on the first core.
+  cpu_set_t cpus;
+  CPU_ZERO(&cpus);
+  CPU_SET(0, &cpus);
+  CPU_SET(1, &cpus);
+  CPU_SET(2, &cpus);
+  CPU_SET(3, &cpus);
+
+  pthread_t thread = pthread_self();
+
+  pthread_setaffinity_np(&thread, sizeof(cpu_set_t), &cpus);
+#endif
+
   config_t *cfg  = NULL; //!< Global configuration
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
