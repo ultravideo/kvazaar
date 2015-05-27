@@ -291,29 +291,28 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
   pthread_attr_t attr;
   pthread_attr_init(&attr);
 
+#if XEON_PHI
+  if (CPU_SETSIZE < 244) {
+    exit(1);
+  }
+
+  cpu_set_t cpus;
+  CPU_ZERO(&cpus);
+  for (unsigned i = 4; i < 60 * 4; ++i) {
+    CPU_SET(i, &cpus);
+  }
+#endif
+
   for(unsigned i = 0; i < thread_count; i++) {
     threadqueue_worker_spec *tqws = MALLOC(threadqueue_worker_spec, 1);
     if (tqws) {
       tqws->threadqueue = threadqueue;
       tqws->worker_id = i;
 #if XEON_PHI
-      // Spread the processses out evenly, such that two workers that started at the same time are less likely to 
-      // be on the same physical core and the first and the last core are left for main process and the OS.
-      unsigned affinity = i * 4;
-      while (affinity >= 236) {
-        affinity -= 236;
-        affinity += 1;
-      }
-      affinity += 4;
-
-      fprintf(stderr, "Setting thread %u affinity to cpu %u\n", i, affinity);
-
-      cpu_set_t cpus;
-      CPU_ZERO(&cpus);
-      CPU_SET(affinity, &cpus);
+      int cpu_count = CPU_COUNT(&cpus);
+      fprintf(stderr, "Setting thread %u affinity to cpus %i\n", i, cpu_count);
 
       pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
-
 #endif
 
       if (pthread_create(&(threadqueue->threads[i]), &attr, threadqueue_worker, (void*)tqws) != 0) {

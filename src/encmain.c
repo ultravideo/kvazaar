@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 
   pthread_t thread = pthread_self();
 
-  pthread_setaffinity_np(&thread, sizeof(cpu_set_t), &cpus);
+  pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpus);
 #endif
 
   config_t *cfg  = NULL; //!< Global configuration
