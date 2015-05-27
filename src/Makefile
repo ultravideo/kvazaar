@@ -71,8 +71,8 @@ STRATEGIES = generic sse2 sse41 avx2 x86_asm altivec
 #Detect if cc is gcc for the link time optimization flag
 GCCVERSION = $(shell $(CC) --version | grep GCC)
 ifneq (, $(GCCVERSION))
-  CFLAGS += -flto
-  LDFLAGS += -flto -O3
+#  CFLAGS += -flto
+#  LDFLAGS += -flto -O3
 endif
 CFLAGS += -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -lm -pthread

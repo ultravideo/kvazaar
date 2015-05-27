@@ -284,32 +284,30 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
   //Lock the queue before creating threads, to ensure they all have correct information
   PTHREAD_LOCK(&threadqueue->lock);
 
-  pthread_attr_t attr = NULL;
-#if XEON_PHI
-  cpu_set_t cpus;
+  pthread_attr_t attr;
   pthread_attr_init(&attr);
-#endif
-  
+
   for(unsigned i = 0; i < thread_count; i++) {
     threadqueue_worker_spec *tqws = MALLOC(threadqueue_worker_spec, 1);
     if (tqws) {
+      tqws->threadqueue = threadqueue;
+      tqws->worker_id = i;
 #if XEON_PHI
       // Spread the processses out evenly, such that two workers that started at the same time are less likely to 
       // be on the same physical core and the first and the last core are left for main process and the OS.
       unsigned threads_per_core = thread_count / 236;
       unsigned affinity = (i * threads_per_core) % 236 + 4;
 
-
       fprintf(stderr, "Setting thread %u affinity to cpu %u\n", i, affinity);
 
+      cpu_set_t cpus;
       CPU_ZERO(&cpus);
       CPU_SET(affinity, &cpus);
 
       pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+
 #endif
 
-      tqws->threadqueue = threadqueue;
-      tqws->worker_id = i;
       if (pthread_create(&(threadqueue->threads[i]), &attr, threadqueue_worker, (void*)tqws) != 0) {
           fprintf(stderr, "pthread_create failed!\n");
           assert(0);
