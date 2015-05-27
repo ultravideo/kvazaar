@@ -18,6 +18,9 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
  
+#define _GNU_SOURCE
+#include <sched.h>
+
 #include <assert.h>
 #include <pthread.h>
 #include <errno.h> //ETIMEDOUT
