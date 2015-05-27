@@ -36,9 +36,6 @@ static void gop_allocate_bits(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  const double avg_bits_per_picture =
-    encoder->cfg->target_bitrate / encoder->cfg->framerate;
-
   // At this point, total_bits_coded of the current state contains the
   // number of bits written encoder->owf frames before the current frame.
   int bits_coded = state->global->total_bits_coded;
@@ -54,7 +51,7 @@ static void gop_allocate_bits(encoder_state_t * const state)
   }
 
   double gop_target_bits =
-    (avg_bits_per_picture * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
+    (encoder->target_avg_bppic * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
     * MAX(1, encoder->cfg->gop_len) / SMOOTHING_WINDOW;
   state->global->cur_gop_target_bits = MAX(200, gop_target_bits);
 }
@@ -71,33 +68,9 @@ double pic_allocate_bits(const encoder_state_t * const state) {
     return state->global->cur_gop_target_bits;
   }
 
-  const double avg_bits_per_picture =
-    encoder->cfg->target_bitrate / encoder->cfg->framerate;
-  const int pixels_per_picture = encoder->in.width * encoder->in.height;
-  const double avg_bits_per_pixel = avg_bits_per_picture / pixels_per_picture;
-
-  int layer_weights[4];
-#define SET_ARRAY(array, x0, x1, x2, x3) \
-  do { array[0] = x0; array[1] = x1; array[2] = x2; array[3] = x3; } while(0)
-
-  if (avg_bits_per_pixel <= 0.05) {
-    SET_ARRAY(layer_weights, 30, 8, 4, 1);
-  } else if (avg_bits_per_pixel <= 0.1) {
-    SET_ARRAY(layer_weights, 25, 7, 4, 1);
-  } else if (avg_bits_per_pixel <= 0.2) {
-    SET_ARRAY(layer_weights, 20, 6, 4, 1);
-  } else {
-    SET_ARRAY(layer_weights, 15, 5, 4, 1);
-  }
-#undef SET_ARRAY
-
-  const int pic_weight = layer_weights[encoder->cfg->gop[state->global->gop_offset].layer - 1];
-  int sum_weights = 0;
-  for (int i = 0; i < encoder->cfg->gop_len; ++i) {
-    sum_weights += layer_weights[encoder->cfg->gop[i].layer - 1];
-  }
-
-  return state->global->cur_gop_target_bits * pic_weight / sum_weights;
+  const double pic_weight = encoder->gop_layer_weights[
+    encoder->cfg->gop[state->global->gop_offset].layer - 1];
+  return state->global->cur_gop_target_bits * pic_weight;
 }
 
 /**
@@ -123,10 +96,9 @@ double select_picture_lambda(encoder_state_t * const state)
   }
 
   // TODO: take the picture headers into account
-  const int pixels_per_picture = encoder->in.width * encoder->in.height;
   const double target_bits_current_picture = pic_allocate_bits(state);
   const double target_bits_per_pixel =
-    target_bits_current_picture / pixels_per_picture;
+    target_bits_current_picture / encoder->in.pixels_per_pic;
   const double lambda = 3.2003 * pow(target_bits_per_pixel, -1.367);
   return CLIP(0.1, 10000, lambda);
 }

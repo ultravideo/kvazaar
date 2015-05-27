@@ -43,6 +43,7 @@
 #include "sao.h"
 #include "rdo.h"
 
+static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
 int encoder_control_init(encoder_control_t * const encoder, const config_t * const cfg) {
   if (!cfg) {
@@ -89,6 +90,13 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
   scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
   
   encoder_control_input_init(encoder, cfg->width, cfg->height);
+
+  encoder->target_avg_bppic = cfg->target_bitrate / cfg->framerate;
+  encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
+
+  if (!encoder_control_init_gop_layer_weights(encoder)) {
+    return 0;
+  }
   
   //Tiles
   encoder->tiles_enable = (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0);
@@ -363,6 +371,7 @@ void encoder_control_input_init(encoder_control_t * const encoder,
     encoder->in.width_in_lcu++;
   }
 
+  encoder->in.pixels_per_pic = encoder->in.width * encoder->in.height;
 
 
   #ifdef _DEBUG
@@ -374,3 +383,66 @@ void encoder_control_input_init(encoder_control_t * const encoder,
   #endif
 }
 
+/**
+ * \brief Initialize GOP layer weights.
+ * \return 1 on success, 0 on failure.
+ *
+ * Selects appropriate weights for layers according to the target bpp.
+ * Only GOP structures with exactly four layers are supported.
+ */
+static int encoder_control_init_gop_layer_weights(encoder_control_t * const encoder)
+{
+
+  gop_config_t const * const gop = encoder->cfg->gop;
+  const int8_t gop_len = encoder->cfg->gop_len;
+
+  int num_layers = 0;
+  for (int i = 0; i < gop_len; ++i) {
+    num_layers = MAX(gop[i].layer, num_layers);
+  }
+
+  switch (num_layers) {
+    case 0:
+      break;
+
+    case 4:
+      // These weights were copied from http://doi.org/10.1109/TIP.2014.2336550
+      if (encoder->target_avg_bpp <= 0.05) {
+        encoder->gop_layer_weights[0] = 30;
+        encoder->gop_layer_weights[1] = 8;
+        encoder->gop_layer_weights[2] = 4;
+        encoder->gop_layer_weights[3] = 1;
+      } else if (encoder->target_avg_bpp <= 0.1) {
+        encoder->gop_layer_weights[0] = 25;
+        encoder->gop_layer_weights[1] = 7;
+        encoder->gop_layer_weights[2] = 4;
+        encoder->gop_layer_weights[3] = 1;
+      } else if (encoder->target_avg_bpp <= 0.2) {
+        encoder->gop_layer_weights[0] = 20;
+        encoder->gop_layer_weights[1] = 6;
+        encoder->gop_layer_weights[2] = 4;
+        encoder->gop_layer_weights[3] = 1;
+      } else {
+        encoder->gop_layer_weights[0] = 15;
+        encoder->gop_layer_weights[1] = 5;
+        encoder->gop_layer_weights[2] = 4;
+        encoder->gop_layer_weights[3] = 1;
+      }
+      break;
+
+    default:
+      fprintf(stderr, "Unsupported number of GOP layers (%d)\n", num_layers);
+      return 0;
+  }
+
+  // Normalize weights so that the sum of weights in a GOP is one.
+  double sum_weights = 0;
+  for (int i = 0; i < gop_len; ++i) {
+    sum_weights += encoder->gop_layer_weights[gop[i].layer - 1];
+  }
+  for (int i = 0; i < num_layers; ++i) {
+    encoder->gop_layer_weights[i] /= sum_weights;
+  }
+
+  return 1;
+}

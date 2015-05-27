@@ -69,6 +69,9 @@ typedef int16_t coeff_t;
 // Maximum length of GoP (for allocating structures)
 #define MAX_GOP 32
 
+// Maximum number of layers in GOP structure (for allocating structures)
+#define MAX_GOP_LAYERS 6
+
 // Maximum CU depth when descending form LCU level.
 #define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */
 // Minimum log2 size of CUs.
