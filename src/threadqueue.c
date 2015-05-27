@@ -504,7 +504,7 @@ int threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job
     
     if (!job_done) {
       int ret;
-      PTHREAD_COND_BROADCAST(&(threadqueue->cond));
+      PTHREAD_COND_SIGNAL(&(threadqueue->cond));
       PTHREAD_UNLOCK(&threadqueue->lock);
       SLEEP();
       PTHREAD_LOCK(&threadqueue->lock);
