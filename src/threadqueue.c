@@ -295,8 +295,7 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
 #if XEON_PHI
       // Spread the processses out evenly, such that two workers that started at the same time are less likely to 
       // be on the same physical core and the first and the last core are left for main process and the OS.
-      unsigned threads_per_core = thread_count / 236;
-      unsigned affinity = i * threads_per_core;
+      unsigned affinity = i * 4;
       while (affinity >= 236) {
         affinity -= 236;
         affinity += 1;
