@@ -238,7 +238,11 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
 }
 int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, int fifo) {
   int i;
-  if (pthread_mutex_init(&threadqueue->lock, NULL) != 0) {
+  pthread_mutexattr_t mutex_attr;
+  pthread_mutexattr_init(&mutex_attr);
+  pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
+
+  if (pthread_mutex_init(&threadqueue->lock, &mutex_attr) != 0) {
     fprintf(stderr, "pthread_mutex_init failed!\n");
     assert(0);
     return 0;
@@ -581,7 +585,10 @@ threadqueue_job_t * threadqueue_submit(threadqueue_queue_t * const threadqueue, 
   
   job->fptr = fptr;
   job->arg = arg;
-  if (pthread_mutex_init(&job->lock, NULL) != 0) {
+  pthread_mutexattr_t mutex_attr;
+  pthread_mutexattr_init(&mutex_attr);
+  pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
+  if (pthread_mutex_init(&job->lock, &mutex_attr) != 0) {
     fprintf(stderr, "pthread_mutex_init(job) failed!\n");
     assert(0);
     return NULL;
