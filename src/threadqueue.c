@@ -296,7 +296,12 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
       // Spread the processses out evenly, such that two workers that started at the same time are less likely to 
       // be on the same physical core and the first and the last core are left for main process and the OS.
       unsigned threads_per_core = thread_count / 236;
-      unsigned affinity = (i * threads_per_core) % 236 + 4;
+      unsigned affinity = i * threads_per_core;
+      while (affinity >= 236) {
+        affinity -= 236;
+        affinity += 1;
+      }
+      affinity += 4;
 
       fprintf(stderr, "Setting thread %u affinity to cpu %u\n", i, affinity);
 
