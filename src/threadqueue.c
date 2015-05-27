@@ -110,7 +110,6 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
     //Find a task (should be fast enough)
     job = NULL;
     if (next_job) {
-      PTHREAD_LOCK(&next_job->lock);
       assert(next_job->ndepends == 0);
       job = next_job;
     } else {
@@ -149,8 +148,6 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
         ++threadqueue->queue_running;
       }
       
-      //We can unlock the job here, since fptr and arg are constant
-      PTHREAD_UNLOCK(&job->lock);
       //Unlock the queue
       PTHREAD_UNLOCK(&threadqueue->lock);
       
