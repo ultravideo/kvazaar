@@ -280,13 +280,26 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
   
   //Lock the queue before creating threads, to ensure they all have correct information
   PTHREAD_LOCK(&threadqueue->lock);
+
+  pthread_attr_t attr;
+  cpu_set_t cpus;
+  pthread_attr_init(&attr);
+
   
   for(i = 0; i < thread_count; i++) {
     threadqueue_worker_spec *tqws = MALLOC(threadqueue_worker_spec, 1);
     if (tqws) {
+      unsigned threads_per_core = thread_count / 236;
+      unsigned affinity = (i * threads_per_core) % 236 + 4;
+
+      CPU_ZERO(&cpus);
+      CPU_SET(affinity, &cpus);
+
+      pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus);
+
       tqws->threadqueue = threadqueue;
       tqws->worker_id = i;
-      if(pthread_create(&(threadqueue->threads[i]), NULL, threadqueue_worker, (void*)tqws) != 0) {
+      if (pthread_create(&(threadqueue->threads[i]), &attr, threadqueue_worker, (void*)tqws) != 0) {
           fprintf(stderr, "pthread_create failed!\n");
           assert(0);
           return 0;
@@ -298,7 +311,7 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
       return 0;
     }
   }
-  
+
   PTHREAD_UNLOCK(&threadqueue->lock);
 
   return 1;
