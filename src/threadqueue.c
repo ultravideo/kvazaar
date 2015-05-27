@@ -237,7 +237,7 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
   int i;
   pthread_mutexattr_t mutex_attr;
   pthread_mutexattr_init(&mutex_attr);
-  pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_ERRORCHECK);
+  pthread_mutexattr_settype(&mutex_attr, PTHREAD_MUTEX_DEFAULT);
 
   if (pthread_mutex_init(&threadqueue->lock, &mutex_attr) != 0) {
     fprintf(stderr, "pthread_mutex_init failed!\n");
