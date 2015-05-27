@@ -162,9 +162,15 @@ DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
 GREATEST = ../greatest/greatest.h
 
-all: $(PROG)
-.PHONY: all clean build_tests tests debug
+.PHONY: all xeonphi clean build_tests tests debug
 
+all: $(PROG)
+
+xeonphi: CFLAGS += -mmic -DXEON_PHI
+xeonphi: LDFLAGS += -mmic
+xeonphi: CC := icc
+xeonphi: LD := icc
+xeonphi: all
 
 # Compile files in strategy directories with appropriate flags.
 ifeq ($(ARCH), ppc64)
