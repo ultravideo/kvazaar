@@ -363,7 +363,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         // once. The added dependancy is for the first LCU of each wavefront
         // row to depend on the reconstruction status of the row below in the
         // previous frame.
-        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && !state->global->is_idr_frame) {
+        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && state->global->slicetype != SLICE_I) {
           if (!lcu->left) {
             if (lcu->below) {
               threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
