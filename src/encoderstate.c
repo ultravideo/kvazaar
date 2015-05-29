@@ -45,10 +45,6 @@
 #include "rdo.h"
 #include "rate_control.h"
 
-#ifndef LMBD
-# define LMBD 1.0
-#endif
-
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
@@ -771,10 +767,24 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       encoder_state_ref_sort(state);
     }
 
-    double lambda = select_picture_lambda(state);
+    double lambda;
+    if (encoder->cfg->target_bitrate > 0) {
+      // Rate control enabled.
+      lambda = select_picture_lambda(state);
+      state->global->QP = lambda_to_QP(lambda);
+    } else {
+      if (encoder->cfg->gop_len > 0 && state->global->slicetype != SLICE_I) {
+        gop_config_t const * const gop =
+          encoder->cfg->gop + state->global->gop_offset;
+        state->global->QP = encoder->cfg->qp + gop->qp_offset;
+        state->global->QP_factor = gop->qp_factor;
+      } else {
+        state->global->QP = encoder->cfg->qp;
+      }
+      lambda = select_picture_lambda_from_qp(state);
+    }
     state->global->cur_lambda_cost = lambda;
     state->global->cur_lambda_cost_sqrt = sqrt(lambda);
-    state->global->QP = lambda_to_QP(lambda);
 
   } else {
     //Clear the bitstream if it's not the main encoder

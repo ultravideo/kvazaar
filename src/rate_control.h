@@ -31,4 +31,6 @@ double select_picture_lambda(encoder_state_t * const state);
 
 int8_t lambda_to_QP(const double lambda);
 
+double select_picture_lambda_from_qp(encoder_state_t const * const state);
+
 #endif // RATE_CONTROL_H_

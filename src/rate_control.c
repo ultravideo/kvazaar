@@ -108,22 +108,23 @@ static double pic_allocate_bits(const encoder_state_t * const state)
  * \brief Select a lambda value for encoding the next picture
  * \param state the main encoder state
  * \return lambda for the next picture
+ *
+ * Rate control must be enabled (i.e. cfg->target_bitrate > 0) when this
+ * function is called.
  */
 double select_picture_lambda(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  if (encoder->cfg->target_bitrate <= 0) {
-    // Rate control disabled.
-    return exp((encoder->cfg->qp - 13.7223 - 0.5) / 4.2005);
-  }
+  assert(encoder->cfg->target_bitrate > 0);
 
   if (state->global->frame > encoder->cfg->owf) {
+    // At least one frame has been written.
     update_rc_parameters(state);
   }
 
   if (encoder->cfg->gop_len == 0 || state->global->gop_offset == 0) {
-    // a new GOP begins at this frame
+    // A new GOP begins at this frame.
     gop_allocate_bits(state);
   } else {
     state->global->cur_gop_target_bits =
@@ -141,6 +142,34 @@ double select_picture_lambda(encoder_state_t * const state)
 
 int8_t lambda_to_QP(const double lambda)
 {
-  int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
+  const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
   return CLIP(0, 51, qp);
+}
+
+/**
+ * \brief Select a lambda value according to current QP value
+ * \param state the main encoder state
+ * \return lambda for the next picture
+ *
+ * This function should be used to select lambda when rate control is
+ * disabled.
+ */
+double select_picture_lambda_from_qp(encoder_state_t const * const state)
+{
+  const int gop_len = state->encoder_control->cfg->gop_len;
+  const double qp_temp = state->global->QP - 12;
+
+  double qp_factor;
+  if (state->global->slicetype == SLICE_I) {
+    const double lambda_scale = 1.0 - CLIP(0.0, 0.5, 0.05 * gop_len);
+    qp_factor = 0.57 * lambda_scale;
+  } else if (gop_len > 0) {
+    qp_factor = 0.95 * state->global->QP_factor;
+  } else {
+    // default QP factor from HM config
+    qp_factor = 0.95 * 0.4624;
+  }
+
+  const double lambda = qp_factor * pow(2.0, qp_temp / 3.0);
+  return lambda;
 }
