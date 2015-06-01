@@ -55,6 +55,7 @@ typedef struct encoder_control_t
     int32_t real_height; /*!< \brief real input picture width */
     int8_t video_format;
     int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
+    int64_t pixels_per_pic;
   } in;
   
   /* Output */
@@ -144,6 +145,15 @@ typedef struct encoder_control_t
   uint32_t vps_period;
 
   bool sign_hiding;
+
+  //! Target average bits per picture.
+  double target_avg_bppic;
+
+  //! Target average bits per pixel.
+  double target_avg_bpp;
+
+  //! Picture weights when GOP is used.
+  double gop_layer_weights[MAX_GOP_LAYERS];
 
 } encoder_control_t;
 

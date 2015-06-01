@@ -60,6 +60,7 @@ int config_init(config_t *cfg)
   cfg->frames          = 0;
   cfg->width           = 0;
   cfg->height          = 0;
+  cfg->framerate       = 25;
   cfg->qp              = 32;
   cfg->intra_period    = 0;
   cfg->vps_period      = 0;
@@ -90,6 +91,7 @@ int config_init(config_t *cfg)
   cfg->seek            = 0;
   cfg->gop_len         = 0;
   cfg->bipred          = 0;
+  cfg->target_bitrate  = 0;
 
   cfg->tiles_width_count         = 0;
   cfg->tiles_height_count         = 0;
@@ -344,6 +346,13 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
       cfg->width = cfg->height = 0;
     }
   }
+  else if OPT("input-fps") {
+    cfg->framerate = atof(value);
+    if (cfg->framerate <= 0.0) {
+      fprintf(stderr, "Input error: --input-fps must be positive\n");
+      error = 1;
+    }
+  }
   else if OPT("frames")
     cfg->frames = atoi(value);
   else if OPT("qp")
@@ -566,6 +575,13 @@ static int config_parse(config_t *cfg, const char *name, const char *value)
   }
   else if OPT("bipred")
     cfg->bipred = atobool(value);
+  else if OPT("bitrate") {
+    cfg->target_bitrate = atoi(value);
+    if (cfg->target_bitrate < 0) {
+        fprintf(stderr, "Input error: --bitrate must be nonnegative\n");
+        error = 1;
+    }
+  }
   else
     return 0;
 #undef OPT
@@ -596,6 +612,7 @@ int config_read(config_t *cfg,int argc, char *argv[])
     { "ref",                required_argument, NULL, 'r' },
     { "vps-period",         required_argument, NULL, 0 },
     { "input-res",          required_argument, NULL, 0 },
+    { "input-fps",          required_argument, NULL, 0 },
     { "no-deblock",               no_argument, NULL, 0 },
     { "deblock",            required_argument, NULL, 0 },
     { "no-sao",                   no_argument, NULL, 0 },
@@ -630,6 +647,7 @@ int config_read(config_t *cfg,int argc, char *argv[])
     { "no-info",                  no_argument, NULL, 0 },
     { "gop",                required_argument, NULL, 0 },
     { "bipred",                   no_argument, NULL, 0 },
+    { "bitrate",            required_argument, NULL, 0 },
     {0, 0, 0, 0}
   };
 

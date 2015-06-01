@@ -1,5 +1,5 @@
-#ifndef ENCODER_STATE_CTORS_DTORS_H_
-#define ENCODER_STATE_CTORS_DTORS_H_
+#ifndef RATE_CONTROL_H_
+#define RATE_CONTROL_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -22,18 +22,15 @@
 
 /*
  * \file
+ * \brief Functions related with rate control
  */
 
-#include "global.h"
+#include "encoderstate.h"
 
+double select_picture_lambda(encoder_state_t * const state);
 
-// Forward declare because including the header would lead  to a cyclic
-// dependency.
-struct encoder_state_t;
+int8_t lambda_to_QP(const double lambda);
 
+double select_picture_lambda_from_qp(encoder_state_t const * const state);
 
-int encoder_state_init(struct encoder_state_t * child_state, struct encoder_state_t * parent_state);
-void encoder_state_finalize(struct encoder_state_t *state);
-
-
-#endif // ENCODER_STATE_CTORS_DTORS_H_
+#endif // RATE_CONTROL_H_

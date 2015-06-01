@@ -54,6 +54,7 @@ typedef struct
   int32_t frames;  /*!< \brief Number of frames to decode */
   int32_t width;   /*!< \brief frame width */
   int32_t height;  /*!< \brief frame height */
+  double framerate; /*!< \brief Input framerate */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
@@ -107,6 +108,7 @@ typedef struct
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
   gop_config_t gop[MAX_GOP];  /*!< \brief Array of GOP settings */
 
+  int32_t target_bitrate;
 } config_t;
 
 /* Function definitions */

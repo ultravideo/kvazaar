@@ -82,7 +82,20 @@ typedef struct {
   bool is_idr_frame;
   uint8_t pictype;
   uint8_t slicetype;
-  
+
+  //! Total number of bits written.
+  uint64_t total_bits_coded;
+
+  //! Number of bits written in the current GOP.
+  uint64_t cur_gop_bits_coded;
+
+  //! Number of bits targeted for the current GOP.
+  double cur_gop_target_bits;
+
+  // Parameters used in rate control
+  double rc_alpha;
+  double rc_beta;
+
 } encoder_state_config_global_t;
 
 typedef struct {

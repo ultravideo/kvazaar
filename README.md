@@ -20,6 +20,7 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
           -n, --frames <integer>     : Number of frames to code [all]
           --seek <integer>           : First frame to code [0]
           --input-res <int>x<int>    : Input resolution (width x height)
+          --input-fps <number>       : Framerate of the input video [25.0]
           -q, --qp <integer>         : Quantization Parameter [32]
           -p, --period <integer>     : Period of intra pictures [0]
                                          0: only first picture is intra
@@ -60,6 +61,9 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
               --no-info              : Don't add information about the encoder to settings.
               --gop <int>            : Length of Group of Pictures, must be 8 or 0 [0]
               --bipred               : Enable bi-prediction search
+              --bitrate <integer>    : Target bitrate. [0]
+                                         0: disable rate-control
+                                         N: target N bits per second
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio

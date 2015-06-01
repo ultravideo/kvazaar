@@ -86,6 +86,7 @@ OBJS = \
   cu.o \
   encoder.o \
   encoderstate.o \
+  rate_control.o \
   filter.o \
   inter.o \
   intra.o \
