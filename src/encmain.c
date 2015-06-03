@@ -59,7 +59,7 @@
  */
 int main(int argc, char *argv[])
 {
-#if XEON_PHI
+#if XEON_PHI && TUNE_AFFINITIES
   // Force main thread to run on the first core.
   cpu_set_t cpus;
   CPU_ZERO(&cpus);

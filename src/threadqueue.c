@@ -288,7 +288,7 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
   pthread_attr_t attr;
   pthread_attr_init(&attr);
 
-#if XEON_PHI
+#if XEON_PHI && TUNE_AFFINITIES
   if (CPU_SETSIZE < 244) {
     exit(1);
   }
@@ -305,7 +305,7 @@ int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, 
     if (tqws) {
       tqws->threadqueue = threadqueue;
       tqws->worker_id = i;
-#if XEON_PHI
+#if XEON_PHI && TUNE_AFFINITIES
       int cpu_count = CPU_COUNT(&cpus);
       fprintf(stderr, "Setting thread %u affinity to cpus %i\n", i, cpu_count);
 
