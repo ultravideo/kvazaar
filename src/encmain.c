@@ -323,7 +323,6 @@ int main(int argc, char *argv[])
       int first_enc = current_encoder_state;
       do {
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
         encoder_state_t *state = &encoder_states[current_encoder_state];
 
         if (!state->stats_done) {
@@ -334,6 +333,8 @@ int main(int argc, char *argv[])
           psnr_sum[1] += frame_psnr[1];
           psnr_sum[2] += frame_psnr[2];
         }
+
+        current_encoder_state = (current_encoder_state + 1) % (encoder.owf + 1);
       } while (current_encoder_state != first_enc);
     }
     

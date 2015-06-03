@@ -843,7 +843,8 @@ void encode_one_frame(encoder_state_t * const state)
 #else
     char* job_description = NULL;
 #endif
-          
+
+    state->stats_done = 0;
     job = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
     
     _encode_one_frame_add_bitstream_deps(state, job);
@@ -1058,7 +1059,7 @@ void encoder_next_frame(encoder_state_t *state) {
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
-  state->stats_done = 0;
+  state->stats_done = 1;
 
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
