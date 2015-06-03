@@ -1872,7 +1872,7 @@ static double get_cost(encoder_state_t * const state,
                        int width)
 {
   double satd_cost = satd_func(pred, orig_block);
-  if (TRSKIP_RATIO != 0 && width == 4) {
+  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
