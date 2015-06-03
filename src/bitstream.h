@@ -66,7 +66,7 @@ typedef struct
   uint32_t value;
 } bit_table_t;
 
-extern const bit_table_t *g_exp_table;
+extern bit_table_t g_exp_table[EXP_GOLOMB_TABLE_SIZE];
 
 int bitstream_init(bitstream_t * stream, bitstream_type type);
 int bitstream_finalize(bitstream_t * stream);
@@ -84,8 +84,7 @@ int bitstream_clear(bitstream_t *stream);
 
 void bitstream_align(bitstream_t *stream);
 void bitstream_align_zero(bitstream_t *stream);
-int init_exp_golomb(uint32_t len);
-void free_exp_golomb();
+void init_exp_golomb();
 
 
 /* In debug mode print out some extra info */

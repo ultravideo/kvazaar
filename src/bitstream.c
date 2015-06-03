@@ -44,6 +44,8 @@ const uint32_t bit_set_mask[] =
 0x10000000,0x20000000,0x40000000,0x80000000
 };
 
+bit_table_t g_exp_table[EXP_GOLOMB_TABLE_SIZE];
+
 
 //#define VERBOSE
 
@@ -59,8 +61,6 @@ void printf_bitstream(char *msg, ...)
 }
 #endif
 
-const bit_table_t *g_exp_table;
-
 static int floor_log2(unsigned int n) {
   assert(n != 0);
 
@@ -74,40 +74,26 @@ static int floor_log2(unsigned int n) {
 }
 
 /**
- * \brief Initialize the Exp Golomb code table with desired number of values
- * \param len table length to init
- * \return 1 on success, 0 on failure
+ * \brief Initialize the Exp Golomb code table.
  *
- * Allocates g_exp_table with len*sizeof(bit_table) and fills it with exponential golomb codes
+ * Fills g_exp_table with exponential golomb codes.
  */
-int init_exp_golomb(const uint32_t len)
+void init_exp_golomb()
 {
+  static int exp_table_initialized = 0;
+  if (exp_table_initialized) return;
+
   uint32_t code_num;
   uint8_t M;
   uint32_t info;
-  bit_table_t *exp_table;
-  exp_table = (bit_table_t*)malloc(len*sizeof(bit_table_t));
-  if(!exp_table)
-    return 0;
-
-  for (code_num = 0; code_num < len; code_num++) {
+  for (code_num = 0; code_num < EXP_GOLOMB_TABLE_SIZE; code_num++) {
     M = (uint8_t)floor_log2(code_num + 1);
     info = code_num + 1 - (uint32_t)pow(2, M);
-    exp_table[code_num].len = M * 2 + 1;
-    exp_table[code_num].value = (1<<M) | info;
+    g_exp_table[code_num].len = M * 2 + 1;
+    g_exp_table[code_num].value = (1<<M) | info;
   }
-  
-  g_exp_table = exp_table;
 
-  return 1;
-}
-
-/**
- * \brief Free Exp Golomb tables
- */
-void free_exp_golomb()
-{
-  FREE_POINTER(g_exp_table);
+  exp_table_initialized = 1;
 }
 
 /**

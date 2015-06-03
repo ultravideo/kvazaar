@@ -133,12 +133,6 @@ int main(int argc, char *argv[])
     }
   }
   
-  //Allocate and init exp golomb table
-  if (!init_exp_golomb(4096*8)) {
-    fprintf(stderr, "Failed to allocate the exp golomb code table, shutting down!\n");
-    goto exit_failure;
-  }
-
   const kvz_api *api = kvz_api_get(8);
 
   kvz_encoder* enc = api->encoder_open(cfg);
@@ -303,8 +297,6 @@ int main(int argc, char *argv[])
   // Deallocating
   config_destroy(cfg);
 
-  free_exp_golomb();
-  
   CHECKPOINTS_FINALIZE();
 
   return EXIT_SUCCESS;

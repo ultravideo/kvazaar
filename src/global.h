@@ -196,6 +196,7 @@ typedef int16_t coeff_t;
 
 #define MAX_TR_DYNAMIC_RANGE 15
 
+#define EXP_GOLOMB_TABLE_SIZE (4096*8)
 
 //DEBUG BITMASK
 #define _DEBUG_PERF_FRAME_LEVEL 0x0001

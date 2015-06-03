@@ -54,11 +54,7 @@ static kvz_encoder * kvazaar_open(config_t *cfg)
     goto kvazaar_open_failure;
   }
 
-  //Allocate and init exp golomb table
-  if (!init_exp_golomb(4096 * 8)) {
-    fprintf(stderr, "Failed to allocate the exp golomb code table, shutting down!\n");
-    goto kvazaar_open_failure;
-  }
+  init_exp_golomb();
 
   encoder = MALLOC(kvz_encoder, 1);
   if (!encoder) {
