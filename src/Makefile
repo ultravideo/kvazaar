@@ -166,7 +166,7 @@ GREATEST = ../greatest/greatest.h
 
 all: $(PROG)
 
-xeonphi: CFLAGS += -mmic -DXEON_PHI
+xeonphi: CFLAGS += -mmic -DXEON_PHI -no-vec
 xeonphi: LDFLAGS += -mmic
 xeonphi: CC := icc
 xeonphi: LD := icc
