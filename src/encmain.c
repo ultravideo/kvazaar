@@ -224,7 +224,10 @@ int main(int argc, char *argv[])
       }
 
       image_t *img_out = NULL;
-      api->encoder_encode(enc, img_in, &img_out, &output_stream);
+      if (1 != api->encoder_encode(enc, img_in, &img_out, &output_stream)) {
+        fprintf(stderr, "Failed to encode image.\n");
+        goto exit_failure;
+      }
 
       if (img_out != NULL) {
         state = &enc->states[enc->cur_state_num];
@@ -245,14 +248,11 @@ int main(int argc, char *argv[])
     
     //Compute stats for the remaining encoders
     {
-      int first_enc = current_encoder_state;
-      do {
-        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        image_t *img_out = NULL;
-        api->encoder_encode(enc, NULL, &img_out, &output_stream);
-
+      image_t *img_out = NULL;
+      while (1 == api->encoder_encode(enc, NULL, &img_out, &output_stream)) {
         if (img_out != NULL) {
-          encoder_state_t *state = &enc->states[current_encoder_state];
+          double frame_psnr[3] = { 0.0, 0.0, 0.0 };
+          encoder_state_t *state = &enc->states[enc->cur_state_num];
 
           encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
           print_frame_info(state, frame_psnr);
@@ -262,10 +262,9 @@ int main(int argc, char *argv[])
           psnr_sum[2] += frame_psnr[2];
 
           image_free(img_out);
+          img_out = NULL;
         }
-
-        current_encoder_state = (current_encoder_state + 1) % (encoder->owf + 1);
-      } while (current_encoder_state != first_enc);
+      }
     }
     
     GET_TIME(&encoding_end_real_time);

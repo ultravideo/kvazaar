@@ -73,6 +73,7 @@ static kvz_encoder * kvazaar_open(config_t *cfg)
   encoder->num_encoder_states = cfg->owf + 1;
   encoder->cur_state_num = 0;
   encoder->frames_started = 0;
+  encoder->frames_done = 0;
   encoder->states = MALLOC(encoder_state_t, encoder->num_encoder_states);
   if (!encoder->states) {
     goto kvazaar_open_failure;
@@ -122,6 +123,11 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
     encode_one_frame(state);
   }
 
+  // If we have finished encoding as many frames as we have started, we are done.
+  if (enc->frames_done == enc->frames_started) {
+    return 0;
+  }
+
   enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
@@ -136,9 +142,11 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
     }
 
     *img_out = image_make_subimage(state->tile->frame->rec, 0, 0, state->tile->frame->width, state->tile->frame->height);
+
+    enc->frames_done += 1;
   }
 
-  return 0;
+  return 1;
 }
 
 kvz_api kvz_8bit_api = {

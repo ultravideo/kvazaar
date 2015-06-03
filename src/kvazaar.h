@@ -82,6 +82,7 @@ typedef struct kvz_encoder {
   unsigned num_encoder_states;
   unsigned cur_state_num;
   unsigned frames_started;
+  unsigned frames_done;
 
   size_t bitstream_length;
 } kvz_encoder;
