@@ -155,23 +155,21 @@ int main(int argc, char *argv[])
     
     if (cfg->seek > 0) {
       int frame_bytes = cfg->width * cfg->height * 3 / 2;
+      size_t skip_bytes = cfg->seek * frame_bytes;
       int error = 0;
 
       if (!strcmp(cfg->input, "-")) {
-        // Input is stdin.
-        int i;
-        image_t *img_in = image_alloc(encoder->in.width, encoder->in.height, 0);
-        if (!img_in) {
-          fprintf(stderr, "Failed to allocate image.\n");
-          goto exit_failure;
+        // Input is stdin. Skip by reading.
+        unsigned char* tmp[4096];
+        size_t bytes_left = skip_bytes;
+        while (bytes_left > 0 && !error) {
+          size_t skip = MIN(4096, bytes_left);
+          error = fread(tmp, sizeof(unsigned char), skip, input) != skip;
+          bytes_left -= skip;
         }
-        for (i = 0; !error && i < cfg->seek; ++i) {
-          error = !read_one_frame(input, &enc->states[enc->cur_state_num], img_in);
-        }
-        image_free(img_in);
       } else {
         // input is a file. We hope. Proper detection is OS dependent.
-        error = fseek(input, cfg->seek * frame_bytes, SEEK_CUR);
+        error = fseek(input, skip_bytes, SEEK_CUR);
       }
       if (error && !feof(input)) {
         fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
