@@ -107,6 +107,7 @@ OBJS = \
   encoder_state-geometry.o \
   image.o \
   videoframe.o \
+  yuv_input.o \
   strategies/strategies-picture.o \
   strategies/strategies-nal.o \
   strategies/strategies-dct.o \

@@ -25,7 +25,6 @@
 #include "encoderstate.h"
 
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -44,6 +43,7 @@
 #include "sao.h"
 #include "rdo.h"
 #include "rate_control.h"
+#include "yuv_input.h"
 
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -860,45 +860,6 @@ void encode_one_frame(encoder_state_t * const state)
   //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
-static void fill_after_frame(unsigned height, unsigned array_width,
-                             unsigned array_height, pixel_t *data)
-{
-  pixel_t* p = data + height * array_width;
-  pixel_t* end = data + array_width * array_height;
-
-  while (p < end) {
-    // Fill the line by copying the line above.
-    memcpy(p, p - array_width, array_width);
-    p += array_width;
-  }
-}
-
-static int read_and_fill_frame_data(FILE *file,
-                                    unsigned width, unsigned height,
-                                    unsigned array_width, pixel_t *data)
-{
-  pixel_t* p = data;
-  pixel_t* end = data + array_width * height;
-  pixel_t fill_char;
-  unsigned i;
-
-  while (p < end) {
-    // Read the beginning of the line from input.
-    if (width != fread(p, sizeof(unsigned char), width, file))
-      return 0;
-
-    // Fill the rest with the last pixel value.
-    fill_char = p[width - 1];
-
-    for (i = width; i < array_width; ++i) {
-      p[i] = fill_char;
-    }
-
-    p += array_width;
-  }
-  return 1;
-}
-
 int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img_out)
 {
   unsigned width = state->encoder_control->in.real_width;
@@ -924,45 +885,27 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
   }
 
   // If GOP is present but no pictures found
-  if (state->global->frame && 
+  if (state->global->frame &&
       state->encoder_control->cfg->gop_len &&
       !gop_pictures_available) {
-    int i;
-    unsigned y_size = width * height;
-    unsigned uv_size = (width >> 1) * (height >> 1);
-
-    for (i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
-      if (state->encoder_control->cfg->frames && state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
+    for (int i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
+      if (state->encoder_control->cfg->frames
+          && state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
         if (gop_pictures_available) {
           gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
           break;
         }
         else return 0;
       }
-      if (width != array_width) {
-       // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-        if(!read_and_fill_frame_data(file, width, height, array_width, gop_pictures[i].source->y) ||
-           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->u) ||
-           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->v)) {
-          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
-          else return 0;
-        }
-      } else {
-        // Otherwise the data can be read directly to the array.
-        if(y_size != fread(gop_pictures[i].source->y, sizeof(unsigned char), y_size, file) ||
-          uv_size != fread(gop_pictures[i].source->u, sizeof(unsigned char), uv_size, file) ||
-          uv_size != fread(gop_pictures[i].source->v, sizeof(unsigned char), uv_size, file)) {
-          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
-          else return 0;
+      if (!read_yuv_frame(file, width, height, array_width, array_height, gop_pictures[i].source)) {
+        if (gop_pictures_available) {
+          gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
+          break;
+        } else {
+          return 0;
         }
       }
-
-      if (height != array_height) {
-        fill_after_frame(height, array_width, array_height, gop_pictures[i].source->y);
-        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->u);
-        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->v);
-      }
-    }  
+    }
   }
 
   // If GOP is present, fetch the data from our GOP picture buffer
@@ -984,37 +927,9 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
     memcpy(img_out->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
     gop_pictures_available--;
   } else {
-    if (width != array_width) {
-      // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-      if (!read_and_fill_frame_data(file, width, height, array_width,
-        img_out->y) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-        img_out->u) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-        img_out->v))
-        return 0;
-    } else {
-      // Otherwise the data can be read directly to the array.
-      unsigned y_size = width * height;
-      unsigned uv_size = (width >> 1) * (height >> 1);
-      if (y_size != fread(img_out->y, sizeof(unsigned char),
-        y_size, file) ||
-        uv_size != fread(img_out->u, sizeof(unsigned char),
-        uv_size, file) ||
-        uv_size != fread(img_out->v, sizeof(unsigned char),
-        uv_size, file))
-        return 0;
-    }
-
-    if (height != array_height) {
-      fill_after_frame(height, array_width, array_height,
-        img_out->y);
-      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-        img_out->u);
-      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-        img_out->v);
-    }
+    return read_yuv_frame(file, width, height, array_width, array_height, img_out);
   }
+
   return 1;
 }
 

@@ -150,6 +150,7 @@
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClCompile Include="..\..\src\yuv_input.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
     <ClInclude Include="..\..\src\cli.h" />
     <ClInclude Include="..\..\src\cu.h" />
