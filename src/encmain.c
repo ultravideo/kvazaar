@@ -49,6 +49,33 @@
 #include "cli.h"
 #include "kvazaar.h"
 
+/**
+ * \brief Open a file for reading.
+ *
+ * If the file is "-", stdin is used.
+ *
+ * \param filename  name of the file to open or "-"
+ * \return          the opened file or NULL if opening fails
+ */
+static FILE* open_input_file(const char* filename)
+{
+  if (!strcmp(filename, "-")) return stdin;
+  return fopen(filename, "rb");
+}
+
+/**
+ * \brief Open a file for writing.
+ *
+ * If the file is "-", stdout is used.
+ *
+ * \param filename  name of the file to open or "-"
+ * \return          the opened file or NULL if opening fails
+ */
+static FILE* open_output_file(const char* filename)
+{
+  if (!strcmp(filename, "-")) return stdout;
+  return fopen(filename, "wb");
+}
 
 /**
  * \brief Program main function.
@@ -91,29 +118,22 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  // Check if the input file name is a dash, this means stdin
-  if (!strcmp(cfg->input, "-")) {
-    input = stdin;
-  } else {
-    // Otherwise we try to open the input file
-    input = fopen(cfg->input, "rb");
-  }
-
-  // Check that input was opened correctly
+  input = open_input_file(cfg->input);
   if (input == NULL) {
     fprintf(stderr, "Could not open input file, shutting down!\n");
     goto exit_failure;
   }
 
-  // Check if the output file name is a dash, this means stdout 
-  if (!strcmp(cfg->output, "-")) {
-    output = stdout;
-  } else {
-    // Otherwise we try to open the output file
-    output = fopen(cfg->output, "wb");
-    // Check that output was opened correctly
-    if (output == NULL) {
-      fprintf(stderr, "Could not open output file, shutting down!\n");
+  output = open_output_file(cfg->output);
+  if (output == NULL) {
+    fprintf(stderr, "Could not open output file, shutting down!\n");
+    goto exit_failure;
+  }
+
+  if (cfg->debug != NULL) {
+    recout = open_output_file(cfg->debug);
+    if (recout == NULL) {
+      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", cfg->debug);
       goto exit_failure;
     }
   }
@@ -125,14 +145,6 @@ int main(int argc, char *argv[])
   }
   output_stream.file.output = output;
 
-  if (cfg->debug != NULL) {
-    recout = fopen(cfg->debug, "wb");
-    if (recout == NULL) {
-      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", cfg->debug);
-      goto exit_failure;
-    }
-  }
-  
   const kvz_api *api = kvz_api_get(8);
 
   kvz_encoder* enc = api->encoder_open(cfg);
