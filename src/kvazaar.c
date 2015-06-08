@@ -33,11 +33,16 @@
 static void kvazaar_close(kvz_encoder *encoder)
 {
   if (encoder) {
+    if (encoder->states) {
+      for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
+        encoder_state_finalize(&encoder->states[i]);
+      }
+    }
     if (encoder->control) {
       encoder_control_finalize(encoder->control);
     }
-    FREE_POINTER(encoder->control);
     FREE_POINTER(encoder->states);
+    FREE_POINTER(encoder->control);
   }
   FREE_POINTER(encoder);
 }

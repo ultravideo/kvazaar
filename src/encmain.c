@@ -39,13 +39,10 @@
 #include "checkpoint.h"
 #include "global.h"
 #include "config.h"
-#include "threads.h"
+#include "threadqueue.h"
 #include "encoder.h"
-#include "cabac.h"
+#include "encoderstate.h"
 #include "image.h"
-#include "transform.h"
-#include "scalinglist.h"
-#include "strategyselector.h"
 #include "cli.h"
 #include "kvazaar.h"
 
@@ -85,10 +82,12 @@ static FILE* open_output_file(const char* filename)
  */
 int main(int argc, char *argv[])
 {
-  config_t *cfg  = NULL; //!< Global configuration
+  int retval = EXIT_SUCCESS;
+
+  config_t *cfg = NULL; //!< Global configuration
+  kvz_encoder* enc = NULL;
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
-  uint64_t curpos = 0;
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
@@ -107,11 +106,13 @@ int main(int argc, char *argv[])
       
   CHECKPOINTS_INIT();
 
+  const kvz_api * const api = kvz_api_get(8);
+
   // Handle configuration
-  cfg = config_alloc();
+  cfg = api->config_alloc();
 
   // If problem with configuration, print banner and shutdown
-  if (!cfg || !config_init(cfg) || !config_read(cfg,argc,argv)) {
+  if (!cfg || !api->config_init(cfg) || !config_read(cfg,argc,argv)) {
     print_version();
     print_help();
 
@@ -141,15 +142,13 @@ int main(int argc, char *argv[])
   bitstream_t output_stream;
   if (!bitstream_init(&output_stream, BITSTREAM_TYPE_FILE)) {
     fprintf(stderr, "Could not initialize stream!\n");
-    return 0;
+    goto exit_failure;
   }
   output_stream.file.output = output;
 
-  const kvz_api *api = kvz_api_get(8);
-
-  kvz_encoder* enc = api->encoder_open(cfg);
+  enc = api->encoder_open(cfg);
   if (!enc) {
-    fprintf(stderr, "Failed to open encoder.");
+    fprintf(stderr, "Failed to open encoder.\n");
     goto exit_failure;
   }
 
@@ -163,8 +162,6 @@ int main(int argc, char *argv[])
   //Now, do the real stuff
   {
 
-    int i;
-    
     if (cfg->seek > 0) {
       int frame_bytes = cfg->width * cfg->height * 3 / 2;
       size_t skip_bytes = cfg->seek * frame_bytes;
@@ -218,14 +215,15 @@ int main(int argc, char *argv[])
         if (!feof(input))
           fprintf(stderr, "Failed to read a frame %d\n", enc->states[enc->cur_state_num].global->frame);
 
-        
         enc->states[enc->cur_state_num].stats_done = 1;
+        image_free(img_in);
         break;
       }
 
       image_t *img_out = NULL;
       if (1 != api->encoder_encode(enc, img_in, &img_out, &output_stream)) {
         fprintf(stderr, "Failed to encode image.\n");
+        image_free(img_in);
         goto exit_failure;
       }
 
@@ -271,10 +269,7 @@ int main(int argc, char *argv[])
     encoding_end_cpu_time = clock();
     
     threadqueue_flush(encoder->threadqueue);
-    
-    
     // Coding finished
-    fgetpos(output,(fpos_t*)&curpos);
 
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", 
@@ -290,33 +285,25 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
-
-    bitstream_finalize(&output_stream);
-
-    fclose(input);
-    fclose(output);
-    if(recout != NULL) fclose(recout);
-    
-    for (i = 0; i <= encoder->owf; ++i) {
-      encoder_state_finalize(&enc->states[i]);
-    }
-
-    api->encoder_close(enc);
   }
 
-  // Deallocating
-  config_destroy(cfg);
-
-  CHECKPOINTS_FINALIZE();
-
-  return EXIT_SUCCESS;
+  goto done;
 
 exit_failure:
-  if (cfg) config_destroy(cfg);
-  if (input) fclose(input);
+  retval = EXIT_FAILURE;
+
+done:
+  // deallocate structures
+  if (enc) api->encoder_close(enc);
+  bitstream_finalize(&output_stream);
+  if (cfg) api->config_destroy(cfg);
+
+  // close files
+  if (input)  fclose(input);
   if (output) fclose(output);
   if (recout) fclose(recout);
-  strategyselector_free();
+
   CHECKPOINTS_FINALIZE();
-  return EXIT_FAILURE;
+
+  return retval;
 }
