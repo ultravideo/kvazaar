@@ -28,9 +28,12 @@
 
 #include "global.h"
 
-int read_yuv_frame(FILE* file,
+int yuv_input_read(FILE* file,
                    unsigned input_width, unsigned input_height,
                    unsigned array_width, unsigned array_height,
                    image_t *img_out);
+
+int yuv_input_seek(FILE* file, unsigned frames,
+                   unsigned input_width, unsigned input_height);
 
 #endif // YUV_INPUT_H_

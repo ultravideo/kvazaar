@@ -45,6 +45,7 @@
 #include "image.h"
 #include "cli.h"
 #include "kvazaar.h"
+#include "yuv_input.h"
 
 /**
  * \brief Open a file for reading.
@@ -158,33 +159,14 @@ int main(int argc, char *argv[])
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
-  
+
+  if (cfg->seek > 0 && !yuv_input_seek(input, cfg->seek, cfg->width, cfg->height)) {
+    fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
+    goto exit_failure;
+  }
+
   //Now, do the real stuff
   {
-
-    if (cfg->seek > 0) {
-      int frame_bytes = cfg->width * cfg->height * 3 / 2;
-      size_t skip_bytes = cfg->seek * frame_bytes;
-      int error = 0;
-
-      if (!strcmp(cfg->input, "-")) {
-        // Input is stdin. Skip by reading.
-        unsigned char* tmp[4096];
-        size_t bytes_left = skip_bytes;
-        while (bytes_left > 0 && !error) {
-          size_t skip = MIN(4096, bytes_left);
-          error = fread(tmp, sizeof(unsigned char), skip, input) != skip;
-          bytes_left -= skip;
-        }
-      } else {
-        // input is a file. We hope. Proper detection is OS dependent.
-        error = fseek(input, skip_bytes, SEEK_CUR);
-      }
-      if (error && !feof(input)) {
-        fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
-        goto exit_failure;
-      }
-    }
 
     GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();

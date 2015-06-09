@@ -83,7 +83,7 @@ static int read_and_fill_frame_data(FILE *file,
  *
  * \return              1 on success, 0 on failure
  */
-int read_yuv_frame(FILE* file,
+int yuv_input_read(FILE* file,
                    unsigned input_width, unsigned input_height,
                    unsigned array_width, unsigned array_height,
                    image_t *img_out)
@@ -117,4 +117,37 @@ int read_yuv_frame(FILE* file,
   }
 
   return 1;
+}
+
+
+/**
+ * \brief Seek forward in a YUV input file.
+ *
+ * \param file          the input file
+ * \param frames        number of frames to seek
+ * \param input_width   width of the input video in pixels
+ * \param input_height  height of the input video in pixels
+ *
+ * \return              1 on success, 0 on failure
+ */
+int yuv_input_seek(FILE* file, unsigned frames,
+                   unsigned input_width, unsigned input_height)
+{
+    const size_t frame_bytes = input_width * input_height * 3 / 2;
+    const size_t skip_bytes = frames * frame_bytes;
+
+    // Attempt to seek normally.
+    int error = fseek(file, skip_bytes, SEEK_CUR);
+    if (!error) return 1;
+
+    // Seek failed. Skip data by reading.
+    unsigned char* tmp[4096];
+    size_t bytes_left = skip_bytes;
+    while (bytes_left > 0 && !error) {
+      const size_t skip = MIN(4096, bytes_left);
+      error = fread(tmp, sizeof(unsigned char), skip, file) != skip;
+      bytes_left -= skip;
+    }
+
+    return !error || feof(file);
 }

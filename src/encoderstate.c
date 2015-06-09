@@ -897,7 +897,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
         }
         else return 0;
       }
-      if (!read_yuv_frame(file, width, height, array_width, array_height, gop_pictures[i].source)) {
+      if (!yuv_input_read(file, width, height, array_width, array_height, gop_pictures[i].source)) {
         if (gop_pictures_available) {
           gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
           break;
@@ -927,7 +927,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
     memcpy(img_out->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
     gop_pictures_available--;
   } else {
-    return read_yuv_frame(file, width, height, array_width, array_height, img_out);
+    return yuv_input_read(file, width, height, array_width, array_height, img_out);
   }
 
   return 1;
