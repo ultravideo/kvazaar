@@ -1140,8 +1140,8 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
             // is done, although the bottom 2 pixels might still need deblocking.
             // To work around this, add 2 luma pixels to the reach of the mv
             // in order to avoid referencing those possibly non-deblocked pixels.
-            int mv_lcu_row_reach_1 = ((y+(mv[0][1]>>2)) + LCU_WIDTH >> depth - 1 + 2) / LCU_WIDTH;
-            int mv_lcu_row_reach_2 = ((y+(mv[1][1]>>2)) + LCU_WIDTH >> depth - 1 + 2) / LCU_WIDTH;
+            int mv_lcu_row_reach_1 = ((y+(mv[0][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
+            int mv_lcu_row_reach_2 = ((y+(mv[1][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
             int cur_lcu_row = y / LCU_WIDTH;
             if (mv_lcu_row_reach_1 > cur_lcu_row + max_lcu_below || mv_lcu_row_reach_2 > cur_lcu_row + max_lcu_below) {
               continue;
