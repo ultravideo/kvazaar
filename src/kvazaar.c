@@ -115,7 +115,6 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
     encoder_state_t *state = &enc->states[enc->cur_state_num];
 
     enc->frames_started += 1;
-    encoder_next_frame(state, img_in);
 
     CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
 

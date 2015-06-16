@@ -1067,7 +1067,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
   }
   state->tile->frame->source = image_make_subimage(img_in, 0, 0, state->tile->frame->width, state->tile->frame->height);
   
-  state->stats_done = 1;
+  state->stats_done = 0;
 
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;

@@ -91,12 +91,6 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  //Initialize strategies
-  if (!strategyselector_init(cfg->cpuid)) {
-    fprintf(stderr, "Failed to initialize strategies.\n");
-    goto exit_failure;
-  }
-
   // Check if the input file name is a dash, this means stdin
   if (!strcmp(cfg->input, "-")) {
     input = stdin;
@@ -164,8 +158,6 @@ int main(int argc, char *argv[])
   {
 
     int i;
-    int current_encoder_state = 0;
-    
     
     if (cfg->seek > 0) {
       int frame_bytes = cfg->width * cfg->height * 3 / 2;
@@ -180,7 +172,7 @@ int main(int argc, char *argv[])
           goto exit_failure;
         }
         for (i = 0; !error && i < cfg->seek; ++i) {
-          error = !read_one_frame(input, &enc->states[current_encoder_state], img_in);
+          error = !read_one_frame(input, &enc->states[enc->cur_state_num], img_in);
         }
         image_free(img_in);
       } else {
@@ -202,8 +194,9 @@ int main(int argc, char *argv[])
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     // Start coding cycle while data on input and not on the last frame
-    encoder_state_t *state = &enc->states[current_encoder_state];
     while (cfg->frames == 0 || frames_started < cfg->frames) {
+      encoder_state_t *state = &enc->states[enc->cur_state_num];
+
       frames_started += 1;
 
       
@@ -213,13 +206,16 @@ int main(int argc, char *argv[])
         goto exit_failure;
       }
 
+      // Clear the encoder state.
+      encoder_next_frame(state, img_in);
+
       // Read one frame from the input
-      if (!read_one_frame(input, &enc->states[current_encoder_state], img_in)) {
+      if (!read_one_frame(input, &enc->states[enc->cur_state_num], img_in)) {
         if (!feof(input))
-          fprintf(stderr, "Failed to read a frame %d\n", enc->states[current_encoder_state].global->frame);
+          fprintf(stderr, "Failed to read a frame %d\n", enc->states[enc->cur_state_num].global->frame);
 
         
-        enc->states[current_encoder_state].stats_done = 1;
+        enc->states[enc->cur_state_num].stats_done = 1;
         break;
       }
 
@@ -308,8 +304,6 @@ int main(int argc, char *argv[])
   config_destroy(cfg);
 
   free_exp_golomb();
-  
-  strategyselector_free();
   
   CHECKPOINTS_FINALIZE();
 
