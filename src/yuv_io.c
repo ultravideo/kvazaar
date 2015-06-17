@@ -148,3 +148,33 @@ int yuv_io_seek(FILE* file, unsigned frames,
 
     return !error || feof(file);
 }
+
+
+/**
+ * \brief Write a single frame to a file.
+ *
+ * \param file           output file
+ * \param img            image to output
+ * \param output_width   width of the output in pixels
+ * \param output_height  height of the output in pixels
+ *
+ * \return              1 on success, 0 on failure
+ */
+int yuv_io_write(FILE* file,
+                image_t const* img,
+                unsigned output_width, unsigned output_height)
+{
+  const int width = img->width;
+  for (int y = 0; y < output_height; ++y) {
+    fwrite(&img->y[y * width], sizeof(*img->y), output_width, file);
+    // TODO: Check that fwrite succeeded.
+  }
+  for (int y = 0; y < output_height / 2; ++y) {
+    fwrite(&img->u[y * width / 2], sizeof(*img->u), output_width / 2, file);
+  }
+  for (int y = 0; y < output_height / 2; ++y) {
+    fwrite(&img->v[y * width / 2], sizeof(*img->v), output_width / 2, file);
+  }
+
+  return 1;
+}

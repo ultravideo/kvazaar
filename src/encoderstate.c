@@ -942,26 +942,10 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double f
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
   if (recout) {
-    const videoframe_t * const frame = state->tile->frame;
-    // Write reconstructed frame out.
-    // Use conformance-window dimensions instead of internal ones.
-    const int width = frame->width;
-    const int out_width = encoder->in.real_width;
-    const int out_height = encoder->in.real_height;
-    int y;
-    const pixel_t *y_rec = frame->rec->y;
-    const pixel_t *u_rec = frame->rec->u;
-    const pixel_t *v_rec = frame->rec->v;
-
-    for (y = 0; y < out_height; ++y) {
-      fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
-    }
-    for (y = 0; y < out_height / 2; ++y) {
-      fwrite(&u_rec[y * width / 2], sizeof(*u_rec), out_width / 2, recout);
-    }
-    for (y = 0; y < out_height / 2; ++y) {
-      fwrite(&v_rec[y * width / 2], sizeof(*v_rec), out_width / 2, recout);
-    }
+    yuv_io_write(recout,
+                 state->tile->frame->rec,
+                 encoder->in.real_width,
+                 encoder->in.real_height);
   }
   
   videoframe_compute_psnr(state->tile->frame, frame_psnr);
