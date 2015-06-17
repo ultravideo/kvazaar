@@ -131,7 +131,7 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
   enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-  if (enc->frames_started >= enc->num_encoder_states && !state->stats_done) {
+  if (enc->frames_started >= enc->num_encoder_states && !state->frame_done) {
     threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
     
     bitstream_append(payload, &state->stream);
@@ -144,6 +144,7 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
     *img_out = image_copy_ref(state->tile->frame->rec);
 
     enc->frames_done += 1;
+    state->frame_done = 1;
   }
 
   return 1;

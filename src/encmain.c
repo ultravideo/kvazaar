@@ -196,8 +196,6 @@ int main(int argc, char *argv[])
       if (!read_one_frame(input, &enc->states[enc->cur_state_num], img_in)) {
         if (!feof(input))
           fprintf(stderr, "Failed to read a frame %d\n", enc->states[enc->cur_state_num].global->frame);
-
-        enc->states[enc->cur_state_num].stats_done = 1;
         image_free(img_in);
         break;
       }

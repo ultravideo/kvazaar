@@ -845,7 +845,6 @@ void encode_one_frame(encoder_state_t * const state)
     char* job_description = NULL;
 #endif
 
-    state->stats_done = 0;
     job = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
     
     _encode_one_frame_add_bitstream_deps(state, job);
@@ -857,6 +856,7 @@ void encode_one_frame(encoder_state_t * const state)
     assert(!state->tqj_bitstream_written);
     state->tqj_bitstream_written = job;
   }
+  state->frame_done = 0;
   //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
@@ -938,9 +938,6 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double f
 {
   const encoder_control_t * const encoder = state->encoder_control;
   
-  if (state->stats_done) return;
-  state->stats_done = 1;
-  
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
@@ -982,8 +979,6 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
     image_free(state->tile->frame->source);
   }
   state->tile->frame->source = image_copy_ref(img_in);
-  
-  state->stats_done = 0;
 
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;

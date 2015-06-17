@@ -183,8 +183,14 @@ typedef struct encoder_state_t {
   
   bitstream_t stream;
   cabac_data_t cabac;
-  
-  int stats_done;
+
+  /**
+   * \brief Indicates that the previous frame has been encoded and the
+   * encoded data written and the encoding the next frame has not been
+   * started yet.
+   */
+  int frame_done;
+
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
   
   //Jobs to wait for
