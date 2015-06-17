@@ -36,32 +36,34 @@
 #include "sao.h"
 
 /**
- * \brief Allocate new image
- * \return image pointer
+ * \brief Allocate a new image.
+ * \return image pointer or NULL on failure
  */
 image_t *image_alloc(const int32_t width, const int32_t height)
 {
-  image_t *im = MALLOC(image_t, 1);
-  
-  unsigned int luma_size = width * height;
-  unsigned int chroma_size = luma_size / 4;
-  
   //Assert that we have a well defined image
   assert((width % 2) == 0);
   assert((height % 2) == 0);
 
+  image_t *im = MALLOC(image_t, 1);
   if (!im) return NULL;
-  
+
+  unsigned int luma_size = width * height;
+  unsigned int chroma_size = luma_size / 4;
+
+  //Allocate memory
+  im->fulldata = MALLOC(pixel_t, (luma_size + 2 * chroma_size));
+  if (!im->fulldata) {
+    free(im);
+    return NULL;
+  }
+
+  im->base_image = im;
+  im->refcount = 1; //We give a reference to caller
   im->width = width;
   im->height = height;
   im->stride = width;
-  
-  im->base_image = im;
-  
-  im->refcount = 1; //We give a reference to caller
-  
-  //Allocate memory
-  im->fulldata = MALLOC(pixel_t, (luma_size + 2 * chroma_size));
+
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
   im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
   im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
@@ -70,59 +72,78 @@ image_t *image_alloc(const int32_t width, const int32_t height)
 }
 
 /**
- * \brief Free memory allocated to picture (if we have no reference left)
- * \param pic picture pointer
- * \return 1 on success, 0 on failure
+ * \brief Free an image.
+ *
+ * Decrement reference count of the image and deallocate associated memory
+ * if no references exist any more.
+ *
+ * \param im image to free
  */
-int image_free(image_t * const im)
+void image_free(image_t * const im)
 {
-  //Nothing to do
-  if (!im) return 1;
-  
-  //Either we are the base image, or we should have no references
-  assert(im->base_image == im || im->refcount == 0);
-  
-  int32_t new_refcount = ATOMIC_DEC(&(im->base_image->refcount));
-  //If we're freeing a subimage, then we must free the pointer
-  //Base image may be stored in image_list, and should not be freed
-  //FIXME I don't find this very clean...
-  if (new_refcount > 0 && im->base_image != im) free(im);
-  if (new_refcount > 0) return 1;
-  FREE_POINTER(im->base_image->fulldata);
-  
-  //Just to make the program crash when using those values after the free
-  im->y = im->u = im->v = im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
-  
-  free(im);
+  if (im == NULL) return;
 
-  return 1;
+  int32_t new_refcount = ATOMIC_DEC(&(im->refcount));
+  if (new_refcount > 0) {
+    // There are still references so we don't free the data yet.
+    return;
+  }
+
+  if (im->base_image != im) {
+    // Free our reference to the base image.
+    image_free(im->base_image);
+  } else {
+    free(im->fulldata);
+  }
+
+  // Make sure freed data won't be used.
+  im->base_image = NULL;
+  im->fulldata = NULL;
+  im->y = im->u = im->v = NULL;
+  im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
+  free(im);
 }
 
-
-image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height)
+/**
+ * \brief Get a new pointer to an image.
+ *
+ * Increment reference count and return the image.
+ */
+image_t *image_copy_ref(image_t *im)
 {
-  image_t *im = MALLOC(image_t, 1);
-  if (!im) return NULL;
-  
-  im->base_image = orig_image->base_image;
-  ATOMIC_INC(&(im->base_image->refcount));
-  
-  assert(x_offset + width <= orig_image->width);
-  assert(y_offset + height <= orig_image->height);
-  
-  //Assert that we have a well defined image
+  int32_t new_refcount = ATOMIC_INC(&(im->refcount));
+
+  // The caller should have had another reference.
+  assert(new_refcount > 1);
+
+  return im;
+}
+
+image_t *image_make_subimage(image_t *const orig_image,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height)
+{
+  // Assert that we have a well defined image
   assert((width % 2) == 0);
   assert((height % 2) == 0);
-  
+
   assert((x_offset % 2) == 0);
   assert((y_offset % 2) == 0);
-  
-  im->stride = orig_image->stride;
-  im->refcount = 0; //No references on subimages
-  
+
+  assert(x_offset + width <= orig_image->width);
+  assert(y_offset + height <= orig_image->height);
+
+  image_t *im = MALLOC(image_t, 1);
+  if (!im) return NULL;
+
+  im->base_image = image_copy_ref(orig_image->base_image);
+  im->refcount = 1; // We give a reference to caller
   im->width = width;
   im->height = height;
-  
+  im->stride = orig_image->stride;
+
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
   im->u = im->data[COLOR_U] = &orig_image->u[x_offset/2 + y_offset/2 * orig_image->stride/2];
   im->v = im->data[COLOR_V] = &orig_image->v[x_offset/2 + y_offset/2 * orig_image->stride/2];

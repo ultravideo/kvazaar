@@ -66,7 +66,7 @@ typedef struct image_t {
   int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
 
   struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
-  int32_t refcount;        //!< \brief Number of references in reflist to the picture
+  int32_t refcount;        //!< \brief Number of references to the picture
 
 } image_t;
 

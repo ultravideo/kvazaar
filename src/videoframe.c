@@ -71,8 +71,10 @@ videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const 
  */
 int videoframe_free(videoframe_t * const frame)
 {
-  //image_free(frame->source);
-  //image_free(frame->rec);
+  image_free(frame->source);
+  frame->source = NULL;
+  image_free(frame->rec);
+  frame->rec = NULL;
 
   cu_array_free(frame->cu_array);
 

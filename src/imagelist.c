@@ -150,12 +150,8 @@ int image_list_rem(image_list_t * const list, const unsigned n)
     return 0;
   }
 
-  if (!image_free(list->images[n])) {
-    fprintf(stderr, "Could not free image!\n");
-    assert(0); //Stop here
-    return 0;
-  }
-  
+  image_free(list->images[n]);
+
   if (!cu_array_free(list->cu_arrays[n])) {
     fprintf(stderr, "Could not free cu_array!\n");
     assert(0); //Stop here

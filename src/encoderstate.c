@@ -879,6 +879,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
     int i;
     for (i = 0; i < state->encoder_control->cfg->gop_len; i++) {
       gop_pictures[i].source = image_alloc(array_width, array_height);
+      assert(gop_pictures[i].source);
     }
     state->global->gop_offset = 0;
     gop_init = 1;
@@ -980,7 +981,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
   if (state->tile->frame->source) {
     image_free(state->tile->frame->source);
   }
-  state->tile->frame->source = image_make_subimage(img_in, 0, 0, state->tile->frame->width, state->tile->frame->height);
+  state->tile->frame->source = image_copy_ref(img_in);
   
   state->stats_done = 0;
 
@@ -990,6 +991,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
     state->global->poc = 0;
     assert(!state->tile->frame->rec);
     state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+    assert(state->tile->frame->rec);
     return;
   }
   
@@ -1004,6 +1006,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
     cu_array_free(state->tile->frame->cu_array);
     
     state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+    assert(state->tile->frame->rec);
     {
       // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
       unsigned height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
@@ -1043,6 +1046,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
   image_free(state->tile->frame->rec);
 
   state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+  assert(state->tile->frame->rec);
   videoframe_set_poc(state->tile->frame, state->global->poc);
 }
 

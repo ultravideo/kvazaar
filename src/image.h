@@ -43,8 +43,16 @@ typedef struct {
 
 
 image_t *image_alloc(const int32_t width, const int32_t height);
-int image_free(image_t * im);
-image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height);
+
+void image_free(image_t *im);
+
+image_t *image_copy_ref(image_t *im);
+
+image_t *image_make_subimage(image_t *const orig_image,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height);
 
 yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);

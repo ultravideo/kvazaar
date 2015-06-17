@@ -105,9 +105,6 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   yuv_t_free(state->tile->hor_buf_search);
   yuv_t_free(state->tile->ver_buf_search);
   
-  if (state->tile->frame->source) image_free(state->tile->frame->source);
-  if (state->tile->frame->rec) image_free(state->tile->frame->rec);
-
   videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   

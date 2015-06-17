@@ -141,7 +141,7 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
       fflush(payload->file.output);
     }
 
-    *img_out = image_make_subimage(state->tile->frame->rec, 0, 0, state->tile->frame->width, state->tile->frame->height);
+    *img_out = image_copy_ref(state->tile->frame->rec);
 
     enc->frames_done += 1;
   }
