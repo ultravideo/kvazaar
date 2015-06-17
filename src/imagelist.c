@@ -60,44 +60,11 @@ image_list_t * image_list_alloc(int size)
  */
 int image_list_resize(image_list_t *list, unsigned size)
 {
-  unsigned int i;
-  image_t** old_images = NULL;
-  cu_array_t** old_cu_arrays = NULL;
-  int32_t* old_pocs = NULL;
-  
-  //FIXME This could be done in a simple way using realloc...
-
-  // No need to do anything when resizing to same size
-  if (size == list->size) {
-    return 1;
-  }
-
-  // Save the old list
-  if (list->used_size > 0) {
-    old_images = list->images;
-    old_cu_arrays = list->cu_arrays;
-    old_pocs = list->pocs;
-  }
-
-  // allocate space for the new list
-  list->images = (image_t**)malloc(sizeof(image_t*)*size);
-  list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*)*size);
-  list->pocs = (int32_t*)malloc(sizeof(int32_t*)*size);
-
-  // Copy everything from the old list to the new if needed.
-  if (old_images != NULL) {
-    for (i = 0; i < list->used_size; ++i) {
-      list->images[i] = old_images[i];
-      list->cu_arrays[i] = old_cu_arrays[i];
-      list->pocs[i] = old_pocs[i];
-    }
-
-    free(old_images);
-    free(old_cu_arrays);
-    free(old_pocs);
-  }
-
-  return 1;
+  list->images = (image_t**)realloc(list->images, sizeof(image_t*) * size);
+  list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
+  list->pocs = (int32_t*)realloc(list->pocs, sizeof(int32_t*) * size);
+  list->size = size;
+  return size == 0 || (list->images && list->cu_arrays && list->pocs);
 }
 
 /**
