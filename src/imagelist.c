@@ -44,6 +44,7 @@ image_list_t * image_list_alloc(int size)
   if (size > 0) {
     list->images = (image_t**)malloc(sizeof(image_t*) * size);
     list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*) * size);
+    list->pocs = (int32_t*)malloc(sizeof(int32_t) * size);
   }
 
   list->used_size = 0;
@@ -62,6 +63,7 @@ int image_list_resize(image_list_t *list, unsigned size)
   unsigned int i;
   image_t** old_images = NULL;
   cu_array_t** old_cu_arrays = NULL;
+  int32_t* old_pocs = NULL;
   
   //FIXME This could be done in a simple way using realloc...
 
@@ -74,21 +76,25 @@ int image_list_resize(image_list_t *list, unsigned size)
   if (list->used_size > 0) {
     old_images = list->images;
     old_cu_arrays = list->cu_arrays;
+    old_pocs = list->pocs;
   }
 
   // allocate space for the new list
   list->images = (image_t**)malloc(sizeof(image_t*)*size);
   list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*)*size);
+  list->pocs = (int32_t*)malloc(sizeof(int32_t*)*size);
 
   // Copy everything from the old list to the new if needed.
   if (old_images != NULL) {
     for (i = 0; i < list->used_size; ++i) {
       list->images[i] = old_images[i];
       list->cu_arrays[i] = old_cu_arrays[i];
+      list->pocs[i] = old_pocs[i];
     }
 
     free(old_images);
     free(old_cu_arrays);
+    free(old_pocs);
   }
 
   return 1;
@@ -108,13 +114,18 @@ int image_list_destroy(image_list_t *list)
       list->images[i] = NULL;
       cu_array_free(list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
+      list->pocs[i] = 0;
     }
   }
 
   if (list->size > 0) {
     free(list->images);
     free(list->cu_arrays);
+    free(list->pocs);
   }
+  list->images = NULL;
+  list->cu_arrays = NULL;
+  list->pocs = NULL;
   free(list);
   return 1;
 }
@@ -125,7 +136,7 @@ int image_list_destroy(image_list_t *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int image_list_add(image_list_t *list, image_t* im, cu_array_t* cua)
+int image_list_add(image_list_t *list, image_t* im, cu_array_t* cua, int32_t poc)
 {
   int i = 0;
   if (ATOMIC_INC(&(im->refcount)) == 1) {
@@ -147,10 +158,12 @@ int image_list_add(image_list_t *list, image_t* im, cu_array_t* cua)
   for (i = list->used_size; i > 0; i--) {
     list->images[i] = list->images[i - 1];
     list->cu_arrays[i] = list->cu_arrays[i - 1];
+    list->pocs[i] = list->pocs[i - 1];
   }
 
   list->images[0] = im;
   list->cu_arrays[0] = cua;
+  list->pocs[0] = poc;
   
   list->used_size++;
   return 1;
@@ -186,6 +199,7 @@ int image_list_rem(image_list_t * const list, const unsigned n)
   if (n == list->used_size - 1) {
     list->images[n] = NULL;
     list->cu_arrays[n] = NULL;
+    list->pocs[n] = 0;
     list->used_size--;
   } else {
     int i = n;
@@ -193,9 +207,11 @@ int image_list_rem(image_list_t * const list, const unsigned n)
     for (i = n; i < list->used_size - 1; ++i) {
       list->images[i] = list->images[i + 1];
       list->cu_arrays[i] = list->cu_arrays[i + 1];
+      list->pocs[i] = list->pocs[i + 1];
     }
     list->images[list->used_size - 1] = NULL;
     list->cu_arrays[list->used_size - 1] = NULL;
+    list->pocs[list->used_size - 1] = 0;
     list->used_size--;
   }
 
@@ -209,7 +225,7 @@ int image_list_copy_contents(image_list_t *target, image_list_t *source) {
   }
   
   for (i = source->used_size - 1; i >= 0; --i) {
-    image_list_add(target, source->images[i], source->cu_arrays[i]);
+    image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i]);
   }
   return 1;
 }

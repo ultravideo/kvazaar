@@ -640,11 +640,11 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 
   // List all pocs of lists
   for (j = 0; j < state->global->ref->used_size; j++) {
-    if (state->global->ref->images[j]->poc < state->global->poc) {
-      ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+    if (state->global->ref->pocs[j] < state->global->poc) {
+      ref_list_poc[0][ref_list[0]] = state->global->ref->pocs[j];
       ref_list[0]++;
     } else {
-      ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+      ref_list_poc[1][ref_list[1]] = state->global->ref->pocs[j];
       ref_list[1]++;
     }
   }
@@ -653,9 +653,9 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
   encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
 
   for (j = 0; j < state->global->ref->used_size; j++) {
-    if (state->global->ref->images[j]->poc < state->global->poc) {
+    if (state->global->ref->pocs[j] < state->global->poc) {
       for (int ref_idx = 0; ref_idx < ref_list[0]; ref_idx++) {
-        if (ref_list_poc[0][ref_idx] == state->global->ref->images[j]->poc) {
+        if (ref_list_poc[0][ref_idx] == state->global->ref->pocs[j]) {
           state->global->refmap[j].idx = ref_list[0] - ref_idx - 1;
           break;
         }
@@ -664,14 +664,14 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 
     } else {
       for (int ref_idx = 0; ref_idx < ref_list[1]; ref_idx++) {
-        if (ref_list_poc[1][ref_idx] == state->global->ref->images[j]->poc) {
+        if (ref_list_poc[1][ref_idx] == state->global->ref->pocs[j]) {
           state->global->refmap[j].idx = ref_idx;
           break;
         }
       }
       state->global->refmap[j].list = 2;
     }
-    state->global->refmap[j].poc = state->global->ref->images[j]->poc;
+    state->global->refmap[j].poc = state->global->ref->pocs[j];
   }
 }
 
@@ -692,14 +692,14 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
       for (int ref = 0; ref < state->global->ref->used_size; ref++) {
         uint8_t found = 0;
         for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_neg_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
+          if (state->global->ref->pocs[ref] == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
             found = 1;
             break;
           }
         }
         if (found) continue;
         for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_pos_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
+          if (state->global->ref->pocs[ref] == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
             found = 1;
             break;
           }
@@ -878,7 +878,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
   if (state->encoder_control->cfg->gop_len && !gop_init) {
     int i;
     for (i = 0; i < state->encoder_control->cfg->gop_len; i++) {
-      gop_pictures[i].source = image_alloc(array_width, array_height, 0);
+      gop_pictures[i].source = image_alloc(array_width, array_height);
     }
     state->global->gop_offset = 0;
     gop_init = 1;
@@ -989,19 +989,21 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
     state->global->frame = 0;
     state->global->poc = 0;
     assert(!state->tile->frame->rec);
-    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
     return;
   }
   
   if (state->previous_encoder_state != state) {
+    encoder_state_t *prev_state = state->previous_encoder_state;
+
     //We have a "real" previous encoder
-    state->global->frame = state->previous_encoder_state->global->frame + 1;
-    state->global->poc = state->previous_encoder_state->global->poc + 1;
+    state->global->frame = prev_state->global->frame + 1;
+    state->global->poc = prev_state->global->poc + 1;
 
     image_free(state->tile->frame->rec);
     cu_array_free(state->tile->frame->cu_array);
     
-    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
     {
       // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
       unsigned height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
@@ -1009,18 +1011,28 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
       state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
     }
     videoframe_set_poc(state->tile->frame, state->global->poc);
-    image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
-    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->previous_encoder_state->global->gop_offset].is_ref) {
-      image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
+    image_list_copy_contents(state->global->ref, prev_state->global->ref);
+    if (!encoder->cfg->gop_len ||
+        !prev_state->global->poc ||
+        encoder->cfg->gop[prev_state->global->gop_offset].is_ref) {
+      image_list_add(state->global->ref,
+                     prev_state->tile->frame->rec,
+                     prev_state->tile->frame->cu_array,
+                     prev_state->global->poc);
     }
 
     return;
   }
 
 
-  if (!encoder->cfg->gop_len || !state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
+  if (!encoder->cfg->gop_len ||
+      !state->global->poc ||
+      encoder->cfg->gop[state->global->gop_offset].is_ref) {
     // Add current reconstructed picture as reference
-    image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
+    image_list_add(state->global->ref,
+                   state->tile->frame->rec,
+                   state->tile->frame->cu_array,
+                   state->global->poc);
   }
 
 
@@ -1030,7 +1042,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
   //Remove current reconstructed picture, and alloc a new one
   image_free(state->tile->frame->rec);
 
-  state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+  state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
   videoframe_set_poc(state->tile->frame, state->global->poc);
 }
 
@@ -1181,7 +1193,7 @@ void encode_coding_tree(encoder_state_t * const state,
       uint32_t j;
       int ref_list[2] = { 0, 0 };
       for (j = 0; j < state->global->ref->used_size; j++) {
-        if (state->global->ref->images[j]->poc < state->global->poc) {
+        if (state->global->ref->pocs[j] < state->global->poc) {
           ref_list[0]++;
         } else {
           ref_list[1]++;

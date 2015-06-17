@@ -476,8 +476,8 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->images[(cu)->inter.mv_ref[list]]->poc;\
-                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref[reflist]]->poc;\
+#define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
+                                   int tb = state->global->poc - state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]];\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 ); \
@@ -787,7 +787,7 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
     int ref_negative = 0;
     int ref_positive = 0;
     for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->images[j]->poc < state->global->poc) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
         ref_negative++;
       } else {
         ref_positive++;

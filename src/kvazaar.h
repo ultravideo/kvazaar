@@ -68,7 +68,6 @@ typedef struct image_t {
   struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
   int32_t refcount;        //!< \brief Number of references in reflist to the picture
 
-  int32_t poc;             //!< \brief Picture order count
 } image_t;
 
 /**

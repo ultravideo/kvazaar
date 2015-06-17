@@ -562,7 +562,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
   int ref_positive = 0;
   if (state->encoder_control->cfg->gop_len) {
     for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->images[j]->poc < state->global->poc) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
         ref_negative++;
       } else {
         ref_positive++;
@@ -612,7 +612,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
         do {
           delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
           for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->images[i]->poc == state->global->poc - delta_poc) {
+            if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
               found = 1;
               break;
             }
@@ -639,7 +639,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
         do {
           delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
           for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->images[i]->poc == state->global->poc + delta_poc) {
+            if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
               found = 1;
               break;
             }
@@ -799,8 +799,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
     add_checksum(state);
     PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
-  
-  assert(state->tile->frame->poc == state->global->poc);
   
   //Get bitstream length for stats
   newpos = bitstream_tell(stream);

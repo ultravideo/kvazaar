@@ -48,10 +48,6 @@ videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const 
   if (frame->width_in_lcu * LCU_WIDTH < frame->width) frame->width_in_lcu++;
   frame->height_in_lcu = frame->height / LCU_WIDTH;
   if (frame->height_in_lcu * LCU_WIDTH < frame->height) frame->height_in_lcu++;
-  
-  //Allocate images
-  //frame->source = image_alloc(frame->width, frame->height, poc);
-  //frame->rec = image_alloc(frame->width, frame->height, poc);
 
   {
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
@@ -93,8 +89,6 @@ int videoframe_free(videoframe_t * const frame)
 }
 
 void videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
-  if (frame->source) frame->source->poc = poc;
-  if (frame->rec) frame->rec->poc = poc;
   frame->poc = poc;
 }
 

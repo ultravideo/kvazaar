@@ -39,7 +39,7 @@
  * \brief Allocate new image
  * \return image pointer
  */
-image_t *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
+image_t *image_alloc(const int32_t width, const int32_t height)
 {
   image_t *im = MALLOC(image_t, 1);
   
@@ -59,8 +59,6 @@ image_t *image_alloc(const int32_t width, const int32_t height, const int32_t po
   im->base_image = im;
   
   im->refcount = 1; //We give a reference to caller
-  
-  im->poc = poc;
   
   //Allocate memory
   im->fulldata = MALLOC(pixel_t, (luma_size + 2 * chroma_size));

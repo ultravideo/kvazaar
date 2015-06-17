@@ -163,11 +163,11 @@ void print_frame_info(encoder_state_t *state, double frame_psnr[3])
     int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
     // List all pocs of lists
     for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->images[j]->poc < state->global->poc) {
-        ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+      if (state->global->ref->pocs[j] < state->global->poc) {
+        ref_list_poc[0][ref_list[0]] = state->global->ref->pocs[j];
         ref_list[0]++;
       } else {
-        ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+        ref_list_poc[1][ref_list[1]] = state->global->ref->pocs[j];
         ref_list[1]++;
       }
     }

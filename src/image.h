@@ -42,7 +42,7 @@ typedef struct {
 } yuv_t;
 
 
-image_t *image_alloc(const int32_t width, const int32_t height, const int32_t poc);
+image_t *image_alloc(const int32_t width, const int32_t height);
 int image_free(image_t * im);
 image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height);
 

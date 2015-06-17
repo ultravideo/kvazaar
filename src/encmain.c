@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
       frames_started += 1;
 
       
-      image_t *img_in = image_alloc(state->tile->frame->width, state->tile->frame->height, 0);
+      image_t *img_in = image_alloc(state->tile->frame->width, state->tile->frame->height);
       if (!img_in) {
         fprintf(stderr, "Failed to allocate image.\n");
         goto exit_failure;
