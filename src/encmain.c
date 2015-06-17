@@ -45,7 +45,7 @@
 #include "image.h"
 #include "cli.h"
 #include "kvazaar.h"
-#include "yuv_input.h"
+#include "yuv_io.h"
 
 /**
  * \brief Open a file for reading.
@@ -160,7 +160,7 @@ int main(int argc, char *argv[])
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
-  if (cfg->seek > 0 && !yuv_input_seek(input, cfg->seek, cfg->width, cfg->height)) {
+  if (cfg->seek > 0 && !yuv_io_seek(input, cfg->seek, cfg->width, cfg->height)) {
     fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
     goto exit_failure;
   }

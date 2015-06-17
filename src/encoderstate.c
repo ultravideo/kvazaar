@@ -43,7 +43,7 @@
 #include "sao.h"
 #include "rdo.h"
 #include "rate_control.h"
-#include "yuv_input.h"
+#include "yuv_io.h"
 
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -898,7 +898,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
         }
         else return 0;
       }
-      if (!yuv_input_read(file, width, height, array_width, array_height, gop_pictures[i].source)) {
+      if (!yuv_io_read(file, width, height, gop_pictures[i].source)) {
         if (gop_pictures_available) {
           gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
           break;
@@ -928,7 +928,7 @@ int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img
     memcpy(img_out->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
     gop_pictures_available--;
   } else {
-    return yuv_input_read(file, width, height, array_width, array_height, img_out);
+    return yuv_io_read(file, width, height, img_out);
   }
 
   return 1;

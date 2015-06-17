@@ -18,22 +18,21 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#ifndef YUV_INPUT_H_
-#define YUV_INPUT_H_
+#ifndef YUV_IO_H_
+#define YUV_IO_H_
 
 /*
  * \file
- * \brief Functions related to reading YUV input.
+ * \brief Functions related to reading YUV input and output.
  */
 
 #include "global.h"
 
-int yuv_input_read(FILE* file,
-                   unsigned input_width, unsigned input_height,
-                   unsigned array_width, unsigned array_height,
-                   image_t *img_out);
+int yuv_io_read(FILE* file,
+                unsigned input_width, unsigned input_height,
+                image_t *img_out);
 
-int yuv_input_seek(FILE* file, unsigned frames,
-                   unsigned input_width, unsigned input_height);
+int yuv_io_seek(FILE* file, unsigned frames,
+                unsigned input_width, unsigned input_height);
 
-#endif // YUV_INPUT_H_
+#endif // YUV_IO_H_

@@ -150,7 +150,7 @@
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
-    <ClCompile Include="..\..\src\yuv_input.c" />
+    <ClCompile Include="..\..\src\yuv_io.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
     <ClInclude Include="..\..\src\cli.h" />
     <ClInclude Include="..\..\src\cu.h" />
@@ -194,6 +194,7 @@
     <ClCompile Include="..\..\src\tables.c" />
     <ClCompile Include="..\..\src\threadqueue.c" />
     <ClCompile Include="..\..\src\transform.c" />
+    <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h" />

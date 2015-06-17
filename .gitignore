@@ -1,6 +1,10 @@
 # Build files
 /bin
-/build
+/build/*
+!/build/kvazaar_lib
+/build/kvazaar_lib/*
+!/build/kvazaar_lib/kvazaar_lib.vcxproj
+!/build/kvazaar_lib/kvazaar_lib.vcxproj.filters
 /scons_build_*
 
 # Generated documentation

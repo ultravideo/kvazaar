@@ -195,7 +195,7 @@
     <ClCompile Include="..\..\src\rate_control.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\yuv_input.c">
+    <ClCompile Include="..\..\src\yuv_io.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -348,6 +348,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\rate_control.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\yuv_io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

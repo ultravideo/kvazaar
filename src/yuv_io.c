@@ -25,7 +25,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#include "yuv_input.h"
+#include "yuv_io.h"
 
 static void fill_after_frame(unsigned height, unsigned array_width,
                              unsigned array_height, pixel_t *data)
@@ -77,26 +77,23 @@ static int read_and_fill_frame_data(FILE *file,
  * \param file          input file
  * \param input_width   width of the input video in pixels
  * \param input_height  height of the input video in pixels
- * \param array_width   width of the image buffer in pixels
- * \param array_height  height of the image buffer in pixels
  * \param img_out       image buffer
  *
  * \return              1 on success, 0 on failure
  */
-int yuv_input_read(FILE* file,
-                   unsigned input_width, unsigned input_height,
-                   unsigned array_width, unsigned array_height,
-                   image_t *img_out)
+int yuv_io_read(FILE* file,
+                unsigned input_width, unsigned input_height,
+                image_t *img_out)
 {
   const unsigned y_size = input_width * input_height;
   const unsigned uv_input_width  = input_width  / 2;
   const unsigned uv_input_height = input_height / 2;
   const unsigned uv_size = uv_input_width * uv_input_height;
 
-  const unsigned uv_array_width  = array_width  / 2;
-  const unsigned uv_array_height = array_height  / 2;
+  const unsigned uv_array_width  = img_out->width  / 2;
+  const unsigned uv_array_height = img_out->height  / 2;
 
-  if (input_width == array_width) {
+  if (input_width == img_out->width) {
     // No need to extend pixels.
     const size_t pixel_size = sizeof(unsigned char);
     if (fread(img_out->y, pixel_size, y_size,  file) != y_size)  return 0;
@@ -104,14 +101,14 @@ int yuv_input_read(FILE* file,
     if (fread(img_out->v, pixel_size, uv_size, file) != uv_size) return 0;
   } else {
     // Need to copy pixels to fill the image in horizontal direction.
-    if (!read_and_fill_frame_data(file, input_width,    input_height,    array_width,    img_out->y)) return 0;
+    if (!read_and_fill_frame_data(file, input_width,    input_height,    img_out->width, img_out->y)) return 0;
     if (!read_and_fill_frame_data(file, uv_input_width, uv_input_height, uv_array_width, img_out->u)) return 0;
     if (!read_and_fill_frame_data(file, uv_input_width, uv_input_height, uv_array_width, img_out->v)) return 0;
   }
 
-  if (input_height != array_height) {
+  if (input_height != img_out->height) {
     // Need to copy pixels to fill the image in vertical direction.
-    fill_after_frame(input_height,    array_width,    array_height,    img_out->y);
+    fill_after_frame(input_height,    img_out->width, img_out->height,    img_out->y);
     fill_after_frame(uv_input_height, uv_array_width, uv_array_height, img_out->u);
     fill_after_frame(uv_input_height, uv_array_width, uv_array_height, img_out->v);
   }
@@ -121,7 +118,7 @@ int yuv_input_read(FILE* file,
 
 
 /**
- * \brief Seek forward in a YUV input file.
+ * \brief Seek forward in a YUV file.
  *
  * \param file          the input file
  * \param frames        number of frames to seek
@@ -130,8 +127,8 @@ int yuv_input_read(FILE* file,
  *
  * \return              1 on success, 0 on failure
  */
-int yuv_input_seek(FILE* file, unsigned frames,
-                   unsigned input_width, unsigned input_height)
+int yuv_io_seek(FILE* file, unsigned frames,
+                unsigned input_width, unsigned input_height)
 {
     const size_t frame_bytes = input_width * input_height * 3 / 2;
     const size_t skip_bytes = frames * frame_bytes;
