@@ -97,11 +97,11 @@ typedef struct kvz_api {
   void          (*encoder_close)(kvz_encoder *);
 
   // \brief Encode one picture.
-  // \param encoder  
-  // \param pic_in    Picture containing the encoded data.
-  // \param pic_out   Picture containing the reconstructed data.
-  // \param nals_out  The first NAL containing bitstream generated, or NULL.
-  // \return 1 on success, negative on error.
+  // \param encoder   Encoder
+  // \param pic_in    Input frame
+  // \param pic_out   Returns the reconstructed picture.
+  // \param payload   Bitstream for writing the encoded data
+  // \return 1 on success, 0 on error.
   int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload *payload);
 } kvz_api;
 

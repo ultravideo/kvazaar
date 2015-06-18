@@ -111,29 +111,38 @@ kvazaar_open_failure:
 
 static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload *payload)
 {
-  // If img_in is NULL, just return the next unfinished frame.
+  *img_out = NULL;
+
+  encoder_state_t *state = &enc->states[enc->cur_state_num];
+
+  if (!state->prepared) {
+    encoder_next_frame(state);
+  }
+
   if (img_in != NULL) {
-    encoder_state_t *state = &enc->states[enc->cur_state_num];
-
-    enc->frames_started += 1;
-
+    // FIXME: The frame number printed here is wrong when GOP is enabled.
     CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
+  }
 
-    // The actual coding happens here, after this function we have a coded frame
+  if (encoder_feed_frame(state, img_in)) {
+    assert(state->global->frame == enc->frames_started);
+    // Start encoding.
     encode_one_frame(state);
+    enc->frames_started += 1;
   }
 
   // If we have finished encoding as many frames as we have started, we are done.
   if (enc->frames_done == enc->frames_started) {
-    return 0;
+    return 1;
   }
 
+  // Move to the next encoder state.
   enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
-  encoder_state_t *state = &enc->states[enc->cur_state_num];
+  state = &enc->states[enc->cur_state_num];
 
-  if (enc->frames_started >= enc->num_encoder_states && !state->frame_done) {
+  if (!state->frame_done) {
     threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
-    
+
     bitstream_append(payload, &state->stream);
 
     // Flush the output in case someone is reading the file on the other end.
@@ -143,8 +152,9 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
 
     *img_out = image_copy_ref(state->tile->frame->rec);
 
-    enc->frames_done += 1;
     state->frame_done = 1;
+    state->prepared = 0;
+    enc->frames_done += 1;
   }
 
   return 1;

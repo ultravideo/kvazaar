@@ -285,6 +285,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
   child_state->children[0].encoder_control = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
+  child_state->prepared = 0;
   child_state->frame_done = 1;
   
   if (!parent_state) {

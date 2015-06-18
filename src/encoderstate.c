@@ -860,84 +860,97 @@ void encode_one_frame(encoder_state_t * const state)
   //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
-int read_one_frame(FILE* file, const encoder_state_t * const state, image_t *img_out)
+/**
+ * \brief Pass an input frame to the encoder state.
+ *
+ * Sets the source image of the encoder state if there is a suitable image
+ * available.
+ *
+ * The caller must not modify img_in after calling this function.
+ *
+ * \param state   a main encoder state
+ * \param img_in  input frame or NULL
+ * \return        1 if the source image was set, 0 if not
+ */
+int encoder_feed_frame(encoder_state_t* const state, image_t* const img_in)
 {
-  unsigned width = state->encoder_control->in.real_width;
-  unsigned height = state->encoder_control->in.real_height;
-  unsigned array_width = state->tile->frame->width;
-  unsigned array_height = state->tile->frame->height;
+  const encoder_control_t* const encoder = state->encoder_control;
+  const config_t* const cfg = encoder->cfg;
 
-  // storing GOP pictures
-  static int8_t gop_init = 0;
-  static int8_t gop_pictures_available = 0;
-  static videoframe_t gop_pictures[MAX_GOP];
-  static int8_t gop_skip_frames = 0;
-  static int8_t gop_skipped = 0;
+  // TODO: Get rid of static variables.
+  static image_t *gop_buffer[2 * MAX_GOP] = { NULL };
+  static int gop_buf_write_idx = 0;
+  static int gop_buf_read_idx = 0;
+  static int gop_pictures_available = 0;
+  static int gop_offset = 0;
 
-  // Initialize GOP structure when gop is enabled and not initialized
-  if (state->encoder_control->cfg->gop_len && !gop_init) {
-    int i;
-    for (i = 0; i < state->encoder_control->cfg->gop_len; i++) {
-      gop_pictures[i].source = image_alloc(array_width, array_height);
-      assert(gop_pictures[i].source);
-    }
+  const int gop_buf_size = 2 * cfg->gop_len;
+
+  assert(state->global->frame >= 0);
+  assert(state->tile->frame->source == NULL);
+
+  if (cfg->gop_len == 0 || state->global->frame == 0) {
+    if (img_in == NULL) return 0;
+    state->tile->frame->source = image_copy_ref(img_in);
     state->global->gop_offset = 0;
-    gop_init = 1;
+    return 1;
   }
+  // GOP enabled and not the first frame
 
-  // If GOP is present but no pictures found
-  if (state->global->frame &&
-      state->encoder_control->cfg->gop_len &&
-      !gop_pictures_available) {
-    for (int i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
-      if (state->encoder_control->cfg->frames
-          && state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
-        if (gop_pictures_available) {
-          gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
-          break;
-        }
-        else return 0;
-      }
-      if (!yuv_io_read(file, width, height, gop_pictures[i].source)) {
-        if (gop_pictures_available) {
-          gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
-          break;
-        } else {
-          return 0;
-        }
-      }
+  if (img_in != NULL) {
+    // Save the input image in the buffer.
+    assert(gop_pictures_available < gop_buf_size);
+    assert(gop_buffer[gop_buf_write_idx] == NULL);
+    gop_buffer[gop_buf_write_idx] = image_copy_ref(img_in);
+
+    ++gop_pictures_available;
+    if (++gop_buf_write_idx >= gop_buf_size) {
+      gop_buf_write_idx = 0;
     }
   }
 
-  // If GOP is present, fetch the data from our GOP picture buffer
-  if (state->global->frame && state->encoder_control->cfg->gop_len) {
-    int cur_gop_idx = state->encoder_control->cfg->gop_len - (gop_pictures_available + gop_skip_frames) + gop_skipped;
-    int cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
-    // Special case when end of the sequence and not all pictures are available
-    if (gop_skip_frames && cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames) {
-      for (; cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames; cur_gop_idx++) {
-        cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
-        gop_skipped++;
-      }
-      cur_gop_idx--;
-      gop_skipped--;
+  if (gop_pictures_available < cfg->gop_len) {
+    if (img_in != NULL || gop_pictures_available == 0) {
+      // Either start of the sequence with no full GOP available yet, or the
+      // end of the sequence with all pics encoded.
+      return 0;
     }
-    state->global->gop_offset = cur_gop_idx;
-    memcpy(img_out->y, gop_pictures[cur_gop].source->y, width * height);
-    memcpy(img_out->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
-    memcpy(img_out->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
-    gop_pictures_available--;
-  } else {
-    return yuv_io_read(file, width, height, img_out);
+    // End of the sequence and a full GOP is not available.
+    // Skip pictures until an available one is found.
+    for (; gop_offset < cfg->gop_len &&
+           cfg->gop[gop_offset].poc_offset - 1 >= gop_pictures_available;
+           ++gop_offset);
+
+    if (gop_offset >= cfg->gop_len) {
+      // All available pictures used.
+      gop_offset = 0;
+      gop_pictures_available = 0;
+      return 0;
+    }
   }
 
+  // Move image from buffer to state.
+  int buffer_index = gop_buf_read_idx + cfg->gop[gop_offset].poc_offset - 1;
+  assert(gop_buffer[buffer_index] != NULL);
+  assert(state->tile->frame->source == NULL);
+  state->tile->frame->source = gop_buffer[buffer_index];
+  gop_buffer[buffer_index] = NULL;
+
+  state->global->gop_offset = gop_offset;
+
+  if (++gop_offset >= cfg->gop_len) {
+    gop_offset = 0;
+    gop_pictures_available = MAX(0, gop_pictures_available - cfg->gop_len);
+    gop_buf_read_idx = (gop_buf_read_idx + cfg->gop_len) % gop_buf_size;
+  }
   return 1;
 }
+
 
 void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3], uint64_t *bitstream_length)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  
+
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
@@ -953,24 +966,21 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double f
   *bitstream_length += state->stats_bitstream_length;
 }
 
-void encoder_next_frame(encoder_state_t *state, image_t *img_in)
+void encoder_next_frame(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
 
-  if (state->tile->frame->source) {
-    image_free(state->tile->frame->source);
-  }
-  state->tile->frame->source = image_copy_ref(img_in);
-
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
     state->global->frame = 0;
     state->global->poc = 0;
+    assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
     state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
     assert(state->tile->frame->rec);
+    state->prepared = 1;
     return;
   }
   
@@ -981,9 +991,10 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
     state->global->frame = prev_state->global->frame + 1;
     state->global->poc = prev_state->global->poc + 1;
 
-    image_free(state->tile->frame->rec);
     cu_array_free(state->tile->frame->cu_array);
-    
+    image_free(state->tile->frame->source);
+    state->tile->frame->source = NULL;
+    image_free(state->tile->frame->rec);
     state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
     assert(state->tile->frame->rec);
     {
@@ -1003,6 +1014,7 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
                      prev_state->global->poc);
     }
 
+    state->prepared = 1;
     return;
   }
 
@@ -1021,12 +1033,17 @@ void encoder_next_frame(encoder_state_t *state, image_t *img_in)
   state->global->frame++;
   state->global->poc++;
 
-  //Remove current reconstructed picture, and alloc a new one
+  // Remove current source picture.
+  image_free(state->tile->frame->source);
+  state->tile->frame->source = NULL;
+
+  // Remove current reconstructed picture, and alloc a new one
   image_free(state->tile->frame->rec);
 
   state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
   assert(state->tile->frame->rec);
   videoframe_set_poc(state->tile->frame, state->global->poc);
+  state->prepared = 1;
 }
 
 

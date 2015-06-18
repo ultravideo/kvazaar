@@ -185,6 +185,12 @@ typedef struct encoder_state_t {
   cabac_data_t cabac;
 
   /**
+   * \brief Indicates that this encoder state is ready for encoding the
+   * next frame i.e. encoder_next_frame has been called.
+   */
+  int prepared;
+
+  /**
    * \brief Indicates that the previous frame has been encoded and the
    * encoded data written and the encoding the next frame has not been
    * started yet.
@@ -201,10 +207,10 @@ typedef struct encoder_state_t {
 
 
 void encode_one_frame(encoder_state_t *state);
-int read_one_frame(FILE* file, const encoder_state_t *state, image_t *img_out);
+int encoder_feed_frame(encoder_state_t* const state, image_t* const img_in);
 
 void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double psnr[3], uint64_t *bitstream_length);
-void encoder_next_frame(encoder_state_t *state, image_t *img_in);
+void encoder_next_frame(encoder_state_t *state);
 
 
 void encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,

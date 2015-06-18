@@ -172,46 +172,52 @@ int main(int argc, char *argv[])
     encoding_start_cpu_time = clock();
 
     uint64_t bitstream_length = 0;
-    uint32_t frames_started = 0;
+    uint32_t frames_read = 0;
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
-    // Start coding cycle while data on input and not on the last frame
-    while (cfg->frames == 0 || frames_started < cfg->frames) {
+    for (;;) {
       encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-      frames_started += 1;
+      image_t *img_in = NULL;
+      if (!feof(input) && (cfg->frames == 0 || frames_read < cfg->frames)) {
+        // Try to read an input frame.
+        img_in = image_alloc(encoder->in.width, encoder->in.height);
+        if (!img_in) {
+          fprintf(stderr, "Failed to allocate image.\n");
+          goto exit_failure;
+        }
 
-      
-      image_t *img_in = image_alloc(state->tile->frame->width, state->tile->frame->height);
-      if (!img_in) {
-        fprintf(stderr, "Failed to allocate image.\n");
-        goto exit_failure;
-      }
-
-      // Clear the encoder state.
-      encoder_next_frame(state, img_in);
-
-      // Read one frame from the input
-      if (!read_one_frame(input, &enc->states[enc->cur_state_num], img_in)) {
-        if (!feof(input))
-          fprintf(stderr, "Failed to read a frame %d\n", enc->states[enc->cur_state_num].global->frame);
-        image_free(img_in);
-        break;
+        if (yuv_io_read(input, cfg->width, cfg->height, img_in)) {
+          frames_read += 1;
+        } else {
+          // EOF or some error
+          image_free(img_in);
+          img_in = NULL;
+          if (!feof(input)) {
+            fprintf(stderr, "Failed to read a frame %d\n", frames_read);
+            goto exit_failure;
+          }
+        }
       }
 
       image_t *img_out = NULL;
-      if (1 != api->encoder_encode(enc, img_in, &img_out, &output_stream)) {
+      if (!api->encoder_encode(enc, img_in, &img_out, &output_stream)) {
         fprintf(stderr, "Failed to encode image.\n");
         image_free(img_in);
         goto exit_failure;
+      }
+
+      if (img_out == NULL && img_in == NULL) {
+        // We are done since there is no more input and output left.
+        break;
       }
 
       if (img_out != NULL) {
         state = &enc->states[enc->cur_state_num];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
-        
+
         frames_done += 1;
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
@@ -223,28 +229,7 @@ int main(int argc, char *argv[])
       image_free(img_in);
       image_free(img_out);
     }
-    
-    //Compute stats for the remaining encoders
-    {
-      image_t *img_out = NULL;
-      while (1 == api->encoder_encode(enc, NULL, &img_out, &output_stream)) {
-        if (img_out != NULL) {
-          double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-          encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-          encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
-          print_frame_info(state, frame_psnr);
-          frames_done += 1;
-          psnr_sum[0] += frame_psnr[0];
-          psnr_sum[1] += frame_psnr[1];
-          psnr_sum[2] += frame_psnr[2];
-
-          image_free(img_out);
-          img_out = NULL;
-        }
-      }
-    }
-    
     GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     
