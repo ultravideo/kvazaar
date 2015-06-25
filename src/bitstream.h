@@ -86,6 +86,7 @@ void bitstream_finalize(bitstream_t * stream);
 uint64_t bitstream_tell(const bitstream_t * stream);
 
 void bitstream_writebyte(bitstream_t *stream, uint8_t byte);
+void bitstream_move(bitstream_t *dst, bitstream_t *src);
 void bitstream_append(bitstream_t *dst, const bitstream_t *src);
 void bitstream_clear(bitstream_t *stream);
 

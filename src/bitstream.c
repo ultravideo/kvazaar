@@ -196,6 +196,39 @@ void bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
 }
 
 /**
+ * \brief Move data from one stream to another.
+ *
+ * Destination stream must be byte-aligned.
+ *
+ * Equivalent to bitstream_append(dst, src) followed by
+ * bitstream_clear(src).
+ */
+void bitstream_move(bitstream_t *const dst, bitstream_t *const src)
+{
+  assert(dst->cur_bit == 0);
+
+  if (src->len > 0) {
+    if (dst->first == NULL) {
+      dst->first = src->first;
+      dst->last = src->last;
+      dst->len = src->len;
+    } else {
+      dst->last->next = src->first;
+      dst->last = src->last;
+      dst->len += src->len;
+    }
+  }
+
+  // Move the leftover bits.
+  dst->data = src->data;
+  dst->cur_bit = src->cur_bit;
+  dst->zerocount = src->zerocount;
+
+  src->first = src->last = NULL;
+  bitstream_clear(src);
+}
+
+/**
  * \brief Copy data from one stream to another.
  *
  * Destination stream must be byte-aligned.

@@ -785,10 +785,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
   for (i = 0; state->children[i].encoder_control; ++i) {
-    //Append bitstream to main stream
-    bitstream_append(&state->stream, &state->children[i].stream);
-    //FIXME: Move this...
-    bitstream_clear(&state->children[i].stream);
+    // Move bitstream to main stream
+    bitstream_move(&state->stream, &state->children[i].stream);
   }
     PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
@@ -848,33 +846,31 @@ void encoder_state_worker_write_bitstream_leaf(void * opaque) {
 
 static void encoder_state_write_bitstream_tile(encoder_state_t * const state) {
   //If it's not a leaf, a tile is "nothing". We only have to write sub elements
-  int i;
-  for (i = 0; state->children[i].encoder_control; ++i) {
-    //Append bitstream to main stream
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    // Cannot move here because the lengths of the leaf streams will be
+    // needed when writing the slice header.
     bitstream_append(&state->stream, &state->children[i].stream);
   }
 }
 
 static void encoder_state_write_bitstream_slice(encoder_state_t * const state) {
-  int i;
   encoder_state_write_bitstream_slice_header(state);
-  bitstream_align(&state->stream); 
-  
-  for (i = 0; state->children[i].encoder_control; ++i) {
-    //Append bitstream to main stream
-    bitstream_append(&state->stream, &state->children[i].stream);
+  bitstream_align(&state->stream);
+
+  // Move child state bitstreams to the main stream.
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    bitstream_move(&state->stream, &state->children[i].stream);
   }
 }
 
 
 void encoder_state_write_bitstream(encoder_state_t * const state) {
-  int i;
   if (!state->is_leaf) {
-    for (i=0; state->children[i].encoder_control; ++i) {
+    for (int i = 0; state->children[i].encoder_control; ++i) {
       encoder_state_t *sub_state = &(state->children[i]);
       encoder_state_write_bitstream(sub_state);
     }
-    
+
     switch (state->type) {
       case ENCODER_STATE_TYPE_MAIN:
         encoder_state_write_bitstream_main(state);
