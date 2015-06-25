@@ -320,10 +320,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
   }
   
-  if (!bitstream_init(&child_state->stream, BITSTREAM_TYPE_MEMORY)) {
-    fprintf(stderr, "Could not initialize stream!\n");
-    return 0;
-  }
+  bitstream_init(&child_state->stream);
   
   // Set CABAC output bitstream
   child_state->cabac.stream = &child_state->stream;

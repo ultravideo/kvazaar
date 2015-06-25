@@ -36,10 +36,9 @@ extern "C" {
 
 typedef struct config_t kvz_cfg;
 typedef struct encoder_state_t encoder_state_t;
-typedef union bitstream_t kvz_payload;
 typedef struct encoder_control_t encoder_control_t;
 typedef struct image_t kvz_picture;
-
+typedef struct bitstream_chunk_t kvz_payload;
 
 #define BIT_DEPTH 8
 #if BIT_DEPTH == 8
@@ -100,9 +99,9 @@ typedef struct kvz_api {
   // \param encoder   Encoder
   // \param pic_in    Input frame
   // \param pic_out   Returns the reconstructed picture.
-  // \param payload   Bitstream for writing the encoded data
+  // \param payload   Returns the encoded data.
   // \return 1 on success, 0 on error.
-  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload *payload);
+  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload **payload);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

@@ -61,7 +61,8 @@ void printf_bitstream(char *msg, ...)
 }
 #endif
 
-static int floor_log2(unsigned int n) {
+static int floor_log2(unsigned int n)
+{
   assert(n != 0);
 
   int pos = 0;
@@ -97,184 +98,163 @@ void init_exp_golomb()
 }
 
 /**
- * \brief Initialize a new bitstream
+ * \brief Initialize a new bitstream.
  */
-int bitstream_init(bitstream_t * const stream, const bitstream_type type) {
-  switch (type) {
-    case BITSTREAM_TYPE_MEMORY:
-      stream->mem.allocated_length = 0;
-      stream->mem.output_data = NULL;
-      stream->mem.output_length = 0;
-      break;
-      
-    case BITSTREAM_TYPE_FILE:
-      stream->file.output = NULL;
-      break;
-      
-    default:
-      fprintf(stderr, "Unknown type for bitstream!\n");
-      return 0;
-  }
-  
-  stream->base.cur_bit = 0;
-  stream->base.data = 0;
-  stream->base.zerocount = 0;
-  stream->base.type = type;
-  
-  return 1;
+void bitstream_init(bitstream_t *const stream)
+{
+  memset(stream, 0, sizeof(bitstream_t));
 }
 
 /**
- * \brief Finalize bitstream internal structures
+ * \brief Take chunks from a bitstream.
+ *
+ * Move ownership of the chunks to the caller and clear the bitstream.
+ *
+ * The bitstream must be byte-aligned.
  */
-
-int bitstream_finalize(bitstream_t * const stream) {
-  switch (stream->base.type) {
-    case BITSTREAM_TYPE_MEMORY:
-      FREE_POINTER(stream->mem.output_data);
-      stream->mem.allocated_length = 0;
-      stream->mem.output_length = 0;
-      break;
-      
-    case BITSTREAM_TYPE_FILE:
-      //FIXME: if we fix create_bitstream, we would maybe have to do something here
-      stream->file.output = NULL;
-      break;
-      
-    default:
-      fprintf(stderr, "Unknown type for bitstream!\n");
-      return 0;
-  }
-  
-  return 1;
+bitstream_chunk_t * bitstream_take_chunks(bitstream_t *const stream)
+{
+  assert(stream->cur_bit == 0);
+  bitstream_chunk_t *chunks = stream->first;
+  stream->first = stream->last = NULL;
+  stream->len = 0;
+  return chunks;
 }
 
+/**
+ * \brief Allocates a new bitstream chunk.
+ *
+ * \return Pointer to the new chunk, or NULL.
+ */
+bitstream_chunk_t * bitstream_alloc_chunk()
+{
+    bitstream_chunk_t *chunk = malloc(sizeof(bitstream_chunk_t));
+    if (chunk) {
+      chunk->len = 0;
+      chunk->next = NULL;
+    }
+    return chunk;
+}
+
+/**
+ * \brief Free a list of chunks.
+ */
+void bitstream_free_chunks(bitstream_chunk_t *chunk)
+{
+  while (chunk != NULL) {
+    bitstream_chunk_t *next = chunk->next;
+    free(chunk);
+    chunk = next;
+  }
+}
+
+/**
+ * \brief Free resources used by a bitstream.
+ */
+void bitstream_finalize(bitstream_t *const stream)
+{
+  bitstream_clear(stream);
+}
+
+/**
+ * \brief Get the number of bits written.
+ * \param stream  bitstream
+ * \return        position
+ */
+uint64_t bitstream_tell(const bitstream_t *const stream)
+{
+  uint64_t position = stream->len;
+  return position * 8 + stream->cur_bit;
+}
 
 /**
  * \brief Write a byte to bitstream
- * \param stream pointer bitstream to put the data
- * \param byte byte to write
- * \return 1 on success, 0 on failure
+ *
+ * The stream must be byte-aligned.
+ *
+ * \param stream  pointer bitstream to put the data
+ * \param byte    byte to write
  */
-int bitstream_writebyte(bitstream_t * const stream, const uint8_t byte) {
-  switch (stream->base.type) {
-    case BITSTREAM_TYPE_FILE:
-      if (fwrite(&byte, 1, 1, stream->file.output) != 1) {
-        fprintf(stderr, "Could not write byte to bitstream_file object.");
-        return 0;
-      }
-      break;
-      
-    case BITSTREAM_TYPE_MEMORY:
-      if (stream->mem.allocated_length==stream->mem.output_length) {
-        //Need to reallocate
-        uint32_t new_size = stream->mem.allocated_length + BITSTREAM_MEMORY_CHUNK_SIZE;
-        uint8_t* new_data = realloc(stream->mem.output_data, new_size);
-        if (!new_data) {
-          fprintf(stderr, "Failed to allocate memory for bitstream_mem object");
-          return 0;
-        }
-        stream->mem.output_data = new_data;
-        stream->mem.allocated_length = new_size;
-      }
-      //Write byte
-      stream->mem.output_data[stream->mem.output_length++] = byte;
-      break;
-      
-    default:
-      fprintf(stderr, "Unknown stream type!\n");
-      assert(0);
-      return 0;
-  }
-  return 1;
-}
+void bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
+{
+  assert(stream->cur_bit == 0);
 
+  if (stream->last == NULL || stream->last->len == BITSTREAM_MEMORY_CHUNK_SIZE) {
+    // Need to allocate a new chunk.
+    bitstream_chunk_t *new_chunk = bitstream_alloc_chunk();
+    assert(new_chunk);
 
-/**
- * \brief Get the bit position in bitstream
- * \param stream pointer bitstream
- * \return position
- */
-long long unsigned int bitstream_tell(const bitstream_t * const stream) {
-  long long unsigned int position;
-  
-  switch (stream->base.type) {
-    case BITSTREAM_TYPE_FILE:
-      position = ftell(stream->file.output);
-      break;
-      
-    case BITSTREAM_TYPE_MEMORY:
-      position = stream->mem.output_length;
-      break;
-      
-    default:
-      fprintf(stderr, "Unknown stream type!\n");
-      assert(0);
-      return 0;
+    if (!stream->first) stream->first = new_chunk;
+    if (stream->last)   stream->last->next = new_chunk;
+    stream->last = new_chunk;
   }
-  return position*8 + stream->base.cur_bit;
-}
+  assert(stream->last->len < BITSTREAM_MEMORY_CHUNK_SIZE);
 
-int bitstream_append(bitstream_t * const dst, const bitstream_t * const src) {
-  int i;
-  
-  switch(src->base.type) {
-    case BITSTREAM_TYPE_MEMORY:
-      for (i = 0; i < src->mem.output_length; ++i) {
-        bitstream_writebyte(dst, src->mem.output_data[i]);
-      }
-      break;
-    default:
-      fprintf(stderr, "Unsupported source stream type for bitstream_append!\n");
-      assert(0);
-      return 0;
-  }
-  return 1;
-}
-
-int bitstream_clear(bitstream_t * const bitstream) {
-  switch(bitstream->base.type) {
-    case BITSTREAM_TYPE_MEMORY:
-      bitstream->mem.output_length = 0;
-      break;
-    default:
-      fprintf(stderr, "Unsupported stream type for bitstream_clear!\n");
-      assert(0);
-      return 0;
-  }
-  return 1;
+  stream->last->data[stream->last->len] = byte;
+  stream->last->len += 1;
+  stream->len += 1;
 }
 
 /**
- * \brief Put bits to bitstream
+ * \brief Copy data from one stream to another.
+ *
+ * Destination stream must be byte-aligned.
+ */
+void bitstream_append(bitstream_t *const dst, const bitstream_t *const src)
+{
+  assert(dst->cur_bit == 0);
+
+  for (const bitstream_chunk_t *chunk = src->first; chunk != NULL; chunk = chunk->next) {
+    for (uint32_t i = 0; i < chunk->len; ++i) {
+      bitstream_writebyte(dst, chunk->data[i]);
+    }
+  }
+
+  // Copy the leftover bits.
+  dst->data = src->data;
+  dst->cur_bit = src->cur_bit;
+  dst->zerocount = src->zerocount;
+}
+
+/**
+ * Reset stream.
+ */
+void bitstream_clear(bitstream_t *const stream)
+{
+  bitstream_free_chunks(stream->first);
+  bitstream_init(stream);
+}
+
+/**
+ * \brief Write bits to bitstream
  * \param stream pointer bitstream to put the data
  * \param data input data
  * \param bits number of bits to write from data to stream
  */
-void bitstream_put(bitstream_t * const stream, const uint32_t data, uint8_t bits)
+void bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
 {
   const uint8_t emulation_prevention_three_byte = 0x03;
   while(bits--) {
-    stream->base.data <<= 1;
+    stream->data <<= 1;
 
     if (data & bit_set_mask[bits]) {
-      stream->base.data |= 1;
+      stream->data |= 1;
     }
-    stream->base.cur_bit++;
+    stream->cur_bit++;
 
-  // write byte to output
-    if (stream->base.cur_bit==8) {
-      if((stream->base.zerocount == 2) && (stream->base.data < 4)) {
+    // write byte to output
+    if (stream->cur_bit==8) {
+      stream->cur_bit = 0;
+      if((stream->zerocount == 2) && (stream->data < 4)) {
         bitstream_writebyte(stream, emulation_prevention_three_byte);
-        stream->base.zerocount = 0;
+        stream->zerocount = 0;
       }
-      if(stream->base.data == 0) {
-        stream->base.zerocount++;
+      if(stream->data == 0) {
+        stream->zerocount++;
       } else {
-        stream->base.zerocount = 0;
+        stream->zerocount = 0;
       }
-      bitstream_writebyte(stream, stream->base.data);
-      stream->base.cur_bit = 0;
+      bitstream_writebyte(stream, stream->data);
     }
   }
 }
@@ -285,8 +265,8 @@ void bitstream_put(bitstream_t * const stream, const uint32_t data, uint8_t bits
 void bitstream_align(bitstream_t * const stream)
 {
   bitstream_put(stream, 1, 1);
-  if ((stream->base.cur_bit & 7) != 0) {
-    bitstream_put(stream, 0, 8 - (stream->base.cur_bit & 7));
+  if ((stream->cur_bit & 7) != 0) {
+    bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
   }
 }
 
@@ -295,7 +275,7 @@ void bitstream_align(bitstream_t * const stream)
  */
 void bitstream_align_zero(bitstream_t * const stream)
 {
-  if ((stream->base.cur_bit & 7) != 0) {
-    bitstream_put(stream, 0, 8 - (stream->base.cur_bit & 7));
+  if ((stream->cur_bit & 7) != 0) {
+    bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
   }
 }

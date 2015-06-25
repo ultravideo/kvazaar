@@ -109,9 +109,10 @@ kvazaar_open_failure:
 }
 
 
-static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload *payload)
+static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload **payload)
 {
-  *img_out = NULL;
+  if (img_out) *img_out = NULL;
+  if (payload) *payload = NULL;
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
@@ -143,14 +144,8 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
   if (!state->frame_done) {
     threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
 
-    bitstream_append(payload, &state->stream);
-
-    // Flush the output in case someone is reading the file on the other end.
-    if (payload->base.type == BITSTREAM_TYPE_FILE) {
-      fflush(payload->file.output);
-    }
-
-    *img_out = image_copy_ref(state->tile->frame->rec);
+    if (payload) *payload = bitstream_take_chunks(&state->stream);
+    if (img_out) *img_out = image_copy_ref(state->tile->frame->rec);
 
     state->frame_done = 1;
     state->prepared = 0;

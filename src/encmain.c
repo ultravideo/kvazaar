@@ -140,13 +140,6 @@ int main(int argc, char *argv[])
     }
   }
 
-  bitstream_t output_stream;
-  if (!bitstream_init(&output_stream, BITSTREAM_TYPE_FILE)) {
-    fprintf(stderr, "Could not initialize stream!\n");
-    goto exit_failure;
-  }
-  output_stream.file.output = output;
-
   enc = api->encoder_open(cfg);
   if (!enc) {
     fprintf(stderr, "Failed to open encoder.\n");
@@ -201,8 +194,9 @@ int main(int argc, char *argv[])
         }
       }
 
+      bitstream_chunk_t* chunks_out = NULL;
       image_t *img_out = NULL;
-      if (!api->encoder_encode(enc, img_in, &img_out, &output_stream)) {
+      if (!api->encoder_encode(enc, img_in, &img_out, &chunks_out)) {
         fprintf(stderr, "Failed to encode image.\n");
         image_free(img_in);
         goto exit_failure;
@@ -214,6 +208,21 @@ int main(int argc, char *argv[])
       }
 
       if (img_out != NULL) {
+        // Write data into the output file.
+        for (bitstream_chunk_t *chunk = chunks_out;
+             chunk != NULL;
+             chunk = chunk->next) {
+          if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
+            fprintf(stderr, "Failed to write data to file.\n");
+            image_free(img_in);
+            image_free(img_out);
+            bitstream_free_chunks(chunks_out);
+            goto exit_failure;
+          }
+        }
+        fflush(output);
+
+        // Compute and print stats.
         state = &enc->states[enc->cur_state_num];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
@@ -228,6 +237,7 @@ int main(int argc, char *argv[])
 
       image_free(img_in);
       image_free(img_out);
+      bitstream_free_chunks(chunks_out);
     }
 
     GET_TIME(&encoding_end_real_time);
@@ -260,7 +270,6 @@ exit_failure:
 done:
   // deallocate structures
   if (enc) api->encoder_close(enc);
-  bitstream_finalize(&output_stream);
   if (cfg) api->config_destroy(cfg);
 
   // close files
