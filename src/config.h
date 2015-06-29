@@ -58,9 +58,9 @@ typedef struct config_t
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
-  bool signhide_enable;
+  int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t rdo;            /*!< \brief RD-calculation level (0..2) */
-  bool full_intra_search; /*!< \brief Don't skip modes in intra search.e */
+  int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
   int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
   int8_t  ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
@@ -117,7 +117,7 @@ int config_init(config_t *cfg);
 int config_destroy(config_t *cfg);
 int config_read(config_t *cfg,int argc, char *argv[]);
 int config_parse(config_t *cfg, const char *name, const char *value);
-int config_validate(config_t *cfg);
+int config_validate(config_t const *cfg);
 int config_set_owf_auto(config_t *cfg);
 
 #endif

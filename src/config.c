@@ -317,10 +317,9 @@ int config_parse(config_t *cfg, const char *name, const char *value)
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
 
-  int error = 0;
-
   if (!name)
     return 0;
+
   if (!value)
     value = "true";
 
@@ -341,38 +340,20 @@ int config_parse(config_t *cfg, const char *name, const char *value)
     cfg->width = atoi(value);
   else if OPT("height")
     cfg->height = atoi(value);
-  else if OPT("input-res") {
-    if (2 != sscanf(value, "%dx%d", &cfg->width, &cfg->height)) {
-      cfg->width = cfg->height = 0;
-    }
-  }
-  else if OPT("input-fps") {
+  else if OPT("input-res")
+    return sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2;
+  else if OPT("input-fps")
     cfg->framerate = atof(value);
-    if (cfg->framerate <= 0.0) {
-      fprintf(stderr, "Input error: --input-fps must be positive\n");
-      error = 1;
-    }
-  }
   else if OPT("frames")
     cfg->frames = atoi(value);
   else if OPT("qp")
     cfg->qp = atoi(value);
-  else if OPT("period") {
+  else if OPT("period")
     cfg->intra_period = atoi(value);
-    if (cfg->gop_len && cfg->intra_period && cfg->intra_period%cfg->gop_len != 0) {
-      fprintf(stderr, "Input error: Intra period (%d) not equal to goplen (%d)\n", cfg->intra_period, atoi(value));
-      return 0;
-    }
-  }
   else if OPT("vps-period")
     cfg->vps_period = atoi(value);
-  else if OPT("ref") {
+  else if OPT("ref")
     cfg->ref_frames = atoi(value);
-    if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
-      fprintf(stderr, "--ref out of range [1..15], set to 3\n");
-      cfg->ref_frames = 3;
-    }
-  }
   else if OPT("deblock") {
     int beta, tc;
     if (2 == sscanf(value, "%d:%d", &beta, &tc)) {
@@ -383,16 +364,8 @@ int config_parse(config_t *cfg, const char *name, const char *value)
       cfg->deblock_enable = 1;
       cfg->deblock_beta   = beta;
       cfg->deblock_tc     = cfg->deblock_beta;
-    } else
+    } else {
       cfg->deblock_enable = atobool(value);
-
-    if (cfg->deblock_beta  < -6 || cfg->deblock_beta  > 6) {
-      fprintf(stderr, "--deblock beta parameter out of range [-6..6], set to 0\n");
-      cfg->deblock_beta = 0;
-    }
-    if (cfg->deblock_tc < -6 || cfg->deblock_tc > 6) {
-      fprintf(stderr, "--deblock tc parameter out of range [-6..6], set to 0\n");
-      cfg->deblock_tc = 0;
     }
   }
   else if OPT("sao")
@@ -402,66 +375,33 @@ int config_parse(config_t *cfg, const char *name, const char *value)
   else if OPT("signhide")
     cfg->signhide_enable = (bool)atobool(value);
   else if OPT("rd")
-  {
-    int rdo = 0;
-    if (sscanf(value, "%d", &rdo)) {
-      if (rdo < 0 || rdo > 3) {
-        fprintf(stderr, "--rd parameter out of range [0..2], set to 1\n");
-        rdo = 1;
-      }
-      cfg->rdo = rdo;
-    }
-  }
+    cfg->rdo = atoi(value);
   else if OPT("full-intra-search")
     cfg->full_intra_search = atobool(value);
   else if OPT("transform-skip")
     cfg->trskip_enable = atobool(value);
-  else if OPT("tr-depth-intra") {
+  else if OPT("tr-depth-intra")
     cfg->tr_depth_intra = atoi(value);
-    if (cfg->tr_depth_intra == 0 && strcmp(value, "0")) {
-      error = 1;
-    } else if (cfg->tr_depth_intra < 0 || cfg->tr_depth_intra > 4) {
-      // range is 0 .. CtbLog2SizeY - Log2MinTrafoSize
-      error = 1;
-    }
-  }
-  else if OPT("me") {
-    error = !parse_enum(value, me_names, &cfg->ime_algorithm);
-  }
-  else if OPT("subme") {
+  else if OPT("me")
+    return parse_enum(value, me_names, &cfg->ime_algorithm);
+  else if OPT("subme")
     cfg->fme_level = atoi(value);
-    if (cfg->fme_level != 0 && cfg->fme_level != 1) {
-      error = 1;
-      fprintf(stderr, "Invalid --subme parameter (must be 0 or 1).\n");
-    }
-  }
-  else if OPT("sar") {
-      int sar_width, sar_height;
-      if (2 == sscanf(value, "%d:%d", &sar_width, &sar_height)) {
-        cfg->vui.sar_width  = sar_width;
-        cfg->vui.sar_height = sar_height;
-      } else
-        error = 1;
-  }
+  else if OPT("sar")
+    return sscanf(value, "%d:%d", &cfg->vui.sar_width, &cfg->vui.sar_height) == 2;
   else if OPT("overscan")
-    error = !parse_enum(value, overscan_names, &cfg->vui.overscan);
+    return parse_enum(value, overscan_names, &cfg->vui.overscan);
   else if OPT("videoformat")
-    error = !parse_enum(value, videoformat_names, &cfg->vui.videoformat);
+    return parse_enum(value, videoformat_names, &cfg->vui.videoformat);
   else if OPT("range")
-    error = !parse_enum(value, range_names, &cfg->vui.fullrange);
+    return parse_enum(value, range_names, &cfg->vui.fullrange);
   else if OPT("colorprim")
-    error = !parse_enum(value, colorprim_names, &cfg->vui.colorprim);
+    return parse_enum(value, colorprim_names, &cfg->vui.colorprim);
   else if OPT("transfer")
-    error = !parse_enum(value, transfer_names, &cfg->vui.transfer);
+    return parse_enum(value, transfer_names, &cfg->vui.transfer);
   else if OPT("colormatrix")
-    error = !parse_enum(value, colormatrix_names, &cfg->vui.colormatrix);
-  else if OPT("chromaloc") {
-      cfg->vui.chroma_loc = atoi(value);
-      if (cfg->vui.chroma_loc < 0 || cfg->vui.chroma_loc > 5) {
-        fprintf(stderr, "--chromaloc parameter out of range [0..5], set to 0\n");
-        cfg->vui.chroma_loc = 0;
-      }
-  }
+    return parse_enum(value, colormatrix_names, &cfg->vui.colormatrix);
+  else if OPT("chromaloc")
+    cfg->vui.chroma_loc = atoi(value);
   else if OPT("aud")
     cfg->aud_enable = atobool(value);
   else if OPT("cqmfile")
@@ -469,71 +409,32 @@ int config_parse(config_t *cfg, const char *name, const char *value)
   else if OPT("seek")
     cfg->seek = atoi(value);
   else if OPT("tiles-width-split")
-    error = !parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
+    return parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
   else if OPT("tiles-height-split")
-    error = !parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+    return parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
   else if OPT("wpp")
     cfg->wpp = atobool(value);
   else if OPT("owf") {
     cfg->owf = atoi(value);
-    if (cfg->owf < 0) {
-      fprintf(stderr, "--owf parameter smaller than 0, set to 0\n");
-      cfg->owf = 0;
-    } else if (cfg->owf == 0 && !strcmp(value, "auto")) {
+    if (cfg->owf == 0 && !strcmp(value, "auto")) {
+      // -1 means automatic selection
       cfg->owf = -1;
     }
   }
   else if OPT("slice-addresses")
-    error = !parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
+    return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
   else if OPT("threads")
     cfg->threads = atoi(value);
   else if OPT("cpuid")
     cfg->cpuid = atoi(value);
   else if OPT("pu-depth-inter")
-  {
-    if (2 == sscanf(value, "%d-%d", &cfg->pu_depth_inter.min, &cfg->pu_depth_inter.max)) {
-      if (!WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX) ||
-          !WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX)) 
-      {
-        fprintf(stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)",
-                cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
-        return 0;
-      }
-      if (cfg->pu_depth_inter.min > cfg->pu_depth_inter.max) {
-        fprintf(stderr, "Input error: Inter PU depth min (%d) > max (%d)\n",
-                cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
-        return 0;
-      }
-    }
-  }
+    return sscanf(value, "%d-%d", &cfg->pu_depth_inter.min, &cfg->pu_depth_inter.max) == 2;
   else if OPT("pu-depth-intra")
-  {
-    if (2 == sscanf(value, "%d-%d", &cfg->pu_depth_intra.min, &cfg->pu_depth_intra.max)) {
-      if (!WITHIN(cfg->pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX) ||
-          !WITHIN(cfg->pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX))
-      {
-        fprintf(stderr, "Input error: illegal value for --pu-depth-intra (%d-%d)",
-          cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
-        return 0;
-      }
-      if (cfg->pu_depth_intra.min > cfg->pu_depth_intra.max) {
-        fprintf(stderr, "Input error: Intra PU depth min (%d) > max (%d)\n",
-                cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
-        return 0;
-      }
-    }
-  }
+    return sscanf(value, "%d-%d", &cfg->pu_depth_intra.min, &cfg->pu_depth_intra.max) == 2;
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
   else if OPT("gop") {
-    // ToDo: Defining the whole GOp structure via parameters
-
-    // Check for intra period, must be equal to goplen
-    if (atoi(value) && cfg->intra_period && cfg->intra_period%atoi(value) != 0) {
-      fprintf(stderr, "Input error: Intra period (%d) not equal to goplen (%d)\n", cfg->intra_period, atoi(value));
-      return 0;
-    }
-
+    // TODO: Defining the whole GOP structure via parameters
     if(atoi(value) == 8) {
       // GOP
       cfg->gop_len = 8;
@@ -568,25 +469,20 @@ int config_parse(config_t *cfg, const char *name, const char *value)
       cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
-    } else if(atoi(value)) {
-      fprintf(stderr, "Input error: goplen must be 8\n");
+    } else if (atoi(value)) {
+      fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
     }
   }
   else if OPT("bipred")
     cfg->bipred = atobool(value);
-  else if OPT("bitrate") {
+  else if OPT("bitrate")
     cfg->target_bitrate = atoi(value);
-    if (cfg->target_bitrate < 0) {
-        fprintf(stderr, "Input error: --bitrate must be nonnegative\n");
-        error = 1;
-    }
-  }
   else
     return 0;
 #undef OPT
 
-  return error ? 0 : 1;
+  return 1;
 }
 
 /**
@@ -674,19 +570,13 @@ int config_read(config_t *cfg,int argc, char *argv[])
 
     if (!config_parse(cfg, long_options[long_options_index].name, optarg)) {
       const char *name = long_options_index > 0 ? long_options[long_options_index].name : argv[optind-2];
-      fprintf(stderr, "invalid argument: %s = %s\r\n", name, optarg );
+      fprintf(stderr, "invalid argument: %s=%s\n", name, optarg );
       return 0;
     }
   }
 
   // Check that the required files were defined
   if(cfg->input == NULL || cfg->output == NULL) return 0;
-
-  if (cfg->owf == -1) {
-    if (!config_set_owf_auto(cfg)) {
-      return 0;
-    }
-  }
 
   // Add dimensions to the reconstructions file name.
   if (cfg->debug != NULL) {
@@ -708,66 +598,166 @@ int config_read(config_t *cfg,int argc, char *argv[])
     return 0;
   }
 
+  if (cfg->owf == -1) {
+    if (!config_set_owf_auto(cfg)) {
+      return 0;
+    }
+  }
+
   return 1;
 }
 
 /**
- * \brief A function that does additional checks after config_init.
+ * \brief Check that configuration is sensible.
  *
- * Add checks that don't make sense to have in config_init here.
- * This should be called when cfg is in it's final state.
- *
- * \return 0 if config fails, otherwise 1.
+ * \param cfg   config to check
+ * \return      1 if the config is ok, otherwise 1
  */
-int config_validate(config_t *cfg)
+int config_validate(config_t const *const cfg)
 {
-  if (cfg->width == 0 || cfg->height == 0) {
-    fprintf(stderr, "Input error: one of the dimensions is 0: dims=%dx%d", cfg->width, cfg->height);
-    return 0;
+  int error = 0;
+
+  if (cfg->width <= 0) {
+    fprintf(stderr, "Input error: width is not positive\n");
+    error = 1;
   }
-  //Tile separation should be at round position in terms of LCU, should be monotonic, and should not start by 0
+
+  if (cfg->framerate <= 0.0) {
+    fprintf(stderr, "Input error: --input-fps must be positive\n");
+    error = 1;
+  }
+
+  if (cfg->height <= 0) {
+    fprintf(stderr, "Input error: height is not positive\n");
+    error = 1;
+  }
+
+  if (cfg->gop_len &&
+      cfg->intra_period &&
+      cfg->intra_period % cfg->gop_len != 0) {
+    fprintf(stderr,
+            "Input error: intra period (%d) not a multiple of gop length (%d)\n",
+            cfg->intra_period,
+            cfg->gop_len);
+    error = 1;
+  }
+
+  if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
+    fprintf(stderr, "Input error: --ref out of range [1..%d]\n", MAX_REF_PIC_COUNT - 1);
+    error = 1;
+  }
+
+  if (cfg->deblock_beta  < -6 || cfg->deblock_beta  > 6) {
+    fprintf(stderr, "Input error: deblock beta parameter out of range [-6..6]\n");
+    error = 1;
+  }
+  if (cfg->deblock_tc < -6 || cfg->deblock_tc > 6) {
+    fprintf(stderr, "Input error: deblock tc parameter out of range [-6..6]\n");
+    error = 1;
+  }
+
+  if (cfg->rdo < 0 || cfg->rdo > 2) {
+    fprintf(stderr, "Input error: --rd parameter out of range [0..2]\n");
+    error = 1;
+  }
+
+  if (cfg->tr_depth_intra < 0 || cfg->tr_depth_intra > 4) {
+    // range is 0 .. CtbLog2SizeY - Log2MinTrafoSize
+    fprintf(stderr, "Input error: --tr-depth-intra is out of range [0..4]\n");
+    error = 1;
+  }
+
+  if (cfg->fme_level != 0 && cfg->fme_level != 1) {
+    fprintf(stderr, "Input error: invalid --subme parameter (must be 0 or 1)\n");
+    error = 1;
+  }
+
+  if (cfg->vui.chroma_loc < 0 || cfg->vui.chroma_loc > 5) {
+    fprintf(stderr, "Input error: --chromaloc parameter out of range [0..5]\n");
+    error = 1;
+  }
+
+  if (cfg->owf < -1) {
+    fprintf(stderr, "Input error: --owf must be nonnegative or -1\n");
+    error = 1;
+  }
+
+  if (cfg->target_bitrate < 0) {
+      fprintf(stderr, "Input error: --bitrate must be nonnegative\n");
+      error = 1;
+  }
+
+  if (!WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX) ||
+      !WITHIN(cfg->pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX)) 
+  {
+    fprintf(stderr, "Input error: illegal value for --pu-depth-inter (%d-%d)\n",
+            cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
+    error = 1;
+  } else if (cfg->pu_depth_inter.min > cfg->pu_depth_inter.max) {
+    fprintf(stderr, "Input error: Inter PU depth min (%d) > max (%d)\n",
+            cfg->pu_depth_inter.min, cfg->pu_depth_inter.max);
+    error = 1;
+  }
+
+  if (!WITHIN(cfg->pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX) ||
+      !WITHIN(cfg->pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX))
+  {
+    fprintf(stderr, "Input error: illegal value for --pu-depth-intra (%d-%d)\n",
+      cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
+    error = 1;
+  } else if (cfg->pu_depth_intra.min > cfg->pu_depth_intra.max) {
+    fprintf(stderr, "Input error: Intra PU depth min (%d) > max (%d)\n",
+            cfg->pu_depth_intra.min, cfg->pu_depth_intra.max);
+    error = 1;
+  }
+
+  // Tile separation should be at round position in terms of LCU, should be monotonic, and should not start by 0
   if (cfg->tiles_width_split) {
     int i;
     int32_t prev_tile_split = 0;
     for (i=0; i < cfg->tiles_width_count; ++i) {
       if (cfg->tiles_width_split[i] <= prev_tile_split) {
         fprintf(stderr, "Input error: tile separations in width should be strictly monotonic (%d <= %d)\n", cfg->tiles_width_split[i], prev_tile_split);
-        return 0;
+        error = 1;
+        break;
       }
       if ((cfg->tiles_width_split[i] % LCU_WIDTH) != 0) {
         fprintf(stderr, "Input error: tile separation in width %d (at %d) is not at a multiple of LCU_WIDTH (%d)\n", i, cfg->tiles_width_split[i], LCU_WIDTH);
-        return 0;
+        error = 1;
+        break;
       }
       prev_tile_split = cfg->tiles_width_split[i];
     }
-    
     if (cfg->tiles_width_split[cfg->tiles_width_count-1] >= cfg->width) {
       fprintf(stderr, "Input error: last x tile separation in width (%d) should smaller than image width (%d)\n", cfg->tiles_width_split[cfg->tiles_width_count-1], cfg->width);
-      return 0;
+      error = 1;
     }
   }
-  
+
   if (cfg->tiles_height_split) {
     int i;
     int32_t prev_tile_split = 0;
     for (i=0; i < cfg->tiles_height_count; ++i) {
       if (cfg->tiles_height_split[i] <= prev_tile_split) {
         fprintf(stderr, "Input error: tile separations in height should be strictly monotonic (%d <= %d)\n", cfg->tiles_height_split[i], prev_tile_split);
-        return 0;
+        error = 1;
+        break;
       }
       if ((cfg->tiles_height_split[i] % LCU_WIDTH) != 0) {
         fprintf(stderr, "Input error: tile separation in height %d (at %d) is not at a multiple of LCU_WIDTH (%d)\n", i, cfg->tiles_height_split[i], LCU_WIDTH);
-        return 0;
+        error = 1;
+        break;
       }
       prev_tile_split = cfg->tiles_height_split[i];
     }
-    
+
     if (cfg->tiles_height_split[cfg->tiles_height_count-1] >= cfg->height) {
       fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count-1], cfg->height);
-      return 0;
+      error = 1;
     }
   }
-  return 1;
+
+  return !error;
 }
 
 int size_of_wpp_ends(int threads)
@@ -783,7 +773,7 @@ int config_set_owf_auto(config_t *cfg)
     // frame is covered by the are threads can not work at the same time.
     const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
     const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
-    
+
     // Find the largest number of threads per frame that satifies the
     // the condition: wpp start/stop inefficiency takes up  less than 15%
     // of frame area.
@@ -795,7 +785,7 @@ int config_set_owf_auto(config_t *cfg)
     {
       ++threads_per_frame;
     }
-    
+
     const int threads = (cfg->threads > 1 ? cfg->threads : 1);
     const int frames = CEILDIV(threads, threads_per_frame);
 
@@ -822,6 +812,6 @@ int config_set_owf_auto(config_t *cfg)
   }
 
   fprintf(stderr, "--owf=auto value set to %d.\n", cfg->owf);
-  
+
   return 1;
 }
