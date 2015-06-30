@@ -875,7 +875,7 @@ int encoder_feed_frame(encoder_state_t* const state, image_t* const img_in)
   const config_t* const cfg = encoder->cfg;
 
   // TODO: Get rid of static variables.
-  static image_t *gop_buffer[2 * MAX_GOP] = { NULL };
+  static image_t *gop_buffer[2 * KVZ_MAX_GOP_LENGTH] = { NULL };
   static int gop_buf_write_idx = 0;
   static int gop_buf_read_idx = 0;
   static int gop_pictures_available = 0;

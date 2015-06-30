@@ -37,7 +37,7 @@ extern "C" {
 /**
  * Maximum length of a GoP structure.
  */
-#define MAX_GOP 32
+#define KVZ_MAX_GOP_LENGTH 32
 
 #define BIT_DEPTH 8
 #if BIT_DEPTH == 8
@@ -127,7 +127,7 @@ typedef struct config_t
 
   int32_t add_encoder_info;
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
-  gop_config_t gop[MAX_GOP];  /*!< \brief Array of GOP settings */
+  gop_config_t gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
 
   int32_t target_bitrate;
 } config_t;
