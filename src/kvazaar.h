@@ -135,13 +135,12 @@ typedef struct config_t
 typedef struct config_t kvz_cfg;
 typedef struct encoder_state_t encoder_state_t;
 typedef struct encoder_control_t encoder_control_t;
-typedef struct image_t kvz_picture;
 typedef struct bitstream_chunk_t kvz_payload;
 
 /**
 * \brief Struct which contains all picture data
 */
-typedef struct image_t {
+typedef struct kvz_picture {
   pixel_t *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
 
   pixel_t *y;                //!< \brief Pointer to luma pixel array.
@@ -154,10 +153,9 @@ typedef struct image_t {
 
   int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
 
-  struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
+  struct kvz_picture *base_image; //!< \brief Pointer to the picture which owns the pixels
   int32_t refcount;        //!< \brief Number of references to the picture
-
-} image_t;
+} kvz_picture;
 
 /**
  * Main datastructure representing one instance of the encoder.

@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
     for (;;) {
       encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-      image_t *img_in = NULL;
+      kvz_picture *img_in = NULL;
       if (!feof(input) && (cfg->frames == 0 || frames_read < cfg->frames)) {
         // Try to read an input frame.
         img_in = image_alloc(encoder->in.width, encoder->in.height);
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
       }
 
       bitstream_chunk_t* chunks_out = NULL;
-      image_t *img_out = NULL;
+      kvz_picture *img_out = NULL;
       if (!api->encoder_encode(enc, img_in, &img_out, &chunks_out)) {
         fprintf(stderr, "Failed to encode image.\n");
         image_free(img_in);

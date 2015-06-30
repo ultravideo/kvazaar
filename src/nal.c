@@ -72,7 +72,7 @@ void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
  \param checksum_out Result of the calculation.
  \returns Void
 */
-void image_checksum(const image_t* im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
+void image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH])
 {
   array_checksum(im->y, im->height, im->width, im->width, checksum_out[0]);
 

@@ -30,13 +30,13 @@
 
 int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,
-                image_t *img_out);
+                kvz_picture *img_out);
 
 int yuv_io_seek(FILE* file, unsigned frames,
                 unsigned input_width, unsigned input_height);
 
 int yuv_io_write(FILE* file,
-                image_t const* img,
+                const kvz_picture *img,
                 unsigned output_width, unsigned output_height);
 
 #endif // YUV_IO_H_

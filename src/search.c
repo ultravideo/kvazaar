@@ -207,7 +207,7 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
   return temp_bitcost*(int32_t)(state->global->cur_lambda_cost_sqrt+0.5);
 }
 
-unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *pic, const image_t *ref, unsigned pattern_type,
+unsigned tz_pattern_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref, unsigned pattern_type,
                            const vector2d_t *orig, const int iDist, vector2d_t *mv, unsigned best_cost, int *best_dist,
                            int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                            int block_width, int max_lcu_below)
@@ -360,7 +360,7 @@ unsigned tz_pattern_search(const encoder_state_t * const state, const image_t *p
 
 }
 
-unsigned tz_raster_search(const encoder_state_t * const state, const image_t *pic, const image_t *ref,
+unsigned tz_raster_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref,
                           const vector2d_t *orig, vector2d_t *mv, unsigned best_cost,
                           int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                           int block_width, int iSearchRange, int iRaster, int max_lcu_below)
@@ -412,7 +412,7 @@ unsigned tz_raster_search(const encoder_state_t * const state, const image_t *pi
 }
 
 static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
-                          const image_t *pic, const image_t *ref,
+                          const kvz_picture *pic, const kvz_picture *ref,
                           const vector2d_t *orig, vector2d_t *mv_in_out,
                           int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                           int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
@@ -571,7 +571,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
  * points like 0,0 might be used, such as vectors from top or left.
  */
 static unsigned hexagon_search(const encoder_state_t * const state, unsigned depth,
-                               const image_t *pic, const image_t *ref,
+                               const kvz_picture *pic, const kvz_picture *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
                                int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
@@ -835,7 +835,7 @@ static unsigned search_mv_full(unsigned depth,
  */
 static unsigned search_frac(const encoder_state_t * const state,
                             unsigned depth,
-                            const image_t *pic, const image_t *ref,
+                            const kvz_picture *pic, const kvz_picture *ref,
                             const vector2d_t *orig, vector2d_t *mv_in_out,
                             int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                             int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
@@ -997,7 +997,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
   cur_cu->inter.cost = UINT_MAX;
 
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
-    image_t *ref_image = state->global->ref->images[ref_idx];
+    kvz_picture *ref_image = state->global->ref->images[ref_idx];
     uint32_t temp_bitcost = 0;
     uint32_t temp_cost = 0;
     vector2d_t orig, mvd;

@@ -42,7 +42,7 @@ image_list_t * image_list_alloc(int size)
   image_list_t *list = (image_list_t *)malloc(sizeof(image_list_t));
   list->size = size;
   if (size > 0) {
-    list->images = (image_t**)malloc(sizeof(image_t*) * size);
+    list->images = (kvz_picture**)malloc(sizeof(kvz_picture*) * size);
     list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*) * size);
     list->pocs = (int32_t*)malloc(sizeof(int32_t) * size);
   }
@@ -60,7 +60,7 @@ image_list_t * image_list_alloc(int size)
  */
 int image_list_resize(image_list_t *list, unsigned size)
 {
-  list->images = (image_t**)realloc(list->images, sizeof(image_t*) * size);
+  list->images = (kvz_picture**)realloc(list->images, sizeof(kvz_picture*) * size);
   list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
   list->pocs = (int32_t*)realloc(list->pocs, sizeof(int32_t*) * size);
   list->size = size;
@@ -103,7 +103,7 @@ int image_list_destroy(image_list_t *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int image_list_add(image_list_t *list, image_t* im, cu_array_t* cua, int32_t poc)
+int image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc)
 {
   int i = 0;
   if (ATOMIC_INC(&(im->refcount)) == 1) {

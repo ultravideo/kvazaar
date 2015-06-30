@@ -39,13 +39,13 @@
  * \brief Allocate a new image.
  * \return image pointer or NULL on failure
  */
-image_t *image_alloc(const int32_t width, const int32_t height)
+kvz_picture *image_alloc(const int32_t width, const int32_t height)
 {
   //Assert that we have a well defined image
   assert((width % 2) == 0);
   assert((height % 2) == 0);
 
-  image_t *im = MALLOC(image_t, 1);
+  kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
   unsigned int luma_size = width * height;
@@ -79,7 +79,7 @@ image_t *image_alloc(const int32_t width, const int32_t height)
  *
  * \param im image to free
  */
-void image_free(image_t * const im)
+void image_free(kvz_picture *const im)
 {
   if (im == NULL) return;
 
@@ -109,7 +109,7 @@ void image_free(image_t * const im)
  *
  * Increment reference count and return the image.
  */
-image_t *image_copy_ref(image_t *im)
+kvz_picture *image_copy_ref(kvz_picture *im)
 {
   int32_t new_refcount = ATOMIC_INC(&(im->refcount));
 
@@ -119,7 +119,7 @@ image_t *image_copy_ref(image_t *im)
   return im;
 }
 
-image_t *image_make_subimage(image_t *const orig_image,
+kvz_picture *image_make_subimage(kvz_picture *const orig_image,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
@@ -135,7 +135,7 @@ image_t *image_make_subimage(image_t *const orig_image,
   assert(x_offset + width <= orig_image->width);
   assert(y_offset + height <= orig_image->height);
 
-  image_t *im = MALLOC(image_t, 1);
+  kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
   im->base_image = image_copy_ref(orig_image->base_image);
@@ -265,7 +265,7 @@ static unsigned hor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-static unsigned image_interpolated_sad(const image_t *pic, const image_t *ref,
+static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture *ref,
                                  int pic_x, int pic_y, int ref_x, int ref_y,
                                  int block_width, int block_height)
 {
@@ -400,7 +400,7 @@ static unsigned image_interpolated_sad(const image_t *pic, const image_t *ref,
 *
 * \returns  
 */
-unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);

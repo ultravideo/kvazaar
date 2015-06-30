@@ -83,7 +83,7 @@ static int read_and_fill_frame_data(FILE *file,
  */
 int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,
-                image_t *img_out)
+                kvz_picture *img_out)
 {
   const unsigned y_size = input_width * input_height;
   const unsigned uv_input_width  = input_width  / 2;
@@ -161,7 +161,7 @@ int yuv_io_seek(FILE* file, unsigned frames,
  * \return              1 on success, 0 on failure
  */
 int yuv_io_write(FILE* file,
-                image_t const* img,
+                const kvz_picture *img,
                 unsigned output_width, unsigned output_height)
 {
   const int width = img->width;

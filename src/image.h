@@ -42,13 +42,13 @@ typedef struct {
 } yuv_t;
 
 
-image_t *image_alloc(const int32_t width, const int32_t height);
+kvz_picture *image_alloc(const int32_t width, const int32_t height);
 
-void image_free(image_t *im);
+void image_free(kvz_picture *im);
 
-image_t *image_copy_ref(image_t *im);
+kvz_picture *image_copy_ref(kvz_picture *im);
 
-image_t *image_make_subimage(image_t *const orig_image,
+kvz_picture *image_make_subimage(kvz_picture *const orig_image,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
@@ -58,7 +58,7 @@ yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);
 
 //Algorithms
-unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below);
 
 

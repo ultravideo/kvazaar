@@ -72,7 +72,7 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state_t * const state, const image_t * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -338,7 +338,7 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
 * \returns Void
 */
 
-void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t * ref1, const image_t * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
+void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
   pixel_t temp_lcu_y[64 * 64];
   pixel_t temp_lcu_u[32 * 32];
   pixel_t temp_lcu_v[32 * 32];
