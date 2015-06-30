@@ -151,8 +151,8 @@ typedef struct encoder_control_t
 
 } encoder_control_t;
 
-int encoder_control_init(encoder_control_t *encoder, const config_t *cfg);
-int encoder_control_finalize(encoder_control_t *encoder);
+encoder_control_t* encoder_control_init(const config_t *cfg);
+void encoder_control_free(encoder_control_t *encoder);
 
 void encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
 #endif

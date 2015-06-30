@@ -38,11 +38,10 @@ static void kvazaar_close(kvz_encoder *encoder)
         encoder_state_finalize(&encoder->states[i]);
       }
     }
-    if (encoder->control) {
-      encoder_control_finalize(encoder->control);
-    }
     FREE_POINTER(encoder->states);
-    FREE_POINTER(encoder->control);
+
+    encoder_control_free(encoder->control);
+    encoder->control = NULL;
   }
   FREE_POINTER(encoder);
 }
@@ -61,26 +60,26 @@ static kvz_encoder * kvazaar_open(config_t *cfg)
 
   init_exp_golomb();
 
-  encoder = MALLOC(kvz_encoder, 1);
+  encoder = calloc(1, sizeof(kvz_encoder));
   if (!encoder) {
     goto kvazaar_open_failure;
   }
 
-  encoder->control = MALLOC(encoder_control_t, 1);
-  if (!encoder->control || !encoder_control_init(encoder->control, cfg)) {
+  encoder->control = encoder_control_init(cfg);
+  if (!encoder->control) {
     goto kvazaar_open_failure;
   }
 
-  encoder->num_encoder_states = cfg->owf + 1;
+  encoder->num_encoder_states = encoder->control->owf + 1;
   encoder->cur_state_num = 0;
   encoder->frames_started = 0;
   encoder->frames_done = 0;
-  encoder->states = MALLOC(encoder_state_t, encoder->num_encoder_states);
+  encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
   if (!encoder->states) {
     goto kvazaar_open_failure;
   }
 
-  for (unsigned i = 0; i <= cfg->owf; ++i) {
+  for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
     encoder->states[i].encoder_control = encoder->control;
 
     if (!encoder_state_init(&encoder->states[i], NULL)) {
@@ -90,7 +89,7 @@ static kvz_encoder * kvazaar_open(config_t *cfg)
     encoder->states[i].global->QP = (int8_t)cfg->qp;
   }
 
-  for (int i = 0; i <= cfg->owf; ++i) {
+  for (int i = 0; i < encoder->num_encoder_states; ++i) {
     if (i == 0) {
       encoder->states[i].previous_encoder_state = &encoder->states[encoder->num_encoder_states - 1];
     } else {

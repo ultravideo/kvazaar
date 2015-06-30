@@ -45,26 +45,104 @@
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 
-int encoder_control_init(encoder_control_t * const encoder, const config_t * const cfg) {
+static int size_of_wpp_ends(int threads)
+{
+  // Based on the shape of the area where all threads can't yet run in parallel.
+  return 4 * threads * threads - 2 * threads;
+}
+
+static int select_owf_auto(config_t const* const cfg)
+{
+  if (cfg->wpp) {
+    // If wpp is on, select owf such that less than 15% of the
+    // frame is covered by the are threads can not work at the same time.
+    const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
+    const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
+
+    // Find the largest number of threads per frame that satifies the
+    // the condition: wpp start/stop inefficiency takes up  less than 15%
+    // of frame area.
+    int threads_per_frame = 1;
+    const int wpp_treshold = lcu_width * lcu_height * 15 / 100;
+    while ((threads_per_frame + 1) * 2 < lcu_width &&
+           threads_per_frame + 1 < lcu_height &&
+           size_of_wpp_ends(threads_per_frame + 1) < wpp_treshold)
+    {
+      ++threads_per_frame;
+    }
+
+    const int threads = MAX(cfg->threads, 1);
+    const int frames = CEILDIV(threads, threads_per_frame);
+
+    // Convert from number of parallel frames to number of additional frames.
+    return CLIP(0, threads - 1, frames - 1);
+  } else {
+    // If wpp is not on, select owf such that there is enough
+    // tiles for twice the number of threads.
+
+    int tiles_per_frame = 1;
+    if (cfg->tiles_width_count > 0) {
+      tiles_per_frame *= cfg->tiles_width_count + 1;
+    }
+    if (cfg->tiles_height_count > 0) {
+      tiles_per_frame *= cfg->tiles_height_count + 1;
+    }
+    int threads = (cfg->threads > 1 ? cfg->threads : 1);
+    int frames = CEILDIV(threads * 4, tiles_per_frame);
+
+    // Limit number of frames to 1.25x the number of threads for the case
+    // where there is only 1 tile per frame.
+    frames = CLIP(1, threads * 4 / 3, frames);
+    return frames - 1;
+  }
+}
+
+/**
+ * \brief Allocate and initialize an encoder control structure.
+ *
+ * \param cfg   encoder configuration
+ * \return      initialized encoder control or NULL on failure
+ */
+encoder_control_t* encoder_control_init(const config_t *const cfg) {
+  encoder_control_t *encoder = NULL;
+
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
-    return 0;
+    goto init_failed;
   }
-  
+
+  // Make sure that the parameters make sense.
+  if (!config_validate(cfg)) {
+    goto init_failed;
+  }
+
+  encoder = calloc(1, sizeof(encoder_control_t));
+  if (!encoder) {
+    fprintf(stderr, "Failed to allocate encoder control.\n");
+    goto init_failed;
+  }
+
+  // Need to set owf before initializing threadqueue.
+  if (cfg->owf >= 0) {
+    encoder->owf = cfg->owf;
+  } else {
+    encoder->owf = select_owf_auto(cfg);
+    fprintf(stderr, "--owf=auto value set to %d.\n", encoder->owf);
+  }
+
   encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
-  
-  encoder->owf = cfg->owf;
-    
-  //Init threadqueue
-  if (!encoder->threadqueue || !threadqueue_init(encoder->threadqueue, cfg->threads, encoder->owf > 0)) {
-    fprintf(stderr, "Could not initialize threadqueue");
-    return 0;
+  if (!encoder->threadqueue ||
+      !threadqueue_init(encoder->threadqueue,
+                        cfg->threads,
+                        encoder->owf > 0)) {
+    fprintf(stderr, "Could not initialize threadqueue.\n");
+    goto init_failed;
   }
-  
+
   // Config pointer to config struct
   encoder->cfg = cfg;
   encoder->bitdepth = 8;
-  
+
   // deblocking filter
   encoder->deblock_enable    = 1;
   encoder->beta_offset_div2  = 0;
@@ -74,10 +152,10 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
   // Rate-distortion optimization level
   encoder->rdo        = 1;
   encoder->full_intra_search = 0;
-  
+
   // Initialize the scaling list
   scalinglist_init(&encoder->scaling_list);
-  
+
   // CQM
   {
     FILE* cqmfile;
@@ -95,11 +173,13 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
   encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
 
   if (!encoder_control_init_gop_layer_weights(encoder)) {
-    return 0;
+    goto init_failed;
   }
   
   //Tiles
-  encoder->tiles_enable = (encoder->cfg->tiles_width_count > 0 || encoder->cfg->tiles_height_count > 0);
+  encoder->tiles_enable = encoder->cfg->tiles_width_count > 0 ||
+                          encoder->cfg->tiles_height_count > 0;
+
   {
     int i, j; //iteration variables
     const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
@@ -107,33 +187,50 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
 
     //Temporary pointers to allow encoder fields to be const
     int32_t *tiles_col_width, *tiles_row_height, *tiles_ctb_addr_rs_to_ts, *tiles_ctb_addr_ts_to_rs, *tiles_tile_id, *tiles_col_bd, *tiles_row_bd;
-  
+
     if (encoder->cfg->tiles_width_count >= encoder->in.width_in_lcu) {
       fprintf(stderr, "Too many tiles (width)!\n");
-      return 0;
+      goto init_failed;
+
     } else if (encoder->cfg->tiles_height_count >= encoder->in.height_in_lcu) {
       fprintf(stderr, "Too many tiles (height)!\n");
-      return 0;
+      goto init_failed;
     }
-    
+
     //Will be (perhaps) changed later
     encoder->tiles_uniform_spacing_flag = 1;
-    
+
     //tilesn[x,y] contains the number of _separation_ between tiles, whereas the encoder needs the number of tiles.
     encoder->tiles_num_tile_columns = encoder->cfg->tiles_width_count + 1;
     encoder->tiles_num_tile_rows = encoder->cfg->tiles_height_count + 1;
-    
-    tiles_col_width = MALLOC(int32_t, encoder->tiles_num_tile_columns);
-    tiles_row_height = MALLOC(int32_t, encoder->tiles_num_tile_rows);
-    
-    tiles_col_bd = MALLOC(int32_t, encoder->tiles_num_tile_columns + 1);
-    tiles_row_bd = MALLOC(int32_t, encoder->tiles_num_tile_rows + 1);
-    
-    tiles_ctb_addr_rs_to_ts = MALLOC(int32_t, num_ctbs);
-    tiles_ctb_addr_ts_to_rs = MALLOC(int32_t, num_ctbs);
-    
-    tiles_tile_id = MALLOC(int32_t, num_ctbs);
-    
+
+    encoder->tiles_col_width = tiles_col_width =
+      MALLOC(int32_t, encoder->tiles_num_tile_columns);
+    encoder->tiles_row_height = tiles_row_height =
+      MALLOC(int32_t, encoder->tiles_num_tile_rows);
+
+    encoder->tiles_row_bd = tiles_row_bd =
+      MALLOC(int32_t, encoder->tiles_num_tile_columns + 1);
+    encoder->tiles_col_bd = tiles_col_bd =
+      MALLOC(int32_t, encoder->tiles_num_tile_rows + 1);
+
+    encoder->tiles_ctb_addr_rs_to_ts = tiles_ctb_addr_rs_to_ts =
+      MALLOC(int32_t, num_ctbs);
+    encoder->tiles_ctb_addr_ts_to_rs = tiles_ctb_addr_ts_to_rs =
+      MALLOC(int32_t, num_ctbs);
+    encoder->tiles_tile_id = tiles_tile_id =
+      MALLOC(int32_t, num_ctbs);
+
+    if (!tiles_col_width ||
+        !tiles_row_height ||
+        !tiles_row_bd ||
+        !tiles_col_bd ||
+        !tiles_ctb_addr_rs_to_ts ||
+        !tiles_ctb_addr_ts_to_rs ||
+        !tiles_tile_id) {
+      goto init_failed;
+    }
+
     //(6-3) and (6-4) in ITU-T Rec. H.265 (04/2013)
     if (!encoder->cfg->tiles_width_split) {
       for (i=0; i < encoder->tiles_num_tile_columns; ++i) {
@@ -151,7 +248,7 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
       }
       encoder->tiles_uniform_spacing_flag = 0;
     }
-    
+
     if (!encoder->cfg->tiles_height_split) {
       for (i=0; i < encoder->tiles_num_tile_rows; ++i) {
         tiles_row_height[i] = ((i+1) * encoder->in.height_in_lcu) / encoder->tiles_num_tile_rows -
@@ -168,13 +265,13 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
       }
       encoder->tiles_uniform_spacing_flag = 0;
     }
-    
+
     //(6-5) in ITU-T Rec. H.265 (04/2013)
     tiles_col_bd[0] = 0;
     for (i = 0; i < encoder->tiles_num_tile_columns; ++i) {
       tiles_col_bd[i+1] = tiles_col_bd[i] + tiles_col_width[i];
     }
-    
+
     //(6-6) in ITU-T Rec. H.265 (04/2013)
     tiles_row_bd[0] = 0;
     for (i = 0; i < encoder->tiles_num_tile_rows; ++i) {
@@ -187,15 +284,15 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
       int tileX = 0, tileY = 0;
       int tbX = j % encoder->in.width_in_lcu;
       int tbY = j / encoder->in.width_in_lcu;
-      
+
       for (i = 0; i < encoder->tiles_num_tile_columns; ++i) {
         if (tbX >= tiles_col_bd[i]) tileX = i;
       }
-      
+
       for (i = 0; i < encoder->tiles_num_tile_rows; ++i) {
         if (tbY >= tiles_row_bd[i]) tileY = i;
       }
-      
+
       tiles_ctb_addr_rs_to_ts[j] = 0;
       for (i = 0; i < tileX; ++i) {
         tiles_ctb_addr_rs_to_ts[j] += tiles_row_height[tileY] * tiles_col_width[i];
@@ -203,16 +300,16 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
       for (i = 0; i < tileY; ++i) {
         tiles_ctb_addr_rs_to_ts[j] += encoder->in.width_in_lcu * tiles_row_height[i];
       }
-      tiles_ctb_addr_rs_to_ts[j] += (tbY - tiles_row_bd[tileY]) * tiles_col_width[tileX] + 
+      tiles_ctb_addr_rs_to_ts[j] += (tbY - tiles_row_bd[tileY]) * tiles_col_width[tileX] +
                                      tbX - tiles_col_bd[tileX];
     }
-    
+
     //(6-8) in ITU-T Rec. H.265 (04/2013)
     //Make reverse map from tile scan to raster scan
     for (j = 0; j < num_ctbs; ++j) {
       tiles_ctb_addr_ts_to_rs[tiles_ctb_addr_rs_to_ts[j]] = j;
     }
-    
+
     //(6-9) in ITU-T Rec. H.265 (04/2013)
     tileIdx = 0;
     for (j=0; j < encoder->tiles_num_tile_rows; ++j) {
@@ -226,43 +323,37 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
       }
     }
 
-    encoder->tiles_col_width = tiles_col_width;
-    encoder->tiles_row_height = tiles_row_height;
-    
-    encoder->tiles_row_bd = tiles_row_bd;
-    encoder->tiles_col_bd = tiles_col_bd;
-    
-    encoder->tiles_ctb_addr_rs_to_ts = tiles_ctb_addr_rs_to_ts;
-    encoder->tiles_ctb_addr_ts_to_rs = tiles_ctb_addr_ts_to_rs;
-    
-    encoder->tiles_tile_id = tiles_tile_id;
-    
     //Slices
     {
       int *slice_addresses_in_ts;
       encoder->slice_count = encoder->cfg->slice_count;
       if (encoder->slice_count == 0) {
         encoder->slice_count = 1;
-        slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
+
+        encoder->slice_addresses_in_ts = slice_addresses_in_ts =
+          MALLOC(int, encoder->slice_count);
+        if (!slice_addresses_in_ts) goto init_failed;
+
         slice_addresses_in_ts[0] = 0;
+
       } else {
-        int i;
-        slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
+        encoder->slice_addresses_in_ts = slice_addresses_in_ts =
+          MALLOC(int, encoder->slice_count);
+        if (!slice_addresses_in_ts) goto init_failed;
+
         if (!encoder->cfg->slice_addresses_in_ts) {
           slice_addresses_in_ts[0] = 0;
-          for (i=1; i < encoder->slice_count; ++i) {
+          for (int i=1; i < encoder->slice_count; ++i) {
             slice_addresses_in_ts[i] = encoder->in.width_in_lcu * encoder->in.height_in_lcu * i / encoder->slice_count;
           }
         } else {
-          for (i=0; i < encoder->slice_count; ++i) {
+          for (int i=0; i < encoder->slice_count; ++i) {
             slice_addresses_in_ts[i] = encoder->cfg->slice_addresses_in_ts[i];
           }
         }
       }
-      
-      encoder->slice_addresses_in_ts = slice_addresses_in_ts;
     }
-    
+
     encoder->wpp = encoder->cfg->wpp;
 
 #ifdef _DEBUG
@@ -283,7 +374,7 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
         const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
         const char slice_start = lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
         const char slice_end = lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
-        
+
         printf("%c%03d%c", slice_start, encoder->tiles_tile_id[lcu_id_ts], slice_end);
       }
       printf("\n");
@@ -342,35 +433,42 @@ int encoder_control_init(encoder_control_t * const encoder, const config_t * con
 
   encoder->vps_period = encoder->cfg->vps_period * encoder->cfg->intra_period;
 
-  return 1;
+  return encoder;
+
+init_failed:
+  encoder_control_free(encoder);
+  return NULL;
 }
 
-int encoder_control_finalize(encoder_control_t * const encoder) {
+/**
+ * \brief Free an encoder control structure.
+ */
+void encoder_control_free(encoder_control_t *const encoder) {
+  if (!encoder) return;
+
   //Slices
   FREE_POINTER(encoder->slice_addresses_in_ts);
-  
+
   //Tiles
   FREE_POINTER(encoder->tiles_col_width);
   FREE_POINTER(encoder->tiles_row_height);
-  
+
   FREE_POINTER(encoder->tiles_col_bd);
   FREE_POINTER(encoder->tiles_row_bd);
-  
+
   FREE_POINTER(encoder->tiles_ctb_addr_rs_to_ts);
   FREE_POINTER(encoder->tiles_ctb_addr_ts_to_rs);
-  
+
   FREE_POINTER(encoder->tiles_tile_id);
+
   scalinglist_destroy(&encoder->scaling_list);
-  
-  if (!threadqueue_finalize(encoder->threadqueue)) {
-    fprintf(stderr, "Could not initialize threadqueue");
-    return 0;
+
+  if (encoder->threadqueue) {
+    threadqueue_finalize(encoder->threadqueue);
   }
-  
   FREE_POINTER(encoder->threadqueue);
 
-  
-  return 1;
+  free(encoder);
 }
 
 void encoder_control_input_init(encoder_control_t * const encoder,
