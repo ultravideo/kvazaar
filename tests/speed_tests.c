@@ -40,8 +40,8 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-pixel_t * bufs[NUM_TESTS]; // SIMD aligned pointers.
-pixel_t * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
+kvz_pixel * bufs[NUM_TESTS]; // SIMD aligned pointers.
+kvz_pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
 
 static struct test_env_t {
   int log_width; // for selecting dim from bufs
@@ -53,7 +53,7 @@ static struct test_env_t {
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
-static void init_gradient(int x_px, int y_px, int width, int slope, pixel_t *buf)
+static void init_gradient(int x_px, int y_px, int width, int slope, kvz_pixel *buf)
 {
   for (int y = 0; y < width; ++y) {
     for (int x = 0; x < width; ++x) {
@@ -71,7 +71,7 @@ static void setup_tests()
   for (int test = 0; test < NUM_TESTS; ++test) {
     unsigned size = NUM_CHUNKS * 64 * 64;
     
-    actual_bufs[test] = malloc(size * sizeof(pixel_t) + SIMD_ALIGNMENT);
+    actual_bufs[test] = malloc(size * sizeof(kvz_pixel) + SIMD_ALIGNMENT);
     bufs[test] = ALIGNED_POINTER(actual_bufs[test], SIMD_ALIGNMENT);
   }
 
@@ -112,9 +112,9 @@ TEST test_intra_speed(const int width)
     uint64_t sum = 0;
     for (int offset = 0; offset < NUM_CHUNKS * 64 * 64; offset += NUM_CHUNKS * size) {
       // Compare the first chunk against the 35 other chunks to simulate real usage.
-      pixel_t * buf1 = &bufs[test][offset];
+      kvz_pixel * buf1 = &bufs[test][offset];
       for (int chunk = 1; chunk < NUM_CHUNKS; ++chunk) {
-        pixel_t * buf2 = &bufs[test][chunk * size + offset];
+        kvz_pixel * buf2 = &bufs[test][chunk * size + offset];
 
         cost_pixel_nxn_func *tested_func = test_env.tested_func;
         sum += tested_func(buf1, buf2);
@@ -151,9 +151,9 @@ TEST test_inter_speed(const int width)
     for (int offset = 0; offset < NUM_CHUNKS * 64 * 64; offset += NUM_CHUNKS * size) {
       // Treat 4 consecutive chunks as one chunk with double width and height,
       // and do a 8x8 grid search against the first chunk to simulate real usage.
-      pixel_t * buf1 = &bufs[test][offset];
+      kvz_pixel * buf1 = &bufs[test][offset];
       for (int chunk = 0; chunk < NUM_CHUNKS; chunk += 4) {
-        pixel_t * buf2 = &bufs[test][chunk * size + offset];
+        kvz_pixel * buf2 = &bufs[test][chunk * size + offset];
         for (int y = 0; y < 8; ++y) {
           for (int x = 0; x < 8; ++x) {
             const int stride1 = 2 * 64;
@@ -203,8 +203,8 @@ TEST dct_speed(const int width)
     for (int offset = 0; offset < NUM_CHUNKS * 64 * 64; offset += NUM_CHUNKS * size) {
       // Compare the first chunk against the 35 other chunks to simulate real usage.
       for (int chunk = 0; chunk < NUM_CHUNKS; ++chunk) {
-        pixel_t * buf1 = &bufs[test][offset];
-        pixel_t * buf2 = &bufs[test][chunk * size + offset];
+        kvz_pixel * buf1 = &bufs[test][offset];
+        kvz_pixel * buf2 = &bufs[test][chunk * size + offset];
         for (int p = 0; p < size; ++p) {
           tmp_residual[p] = (int16_t)(buf1[p] - buf2[p]);
         }

@@ -29,16 +29,16 @@
 #include "kvazaar.h"
 
 typedef struct {
-  pixel_t y[LCU_LUMA_SIZE];
-  pixel_t u[LCU_CHROMA_SIZE];
-  pixel_t v[LCU_CHROMA_SIZE];
+  kvz_pixel y[LCU_LUMA_SIZE];
+  kvz_pixel u[LCU_CHROMA_SIZE];
+  kvz_pixel v[LCU_CHROMA_SIZE];
 } lcu_yuv_t;
 
 typedef struct {
   int size;
-  pixel_t *y;
-  pixel_t *u;
-  pixel_t *v;
+  kvz_pixel *y;
+  kvz_pixel *u;
+  kvz_pixel *v;
 } yuv_t;
 
 
@@ -62,12 +62,12 @@ unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_
                         int block_width, int block_height, int max_lcu_below);
 
 
-unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
+unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
                   const int ref_stride, const int rec_stride,
                   const int width);
 
 
-void pixels_blit(const pixel_t* orig, pixel_t *dst,
+void pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 

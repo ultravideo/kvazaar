@@ -30,7 +30,7 @@
  * \param width Width of the picture.
  * \param stride Width of one row in the pixel array.
  */
-typedef void (*array_checksum_func)(const pixel_t* data,
+typedef void (*array_checksum_func)(const kvz_pixel* data,
                                     const int height, const int width,
                                     const int stride,
                                     unsigned char checksum_out[SEI_HASH_MAX_LENGTH]);

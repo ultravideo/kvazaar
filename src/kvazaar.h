@@ -41,9 +41,9 @@ extern "C" {
 
 #define KVZ_BIT_DEPTH 8
 #if KVZ_BIT_DEPTH == 8
-typedef uint8_t pixel_t;
+typedef uint8_t kvz_pixel;
 #else
-typedef uint16_t pixel_t;
+typedef uint16_t kvz_pixel;
 #endif
 
 /**
@@ -140,12 +140,12 @@ typedef struct bitstream_chunk_t kvz_payload;
 * \brief Struct which contains all picture data
 */
 typedef struct kvz_picture {
-  pixel_t *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
+  kvz_pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
 
-  pixel_t *y;                //!< \brief Pointer to luma pixel array.
-  pixel_t *u;                //!< \brief Pointer to chroma U pixel array.
-  pixel_t *v;                //!< \brief Pointer to chroma V pixel array.
-  pixel_t *data[3]; //!< \brief Alternate access method to same data.
+  kvz_pixel *y;                //!< \brief Pointer to luma pixel array.
+  kvz_pixel *u;                //!< \brief Pointer to chroma U pixel array.
+  kvz_pixel *v;                //!< \brief Pointer to chroma V pixel array.
+  kvz_pixel *data[3]; //!< \brief Alternate access method to same data.
 
   int32_t width;           //!< \brief Luma pixel array width.
   int32_t height;          //!< \brief Luma pixel array height.

@@ -35,19 +35,19 @@
 
 int8_t intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
                                     const cu_info_t* cur_cu, const cu_info_t* left_cu, const cu_info_t* above_cu);
-void intra_dc_pred_filtering(const pixel_t* src, int32_t src_stride, pixel_t* dst, int32_t dst_stride, int32_t width, int32_t height );
+void intra_dc_pred_filtering(const kvz_pixel* src, int32_t src_stride, kvz_pixel* dst, int32_t dst_stride, int32_t width, int32_t height );
 
-void intra_build_reference_border(const encoder_control_t *encoder, int32_t x_luma, int32_t y_luma, int16_t out_width, pixel_t *dst, int32_t dst_stride, int8_t chroma, int32_t pic_width, int32_t pic_height, lcu_t *lcu);
-void intra_filter(pixel_t* ref, int32_t stride, int32_t width, int8_t mode);
+void intra_build_reference_border(const encoder_control_t *encoder, int32_t x_luma, int32_t y_luma, int16_t out_width, kvz_pixel *dst, int32_t dst_stride, int8_t chroma, int32_t pic_width, int32_t pic_height, lcu_t *lcu);
+void intra_filter(kvz_pixel* ref, int32_t stride, int32_t width, int8_t mode);
 
 /* Predictions */
-void intra_get_pred(const encoder_control_t * const encoder, const pixel_t *rec, const pixel_t *rec_filtered, int recstride, pixel_t *dst, int width, int mode, int is_chroma);
+void intra_get_pred(const encoder_control_t * const encoder, const kvz_pixel *rec, const kvz_pixel *rec_filtered, int recstride, kvz_pixel *dst, int width, int mode, int is_chroma);
 
-pixel_t intra_get_dc_pred(const pixel_t* pic, uint16_t pic_width, uint8_t width);
-void intra_get_planar_pred(const pixel_t* src,int32_t srcstride, uint32_t width, pixel_t* dst, int32_t dststride);
-void intra_get_angular_pred(const encoder_control_t *encoder, const pixel_t* src, int32_t src_stride, pixel_t* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter);
+kvz_pixel intra_get_dc_pred(const kvz_pixel* pic, uint16_t pic_width, uint8_t width);
+void intra_get_planar_pred(const kvz_pixel* src,int32_t srcstride, uint32_t width, kvz_pixel* dst, int32_t dststride);
+void intra_get_angular_pred(const encoder_control_t *encoder, const kvz_pixel* src, int32_t src_stride, kvz_pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter);
 
-void intra_recon(const encoder_control_t *encoder, pixel_t* rec, int32_t rec_stride, uint32_t width, pixel_t* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
+void intra_recon(const encoder_control_t *encoder, kvz_pixel* rec, int32_t rec_stride, uint32_t width, kvz_pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
 void intra_recon_lcu_luma(encoder_state_t *state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
 void intra_recon_lcu_chroma(encoder_state_t *state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);

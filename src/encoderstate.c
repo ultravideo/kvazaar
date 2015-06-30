@@ -441,9 +441,9 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   int x;
   
   //TODO: copy only needed data
-  pixel_t *new_y_data = MALLOC(pixel_t, frame->width * frame->height);
-  pixel_t *new_u_data = MALLOC(pixel_t, (frame->width * frame->height) >> 2);
-  pixel_t *new_v_data = MALLOC(pixel_t, (frame->width * frame->height) >> 2);
+  kvz_pixel *new_y_data = MALLOC(kvz_pixel, frame->width * frame->height);
+  kvz_pixel *new_u_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
+  kvz_pixel *new_v_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
   
   const int offset = frame->width * (data->y*LCU_WIDTH);
   const int offset_c = frame->width/2 * (data->y*LCU_WIDTH_C);
@@ -453,15 +453,15 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
     num_pixels = frame->width * frame->height - offset;
   }
   
-  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(pixel_t) * num_pixels);
-  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(pixel_t) * num_pixels >> 2);
-  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(pixel_t) * num_pixels >> 2);
+  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(kvz_pixel) * num_pixels);
+  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
+  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
   
   if (data->y>0) {
     //copy first row from buffer
-    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(pixel_t));
-    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel_t));
-    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel_t));
+    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(kvz_pixel));
+    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(kvz_pixel));
+    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(kvz_pixel));
   }
 
   for (x = 0; x < frame->width_in_lcu; x++) {

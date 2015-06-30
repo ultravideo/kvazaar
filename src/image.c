@@ -52,7 +52,7 @@ kvz_picture *image_alloc(const int32_t width, const int32_t height)
   unsigned int chroma_size = luma_size / 4;
 
   //Allocate memory
-  im->fulldata = MALLOC(pixel_t, (luma_size + 2 * chroma_size));
+  im->fulldata = MALLOC(kvz_pixel, (luma_size + 2 * chroma_size));
   if (!im->fulldata) {
     free(im);
     return NULL;
@@ -156,9 +156,9 @@ yuv_t * yuv_t_alloc(int luma_size)
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
   yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
-  yuv->y = (pixel_t *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (pixel_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
-  yuv->v = (pixel_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->y = (kvz_pixel *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (kvz_pixel *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (kvz_pixel *)malloc(luma_size / 2 * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   return yuv;
@@ -183,10 +183,10 @@ void yuv_t_free(yuv_t * yuv)
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned cor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
+static unsigned cor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
-  pixel_t ref = *ref_data;
+  kvz_pixel ref = *ref_data;
   int x, y;
   unsigned sad = 0;
 
@@ -210,7 +210,7 @@ static unsigned cor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned ver_sad(const pixel_t *pic_data, const pixel_t *ref_data,
+static unsigned ver_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
   int x, y;
@@ -236,7 +236,7 @@ static unsigned ver_sad(const pixel_t *pic_data, const pixel_t *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned hor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
+static unsigned hor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
 {
   int x, y;
@@ -269,7 +269,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                                  int pic_x, int pic_y, int ref_x, int ref_y,
                                  int block_width, int block_height)
 {
-  pixel_t *pic_data, *ref_data;
+  kvz_pixel *pic_data, *ref_data;
 
   int left, right, top, bottom;
   int result = 0;
@@ -424,8 +424,8 @@ unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    const pixel_t *pic_data = &pic->y[pic_y * pic->stride + pic_x];
-    const pixel_t *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
     return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
@@ -434,7 +434,7 @@ unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_
 }
 
 
-unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
+unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
@@ -467,7 +467,7 @@ unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
  * This should be inlined, but it's defined here for now to see if Visual
  * Studios LTCG will inline it.
  */
-void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
+void pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
@@ -496,7 +496,7 @@ void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
   assert(orig != dst || orig_stride == dst_stride);
 
   for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel_t));
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
   }
 }
 

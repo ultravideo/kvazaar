@@ -98,7 +98,7 @@ static INLINE uint32_t m256i_horizontal_sum(const __m256i sum)
 }
 
 
-static unsigned sad_8bit_8x8_avx2(const pixel_t *buf1, const pixel_t *buf2)
+static unsigned sad_8bit_8x8_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
@@ -108,7 +108,7 @@ static unsigned sad_8bit_8x8_avx2(const pixel_t *buf1, const pixel_t *buf2)
 }
 
 
-static unsigned sad_8bit_16x16_avx2(const pixel_t *buf1, const pixel_t *buf2)
+static unsigned sad_8bit_16x16_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
@@ -118,7 +118,7 @@ static unsigned sad_8bit_16x16_avx2(const pixel_t *buf1, const pixel_t *buf2)
 }
 
 
-static unsigned sad_8bit_32x32_avx2(const pixel_t *buf1, const pixel_t *buf2)
+static unsigned sad_8bit_32x32_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
 {
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;

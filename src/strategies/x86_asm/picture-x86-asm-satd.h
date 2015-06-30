@@ -24,10 +24,10 @@
  /*! \file picture-x86-asm-satd.h
     \brief assembly functions header for satd
 */
-unsigned kvz_satd_4x4_avx(const pixel_t *org, const pixel_t *cur);
-unsigned kvz_satd_8x8_avx(const pixel_t *org, const pixel_t *cur);
-unsigned kvz_satd_16x16_avx(const pixel_t *org, const pixel_t *cur);
-unsigned kvz_satd_32x32_avx(const pixel_t *org, const pixel_t *cur);
-unsigned kvz_satd_64x64_avx(const pixel_t *org, const pixel_t *cur);
+unsigned kvz_satd_4x4_avx(const kvz_pixel *org, const kvz_pixel *cur);
+unsigned kvz_satd_8x8_avx(const kvz_pixel *org, const kvz_pixel *cur);
+unsigned kvz_satd_16x16_avx(const kvz_pixel *org, const kvz_pixel *cur);
+unsigned kvz_satd_32x32_avx(const kvz_pixel *org, const kvz_pixel *cur);
+unsigned kvz_satd_64x64_avx(const kvz_pixel *org, const kvz_pixel *cur);
 
 #endif

@@ -24,10 +24,10 @@ int strategy_register_picture_generic(void* opaque);
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-pixel_t fast_clip_16bit_to_pixel(int16_t value);
+kvz_pixel fast_clip_16bit_to_pixel(int16_t value);
 
 // Function to clip int32_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-pixel_t fast_clip_32bit_to_pixel(int32_t value);
+kvz_pixel fast_clip_32bit_to_pixel(int32_t value);
 
 #endif //STRATEGIES_PICTURE_GENERIC_H_

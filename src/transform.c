@@ -326,8 +326,8 @@ int quantize_residual(encoder_state_t *const state,
                       const cu_info_t *const cur_cu, const int width, const color_t color,
                       const coeff_scan_order_t scan_order, const int use_trskip, 
                       const int in_stride, const int out_stride,
-                      const pixel_t *const ref_in, const pixel_t *const pred_in, 
-                      pixel_t *rec_out, coeff_t *coeff_out)
+                      const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
+                      kvz_pixel *rec_out, coeff_t *coeff_out)
 {
   // Temporary arrays to pass data to and from quant and transform functions.
   int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
@@ -440,11 +440,11 @@ int quantize_residual_trskip(
     const cu_info_t *const cur_cu, const int width, const color_t color,
     const coeff_scan_order_t scan_order, int8_t *trskip_out, 
     const int in_stride, const int out_stride,
-    const pixel_t *const ref_in, const pixel_t *const pred_in, 
-    pixel_t *rec_out, coeff_t *coeff_out)
+    const kvz_pixel *const ref_in, const kvz_pixel *const pred_in, 
+    kvz_pixel *rec_out, coeff_t *coeff_out)
 {
   struct {
-    pixel_t rec[4*4];
+    kvz_pixel rec[4*4];
     coeff_t coeff[4*4];
     uint32_t cost;
     int has_coeffs;
@@ -543,9 +543,9 @@ void quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, int32_
     const int luma_offset = lcu_px.x + lcu_px.y * LCU_WIDTH;
 
     // Pointers to current location in arrays with prediction.
-    pixel_t *recbase_y = &lcu->rec.y[luma_offset];
+    kvz_pixel *recbase_y = &lcu->rec.y[luma_offset];
     // Pointers to current location in arrays with reference.
-    const pixel_t *base_y = &lcu->ref.y[luma_offset];
+    const kvz_pixel *base_y = &lcu->ref.y[luma_offset];
     // Pointers to current location in arrays with kvantized coefficients.
     coeff_t *orig_coeff_y = &lcu->coeff.y[luma_offset];
 
@@ -633,10 +633,10 @@ void quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, int3
     cbf_clear(&cur_cu->cbf.v, depth);
 
     const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH_C;
-    pixel_t *recbase_u = &lcu->rec.u[chroma_offset];
-    pixel_t *recbase_v = &lcu->rec.v[chroma_offset];
-    const pixel_t *base_u = &lcu->ref.u[chroma_offset];
-    const pixel_t *base_v = &lcu->ref.v[chroma_offset];
+    kvz_pixel *recbase_u = &lcu->rec.u[chroma_offset];
+    kvz_pixel *recbase_v = &lcu->rec.v[chroma_offset];
+    const kvz_pixel *base_u = &lcu->ref.u[chroma_offset];
+    const kvz_pixel *base_v = &lcu->ref.v[chroma_offset];
     coeff_t *orig_coeff_u = &lcu->coeff.u[chroma_offset];
     coeff_t *orig_coeff_v = &lcu->coeff.v[chroma_offset];
     coeff_scan_order_t scan_idx_chroma;

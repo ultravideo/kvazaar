@@ -28,10 +28,10 @@
 #include "yuv_io.h"
 
 static void fill_after_frame(unsigned height, unsigned array_width,
-                             unsigned array_height, pixel_t *data)
+                             unsigned array_height, kvz_pixel *data)
 {
-  pixel_t* p = data + height * array_width;
-  pixel_t* end = data + array_width * array_height;
+  kvz_pixel* p = data + height * array_width;
+  kvz_pixel* end = data + array_width * array_height;
 
   while (p < end) {
     // Fill the line by copying the line above.
@@ -43,11 +43,11 @@ static void fill_after_frame(unsigned height, unsigned array_width,
 
 static int read_and_fill_frame_data(FILE *file,
                                     unsigned width, unsigned height,
-                                    unsigned array_width, pixel_t *data)
+                                    unsigned array_width, kvz_pixel *data)
 {
-  pixel_t* p = data;
-  pixel_t* end = data + array_width * height;
-  pixel_t fill_char;
+  kvz_pixel* p = data;
+  kvz_pixel* end = data + array_width * height;
+  kvz_pixel fill_char;
   unsigned i;
 
   while (p < end) {

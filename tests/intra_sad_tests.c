@@ -35,7 +35,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-pixel_t * bufs[NUM_TESTS][6][2];
+kvz_pixel * bufs[NUM_TESTS][6][2];
 
 static struct {
   int log_width; // for selecting dim from bufs
@@ -45,7 +45,7 @@ static struct {
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
-static void init_gradient(int x_px, int y_px, int width, int slope, pixel_t *buf)
+static void init_gradient(int x_px, int y_px, int width, int slope, kvz_pixel *buf)
 {
   for (int y = 0; y < width; ++y) {
     for (int x = 0; x < width; ++x) {
@@ -68,10 +68,10 @@ static void setup_tests()
 
     for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
       unsigned size = 1 << (w * 2);
-      bufs[test][w][0] = malloc(size * sizeof(pixel_t) + SIMD_ALIGNMENT);
+      bufs[test][w][0] = malloc(size * sizeof(kvz_pixel) + SIMD_ALIGNMENT);
       bufs[test][w][0] = ALIGNED_POINTER(bufs[test][w][0], SIMD_ALIGNMENT);
 
-      bufs[test][w][1] = malloc(size * sizeof(pixel_t) + SIMD_ALIGNMENT);
+      bufs[test][w][1] = malloc(size * sizeof(kvz_pixel) + SIMD_ALIGNMENT);
       bufs[test][w][1] = ALIGNED_POINTER(bufs[test][w][1], SIMD_ALIGNMENT);
     }
   }
@@ -104,7 +104,7 @@ static void tear_down_tests()
 }
 
 
-static unsigned test_calc_sad(const pixel_t * buf1, const pixel_t * buf2, int dim)
+static unsigned test_calc_sad(const kvz_pixel * buf1, const kvz_pixel * buf2, int dim)
 {
   unsigned result = 0;
   for (int i = 0; i < dim * dim; ++i) {
@@ -125,8 +125,8 @@ TEST test_black_and_white(void)
   const int test = 0;
   const int width = 1 << test_env.log_width;
 
-  pixel_t * buf1 = bufs[test][test_env.log_width][0];
-  pixel_t * buf2 = bufs[test][test_env.log_width][1];
+  kvz_pixel * buf1 = bufs[test][test_env.log_width][0];
+  kvz_pixel * buf2 = bufs[test][test_env.log_width][1];
 
   unsigned result1 = test_env.tested_func(buf1, buf2);
   unsigned result2 = test_env.tested_func(buf2, buf1);
@@ -149,8 +149,8 @@ TEST test_gradient(void)
   const int test = 1;
   const int width = 1 << test_env.log_width;
 
-  pixel_t * buf1 = bufs[test][test_env.log_width][0];
-  pixel_t * buf2 = bufs[test][test_env.log_width][1];
+  kvz_pixel * buf1 = bufs[test][test_env.log_width][0];
+  kvz_pixel * buf2 = bufs[test][test_env.log_width][1];
 
   unsigned result = test_calc_sad(buf1, buf2, width);
   unsigned result1 = test_env.tested_func(buf1, buf2);

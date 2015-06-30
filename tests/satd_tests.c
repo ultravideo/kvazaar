@@ -33,7 +33,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-pixel_t * satd_bufs[NUM_TESTS][7][2];
+kvz_pixel * satd_bufs[NUM_TESTS][7][2];
 
 static struct {
   int log_width; // for selecting dim from satd_bufs
@@ -53,8 +53,8 @@ static void setup_tests()
 
     for (int w = LCU_MIN_LOG_W; w <= LCU_MAX_LOG_W; ++w) {
       unsigned size = 1 << (w * 2);
-      satd_bufs[test][w][0] = malloc(size * sizeof(pixel_t));
-      satd_bufs[test][w][1] = malloc(size * sizeof(pixel_t));
+      satd_bufs[test][w][0] = malloc(size * sizeof(kvz_pixel));
+      satd_bufs[test][w][1] = malloc(size * sizeof(kvz_pixel));
     }
   }
 
@@ -110,8 +110,8 @@ TEST satd_test_black_and_white(void)
   
   const int test = 0;
 
-  pixel_t * buf1 = satd_bufs[test][satd_test_env.log_width][0];
-  pixel_t * buf2 = satd_bufs[test][satd_test_env.log_width][1];
+  kvz_pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
+  kvz_pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
 
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
@@ -128,8 +128,8 @@ TEST satd_test_checkers(void)
 
   const int test = 1;
 
-  pixel_t * buf1 = satd_bufs[test][satd_test_env.log_width][0];
-  pixel_t * buf2 = satd_bufs[test][satd_test_env.log_width][1];
+  kvz_pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
+  kvz_pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
   
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
@@ -147,8 +147,8 @@ TEST satd_test_gradient(void)
 
   const int test = 2;
 
-  pixel_t * buf1 = satd_bufs[test][satd_test_env.log_width][0];
-  pixel_t * buf2 = satd_bufs[test][satd_test_env.log_width][1];
+  kvz_pixel * buf1 = satd_bufs[test][satd_test_env.log_width][0];
+  kvz_pixel * buf2 = satd_bufs[test][satd_test_env.log_width][1];
   
   unsigned result1 = satd_test_env.tested_func(buf1, buf2);
   unsigned result2 = satd_test_env.tested_func(buf2, buf1);
