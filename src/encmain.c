@@ -44,7 +44,6 @@
 #include "threadqueue.h"
 #include "encoder.h"
 #include "encoderstate.h"
-#include "image.h"
 #include "cli.h"
 #include "yuv_io.h"
 
@@ -176,7 +175,7 @@ int main(int argc, char *argv[])
       kvz_picture *img_in = NULL;
       if (!feof(input) && (cfg->frames == 0 || frames_read < cfg->frames)) {
         // Try to read an input frame.
-        img_in = image_alloc(encoder->in.width, encoder->in.height);
+        img_in = api->picture_alloc(encoder->in.width, encoder->in.height);
         if (!img_in) {
           fprintf(stderr, "Failed to allocate image.\n");
           goto exit_failure;
@@ -186,7 +185,7 @@ int main(int argc, char *argv[])
           frames_read += 1;
         } else {
           // EOF or some error
-          image_free(img_in);
+          api->picture_free(img_in);
           img_in = NULL;
           if (!feof(input)) {
             fprintf(stderr, "Failed to read a frame %d\n", frames_read);
@@ -199,7 +198,7 @@ int main(int argc, char *argv[])
       kvz_picture *img_out = NULL;
       if (!api->encoder_encode(enc, img_in, &img_out, &chunks_out)) {
         fprintf(stderr, "Failed to encode image.\n");
-        image_free(img_in);
+        api->picture_free(img_in);
         goto exit_failure;
       }
 
@@ -215,8 +214,8 @@ int main(int argc, char *argv[])
              chunk = chunk->next) {
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
-            image_free(img_in);
-            image_free(img_out);
+            api->picture_free(img_in);
+            api->picture_free(img_out);
             api->chunk_free(chunks_out);
             goto exit_failure;
           }
@@ -236,8 +235,8 @@ int main(int argc, char *argv[])
         print_frame_info(state, frame_psnr);
       }
 
-      image_free(img_in);
-      image_free(img_out);
+      api->picture_free(img_in);
+      api->picture_free(img_out);
       api->chunk_free(chunks_out);
     }
 

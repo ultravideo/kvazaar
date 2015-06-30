@@ -163,6 +163,9 @@ kvz_api kvz_8bit_api = {
   .config_destroy = config_destroy,
   .config_parse = config_parse,
 
+  .picture_alloc = image_alloc,
+  .picture_free = image_free,
+
   .chunk_free = bitstream_free_chunks,
 
   .encoder_open = kvazaar_open,

@@ -196,6 +196,9 @@ typedef struct kvz_api {
   int           (*config_init)(kvz_config *);
   int           (*config_parse)(kvz_config *, const char *name, const char *value);
 
+  kvz_picture * (*picture_alloc)(int32_t width, int32_t height);
+  void          (*picture_free)(kvz_picture *pic);
+
   /**
    * \brief Free a list of data chunks.
    */
@@ -210,7 +213,7 @@ typedef struct kvz_api {
    * The caller must not modify pic_in after passing it to this function.
    *
    * If pic_out and data_out are set to non-NULL values, the caller is
-   * responsible for freeing them.
+   * responsible for calling picture_free and chunk_free on them.
    *
    * \param encoder   Encoder
    * \param pic_in    Input frame
