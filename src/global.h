@@ -46,7 +46,7 @@
 #endif
 
 #define PIXEL_MIN 0
-#define PIXEL_MAX ((1 << BIT_DEPTH) - 1)
+#define PIXEL_MAX ((1 << KVZ_BIT_DEPTH) - 1)
 
 typedef int16_t coeff_t;
 
@@ -127,7 +127,7 @@ typedef int16_t coeff_t;
 
 //#define VERBOSE 1
 
-#define SAO_ABS_OFFSET_MAX ((1 << (MIN(BIT_DEPTH, 10) - 5)) - 1)
+#define SAO_ABS_OFFSET_MAX ((1 << (MIN(KVZ_BIT_DEPTH, 10) - 5)) - 1)
 
 
 #define SIZE_2Nx2N 0

@@ -124,9 +124,9 @@ void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encode
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
-  int16_t shift1 = BIT_DEPTH - 8;
+  int16_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
@@ -191,9 +191,9 @@ void filter_inter_halfpel_chroma_generic(const encoder_control_t * const encoder
   * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
   */
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int32_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
@@ -245,9 +245,9 @@ void filter_inter_octpel_chroma_generic(const encoder_control_t * const encoder,
 {
 
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int32_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 

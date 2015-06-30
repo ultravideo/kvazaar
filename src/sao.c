@@ -387,7 +387,7 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
   int offset_v = color_i == COLOR_V ? 5 : 0;
 
   if(sao->type == SAO_TYPE_BAND) {
-    int offsets[1<<BIT_DEPTH];
+    int offsets[1<<KVZ_BIT_DEPTH];
     calc_sao_offset_array(encoder, sao, offsets, color_i);
     for (y = 0; y < block_height; ++y) {
       for (x = 0; x < block_width; ++x) {
@@ -409,7 +409,7 @@ static void sao_reconstruct_color(const encoder_control_t * const encoder,
 
         int eo_cat = sao_calc_eo_cat(a, b, c);
 
-        new_data[0] = (pixel_t)CLIP(0, (1 << BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
+        new_data[0] = (pixel_t)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
       }
     }
   }

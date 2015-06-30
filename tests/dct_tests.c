@@ -100,7 +100,7 @@ static void setup_tests()
       )
     {
       dct_generic = strat->fptr;
-      dct_generic(BIT_DEPTH, dct_bufs[block], dct_result[block]);
+      dct_generic(KVZ_BIT_DEPTH, dct_bufs[block], dct_result[block]);
       ++block;
     }
   }
@@ -124,7 +124,7 @@ static void setup_tests()
       )
     {
       idct_generic = strat->fptr;
-      idct_generic(BIT_DEPTH, dct_bufs[block], idct_result[block]);
+      idct_generic(KVZ_BIT_DEPTH, dct_bufs[block], idct_result[block]);
       ++block;
     }
   }
@@ -148,7 +148,7 @@ TEST dct(void)
   int16_t *buf = dct_bufs[index];
   int16_t test_result[LCU_WIDTH*LCU_WIDTH] = { 0 };
 
-  test_env.tested_func(BIT_DEPTH, buf, test_result);
+  test_env.tested_func(KVZ_BIT_DEPTH, buf, test_result);
 
   for (int i = 0; i < LCU_WIDTH*LCU_WIDTH; ++i){
     ASSERT_EQ(test_result[i], dct_result[index][i]);
@@ -165,7 +165,7 @@ TEST idct(void)
   int16_t *buf = dct_bufs[index];
   int16_t test_result[LCU_WIDTH*LCU_WIDTH] = { 0 };
 
-  test_env.tested_func(BIT_DEPTH, buf, test_result);
+  test_env.tested_func(KVZ_BIT_DEPTH, buf, test_result);
 
   for (int i = 0; i < LCU_WIDTH*LCU_WIDTH; ++i){
     ASSERT_EQ(test_result[i], idct_result[index][i]);

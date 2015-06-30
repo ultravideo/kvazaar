@@ -39,8 +39,8 @@ extern "C" {
  */
 #define KVZ_MAX_GOP_LENGTH 32
 
-#define BIT_DEPTH 8
-#if BIT_DEPTH == 8
+#define KVZ_BIT_DEPTH 8
+#if KVZ_BIT_DEPTH == 8
 typedef uint8_t pixel_t;
 #else
 typedef uint16_t pixel_t;
