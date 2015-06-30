@@ -23,6 +23,8 @@
  *
  */
 
+#include "kvazaar.h"
+
 #ifdef _WIN32
 /* The following two defines must be located before the inclusion of any system header files. */
 #define WINVER       0x0500
@@ -44,7 +46,6 @@
 #include "encoderstate.h"
 #include "image.h"
 #include "cli.h"
-#include "kvazaar.h"
 #include "yuv_io.h"
 
 /**
@@ -194,7 +195,7 @@ int main(int argc, char *argv[])
         }
       }
 
-      bitstream_chunk_t* chunks_out = NULL;
+      kvz_data_chunk* chunks_out = NULL;
       kvz_picture *img_out = NULL;
       if (!api->encoder_encode(enc, img_in, &img_out, &chunks_out)) {
         fprintf(stderr, "Failed to encode image.\n");
@@ -209,14 +210,14 @@ int main(int argc, char *argv[])
 
       if (img_out != NULL) {
         // Write data into the output file.
-        for (bitstream_chunk_t *chunk = chunks_out;
+        for (kvz_data_chunk *chunk = chunks_out;
              chunk != NULL;
              chunk = chunk->next) {
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
             image_free(img_in);
             image_free(img_out);
-            bitstream_free_chunks(chunks_out);
+            api->chunk_free(chunks_out);
             goto exit_failure;
           }
         }
@@ -237,7 +238,7 @@ int main(int argc, char *argv[])
 
       image_free(img_in);
       image_free(img_out);
-      bitstream_free_chunks(chunks_out);
+      api->chunk_free(chunks_out);
     }
 
     GET_TIME(&encoding_end_real_time);

@@ -25,24 +25,8 @@
  * \brief Bitstream can be written to one or several bits at a time.
  */
 
+#include "kvazaar.h"
 #include "global.h"
-
-//Size of the allocation for a memory bitstream in bytes
-#define BITSTREAM_MEMORY_CHUNK_SIZE 4096
-
-/**
- * \brief A list of chunks of data in a bitstream.
- */
-typedef struct bitstream_chunk_t {
-  /// \brief Buffer for the data.
-  uint8_t data[BITSTREAM_MEMORY_CHUNK_SIZE];
-
-  /// \brief Number of bytes filled in this chunk.
-  uint32_t len;
-
-  /// \brief Next chunk in the list.
-  struct bitstream_chunk_t *next;
-} bitstream_chunk_t;
 
 /**
  * A stream of bits.
@@ -53,10 +37,10 @@ typedef struct bitstream_t
   uint32_t len;
 
   /// \brief Pointer to the first chunk, or NULL.
-  bitstream_chunk_t *first;
+  kvz_data_chunk *first;
 
   /// \brief Pointer to the last chunk, or NULL.
-  bitstream_chunk_t *last;
+  kvz_data_chunk *last;
 
   /// \brief The incomplete byte.
   uint8_t data;
@@ -78,9 +62,9 @@ extern bit_table_t g_exp_table[EXP_GOLOMB_TABLE_SIZE];
 void init_exp_golomb();
 
 void bitstream_init(bitstream_t * stream);
-bitstream_chunk_t * bitstream_alloc_chunk();
-bitstream_chunk_t * bitstream_take_chunks(bitstream_t *stream);
-void bitstream_free_chunks(bitstream_chunk_t *chunk);
+kvz_data_chunk * bitstream_alloc_chunk();
+kvz_data_chunk * bitstream_take_chunks(bitstream_t *stream);
+void bitstream_free_chunks(kvz_data_chunk *chunk);
 void bitstream_finalize(bitstream_t * stream);
 
 uint64_t bitstream_tell(const bitstream_t * stream);

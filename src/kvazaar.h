@@ -39,6 +39,11 @@ extern "C" {
  */
 #define KVZ_MAX_GOP_LENGTH 32
 
+/**
+ * Size of data chunks.
+ */
+#define KVZ_DATA_CHUNK_SIZE 4096
+
 #define KVZ_BIT_DEPTH 8
 #if KVZ_BIT_DEPTH == 8
 typedef uint8_t kvz_pixel;
@@ -134,7 +139,6 @@ typedef struct kvz_config
 
 typedef struct encoder_state_t encoder_state_t;
 typedef struct encoder_control_t encoder_control_t;
-typedef struct bitstream_chunk_t kvz_payload;
 
 /**
 * \brief Struct which contains all picture data
@@ -157,9 +161,23 @@ typedef struct kvz_picture {
 } kvz_picture;
 
 /**
+ * \brief A linked list of chunks of data.
+ *
+ * Used for returning the encoded data.
+ */
+typedef struct kvz_data_chunk {
+  /// \brief Buffer for the data.
+  uint8_t data[KVZ_DATA_CHUNK_SIZE];
+
+  /// \brief Number of bytes filled in this chunk.
+  uint32_t len;
+
+  /// \brief Next chunk in the list.
+  struct kvz_data_chunk *next;
+} kvz_data_chunk;
+
+/**
  * Main datastructure representing one instance of the encoder.
- * - encoder_open
- * - encoder_close
  */
 typedef struct kvz_encoder {
   encoder_control_t* control;
@@ -178,16 +196,32 @@ typedef struct kvz_api {
   int           (*config_init)(kvz_config *);
   int           (*config_parse)(kvz_config *, const char *name, const char *value);
 
-  kvz_encoder * (*encoder_open)(kvz_config *);
+  /**
+   * \brief Free a list of data chunks.
+   */
+  void          (*chunk_free)(kvz_data_chunk *chunk);
+
+  kvz_encoder * (*encoder_open)(const kvz_config *);
   void          (*encoder_close)(kvz_encoder *);
 
-  // \brief Encode one picture.
-  // \param encoder   Encoder
-  // \param pic_in    Input frame
-  // \param pic_out   Returns the reconstructed picture.
-  // \param payload   Returns the encoded data.
-  // \return 1 on success, 0 on error.
-  int           (*encoder_encode)(kvz_encoder *encoder, kvz_picture *pic_in, kvz_picture **pic_out, kvz_payload **payload);
+  /**
+   * \brief Encode one picture.
+   *
+   * The caller must not modify pic_in after passing it to this function.
+   *
+   * If pic_out and data_out are set to non-NULL values, the caller is
+   * responsible for freeing them.
+   *
+   * \param encoder   Encoder
+   * \param pic_in    Input frame
+   * \param pic_out   Returns the reconstructed picture.
+   * \param data_out  Returns the encoded data.
+   * \return 1 on success, 0 on error.
+   */
+  int           (*encoder_encode)(kvz_encoder *encoder,
+                                  kvz_picture *pic_in,
+                                  kvz_picture **pic_out,
+                                  kvz_data_chunk **data_out);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

@@ -112,10 +112,10 @@ void bitstream_init(bitstream_t *const stream)
  *
  * The bitstream must be byte-aligned.
  */
-bitstream_chunk_t * bitstream_take_chunks(bitstream_t *const stream)
+kvz_data_chunk * bitstream_take_chunks(bitstream_t *const stream)
 {
   assert(stream->cur_bit == 0);
-  bitstream_chunk_t *chunks = stream->first;
+  kvz_data_chunk *chunks = stream->first;
   stream->first = stream->last = NULL;
   stream->len = 0;
   return chunks;
@@ -126,9 +126,9 @@ bitstream_chunk_t * bitstream_take_chunks(bitstream_t *const stream)
  *
  * \return Pointer to the new chunk, or NULL.
  */
-bitstream_chunk_t * bitstream_alloc_chunk()
+kvz_data_chunk * bitstream_alloc_chunk()
 {
-    bitstream_chunk_t *chunk = malloc(sizeof(bitstream_chunk_t));
+    kvz_data_chunk *chunk = malloc(sizeof(kvz_data_chunk));
     if (chunk) {
       chunk->len = 0;
       chunk->next = NULL;
@@ -139,10 +139,10 @@ bitstream_chunk_t * bitstream_alloc_chunk()
 /**
  * \brief Free a list of chunks.
  */
-void bitstream_free_chunks(bitstream_chunk_t *chunk)
+void bitstream_free_chunks(kvz_data_chunk *chunk)
 {
   while (chunk != NULL) {
-    bitstream_chunk_t *next = chunk->next;
+    kvz_data_chunk *next = chunk->next;
     free(chunk);
     chunk = next;
   }
@@ -179,16 +179,16 @@ void bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
 {
   assert(stream->cur_bit == 0);
 
-  if (stream->last == NULL || stream->last->len == BITSTREAM_MEMORY_CHUNK_SIZE) {
+  if (stream->last == NULL || stream->last->len == KVZ_DATA_CHUNK_SIZE) {
     // Need to allocate a new chunk.
-    bitstream_chunk_t *new_chunk = bitstream_alloc_chunk();
+    kvz_data_chunk *new_chunk = bitstream_alloc_chunk();
     assert(new_chunk);
 
     if (!stream->first) stream->first = new_chunk;
     if (stream->last)   stream->last->next = new_chunk;
     stream->last = new_chunk;
   }
-  assert(stream->last->len < BITSTREAM_MEMORY_CHUNK_SIZE);
+  assert(stream->last->len < KVZ_DATA_CHUNK_SIZE);
 
   stream->last->data[stream->last->len] = byte;
   stream->last->len += 1;
@@ -237,7 +237,7 @@ void bitstream_append(bitstream_t *const dst, const bitstream_t *const src)
 {
   assert(dst->cur_bit == 0);
 
-  for (const bitstream_chunk_t *chunk = src->first; chunk != NULL; chunk = chunk->next) {
+  for (const kvz_data_chunk *chunk = src->first; chunk != NULL; chunk = chunk->next) {
     for (uint32_t i = 0; i < chunk->len; ++i) {
       bitstream_writebyte(dst, chunk->data[i]);
     }

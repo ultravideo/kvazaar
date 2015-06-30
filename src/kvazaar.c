@@ -47,7 +47,7 @@ static void kvazaar_close(kvz_encoder *encoder)
 }
 
 
-static kvz_encoder * kvazaar_open(kvz_config *cfg)
+static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 {
   kvz_encoder *encoder = NULL;
 
@@ -108,10 +108,13 @@ kvazaar_open_failure:
 }
 
 
-static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **img_out, kvz_payload **payload)
+static int kvazaar_encode(kvz_encoder *enc,
+                          kvz_picture *pic_in,
+                          kvz_picture **pic_out,
+                          kvz_data_chunk **data_out)
 {
-  if (img_out) *img_out = NULL;
-  if (payload) *payload = NULL;
+  if (pic_out) *pic_out = NULL;
+  if (data_out) *data_out = NULL;
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
@@ -119,12 +122,12 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
     encoder_next_frame(state);
   }
 
-  if (img_in != NULL) {
+  if (pic_in != NULL) {
     // FIXME: The frame number printed here is wrong when GOP is enabled.
     CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
   }
 
-  if (encoder_feed_frame(state, img_in)) {
+  if (encoder_feed_frame(state, pic_in)) {
     assert(state->global->frame == enc->frames_started);
     // Start encoding.
     encode_one_frame(state);
@@ -143,8 +146,8 @@ static int kvazaar_encode(kvz_encoder *enc, kvz_picture *img_in, kvz_picture **i
   if (!state->frame_done) {
     threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
 
-    if (payload) *payload = bitstream_take_chunks(&state->stream);
-    if (img_out) *img_out = image_copy_ref(state->tile->frame->rec);
+    if (pic_out) *pic_out = image_copy_ref(state->tile->frame->rec);
+    if (data_out) *data_out = bitstream_take_chunks(&state->stream);
 
     state->frame_done = 1;
     state->prepared = 0;
@@ -159,6 +162,8 @@ kvz_api kvz_8bit_api = {
   .config_init = config_init,
   .config_destroy = config_destroy,
   .config_parse = config_parse,
+
+  .chunk_free = bitstream_free_chunks,
 
   .encoder_open = kvazaar_open,
   .encoder_close = kvazaar_close,
