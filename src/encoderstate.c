@@ -944,7 +944,7 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 }
 
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3], uint64_t *bitstream_length)
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3])
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
@@ -959,8 +959,6 @@ void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double f
   }
   
   videoframe_compute_psnr(state->tile->frame, frame_psnr);
-
-  *bitstream_length += state->stats_bitstream_length;
 }
 
 void encoder_next_frame(encoder_state_t *state)

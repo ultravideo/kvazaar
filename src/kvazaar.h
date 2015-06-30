@@ -217,14 +217,16 @@ typedef struct kvz_api {
    *
    * \param encoder   Encoder
    * \param pic_in    Input frame
-   * \param pic_out   Returns the reconstructed picture.
    * \param data_out  Returns the encoded data.
+   * \param len_out   Returns number of bytes in the encoded data.
+   * \param pic_out   Returns the reconstructed picture.
    * \return 1 on success, 0 on error.
    */
   int           (*encoder_encode)(kvz_encoder *encoder,
                                   kvz_picture *pic_in,
-                                  kvz_picture **pic_out,
-                                  kvz_data_chunk **data_out);
+                                  kvz_data_chunk **data_out,
+                                  uint32_t *len_out,
+                                  kvz_picture **pic_out);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

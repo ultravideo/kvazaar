@@ -209,7 +209,7 @@ typedef struct encoder_state_t {
 void encode_one_frame(encoder_state_t *state);
 int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in);
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double psnr[3], uint64_t *bitstream_length);
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double psnr[3]);
 void encoder_next_frame(encoder_state_t *state);
 
 

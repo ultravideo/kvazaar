@@ -195,37 +195,41 @@ int main(int argc, char *argv[])
       }
 
       kvz_data_chunk* chunks_out = NULL;
-      kvz_picture *img_out = NULL;
-      if (!api->encoder_encode(enc, img_in, &img_out, &chunks_out)) {
+      uint32_t len_out = 0;
+      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, NULL)) {
         fprintf(stderr, "Failed to encode image.\n");
         api->picture_free(img_in);
         goto exit_failure;
       }
 
-      if (img_out == NULL && img_in == NULL) {
+      if (chunks_out == NULL && img_in == NULL) {
         // We are done since there is no more input and output left.
         break;
       }
 
-      if (img_out != NULL) {
+      if (chunks_out != NULL) {
+        uint64_t written = 0;
         // Write data into the output file.
         for (kvz_data_chunk *chunk = chunks_out;
              chunk != NULL;
              chunk = chunk->next) {
+          assert(written + chunk->len <= len_out);
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
             api->picture_free(img_in);
-            api->picture_free(img_out);
             api->chunk_free(chunks_out);
             goto exit_failure;
           }
+          written += chunk->len;
         }
         fflush(output);
+
+        bitstream_length += len_out;
 
         // Compute and print stats.
         state = &enc->states[enc->cur_state_num];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_compute_stats(state, recout, frame_psnr, &bitstream_length);
+        encoder_compute_stats(state, recout, frame_psnr);
 
         frames_done += 1;
         psnr_sum[0] += frame_psnr[0];
@@ -236,7 +240,6 @@ int main(int argc, char *argv[])
       }
 
       api->picture_free(img_in);
-      api->picture_free(img_out);
       api->chunk_free(chunks_out);
     }
 

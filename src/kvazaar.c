@@ -110,11 +110,13 @@ kvazaar_open_failure:
 
 static int kvazaar_encode(kvz_encoder *enc,
                           kvz_picture *pic_in,
-                          kvz_picture **pic_out,
-                          kvz_data_chunk **data_out)
+                          kvz_data_chunk **data_out,
+                          uint32_t *len_out,
+                          kvz_picture **pic_out)
 {
-  if (pic_out) *pic_out = NULL;
   if (data_out) *data_out = NULL;
+  if (len_out) *len_out = 0;
+  if (pic_out) *pic_out = NULL;
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
@@ -146,8 +148,10 @@ static int kvazaar_encode(kvz_encoder *enc,
   if (!state->frame_done) {
     threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
 
-    if (pic_out) *pic_out = image_copy_ref(state->tile->frame->rec);
+    // Get stream length before taking chunks since that clears the stream.
+    if (len_out) *len_out = bitstream_tell(&state->stream) / 8;
     if (data_out) *data_out = bitstream_take_chunks(&state->stream);
+    if (pic_out) *pic_out = image_copy_ref(state->tile->frame->rec);
 
     state->frame_done = 1;
     state->prepared = 0;
