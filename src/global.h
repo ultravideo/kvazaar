@@ -62,9 +62,6 @@ typedef int16_t coeff_t;
 #define PU_DEPTH_INTRA_MIN 0
 #define PU_DEPTH_INTRA_MAX 4
 
-// Maximum length of GoP (for allocating structures)
-#define MAX_GOP 32
-
 // Maximum number of layers in GOP structure (for allocating structures)
 #define MAX_GOP_LAYERS 6
 
