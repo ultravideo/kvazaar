@@ -774,7 +774,7 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       state->global->QP = lambda_to_QP(lambda);
     } else {
       if (encoder->cfg->gop_len > 0 && state->global->slicetype != SLICE_I) {
-        gop_config_t const * const gop =
+        kvz_gop_config const * const gop =
           encoder->cfg->gop + state->global->gop_offset;
         state->global->QP = encoder->cfg->qp + gop->qp_offset;
         state->global->QP_factor = gop->qp_factor;
@@ -872,7 +872,7 @@ void encode_one_frame(encoder_state_t * const state)
 int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
-  const config_t* const cfg = encoder->cfg;
+  const kvz_config* const cfg = encoder->cfg;
 
   // TODO: Get rid of static variables.
   static kvz_picture *gop_buffer[2 * KVZ_MAX_GOP_LENGTH] = { NULL };

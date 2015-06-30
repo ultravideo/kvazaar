@@ -49,7 +49,7 @@ typedef uint16_t pixel_t;
 /**
  * \brief GoP picture configuration.
  */
-typedef struct {
+typedef struct kvz_gop_config {
   double qp_factor;
   int8_t qp_offset;    /*!< \brief QP offset */
   int8_t poc_offset;   /*!< \brief POC offset */
@@ -59,12 +59,12 @@ typedef struct {
   int8_t ref_pos[16];  /*!< \brief reference picture offset list */
   int8_t ref_neg_count;/*!< \brief Reference picture count */
   int8_t ref_neg[16];  /*!< \brief reference picture offset list */
-} gop_config_t;
+} kvz_gop_config;
 
 /**
  * \brief Struct which contains all configuration data
  */
-typedef struct config_t
+typedef struct kvz_config
 {
   char *input;      /*!< \brief Pointer to input filename  */
   char *output;     /*!< \brief Pointer to output filename */
@@ -127,12 +127,11 @@ typedef struct config_t
 
   int32_t add_encoder_info;
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
-  gop_config_t gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
+  kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
 
   int32_t target_bitrate;
-} config_t;
+} kvz_config;
 
-typedef struct config_t kvz_cfg;
 typedef struct encoder_state_t encoder_state_t;
 typedef struct encoder_control_t encoder_control_t;
 typedef struct bitstream_chunk_t kvz_payload;
@@ -174,12 +173,12 @@ typedef struct kvz_encoder {
 } kvz_encoder;
 
 typedef struct kvz_api {
-  kvz_cfg *     (*config_alloc)(void);
-  int           (*config_destroy)(kvz_cfg *);
-  int           (*config_init)(kvz_cfg *);
-  int           (*config_parse)(kvz_cfg *, const char *name, const char *value);
+  kvz_config *  (*config_alloc)(void);
+  int           (*config_destroy)(kvz_config *);
+  int           (*config_init)(kvz_config *);
+  int           (*config_parse)(kvz_config *, const char *name, const char *value);
 
-  kvz_encoder * (*encoder_open)(kvz_cfg *);
+  kvz_encoder * (*encoder_open)(kvz_config *);
   void          (*encoder_close)(kvz_encoder *);
 
   // \brief Encode one picture.

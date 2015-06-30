@@ -34,9 +34,9 @@
  * \brief Allocate memory for config object
  * \return pointer to allocated memory
  */
-config_t *config_alloc(void)
+kvz_config *config_alloc(void)
 {
-  config_t *cfg = (config_t *)malloc(sizeof(config_t));
+  kvz_config *cfg = (kvz_config *)malloc(sizeof(kvz_config));
   if (!cfg) {
     fprintf(stderr, "Failed to allocate a config object!\n");
     return cfg;
@@ -52,7 +52,7 @@ config_t *config_alloc(void)
  * \param cfg config object
  * \return 1 on success, 0 on failure
  */
-int config_init(config_t *cfg)
+int config_init(kvz_config *cfg)
 {
   cfg->input           = NULL;
   cfg->output          = NULL;
@@ -123,7 +123,7 @@ int config_init(config_t *cfg)
  * \param cfg config object
  * \return 1 on success, 0 on failure
  */
-int config_destroy(config_t *cfg)
+int config_destroy(kvz_config *cfg)
 {
   FREE_POINTER(cfg->input);
   FREE_POINTER(cfg->output);
@@ -302,7 +302,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
   return 1;
 }
 
-int config_parse(config_t *cfg, const char *name, const char *value)
+int config_parse(kvz_config *cfg, const char *name, const char *value)
 {
   static const char * const me_names[]          = { "hexbs", "tz", NULL };
 
@@ -492,7 +492,7 @@ int config_parse(config_t *cfg, const char *name, const char *value)
  * \param argv argument list
  * \return 1 on success, 0 on failure
  */
-int config_read(config_t *cfg,int argc, char *argv[])
+int config_read(kvz_config *cfg,int argc, char *argv[])
 {
   static char short_options[] = "i:o:d:w:h:n:q:p:r:";
   static struct option long_options[] =
@@ -602,7 +602,7 @@ int config_read(config_t *cfg,int argc, char *argv[])
  * \param cfg   config to check
  * \return      1 if the config is ok, otherwise 1
  */
-int config_validate(config_t const *const cfg)
+int config_validate(const kvz_config *const cfg)
 {
   int error = 0;
 

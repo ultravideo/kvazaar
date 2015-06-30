@@ -51,7 +51,7 @@ static int size_of_wpp_ends(int threads)
   return 4 * threads * threads - 2 * threads;
 }
 
-static int select_owf_auto(config_t const* const cfg)
+static int select_owf_auto(const kvz_config *const cfg)
 {
   if (cfg->wpp) {
     // If wpp is on, select owf such that less than 15% of the
@@ -103,7 +103,7 @@ static int select_owf_auto(config_t const* const cfg)
  * \param cfg   encoder configuration
  * \return      initialized encoder control or NULL on failure
  */
-encoder_control_t* encoder_control_init(const config_t *const cfg) {
+encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
   encoder_control_t *encoder = NULL;
 
   if (!cfg) {
@@ -526,7 +526,7 @@ void encoder_control_input_init(encoder_control_t * const encoder,
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const encoder)
 {
 
-  gop_config_t const * const gop = encoder->cfg->gop;
+  kvz_gop_config const * const gop = encoder->cfg->gop;
   const int8_t gop_len = encoder->cfg->gop_len;
 
   int num_layers = 0;

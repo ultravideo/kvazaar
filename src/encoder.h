@@ -42,7 +42,7 @@ enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
 typedef struct encoder_control_t
 {
   /* Configuration */
-  const config_t *cfg;
+  const kvz_config *cfg;
   
   /* Input */
   struct {
@@ -151,7 +151,7 @@ typedef struct encoder_control_t
 
 } encoder_control_t;
 
-encoder_control_t* encoder_control_init(const config_t *cfg);
+encoder_control_t* encoder_control_init(const kvz_config *cfg);
 void encoder_control_free(encoder_control_t *encoder);
 
 void encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);

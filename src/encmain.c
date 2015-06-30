@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 {
   int retval = EXIT_SUCCESS;
 
-  config_t *cfg = NULL; //!< Global configuration
+  kvz_config *cfg = NULL; //!< Global configuration
   kvz_encoder* enc = NULL;
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
