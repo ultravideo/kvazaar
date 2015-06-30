@@ -52,6 +52,11 @@ typedef uint16_t kvz_pixel;
 #endif
 
 /**
+ * Opaque data structure representing one instance of the encoder.
+ */
+typedef struct kvz_encoder kvz_encoder;
+
+/**
  * \brief GoP picture configuration.
  */
 typedef struct kvz_gop_config {
@@ -137,9 +142,6 @@ typedef struct kvz_config
   int32_t target_bitrate;
 } kvz_config;
 
-typedef struct encoder_state_t encoder_state_t;
-typedef struct encoder_control_t encoder_control_t;
-
 /**
 * \brief Struct which contains all picture data
 */
@@ -175,20 +177,6 @@ typedef struct kvz_data_chunk {
   /// \brief Next chunk in the list.
   struct kvz_data_chunk *next;
 } kvz_data_chunk;
-
-/**
- * Main datastructure representing one instance of the encoder.
- */
-typedef struct kvz_encoder {
-  encoder_control_t* control;
-  encoder_state_t* states;
-  unsigned num_encoder_states;
-  unsigned cur_state_num;
-  unsigned frames_started;
-  unsigned frames_done;
-
-  size_t bitstream_length;
-} kvz_encoder;
 
 typedef struct kvz_api {
   kvz_config *  (*config_alloc)(void);

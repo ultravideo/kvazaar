@@ -18,7 +18,7 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-#include "kvazaar.h"
+#include "kvazaar_internal.h"
 
 #include <stdlib.h>
 

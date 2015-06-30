@@ -23,7 +23,7 @@
  *
  */
 
-#include "kvazaar.h"
+#include "kvazaar_internal.h"
 
 #ifdef _WIN32
 /* The following two defines must be located before the inclusion of any system header files. */
