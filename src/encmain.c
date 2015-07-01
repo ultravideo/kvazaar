@@ -23,8 +23,6 @@
  *
  */
 
-#include "kvazaar_internal.h"
-
 #ifdef _WIN32
 /* The following two defines must be located before the inclusion of any system header files. */
 #define WINVER       0x0500
@@ -32,6 +30,8 @@
 #include <io.h>       /* _setmode() */
 #include <fcntl.h>    /* _O_BINARY */
 #endif
+
+#include "kvazaar_internal.h"
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -19,3 +19,4 @@
 *.log
 .kdev4
 src/kvazaar
+src/libkvazaar.so.*
