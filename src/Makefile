@@ -6,17 +6,21 @@ PREFIX  = /usr/local
 BINDIR  = $(PREFIX)/bin
 INCDIR  = $(PREFIX)/include
 LIBDIR  = $(PREFIX)/lib
+DLLDIR  = $(BINDIR)
 
 PROG   = ./kvazaar
 DEBUG  = ./kvazaar_debug
 TESTS  = ./kvazaar_tests
 LIB    = ./libkvazaar.so.0.0.0
 SONAME = libkvazaar.so.0
+DLL    = ./kvazaar.dll
+IMPLIB = ./libkvazaar.dll.a
 INC    = ./kvazaar.h \
          ./kvazaar_version.h
 
 # Compilers and other tools
 AS = yasm
+CC = gcc
 LD = gcc
 INSTALL = install
 
@@ -183,11 +187,13 @@ RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
 DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
 TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
-PROGS = $(PROG) $(DEBUG) $(TESTS)
-
 DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
-all: $(PROG) $(LIB)
+ifneq ( ,$(findstring Windows, $(OS)))
+  all: $(PROG) $(DLL)
+else
+  all: $(PROG) $(LIB)
+endif
 
 debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
 debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
@@ -205,6 +211,9 @@ $(PROG): $(RELEASE_OBJS)
 $(LIB): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) -shared -Wl,-soname,$(SONAME) -o $@
 
+$(DLL): $(RELEASE_OBJS)
+	$(LD) $^ $(LDFLAGS) -shared -Wl,--out-implib,$(IMPLIB) -o $@
+
 $(DEBUG): $(DEBUG_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
@@ -221,7 +230,11 @@ init_submodules:
 	git submodule init
 	git submodule update
 
-install: install-prog install-lib
+ifneq ( ,$(findstring Windows, $(OS)))
+  install: install-prog install-dll
+else
+  install: install-prog install-lib
+endif
 
 install-prog: $(PROG)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
@@ -233,8 +246,17 @@ install-lib: $(LIB)
 	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
 	$(INSTALL) -m644 $(LIB) -t $(DESTDIR)$(LIBDIR)
 
+install-dll: $(DLL)
+	$(INSTALL) -d $(DESTDIR)$(DLLDIR)
+	$(INSTALL) -d $(DESTDIR)$(INCDIR)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(DLL) -t $(DESTDIR)$(DLLDIR)
+	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(IMPLIB) -t $(DESTDIR)$(LIBDIR)
+
 clean:
-	$(RM) $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS) $(PROGS) $(LIB)
+	$(RM) $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
+	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPS)
@@ -244,4 +266,4 @@ endif
 .SUFFIXES:
 
 .PHONY: all clean build_tests tests debug init_submodules
-.PHONY: install install-prog install-lib
+.PHONY: install install-prog install-lib install-dll
