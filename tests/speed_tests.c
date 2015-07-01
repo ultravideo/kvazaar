@@ -40,8 +40,8 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-kvz_pixel * bufs[NUM_TESTS]; // SIMD aligned pointers.
-kvz_pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
+static kvz_pixel * bufs[NUM_TESTS]; // SIMD aligned pointers.
+static kvz_pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
 
 static struct test_env_t {
   int log_width; // for selecting dim from bufs

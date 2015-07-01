@@ -35,7 +35,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-kvz_pixel * bufs[NUM_TESTS][6][2];
+static kvz_pixel * bufs[NUM_TESTS][7][2];
 
 static struct {
   int log_width; // for selecting dim from bufs

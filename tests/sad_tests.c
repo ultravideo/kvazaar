@@ -35,7 +35,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-const uint8_t ref_data[64] = {
+static const uint8_t ref_data[64] = {
   1,2,2,2,2,2,2,3,
   4,5,5,5,5,5,5,6,
   4,5,5,5,5,5,5,6,
@@ -46,7 +46,7 @@ const uint8_t ref_data[64] = {
   7,8,8,8,8,8,8,9
 };
 
-const uint8_t pic_data[64] = {
+static const uint8_t pic_data[64] = {
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
@@ -57,8 +57,8 @@ const uint8_t pic_data[64] = {
   1,1,1,1,1,1,1,1
 };
 
-kvz_picture *g_pic = 0;
-kvz_picture *g_ref = 0;
+static kvz_picture *g_pic = 0;
+static kvz_picture *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
