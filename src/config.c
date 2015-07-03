@@ -28,8 +28,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <getopt.h>
-
 /**
  * \brief Allocate memory for config object
  * \return pointer to allocated memory
@@ -54,10 +52,6 @@ kvz_config *config_alloc(void)
  */
 int config_init(kvz_config *cfg)
 {
-  cfg->input           = NULL;
-  cfg->output          = NULL;
-  cfg->debug           = NULL;
-  cfg->frames          = 0;
   cfg->width           = 0;
   cfg->height          = 0;
   cfg->framerate       = 25;
@@ -88,7 +82,6 @@ int config_init(kvz_config *cfg)
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
-  cfg->seek            = 0;
   cfg->gop_len         = 0;
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
@@ -125,8 +118,6 @@ int config_init(kvz_config *cfg)
  */
 int config_destroy(kvz_config *cfg)
 {
-  FREE_POINTER(cfg->input);
-  FREE_POINTER(cfg->output);
   FREE_POINTER(cfg->cqmfile);
   FREE_POINTER(cfg->tiles_width_split);
   FREE_POINTER(cfg->tiles_height_split);
@@ -134,26 +125,6 @@ int config_destroy(kvz_config *cfg)
   free(cfg);
 
   return 1;
-}
-
-/**
- * \brief Allocates memory space for a string, and copies it
- * \param char * string to copy
- * \return a pointer to the copied string on success, null on failure
- */
-static char *copy_string(const char *string)
-{
-  // Allocate +1 for \0
-  char *allocated_string = (char *)malloc(strlen(string) + 1);
-  if (!allocated_string) {
-    fprintf(stderr, "Failed to allocate a string!\n");
-    return allocated_string;
-  }
-
-  // Copy the string to the new buffer
-  memcpy(allocated_string, string, strlen(string) + 1);
-
-  return allocated_string;
 }
 
 static int atobool(const char *str)
@@ -330,13 +301,7 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
   }
 
 #define OPT(STR) (!strcmp(name, STR))
-  if OPT("input")
-    cfg->input = copy_string(value);
-  else if OPT("output")
-    cfg->output = copy_string(value);
-  else if OPT("debug")
-    cfg->debug = copy_string(value);
-  else if OPT("width")
+  if OPT("width")
     cfg->width = atoi(value);
   else if OPT("height")
     cfg->height = atoi(value);
@@ -344,8 +309,6 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
     return sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2;
   else if OPT("input-fps")
     cfg->framerate = atof(value);
-  else if OPT("frames")
-    cfg->frames = atoi(value);
   else if OPT("qp")
     cfg->qp = atoi(value);
   else if OPT("period")
@@ -405,9 +368,7 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("aud")
     cfg->aud_enable = atobool(value);
   else if OPT("cqmfile")
-    cfg->cqmfile = copy_string(value);
-  else if OPT("seek")
-    cfg->seek = atoi(value);
+    cfg->cqmfile = strdup(value);
   else if OPT("tiles-width-split")
     return parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
   else if OPT("tiles-height-split")
@@ -481,117 +442,6 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
   else
     return 0;
 #undef OPT
-
-  return 1;
-}
-
-/**
- * \brief Read configuration options from argv to the config struct
- * \param cfg config object
- * \param argc argument count
- * \param argv argument list
- * \return 1 on success, 0 on failure
- */
-int config_read(kvz_config *cfg,int argc, char *argv[])
-{
-  static char short_options[] = "i:o:d:w:h:n:q:p:r:";
-  static struct option long_options[] =
-  {
-    { "input",              required_argument, NULL, 'i' },
-    { "output",             required_argument, NULL, 'o' },
-    { "debug",              required_argument, NULL, 'd' },
-    { "width",              required_argument, NULL, 'w' },
-    { "height",             required_argument, NULL, 'h' }, // deprecated
-    { "frames",             required_argument, NULL, 'n' }, // deprecated
-    { "qp",                 required_argument, NULL, 'q' },
-    { "period",             required_argument, NULL, 'p' },
-    { "ref",                required_argument, NULL, 'r' },
-    { "vps-period",         required_argument, NULL, 0 },
-    { "input-res",          required_argument, NULL, 0 },
-    { "input-fps",          required_argument, NULL, 0 },
-    { "no-deblock",               no_argument, NULL, 0 },
-    { "deblock",            required_argument, NULL, 0 },
-    { "no-sao",                   no_argument, NULL, 0 },
-    { "no-rdoq",                  no_argument, NULL, 0 },
-    { "no-signhide",              no_argument, NULL, 0 },
-    { "rd",                 required_argument, NULL, 0 },
-    { "full-intra-search",        no_argument, NULL, 0 },
-    { "no-transform-skip",        no_argument, NULL, 0 },
-    { "tr-depth-intra",     required_argument, NULL, 0 },
-    { "me",                 required_argument, NULL, 0 },
-    { "subme",              required_argument, NULL, 0 },
-    { "sar",                required_argument, NULL, 0 },
-    { "overscan",           required_argument, NULL, 0 },
-    { "videoformat",        required_argument, NULL, 0 },
-    { "range",              required_argument, NULL, 0 },
-    { "colorprim",          required_argument, NULL, 0 },
-    { "transfer",           required_argument, NULL, 0 },
-    { "colormatrix",        required_argument, NULL, 0 },
-    { "chromaloc",          required_argument, NULL, 0 },
-    { "aud",                      no_argument, NULL, 0 },
-    { "cqmfile",            required_argument, NULL, 0 },
-    { "seek",               required_argument, NULL, 0 },
-    { "tiles-width-split",  required_argument, NULL, 0 },
-    { "tiles-height-split", required_argument, NULL, 0 },
-    { "wpp",                      no_argument, NULL, 0 },
-    { "owf",                required_argument, NULL, 0 },
-    { "slice-addresses",    required_argument, NULL, 0 },
-    { "threads",            required_argument, NULL, 0 },
-    { "cpuid",              required_argument, NULL, 0 },
-    { "pu-depth-inter",     required_argument, NULL, 0 },
-    { "pu-depth-intra",     required_argument, NULL, 0 },
-    { "no-info",                  no_argument, NULL, 0 },
-    { "gop",                required_argument, NULL, 0 },
-    { "bipred",                   no_argument, NULL, 0 },
-    { "bitrate",            required_argument, NULL, 0 },
-    {0, 0, 0, 0}
-  };
-
-  // Parse command line options
-  for (optind = 0;;) {
-    int long_options_index = -1;
-
-    int c = getopt_long(argc, argv, short_options, long_options, &long_options_index);
-    if (c == -1)
-      break;
-
-    if (long_options_index < 0) {
-      int i;
-      for (i = 0; long_options[i].name; i++)
-        if (long_options[i].val == c) {
-            long_options_index = i;
-            break;
-        }
-      if (long_options_index < 0) {
-        // getopt_long already printed an error message
-        return 0;
-      }
-    }
-
-    if (!config_parse(cfg, long_options[long_options_index].name, optarg)) {
-      const char *name = long_options_index > 0 ? long_options[long_options_index].name : argv[optind-2];
-      fprintf(stderr, "invalid argument: %s=%s\n", name, optarg );
-      return 0;
-    }
-  }
-
-  // Check that the required files were defined
-  if(cfg->input == NULL || cfg->output == NULL) return 0;
-
-  // Add dimensions to the reconstructions file name.
-  if (cfg->debug != NULL) {
-    char dim_str[50]; // log10(2^64) < 20, so this should suffice. I hate C.
-    size_t left_len, right_len;
-    sprintf(dim_str, "_%dx%d.yuv", cfg->width, cfg->height);
-    left_len = strlen(cfg->debug);
-    right_len = strlen(dim_str);
-    cfg->debug = realloc(cfg->debug, left_len + right_len + 1);
-    if (!cfg->debug) {
-      fprintf(stderr, "realloc failed!\n");
-      return 0;
-    }
-    strcpy(cfg->debug + left_len, dim_str);
-  }
 
   return 1;
 }

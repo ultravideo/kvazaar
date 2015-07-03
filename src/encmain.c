@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
 {
   int retval = EXIT_SUCCESS;
 
-  kvz_config *cfg = NULL; //!< Global configuration
+  cmdline_opts_t *opts = NULL; //!< Command line options
   kvz_encoder* enc = NULL;
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
@@ -109,38 +109,36 @@ int main(int argc, char *argv[])
 
   const kvz_api * const api = kvz_api_get(8);
 
-  // Handle configuration
-  cfg = api->config_alloc();
-
-  // If problem with configuration, print banner and shutdown
-  if (!cfg || !api->config_init(cfg) || !config_read(cfg,argc,argv)) {
+  opts = cmdline_opts_parse(api, argc, argv);
+  // If problem with command line options, print banner and shutdown.
+  if (!opts) {
     print_version();
     print_help();
 
     goto exit_failure;
   }
 
-  input = open_input_file(cfg->input);
+  input = open_input_file(opts->input);
   if (input == NULL) {
     fprintf(stderr, "Could not open input file, shutting down!\n");
     goto exit_failure;
   }
 
-  output = open_output_file(cfg->output);
+  output = open_output_file(opts->output);
   if (output == NULL) {
     fprintf(stderr, "Could not open output file, shutting down!\n");
     goto exit_failure;
   }
 
-  if (cfg->debug != NULL) {
-    recout = open_output_file(cfg->debug);
+  if (opts->debug != NULL) {
+    recout = open_output_file(opts->debug);
     if (recout == NULL) {
-      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", cfg->debug);
+      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", opts->debug);
       goto exit_failure;
     }
   }
 
-  enc = api->encoder_open(cfg);
+  enc = api->encoder_open(opts->config);
   if (!enc) {
     fprintf(stderr, "Failed to open encoder.\n");
     goto exit_failure;
@@ -148,13 +146,13 @@ int main(int argc, char *argv[])
 
   encoder_control_t *encoder = enc->control;
   
-  fprintf(stderr, "Input: %s, output: %s\n", cfg->input, cfg->output);
+  fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
          encoder->in.width, encoder->in.height,
          encoder->in.real_width, encoder->in.real_height);
 
-  if (cfg->seek > 0 && !yuv_io_seek(input, cfg->seek, cfg->width, cfg->height)) {
-    fprintf(stderr, "Failed to seek %d frames.\n", cfg->seek);
+  if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height)) {
+    fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
     goto exit_failure;
   }
 
@@ -173,7 +171,7 @@ int main(int argc, char *argv[])
       encoder_state_t *state = &enc->states[enc->cur_state_num];
 
       kvz_picture *img_in = NULL;
-      if (!feof(input) && (cfg->frames == 0 || frames_read < cfg->frames)) {
+      if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames)) {
         // Try to read an input frame.
         img_in = api->picture_alloc(encoder->in.width, encoder->in.height);
         if (!img_in) {
@@ -181,7 +179,7 @@ int main(int argc, char *argv[])
           goto exit_failure;
         }
 
-        if (yuv_io_read(input, cfg->width, cfg->height, img_in)) {
+        if (yuv_io_read(input, opts->config->width, opts->config->height, img_in)) {
           frames_read += 1;
         } else {
           // EOF or some error
@@ -273,7 +271,7 @@ exit_failure:
 done:
   // deallocate structures
   if (enc) api->encoder_close(enc);
-  if (cfg) api->config_destroy(cfg);
+  if (opts) cmdline_opts_free(api, opts);
 
   // close files
   if (input)  fclose(input);

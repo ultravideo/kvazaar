@@ -32,7 +32,6 @@
 kvz_config *config_alloc(void);
 int config_init(kvz_config *cfg);
 int config_destroy(kvz_config *cfg);
-int config_read(kvz_config *cfg,int argc, char *argv[]);
 int config_parse(kvz_config *cfg, const char *name, const char *value);
 int config_validate(const kvz_config *cfg);
 int config_set_owf_auto(kvz_config *cfg);

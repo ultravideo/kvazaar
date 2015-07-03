@@ -76,13 +76,9 @@ typedef struct kvz_gop_config {
  */
 typedef struct kvz_config
 {
-  char *input;      /*!< \brief Pointer to input filename  */
-  char *output;     /*!< \brief Pointer to output filename */
-  char *debug;      /*!< \brief Pointer to debug output    */
   int32_t qp;        /*!< \brief Quantization parameter */
   int32_t intra_period; /*!< \brief the period of intra frames in stream */
   int32_t vps_period; /*!< \brief how often the vps is re-sent */
-  int32_t frames;  /*!< \brief Number of frames to decode */
   int32_t width;   /*!< \brief frame width */
   int32_t height;  /*!< \brief frame height */
   double framerate; /*!< \brief Input framerate */
@@ -114,7 +110,6 @@ typedef struct kvz_config
   int32_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
   int32_t ref_frames;     /*!< \brief number of reference frames to use */
   char * cqmfile;        /*!< \brief Pointer to custom quantization matrices filename */
-  int32_t seek;           /*!< \brief Number of frames to skip in the beginning of input. */
   
   int32_t tiles_width_count;      /*!< \brief number of tiles separation in x direction */
   int32_t tiles_height_count;      /*!< \brief number of tiles separation in y direction */

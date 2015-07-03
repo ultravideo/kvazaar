@@ -25,8 +25,27 @@
 * \brief Contains code related to command line interface.
 */
 
+#include "kvazaar.h"
 #include "global.h"
+#include "encoderstate.h"
 
+typedef struct cmdline_opts_t {
+  /** \brief Input filename */
+  char *input;
+  /** \brief Output filename */
+  char *output;
+  /** \brief Debug output */
+  char *debug;
+  /** \brief Number of input frames to skip */
+  int32_t seek;
+  /** \brief Number of frames to encode */
+  int32_t frames;
+  /** \brief Encoder configuration */
+  kvz_config *config;
+} cmdline_opts_t;
+
+cmdline_opts_t* cmdline_opts_parse(const kvz_api *api, int argc, char *argv[]);
+void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);
 
 void print_version(void);
 void print_help(void);

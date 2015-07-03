@@ -23,11 +23,172 @@
 *
 */
 
-#include "config.h"
+#include "cli.h"
+#include "encoderstate.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <getopt.h>
 
-#include "encoderstate.h"
+static const char short_options[] = "i:o:d:w:h:n:q:p:r:";
+static const struct option long_options[] = {
+  { "input",              required_argument, NULL, 'i' },
+  { "output",             required_argument, NULL, 'o' },
+  { "debug",              required_argument, NULL, 'd' },
+  { "width",              required_argument, NULL, 'w' },
+  { "height",             required_argument, NULL, 'h' }, // deprecated
+  { "frames",             required_argument, NULL, 'n' }, // deprecated
+  { "qp",                 required_argument, NULL, 'q' },
+  { "period",             required_argument, NULL, 'p' },
+  { "ref",                required_argument, NULL, 'r' },
+  { "vps-period",         required_argument, NULL, 0 },
+  { "input-res",          required_argument, NULL, 0 },
+  { "input-fps",          required_argument, NULL, 0 },
+  { "no-deblock",               no_argument, NULL, 0 },
+  { "deblock",            required_argument, NULL, 0 },
+  { "no-sao",                   no_argument, NULL, 0 },
+  { "no-rdoq",                  no_argument, NULL, 0 },
+  { "no-signhide",              no_argument, NULL, 0 },
+  { "rd",                 required_argument, NULL, 0 },
+  { "full-intra-search",        no_argument, NULL, 0 },
+  { "no-transform-skip",        no_argument, NULL, 0 },
+  { "tr-depth-intra",     required_argument, NULL, 0 },
+  { "me",                 required_argument, NULL, 0 },
+  { "subme",              required_argument, NULL, 0 },
+  { "sar",                required_argument, NULL, 0 },
+  { "overscan",           required_argument, NULL, 0 },
+  { "videoformat",        required_argument, NULL, 0 },
+  { "range",              required_argument, NULL, 0 },
+  { "colorprim",          required_argument, NULL, 0 },
+  { "transfer",           required_argument, NULL, 0 },
+  { "colormatrix",        required_argument, NULL, 0 },
+  { "chromaloc",          required_argument, NULL, 0 },
+  { "aud",                      no_argument, NULL, 0 },
+  { "cqmfile",            required_argument, NULL, 0 },
+  { "seek",               required_argument, NULL, 0 },
+  { "tiles-width-split",  required_argument, NULL, 0 },
+  { "tiles-height-split", required_argument, NULL, 0 },
+  { "wpp",                      no_argument, NULL, 0 },
+  { "owf",                required_argument, NULL, 0 },
+  { "slice-addresses",    required_argument, NULL, 0 },
+  { "threads",            required_argument, NULL, 0 },
+  { "cpuid",              required_argument, NULL, 0 },
+  { "pu-depth-inter",     required_argument, NULL, 0 },
+  { "pu-depth-intra",     required_argument, NULL, 0 },
+  { "no-info",                  no_argument, NULL, 0 },
+  { "gop",                required_argument, NULL, 0 },
+  { "bipred",                   no_argument, NULL, 0 },
+  { "bitrate",            required_argument, NULL, 0 },
+  {0, 0, 0, 0}
+};
+
+/**
+ * \brief Parse command line arguments.
+ * \param argc  Number of arguments
+ * \param argv  Argument list
+ * \return      Pointer to the parsed options, or NULL on failure.
+ */
+cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *argv[])
+{
+  int ok = 1;
+  cmdline_opts_t *opts = calloc(1, sizeof(cmdline_opts_t));
+  if (!opts) {
+    ok = 0;
+    goto done;
+  }
+
+  opts->config = api->config_alloc();
+  if (!opts->config || !api->config_init(opts->config)) {
+    ok = 0;
+    goto done;
+  }
+
+  // Parse command line options
+  for (optind = 0;;) {
+    int long_options_index = -1;
+
+    int c = getopt_long(argc, argv, short_options, long_options, &long_options_index);
+    if (c == -1)
+      break;
+
+    if (long_options_index < 0) {
+      int i;
+      for (i = 0; long_options[i].name; i++)
+        if (long_options[i].val == c) {
+            long_options_index = i;
+            break;
+        }
+      if (long_options_index < 0) {
+        // getopt_long already printed an error message
+        ok = 0;
+        goto done;
+      }
+    }
+
+    const char* name = long_options[long_options_index].name;
+    if (!strcmp(name, "input")) {
+      if (opts->input) {
+        fprintf(stderr, "Input error: More than one input file given.\n");
+        ok = 0;
+        goto done;
+      }
+      opts->input = strdup(optarg);
+    } else if (!strcmp(name, "output")) {
+      if (opts->output) {
+        fprintf(stderr, "Input error: More than one output file given.\n");
+        ok = 0;
+        goto done;
+      }
+      opts->output = strdup(optarg);
+    } else if (!strcmp(name, "debug")) {
+      if (opts->debug) {
+        fprintf(stderr, "Input error: More than one debug output file given.\n");
+        ok = 0;
+        goto done;
+      }
+      opts->debug = strdup(optarg);
+    } else if (!strcmp(name, "seek")) {
+      opts->seek = atoi(optarg);
+    } else if (!strcmp(name, "frames")) {
+      opts->frames = atoi(optarg);
+    } else if (!config_parse(opts->config, name, optarg)) {
+      fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
+      ok = 0;
+      goto done;
+    }
+  }
+
+  // Check that the required files were defined
+  if (opts->input == NULL || opts->output == NULL) {
+    ok = 0;
+    goto done;
+  }
+
+done:
+  if (!ok) {
+    cmdline_opts_free(api, opts);
+    opts = NULL;
+  }
+
+  return opts;
+}
+
+
+/**
+ * \brief Deallocate a cmdline_opts_t structure.
+ */
+void cmdline_opts_free(const kvz_api *const api, cmdline_opts_t *opts)
+{
+  if (opts) {
+    FREE_POINTER(opts->input);
+    FREE_POINTER(opts->output);
+    FREE_POINTER(opts->debug);
+    api->config_destroy(opts->config);
+    opts->config = NULL;
+  }
+  FREE_POINTER(opts);
+}
 
 
 void print_version(void)
