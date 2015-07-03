@@ -104,6 +104,10 @@ ifndef KVZ_DISABLE_ASM
   endif
 endif
 
+ifdef CHECKPOINTS
+  CFLAGS += -DCHECKPOINTS
+endif
+
 # Compile files in strategy directories with appropriate flags.
 ifeq ($(ARCH), ppc64)
   strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto

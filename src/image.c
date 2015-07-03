@@ -477,8 +477,8 @@ void pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
   assert(width <= dst_stride);
 
 #ifdef CHECKPOINTS
+  char *buffer = malloc((3 * width + 1) * sizeof(char));
   for (y = 0; y < height; ++y) {
-    char buffer[3*width];
     int p;
     for (p = 0; p < width; ++p) {
       sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
@@ -486,6 +486,7 @@ void pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
     buffer[3*width] = 0;
     CHECKPOINT("pixels_blit: %04d: %s", y, buffer);
   }
+  FREE_POINTER(buffer);
 #endif //CHECKPOINTS
 
   if (orig == dst) {
