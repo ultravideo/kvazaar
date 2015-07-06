@@ -138,6 +138,7 @@ int yuv_io_seek(FILE* file, unsigned frames,
     if (!error) return 1;
 
     // Seek failed. Skip data by reading.
+    error = 0;
     unsigned char* tmp[4096];
     size_t bytes_left = skip_bytes;
     while (bytes_left > 0 && !error) {
