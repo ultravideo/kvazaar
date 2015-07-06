@@ -23,18 +23,18 @@
 #include "kvazaar.h"
 
 // Forward declarations.
-typedef struct encoder_state_t encoder_state_t;
-typedef struct encoder_control_t encoder_control_t;
+struct encoder_state_t;
+struct encoder_control_t;
 
-typedef struct kvz_encoder {
-  encoder_control_t* control;
-  encoder_state_t* states;
+struct kvz_encoder {
+  struct encoder_control_t* control;
+  struct encoder_state_t* states;
   unsigned num_encoder_states;
   unsigned cur_state_num;
   unsigned frames_started;
   unsigned frames_done;
 
   size_t bitstream_length;
-} kvz_encoder;
+};
 
 #endif // KVAZAAR_INTERNAL_H_
