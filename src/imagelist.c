@@ -44,7 +44,7 @@ image_list_t * image_list_alloc(int size)
   if (size > 0) {
     list->images = (kvz_picture**)malloc(sizeof(kvz_picture*) * size);
     list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*) * size);
-    list->pocs = (int32_t*)malloc(sizeof(int32_t) * size);
+    list->pocs = malloc(sizeof(int32_t) * size);
   }
 
   list->used_size = 0;
@@ -62,7 +62,7 @@ int image_list_resize(image_list_t *list, unsigned size)
 {
   list->images = (kvz_picture**)realloc(list->images, sizeof(kvz_picture*) * size);
   list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
-  list->pocs = (int32_t*)realloc(list->pocs, sizeof(int32_t*) * size);
+  list->pocs = realloc(list->pocs, sizeof(int32_t) * size);
   list->size = size;
   return size == 0 || (list->images && list->cu_arrays && list->pocs);
 }
