@@ -20,7 +20,6 @@ INC    = ./kvazaar.h \
 
 # Compilers and other tools
 AS = yasm
-CC = gcc
 LD = gcc
 INSTALL = install
 
