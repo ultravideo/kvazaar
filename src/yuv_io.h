@@ -1,5 +1,3 @@
-#ifndef _PICTURE_X86_ASM_SATD_H_
-#define _PICTURE_X86_ASM_SATD_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -20,14 +18,25 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#ifndef YUV_IO_H_
+#define YUV_IO_H_
 
- /*! \file picture-x86-asm-satd.h
-    \brief assembly functions header for satd
-*/
-unsigned kvz_satd_4x4_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_8x8_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_16x16_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_32x32_avx(const kvz_pixel *org, const kvz_pixel *cur);
-unsigned kvz_satd_64x64_avx(const kvz_pixel *org, const kvz_pixel *cur);
+/*
+ * \file
+ * \brief Functions related to reading YUV input and output.
+ */
 
-#endif
+#include "global.h"
+
+int yuv_io_read(FILE* file,
+                unsigned input_width, unsigned input_height,
+                kvz_picture *img_out);
+
+int yuv_io_seek(FILE* file, unsigned frames,
+                unsigned input_width, unsigned input_height);
+
+int yuv_io_write(FILE* file,
+                const kvz_picture *img,
+                unsigned output_width, unsigned output_height);
+
+#endif // YUV_IO_H_

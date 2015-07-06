@@ -24,6 +24,7 @@
 #ifdef NDEBUG
 #error "CHECKPOINTS require assertions to be enabled!"
 #endif
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -66,7 +67,7 @@ extern int g_ckpt_record; //Do we record?
       g_ckpt_enabled = 0; \
       while (!feof(g_ckpt_file)) { \
         char buffer_file[4096]; \
-        fgets(buffer_file, 4095, g_ckpt_file); \
+        assert(fgets(buffer_file, 4095, g_ckpt_file) != NULL); \
         if (strncmp(buffer_file, buffer_ckpt, 4096)==0) { \
           g_ckpt_enabled = 1; \
           break; \
@@ -82,7 +83,7 @@ extern int g_ckpt_record; //Do we record?
       fprintf(g_ckpt_file, str "\n", __VA_ARGS__); \
     } else if (g_ckpt_enabled) { \
       char buffer_file[4096], buffer_ckpt[4096]; \
-      fgets(buffer_file, 4095, g_ckpt_file); \
+      assert(fgets(buffer_file, 4095, g_ckpt_file) != NULL); \
       snprintf(buffer_ckpt, 4095, str "\n", __VA_ARGS__); \
       if (strncmp(buffer_file, buffer_ckpt, 4096)!=0) { \
         fprintf(stderr, "Checkpoint failed (at %ld):\nFile: %sExec: %s", ftell(g_ckpt_file), buffer_file, buffer_ckpt); \

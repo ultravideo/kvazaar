@@ -183,8 +183,20 @@ typedef struct encoder_state_t {
   
   bitstream_t stream;
   cabac_data_t cabac;
-  
-  int stats_done;
+
+  /**
+   * \brief Indicates that this encoder state is ready for encoding the
+   * next frame i.e. encoder_next_frame has been called.
+   */
+  int prepared;
+
+  /**
+   * \brief Indicates that the previous frame has been encoded and the
+   * encoded data written and the encoding the next frame has not been
+   * started yet.
+   */
+  int frame_done;
+
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
   
   //Jobs to wait for
@@ -195,9 +207,9 @@ typedef struct encoder_state_t {
 
 
 void encode_one_frame(encoder_state_t *state);
-int read_one_frame(FILE* file, const encoder_state_t *state);
+int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in);
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length);
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double psnr[3]);
 void encoder_next_frame(encoder_state_t *state);
 
 
@@ -218,6 +230,8 @@ void encode_block_residual(const encoder_control_t * const encoder,
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
 
 coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth);
+
+void encoder_ref_insertion_sort(int reflist[16], int length);
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,

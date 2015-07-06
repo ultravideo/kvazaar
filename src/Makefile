@@ -1,14 +1,42 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
-#Disable default rules
-.SUFFIXES:
+# Installation locations
+DESTDIR =
+PREFIX  = /usr/local
+BINDIR  = $(PREFIX)/bin
+INCDIR  = $(PREFIX)/include
+LIBDIR  = $(PREFIX)/lib
+DLLDIR  = $(BINDIR)
+
+PROG   = ./kvazaar
+DEBUG  = ./kvazaar_debug
+TESTS  = ./kvazaar_tests
+LIB    = ./libkvazaar.so.0.0.0
+SONAME = libkvazaar.so.0
+DLL    = ./kvazaar.dll
+IMPLIB = ./libkvazaar.dll.a
+INC    = ./kvazaar.h \
+         ./kvazaar_version.h
+
+# Compilers and other tools
+AS = yasm
+CC = gcc
+LD = gcc
+INSTALL = install
+
+# Do not use variable length arrays because they don't work in Visual Studio 2013.
+WARNINGS = -Wall -Wtype-limits -Wvla
+INCLUDEDIRS = -I. -I./strategies -I./extras -I..
+
+ASFLAGS += $(INCLUDEDIRS)
+CFLAGS += -O2 -g -Werror -ftree-vectorize -fpic -std=gnu99
+CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
+LDFLAGS += -lm -pthread
 
 ifeq (, $(ARCH))
   ARCH = $(shell uname -m)
 endif
 SYSTEM = $(shell uname -s)
-ASMFLAGS =
-CFLAGS += -O2 -g -Werror -ftree-vectorize
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
@@ -29,44 +57,37 @@ LDFLAGS += -m$(TARGET_CPU_BITS)
 # Windows (cygwin/mingw) specific flags
 ifneq ( ,$(findstring Windows, $(OS)))
   ifeq ($(ARCH), x86_64)
-    ASMFLAGS += -f win64
-    ASMFLAGS += -DHAVE_ALIGNED_STACK=1
+    ASFLAGS += -f win64
+    ASFLAGS += -DHAVE_ALIGNED_STACK=1
   else
-    ASMFLAGS += -f win32
-    ASMFLAGS += -DPREFIX
-    ASMFLAGS += -DHAVE_ALIGNED_STACK=0
+    ASFLAGS += -f win32
+    ASFLAGS += -DPREFIX
+    ASFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
   CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
 # OS X specific flags
 else ifeq ($(SYSTEM),Darwin)
   ifeq ($(ARCH), x86_64)
-    ASMFLAGS += -f macho64
+    ASFLAGS += -f macho64
   else
-    ASMFLAGS += -f macho32
+    ASFLAGS += -f macho32
   endif
-  ASMFLAGS += -DPREFIX
+  ASFLAGS += -DPREFIX
 # Default to Linux/elf specific flags
 else
   LDFLAGS += -lrt
   ifeq ($(ARCH), x86_64)
-    ASMFLAGS += -f elf64
+    ASFLAGS += -f elf64
   else
-    ASMFLAGS += -f elf32
+    ASFLAGS += -f elf32
   endif
 endif
 # Flags shared across systems
 ifeq ($(ARCH), x86_64)
-  ASMFLAGS += -DARCH_X86_64=1
+  ASFLAGS += -DARCH_X86_64=1
 else
-  ASMFLAGS += -DARCH_X86_64=0
+  ASFLAGS += -DARCH_X86_64=0
 endif
-
-# Do not use variable length arrays because they don't work in Visual Studio 2013.
-WARNINGS = -Wall -Wtype-limits -Wvla
-
-INCLUDEDIRS = -I. -I./strategies -I./extras -I..
-
-STRATEGIES = generic sse2 sse41 avx2 x86_asm altivec
 
 #Detect if cc is gcc for the link time optimization flag
 GCCVERSION = $(shell $(CC) --version | grep GCC)
@@ -74,13 +95,36 @@ ifneq (, $(GCCVERSION))
   CFLAGS += -flto
   LDFLAGS += -flto -O3
 endif
-CFLAGS += -std=gnu99 $(INCLUDEDIRS) $(WARNINGS)
-LDFLAGS += -lm -pthread
-LD = gcc
+
+# Compile asm files by default if yasm is present.
+ifndef KVZ_DISABLE_ASM
+  has_as := $(shell type $(AS) 2>/dev/null)
+  ifeq ($(has_as),)
+    KVZ_DISABLE_ASM := 1
+  endif
+endif
+
+ifdef CHECKPOINTS
+  CFLAGS += -DCHECKPOINTS
+endif
+
+# Compile files in strategy directories with appropriate flags.
+ifeq ($(ARCH), ppc64)
+  strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto
+else
+  strategies/sse2/%.o: EXTRA_FLAGS += -msse2 -fno-lto
+  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1 -fno-lto
+  # Needs to be defined on Travis
+  ifndef KVZ_DISABLE_AVX2
+    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2 -fno-lto
+  endif
+endif
+
 OBJS = \
   bitstream.o \
   cabac.o \
   checkpoint.o \
+  cli.o \
   config.o \
   context.o \
   cu.o \
@@ -90,6 +134,7 @@ OBJS = \
   filter.o \
   inter.o \
   intra.o \
+  kvazaar.o \
   nal.o \
   imagelist.o \
   rdo.o \
@@ -105,6 +150,7 @@ OBJS = \
   encoder_state-geometry.o \
   image.o \
   videoframe.o \
+  yuv_io.o \
   strategies/strategies-picture.o \
   strategies/strategies-nal.o \
   strategies/strategies-dct.o \
@@ -121,7 +167,13 @@ OBJS = \
   strategies/generic/ipol-generic.o \
   strategies/avx2/ipol-avx2.o
 
-MAIN_OBJS := encmain.o interface_main.o
+ifndef KVZ_DISABLE_ASM
+  strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
+
+  OBJS += \
+    strategies/x86_asm/picture-x86-asm-sad.o \
+    strategies/x86_asm/picture-x86-asm-satd.o
+endif
 
 TESTDIR := ../tests
 TEST_OBJS := \
@@ -133,56 +185,18 @@ TEST_OBJS := \
   $(TESTDIR)/tests_main.o \
   $(TESTDIR)/test_strategies.o
 
-  
-ASMFLAGS += $(INCLUDEDIRS)
-ASMOBJS =
+MAIN_OBJS := encmain.o interface_main.o
 
-AS = yasm
-
-# Compile asm files by default if yasm is present.
-ifndef KVZ_DISABLE_ASM
-  has_as := $(shell type $(AS) 2>/dev/null)
-  ifeq ($(has_as),)
-    KVZ_DISABLE_ASM := 1
-  endif
-endif
-
-
-PROG  = ./kvazaar
-DEBUG = ./kvazaar_debug
-TESTS = ./kvazaar_tests
-
-PROGS = $(PROG) $(DEBUG) $(TESTS)
-
-RELEASE_OBJS = $(MAIN_OBJS) $(OBJS) $(ASMOBJS)
+RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
 DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
-TESTS_OBJS = $(TEST_OBJS) $(OBJS) $(ASMOBJS)
-
+TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
 DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
-GREATEST = ../greatest/greatest.h
-
-all: $(PROG)
-.PHONY: all clean build_tests tests debug
-
-
-# Compile files in strategy directories with appropriate flags.
-ifeq ($(ARCH), ppc64)
-  strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto
+ifneq ( ,$(findstring Windows, $(OS)))
+  all: $(PROG) $(DLL)
 else
-  strategies/sse2/%.o: EXTRA_FLAGS += -msse2 -fno-lto
-  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1 -fno-lto
-  #Needs to be defined on Travis
-  ifndef KVZ_DISABLE_AVX2
-    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2 -fno-lto
-  endif
-endif
-
-ifndef KVZ_DISABLE_ASM
-  ASMOBJS += strategies/x86_asm/picture-x86-asm-sad.o
-  ASMOBJS += strategies/x86_asm/picture-x86-asm-satd.o
-  strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
+  all: $(PROG) $(LIB)
 endif
 
 debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
@@ -195,20 +209,24 @@ tests: build_tests
 build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 build_tests: init_submodules $(TESTS)
 
-REMOVE_FILES = $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS) $(PROGS)
- 
 $(PROG): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
-	
+
+$(LIB): $(RELEASE_OBJS)
+	$(LD) $^ $(LDFLAGS) -shared -Wl,-soname,$(SONAME) -o $@
+
+$(DLL): $(RELEASE_OBJS)
+	$(LD) $^ $(LDFLAGS) -shared -Wl,--out-implib,$(IMPLIB) -o $@
+
 $(DEBUG): $(DEBUG_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
-	
+
 $(TESTS): $(TESTS_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 %.o %_debug.o: %.asm Makefile
-	$(AS) $(ASMFLAGS) -o $@ $<
-	
+	$(AS) $(ASFLAGS) -o $@ $<
+
 %.o %_debug.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
@@ -216,9 +234,40 @@ init_submodules:
 	git submodule init
 	git submodule update
 
+ifneq ( ,$(findstring Windows, $(OS)))
+  install: install-prog install-dll
+else
+  install: install-prog install-lib
+endif
+
+install-prog: $(PROG)
+	$(INSTALL) -d $(DESTDIR)$(BINDIR)
+	$(INSTALL) -m755 $(PROG) -t $(DESTDIR)$(BINDIR)
+
+install-lib: $(LIB)
+	$(INSTALL) -d $(DESTDIR)$(INCDIR)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(LIB) -t $(DESTDIR)$(LIBDIR)
+
+install-dll: $(DLL)
+	$(INSTALL) -d $(DESTDIR)$(DLLDIR)
+	$(INSTALL) -d $(DESTDIR)$(INCDIR)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(DLL) -t $(DESTDIR)$(DLLDIR)
+	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(IMPLIB) -t $(DESTDIR)$(LIBDIR)
+
 clean:
-	rm -f $(REMOVE_FILES)
+	$(RM) $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
+	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPS)
 endif
+
+# Disable default rules
+.SUFFIXES:
+
+.PHONY: all clean build_tests tests debug init_submodules
+.PHONY: install install-prog install-lib install-dll

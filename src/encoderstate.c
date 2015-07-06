@@ -25,7 +25,6 @@
 #include "encoderstate.h"
 
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -44,6 +43,7 @@
 #include "sao.h"
 #include "rdo.h"
 #include "rate_control.h"
+#include "yuv_io.h"
 
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -441,9 +441,9 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   int x;
   
   //TODO: copy only needed data
-  pixel_t *new_y_data = MALLOC(pixel_t, frame->width * frame->height);
-  pixel_t *new_u_data = MALLOC(pixel_t, (frame->width * frame->height) >> 2);
-  pixel_t *new_v_data = MALLOC(pixel_t, (frame->width * frame->height) >> 2);
+  kvz_pixel *new_y_data = MALLOC(kvz_pixel, frame->width * frame->height);
+  kvz_pixel *new_u_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
+  kvz_pixel *new_v_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
   
   const int offset = frame->width * (data->y*LCU_WIDTH);
   const int offset_c = frame->width/2 * (data->y*LCU_WIDTH_C);
@@ -453,15 +453,15 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
     num_pixels = frame->width * frame->height - offset;
   }
   
-  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(pixel_t) * num_pixels);
-  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(pixel_t) * num_pixels >> 2);
-  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(pixel_t) * num_pixels >> 2);
+  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(kvz_pixel) * num_pixels);
+  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
+  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
   
   if (data->y>0) {
     //copy first row from buffer
-    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(pixel_t));
-    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel_t));
-    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(pixel_t));
+    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(kvz_pixel));
+    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(kvz_pixel));
+    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(kvz_pixel));
   }
 
   for (x = 0; x < frame->width_in_lcu; x++) {
@@ -623,7 +623,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 }
 
 
-static void encoder_ref_insertion_sort(int reflist[16], int length) {
+void encoder_ref_insertion_sort(int reflist[16], int length) {
 
   for (uint8_t i = 1; i < length; ++i) {
     const int16_t cur_poc = reflist[i];
@@ -640,11 +640,11 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 
   // List all pocs of lists
   for (j = 0; j < state->global->ref->used_size; j++) {
-    if (state->global->ref->images[j]->poc < state->global->poc) {
-      ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
+    if (state->global->ref->pocs[j] < state->global->poc) {
+      ref_list_poc[0][ref_list[0]] = state->global->ref->pocs[j];
       ref_list[0]++;
     } else {
-      ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
+      ref_list_poc[1][ref_list[1]] = state->global->ref->pocs[j];
       ref_list[1]++;
     }
   }
@@ -653,9 +653,9 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
   encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
 
   for (j = 0; j < state->global->ref->used_size; j++) {
-    if (state->global->ref->images[j]->poc < state->global->poc) {
+    if (state->global->ref->pocs[j] < state->global->poc) {
       for (int ref_idx = 0; ref_idx < ref_list[0]; ref_idx++) {
-        if (ref_list_poc[0][ref_idx] == state->global->ref->images[j]->poc) {
+        if (ref_list_poc[0][ref_idx] == state->global->ref->pocs[j]) {
           state->global->refmap[j].idx = ref_list[0] - ref_idx - 1;
           break;
         }
@@ -664,14 +664,14 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 
     } else {
       for (int ref_idx = 0; ref_idx < ref_list[1]; ref_idx++) {
-        if (ref_list_poc[1][ref_idx] == state->global->ref->images[j]->poc) {
+        if (ref_list_poc[1][ref_idx] == state->global->ref->pocs[j]) {
           state->global->refmap[j].idx = ref_idx;
           break;
         }
       }
       state->global->refmap[j].list = 2;
     }
-    state->global->refmap[j].poc = state->global->ref->images[j]->poc;
+    state->global->refmap[j].poc = state->global->ref->pocs[j];
   }
 }
 
@@ -692,14 +692,14 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
       for (int ref = 0; ref < state->global->ref->used_size; ref++) {
         uint8_t found = 0;
         for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_neg_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
+          if (state->global->ref->pocs[ref] == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
             found = 1;
             break;
           }
         }
         if (found) continue;
         for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_pos_count; i++) {
-          if (state->global->ref->images[ref]->poc == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
+          if (state->global->ref->pocs[ref] == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
             found = 1;
             break;
           }
@@ -774,7 +774,7 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       state->global->QP = lambda_to_QP(lambda);
     } else {
       if (encoder->cfg->gop_len > 0 && state->global->slicetype != SLICE_I) {
-        gop_config_t const * const gop =
+        kvz_gop_config const * const gop =
           encoder->cfg->gop + state->global->gop_offset;
         state->global->QP = encoder->cfg->qp + gop->qp_offset;
         state->global->QP_factor = gop->qp_factor;
@@ -786,10 +786,8 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     state->global->cur_lambda_cost = lambda;
     state->global->cur_lambda_cost_sqrt = sqrt(lambda);
 
-  } else {
-    //Clear the bitstream if it's not the main encoder
-    bitstream_clear(&state->stream);
   }
+  bitstream_clear(&state->stream);
   
   if (state->is_leaf) {
     //Leaf states have cabac and context
@@ -843,7 +841,7 @@ void encode_one_frame(encoder_state_t * const state)
 #else
     char* job_description = NULL;
 #endif
-          
+
     job = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
     
     _encode_one_frame_add_bitstream_deps(state, job);
@@ -855,272 +853,145 @@ void encode_one_frame(encoder_state_t * const state)
     assert(!state->tqj_bitstream_written);
     state->tqj_bitstream_written = job;
   }
+  state->frame_done = 0;
   //threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
-static void fill_after_frame(unsigned height, unsigned array_width,
-                             unsigned array_height, pixel_t *data)
+/**
+ * \brief Pass an input frame to the encoder state.
+ *
+ * Sets the source image of the encoder state if there is a suitable image
+ * available.
+ *
+ * The caller must not modify img_in after calling this function.
+ *
+ * \param state   a main encoder state
+ * \param img_in  input frame or NULL
+ * \return        1 if the source image was set, 0 if not
+ */
+int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 {
-  pixel_t* p = data + height * array_width;
-  pixel_t* end = data + array_width * array_height;
+  const encoder_control_t* const encoder = state->encoder_control;
+  const kvz_config* const cfg = encoder->cfg;
 
-  while (p < end) {
-    // Fill the line by copying the line above.
-    memcpy(p, p - array_width, array_width);
-    p += array_width;
-  }
-}
+  // TODO: Get rid of static variables.
+  static kvz_picture *gop_buffer[2 * KVZ_MAX_GOP_LENGTH] = { NULL };
+  static int gop_buf_write_idx = 0;
+  static int gop_buf_read_idx = 0;
+  static int gop_pictures_available = 0;
+  static int gop_offset = 0;
 
-static int read_and_fill_frame_data(FILE *file,
-                                    unsigned width, unsigned height,
-                                    unsigned array_width, pixel_t *data)
-{
-  pixel_t* p = data;
-  pixel_t* end = data + array_width * height;
-  pixel_t fill_char;
-  unsigned i;
+  const int gop_buf_size = 2 * cfg->gop_len;
 
-  while (p < end) {
-    // Read the beginning of the line from input.
-    if (width != fread(p, sizeof(unsigned char), width, file))
-      return 0;
+  assert(state->global->frame >= 0);
+  assert(state->tile->frame->source == NULL);
 
-    // Fill the rest with the last pixel value.
-    fill_char = p[width - 1];
-
-    for (i = width; i < array_width; ++i) {
-      p[i] = fill_char;
-    }
-
-    p += array_width;
-  }
-  return 1;
-}
-
-int read_one_frame(FILE* file, const encoder_state_t * const state)
-{
-  unsigned width = state->encoder_control->in.real_width;
-  unsigned height = state->encoder_control->in.real_height;
-  unsigned array_width = state->tile->frame->width;
-  unsigned array_height = state->tile->frame->height;
-
-  // storing GOP pictures
-  static int8_t gop_init = 0;
-  static int8_t gop_pictures_available = 0;
-  static videoframe_t gop_pictures[MAX_GOP];
-  static int8_t gop_skip_frames = 0;
-  static int8_t gop_skipped = 0;
-
-  // Initialize GOP structure when gop is enabled and not initialized
-  if (state->encoder_control->cfg->gop_len && !gop_init) {
-    int i;
-    for (i = 0; i < state->encoder_control->cfg->gop_len; i++) {
-      gop_pictures[i].source = image_alloc(array_width, array_height, 0);
-    }
+  if (cfg->gop_len == 0 || state->global->frame == 0) {
+    if (img_in == NULL) return 0;
+    state->tile->frame->source = image_copy_ref(img_in);
     state->global->gop_offset = 0;
-    gop_init = 1;
+    return 1;
+  }
+  // GOP enabled and not the first frame
+
+  if (img_in != NULL) {
+    // Save the input image in the buffer.
+    assert(gop_pictures_available < gop_buf_size);
+    assert(gop_buffer[gop_buf_write_idx] == NULL);
+    gop_buffer[gop_buf_write_idx] = image_copy_ref(img_in);
+
+    ++gop_pictures_available;
+    if (++gop_buf_write_idx >= gop_buf_size) {
+      gop_buf_write_idx = 0;
+    }
   }
 
-  // If GOP is present but no pictures found
-  if (state->global->frame && 
-      state->encoder_control->cfg->gop_len &&
-      !gop_pictures_available) {
-    int i;
-    unsigned y_size = width * height;
-    unsigned uv_size = (width >> 1) * (height >> 1);
+  if (gop_pictures_available < cfg->gop_len) {
+    if (img_in != NULL || gop_pictures_available == 0) {
+      // Either start of the sequence with no full GOP available yet, or the
+      // end of the sequence with all pics encoded.
+      return 0;
+    }
+    // End of the sequence and a full GOP is not available.
+    // Skip pictures until an available one is found.
+    for (; gop_offset < cfg->gop_len &&
+           cfg->gop[gop_offset].poc_offset - 1 >= gop_pictures_available;
+           ++gop_offset);
 
-    for (i = 0; i < state->encoder_control->cfg->gop_len; i++, gop_pictures_available++) {
-      if (state->encoder_control->cfg->frames && state->global->frame + gop_pictures_available >= state->encoder_control->cfg->frames) {
-        if (gop_pictures_available) {
-          gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available;
-          break;
-        }
-        else return 0;
-      }
-      if (width != array_width) {
-       // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-        if(!read_and_fill_frame_data(file, width, height, array_width, gop_pictures[i].source->y) ||
-           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->u) ||
-           !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1, gop_pictures[i].source->v)) {
-          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
-          else return 0;
-        }
-      } else {
-        // Otherwise the data can be read directly to the array.
-        if(y_size != fread(gop_pictures[i].source->y, sizeof(unsigned char), y_size, file) ||
-          uv_size != fread(gop_pictures[i].source->u, sizeof(unsigned char), uv_size, file) ||
-          uv_size != fread(gop_pictures[i].source->v, sizeof(unsigned char), uv_size, file)) {
-          if (gop_pictures_available) { gop_skip_frames = state->encoder_control->cfg->gop_len - gop_pictures_available; break; }
-          else return 0;
-        }
-      }
-
-      if (height != array_height) {
-        fill_after_frame(height, array_width, array_height, gop_pictures[i].source->y);
-        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->u);
-        fill_after_frame(height >> 1, array_width >> 1, array_height >> 1, gop_pictures[i].source->v);
-      }
-    }  
+    if (gop_offset >= cfg->gop_len) {
+      // All available pictures used.
+      gop_offset = 0;
+      gop_pictures_available = 0;
+      return 0;
+    }
   }
 
-  // If GOP is present, fetch the data from our GOP picture buffer
-  if (state->global->frame && state->encoder_control->cfg->gop_len) {
-    int cur_gop_idx = state->encoder_control->cfg->gop_len - (gop_pictures_available + gop_skip_frames) + gop_skipped;
-    int cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
-    // Special case when end of the sequence and not all pictures are available
-    if (gop_skip_frames && cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames) {
-      for (; cur_gop >= state->encoder_control->cfg->gop_len - gop_skip_frames; cur_gop_idx++) {
-        cur_gop = state->encoder_control->cfg->gop[cur_gop_idx].poc_offset - 1;
-        gop_skipped++;
-      }
-      cur_gop_idx--;
-      gop_skipped--;
-    }
-    state->global->gop_offset = cur_gop_idx;
-    memcpy(state->tile->frame->source->y, gop_pictures[cur_gop].source->y, width * height);
-    memcpy(state->tile->frame->source->u, gop_pictures[cur_gop].source->u, (width >> 1) * (height >> 1));
-    memcpy(state->tile->frame->source->v, gop_pictures[cur_gop].source->v, (width >> 1) * (height >> 1));
-    gop_pictures_available--;
-  } else {
-    if (width != array_width) {
-      // In the case of frames not being aligned on 8 bit borders, bits need to be copied to fill them in.
-      if (!read_and_fill_frame_data(file, width, height, array_width,
-        state->tile->frame->source->y) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-        state->tile->frame->source->u) ||
-        !read_and_fill_frame_data(file, width >> 1, height >> 1, array_width >> 1,
-        state->tile->frame->source->v))
-        return 0;
-    } else {
-      // Otherwise the data can be read directly to the array.
-      unsigned y_size = width * height;
-      unsigned uv_size = (width >> 1) * (height >> 1);
-      if (y_size != fread(state->tile->frame->source->y, sizeof(unsigned char),
-        y_size, file) ||
-        uv_size != fread(state->tile->frame->source->u, sizeof(unsigned char),
-        uv_size, file) ||
-        uv_size != fread(state->tile->frame->source->v, sizeof(unsigned char),
-        uv_size, file))
-        return 0;
-    }
+  // Move image from buffer to state.
+  int buffer_index = gop_buf_read_idx + cfg->gop[gop_offset].poc_offset - 1;
+  assert(gop_buffer[buffer_index] != NULL);
+  assert(state->tile->frame->source == NULL);
+  state->tile->frame->source = gop_buffer[buffer_index];
+  gop_buffer[buffer_index] = NULL;
 
-    if (height != array_height) {
-      fill_after_frame(height, array_width, array_height,
-        state->tile->frame->source->y);
-      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-        state->tile->frame->source->u);
-      fill_after_frame(height >> 1, array_width >> 1, array_height >> 1,
-        state->tile->frame->source->v);
-    }
+  state->global->gop_offset = gop_offset;
+
+  if (++gop_offset >= cfg->gop_len) {
+    gop_offset = 0;
+    gop_pictures_available = MAX(0, gop_pictures_available - cfg->gop_len);
+    gop_buf_read_idx = (gop_buf_read_idx + cfg->gop_len) % gop_buf_size;
   }
   return 1;
 }
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, uint32_t *stat_frames, double psnr[3], uint64_t *bitstream_length) {
+
+void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3])
+{
   const encoder_control_t * const encoder = state->encoder_control;
-  
-  if (state->stats_done) return;
-  state->stats_done = 1;
-  
-  ++(*stat_frames);
-  
+
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
   
   if (recout) {
-    const videoframe_t * const frame = state->tile->frame;
-    // Write reconstructed frame out.
-    // Use conformance-window dimensions instead of internal ones.
-    const int width = frame->width;
-    const int out_width = encoder->in.real_width;
-    const int out_height = encoder->in.real_height;
-    int y;
-    const pixel_t *y_rec = frame->rec->y;
-    const pixel_t *u_rec = frame->rec->u;
-    const pixel_t *v_rec = frame->rec->v;
-
-    for (y = 0; y < out_height; ++y) {
-      fwrite(&y_rec[y * width], sizeof(*y_rec), out_width, recout);
-    }
-    for (y = 0; y < out_height / 2; ++y) {
-      fwrite(&u_rec[y * width / 2], sizeof(*u_rec), out_width / 2, recout);
-    }
-    for (y = 0; y < out_height / 2; ++y) {
-      fwrite(&v_rec[y * width / 2], sizeof(*v_rec), out_width / 2, recout);
-    }
+    yuv_io_write(recout,
+                 state->tile->frame->rec,
+                 encoder->in.real_width,
+                 encoder->in.real_height);
   }
   
-  // PSNR calculations
-  {
-    double temp_psnr[3];
-    
-    videoframe_compute_psnr(state->tile->frame, temp_psnr);
-    
-    fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f", state->global->poc,
-          state->global->QP,
-          "BPI"[state->global->slicetype%3], state->stats_bitstream_length<<3,
-          temp_psnr[0], temp_psnr[1], temp_psnr[2]);
-    // Print reference picture lists
-    if (state->global->slicetype != SLICE_I) {
-      int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
-      // List all pocs of lists
-      for (j = 0; j < state->global->ref->used_size; j++) {
-        if (state->global->ref->images[j]->poc < state->global->poc) {
-          ref_list_poc[0][ref_list[0]] = state->global->ref->images[j]->poc;
-          ref_list[0]++;
-        } else {
-          ref_list_poc[1][ref_list[1]] = state->global->ref->images[j]->poc;
-          ref_list[1]++;
-        }
-      }
-      encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
-      encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
-
-      fprintf(stderr, " [L0 ");
-      for (j = ref_list[0]-1; j >= 0; j--) {
-        fprintf(stderr, "%d ", ref_list_poc[0][j]);
-      }
-      fprintf(stderr, "] [L1 ");
-      for (j = 0; j < ref_list[1]; j++) {
-        fprintf(stderr, "%d ", ref_list_poc[1][j]);
-      }
-      fprintf(stderr, "]");
-    }
-    fprintf(stderr, "\n");
-    // Increment total PSNR
-    psnr[0] += temp_psnr[0];
-    psnr[1] += temp_psnr[1];
-    psnr[2] += temp_psnr[2];
-  }
-
-  *bitstream_length += state->stats_bitstream_length;
+  videoframe_compute_psnr(state->tile->frame, frame_psnr);
 }
 
-void encoder_next_frame(encoder_state_t *state) {
+void encoder_next_frame(encoder_state_t *state)
+{
   const encoder_control_t * const encoder = state->encoder_control;
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
-  
-  state->stats_done = 0;
 
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
     state->global->frame = 0;
     state->global->poc = 0;
+    assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
-    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+    assert(state->tile->frame->rec);
+    state->prepared = 1;
     return;
   }
   
   if (state->previous_encoder_state != state) {
-    //We have a "real" previous encoder
-    state->global->frame = state->previous_encoder_state->global->frame + 1;
-    state->global->poc = state->previous_encoder_state->global->poc + 1;
+    encoder_state_t *prev_state = state->previous_encoder_state;
 
-    image_free(state->tile->frame->rec);
+    //We have a "real" previous encoder
+    state->global->frame = prev_state->global->frame + 1;
+    state->global->poc = prev_state->global->poc + 1;
+
     cu_array_free(state->tile->frame->cu_array);
-    
-    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+    image_free(state->tile->frame->source);
+    state->tile->frame->source = NULL;
+    image_free(state->tile->frame->rec);
+    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+    assert(state->tile->frame->rec);
     {
       // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
       unsigned height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
@@ -1128,29 +999,46 @@ void encoder_next_frame(encoder_state_t *state) {
       state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
     }
     videoframe_set_poc(state->tile->frame, state->global->poc);
-    image_list_copy_contents(state->global->ref, state->previous_encoder_state->global->ref);
-    if (!encoder->cfg->gop_len || !state->previous_encoder_state->global->poc || encoder->cfg->gop[state->previous_encoder_state->global->gop_offset].is_ref) {
-      image_list_add(state->global->ref, state->previous_encoder_state->tile->frame->rec, state->previous_encoder_state->tile->frame->cu_array);
+    image_list_copy_contents(state->global->ref, prev_state->global->ref);
+    if (!encoder->cfg->gop_len ||
+        !prev_state->global->poc ||
+        encoder->cfg->gop[prev_state->global->gop_offset].is_ref) {
+      image_list_add(state->global->ref,
+                     prev_state->tile->frame->rec,
+                     prev_state->tile->frame->cu_array,
+                     prev_state->global->poc);
     }
 
+    state->prepared = 1;
     return;
   }
 
 
-  if (!encoder->cfg->gop_len || !state->global->poc || encoder->cfg->gop[state->global->gop_offset].is_ref) {
+  if (!encoder->cfg->gop_len ||
+      !state->global->poc ||
+      encoder->cfg->gop[state->global->gop_offset].is_ref) {
     // Add current reconstructed picture as reference
-    image_list_add(state->global->ref, state->tile->frame->rec, state->tile->frame->cu_array);
+    image_list_add(state->global->ref,
+                   state->tile->frame->rec,
+                   state->tile->frame->cu_array,
+                   state->global->poc);
   }
 
 
   state->global->frame++;
   state->global->poc++;
 
-  //Remove current reconstructed picture, and alloc a new one
+  // Remove current source picture.
+  image_free(state->tile->frame->source);
+  state->tile->frame->source = NULL;
+
+  // Remove current reconstructed picture, and alloc a new one
   image_free(state->tile->frame->rec);
 
-  state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height, state->global->poc);
+  state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+  assert(state->tile->frame->rec);
   videoframe_set_poc(state->tile->frame, state->global->poc);
+  state->prepared = 1;
 }
 
 
@@ -1300,7 +1188,7 @@ void encode_coding_tree(encoder_state_t * const state,
       uint32_t j;
       int ref_list[2] = { 0, 0 };
       for (j = 0; j < state->global->ref->used_size; j++) {
-        if (state->global->ref->images[j]->poc < state->global->poc) {
+        if (state->global->ref->pocs[j] < state->global->poc) {
           ref_list[0]++;
         } else {
           ref_list[1]++;

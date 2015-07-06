@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <limits.h>
 
+#include "kvazaar.h"
+
 #if defined(_MSC_VER) && defined(_M_AMD64)
   #define X86_64
 #endif
@@ -43,15 +45,9 @@
   #define X86_64
 #endif
 
-#define BIT_DEPTH 8
 #define PIXEL_MIN 0
-#define PIXEL_MAX ((1 << BIT_DEPTH) - 1)
+#define PIXEL_MAX ((1 << KVZ_BIT_DEPTH) - 1)
 
-#if BIT_DEPTH == 8
-typedef uint8_t pixel_t;
-#else
-typedef uint16_t pixel_t;
-#endif
 typedef int16_t coeff_t;
 
 //#define VERBOSE 1
@@ -65,9 +61,6 @@ typedef int16_t coeff_t;
 #define PU_DEPTH_INTER_MAX 3
 #define PU_DEPTH_INTRA_MIN 0
 #define PU_DEPTH_INTRA_MAX 4
-
-// Maximum length of GoP (for allocating structures)
-#define MAX_GOP 32
 
 // Maximum number of layers in GOP structure (for allocating structures)
 #define MAX_GOP_LAYERS 6
@@ -134,7 +127,7 @@ typedef int16_t coeff_t;
 
 //#define VERBOSE 1
 
-#define SAO_ABS_OFFSET_MAX ((1 << (MIN(BIT_DEPTH, 10) - 5)) - 1)
+#define SAO_ABS_OFFSET_MAX ((1 << (MIN(KVZ_BIT_DEPTH, 10) - 5)) - 1)
 
 
 #define SIZE_2Nx2N 0
@@ -200,6 +193,7 @@ typedef int16_t coeff_t;
 
 #define MAX_TR_DYNAMIC_RANGE 15
 
+#define EXP_GOLOMB_TABLE_SIZE (4096*8)
 
 //DEBUG BITMASK
 #define _DEBUG_PERF_FRAME_LEVEL 0x0001

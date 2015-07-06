@@ -123,9 +123,9 @@ int cu_array_free(cu_array_t *cua);
  * - First pixel is the top-left pixel.
  */
 typedef struct {
-  pixel_t y[LCU_REF_PX_WIDTH + 1];
-  pixel_t u[LCU_REF_PX_WIDTH / 2 + 1];
-  pixel_t v[LCU_REF_PX_WIDTH / 2 + 1];
+  kvz_pixel y[LCU_REF_PX_WIDTH + 1];
+  kvz_pixel u[LCU_REF_PX_WIDTH / 2 + 1];
+  kvz_pixel v[LCU_REF_PX_WIDTH / 2 + 1];
 } lcu_ref_px_t;
 
 typedef struct {

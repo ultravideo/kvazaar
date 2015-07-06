@@ -125,8 +125,10 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\kvazaar.c" />
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
+    <ClCompile Include="..\..\src\cli.c" />
     <ClCompile Include="..\..\src\config.c" />
     <ClCompile Include="..\..\src\context.c" />
     <ClCompile Include="..\..\src\cu.c" />
@@ -148,7 +150,9 @@
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClCompile Include="..\..\src\yuv_io.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
+    <ClInclude Include="..\..\src\cli.h" />
     <ClInclude Include="..\..\src\cu.h" />
     <ClInclude Include="..\..\src\image.h" />
     <ClInclude Include="..\..\src\imagelist.h" />
@@ -190,6 +194,8 @@
     <ClCompile Include="..\..\src\tables.c" />
     <ClCompile Include="..\..\src\threadqueue.c" />
     <ClCompile Include="..\..\src\transform.c" />
+    <ClInclude Include="..\..\src\kvazaar_internal.h" />
+    <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h" />
@@ -203,6 +209,8 @@
     <ClInclude Include="..\..\src\global.h" />
     <ClInclude Include="..\..\src\inter.h" />
     <ClInclude Include="..\..\src\intra.h" />
+    <ClInclude Include="..\..\src\kvazaar.h" />
+    <ClInclude Include="..\..\src\kvazaar_version.h" />
     <ClInclude Include="..\..\src\nal.h" />
     <ClInclude Include="..\..\src\rate_control.h" />
     <ClInclude Include="..\..\src\rdo.h" />

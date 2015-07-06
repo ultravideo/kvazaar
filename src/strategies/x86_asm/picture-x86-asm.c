@@ -29,7 +29,7 @@
 #include "picture-x86-asm-sad.h"
 #include "picture-x86-asm-satd.h"
 
-static unsigned kvz_sad_32x32_avx(const pixel_t *data1, const pixel_t *data2)
+static unsigned kvz_sad_32x32_avx(const kvz_pixel *data1, const kvz_pixel *data2)
 {
   unsigned sad = 0;
   sad += kvz_sad_16x16_avx(data1, data2);
@@ -39,7 +39,7 @@ static unsigned kvz_sad_32x32_avx(const pixel_t *data1, const pixel_t *data2)
   return sad;
 }
 
-static unsigned kvz_sad_32x32_stride_avx(const pixel_t *data1, const pixel_t *data2, unsigned stride)
+static unsigned kvz_sad_32x32_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride)
 {
   unsigned sad = 0;
   sad += kvz_sad_16x16_stride_avx(data1, data2, stride);
@@ -49,7 +49,7 @@ static unsigned kvz_sad_32x32_stride_avx(const pixel_t *data1, const pixel_t *da
   return sad;
 }
 
-static unsigned kvz_sad_64x64_avx(const pixel_t *data1, const pixel_t *data2)
+static unsigned kvz_sad_64x64_avx(const kvz_pixel *data1, const kvz_pixel *data2)
 {
   unsigned sad = 0;
   sad += kvz_sad_32x32_avx(data1, data2);
@@ -59,7 +59,7 @@ static unsigned kvz_sad_64x64_avx(const pixel_t *data1, const pixel_t *data2)
   return sad;
 }
 
-static unsigned kvz_sad_64x64_stride_avx(const pixel_t *data1, const pixel_t *data2, unsigned stride)
+static unsigned kvz_sad_64x64_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride)
 {
   unsigned sad = 0;
   sad += kvz_sad_32x32_stride_avx(data1, data2, stride);
@@ -69,7 +69,7 @@ static unsigned kvz_sad_64x64_stride_avx(const pixel_t *data1, const pixel_t *da
   return sad;
 }
 
-static unsigned kvz_sad_other_avx(const pixel_t * const data1, const pixel_t * const data2,
+static unsigned kvz_sad_other_avx(const kvz_pixel * const data1, const kvz_pixel * const data2,
   const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -84,7 +84,7 @@ static unsigned kvz_sad_other_avx(const pixel_t * const data1, const pixel_t * c
   return sad;
 }
 
-static unsigned reg_sad_x86_asm(const pixel_t * const data1, const pixel_t * const data2,
+static unsigned reg_sad_x86_asm(const kvz_pixel * const data1, const kvz_pixel * const data2,
 const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   if (width == 4 && height == 4) {

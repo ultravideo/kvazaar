@@ -28,7 +28,7 @@
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-pixel_t fast_clip_16bit_to_pixel(int16_t value)
+kvz_pixel fast_clip_16bit_to_pixel(int16_t value)
 {
   // Ensure that compiler generates arithmetic shift from ">>" 
 #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
@@ -50,7 +50,7 @@ pixel_t fast_clip_16bit_to_pixel(int16_t value)
 
 // Function to clip int32_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-pixel_t fast_clip_32bit_to_pixel(int32_t value)
+kvz_pixel fast_clip_32bit_to_pixel(int32_t value)
 {
   // Ensure that compiler generates arithmetic shift from ">>" 
 #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
@@ -84,7 +84,7 @@ pixel_t fast_clip_32bit_to_pixel(int32_t value)
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned reg_sad_generic(const pixel_t * const data1, const pixel_t * const data2,
+static unsigned reg_sad_generic(const kvz_pixel * const data1, const kvz_pixel * const data2,
                          const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
@@ -104,7 +104,7 @@ static unsigned reg_sad_generic(const pixel_t * const data1, const pixel_t * con
  * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
  * From HM 13.0
  */
-static unsigned satd_8bit_4x4_generic(const pixel_t *piOrg, const pixel_t *piCur)
+static unsigned satd_8bit_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
 {
   int32_t k, satd = 0, diff[16], m[16], d[16];
   for (k = 0; k < 16; ++k) {
@@ -191,8 +191,8 @@ static unsigned satd_8bit_4x4_generic(const pixel_t *piOrg, const pixel_t *piCur
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-unsigned satd_16bit_8x8_general(const pixel_t * piOrg, const int32_t iStrideOrg,
-  const pixel_t * piCur, const int32_t iStrideCur)
+unsigned satd_16bit_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
+  const kvz_pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
   int32_t diff[64], m1[8][8], m2[8][8], m3[8][8];
@@ -307,10 +307,10 @@ cost_pixel_nxn_func satd_8bit_32x32_generic;
 cost_pixel_nxn_func satd_8bit_64x64_generic;
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, pixel_t, 8bit)
-SATD_NXN(16, pixel_t, 8bit)
-SATD_NXN(32, pixel_t, 8bit)
-SATD_NXN(64, pixel_t, 8bit)
+SATD_NXN(8, kvz_pixel, 8bit)
+SATD_NXN(16, kvz_pixel, 8bit)
+SATD_NXN(32, kvz_pixel, 8bit)
+SATD_NXN(64, kvz_pixel, 8bit)
 
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
@@ -336,11 +336,11 @@ static cost_pixel_nxn_func sad_8bit_64x64_generic;
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
 // They are used through get_pixel_sad_func.
-SAD_NXN(4, pixel_t, 8bit)
-SAD_NXN(8, pixel_t, 8bit)
-SAD_NXN(16, pixel_t, 8bit)
-SAD_NXN(32, pixel_t, 8bit)
-SAD_NXN(64, pixel_t, 8bit)
+SAD_NXN(4, kvz_pixel, 8bit)
+SAD_NXN(8, kvz_pixel, 8bit)
+SAD_NXN(16, kvz_pixel, 8bit)
+SAD_NXN(32, kvz_pixel, 8bit)
+SAD_NXN(64, kvz_pixel, 8bit)
 
 
 int strategy_register_picture_generic(void* opaque)

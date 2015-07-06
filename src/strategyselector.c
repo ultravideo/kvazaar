@@ -88,10 +88,6 @@ int strategyselector_init(int32_t cpuid) {
   return 1;
 }
 
-void strategyselector_free() {
-  //Do nothing (yet)
-}
-
 //Returns 1 if successful, 0 otherwise
 int strategyselector_register(void * const opaque, const char * const type, const char * const strategy_name, int priority, void * const fptr) {
   strategy_list_t * const strategies = opaque;

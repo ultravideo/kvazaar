@@ -35,7 +35,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-const uint8_t ref_data[64] = {
+static const uint8_t ref_data[64] = {
   1,2,2,2,2,2,2,3,
   4,5,5,5,5,5,5,6,
   4,5,5,5,5,5,5,6,
@@ -46,7 +46,7 @@ const uint8_t ref_data[64] = {
   7,8,8,8,8,8,8,9
 };
 
-const uint8_t pic_data[64] = {
+static const uint8_t pic_data[64] = {
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
@@ -57,19 +57,19 @@ const uint8_t pic_data[64] = {
   1,1,1,1,1,1,1,1
 };
 
-image_t *g_pic = 0;
-image_t *g_ref = 0;
+static kvz_picture *g_pic = 0;
+static kvz_picture *g_ref = 0;
 
 //////////////////////////////////////////////////////////////////////////
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
 static void setup_tests()
 {
-  g_pic = image_alloc(8, 8, 1);
+  g_pic = image_alloc(8, 8);
   for (int i = 0; i < 64; ++i) {
     g_pic->y[i] = pic_data[i] + 48;
   }
 
-  g_ref = image_alloc(8, 8, 0);
+  g_ref = image_alloc(8, 8);
   for (int i = 0; i < 64; ++i) {
     g_ref->y[i] = ref_data[i] + 48;
   }
@@ -226,8 +226,8 @@ TEST test_bottomright_out(void)
 
 
 struct sad_test_env_t {
-  image_t *g_pic;
-  image_t *g_ref;
+  kvz_picture *g_pic;
+  kvz_picture *g_ref;
 };
 
 

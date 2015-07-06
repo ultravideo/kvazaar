@@ -36,34 +36,34 @@
 #include "sao.h"
 
 /**
- * \brief Allocate new image
- * \return image pointer
+ * \brief Allocate a new image.
+ * \return image pointer or NULL on failure
  */
-image_t *image_alloc(const int32_t width, const int32_t height, const int32_t poc)
+kvz_picture *image_alloc(const int32_t width, const int32_t height)
 {
-  image_t *im = MALLOC(image_t, 1);
-  
-  unsigned int luma_size = width * height;
-  unsigned int chroma_size = luma_size / 4;
-  
   //Assert that we have a well defined image
   assert((width % 2) == 0);
   assert((height % 2) == 0);
 
+  kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
-  
+
+  unsigned int luma_size = width * height;
+  unsigned int chroma_size = luma_size / 4;
+
+  //Allocate memory
+  im->fulldata = MALLOC(kvz_pixel, (luma_size + 2 * chroma_size));
+  if (!im->fulldata) {
+    free(im);
+    return NULL;
+  }
+
+  im->base_image = im;
+  im->refcount = 1; //We give a reference to caller
   im->width = width;
   im->height = height;
   im->stride = width;
-  
-  im->base_image = im;
-  
-  im->refcount = 1; //We give a reference to caller
-  
-  im->poc = poc;
-  
-  //Allocate memory
-  im->fulldata = MALLOC(pixel_t, (luma_size + 2 * chroma_size));
+
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
   im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
   im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
@@ -72,59 +72,78 @@ image_t *image_alloc(const int32_t width, const int32_t height, const int32_t po
 }
 
 /**
- * \brief Free memory allocated to picture (if we have no reference left)
- * \param pic picture pointer
- * \return 1 on success, 0 on failure
+ * \brief Free an image.
+ *
+ * Decrement reference count of the image and deallocate associated memory
+ * if no references exist any more.
+ *
+ * \param im image to free
  */
-int image_free(image_t * const im)
+void image_free(kvz_picture *const im)
 {
-  //Nothing to do
-  if (!im) return 1;
-  
-  //Either we are the base image, or we should have no references
-  assert(im->base_image == im || im->refcount == 0);
-  
-  int32_t new_refcount = ATOMIC_DEC(&(im->base_image->refcount));
-  //If we're freeing a subimage, then we must free the pointer
-  //Base image may be stored in image_list, and should not be freed
-  //FIXME I don't find this very clean...
-  if (new_refcount > 0 && im->base_image != im) free(im);
-  if (new_refcount > 0) return 1;
-  FREE_POINTER(im->base_image->fulldata);
-  
-  //Just to make the program crash when using those values after the free
-  im->y = im->u = im->v = im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
-  
-  free(im);
+  if (im == NULL) return;
 
-  return 1;
+  int32_t new_refcount = ATOMIC_DEC(&(im->refcount));
+  if (new_refcount > 0) {
+    // There are still references so we don't free the data yet.
+    return;
+  }
+
+  if (im->base_image != im) {
+    // Free our reference to the base image.
+    image_free(im->base_image);
+  } else {
+    free(im->fulldata);
+  }
+
+  // Make sure freed data won't be used.
+  im->base_image = NULL;
+  im->fulldata = NULL;
+  im->y = im->u = im->v = NULL;
+  im->data[COLOR_Y] = im->data[COLOR_U] = im->data[COLOR_V] = NULL;
+  free(im);
 }
 
-
-image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height)
+/**
+ * \brief Get a new pointer to an image.
+ *
+ * Increment reference count and return the image.
+ */
+kvz_picture *image_copy_ref(kvz_picture *im)
 {
-  image_t *im = MALLOC(image_t, 1);
-  if (!im) return NULL;
-  
-  im->base_image = orig_image->base_image;
-  ATOMIC_INC(&(im->base_image->refcount));
-  
-  assert(x_offset + width <= orig_image->width);
-  assert(y_offset + height <= orig_image->height);
-  
-  //Assert that we have a well defined image
+  int32_t new_refcount = ATOMIC_INC(&(im->refcount));
+
+  // The caller should have had another reference.
+  assert(new_refcount > 1);
+
+  return im;
+}
+
+kvz_picture *image_make_subimage(kvz_picture *const orig_image,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height)
+{
+  // Assert that we have a well defined image
   assert((width % 2) == 0);
   assert((height % 2) == 0);
-  
+
   assert((x_offset % 2) == 0);
   assert((y_offset % 2) == 0);
-  
-  im->stride = orig_image->stride;
-  im->refcount = 0; //No references on subimages
-  
+
+  assert(x_offset + width <= orig_image->width);
+  assert(y_offset + height <= orig_image->height);
+
+  kvz_picture *im = MALLOC(kvz_picture, 1);
+  if (!im) return NULL;
+
+  im->base_image = image_copy_ref(orig_image->base_image);
+  im->refcount = 1; // We give a reference to caller
   im->width = width;
   im->height = height;
-  
+  im->stride = orig_image->stride;
+
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
   im->u = im->data[COLOR_U] = &orig_image->u[x_offset/2 + y_offset/2 * orig_image->stride/2];
   im->v = im->data[COLOR_V] = &orig_image->v[x_offset/2 + y_offset/2 * orig_image->stride/2];
@@ -137,9 +156,9 @@ yuv_t * yuv_t_alloc(int luma_size)
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
   yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
-  yuv->y = (pixel_t *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (pixel_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
-  yuv->v = (pixel_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->y = (kvz_pixel *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (kvz_pixel *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (kvz_pixel *)malloc(luma_size / 2 * sizeof(*yuv->v));
   yuv->size = luma_size;
 
   return yuv;
@@ -164,10 +183,10 @@ void yuv_t_free(yuv_t * yuv)
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned cor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
+static unsigned cor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
-  pixel_t ref = *ref_data;
+  kvz_pixel ref = *ref_data;
   int x, y;
   unsigned sad = 0;
 
@@ -191,7 +210,7 @@ static unsigned cor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned ver_sad(const pixel_t *pic_data, const pixel_t *ref_data,
+static unsigned ver_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride)
 {
   int x, y;
@@ -217,7 +236,7 @@ static unsigned ver_sad(const pixel_t *pic_data, const pixel_t *ref_data,
  *
  * \returns Sum of Absolute Differences
  */
-static unsigned hor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
+static unsigned hor_sad(const kvz_pixel *pic_data, const kvz_pixel *ref_data,
                         int block_width, int block_height, unsigned pic_stride, unsigned ref_stride)
 {
   int x, y;
@@ -246,11 +265,11 @@ static unsigned hor_sad(const pixel_t *pic_data, const pixel_t *ref_data,
  * \param block_width  Width of the blocks.
  * \param block_height  Height of the blocks.
  */
-static unsigned image_interpolated_sad(const image_t *pic, const image_t *ref,
+static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture *ref,
                                  int pic_x, int pic_y, int ref_x, int ref_y,
                                  int block_width, int block_height)
 {
-  pixel_t *pic_data, *ref_data;
+  kvz_pixel *pic_data, *ref_data;
 
   int left, right, top, bottom;
   int result = 0;
@@ -381,7 +400,7 @@ static unsigned image_interpolated_sad(const image_t *pic, const image_t *ref,
 *
 * \returns  
 */
-unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
@@ -405,8 +424,8 @@ unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int p
   {
     // Reference block is completely inside the frame, so just calculate the
     // SAD directly. This is the most common case, which is why it's first.
-    const pixel_t *pic_data = &pic->y[pic_y * pic->stride + pic_x];
-    const pixel_t *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
     return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
@@ -415,7 +434,7 @@ unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int p
 }
 
 
-unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
+unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
@@ -448,7 +467,7 @@ unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
  * This should be inlined, but it's defined here for now to see if Visual
  * Studios LTCG will inline it.
  */
-void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
+void pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
@@ -458,8 +477,8 @@ void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
   assert(width <= dst_stride);
 
 #ifdef CHECKPOINTS
+  char *buffer = malloc((3 * width + 1) * sizeof(char));
   for (y = 0; y < height; ++y) {
-    char buffer[3*width];
     int p;
     for (p = 0; p < width; ++p) {
       sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
@@ -467,6 +486,7 @@ void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
     buffer[3*width] = 0;
     CHECKPOINT("pixels_blit: %04d: %s", y, buffer);
   }
+  FREE_POINTER(buffer);
 #endif //CHECKPOINTS
 
   if (orig == dst) {
@@ -477,7 +497,7 @@ void pixels_blit(const pixel_t * const orig, pixel_t * const dst,
   assert(orig != dst || orig_stride == dst_stride);
 
   for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(pixel_t));
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
   }
 }
 

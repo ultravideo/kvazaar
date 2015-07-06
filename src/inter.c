@@ -72,7 +72,7 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
  * \param lcu destination lcu
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state_t * const state, const image_t * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
+void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -91,12 +91,12 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
   // Chroma half-pel
   #define HALFPEL_CHROMA_WIDTH ((LCU_WIDTH>>1) + 8)
   int8_t chroma_halfpel = ((mv[0]>>2)&1) || ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
-  pixel_t halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< U source block for interpolation
-  pixel_t halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< V source block for interpolation
-  pixel_t *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_u with offset (4,4)
-  pixel_t *halfpel_src_off_v = &halfpel_src_v[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_v with offset (4,4)
-  pixel_t halfpel_u[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (u)
-  pixel_t halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
+  kvz_pixel halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< U source block for interpolation
+  kvz_pixel halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< V source block for interpolation
+  kvz_pixel *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_u with offset (4,4)
+  kvz_pixel *halfpel_src_off_v = &halfpel_src_v[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_v with offset (4,4)
+  kvz_pixel halfpel_u[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (u)
+  kvz_pixel halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
 
   // Luma quarter-pel
     int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
@@ -114,19 +114,19 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
       #define FILTER_SIZE_C 4 //Chroma filter size
 
       // Fractional luma 1/4-pel
-      pixel_t qpel_src_y[(LCU_WIDTH+FILTER_SIZE_Y) * (LCU_WIDTH+FILTER_SIZE_Y)];
-      pixel_t* qpel_src_off_y = &qpel_src_y[(width+FILTER_SIZE_Y)*(FILTER_SIZE_Y>>1)+(FILTER_SIZE_Y>>1)];
-      pixel_t qpel_dst_y[LCU_WIDTH*LCU_WIDTH*16];
+      kvz_pixel qpel_src_y[(LCU_WIDTH+FILTER_SIZE_Y) * (LCU_WIDTH+FILTER_SIZE_Y)];
+      kvz_pixel* qpel_src_off_y = &qpel_src_y[(width+FILTER_SIZE_Y)*(FILTER_SIZE_Y>>1)+(FILTER_SIZE_Y>>1)];
+      kvz_pixel qpel_dst_y[LCU_WIDTH*LCU_WIDTH*16];
 
       // Fractional chroma 1/8-pel
       int width_c = width>>1;
-      pixel_t octpel_src_u[((LCU_WIDTH>>1)+FILTER_SIZE_C) * ((LCU_WIDTH>>1)+FILTER_SIZE_C)];
-      pixel_t* octpel_src_off_u = &octpel_src_u[(width_c+FILTER_SIZE_C)*(FILTER_SIZE_C>>1)+(FILTER_SIZE_C>>1)];
-      pixel_t octpel_dst_u[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
+      kvz_pixel octpel_src_u[((LCU_WIDTH>>1)+FILTER_SIZE_C) * ((LCU_WIDTH>>1)+FILTER_SIZE_C)];
+      kvz_pixel* octpel_src_off_u = &octpel_src_u[(width_c+FILTER_SIZE_C)*(FILTER_SIZE_C>>1)+(FILTER_SIZE_C>>1)];
+      kvz_pixel octpel_dst_u[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
 
-      pixel_t octpel_src_v[((LCU_WIDTH >> 1) + FILTER_SIZE_C) * ((LCU_WIDTH >> 1) + FILTER_SIZE_C)];
-      pixel_t* octpel_src_off_v = &octpel_src_v[(width_c + FILTER_SIZE_C)*(FILTER_SIZE_C >> 1) + (FILTER_SIZE_C >> 1)];
-      pixel_t octpel_dst_v[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
+      kvz_pixel octpel_src_v[((LCU_WIDTH >> 1) + FILTER_SIZE_C) * ((LCU_WIDTH >> 1) + FILTER_SIZE_C)];
+      kvz_pixel* octpel_src_off_v = &octpel_src_v[(width_c + FILTER_SIZE_C)*(FILTER_SIZE_C >> 1) + (FILTER_SIZE_C >> 1)];
+      kvz_pixel octpel_dst_v[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
 
       // Fractional luma
       extend_borders(xpos, ypos, mv[0]>>2, mv[1]>>2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
@@ -156,7 +156,7 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
         for(x = 0; x < width; ++x) {
           int x_in_lcu = ((x+xpos) & ((LCU_WIDTH)-1));
           int qpel_x = x*4+y_off_x;
-          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel_t)qpel_dst_y[qpel_y*(width*4)+qpel_x];
+          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)qpel_dst_y[qpel_y*(width*4)+qpel_x];
         }
       }
       //Sample fractional pixels for chroma
@@ -166,8 +166,8 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
         for(x = 0; x < width_c; ++x) {
           int x_in_lcu = ((x+(xpos>>1)) & ((LCU_WIDTH>>1)-1));
           int qpel_x = x*8+c_off_x;
-          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (pixel_t)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
-          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (pixel_t)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
+          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (kvz_pixel)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
+          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (kvz_pixel)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
         }
       }
     }
@@ -219,8 +219,8 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
         for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
           int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
           int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (pixel_t)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
-          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (pixel_t)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
+          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (kvz_pixel)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
+          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (kvz_pixel)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
         }
       }
     }
@@ -338,18 +338,18 @@ void inter_recon_lcu(const encoder_state_t * const state, const image_t * const 
 * \returns Void
 */
 
-void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t * ref1, const image_t * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
-  pixel_t temp_lcu_y[64 * 64];
-  pixel_t temp_lcu_u[32 * 32];
-  pixel_t temp_lcu_v[32 * 32];
+void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
+  kvz_pixel temp_lcu_y[64 * 64];
+  kvz_pixel temp_lcu_u[32 * 32];
+  kvz_pixel temp_lcu_v[32 * 32];
   int temp_x, temp_y;
   // TODO: interpolated values require 14-bit accuracy for bi-prediction, current implementation of ipol filters round the value to 8bits
 
   //Reconstruct both predictors
   inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu);
-  memcpy(temp_lcu_y, lcu->rec.y, sizeof(pixel_t) * 64 * 64);
-  memcpy(temp_lcu_u, lcu->rec.u, sizeof(pixel_t) * 32 * 32);
-  memcpy(temp_lcu_v, lcu->rec.v, sizeof(pixel_t) * 32 * 32);
+  memcpy(temp_lcu_y, lcu->rec.y, sizeof(kvz_pixel) * 64 * 64);
+  memcpy(temp_lcu_u, lcu->rec.u, sizeof(kvz_pixel) * 32 * 32);
+  memcpy(temp_lcu_v, lcu->rec.v, sizeof(kvz_pixel) * 32 * 32);
   inter_recon_lcu(state, ref2, xpos, ypos, width, mv_param[1], lcu);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
@@ -357,7 +357,7 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t *
     int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
     for (temp_x = 0; temp_x < width; ++temp_x) {
       int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
-      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (pixel_t)(((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] +
+      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)(((int)lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] +
         (int)temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] + 1) >> 1);
     }
   }
@@ -365,10 +365,10 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const image_t *
     int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
     for (temp_x = 0; temp_x < width>>1; ++temp_x) {
       int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
-      lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (pixel_t)(((int)lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
+      lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)(((int)lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
         (int)temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
 
-      lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (pixel_t)(((int)lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
+      lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)(((int)lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] +
         (int)temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] + 1) >> 1);
     }
   }
@@ -476,8 +476,8 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
   inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->images[(cu)->inter.mv_ref[list]]->poc;\
-                                   int tb = state->global->poc - state->global->ref->images[cur_cu->inter.mv_ref[reflist]]->poc;\
+#define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
+                                   int tb = state->global->poc - state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]];\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 ); \
@@ -787,7 +787,7 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
     int ref_negative = 0;
     int ref_positive = 0;
     for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->images[j]->poc < state->global->poc) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
         ref_negative++;
       } else {
         ref_positive++;

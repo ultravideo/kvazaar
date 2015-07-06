@@ -32,7 +32,7 @@
 extern int8_t g_luma_filter[4][8];
 extern int8_t g_chroma_filter[8][4];
 
-int16_t eight_tap_filter_hor_generic(int8_t *filter, pixel_t *data)
+int16_t eight_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
 {
   int16_t temp = 0;
   for (int i = 0; i < 8; ++i)
@@ -54,7 +54,7 @@ int32_t eight_tap_filter_hor_16bit_generic(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t eight_tap_filter_ver_generic(int8_t *filter, pixel_t *data, int16_t stride)
+int16_t eight_tap_filter_ver_generic(int8_t *filter, kvz_pixel *data, int16_t stride)
 {
   int16_t temp = 0;
   for (int i = 0; i < 8; ++i)
@@ -76,7 +76,7 @@ int32_t eight_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_
   return temp;
 }
 
-int16_t four_tap_filter_hor_generic(int8_t *filter, pixel_t *data)
+int16_t four_tap_filter_hor_generic(int8_t *filter, kvz_pixel *data)
 {
   int16_t temp = 0;
   for (int i = 0; i < 4; ++i)
@@ -98,7 +98,7 @@ int32_t four_tap_filter_hor_16bit_generic(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t four_tap_filter_ver_generic(int8_t *filter, pixel_t *data, int16_t stride)
+int16_t four_tap_filter_ver_generic(int8_t *filter, kvz_pixel *data, int16_t stride)
 {
   int16_t temp = 0;
   for (int i = 0; i < 4; ++i)
@@ -120,13 +120,13 @@ int32_t four_tap_filter_ver_16bit_generic(int8_t *filter, int16_t *data, int16_t
   return temp;
 }
 
-void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
-  int16_t shift1 = BIT_DEPTH - 8;
+  int16_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
@@ -180,7 +180,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encode
  * \param dst_stride stride of destination image
  *
  */
-void filter_inter_halfpel_chroma_generic(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_halfpel_chroma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
   * | B0,0|ae0,0|
@@ -191,9 +191,9 @@ void filter_inter_halfpel_chroma_generic(const encoder_control_t * const encoder
   * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
   */
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int32_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
@@ -241,13 +241,13 @@ void filter_inter_halfpel_chroma_generic(const encoder_control_t * const encoder
   }
 }
 
-void filter_inter_octpel_chroma_generic(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int32_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
@@ -349,8 +349,8 @@ void filter_inter_octpel_chroma_generic(const encoder_control_t * const encoder,
   }
 }
 
-void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel_t *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, pixel_t *dst) {
+void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
+  int filterSize, int width, int height, kvz_pixel *dst) {
 
   int16_t mv[2] = { mv_x, mv_y };
   int halfFilterSize = filterSize >> 1;

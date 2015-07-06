@@ -54,12 +54,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   
   state->tile->frame->rec = NULL;
   
-  if (state->type == ENCODER_STATE_TYPE_MAIN) {
-    //If not a parent, then we can avoid keeping a copy of the image
-    state->tile->frame->source = image_alloc(state->tile->frame->width, state->tile->frame->height, 0);
-  } else {
-    state->tile->frame->source = NULL;
-  }
+  state->tile->frame->source = NULL;
 
   if (!state->tile->frame) {
     printf("Error allocating videoframe!\r\n");
@@ -110,9 +105,6 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   yuv_t_free(state->tile->hor_buf_search);
   yuv_t_free(state->tile->ver_buf_search);
   
-  if (state->tile->frame->source) image_free(state->tile->frame->source);
-  if (state->tile->frame->rec) image_free(state->tile->frame->rec);
-
   videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   
@@ -293,7 +285,8 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
   child_state->children[0].encoder_control = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
-  child_state->stats_done = 1; //It avoids printing meaningless stats at the beginning
+  child_state->prepared = 0;
+  child_state->frame_done = 1;
   
   if (!parent_state) {
     const encoder_control_t * const encoder = child_state->encoder_control;
@@ -327,21 +320,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
   }
   
-  //Allocate bitstream
-  if (child_state->type == ENCODER_STATE_TYPE_MAIN) {
-    //Main encoder outputs to file
-    if (!bitstream_init(&child_state->stream, BITSTREAM_TYPE_FILE)) {
-      fprintf(stderr, "Could not initialize stream!\n");
-      return 0;
-    }
-    child_state->stream.file.output = child_state->encoder_control->out.file;
-  } else {
-    //Other encoders use a memory bitstream
-    if (!bitstream_init(&child_state->stream, BITSTREAM_TYPE_MEMORY)) {
-      fprintf(stderr, "Could not initialize stream!\n");
-      return 0;
-    }
-  }
+  bitstream_init(&child_state->stream);
   
   // Set CABAC output bitstream
   child_state->cabac.stream = &child_state->stream;

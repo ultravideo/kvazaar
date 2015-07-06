@@ -33,8 +33,9 @@
  */
 typedef struct
 {
-  struct image_t* *images;          //!< \brief Pointer to array of picture pointers.
+  struct kvz_picture* *images;          //!< \brief Pointer to array of picture pointers.
   cu_array_t* *cu_arrays;
+  int32_t *pocs;
   uint32_t size;       //!< \brief Array size.
   uint32_t used_size;
 } image_list_t;
@@ -42,7 +43,7 @@ typedef struct
 image_list_t * image_list_alloc(int size);
 int image_list_resize(image_list_t *list, unsigned size);
 int image_list_destroy(image_list_t *list);
-int image_list_add(image_list_t *list, image_t *im, cu_array_t* cua);
+int image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
 int image_list_rem(image_list_t *list, unsigned n);
 
 int image_list_copy_contents(image_list_t *target, image_list_t *source);

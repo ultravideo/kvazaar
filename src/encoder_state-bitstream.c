@@ -472,7 +472,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  const config_t * const cfg = state->encoder_control->cfg;
+  const kvz_config * const cfg = state->encoder_control->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
@@ -562,7 +562,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
   int ref_positive = 0;
   if (state->encoder_control->cfg->gop_len) {
     for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->images[j]->poc < state->global->poc) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
         ref_negative++;
       } else {
         ref_positive++;
@@ -612,7 +612,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
         do {
           delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
           for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->images[i]->poc == state->global->poc - delta_poc) {
+            if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
               found = 1;
               break;
             }
@@ -639,7 +639,7 @@ void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
         do {
           delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
           for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->images[i]->poc == state->global->poc + delta_poc) {
+            if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
               found = 1;
               break;
             }
@@ -785,10 +785,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
   for (i = 0; state->children[i].encoder_control; ++i) {
-    //Append bitstream to main stream
-    bitstream_append(&state->stream, &state->children[i].stream);
-    //FIXME: Move this...
-    bitstream_clear(&state->children[i].stream);
+    // Move bitstream to main stream
+    bitstream_move(&state->stream, &state->children[i].stream);
   }
     PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
@@ -799,8 +797,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
     add_checksum(state);
     PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
-  
-  assert(state->tile->frame->poc == state->global->poc);
   
   //Get bitstream length for stats
   newpos = bitstream_tell(stream);
@@ -817,9 +813,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
     state->global->cur_gop_bits_coded = 0;
   }
   state->global->cur_gop_bits_coded += newpos - curpos;
-
-  // Flush the output in case someone is reading the file on the other end.
-  fflush(state->stream.file.output);
 }
 
 void encoder_state_write_bitstream_leaf(encoder_state_t * const state) {
@@ -853,33 +846,31 @@ void encoder_state_worker_write_bitstream_leaf(void * opaque) {
 
 static void encoder_state_write_bitstream_tile(encoder_state_t * const state) {
   //If it's not a leaf, a tile is "nothing". We only have to write sub elements
-  int i;
-  for (i = 0; state->children[i].encoder_control; ++i) {
-    //Append bitstream to main stream
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    // Cannot move here because the lengths of the leaf streams will be
+    // needed when writing the slice header.
     bitstream_append(&state->stream, &state->children[i].stream);
   }
 }
 
 static void encoder_state_write_bitstream_slice(encoder_state_t * const state) {
-  int i;
   encoder_state_write_bitstream_slice_header(state);
-  bitstream_align(&state->stream); 
-  
-  for (i = 0; state->children[i].encoder_control; ++i) {
-    //Append bitstream to main stream
-    bitstream_append(&state->stream, &state->children[i].stream);
+  bitstream_align(&state->stream);
+
+  // Move child state bitstreams to the main stream.
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    bitstream_move(&state->stream, &state->children[i].stream);
   }
 }
 
 
 void encoder_state_write_bitstream(encoder_state_t * const state) {
-  int i;
   if (!state->is_leaf) {
-    for (i=0; state->children[i].encoder_control; ++i) {
+    for (int i = 0; state->children[i].encoder_control; ++i) {
       encoder_state_t *sub_state = &(state->children[i]);
       encoder_state_write_bitstream(sub_state);
     }
-    
+
     switch (state->type) {
       case ENCODER_STATE_TYPE_MAIN:
         encoder_state_write_bitstream_main(state);

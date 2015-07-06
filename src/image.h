@@ -26,62 +26,48 @@
  */
 
 #include "global.h"
-
-/**
- * \brief Struct which contains all picture data
- */
-typedef struct image_t
-{
-  pixel_t *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
-
-  pixel_t *y;                //!< \brief Pointer to luma pixel array.
-  pixel_t *u;                //!< \brief Pointer to chroma U pixel array.
-  pixel_t *v;                //!< \brief Pointer to chroma V pixel array.
-  pixel_t *data[NUM_COLORS]; //!< \brief Alternate access method to same data.
-
-  int32_t width;           //!< \brief Luma pixel array width.
-  int32_t height;          //!< \brief Luma pixel array height.
-  
-  int32_t stride;          //!< \brief Luma pixel array width for the full picture (should be used as stride)
-  
-  struct image_t * base_image; //!< \brief Pointer to the image to which the pixels belong
-  int32_t refcount;        //!< \brief Number of references in reflist to the picture
-  
-  int32_t poc;             //!< \brief Picture order count
-} image_t;
+#include "kvazaar.h"
 
 typedef struct {
-  pixel_t y[LCU_LUMA_SIZE];
-  pixel_t u[LCU_CHROMA_SIZE];
-  pixel_t v[LCU_CHROMA_SIZE];
+  kvz_pixel y[LCU_LUMA_SIZE];
+  kvz_pixel u[LCU_CHROMA_SIZE];
+  kvz_pixel v[LCU_CHROMA_SIZE];
 } lcu_yuv_t;
 
 typedef struct {
   int size;
-  pixel_t *y;
-  pixel_t *u;
-  pixel_t *v;
+  kvz_pixel *y;
+  kvz_pixel *u;
+  kvz_pixel *v;
 } yuv_t;
 
 
-image_t *image_alloc(const int32_t width, const int32_t height, const int32_t poc);
-int image_free(image_t * im);
-image_t *image_make_subimage(image_t * const orig_image, const unsigned int x_offset, const unsigned int y_offset, const unsigned int width, const unsigned int height);
+kvz_picture *image_alloc(const int32_t width, const int32_t height);
+
+void image_free(kvz_picture *im);
+
+kvz_picture *image_copy_ref(kvz_picture *im);
+
+kvz_picture *image_make_subimage(kvz_picture *const orig_image,
+                             const unsigned x_offset,
+                             const unsigned y_offset,
+                             const unsigned width,
+                             const unsigned height);
 
 yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);
 
 //Algorithms
-unsigned image_calc_sad(const image_t *pic, const image_t *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below);
 
 
-unsigned pixels_calc_ssd(const pixel_t *const ref, const pixel_t *const rec,
+unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
                   const int ref_stride, const int rec_stride,
                   const int width);
 
 
-void pixels_blit(const pixel_t* orig, pixel_t *dst,
+void pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 

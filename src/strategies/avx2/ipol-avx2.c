@@ -80,7 +80,7 @@ __m128i eight_tap_filter_x4_and_flip_16bit(__m128i data0, __m128i data1, __m128i
   return a;
 }
 
-void eight_tap_filter_and_flip_avx2(int8_t filter[4][8], pixel_t *src, int16_t src_stride, int16_t* __restrict dst)
+void eight_tap_filter_and_flip_avx2(int8_t filter[4][8], kvz_pixel *src, int16_t src_stride, int16_t* __restrict dst)
 {
 
   //Load 2 rows per xmm register
@@ -104,7 +104,7 @@ void eight_tap_filter_and_flip_avx2(int8_t filter[4][8], pixel_t *src, int16_t s
   eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[3]), (__m128i*)(dst + 3 * dst_stride));
 }
 
-static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int16_t *src, int16_t src_stride, int offset, int combined_shift, pixel_t* __restrict dst, int16_t dst_stride)
+static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int16_t *src, int16_t src_stride, int offset, int combined_shift, kvz_pixel* __restrict dst, int16_t dst_stride)
 {
 
   //Load a row per xmm register
@@ -157,7 +157,7 @@ static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int
 
 }
 
-int16_t eight_tap_filter_hor_avx2(int8_t *filter, pixel_t *data)
+int16_t eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
 {
   union {
     __m128i vector;
@@ -185,7 +185,7 @@ int32_t eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t eight_tap_filter_ver_avx2(int8_t *filter, pixel_t *data, int16_t stride)
+int16_t eight_tap_filter_ver_avx2(int8_t *filter, kvz_pixel *data, int16_t stride)
 {
   int16_t temp = 0;
   for (int i = 0; i < 8; ++i)
@@ -207,7 +207,7 @@ int32_t eight_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t s
   return temp;
 }
 
-int16_t four_tap_filter_hor_avx2(int8_t *filter, pixel_t *data)
+int16_t four_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
 {
   int16_t temp = 0;
   for (int i = 0; i < 4; ++i)
@@ -229,7 +229,7 @@ int32_t four_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
   return temp;
 }
 
-int16_t four_tap_filter_ver_avx2(int8_t *filter, pixel_t *data, int16_t stride)
+int16_t four_tap_filter_ver_avx2(int8_t *filter, kvz_pixel *data, int16_t stride)
 {
   int16_t temp = 0;
   for (int i = 0; i < 4; ++i)
@@ -251,13 +251,13 @@ int32_t four_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t st
   return temp;
 }
 
-void filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
-  int16_t shift1 = BIT_DEPTH - 8;
+  int16_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
@@ -312,7 +312,7 @@ void filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, 
 * \param dst_stride stride of destination image
 *
 */
-void filter_inter_halfpel_chroma_avx2(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_halfpel_chroma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
   /* ____________
   * | B0,0|ae0,0|
@@ -323,9 +323,9 @@ void filter_inter_halfpel_chroma_avx2(const encoder_control_t * const encoder, p
   * ee0,0 = (-4*ae0,-1 + 36*ae0,0 + 36*ae0,1 - 4*ae0,2) >> shift2
   */
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int32_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
@@ -373,13 +373,13 @@ void filter_inter_halfpel_chroma_avx2(const encoder_control_t * const encoder, p
   }
 }
 
-void filter_inter_octpel_chroma_avx2(const encoder_control_t * const encoder, pixel_t *src, int16_t src_stride, int width, int height, pixel_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
+void filter_inter_octpel_chroma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
   int32_t x, y;
-  int32_t shift1 = BIT_DEPTH - 8;
+  int32_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - BIT_DEPTH;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
   int32_t offset3 = 1 << (shift3 - 1);
   int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
@@ -481,8 +481,8 @@ void filter_inter_octpel_chroma_avx2(const encoder_control_t * const encoder, pi
   }
 }
 
-void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, pixel_t *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, pixel_t *dst) {
+void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
+  int filterSize, int width, int height, kvz_pixel *dst) {
 
   int16_t mv[2] = { mv_x, mv_y };
   int halfFilterSize = filterSize >> 1;

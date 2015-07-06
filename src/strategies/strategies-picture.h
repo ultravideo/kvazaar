@@ -23,10 +23,10 @@
 #include "../image.h"
 
 
-typedef unsigned(reg_sad_func)(const pixel_t *const data1, const pixel_t *const data2,
+typedef unsigned(reg_sad_func)(const kvz_pixel *const data1, const kvz_pixel *const data2,
   const int width, const int height,
   const unsigned stride1, const unsigned stride2);
-typedef unsigned (cost_pixel_nxn_func)(const pixel_t *block1, const pixel_t *block2);
+typedef unsigned (cost_pixel_nxn_func)(const kvz_pixel *block1, const kvz_pixel *block2);
 
 
 // Declare function pointers.

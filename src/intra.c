@@ -87,7 +87,7 @@ void intra_set_block_mode(videoframe_t *frame,uint32_t x_cu, uint32_t y_cu, uint
  * \param width block width
  * \returns DC prediction
 */
-pixel_t intra_get_dc_pred(const pixel_t *pic, uint16_t picwidth, uint8_t width)
+kvz_pixel intra_get_dc_pred(const kvz_pixel *pic, uint16_t picwidth, uint8_t width)
 {
   int32_t i, sum = 0;
 
@@ -100,7 +100,7 @@ pixel_t intra_get_dc_pred(const pixel_t *pic, uint16_t picwidth, uint8_t width)
   }
 
   // return the average
-  return (pixel_t)((sum + width) / (width + width));
+  return (kvz_pixel)((sum + width) / (width + width));
 }
 
 /**
@@ -175,11 +175,11 @@ int8_t intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8_t* 
  * \param preds output buffer for 3 predictions
  * \returns (predictions are found)?1:0
  */
-void intra_filter(pixel_t *ref, int32_t stride,int32_t width, int8_t mode)
+void intra_filter(kvz_pixel *ref, int32_t stride,int32_t width, int8_t mode)
 {
   #define FWIDTH (LCU_WIDTH*2+1)
-  pixel_t filtered[FWIDTH * FWIDTH]; //!< temporary buffer for filtered samples
-  pixel_t *filteredShift = &filtered[FWIDTH+1]; //!< pointer to temporary buffer with offset (1,1)
+  kvz_pixel filtered[FWIDTH * FWIDTH]; //!< temporary buffer for filtered samples
+  kvz_pixel *filteredShift = &filtered[FWIDTH+1]; //!< pointer to temporary buffer with offset (1,1)
   int x,y;
 
   if (!mode) {
@@ -222,9 +222,9 @@ void intra_filter(pixel_t *ref, int32_t stride,int32_t width, int8_t mode)
  * \param recstride  Stride for rec pixel arrays.
  * \param dst
  */
-void intra_get_pred(const encoder_control_t * const encoder, const pixel_t *rec, const pixel_t *rec_filtered, int recstride, pixel_t *dst, int width, int mode, int is_chroma)
+void intra_get_pred(const encoder_control_t * const encoder, const kvz_pixel *rec, const kvz_pixel *rec_filtered, int recstride, kvz_pixel *dst, int width, int mode, int is_chroma)
 {
-  const pixel_t *ref_pixels = rec;
+  const kvz_pixel *ref_pixels = rec;
   if (is_chroma || mode == 1 || width == 4) {
     // For chroma, DC and 4x4 blocks, always use unfiltered reference.
   } else if (mode == 0) {
@@ -244,7 +244,7 @@ void intra_get_pred(const encoder_control_t * const encoder, const pixel_t *rec,
     intra_get_planar_pred(ref_pixels, recstride, width, dst, width);
   } else if (mode == 1) {
     int i;
-    pixel_t val = intra_get_dc_pred(ref_pixels, recstride, width);
+    kvz_pixel val = intra_get_dc_pred(ref_pixels, recstride, width);
     for (i = 0; i < width * width; i++) {
       dst[i] = val;
     }
@@ -271,11 +271,11 @@ void intra_get_pred(const encoder_control_t * const encoder, const pixel_t *rec,
  * \param chroma chroma-block flag
 
 */
-void intra_recon(const encoder_control_t * const encoder, pixel_t* rec, int32_t recstride, uint32_t width, pixel_t* dst, int32_t dststride, int8_t mode, int8_t chroma)
+void intra_recon(const encoder_control_t * const encoder, kvz_pixel* rec, int32_t recstride, uint32_t width, kvz_pixel* dst, int32_t dststride, int8_t mode, int8_t chroma)
 {
-  pixel_t pred[LCU_WIDTH * LCU_WIDTH];
-  pixel_t rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-  pixel_t *recf = &rec_filtered_temp[recstride + 1];
+  kvz_pixel pred[LCU_WIDTH * LCU_WIDTH];
+  kvz_pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
+  kvz_pixel *recf = &rec_filtered_temp[recstride + 1];
 
   // Generate filtered reference pixels.
   {
@@ -304,7 +304,7 @@ void intra_recon(const encoder_control_t * const encoder, pixel_t* rec, int32_t 
  * edge pixels filled with the reconstructed pixels.
  */
 void intra_build_reference_border(const encoder_control_t * const encoder, int32_t x_luma, int32_t y_luma, int16_t out_width,
-                                      pixel_t *dst, int32_t dst_stride, int8_t chroma,
+                                      kvz_pixel *dst, int32_t dst_stride, int8_t chroma,
                                       int32_t pic_width, int32_t pic_height,
                                       lcu_t *lcu)
 {
@@ -362,7 +362,7 @@ void intra_build_reference_border(const encoder_control_t * const encoder, int32
     { 64,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4,  4 }
   };
 
-  const pixel_t dc_val = 1 << (encoder->bitdepth - 1);
+  const kvz_pixel dc_val = 1 << (encoder->bitdepth - 1);
   const int is_chroma = chroma ? 1 : 0;
 
   // input picture pointer
@@ -377,12 +377,12 @@ void intra_build_reference_border(const encoder_control_t * const encoder, int32
 
   int x_local = (x_luma&0x3f)>>is_chroma, y_local = (y_luma&0x3f)>>is_chroma;
 
-  pixel_t *left_ref = !chroma ? &lcu->left_ref.y[1] : (chroma == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
-  pixel_t *top_ref  = !chroma ? &lcu->top_ref.y[1]  : (chroma == 1) ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
-  pixel_t *rec_ref  = !chroma ? lcu->rec.y : (chroma == 1) ? lcu->rec.u : lcu->rec.v;
+  kvz_pixel *left_ref = !chroma ? &lcu->left_ref.y[1] : (chroma == 1) ? &lcu->left_ref.u[1] : &lcu->left_ref.v[1];
+  kvz_pixel *top_ref  = !chroma ? &lcu->top_ref.y[1]  : (chroma == 1) ? &lcu->top_ref.u[1]  : &lcu->top_ref.v[1];
+  kvz_pixel *rec_ref  = !chroma ? lcu->rec.y : (chroma == 1) ? lcu->rec.u : lcu->rec.v;
 
-  pixel_t *left_border = &left_ref[y_local];
-  pixel_t *top_border = &top_ref[x_local];
+  kvz_pixel *left_border = &left_ref[y_local];
+  kvz_pixel *top_border = &top_ref[x_local];
   uint32_t left_stride = 1;
 
   if(x_local) {
@@ -399,7 +399,7 @@ void intra_build_reference_border(const encoder_control_t * const encoder, int32
     // Get the number of reference pixels based on the PU coordinate within the LCU.
     int num_ref_pixels = num_ref_pixels_left[y_in_lcu / 4][x_in_lcu / 4] >> is_chroma;
     int i;
-    pixel_t nearest_pixel;
+    kvz_pixel nearest_pixel;
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
@@ -421,7 +421,7 @@ void intra_build_reference_border(const encoder_control_t * const encoder, int32
     }
   } else {
     // If we are on the left edge, extend the first pixel of the top row.
-    pixel_t nearest_pixel = y > 0 ? top_border[0] : dc_val;
+    kvz_pixel nearest_pixel = y > 0 ? top_border[0] : dc_val;
     int i;
     for (i = 1; i < out_width - 1; i++) {
       dst[i * dst_stride] = nearest_pixel;
@@ -433,7 +433,7 @@ void intra_build_reference_border(const encoder_control_t * const encoder, int32
     // Get the number of reference pixels based on the PU coordinate within the LCU.
     int num_ref_pixels = num_ref_pixels_top[y_in_lcu / 4][x_in_lcu / 4] >> is_chroma;
     int i;
-    pixel_t nearest_pixel;
+    kvz_pixel nearest_pixel;
 
     // Max pixel we can copy from src is yy + outwidth - 1 because the dst
     // extends one pixel to the left.
@@ -452,7 +452,7 @@ void intra_build_reference_border(const encoder_control_t * const encoder, int32
     }
   } else {
     // Extend nearest pixel.
-    pixel_t nearest_pixel = x > 0 ? left_border[0] : dc_val;
+    kvz_pixel nearest_pixel = x > 0 ? left_border[0] : dc_val;
     int i;
     for(i = 1; i < out_width; i++)
     {
@@ -484,7 +484,7 @@ const int32_t inv_ang_table[9] = {0, 4096, 1638, 910, 630, 482, 390, 315, 256}; 
  * \brief this functions constructs the angular intra prediction from border samples
  *
  */
-void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel_t* src, int32_t src_stride, pixel_t* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
+void intra_get_angular_pred(const encoder_control_t * const encoder, const kvz_pixel* src, int32_t src_stride, kvz_pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter)
 {
   int32_t k,l;
   int32_t blk_size        = width;
@@ -499,10 +499,10 @@ void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel
   int32_t inv_angle       = inv_ang_table[abs_ang];
 
   // Do angular predictions
-  pixel_t *ref_main;
-  pixel_t *ref_side;
-  pixel_t  ref_above[2 * LCU_WIDTH + 1];
-  pixel_t  ref_left[2 * LCU_WIDTH + 1];
+  kvz_pixel *ref_main;
+  kvz_pixel *ref_side;
+  kvz_pixel  ref_above[2 * LCU_WIDTH + 1];
+  kvz_pixel  ref_left[2 * LCU_WIDTH + 1];
 
   // Tell clang-analyzer that everything is ok.
   assert(width == 4 || width == 8 || width == 16 || width == 32);
@@ -564,7 +564,7 @@ void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel
         // Do linear filtering
         for (l = 0; l < blk_size; l++) {
           ref_main_index        = l + delta_int + 1;
-          dst[k * dst_stride + l] = (pixel_t) ( (minus_delta_fract * ref_main[ref_main_index]
+          dst[k * dst_stride + l] = (kvz_pixel) ( (minus_delta_fract * ref_main[ref_main_index]
                                                  + delta_fract * ref_main[ref_main_index + 1] + 16) >> 5);
         }
       } else {
@@ -578,7 +578,7 @@ void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel
 
   // Flip the block if this is the horizontal mode
   if (!mode_ver) {
-    pixel_t tmp;
+    kvz_pixel tmp;
     for (k=0;k<blk_size-1;k++) {
       for (l=k+1;l<blk_size;l++) {
         tmp                 = dst[k * dst_stride + l];
@@ -592,7 +592,7 @@ void intra_get_angular_pred(const encoder_control_t * const encoder, const pixel
 
 
 
-void intra_dc_pred_filtering(const pixel_t *src, int32_t src_stride, pixel_t *dst, int32_t dst_stride, int32_t width, int32_t height )
+void intra_dc_pred_filtering(const kvz_pixel *src, int32_t src_stride, kvz_pixel *dst, int32_t dst_stride, int32_t width, int32_t height )
 {
   int32_t x, y, dst_stride2, src_stride2;
 
@@ -619,7 +619,7 @@ void intra_dc_pred_filtering(const pixel_t *src, int32_t src_stride, pixel_t *ds
 
   This function derives the prediction samples for planar mode (intra coding).
 */
-void intra_get_planar_pred(const pixel_t* src, int32_t srcstride, uint32_t width, pixel_t* dst, int32_t dststride)
+void intra_get_planar_pred(const kvz_pixel* src, int32_t srcstride, uint32_t width, kvz_pixel* dst, int32_t dststride)
 {
   int32_t k, l, bottom_left, top_right;
   int32_t hor_pred;
@@ -651,7 +651,7 @@ void intra_get_planar_pred(const pixel_t* src, int32_t srcstride, uint32_t width
     for (l = 0; l < (int32_t)blk_size; l++) {
       hor_pred += right_column[k];
       top_row[l] += bottom_row[l];
-      dst[k * dststride + l] = (pixel_t)((hor_pred + top_row[l]) >> shift_2d);
+      dst[k * dststride + l] = (kvz_pixel)((hor_pred + top_row[l]) >> shift_2d);
     }
   }
 }
@@ -689,10 +689,10 @@ void intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth
     const uint32_t pic_height = state->tile->frame->height;
 
     // Pointers to reconstruction arrays
-    pixel_t *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+    kvz_pixel *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
-    pixel_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
-    pixel_t *rec_shift  = &rec[width * 2 + 8 + 1];
+    kvz_pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    kvz_pixel *rec_shift  = &rec[width * 2 + 8 + 1];
 
     int32_t rec_stride = LCU_WIDTH;
 
@@ -744,16 +744,16 @@ void intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int dep
     const uint32_t pic_height = state->tile->frame->height;
 
     // Pointers to reconstruction arrays
-    pixel_t *recbase_u = &lcu->rec.u[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
-    pixel_t *recbase_v = &lcu->rec.v[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
+    kvz_pixel *recbase_u = &lcu->rec.u[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
+    kvz_pixel *recbase_v = &lcu->rec.v[lcu_px.x/2 + (lcu_px.y * LCU_WIDTH)/4];
 
-    pixel_t rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
+    kvz_pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
 
     int32_t rec_stride = LCU_WIDTH;
 
     // Reconstruct chroma.
     if (!(x & 4 || y & 4)) {
-      pixel_t *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
+      kvz_pixel *rec_shift_c  = &rec[width_c * 2 + 8 + 1];
       intra_build_reference_border(encoder, x, y,(int16_t)width_c * 2 + 8, rec, (int16_t)width_c * 2 + 8, 1,
                                    pic_width/2, pic_height/2, lcu);
       intra_recon(encoder,
