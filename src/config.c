@@ -345,8 +345,11 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->trskip_enable = atobool(value);
   else if OPT("tr-depth-intra")
     cfg->tr_depth_intra = atoi(value);
-  else if OPT("me")
-    return parse_enum(value, me_names, &cfg->ime_algorithm);
+  else if OPT("me") {
+    int8_t ime_algorithm = 0;
+    if (!parse_enum(value, me_names, &ime_algorithm)) return 0;
+    cfg->ime_algorithm = ime_algorithm;
+  }
   else if OPT("subme")
     cfg->fme_level = atoi(value);
   else if OPT("sar")

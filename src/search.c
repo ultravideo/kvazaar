@@ -1036,7 +1036,7 @@ static int search_cu_inter(const encoder_state_t * const state, int x, int y, in
     temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
 #else
     switch (state->encoder_control->cfg->ime_algorithm) {
-      case IME_TZ :
+      case KVZ_IME_TZ:
         temp_cost += tz_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
         break;
 

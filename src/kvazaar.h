@@ -52,9 +52,17 @@ typedef uint16_t kvz_pixel;
 #endif
 
 /**
- * Opaque data structure representing one instance of the encoder.
+ * \brief Opaque data structure representing one instance of the encoder.
  */
 typedef struct kvz_encoder kvz_encoder;
+
+/**
+ * \brief Integer motion estimation algorithms.
+ */
+enum kvz_ime_algorithm {
+  KVZ_IME_HEXBS = 0,
+  KVZ_IME_TZ = 1,
+};
 
 /**
  * \brief GoP picture configuration.
@@ -90,7 +98,7 @@ typedef struct kvz_config
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
   int32_t tr_depth_intra; /*!< \brief Maximum transform depth for intra. */
-  int8_t  ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
+  enum kvz_ime_algorithm ime_algorithm;  /*!< \brief Integer motion estimation algorithm. */
   int32_t fme_level;      /*!< \brief Fractional pixel motion estimation level (0: disabled, 1: enabled). */
   int32_t bipred;         /*!< \brief Bi-prediction (0: disabled, 1: enabled). */
   int32_t deblock_beta;   /*!< \brief (deblocking) beta offset (div 2), range -6...6 */
@@ -110,18 +118,18 @@ typedef struct kvz_config
   int32_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
   int32_t ref_frames;     /*!< \brief number of reference frames to use */
   char * cqmfile;        /*!< \brief Pointer to custom quantization matrices filename */
-  
+
   int32_t tiles_width_count;      /*!< \brief number of tiles separation in x direction */
   int32_t tiles_height_count;      /*!< \brief number of tiles separation in y direction */
   int32_t* tiles_width_split;      /*!< \brief tiles split x coordinates (dimension: tiles_width_count) */
   int32_t* tiles_height_split;      /*!< \brief tiles split y coordinates (dimension: tiles_height_count) */
-  
+
   int wpp;
   int owf;
-  
+
   int32_t slice_count;
   int32_t* slice_addresses_in_ts;
-  
+
   int32_t threads;
   int32_t cpuid;
 
