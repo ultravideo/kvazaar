@@ -209,9 +209,9 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
     encoder->tiles_row_height = tiles_row_height =
       MALLOC(int32_t, encoder->tiles_num_tile_rows);
 
-    encoder->tiles_row_bd = tiles_row_bd =
-      MALLOC(int32_t, encoder->tiles_num_tile_columns + 1);
     encoder->tiles_col_bd = tiles_col_bd =
+      MALLOC(int32_t, encoder->tiles_num_tile_columns + 1);
+    encoder->tiles_row_bd = tiles_row_bd =
       MALLOC(int32_t, encoder->tiles_num_tile_rows + 1);
 
     encoder->tiles_ctb_addr_rs_to_ts = tiles_ctb_addr_rs_to_ts =
