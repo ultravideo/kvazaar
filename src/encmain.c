@@ -243,16 +243,23 @@ int main(int argc, char *argv[])
 
     GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
-    
+
     threadqueue_flush(encoder->threadqueue);
     // Coding finished
 
     // Print statistics of the coding
-    fprintf(stderr, " Processed %d frames, %10llu bits AVG PSNR: %2.4f %2.4f %2.4f\n", 
-            frames_done, (long long unsigned int)bitstream_length * 8,
-            psnr_sum[0] / frames_done, psnr_sum[1] / frames_done, psnr_sum[2] / frames_done);
+    fprintf(stderr, " Processed %d frames, %10llu bits",
+            frames_done,
+            (long long unsigned int)bitstream_length * 8);
+    if (frames_done > 0) {
+      fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
+              psnr_sum[0] / frames_done,
+              psnr_sum[1] / frames_done,
+              psnr_sum[2] / frames_done);
+    }
+    fprintf(stderr, "\n");
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
-    
+
     {
       double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
       double wall_time = CLOCK_T_AS_DOUBLE(encoding_end_real_time) - CLOCK_T_AS_DOUBLE(encoding_start_real_time);
