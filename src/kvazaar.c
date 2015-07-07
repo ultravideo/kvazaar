@@ -72,6 +72,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
   encoder->num_encoder_states = encoder->control->owf + 1;
   encoder->cur_state_num = 0;
+  encoder->out_state_num = 0;
   encoder->frames_started = 0;
   encoder->frames_done = 0;
   encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
@@ -141,21 +142,27 @@ static int kvazaar_encode(kvz_encoder *enc,
     return 1;
   }
 
-  // Move to the next encoder state.
-  enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
-  state = &enc->states[enc->cur_state_num];
-
   if (!state->frame_done) {
-    threadqueue_waitfor(enc->control->threadqueue, state->tqj_bitstream_written);
+    // We started encoding a frame; move to the next encoder state.
+    enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
+  }
+
+  encoder_state_t *output_state = &enc->states[enc->out_state_num];
+  if (!output_state->frame_done &&
+      (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
+
+    threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
 
     // Get stream length before taking chunks since that clears the stream.
-    if (len_out) *len_out = bitstream_tell(&state->stream) / 8;
-    if (data_out) *data_out = bitstream_take_chunks(&state->stream);
-    if (pic_out) *pic_out = image_copy_ref(state->tile->frame->rec);
+    if (len_out) *len_out = bitstream_tell(&output_state->stream) / 8;
+    if (data_out) *data_out = bitstream_take_chunks(&output_state->stream);
+    if (pic_out) *pic_out = image_copy_ref(output_state->tile->frame->rec);
 
-    state->frame_done = 1;
-    state->prepared = 0;
+    output_state->frame_done = 1;
+    output_state->prepared = 0;
     enc->frames_done += 1;
+
+    enc->out_state_num = (enc->out_state_num + 1) % (enc->num_encoder_states);
   }
 
   return 1;

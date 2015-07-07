@@ -30,7 +30,20 @@ struct kvz_encoder {
   struct encoder_control_t* control;
   struct encoder_state_t* states;
   unsigned num_encoder_states;
+
+  /**
+   * \brief Number of the current encoder state.
+   *
+   * The current state is the one that will be used for encoding the frame
+   * that is started next.
+   */
   unsigned cur_state_num;
+
+  /**
+   * \brief Number of the next encoder state to be finished.
+   */
+  unsigned out_state_num;
+
   unsigned frames_started;
   unsigned frames_done;
 

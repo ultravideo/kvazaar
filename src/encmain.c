@@ -168,8 +168,6 @@ int main(int argc, char *argv[])
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     for (;;) {
-      encoder_state_t *state = &enc->states[enc->cur_state_num];
-
       kvz_picture *img_in = NULL;
       if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames)) {
         // Try to read an input frame.
@@ -225,7 +223,13 @@ int main(int argc, char *argv[])
         bitstream_length += len_out;
 
         // Compute and print stats.
-        state = &enc->states[enc->cur_state_num];
+
+        // Number of the state that was finished is one less than
+        // enc->out_state_num.
+        encoder_state_t *state = &enc->states[
+          (enc->out_state_num + enc->num_encoder_states - 1) %
+          enc->num_encoder_states
+        ];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         encoder_compute_stats(state, recout, frame_psnr);
 
