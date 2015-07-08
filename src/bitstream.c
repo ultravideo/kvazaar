@@ -198,10 +198,7 @@ void bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
 /**
  * \brief Move data from one stream to another.
  *
- * Destination stream must be byte-aligned.
- *
- * Equivalent to bitstream_append(dst, src) followed by
- * bitstream_clear(src).
+ * Destination stream must be byte-aligned. Source stream will be cleared.
  */
 void bitstream_move(bitstream_t *const dst, bitstream_t *const src)
 {
@@ -226,27 +223,6 @@ void bitstream_move(bitstream_t *const dst, bitstream_t *const src)
 
   src->first = src->last = NULL;
   bitstream_clear(src);
-}
-
-/**
- * \brief Copy data from one stream to another.
- *
- * Destination stream must be byte-aligned.
- */
-void bitstream_append(bitstream_t *const dst, const bitstream_t *const src)
-{
-  assert(dst->cur_bit == 0);
-
-  for (const kvz_data_chunk *chunk = src->first; chunk != NULL; chunk = chunk->next) {
-    for (uint32_t i = 0; i < chunk->len; ++i) {
-      bitstream_writebyte(dst, chunk->data[i]);
-    }
-  }
-
-  // Copy the leftover bits.
-  dst->data = src->data;
-  dst->cur_bit = src->cur_bit;
-  dst->zerocount = src->zerocount;
 }
 
 /**

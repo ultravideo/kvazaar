@@ -731,14 +731,22 @@ static void add_checksum(encoder_state_t * const state)
   bitstream_align(stream);
 }
 
-static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
+/**
+ * \brief Move child state bitstreams to the parent stream.
+ */
+static void encoder_state_write_bitstream_children(encoder_state_t * const state)
+{
+  for (int i = 0; state->children[i].encoder_control; ++i) {
+    encoder_state_write_bitstream(&state->children[i]);
+    bitstream_move(&state->stream, &state->children[i].stream);
+  }
+}
+
+static void encoder_state_write_bitstream_main(encoder_state_t * const state)
+{
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
-  uint64_t curpos;
-  uint64_t newpos;
-  int i;
-  
-  curpos = bitstream_tell(stream);
+  uint64_t curpos = bitstream_tell(stream);
 
   // The first NAL unit of the access unit must use a long start code.
   bool first_nal_in_au = true;
@@ -784,10 +792,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
 
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
-  for (i = 0; state->children[i].encoder_control; ++i) {
-    // Move bitstream to main stream
-    bitstream_move(&state->stream, &state->children[i].stream);
-  }
+    encoder_state_write_bitstream_children(state);
     PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
@@ -799,7 +804,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   }
   
   //Get bitstream length for stats
-  newpos = bitstream_tell(stream);
+  uint64_t newpos = bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
 
   if (state->global->frame > 0) {
@@ -815,7 +820,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state) {
   state->global->cur_gop_bits_coded += newpos - curpos;
 }
 
-void encoder_state_write_bitstream_leaf(encoder_state_t * const state) {
+void encoder_state_write_bitstream_leaf(encoder_state_t * const state)
+{
   const encoder_control_t * const encoder = state->encoder_control;
   //Write terminator of the leaf
   assert(state->is_leaf);
@@ -839,38 +845,26 @@ void encoder_state_write_bitstream_leaf(encoder_state_t * const state) {
   }
 }
 
-
-void encoder_state_worker_write_bitstream_leaf(void * opaque) {
+void encoder_state_worker_write_bitstream_leaf(void * opaque)
+{
   encoder_state_write_bitstream_leaf((encoder_state_t *) opaque);
 }
 
-static void encoder_state_write_bitstream_tile(encoder_state_t * const state) {
-  //If it's not a leaf, a tile is "nothing". We only have to write sub elements
-  for (int i = 0; state->children[i].encoder_control; ++i) {
-    // Cannot move here because the lengths of the leaf streams will be
-    // needed when writing the slice header.
-    bitstream_append(&state->stream, &state->children[i].stream);
-  }
+static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
+{
+  encoder_state_write_bitstream_children(state);
 }
 
-static void encoder_state_write_bitstream_slice(encoder_state_t * const state) {
+static void encoder_state_write_bitstream_slice(encoder_state_t * const state)
+{
   encoder_state_write_bitstream_slice_header(state);
   bitstream_align(&state->stream);
-
-  // Move child state bitstreams to the main stream.
-  for (int i = 0; state->children[i].encoder_control; ++i) {
-    bitstream_move(&state->stream, &state->children[i].stream);
-  }
+  encoder_state_write_bitstream_children(state);
 }
 
-
-void encoder_state_write_bitstream(encoder_state_t * const state) {
+void encoder_state_write_bitstream(encoder_state_t * const state)
+{
   if (!state->is_leaf) {
-    for (int i = 0; state->children[i].encoder_control; ++i) {
-      encoder_state_t *sub_state = &(state->children[i]);
-      encoder_state_write_bitstream(sub_state);
-    }
-
     switch (state->type) {
       case ENCODER_STATE_TYPE_MAIN:
         encoder_state_write_bitstream_main(state);
@@ -888,7 +882,7 @@ void encoder_state_write_bitstream(encoder_state_t * const state) {
   }
 }
 
-void encoder_state_worker_write_bitstream(void * opaque) {
+void encoder_state_worker_write_bitstream(void * opaque)
+{
   encoder_state_write_bitstream((encoder_state_t *) opaque);
 }
-
