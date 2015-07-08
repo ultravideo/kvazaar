@@ -182,20 +182,22 @@ typedef struct {
 // CPUID adapters for different compilers.
 #  if defined(__GNUC__)
 #include <cpuid.h>
-static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info) {
-  return __get_cpuid(level, &cpu_info->eax, &cpu_info->ebx, &cpu_info->ecx, &cpu_info->edx);
+static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info) {
+  if (__get_cpuid_max(level & 0x80000000, NULL) < level) return 0;
+  __cpuid_count(level, sublevel, cpu_info->eax, cpu_info->ebx, cpu_info->ecx, cpu_info->edx);
+  return 1;
 }
 #  elif defined(_MSC_VER)
 #include <intrin.h>
-static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info) {
+static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info) {
   int vendor_info[4] = { 0, 0, 0, 0 };
-  __cpuid(vendor_info, 0);
+  __cpuidex(vendor_info, 0, 0);
 
   // Check highest supported function.
   if (level > vendor_info[0]) return 0;
   
   int ms_cpu_info[4] = { cpu_info->eax, cpu_info->ebx, cpu_info->ecx, cpu_info->edx };
-  __cpuid(ms_cpu_info, level);
+  __cpuidex(ms_cpu_info, level, sublevel);
   cpu_info->eax = ms_cpu_info[0];
   cpu_info->ebx = ms_cpu_info[1];
   cpu_info->ecx = ms_cpu_info[2];
@@ -204,7 +206,7 @@ static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info) {
   return 1;
 }
 #  else
-static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info)
+static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info)
 {
   return 0;
 }
@@ -282,7 +284,7 @@ static void set_hardware_flags(int32_t cpuid) {
     };
 
     // Dig CPU features with cpuid
-    get_cpuid(1, &cpuid1);
+    get_cpuid(1, 0, &cpuid1);
     
     // EDX
     if (cpuid1.edx & CPUID1_EDX_MMX)   g_hardware_flags.intel_flags.mmx = 1;
@@ -316,7 +318,7 @@ static void set_hardware_flags(int32_t cpuid) {
 
       if (g_hardware_flags.intel_flags.avx) {
         cpuid_t cpuid7 = { 0, 0, 0, 0 };
-        get_cpuid(7, &cpuid7);
+        get_cpuid(7, 0, &cpuid7);
         if (cpuid7.ebx & CPUID7_EBX_AVX2)  g_hardware_flags.intel_flags.avx2 = 1;
       }
     }
