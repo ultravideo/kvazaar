@@ -172,31 +172,44 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
 
 #if COMPILE_INTEL
 
-#if defined(__GNUC__)
+typedef struct {
+  unsigned int eax;
+  unsigned int ebx;
+  unsigned int ecx;
+  unsigned int edx;
+} cpuid_t;
+
+// CPUID adapters for different compilers.
+#  if defined(__GNUC__)
 #include <cpuid.h>
-static INLINE int get_cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx) {
-  return __get_cpuid(level, eax, ebx, ecx, edx);
+static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info) {
+  return __get_cpuid(level, &cpu_info->eax, &cpu_info->ebx, &cpu_info->ecx, &cpu_info->edx);
 }
-#else
+#  elif defined(_MSC_VER)
 #include <intrin.h>
-//Adapter from __cpuid (VS) to __get_cpuid (GNU C).
-static INLINE int get_cpuid(unsigned int level, unsigned int *eax, unsigned int *ebx, unsigned int *ecx, unsigned int *edx) {
-  int CPUInfo[4] = {*eax, *ebx, *ecx, *edx};
-  __cpuid(CPUInfo, 0);
-  // check if the CPU supports the cpuid instruction.
-  if (CPUInfo[0] != 0) {
-    __cpuid(CPUInfo, level);
-    *eax = CPUInfo[0];
-    *ebx = CPUInfo[1];
-    *ecx = CPUInfo[2];
-    *edx = CPUInfo[3];
-    return 1;
-  }
+static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info) {
+  int vendor_info[4] = { 0, 0, 0, 0 };
+  __cpuid(vendor_info, 0);
+
+  // Check highest supported function.
+  if (level > vendor_info[0]) return 0;
+  
+  int ms_cpu_info[4] = { cpu_info->eax, cpu_info->ebx, cpu_info->ecx, cpu_info->edx };
+  __cpuid(ms_cpu_info, level);
+  cpu_info->eax = ms_cpu_info[0];
+  cpu_info->ebx = ms_cpu_info[1];
+  cpu_info->ecx = ms_cpu_info[2];
+  cpu_info->edx = ms_cpu_info[3];
+
+  return 1;
+}
+#  else
+static INLINE int get_cpuid(unsigned int level, cpuid_t *cpu_info)
+{
   return 0;
 }
-#endif //defined(__GNUC__)
-
-#endif
+#  endif
+#endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
 #include <unistd.h>
@@ -244,54 +257,68 @@ static void set_hardware_flags(int32_t cpuid) {
 
 #if COMPILE_INTEL
   if (cpuid) {
-    unsigned int eax = 0, ebx = 0, ecx = 0, edx =0;
+    cpuid_t cpuid1 = { 0, 0, 0, 0 };
     /* CPU feature bits */
-    enum { BIT_SSE3 = 0, BIT_SSSE3 = 9, BIT_SSE41 = 19, BIT_SSE42 = 20,
-           BIT_MMX = 24, BIT_SSE = 25, BIT_SSE2 = 26,
-           BIT_OSXSAVE = 27, BIT_AVX = 28};
-    enum { XCR0_XMM = 1, XCR0_YMM = 2 };
+    enum {
+      CPUID1_EDX_MMX = 1 << 23,
+      CPUID1_EDX_SSE = 1 << 25,
+      CPUID1_EDX_SSE2 = 1 << 26,
+    };
+    enum {
+      CPUID1_ECX_SSE3 = 1 << 0,
+      CPUID1_ECX_SSSE3 = 1 << 9,
+      CPUID1_ECX_SSE41 = 1 << 19,
+      CPUID1_ECX_SSE42 = 1 << 20,
+      CPUID1_ECX_XSAVE = 1 << 26,
+      CPUID1_ECX_OSXSAVE = 1 << 27,
+      CPUID1_ECX_AVX = 1 << 28,
+    };
+    enum {
+      CPUID7_EBX_AVX2 = 1 << 5,
+    };
+    enum {
+      XGETBV_XCR0_XMM = 1 << 1,
+      XGETBV_XCR0_YMM = 1 << 2,
+    };
 
     // Dig CPU features with cpuid
-    get_cpuid(1, &eax, &ebx, &ecx, &edx);
+    get_cpuid(1, &cpuid1);
     
     // EDX
-    if (edx & (1<<BIT_MMX))   g_hardware_flags.intel_flags.mmx = 1;
-    if (edx & (1<<BIT_SSE))   g_hardware_flags.intel_flags.sse = 1;
-    if (edx & (1<<BIT_SSE2))  g_hardware_flags.intel_flags.sse2 = 1;
+    if (cpuid1.edx & CPUID1_EDX_MMX)   g_hardware_flags.intel_flags.mmx = 1;
+    if (cpuid1.edx & CPUID1_EDX_SSE)   g_hardware_flags.intel_flags.sse = 1;
+    if (cpuid1.edx & CPUID1_EDX_SSE2)  g_hardware_flags.intel_flags.sse2 = 1;
     // ECX
-    if (ecx & (1<<BIT_SSE3))  g_hardware_flags.intel_flags.sse3 = 1;;
-    if (ecx & (1<<BIT_SSSE3)) g_hardware_flags.intel_flags.ssse3 = 1;
-    if (ecx & (1<<BIT_SSE41)) g_hardware_flags.intel_flags.sse41 = 1;
-    if (ecx & (1<<BIT_SSE42)) g_hardware_flags.intel_flags.sse42 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE3)  g_hardware_flags.intel_flags.sse3 = 1;;
+    if (cpuid1.ecx & CPUID1_ECX_SSSE3) g_hardware_flags.intel_flags.ssse3 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE41) g_hardware_flags.intel_flags.sse41 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE42) g_hardware_flags.intel_flags.sse42 = 1;
     
-    // Check hardware and OS support for AVX.
-    if (ecx & (1 << BIT_OSXSAVE)) {
+    // Check hardware and OS support for xsave and xgetbv.
+    if (cpuid1.ecx & (CPUID1_ECX_XSAVE | CPUID1_ECX_OSXSAVE)) {
       uint64_t xcr0 = 0;
       // Use _XCR_XFEATURE_ENABLED_MASK to check if _xgetbv intrinsic is
       // supported by the compiler.
 #ifdef _XCR_XFEATURE_ENABLED_MASK
       xcr0 = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
 #elif defined(__GNUC__)
-      uint32_t geax = 0;
-      // Apparently there are some older assemblers that don't support xgetbv,
-      // so we use the byte sequence for xgetbv just in case.
-      //__asm__("xgetbv" : "=a" (geax), "=d" (gedx) : "c" (0));
-      __asm__(".byte 0x0f, 0x01, 0xd0" : "=a" (geax) : "c" (0) : "edx");
-      // edx is spillover, but we don't care about those bits.
-      xcr0 = geax;
+      unsigned eax = 0, edx = 0;
+      asm("xgetbv" : "=a"(eax), "=d"(edx) : "c" (0));
+      xcr0 = (uint64_t)edx << 32 | eax;
 #endif
-      bool avx_support = ecx & (1 << BIT_AVX) || false;
-      bool xmm_support = xcr0 & (1 << XCR0_XMM);
-      bool ymm_support = xcr0 & (1 << XCR0_YMM);
+      bool avx_support = cpuid1.ecx & CPUID1_ECX_AVX || false;
+      bool xmm_support = xcr0 & XGETBV_XCR0_XMM || false;
+      bool ymm_support = xcr0 & XGETBV_XCR0_YMM || false;
 
       if (avx_support && xmm_support && ymm_support) {
         g_hardware_flags.intel_flags.avx = 1;
       }
-    }
 
-    if (g_hardware_flags.intel_flags.avx) {
-      get_cpuid(7, &eax, &ebx, &ecx, &edx);
-      if (ebx & (1 << 5))  g_hardware_flags.intel_flags.avx2 = 1;
+      if (g_hardware_flags.intel_flags.avx) {
+        cpuid_t cpuid7 = { 0, 0, 0, 0 };
+        get_cpuid(7, &cpuid7);
+        if (cpuid7.ebx & CPUID7_EBX_AVX2)  g_hardware_flags.intel_flags.avx2 = 1;
+      }
     }
   }
 
