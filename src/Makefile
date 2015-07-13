@@ -34,9 +34,10 @@ WARNINGS = -Wall -Wtype-limits -Wvla
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
 ASFLAGS += $(INCLUDEDIRS)
-CFLAGS += -O2 -g -Werror -ftree-vectorize -fpic -std=gnu99
+CFLAGS += -O2 -g -Werror -ftree-vectorize -fpic -fvisibility=hidden -std=gnu99
+CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
-LDFLAGS += -lm -pthread
+LDFLAGS += -fvisibility=hidden -lm -pthread
 
 ifeq (, $(ARCH))
   ARCH = $(shell uname -m)

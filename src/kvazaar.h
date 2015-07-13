@@ -34,6 +34,18 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+  #ifdef KVZ_DLL_EXPORTS
+    #define KVZ_PUBLIC __declspec(dllexport)
+  #else
+    #define KVZ_PUBLIC __declspec(dllimport)
+  #endif
+#elif defined(__GNUC__)
+  #define KVZ_PUBLIC __attribute__ ((visibility ("default")))
+#else
+  #define KVZ_PUBLIC
+#endif
+
 /**
  * Maximum length of a GoP structure.
  */
@@ -224,7 +236,8 @@ typedef struct kvz_api {
 #define KVZ_API_CONCAT(func, version) func ## _apiv ## version
 #define KVZ_API_EXPAND_VERSION(func, version) KVZ_API_CONCAT(func, version)
 #define kvz_api_get KVZ_API_EXPAND_VERSION(kvz_api_get, KVZ_API_VERSION)
-const kvz_api* kvz_api_get(int bit_depth);
+
+KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
 
 #ifdef __cplusplus
 }

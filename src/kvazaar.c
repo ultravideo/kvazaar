@@ -168,7 +168,8 @@ static int kvazaar_encode(kvz_encoder *enc,
   return 1;
 }
 
-kvz_api kvz_8bit_api = {
+
+static const kvz_api kvz_8bit_api = {
   .config_alloc = config_alloc,
   .config_init = config_init,
   .config_destroy = config_destroy,
