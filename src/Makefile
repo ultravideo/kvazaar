@@ -8,20 +8,26 @@ INCDIR  = $(PREFIX)/include
 LIBDIR  = $(PREFIX)/lib
 DLLDIR  = $(BINDIR)
 
-PROG   = ./kvazaar
-DEBUG  = ./kvazaar_debug
-TESTS  = ./kvazaar_tests
-LIB    = ./libkvazaar.so.0.0.0
-SONAME = libkvazaar.so.0
-DLL    = ./kvazaar.dll
-IMPLIB = ./libkvazaar.dll.a
-INC    = ./kvazaar.h \
-         ./kvazaar_version.h
+# Library version number
+VER_MAJOR = 0
+VER_MINOR = 0
+VER_RELEASE = 0
+
+PROG   = kvazaar
+DEBUG  = kvazaar_debug
+TESTS  = kvazaar_tests
+SO     = libkvazaar.so
+LIB    = $(SO).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE)
+DLL    = kvazaar.dll
+IMPLIB = libkvazaar.dll.a
+INC    = kvazaar.h \
+         kvazaar_version.h
 
 # Compilers and other tools
 AS = yasm
 LD = gcc
 INSTALL = install
+LN_S = ln -s
 
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
 WARNINGS = -Wall -Wtype-limits -Wvla
@@ -212,7 +218,7 @@ $(PROG): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
 $(LIB): $(RELEASE_OBJS)
-	$(LD) $^ $(LDFLAGS) -shared -Wl,-soname,$(SONAME) -o $@
+	$(LD) $^ $(LDFLAGS) -shared -Wl,-soname,$(SO).$(VER_MAJOR) -o $@
 
 $(DLL): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) -shared -Wl,--out-implib,$(IMPLIB) -o $@
@@ -248,6 +254,8 @@ install-lib: $(LIB)
 	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
 	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
 	$(INSTALL) -m644 $(LIB) -t $(DESTDIR)$(LIBDIR)
+	$(LN_S) -f -T $(LIB) $(DESTDIR)$(LIBDIR)/$(SO).$(VER_MAJOR)
+	$(LN_S) -f -T $(LIB) $(DESTDIR)$(LIBDIR)/$(SO)
 
 install-dll: $(DLL)
 	$(INSTALL) -d $(DESTDIR)$(DLLDIR)
