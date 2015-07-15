@@ -210,7 +210,7 @@ debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
 debug: $(DEBUG)
 
 tests: build_tests
-	$(TESTS)
+	./$(TESTS)
 
 build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 build_tests: init_submodules $(TESTS)
