@@ -460,17 +460,27 @@ int config_validate(const kvz_config *const cfg)
   int error = 0;
 
   if (cfg->width <= 0) {
-    fprintf(stderr, "Input error: width is not positive\n");
+    fprintf(stderr, "Input error: width must be positive\n");
+    error = 1;
+  }
+
+  if (cfg->height <= 0) {
+    fprintf(stderr, "Input error: height must be positive\n");
+    error = 1;
+  }
+
+  if (cfg->width % 2 != 0) {
+    fprintf(stderr, "Input error: width must be a multiple of two\n");
+    error = 1;
+  }
+
+  if (cfg->height % 2 != 0) {
+    fprintf(stderr, "Input error: height must be a multiple of two\n");
     error = 1;
   }
 
   if (cfg->framerate <= 0.0) {
     fprintf(stderr, "Input error: --input-fps must be positive\n");
-    error = 1;
-  }
-
-  if (cfg->height <= 0) {
-    fprintf(stderr, "Input error: height is not positive\n");
     error = 1;
   }
 
