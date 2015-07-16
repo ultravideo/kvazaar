@@ -43,7 +43,6 @@
 #include "sao.h"
 #include "rdo.h"
 #include "rate_control.h"
-#include "yuv_io.h"
 
 int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -945,20 +944,12 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 }
 
 
-void encoder_compute_stats(encoder_state_t *state, FILE * const recout, double frame_psnr[3])
+void encoder_compute_stats(encoder_state_t *state, double frame_psnr[3])
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
   //Blocking call
   threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
-  
-  if (recout) {
-    yuv_io_write(recout,
-                 state->tile->frame->rec,
-                 encoder->in.real_width,
-                 encoder->in.real_height);
-  }
-  
   videoframe_compute_psnr(state->tile->frame, frame_psnr);
 }
 
