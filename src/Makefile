@@ -33,7 +33,8 @@ LN_S = ln -s
 WARNINGS = -Wall -Wtype-limits -Wvla
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
-ASFLAGS += $(INCLUDEDIRS)
+# nasm requires trailing slashes in include directories
+ASFLAGS += $(patsubst %,%/,$(INCLUDEDIRS))
 CFLAGS += -O2 -g -Werror -ftree-vectorize -fpic -fvisibility=hidden -std=gnu99
 CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
