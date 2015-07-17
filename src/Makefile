@@ -16,9 +16,11 @@ VER_RELEASE = 0
 PROG   = kvazaar
 DEBUG  = kvazaar_debug
 TESTS  = kvazaar_tests
-SO     = libkvazaar.so
+
+NAME   = libkvazaar
+SO     = $(NAME).so
 LIB    = $(SO).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE)
-DYLIB  = libkvazaar.dylib
+DYLIB  = $(NAME).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE).dylib
 DLL    = kvazaar.dll
 IMPLIB = libkvazaar.dll.a
 INC    = kvazaar.h \
@@ -87,7 +89,7 @@ else ifeq ($(SYSTEM), Darwin)
   endif
   ASFLAGS += -DPREFIX
   ALL_TARGETS = $(PROG) $(DYLIB)
-  INSTALL_TARGETS = install-prog
+  INSTALL_TARGETS = install-prog install-dylib
 
 # Default to Linux/elf specific flags
 else
@@ -262,6 +264,14 @@ install-lib: $(LIB)
 	$(INSTALL) -m644 $(LIB) $(DESTDIR)$(LIBDIR)
 	$(LN_S) -f -T $(LIB) $(DESTDIR)$(LIBDIR)/$(SO).$(VER_MAJOR)
 	$(LN_S) -f -T $(LIB) $(DESTDIR)$(LIBDIR)/$(SO)
+
+install-dylib: $(DYLIB)
+	$(INSTALL) -d $(DESTDIR)$(INCDIR)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(INC) $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(DYLIB) $(DESTDIR)$(LIBDIR)
+	$(LN_S) -f $(DYLIB) $(DESTDIR)$(LIBDIR)/$(NAME).$(VER_MAJOR).dylib
+	$(LN_S) -f $(DYLIB) $(DESTDIR)$(LIBDIR)/$(NAME).dylib
 
 install-dll: $(DLL)
 	$(INSTALL) -d $(DESTDIR)$(DLLDIR)
