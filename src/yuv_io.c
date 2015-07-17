@@ -85,6 +85,9 @@ int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,
                 kvz_picture *img_out)
 {
+  assert(input_width % 2 == 0);
+  assert(input_height % 2 == 0);
+
   const unsigned y_size = input_width * input_height;
   const unsigned uv_input_width  = input_width  / 2;
   const unsigned uv_input_height = input_height / 2;
