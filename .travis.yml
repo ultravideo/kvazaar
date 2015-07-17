@@ -53,6 +53,9 @@ matrix:
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=1 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
 
+    # Tests trying to use invalid input dimensions
+    - env: EXPECTED_STATUS=1 PARAMS="-i kvazaar --input-res=1x65 -o /dev/null"
+
 before_install:
   # Work around a weird bug in Travis-ci, where compiler is set wrong.
   - if [ "$CC" = "[gcc]" ]; then export CC=gcc; gcc --version; fi
