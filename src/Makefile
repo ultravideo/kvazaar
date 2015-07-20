@@ -20,7 +20,7 @@ TESTS  = kvazaar_tests
 NAME   = libkvazaar
 SO     = $(NAME).so
 LIB    = $(SO).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE)
-DYLIB  = $(NAME).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE).dylib
+DYLIB  = $(NAME).$(VER_MAJOR).dylib
 DLL    = kvazaar.dll
 IMPLIB = libkvazaar.dll.a
 INC    = kvazaar.h \
@@ -273,7 +273,6 @@ install-dylib: $(DYLIB)
 	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
 	$(INSTALL) -m644 $(INC) $(DESTDIR)$(INCDIR)
 	$(INSTALL) -m644 $(DYLIB) $(DESTDIR)$(LIBDIR)
-	$(LN_S) -f $(DYLIB) $(DESTDIR)$(LIBDIR)/$(NAME).$(VER_MAJOR).dylib
 	$(LN_S) -f $(DYLIB) $(DESTDIR)$(LIBDIR)/$(NAME).dylib
 
 install-dll: $(DLL)
