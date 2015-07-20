@@ -1,20 +1,13 @@
 language: c
 
-#os:
-# - linux
-# - osx
-
-compiler:
-  - gcc
-
 env:
   global:
-  - USE_YASM=1
-  - TEST_FRAMES=10
-  - TEST_DIM=264x130
+  - AS=nasm
   - KVZ_DISABLE_AVX2=1
+  - TEST_DIM=264x130
+  - TEST_FRAMES=10
 
-sudo: required
+sudo: false
 
 matrix:
   fast_finish: true
@@ -22,10 +15,11 @@ matrix:
   include:
     - compiler: clang
       env: KVZ_DISABLE_AVX2=""
-    - env: USE_NEW_GCC=1 KVZ_DISABLE_AVX2=""
+    - compiler: gcc-4.8
+      env: KVZ_DISABLE_AVX2=""
     
     # These valgrind tests are slow, so they are performed with the minimum
-    # number of small frames and fast settings. 
+    # number of small frames and fast settings.
     
     # Tests for owf, wpp and tiles. There is lots of separate branches of
     # code related to owf=0 and owf!=0, which is why all permutations are
@@ -56,9 +50,17 @@ matrix:
     # Tests trying to use invalid input dimensions
     - env: EXPECTED_STATUS=1 PARAMS="-i kvazaar --input-res=1x65 -o /dev/null"
 
-before_install:
-  # Work around a weird bug in Travis-ci, where compiler is set wrong.
-  - if [ "$CC" = "[gcc]" ]; then export CC=gcc; gcc --version; fi
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+
+    packages:
+    - gcc
+    - gcc-4.8
+    - nasm
+    - p7zip-full
+    - valgrind
 
 install:
   - source .travis-install.sh
