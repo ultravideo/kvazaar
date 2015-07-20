@@ -231,7 +231,10 @@ $(PROG): $(RELEASE_OBJS)
 
 $(LIB):   LDFLAGS += -shared -Wl,-soname,$(SO).$(VER_MAJOR)
 $(DLL):   LDFLAGS += -shared -Wl,--out-implib,$(IMPLIB) -o $@
-$(DYLIB): LDFLAGS += -dynamiclib -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE)
+$(DYLIB): LDFLAGS += -dynamiclib \
+                     -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE) \
+                     -compatibility_version $(VER_MAJOR) \
+                     -install_name $(LIBDIR)/$@
 $(LIB) $(DLL) $(DYLIB): $(OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
