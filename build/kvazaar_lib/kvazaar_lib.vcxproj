@@ -150,6 +150,8 @@
     <ClCompile Include="..\..\src\sao.c" />
     <ClCompile Include="..\..\src\scalinglist.c" />
     <ClCompile Include="..\..\src\search.c" />
+    <ClCompile Include="..\..\src\search_inter.c" />
+    <ClCompile Include="..\..\src\search_intra.c" />
     <ClCompile Include="..\..\src\yuv_io.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
     <ClInclude Include="..\..\src\cli.h" />
@@ -195,6 +197,8 @@
     <ClCompile Include="..\..\src\threadqueue.c" />
     <ClCompile Include="..\..\src\transform.c" />
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
+    <ClInclude Include="..\..\src\search_inter.h" />
+    <ClInclude Include="..\..\src\search_intra.h" />
     <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <ItemGroup>
