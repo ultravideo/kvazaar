@@ -35,45 +35,6 @@
 #define SEARCH_MV_FULL_RADIUS 0
 
 
-/**
- * This is used in the hexagon_search to select 3 points to search.
- *
- * The start of the hexagonal pattern has been repeated at the end so that
- * the indices between 1-6 can be used as the start of a 3-point list of new
- * points to search.
- *
- *   6 o-o 1 / 7
- *    /   \
- * 5 o  0  o 2 / 8
- *    \   /
- *   4 o-o 3
- */
-const vector2d_t large_hexbs[10] = {
-  { 0, 0 },
-  { 1, -2 }, { 2, 0 }, { 1, 2 }, { -1, 2 }, { -2, 0 }, { -1, -2 },
-  { 1, -2 }, { 2, 0 }
-};
-
-/**
- * This is used as the last step of the hexagon search.
- */
-const vector2d_t small_hexbs[5] = {
-  { 0, 0 },
-  { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
-};
-
-/*
- *  6 7 8
- *  3 4 5
- *  0 1 2
- */
-const vector2d_t square[9] = {
-  { -1, 1 },
-  { 0, 1 }, { 1, 1 }, { -1, 0 }, { 0, 0 }, { 1, 0 }, { -1, -1 },
-  { 0, -1 }, { 1, -1 }
-};
-
-
 static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 {
   int32_t num_bins = 0;
@@ -540,6 +501,29 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
                                int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
+  // The start of the hexagonal pattern has been repeated at the end so that
+  // the indices between 1-6 can be used as the start of a 3-point list of new
+  // points to search.
+  //   6--1,7
+  //  /     \    =)
+  // 5   0  2,8
+  //  \     /
+  //   4---3
+  static const vector2d_t large_hexbs[10] = {
+      { 0, 0 },
+      { 1, -2 }, { 2, 0 }, { 1, 2 }, { -1, 2 }, { -2, 0 }, { -1, -2 },
+      { 1, -2 }, { 2, 0 }
+  };
+  // This is used as the last step of the hexagon search.
+  //   1
+  // 2 0 3
+  //   4
+  // TODO: Fix this pattern, it's wrong.
+  static const vector2d_t small_hexbs[5] = {
+      { 0, 0 },
+      { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
+  };
+
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
@@ -805,6 +789,15 @@ static unsigned search_frac(const encoder_state_t * const state,
                             int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                             int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
+  // Map indexes to relative coordinates in the following way:
+  // 6 7 8
+  // 3 4 5
+  // 0 1 2
+  static const vector2d_t square[9] = {
+      { -1, 1 },  { 0, 1 },  { 1, 1 },
+      { -1, 0 },  { 0, 0 },  { 1, 0 },
+      { -1, -1 }, { 0, -1 }, { 1, -1 }
+  };
 
   //Set mv to halfpel precision
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
