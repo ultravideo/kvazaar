@@ -29,17 +29,10 @@
 #include <string.h>
 #include <assert.h>
 
-#include "config.h"
-#include "bitstream.h"
-#include "image.h"
-#include "strategies/strategies-picture.h"
-#include "strategies/strategies-ipol.h"
 #include "intra.h"
 #include "inter.h"
-#include "filter.h"
 #include "rdo.h"
 #include "transform.h"
-#include "encoder.h"
 #include "search_inter.h"
 #include "search_intra.h"
 
