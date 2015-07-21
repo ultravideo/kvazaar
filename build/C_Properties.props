@@ -12,7 +12,7 @@
       <WarningLevel>Level4</WarningLevel>
       <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <PreprocessorDefinitions>KVZ_COMPILE_ASM;WIN32_LEAN_AND_MEAN;WIN32;WIN64;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>KVZ_DLL_EXPORTS;KVZ_COMPILE_ASM;WIN32_LEAN_AND_MEAN;WIN32;WIN64;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4244;4204;4206;4028;4152</DisableSpecificWarnings>
       <OpenMPSupport>false</OpenMPSupport>
