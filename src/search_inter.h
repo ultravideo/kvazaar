@@ -27,4 +27,8 @@
 
 #include "global.h"
 
+#include "encoderstate.h"
+
+int search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu);
+
 #endif // SEARCH_INTER_H_
