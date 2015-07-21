@@ -518,10 +518,9 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   //   1
   // 2 0 3
   //   4
-  // TODO: Fix this pattern, it's wrong.
   static const vector2d_t small_hexbs[5] = {
       { 0, 0 },
-      { -1, -1 }, { -1, 0 }, { 1, 0 }, { 1, 1 }
+      { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 }
   };
 
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
