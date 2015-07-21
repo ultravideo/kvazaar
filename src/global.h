@@ -58,40 +58,52 @@ typedef int16_t coeff_t;
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
 
-// Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
+//! Limits for prediction block sizes. 0 = 64x64, 4 = 4x4.
 #define PU_DEPTH_INTER_MIN 0
 #define PU_DEPTH_INTER_MAX 3
 #define PU_DEPTH_INTRA_MIN 0
 #define PU_DEPTH_INTRA_MAX 4
 
-// Maximum number of layers in GOP structure (for allocating structures)
+//! Maximum number of layers in GOP structure (for allocating structures)
 #define MAX_GOP_LAYERS 6
 
-// Maximum CU depth when descending form LCU level.
-#define MAX_DEPTH 3  /*!< spec: log2_diff_max_min_luma_coding_block_size */
-// Minimum log2 size of CUs.
-#define MIN_SIZE 3   /*!< spec: MinCbLog2SizeY */
-// Minimum log2 size of PUs.
-#define MAX_PU_DEPTH 4 /*!< Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu() */
+//! Maximum CU depth when descending form LCU level.
+//! spec: log2_diff_max_min_luma_coding_block_size
+#define MAX_DEPTH 3
+//! Minimum log2 size of CUs.
+//! spec: MinCbLog2SizeY
+#define MIN_SIZE 3
+//! Minimum log2 size of PUs.
+//! Search is started at depth 0 and goes in Z-order to MAX_PU_DEPTH, see search_cu()
+#define MAX_PU_DEPTH 4
 
-// Minimum log2 transform sizes.
-#define TR_DEPTH_INTER 2 /*!< spec: max_transform_hierarchy_depth_inter */
+//! Minimum log2 transform sizes.
+//! spec: max_transform_hierarchy_depth_inter
+#define TR_DEPTH_INTER 2
 
-#define ENABLE_PCM 0 /*!< spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM) */
+//! spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM)
+#define ENABLE_PCM 0
 
-#define ENABLE_TEMPORAL_MVP 0 /*!< Enable usage of temporal Motion Vector Prediction */
+//! Enable usage of temporal Motion Vector Prediction
+#define ENABLE_TEMPORAL_MVP 0
 
-#define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0 /*!< skip residual coding when it's under _some_ threshold */
+//! skip residual coding when it's under _some_ threshold
+#define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0
 
 /* END OF CONFIG VARIABLES */
 
-#define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE) /*!< pow(2, MIN_SIZE) */
-#define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH)) /*!< spec: CtbSizeY */
-#define LCU_WIDTH_C (LCU_WIDTH / 2) /*!< spec: CtbWidthC and CtbHeightC */
+//! pow(2, MIN_SIZE)
+#define CU_MIN_SIZE_PIXELS (1 << MIN_SIZE)
+//! spec: CtbSizeY
+#define LCU_WIDTH (1 << (MIN_SIZE + MAX_DEPTH))
+//! spec: CtbWidthC and CtbHeightC
+#define LCU_WIDTH_C (LCU_WIDTH / 2)
 
-#define TR_MAX_LOG2_SIZE 5 /*!< spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5) */
+//! spec: Log2MaxTrafoSize <= Min(CtbLog2SizeY, 5)
+#define TR_MAX_LOG2_SIZE 5
 #define TR_MAX_WIDTH (1 << TR_MAX_LOG2_SIZE)
-#define TR_MIN_LOG2_SIZE 2 /*!< spec: Log2MinTrafoSize */
+//! spec: Log2MinTrafoSize
+#define TR_MIN_LOG2_SIZE 2
 #define TR_MIN_WIDTH (1 << TR_MIN_LOG2_SIZE)
 
 #if LCU_WIDTH != 64
