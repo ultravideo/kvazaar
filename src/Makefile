@@ -148,6 +148,8 @@ OBJS = \
   sao.o \
   scalinglist.o \
   search.o \
+  search_intra.o \
+  search_inter.o \
   strategyselector.o \
   tables.o \
   threadqueue.o \
