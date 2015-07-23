@@ -962,9 +962,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   int x_local = (x&0x3f), y_local = (y&0x3f);
   int x_cu = x>>3;
   int y_cu = y>>3;
-  int cu_pos = LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH;
-
-  cu_info_t *cur_cu = &lcu->cu[cu_pos];
+  cu_info_t *cur_cu = LCU_GET_CU(lcu, x_local >> 3, y_local >> 3);
 
   int16_t mv_cand[2][2];
   // Search for merge mode candidate

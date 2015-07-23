@@ -175,6 +175,27 @@ typedef struct {
   cu_info_t cu[9*9+1];
 } lcu_t;
 
+/**
+ * \brief Return pointer to a given CU.
+ *
+ * \param lcu   pointer to the containing LCU
+ * \param x_cu  x-index of the CU
+ * \param y_cu  y-index of the CU
+ * \return      pointer to the CU
+ */
+#define LCU_GET_CU(lcu, x_cu, y_cu) \
+  (&(lcu)->cu[LCU_CU_OFFSET + (x_cu) + (y_cu) * LCU_T_CU_WIDTH])
+
+/**
+ * \brief Return pointer to the CU containing a given pixel.
+ *
+ * \param lcu   pointer to the containing LCU
+ * \param x_px  x-coordinate relative to the upper left corner of the LCU
+ * \param y_px  y-coordinate relative to the upper left corner of the LCU
+ * \return      pointer to the CU at coordinates (x_px, y_px)
+ */
+#define LCU_GET_CU_AT_PX(lcu, x_px, y_px) LCU_GET_CU(lcu, (x_px) >> 3, (y_px) >> 3)
+
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \
   CHECKPOINT_CU(prefix_str " cu[0]", (lcu).cu[0]); \
   CHECKPOINT_CU(prefix_str " cu[1]", (lcu).cu[1]); \

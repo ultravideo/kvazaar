@@ -82,8 +82,8 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
     int x, y;
     for (y = y_cu; y < y_cu + width_cu; ++y) {
       for (x = x_cu; x < x_cu + width_cu; ++x) {
-        const cu_info_t *from_cu = &work_tree[depth + 1].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
-        cu_info_t *to_cu = &work_tree[depth].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
+        const cu_info_t *from_cu = LCU_GET_CU(&work_tree[depth + 1], x, y);
+        cu_info_t *to_cu = LCU_GET_CU(&work_tree[depth], x, y);
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -142,8 +142,8 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
     int x, y;
     for (y = y_cu; y < y_cu + width_cu; ++y) {
       for (x = x_cu; x < x_cu + width_cu; ++x) {
-        const cu_info_t *from_cu = &work_tree[depth].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
-        cu_info_t *to_cu = &work_tree[d].cu[LCU_CU_OFFSET + x + y * LCU_T_CU_WIDTH];
+        const cu_info_t *from_cu = LCU_GET_CU(&work_tree[depth], x, y);
+        cu_info_t *to_cu = LCU_GET_CU(&work_tree[d], x, y);
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -174,7 +174,7 @@ void kvz_lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
   const vector2d_t lcu_cu = { (x_px & (LCU_WIDTH - 1)) / 8, (y_px & (LCU_WIDTH - 1)) / 8 };
-  cu_info_t *const cur_cu = &lcu->cu[lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH + LCU_CU_OFFSET];
+  cu_info_t *const cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
   int x, y;
 
   // Depth 4 doesn't go inside the loop. Set the top-left CU.
@@ -194,7 +194,7 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
   const int width_cu = LCU_CU_WIDTH >> depth;
   const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
   const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
-  cu_info_t *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
+  cu_info_t *const lcu_cu = LCU_GET_CU(lcu, 0, 0);
   int x, y;
 
   // NxN can only be applied to a single CU at a time.
@@ -231,7 +231,7 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *
   const int width_cu = LCU_CU_WIDTH >> depth;
   const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
   const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
-  cu_info_t *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
+  cu_info_t *const lcu_cu = LCU_GET_CU(lcu, 0, 0);
   int x, y;
   // Set mode in every CU covered by part_mode in this depth.
   for (y = y_cu; y < y_cu + width_cu; ++y) {
@@ -295,7 +295,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   const uint8_t pu_index = PU_INDEX(x_px / 4, y_px / 4);
 
   // cur_cu is used for TU parameters.
-  cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (x_px / 8) + (y_px / 8) * LCU_T_CU_WIDTH];
+  cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
   double coeff_bits = 0;
   double tr_tree_bits = 0;
@@ -368,7 +368,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 {
   const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
-  cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x / 4) + (lcu_px.y / 4)*LCU_T_CU_WIDTH];
+  cu_info_t *const tr_cu = LCU_GET_CU(lcu, lcu_px.x / 4, lcu_px.y / 4);
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
@@ -468,7 +468,7 @@ static double calc_mode_bits(const encoder_state_t *state,
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
   vector2d_t lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
-  const cu_info_t *cu_array = &(lcu)->cu[LCU_CU_OFFSET];
+  const cu_info_t *cu_array = LCU_GET_CU(lcu, 0, 0);
   bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) + lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
   bool condL = y >= 8 && cu_array[lcu_cu.x + (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
   return condA + condL;
@@ -506,7 +506,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     return 0;
   }
 
-  cur_cu = &(&work_tree[depth])->cu[LCU_CU_OFFSET+(x_local>>3) + (y_local>>3)*LCU_T_CU_WIDTH];
+  cur_cu = LCU_GET_CU_AT_PX(&work_tree[depth], x_local, y_local);
   // Assign correct depth
   cur_cu->depth = depth > MAX_DEPTH ? MAX_DEPTH : depth;
   cur_cu->tr_depth = depth > 0 ? depth : 1;
@@ -647,7 +647,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         && x + cu_width <= frame->width && y + cu_width <= frame->height)
     {
       vector2d_t lcu_cu = { x_local / 8, y_local / 8 };
-      cu_info_t *cu_array_d1 = &(&work_tree[depth + 1])->cu[LCU_CU_OFFSET];
+      cu_info_t *cu_array_d1 = LCU_GET_CU(&work_tree[depth + 1], 0, 0);
       cu_info_t *cu_d1 = &cu_array_d1[(lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH)];
 
       // If the best CU in depth+1 is intra and the biggest it can be, try it.
@@ -717,7 +717,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
-    cu_info_t *lcu_cu = &lcu->cu[LCU_CU_OFFSET];
+    cu_info_t *lcu_cu = LCU_GET_CU(lcu, 0, 0);
 
     // Copy top CU row.
     if (y_cu > 0) {
@@ -808,7 +808,7 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
 
     // Use top-left sub-cu of LCU as pointer to lcu->cu array to make things
     // simpler.
-    const cu_info_t *const lcu_cu = &lcu->cu[LCU_CU_OFFSET];
+    const cu_info_t *const lcu_cu = LCU_GET_CU(lcu, 0, 0);
 
     int x, y;
     for (y = 0; y < LCU_CU_WIDTH; ++y) {

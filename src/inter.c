@@ -432,7 +432,7 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
   */
   int32_t x_cu = (x & (LCU_WIDTH - 1)) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
   int32_t y_cu = (y & (LCU_WIDTH - 1)) >> MAX_DEPTH;
-  cu_info_t* cu = &lcu->cu[LCU_CU_OFFSET];
+  cu_info_t* cu = LCU_GET_CU(lcu, 0, 0);
   // A0 and A1 availability testing
   if (x != 0) {
     *a1 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
