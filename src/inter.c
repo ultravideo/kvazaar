@@ -64,6 +64,55 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
   }
 }
 
+void inter_recon_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
+{
+  int mv_frac_x = (mv_param[0] & 3);
+  int mv_frac_y = (mv_param[1] & 3);
+
+  int y, x;
+
+  #define FILTER_SIZE_Y 8 //Luma filter size
+
+  // Fractional luma 1/4-pel
+  kvz_pixel qpel_src_y[(LCU_WIDTH + FILTER_SIZE_Y) * (LCU_WIDTH + FILTER_SIZE_Y)];
+  kvz_pixel* qpel_src_off_y = &qpel_src_y[(block_width + FILTER_SIZE_Y)*(FILTER_SIZE_Y >> 1) + (FILTER_SIZE_Y >> 1)];
+
+  // Fractional luma
+  extend_borders(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
+    ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, qpel_src_y);
+  sample_quarterpel_luma_generic(state->encoder_control, qpel_src_off_y, block_width + FILTER_SIZE_Y, block_width,
+    block_width, lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
+}
+
+void inter_recon_frac_chroma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
+{
+  int mv_frac_x = (mv_param[0] & 7);
+  int mv_frac_y = (mv_param[1] & 7);
+
+  // Translate to chroma
+  xpos >>= 1;
+  ypos >>= 1;
+  block_width >>= 1;
+
+#define FILTER_SIZE_C 4 //Chroma filter size
+
+  // Fractional chroma 1/8-pel
+  kvz_pixel octpel_src[((LCU_WIDTH_C) + FILTER_SIZE_C) * ((LCU_WIDTH_C) + FILTER_SIZE_C)];
+  kvz_pixel* octpel_src_off = &octpel_src[(block_width + FILTER_SIZE_C)*(FILTER_SIZE_C >> 1) + (FILTER_SIZE_C >> 1)];
+
+  //Fractional chroma U
+  extend_borders(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+    ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, octpel_src);
+  sample_octpel_chroma_generic(state->encoder_control, octpel_src_off, block_width + FILTER_SIZE_C, block_width,
+    block_width, lcu->rec.u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+
+  //Fractional chroma V
+  extend_borders(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+    ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, octpel_src);
+  sample_octpel_chroma_generic(state->encoder_control, octpel_src_off, block_width + FILTER_SIZE_C, block_width,
+    block_width, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+}
+
 /**
  * \brief Reconstruct inter block
  * \param ref picture to copy the data from
@@ -101,57 +150,12 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
   kvz_pixel halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
 
   // Luma quarter-pel
-    int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
+  int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
 
-    if(fractional_mv) {
-      int y_off_x = (mv[0]&3);
-      int y_off_y = (mv[1]&3);
-
-      int c_off_x = (mv[0]&7);
-      int c_off_y = (mv[1]&7);
-
-      int y,x;
-
-      #define FILTER_SIZE_Y 8 //Luma filter size
-      #define FILTER_SIZE_C 4 //Chroma filter size
-
-      // Fractional luma 1/4-pel
-      kvz_pixel qpel_src_y[(LCU_WIDTH+FILTER_SIZE_Y) * (LCU_WIDTH+FILTER_SIZE_Y)];
-      kvz_pixel* qpel_src_off_y = &qpel_src_y[(width+FILTER_SIZE_Y)*(FILTER_SIZE_Y>>1)+(FILTER_SIZE_Y>>1)];
-      kvz_pixel qpel_dst_y[LCU_WIDTH*LCU_WIDTH*16];
-
-      // Fractional chroma 1/8-pel
-      int width_c = width>>1;
-      kvz_pixel octpel_src_u[((LCU_WIDTH>>1)+FILTER_SIZE_C) * ((LCU_WIDTH>>1)+FILTER_SIZE_C)];
-      kvz_pixel* octpel_src_off_u = &octpel_src_u[(width_c+FILTER_SIZE_C)*(FILTER_SIZE_C>>1)+(FILTER_SIZE_C>>1)];
-      kvz_pixel octpel_dst_u[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
-
-      kvz_pixel octpel_src_v[((LCU_WIDTH >> 1) + FILTER_SIZE_C) * ((LCU_WIDTH >> 1) + FILTER_SIZE_C)];
-      kvz_pixel* octpel_src_off_v = &octpel_src_v[(width_c + FILTER_SIZE_C)*(FILTER_SIZE_C >> 1) + (FILTER_SIZE_C >> 1)];
-      kvz_pixel octpel_dst_v[(LCU_WIDTH >> 1)*(LCU_WIDTH >> 1) * 64];
-
-      // Fractional luma
-      extend_borders(xpos, ypos, mv[0]>>2, mv[1]>>2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
-          ref->y, ref->width, ref->height, FILTER_SIZE_Y, width, width, qpel_src_y);
-      sample_quarterpel_luma_generic(state->encoder_control, qpel_src_off_y, width + FILTER_SIZE_Y, width,
-        width, lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, y_off_x, y_off_y, mv);
-
-      //Fractional chroma U
-      extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, state->tile->lcu_offset_x * (LCU_WIDTH>>1), state->tile->lcu_offset_y * (LCU_WIDTH>>1),
-          ref->u, ref->width>>1, ref->height>>1, FILTER_SIZE_C, width_c, width_c, octpel_src_u);
-
-      sample_octpel_chroma_generic(state->encoder_control, octpel_src_off_u, width_c + FILTER_SIZE_C, width_c,
-        width_c, lcu->rec.u + ((ypos >> 1) % LCU_WIDTH_C)*LCU_WIDTH_C + ((xpos >> 1) % LCU_WIDTH_C), LCU_WIDTH_C, c_off_x, c_off_y, mv);
-
-      //Fractional chroma V
-      extend_borders(xpos >> 1, ypos >> 1, (mv[0] >> 2) >> 1, (mv[1] >> 2) >> 1, state->tile->lcu_offset_x * (LCU_WIDTH_C >> 1), state->tile->lcu_offset_y * (LCU_WIDTH_C >> 1),
-        ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, width_c, width_c, octpel_src_v);
-
-      sample_octpel_chroma_generic(state->encoder_control, octpel_src_off_v, width_c + FILTER_SIZE_C, width_c,
-        width_c, lcu->rec.v + ((ypos >> 1) % LCU_WIDTH_C)*LCU_WIDTH_C + ((xpos >> 1) % LCU_WIDTH_C), LCU_WIDTH_C, c_off_x, c_off_y, mv);
-
-
-    }
+  if(fractional_mv) {
+    inter_recon_frac_luma(state, ref, xpos, ypos, width, mv_param, lcu);
+    inter_recon_frac_chroma(state, ref, xpos, ypos, width, mv_param, lcu);
+  }
 
   mv[0] >>= 2;
   mv[1] >>= 2;
@@ -323,7 +327,7 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
   kvz_pixel temp_lcu_u[32 * 32];
   kvz_pixel temp_lcu_v[32 * 32];
   int temp_x, temp_y;
-  int shift = 15 - BIT_DEPTH;
+  int shift = 15 - KVZ_BIT_DEPTH;
   int offset = 1 << (shift - 1);
 
   //Reconstruct both predictors
