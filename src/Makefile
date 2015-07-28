@@ -16,8 +16,11 @@ VER_RELEASE = 0
 PROG   = kvazaar
 DEBUG  = kvazaar_debug
 TESTS  = kvazaar_tests
-SO     = libkvazaar.so
+
+NAME   = libkvazaar
+SO     = $(NAME).so
 LIB    = $(SO).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE)
+DYLIB  = $(NAME).$(VER_MAJOR).dylib
 DLL    = kvazaar.dll
 IMPLIB = libkvazaar.dll.a
 INC    = kvazaar.h \
@@ -40,10 +43,13 @@ CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -fvisibility=hidden -lm -pthread
 
-ifeq (, $(ARCH))
-  ARCH = $(shell uname -m)
+ARCH ?= $(shell uname -m)
+
+ifneq ($(findstring Windows, $(OS)),)
+  SYSTEM ?= Windows
+else
+  SYSTEM ?= $(shell uname -s)
 endif
-SYSTEM = $(shell uname -s)
 
 # ARCH related flags
 ifeq ($(ARCH), x86_64)
@@ -62,7 +68,7 @@ CFLAGS += -m$(TARGET_CPU_BITS)
 LDFLAGS += -m$(TARGET_CPU_BITS)
 
 # Windows (cygwin/mingw) specific flags
-ifneq ( ,$(findstring Windows, $(OS)))
+ifeq ($(SYSTEM), Windows)
   ifeq ($(ARCH), x86_64)
     ASFLAGS += -f win64
     ASFLAGS += -DHAVE_ALIGNED_STACK=1
@@ -72,14 +78,20 @@ ifneq ( ,$(findstring Windows, $(OS)))
     ASFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
   CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
+  ALL_TARGETS = $(PROG) $(DLL)
+  INSTALL_TARGETS = install-prog install-dll
+
 # OS X specific flags
-else ifeq ($(SYSTEM),Darwin)
+else ifeq ($(SYSTEM), Darwin)
   ifeq ($(ARCH), x86_64)
     ASFLAGS += -f macho64
   else
     ASFLAGS += -f macho32
   endif
   ASFLAGS += -DPREFIX
+  ALL_TARGETS = $(PROG) $(DYLIB)
+  INSTALL_TARGETS = install-prog install-dylib
+
 # Default to Linux/elf specific flags
 else
   LDFLAGS += -lrt
@@ -88,7 +100,10 @@ else
   else
     ASFLAGS += -f elf32
   endif
+  ALL_TARGETS = $(PROG) $(LIB)
+  INSTALL_TARGETS = install-prog install-lib
 endif
+
 # Flags shared across systems
 ifeq ($(ARCH), x86_64)
   ASFLAGS += -DARCH_X86_64=1
@@ -202,11 +217,7 @@ TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
 DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
-ifneq ( ,$(findstring Windows, $(OS)))
-  all: $(PROG) $(DLL)
-else
-  all: $(PROG) $(LIB)
-endif
+all: $(ALL_TARGETS)
 
 debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
 debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
@@ -221,11 +232,14 @@ build_tests: init_submodules $(TESTS)
 $(PROG): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
 
-$(LIB): $(RELEASE_OBJS)
-	$(LD) $^ $(LDFLAGS) -shared -Wl,-soname,$(SO).$(VER_MAJOR) -o $@
-
-$(DLL): $(RELEASE_OBJS)
-	$(LD) $^ $(LDFLAGS) -shared -Wl,--out-implib,$(IMPLIB) -o $@
+$(LIB):   LDFLAGS += -shared -Wl,-soname,$(SO).$(VER_MAJOR)
+$(DLL):   LDFLAGS += -shared -Wl,--out-implib,$(IMPLIB) -o $@
+$(DYLIB): LDFLAGS += -dynamiclib \
+                     -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE) \
+                     -compatibility_version $(VER_MAJOR) \
+                     -install_name $(LIBDIR)/$@
+$(LIB) $(DLL) $(DYLIB): $(OBJS)
+	$(LD) $^ $(LDFLAGS) -o $@
 
 $(DEBUG): $(DEBUG_OBJS)
 	$(LD) $^ $(LDFLAGS) -o $@
@@ -243,35 +257,38 @@ init_submodules:
 	git submodule init
 	git submodule update
 
-ifneq ( ,$(findstring Windows, $(OS)))
-  install: install-prog install-dll
-else
-  install: install-prog install-lib
-endif
+install: $(INSTALL_TARGETS)
 
 install-prog: $(PROG)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m755 $(PROG) -t $(DESTDIR)$(BINDIR)
+	$(INSTALL) -m755 $(PROG) $(DESTDIR)$(BINDIR)
 
 install-lib: $(LIB)
 	$(INSTALL) -d $(DESTDIR)$(INCDIR)
 	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
-	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
-	$(INSTALL) -m644 $(LIB) -t $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(INC) $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(LIB) $(DESTDIR)$(LIBDIR)
 	$(LN_S) -f -T $(LIB) $(DESTDIR)$(LIBDIR)/$(SO).$(VER_MAJOR)
 	$(LN_S) -f -T $(LIB) $(DESTDIR)$(LIBDIR)/$(SO)
+
+install-dylib: $(DYLIB)
+	$(INSTALL) -d $(DESTDIR)$(INCDIR)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(INC) $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(DYLIB) $(DESTDIR)$(LIBDIR)
+	$(LN_S) -f $(DYLIB) $(DESTDIR)$(LIBDIR)/$(NAME).dylib
 
 install-dll: $(DLL)
 	$(INSTALL) -d $(DESTDIR)$(DLLDIR)
 	$(INSTALL) -d $(DESTDIR)$(INCDIR)
 	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
-	$(INSTALL) -m644 $(DLL) -t $(DESTDIR)$(DLLDIR)
-	$(INSTALL) -m644 $(INC) -t $(DESTDIR)$(INCDIR)
-	$(INSTALL) -m644 $(IMPLIB) -t $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(DLL) $(DESTDIR)$(DLLDIR)
+	$(INSTALL) -m644 $(INC) $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(IMPLIB) $(DESTDIR)$(LIBDIR)
 
 clean:
 	$(RM) $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
-	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB)
+	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB) $(DYLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPS)
