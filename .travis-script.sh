@@ -3,11 +3,11 @@ set -ev
 
 if [ -n "$VALGRIND_TEST" ]; then
   cd src
-  make -e debug
+  make debug
   valgrind --leak-check=full --error-exitcode=1 ./kvazaar_debug -i ../mandelbrot_${TEST_DIM}.yuv --input-res=${TEST_DIM} -o /dev/null $VALGRIND_TEST
 elif [ -n "$EXPECTED_STATUS" ]; then
   cd src
-  make -e
+  make
   set +e
   ./kvazaar $PARAMS
   EXIT_STATUS=$?
@@ -15,6 +15,6 @@ elif [ -n "$EXPECTED_STATUS" ]; then
   [ "$EXIT_STATUS" = "$EXPECTED_STATUS" ]
 else
   cd src
-  make -e
-  make -e tests
+  make
+  make tests
 fi
