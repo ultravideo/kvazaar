@@ -139,16 +139,7 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
   int8_t overflow_pos_x = (state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) + width > ref->width )?1:0;
   int8_t overflow_pos_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) + width > ref->height)?1:0;
 
-  // Chroma half-pel
-  #define HALFPEL_CHROMA_WIDTH ((LCU_WIDTH>>1) + 8)
   int8_t chroma_halfpel = ((mv[0]>>2)&1) || ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
-  kvz_pixel halfpel_src_u[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< U source block for interpolation
-  kvz_pixel halfpel_src_v[HALFPEL_CHROMA_WIDTH * HALFPEL_CHROMA_WIDTH]; //!< V source block for interpolation
-  kvz_pixel *halfpel_src_off_u = &halfpel_src_u[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_u with offset (4,4)
-  kvz_pixel *halfpel_src_off_v = &halfpel_src_v[HALFPEL_CHROMA_WIDTH * 4 + 4]; //!< halfpel_src_v with offset (4,4)
-  kvz_pixel halfpel_u[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (u)
-  kvz_pixel halfpel_v[LCU_WIDTH * LCU_WIDTH]; //!< interpolated 2W x 2H block (v)
-
   // Luma quarter-pel
   int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
 
@@ -164,50 +155,7 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
   // get half-pel interpolated block and push it to output
   if(!fractional_mv) {
     if(chroma_halfpel) {
-      int halfpel_y, halfpel_x;
-      int abs_mv_x = mv[0]&1;
-      int abs_mv_y = mv[1]&1;
-      int8_t overflow_neg_y_temp,overflow_pos_y_temp,overflow_neg_x_temp,overflow_pos_x_temp;
-      // Fill source blocks with data from reference, -4...width+4
-      for (halfpel_y = 0, y = (ypos>>1) - 4; y < ((ypos + width)>>1) + 4; halfpel_y++, y++) {
-        // calculate y-pixel offset
-        coord_y = (y + state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1);
-
-        // On y-overflow set coord_y accordingly
-        overflow_neg_y_temp = (coord_y < 0) ? 1 : 0;
-        overflow_pos_y_temp = (coord_y >= ref->height>>1) ? 1 : 0;
-        if (overflow_neg_y_temp)      coord_y = 0;
-        else if (overflow_pos_y_temp) coord_y = (ref->height>>1) - 1;
-        coord_y *= ref_width_c;
-
-        for (halfpel_x = 0, x = (xpos>>1) - 4; x < ((xpos + width)>>1) + 4; halfpel_x++, x++) {
-          coord_x = (x + state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1);
-
-          // On x-overflow set coord_x accordingly
-          overflow_neg_x_temp = (coord_x < 0) ? 1 : 0;
-          overflow_pos_x_temp = (coord_x >= ref_width_c) ? 1 : 0;
-          if (overflow_neg_x_temp)      coord_x = 0;
-          else if (overflow_pos_x_temp) coord_x = ref_width_c - 1;
-
-          // Store source block data (with extended borders)
-          halfpel_src_u[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->u[coord_y + coord_x];
-          halfpel_src_v[halfpel_y*HALFPEL_CHROMA_WIDTH + halfpel_x] = ref->v[coord_y + coord_x];
-        }
-      }
-
-      // Filter the block to half-pel resolution
-      filter_inter_halfpel_chroma(state->encoder_control, halfpel_src_off_u, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_u, LCU_WIDTH, abs_mv_x, abs_mv_y);
-      filter_inter_halfpel_chroma(state->encoder_control, halfpel_src_off_v, HALFPEL_CHROMA_WIDTH, width>>1, width>>1, halfpel_v, LCU_WIDTH, abs_mv_x, abs_mv_y);
-
-      // Assign filtered pixels to output, take every second half-pel sample with offset of abs_mv_y/x
-      for (halfpel_y = abs_mv_y, y = ypos>>1; y < (ypos + width)>>1; halfpel_y += 2, y++) {
-        for (halfpel_x = abs_mv_x, x = xpos>>1; x < (xpos + width)>>1; halfpel_x += 2, x++) {
-          int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
-          int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-          lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = (kvz_pixel)halfpel_u[halfpel_y*LCU_WIDTH + halfpel_x];
-          lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = (kvz_pixel)halfpel_v[halfpel_y*LCU_WIDTH + halfpel_x];
-        }
-      }
+      inter_recon_frac_chroma(state, ref, xpos, ypos, width, mv_param, lcu);
     }
 
     // With overflow present, more checking
