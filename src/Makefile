@@ -67,6 +67,8 @@ endif
 CFLAGS += -m$(TARGET_CPU_BITS)
 LDFLAGS += -m$(TARGET_CPU_BITS)
 
+INSTALL_TARGETS = install-prog install-pc
+
 # Windows (cygwin/mingw) specific flags
 ifeq ($(SYSTEM), Windows)
   ifeq ($(ARCH), x86_64)
@@ -79,7 +81,7 @@ ifeq ($(SYSTEM), Windows)
   endif
   CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
   ALL_TARGETS = $(PROG) $(DLL)
-  INSTALL_TARGETS = install-prog install-dll
+  INSTALL_TARGETS += install-dll
 
 # OS X specific flags
 else ifeq ($(SYSTEM), Darwin)
@@ -90,18 +92,18 @@ else ifeq ($(SYSTEM), Darwin)
   endif
   ASFLAGS += -DPREFIX
   ALL_TARGETS = $(PROG) $(DYLIB)
-  INSTALL_TARGETS = install-prog install-dylib
+  INSTALL_TARGETS += install-dylib
 
 # Default to Linux/elf specific flags
 else
-  LDFLAGS += -lrt
+  LIBS += -lrt
   ifeq ($(ARCH), x86_64)
     ASFLAGS += -f elf64
   else
     ASFLAGS += -f elf32
   endif
   ALL_TARGETS = $(PROG) $(LIB)
-  INSTALL_TARGETS = install-prog install-lib
+  INSTALL_TARGETS += install-lib
 endif
 
 # Flags shared across systems
@@ -229,23 +231,24 @@ tests: build_tests
 build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 build_tests: init_submodules $(TESTS)
 
-$(PROG): $(RELEASE_OBJS)
-	$(LD) $^ $(LDFLAGS) -o $@
-
 $(LIB):   LDFLAGS += -shared -Wl,-soname,$(SO).$(VER_MAJOR)
 $(DLL):   LDFLAGS += -shared -Wl,--out-implib,$(IMPLIB) -o $@
 $(DYLIB): LDFLAGS += -dynamiclib \
                      -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE) \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
+
+$(PROG): $(RELEASE_OBJS)
+	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
+
 $(LIB) $(DLL) $(DYLIB): $(OBJS)
-	$(LD) $^ $(LDFLAGS) -o $@
+	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(DEBUG): $(DEBUG_OBJS)
-	$(LD) $^ $(LDFLAGS) -o $@
+	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(TESTS): $(TESTS_OBJS)
-	$(LD) $^ $(LDFLAGS) -o $@
+	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 %.o %_debug.o: %.asm Makefile
 	$(AS) $(ASFLAGS) -o $@ $<
@@ -253,11 +256,20 @@ $(TESTS): $(TESTS_OBJS)
 %.o %_debug.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
+kvazaar.pc: kvazaar.pc.in Makefile
+	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
+            -e "s;@VERSION@;$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE);" \
+            -e "s;@LIBS@;$(LIBS);" kvazaar.pc.in > $@
+
 init_submodules:
 	git submodule init
 	git submodule update
 
 install: $(INSTALL_TARGETS)
+
+install-pc: kvazaar.pc
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)/pkgconfig
+	$(INSTALL) -m644 $^ $(DESTDIR)$(LIBDIR)/pkgconfig
 
 install-prog: $(PROG)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
