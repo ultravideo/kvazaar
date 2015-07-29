@@ -228,15 +228,16 @@ tests: build_tests
 build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 build_tests: init_submodules $(TESTS)
 
-$(PROG): $(RELEASE_OBJS)
-	$(LD) $^ $(LDFLAGS) -o $@
-
 $(LIB):   LDFLAGS += -shared -Wl,-soname,$(SO).$(VER_MAJOR)
 $(DLL):   LDFLAGS += -shared -Wl,--out-implib,$(IMPLIB) -o $@
 $(DYLIB): LDFLAGS += -dynamiclib \
                      -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE) \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
+
+$(PROG): $(RELEASE_OBJS)
+	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
+
 $(LIB) $(DLL) $(DYLIB): $(OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
