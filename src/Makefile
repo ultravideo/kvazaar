@@ -28,7 +28,7 @@ INC    = kvazaar.h \
 
 # Compilers and other tools
 AS = yasm
-LD = gcc
+LD = $(CC)
 INSTALL = install
 LN_S = ln -s
 
@@ -38,10 +38,15 @@ INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
 # nasm requires trailing slashes in include directories
 ASFLAGS += $(patsubst %,%/,$(INCLUDEDIRS))
+
+# Notes about optimization levels:
+# Overall, kvazaar seems to run 15-20 % faster when compiler with gcc.
+# gcc-5.1.1: no benefit from -flto, slight harm from -O3
+# clang-4.3.0: slight benefit from -O3, more from -flto
 CFLAGS += -O2 -g -Werror -ftree-vectorize -fvisibility=hidden -std=gnu99
 CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
-LDFLAGS += -fvisibility=hidden -lm -pthread
+LDFLAGS += -O2 -fvisibility=hidden -lm -pthread
 
 ARCH ?= $(shell uname -m)
 
@@ -111,13 +116,6 @@ ifeq ($(ARCH), x86_64)
   ASFLAGS += -DARCH_X86_64=1
 else
   ASFLAGS += -DARCH_X86_64=0
-endif
-
-#Detect if cc is gcc for the link time optimization flag
-GCCVERSION = $(shell $(CC) --version | grep GCC)
-ifneq (, $(GCCVERSION))
-  CFLAGS += -flto
-  LDFLAGS += -flto -O3
 endif
 
 # Compile asm files by default if yasm is present.
