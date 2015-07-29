@@ -38,7 +38,7 @@ INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
 # nasm requires trailing slashes in include directories
 ASFLAGS += $(patsubst %,%/,$(INCLUDEDIRS))
-CFLAGS += -O2 -g -Werror -ftree-vectorize -fpic -fvisibility=hidden -std=gnu99
+CFLAGS += -O2 -g -Werror -ftree-vectorize -fvisibility=hidden -std=gnu99
 CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -fvisibility=hidden -lm -pthread
@@ -214,6 +214,12 @@ TEST_OBJS := \
 MAIN_OBJS := encmain.o interface_main.o
 
 RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
+# Compile separate PIC objects for Linux/OSX.
+ifeq ($(SYSTEM), Windows)
+  LIB_OBJS = $(OBJS)
+else
+  LIB_OBJS = $(OBJS:.o=.lo)
+endif
 DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
 TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
@@ -231,9 +237,9 @@ tests: build_tests
 build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 build_tests: init_submodules $(TESTS)
 
-$(LIB):   LDFLAGS += -shared -Wl,-soname,$(SO).$(VER_MAJOR)
+$(LIB):   LDFLAGS += -shared -fpic -Wl,-soname,$(SO).$(VER_MAJOR)
 $(DLL):   LDFLAGS += -shared -Wl,--out-implib,$(IMPLIB) -o $@
-$(DYLIB): LDFLAGS += -dynamiclib \
+$(DYLIB): LDFLAGS += -dynamiclib -fpic \
                      -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE) \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
@@ -241,7 +247,7 @@ $(DYLIB): LDFLAGS += -dynamiclib \
 $(PROG): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-$(LIB) $(DLL) $(DYLIB): $(OBJS)
+$(LIB) $(DLL) $(DYLIB): $(LIB_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(DEBUG): $(DEBUG_OBJS)
@@ -250,11 +256,15 @@ $(DEBUG): $(DEBUG_OBJS)
 $(TESTS): $(TESTS_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-%.o %_debug.o: %.asm Makefile
+# Hopefully the ASM code is PIC. If not, we have to disable for the .so and .dylib.
+%.o %_debug.o %.lo %_debug.lo: %.asm Makefile
 	$(AS) $(ASFLAGS) -o $@ $<
 
 %.o %_debug.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+
+%.lo %_debug.lo: %.c Makefile
+	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
 kvazaar.pc: kvazaar.pc.in Makefile
 	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
@@ -299,7 +309,7 @@ install-dll: $(DLL)
 	$(INSTALL) -m644 $(IMPLIB) $(DESTDIR)$(LIBDIR)
 
 clean:
-	$(RM) $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
+	$(RM) $(RELEASE_OBJS) $(LIB_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
 	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB) $(DYLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
