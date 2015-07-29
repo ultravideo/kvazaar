@@ -30,6 +30,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <ctype.h>
 
 static const char short_options[] = "i:o:d:w:h:n:q:p:r:";
 static const struct option long_options[] = {
@@ -82,6 +83,38 @@ static const struct option long_options[] = {
   { "bitrate",            required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
+
+/**
+* \brief Try to detect resolution from file name automatically
+*
+* \param file_name    file name to get dimensions from
+* \param out_width    detected width
+* \param out_height   detected height
+* \return      1 if the resolution is set, 0 on fail
+*/
+static int select_input_res_auto(const char *file_name, int32_t *out_width, int32_t *out_height)
+{
+  if (!file_name) return 0;
+
+  // Find the last delimiter char ( / or \ ). Hope the other kind is not used in the name.
+  // If delim is not found, set pointer to the beginning.
+  char* sub_str = MAX(strrchr(file_name, '/'), strrchr(file_name, '\\'));
+  if (!sub_str) sub_str = (char*)file_name;
+
+  int success = 0;
+  // Try if the substring starts with "<int>x<int>" without either of them being 0
+  do {
+    success = (sscanf(sub_str, "%dx%d%*s", out_width, out_height) == 2);
+    success &= (*out_width > 0 && *out_height > 0);
+    // Move to the next char until a digit is found or the string ends
+    do{
+      ++sub_str;
+    } while (*sub_str != 0 && !isdigit(*sub_str));
+    // Continue until "<int>x<int>" is found or the string ends
+  } while (*sub_str != 0 && !success);
+
+  return success;
+}
 
 /**
  * \brief Parse command line arguments.
@@ -165,6 +198,12 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     goto done;
   }
 
+  // Set resolution automatically if necessary
+  if (opts->config->width == 0 && opts->config->width == 0){
+    ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
+    goto done;
+  }
+
 done:
   if (!ok) {
     cmdline_opts_free(api, opts);
@@ -210,7 +249,8 @@ void print_help(void)
     "Optional parameters:\n"
     "      -n, --frames <integer>     : Number of frames to code [all]\n"
     "      --seek <integer>           : First frame to code [0]\n"
-    "      --input-res <int>x<int>    : Input resolution (width x height)\n"
+    "      --input-res <int>x<int>    : Input resolution (width x height) or\n"
+    "                  auto           : try to detect from file name [auto]\n"
     "      --input-fps <number>       : Framerate of the input video [25.0]\n"
     "      -q, --qp <integer>         : Quantization Parameter [32]\n"
     "      -p, --period <integer>     : Period of intra pictures [0]\n"

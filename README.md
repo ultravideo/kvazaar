@@ -19,7 +19,8 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
     Optional parameters:
           -n, --frames <integer>     : Number of frames to code [all]
           --seek <integer>           : First frame to code [0]
-          --input-res <int>x<int>    : Input resolution (width x height)
+          --input-res <int>x<int>    : Input resolution (width x height) or
+                      auto           : try to detect from file name [auto]
           --input-fps <number>       : Framerate of the input video [25.0]
           -q, --qp <integer>         : Quantization Parameter [32]
           -p, --period <integer>     : Period of intra pictures [0]

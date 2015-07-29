@@ -306,7 +306,11 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("height")
     cfg->height = atoi(value);
   else if OPT("input-res")
-    return sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2;
+    if (!strcmp(value, "auto")) {
+      return 1;
+    } else {
+      return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
+    }
   else if OPT("input-fps")
     cfg->framerate = atof(value);
   else if OPT("qp")
