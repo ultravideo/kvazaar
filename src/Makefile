@@ -254,15 +254,28 @@ $(DEBUG): $(DEBUG_OBJS)
 $(TESTS): $(TESTS_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-# Hopefully the ASM code is PIC. If not, we have to disable for the .so and .dylib.
-%.o %_debug.o %.lo %_debug.lo: %.asm Makefile
+
+%.o: %.asm Makefile
+	$(AS) $(ASFLAGS) -o $@ $<
+%_debug.o: %.asm Makefile
 	$(AS) $(ASFLAGS) -o $@ $<
 
-%.o %_debug.o: %.c Makefile
+# Hopefully the ASM code is PIC. If not, we have to disable for the .so and .dylib.
+%.lo: %.asm Makefile
+	$(AS) $(ASFLAGS) -o $@ $<
+%_debug.lo: %.asm Makefile
+	$(AS) $(ASFLAGS) -o $@ $<
+
+%.o: %.c Makefile
+	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+%_debug.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
-%.lo %_debug.lo: %.c Makefile
+%.lo: %.c Makefile
 	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+%_debug.lo: %.c Makefile
+	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+
 
 kvazaar.pc: kvazaar.pc.in Makefile
 	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
