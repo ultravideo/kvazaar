@@ -1,5 +1,8 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
+all: cli lib-shared
+.PHONY: all
+
 # Installation locations
 DESTDIR =
 PREFIX  = /usr/local
@@ -28,20 +31,27 @@ INC    = kvazaar.h \
 
 # Compilers and other tools
 AS = yasm
-LD = gcc
+LD = $(CC)
 INSTALL = install
 LN_S = ln -s
 
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
-WARNINGS = -Wall -Wtype-limits -Wvla
+WARNINGS = -Werror -Wall -Wtype-limits -Wvla
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
 # nasm requires trailing slashes in include directories
 ASFLAGS += $(patsubst %,%/,$(INCLUDEDIRS))
-CFLAGS += -O2 -g -Werror -ftree-vectorize -fpic -fvisibility=hidden -std=gnu99
+
+# Notes about optimization levels:
+# Overall, kvazaar seems to run 15-20 % faster when compiler with gcc.
+# gcc-5.1.1: no benefit from -flto, slight harm from -O3
+# clang-4.3.0: slight benefit from -O3, more from -flto
+CFLAGS += -O2 -g -ftree-vectorize
+
+CFLAGS += -fvisibility=hidden -std=gnu99
 CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
-LDFLAGS += -fvisibility=hidden -lm -pthread
+LDFLAGS += -O2 -fvisibility=hidden -lm -pthread
 
 ARCH ?= $(shell uname -m)
 
@@ -80,7 +90,7 @@ ifeq ($(SYSTEM), Windows)
     ASFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
   CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
-  ALL_TARGETS = $(PROG) $(DLL)
+  LIBKVAZAAR_SHARED = $(DLL)
   INSTALL_TARGETS += install-dll
 
 # OS X specific flags
@@ -91,7 +101,7 @@ else ifeq ($(SYSTEM), Darwin)
     ASFLAGS += -f macho32
   endif
   ASFLAGS += -DPREFIX
-  ALL_TARGETS = $(PROG) $(DYLIB)
+  LIBKVAZAAR_SHARED = $(DYLIB)
   INSTALL_TARGETS += install-dylib
 
 # Default to Linux/elf specific flags
@@ -102,7 +112,7 @@ else
   else
     ASFLAGS += -f elf32
   endif
-  ALL_TARGETS = $(PROG) $(LIB)
+  LIBKVAZAAR_SHARED = $(LIB)
   INSTALL_TARGETS += install-lib
 endif
 
@@ -111,13 +121,6 @@ ifeq ($(ARCH), x86_64)
   ASFLAGS += -DARCH_X86_64=1
 else
   ASFLAGS += -DARCH_X86_64=0
-endif
-
-#Detect if cc is gcc for the link time optimization flag
-GCCVERSION = $(shell $(CC) --version | grep GCC)
-ifneq (, $(GCCVERSION))
-  CFLAGS += -flto
-  LDFLAGS += -flto -O3
 endif
 
 # Compile asm files by default if yasm is present.
@@ -214,12 +217,21 @@ TEST_OBJS := \
 MAIN_OBJS := encmain.o interface_main.o
 
 RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
+# Compile separate PIC objects for Linux/OSX.
+ifeq ($(SYSTEM), Windows)
+  LIB_OBJS = $(OBJS)
+else
+  LIB_OBJS = $(OBJS:.o=.lo)
+endif
 DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
 TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
 DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
-all: $(ALL_TARGETS)
+.PHONY: cli lib-shared lib-static debug tests build_tests
+cli: $(PROG)
+lib-shared: $(LIBKVAZAAR_SHARED)
+lib-static: # TODO
 
 debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
 debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
@@ -241,7 +253,7 @@ $(DYLIB): LDFLAGS += -dynamiclib \
 $(PROG): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-$(LIB) $(DLL) $(DYLIB): $(OBJS)
+$(LIB) $(DLL) $(DYLIB): $(LIB_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(DEBUG): $(DEBUG_OBJS)
@@ -250,12 +262,31 @@ $(DEBUG): $(DEBUG_OBJS)
 $(TESTS): $(TESTS_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-%.o %_debug.o: %.asm Makefile
+
+%.o: %.asm Makefile
+	$(AS) $(ASFLAGS) -o $@ $<
+%_debug.o: %.asm Makefile
 	$(AS) $(ASFLAGS) -o $@ $<
 
-%.o %_debug.o: %.c Makefile
+# Hopefully the ASM code is PIC. If not, we have to disable for the .so and .dylib.
+%.lo: %.asm Makefile
+	$(AS) $(ASFLAGS) -o $@ $<
+%_debug.lo: %.asm Makefile
+	$(AS) $(ASFLAGS) -o $@ $<
+
+%.o: %.c Makefile
+	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+%_debug.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
+%.lo: %.c Makefile
+	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+%_debug.lo: %.c Makefile
+	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+
+
+.PHONY: kvazaar.pc init_submodules install install-pc install-prog install-lib
+.PHONY: install-dylib install-dll clean
 kvazaar.pc: kvazaar.pc.in Makefile
 	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
             -e "s;@VERSION@;$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE);" \
@@ -299,7 +330,7 @@ install-dll: $(DLL)
 	$(INSTALL) -m644 $(IMPLIB) $(DESTDIR)$(LIBDIR)
 
 clean:
-	$(RM) $(RELEASE_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
+	$(RM) $(RELEASE_OBJS) $(LIB_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
 	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB) $(DYLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
