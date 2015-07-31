@@ -1,5 +1,8 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
+all: cli lib-shared
+.PHONY: all
+
 # Installation locations
 DESTDIR =
 PREFIX  = /usr/local
@@ -85,7 +88,7 @@ ifeq ($(SYSTEM), Windows)
     ASFLAGS += -DHAVE_ALIGNED_STACK=0
   endif
   CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
-  ALL_TARGETS = $(PROG) $(DLL)
+  LIBKVAZAAR_SHARED = $(DLL)
   INSTALL_TARGETS += install-dll
 
 # OS X specific flags
@@ -96,7 +99,7 @@ else ifeq ($(SYSTEM), Darwin)
     ASFLAGS += -f macho32
   endif
   ASFLAGS += -DPREFIX
-  ALL_TARGETS = $(PROG) $(DYLIB)
+  LIBKVAZAAR_SHARED = $(DYLIB)
   INSTALL_TARGETS += install-dylib
 
 # Default to Linux/elf specific flags
@@ -107,7 +110,7 @@ else
   else
     ASFLAGS += -f elf32
   endif
-  ALL_TARGETS = $(PROG) $(LIB)
+  LIBKVAZAAR_SHARED = $(LIB)
   INSTALL_TARGETS += install-lib
 endif
 
@@ -223,7 +226,10 @@ TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
 DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
-all: $(ALL_TARGETS)
+.PHONY: cli lib-shared lib-static debug tests build_tests
+cli: $(PROG)
+lib-shared: $(LIBKVAZAAR_SHARED)
+lib-static: # TODO
 
 debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
 debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
@@ -277,6 +283,8 @@ $(TESTS): $(TESTS_OBJS)
 	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
 
+.PHONY: kvazaar.pc init_submodules install install-pc install-prog install-lib
+.PHONY: install-dylib install-dll clean
 kvazaar.pc: kvazaar.pc.in Makefile
 	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
             -e "s;@VERSION@;$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE);" \
