@@ -98,13 +98,13 @@ static int select_input_res_auto(const char *file_name, int32_t *out_width, int3
 
   // Find the last delimiter char ( / or \ ). Hope the other kind is not used in the name.
   // If delim is not found, set pointer to the beginning.
-  char* sub_str = MAX(strrchr(file_name, '/'), strrchr(file_name, '\\'));
-  if (!sub_str) sub_str = (char*)file_name;
+  unsigned char* sub_str = (unsigned char*)MAX(strrchr(file_name, '/'), strrchr(file_name, '\\'));
+  if (!sub_str) sub_str = (unsigned char*)file_name;
 
   int success = 0;
   // Try if the substring starts with "<int>x<int>" without either of them being 0
   do {
-    success = (sscanf(sub_str, "%dx%d%*s", out_width, out_height) == 2);
+    success = (sscanf((char*)sub_str, "%dx%d%*s", out_width, out_height) == 2);
     success &= (*out_width > 0 && *out_height > 0);
     // Move to the next char until a digit is found or the string ends
     do{
