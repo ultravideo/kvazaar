@@ -36,7 +36,7 @@ INSTALL = install
 LN_S = ln -s
 
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
-WARNINGS = -Wall -Wtype-limits -Wvla
+WARNINGS = -Werror -Wall -Wtype-limits -Wvla
 INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 
 # nasm requires trailing slashes in include directories
@@ -46,7 +46,9 @@ ASFLAGS += $(patsubst %,%/,$(INCLUDEDIRS))
 # Overall, kvazaar seems to run 15-20 % faster when compiler with gcc.
 # gcc-5.1.1: no benefit from -flto, slight harm from -O3
 # clang-4.3.0: slight benefit from -O3, more from -flto
-CFLAGS += -O2 -g -Werror -ftree-vectorize -fvisibility=hidden -std=gnu99
+CFLAGS += -O2 -g -ftree-vectorize
+
+CFLAGS += -fvisibility=hidden -std=gnu99
 CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
 LDFLAGS += -O2 -fvisibility=hidden -lm -pthread
@@ -241,9 +243,9 @@ tests: build_tests
 build_tests: CFLAGS := $(filter-out -Werror, $(CFLAGS))
 build_tests: init_submodules $(TESTS)
 
-$(LIB):   LDFLAGS += -shared -fpic -Wl,-soname,$(SO).$(VER_MAJOR)
+$(LIB):   LDFLAGS += -shared -Wl,-soname,$(SO).$(VER_MAJOR)
 $(DLL):   LDFLAGS += -shared -Wl,--out-implib,$(IMPLIB) -o $@
-$(DYLIB): LDFLAGS += -dynamiclib -fpic \
+$(DYLIB): LDFLAGS += -dynamiclib \
                      -current_version $(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE) \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
