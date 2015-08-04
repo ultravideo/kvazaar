@@ -233,7 +233,7 @@ void sample_14bit_quarterpel_luma_generic(const encoder_control_t * const encode
     for (y = 0; y < height; ++y) {
       int ypos = y;
       int xpos = x;
-      dst[y*dst_stride + x] = (eight_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2;
+      dst[y*dst_stride + x] = (eight_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos])) >> shift2;
     }
   }
 }
@@ -482,7 +482,7 @@ void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder,
     for (y = 0; y < height; ++y) {
       int ypos = y;
       int xpos = x;
-      dst[y*dst_stride + x] = (four_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos]) + offset23) >> shift2;
+      dst[y*dst_stride + x] = (four_tap_filter_hor_16bit_generic(ver_filter, &flipped_hor_filtered[xpos][ypos])) >> shift2;
     }
   }
 }
