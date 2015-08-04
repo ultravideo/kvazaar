@@ -36,6 +36,13 @@ typedef struct {
 
 typedef struct {
   int size;
+  int16_t *y;
+  int16_t *u;
+  int16_t *v;
+} hi_prec_buf_t;
+
+typedef struct {
+  int size;
   kvz_pixel *y;
   kvz_pixel *u;
   kvz_pixel *v;
@@ -56,6 +63,10 @@ kvz_picture *image_make_subimage(kvz_picture *const orig_image,
 
 yuv_t * yuv_t_alloc(int luma_size);
 void yuv_t_free(yuv_t * yuv);
+
+hi_prec_buf_t * hi_prec_buf_t_alloc(int luma_size);
+void hi_prec_buf_t_free(hi_prec_buf_t * yuv);
+
 
 //Algorithms
 unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,

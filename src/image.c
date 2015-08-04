@@ -172,6 +172,28 @@ void yuv_t_free(yuv_t * yuv)
   free(yuv);
 }
 
+hi_prec_buf_t * hi_prec_buf_t_alloc(int luma_size)
+{
+  // Get buffers with separate mallocs in order to take advantage of
+  // automatic buffer overrun checks.
+  hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
+  yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->size = luma_size;
+
+  return yuv;
+}
+
+void hi_prec_buf_t_free(hi_prec_buf_t * yuv)
+{
+  free(yuv->y);
+  free(yuv->u);
+  free(yuv->v);
+  free(yuv);
+}
+
+
 /**
  * \brief Diagonally interpolate SAD outside the frame.
  *
