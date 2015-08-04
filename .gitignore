@@ -24,3 +24,4 @@ src/libkvazaar.so.*
 src/kvazaar.dll
 src/libkvazaar.dll.a
 src/libkvazaar.*.dylib
+src/kvazaar.pc
