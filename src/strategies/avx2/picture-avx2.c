@@ -64,27 +64,6 @@ static INLINE __m256i inline_8bit_sad_16x16_avx2(const __m256i *const a, const _
 
 
 /**
-* \brief Calculate SAD for 32x32 bytes in continuous memory.
-*/
-static INLINE __m256i inline_8bit_sad_32x32_avx2(const __m256i *const a, const __m256i *const b)
-{
-  const unsigned size_of_16x16 = 16 * 16 / sizeof(__m256i);
-
-  // Calculate in 4 chunks of 32x8.
-  __m256i sum0, sum1, sum2, sum3;
-  sum0 = inline_8bit_sad_16x16_avx2(a + 0 * size_of_16x16, b + 0 * size_of_16x16);
-  sum1 = inline_8bit_sad_16x16_avx2(a + 1 * size_of_16x16, b + 1 * size_of_16x16);
-  sum2 = inline_8bit_sad_16x16_avx2(a + 2 * size_of_16x16, b + 2 * size_of_16x16);
-  sum3 = inline_8bit_sad_16x16_avx2(a + 3 * size_of_16x16, b + 3 * size_of_16x16);
-
-  sum0 = _mm256_add_epi32(sum0, sum1);
-  sum2 = _mm256_add_epi32(sum2, sum3);
-
-  return _mm256_add_epi32(sum0, sum2);
-}
-
-
-/**
 * \brief Get sum of the low 32 bits of four 64 bit numbers from __m256i as uint32_t.
 */
 static INLINE uint32_t m256i_horizontal_sum(const __m256i sum)
@@ -123,9 +102,38 @@ static unsigned sad_8bit_32x32_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2
   const __m256i *const a = (const __m256i *)buf1;
   const __m256i *const b = (const __m256i *)buf2;
 
-  __m256i sum = inline_8bit_sad_32x32_avx2(a, b);
+  const unsigned size_of_8x8 = 8 * 8 / sizeof(__m256i);
+  const unsigned size_of_32x32 = 32 * 32 / sizeof(__m256i);
 
-  return m256i_horizontal_sum(sum);
+  // Looping 512 bytes at a time seems faster than letting VC figure it out
+  // through inlining, like inline_8bit_sad_16x16_avx2 does.
+  __m256i sum0 = inline_8bit_sad_8x8_avx2(a, b);
+  for (unsigned i = size_of_8x8; i < size_of_32x32; i += size_of_8x8) {
+    __m256i sum1 = inline_8bit_sad_8x8_avx2(a + i, b + i);
+    sum0 = _mm256_add_epi32(sum0, sum1);
+  }
+
+  return m256i_horizontal_sum(sum0);
+}
+
+
+static unsigned sad_8bit_64x64_avx2(const kvz_pixel * buf1, const kvz_pixel * buf2)
+{
+  const __m256i *const a = (const __m256i *)buf1;
+  const __m256i *const b = (const __m256i *)buf2;
+
+  const unsigned size_of_8x8 = 8 * 8 / sizeof(__m256i);
+  const unsigned size_of_64x64 = 64 * 64 / sizeof(__m256i);
+
+  // Looping 512 bytes at a time seems faster than letting VC figure it out
+  // through inlining, like inline_8bit_sad_16x16_avx2 does.
+  __m256i sum0 = inline_8bit_sad_8x8_avx2(a, b);
+  for (unsigned i = size_of_8x8; i < size_of_64x64; i += size_of_8x8) {
+    __m256i sum1 = inline_8bit_sad_8x8_avx2(a + i, b + i);
+    sum0 = _mm256_add_epi32(sum0, sum1);
+  }
+
+  return m256i_horizontal_sum(sum0);
 }
 
 
@@ -136,9 +144,14 @@ int strategy_register_picture_avx2(void* opaque)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+  // We don't actually use SAD for intra right now, other than 4x4 for
+  // transform skip, but we might again one day and this is some of the
+  // simplest code to look at for anyone interested in doing more
+  // optimizations, so it's worth it to keep this maintained.
   success &= strategyselector_register(opaque, "sad_8bit_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
   success &= strategyselector_register(opaque, "sad_8bit_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
   success &= strategyselector_register(opaque, "sad_8bit_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
+  success &= strategyselector_register(opaque, "sad_8bit_64x64", "avx2", 40, &sad_8bit_64x64_avx2);
 #endif
   return success;
 }
