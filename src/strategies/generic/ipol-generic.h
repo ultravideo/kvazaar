@@ -22,6 +22,9 @@
 #include "encoder.h"
 
 int strategy_register_ipol_generic(void* opaque);
+
+//TODO: create strategies from sample functions
 void sample_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
+void sample_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
 
 #endif //STRATEGIES_IPOL_GENERIC_H_

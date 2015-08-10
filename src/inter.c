@@ -139,28 +139,17 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
       extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, state->tile->lcu_offset_x * (LCU_WIDTH>>1), state->tile->lcu_offset_y * (LCU_WIDTH>>1),
           ref->u, ref->width>>1, ref->height>>1, FILTER_SIZE_C, width_c, width_c, octpel_src_u);
 
-      filter_inter_octpel_chroma(state->encoder_control, octpel_src_off_u, width_c+FILTER_SIZE_C, width_c,
-                                 width_c, octpel_dst_u, width_c*8, c_off_x, c_off_y);
+      sample_octpel_chroma_generic(state->encoder_control, octpel_src_off_u, width_c + FILTER_SIZE_C, width_c,
+        width_c, lcu->rec.u + ((ypos >> 1) % LCU_WIDTH_C)*LCU_WIDTH_C + ((xpos >> 1) % LCU_WIDTH_C), LCU_WIDTH_C, c_off_x, c_off_y, mv);
 
       //Fractional chroma V
-      extend_borders(xpos>>1, ypos>>1, (mv[0]>>2)>>1, (mv[1]>>2)>>1, state->tile->lcu_offset_x * (LCU_WIDTH>>1), state->tile->lcu_offset_y * (LCU_WIDTH>>1),
-          ref->v, ref->width>>1, ref->height>>1, FILTER_SIZE_C, width_c, width_c, octpel_src_v);
+      extend_borders(xpos >> 1, ypos >> 1, (mv[0] >> 2) >> 1, (mv[1] >> 2) >> 1, state->tile->lcu_offset_x * (LCU_WIDTH_C >> 1), state->tile->lcu_offset_y * (LCU_WIDTH_C >> 1),
+        ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, width_c, width_c, octpel_src_v);
 
-      filter_inter_octpel_chroma(state->encoder_control, octpel_src_off_v, width_c+FILTER_SIZE_C, width_c,
-                   width_c, octpel_dst_v, width_c*8, c_off_x, c_off_y);
+      sample_octpel_chroma_generic(state->encoder_control, octpel_src_off_v, width_c + FILTER_SIZE_C, width_c,
+        width_c, lcu->rec.v + ((ypos >> 1) % LCU_WIDTH_C)*LCU_WIDTH_C + ((xpos >> 1) % LCU_WIDTH_C), LCU_WIDTH_C, c_off_x, c_off_y, mv);
 
 
-      //Sample fractional pixels for chroma
-      for(y = 0; y < width_c; ++y) {
-        int y_in_lcu = ((y+(ypos>>1)) & ((LCU_WIDTH>>1)-1));
-        int qpel_y = y*8+c_off_y;
-        for(x = 0; x < width_c; ++x) {
-          int x_in_lcu = ((x+(xpos>>1)) & ((LCU_WIDTH>>1)-1));
-          int qpel_x = x*8+c_off_x;
-          lcu->rec.u[y_in_lcu * dst_width_c + x_in_lcu] = (kvz_pixel)octpel_dst_u[qpel_y*(width_c*8)+qpel_x];
-          lcu->rec.v[y_in_lcu * dst_width_c + x_in_lcu] = (kvz_pixel)octpel_dst_v[qpel_y*(width_c*8)+qpel_x];
-        }
-      }
     }
 
   mv[0] >>= 2;
