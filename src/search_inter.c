@@ -838,12 +838,13 @@ static unsigned search_frac(const encoder_state_t * const state,
   mv.x <<= 1;
   mv.y <<= 1;
 
+  kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
+  kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
+  pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, block_width, block_width, pic->stride, block_width);
+
   // Search halfpel positions around best integer mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
-
-    kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
-    kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
 
     int y,x;
     for(y = 0; y < block_width; ++y) {
@@ -851,7 +852,6 @@ static unsigned search_frac(const encoder_state_t * const state,
       for(x = 0; x < block_width; ++x) {
         int dst_x = x*4+pattern->x*2;
         tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
-        tmp_pic[y*block_width+x] = pic->y[orig->x+x + (orig->y+y)*pic->width];
       }
     }
 
@@ -882,16 +882,12 @@ static unsigned search_frac(const encoder_state_t * const state,
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
 
-    kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
-    kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
-
     int y,x;
     for(y = 0; y < block_width; ++y) {
       int dst_y = y*4+halfpel_offset.y+pattern->y;
       for(x = 0; x < block_width; ++x) {
         int dst_x = x*4+halfpel_offset.x+pattern->x;
         tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
-        tmp_pic[y*block_width+x] = pic->y[orig->x+x + (orig->y+y)*pic->width];
       }
     }
 
