@@ -1080,11 +1080,10 @@ int search_cu_inter(const encoder_state_t * const state, int x, int y, int depth
           // Force L0 and L1 references
           if (state->global->refmap[merge_cand[i].ref[0]].list == 2 || state->global->refmap[merge_cand[j].ref[1]].list == 1) continue;
 
-          // TODO: enable fractional pixel bipred search
-          mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
-          mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
-          mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
-          mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
+          mv[0][0] = merge_cand[i].mv[0][0];
+          mv[0][1] = merge_cand[i].mv[0][1];
+          mv[1][0] = merge_cand[j].mv[1][0];
+          mv[1][1] = merge_cand[j].mv[1][1];
 
           // Check boundaries when using owf to process multiple frames at the same time
           if (max_lcu_below >= 0) {
@@ -1112,9 +1111,8 @@ int search_cu_inter(const encoder_state_t * const state, int x, int y, int depth
 
           cost = satd(tmp_pic, tmp_block);
 
-          // TODO: enable fractional pixel bipred search
-          cost += calc_mvd_cost(state, merge_cand[i].mv[0][0] & 0xfff8, merge_cand[i].mv[0][1] & 0xfff8, 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
-          cost += calc_mvd_cost(state, merge_cand[i].mv[1][0] & 0xfff8, merge_cand[i].mv[1][1] & 0xfff8, 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
+          cost += calc_mvd_cost(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
+          cost += calc_mvd_cost(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
           if (cost < cur_cu->inter.cost) {
 
@@ -1127,11 +1125,10 @@ int search_cu_inter(const encoder_state_t * const state, int x, int y, int depth
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
 
-            // TODO: enable fractional pixel bipred search
-            cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0] & 0xfff8;
-            cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1] & 0xfff8;
-            cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0] & 0xfff8;
-            cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1] & 0xfff8;
+            cur_cu->inter.mv[0][0] = merge_cand[i].mv[0][0];
+            cur_cu->inter.mv[0][1] = merge_cand[i].mv[0][1];
+            cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0];
+            cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1];
             cur_cu->merged = 0;
                         
             // Check every candidate to find a match
