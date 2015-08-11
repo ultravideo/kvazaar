@@ -35,7 +35,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
-static const uint8_t ref_data[64] = {
+static const kvz_pixel ref_data[64] = {
   1,2,2,2,2,2,2,3,
   4,5,5,5,5,5,5,6,
   4,5,5,5,5,5,5,6,
@@ -46,7 +46,7 @@ static const uint8_t ref_data[64] = {
   7,8,8,8,8,8,8,9
 };
 
-static const uint8_t pic_data[64] = {
+static const kvz_pixel pic_data[64] = {
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,
   1,1,1,1,1,1,1,1,

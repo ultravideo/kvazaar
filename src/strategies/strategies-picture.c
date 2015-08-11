@@ -24,17 +24,17 @@
 // Define function pointers.
 reg_sad_func * reg_sad = 0;
 
-cost_pixel_nxn_func * sad_8bit_4x4 = 0;
-cost_pixel_nxn_func * sad_8bit_8x8 = 0;
-cost_pixel_nxn_func * sad_8bit_16x16 = 0;
-cost_pixel_nxn_func * sad_8bit_32x32 = 0;
-cost_pixel_nxn_func * sad_8bit_64x64 = 0;
+cost_pixel_nxn_func * sad_4x4 = 0;
+cost_pixel_nxn_func * sad_8x8 = 0;
+cost_pixel_nxn_func * sad_16x16 = 0;
+cost_pixel_nxn_func * sad_32x32 = 0;
+cost_pixel_nxn_func * sad_64x64 = 0;
 
-cost_pixel_nxn_func * satd_8bit_4x4 = 0;
-cost_pixel_nxn_func * satd_8bit_8x8 = 0;
-cost_pixel_nxn_func * satd_8bit_16x16 = 0;
-cost_pixel_nxn_func * satd_8bit_32x32 = 0;
-cost_pixel_nxn_func * satd_8bit_64x64 = 0;
+cost_pixel_nxn_func * satd_4x4 = 0;
+cost_pixel_nxn_func * satd_8x8 = 0;
+cost_pixel_nxn_func * satd_16x16 = 0;
+cost_pixel_nxn_func * satd_32x32 = 0;
+cost_pixel_nxn_func * satd_64x64 = 0;
 
 
 // Headers for platform optimizations.
@@ -82,15 +82,15 @@ cost_pixel_nxn_func * pixels_get_satd_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return satd_8bit_4x4;
+    return satd_4x4;
   case 8:
-    return satd_8bit_8x8;
+    return satd_8x8;
   case 16:
-    return satd_8bit_16x16;
+    return satd_16x16;
   case 32:
-    return satd_8bit_32x32;
+    return satd_32x32;
   case 64:
-    return satd_8bit_64x64;
+    return satd_64x64;
   default:
     return NULL;
   }
@@ -108,15 +108,15 @@ cost_pixel_nxn_func * pixels_get_sad_func(unsigned n)
 {
   switch (n) {
   case 4:
-    return sad_8bit_4x4;
+    return sad_4x4;
   case 8:
-    return sad_8bit_8x8;
+    return sad_8x8;
   case 16:
-    return sad_8bit_16x16;
+    return sad_16x16;
   case 32:
-    return sad_8bit_32x32;
+    return sad_32x32;
   case 64:
-    return sad_8bit_64x64;
+    return sad_64x64;
   default:
     return NULL;
   }

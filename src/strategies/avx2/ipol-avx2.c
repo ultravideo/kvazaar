@@ -523,9 +523,11 @@ int strategy_register_ipol_avx2(void* opaque)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+  #if KVZ_BIT_DEPTH == 8
   success &= strategyselector_register(opaque, "filter_inter_quarterpel_luma", "avx2", 40, &filter_inter_quarterpel_luma_avx2);
   success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 40, &filter_inter_halfpel_chroma_avx2);
   success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 40, &filter_inter_octpel_chroma_avx2);
+  #endif //KVZ_BIT_DEPTH == 8
   success &= strategyselector_register(opaque, "extend_borders", "avx2", 40, &extend_borders_avx2);
 #endif //COMPILE_INTEL_AVX2
   return success;

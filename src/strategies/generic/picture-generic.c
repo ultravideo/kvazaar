@@ -104,7 +104,7 @@ static unsigned reg_sad_generic(const kvz_pixel * const data1, const kvz_pixel *
  * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
  * From HM 13.0
  */
-static unsigned satd_8bit_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
+static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
 {
   int32_t k, satd = 0, diff[16], m[16], d[16];
   for (k = 0; k < 16; ++k) {
@@ -191,7 +191,7 @@ static unsigned satd_8bit_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *p
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-unsigned satd_16bit_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
+unsigned satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
   const kvz_pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
@@ -284,8 +284,8 @@ unsigned satd_16bit_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOr
 // Function macro for defining hadamard calculating functions
 // for fixed size blocks. They calculate hadamard for integer
 // multiples of 8x8 with the 8x8 hadamard function.
-#define SATD_NXN(n, pixel_type, suffix) \
-unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
+#define SATD_NXN(n, pixel_type) \
+unsigned satd_ ## n ## x ## n ## _generic( \
   const pixel_type * const block1, const pixel_type * const block2) \
 { \
   unsigned x, y; \
@@ -293,29 +293,29 @@ unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += satd_16bit_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
+  sum += satd_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
   } \
   } \
   return sum>>(KVZ_BIT_DEPTH-8); \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
-cost_pixel_nxn_func satd_8bit_4x4_generic;
-cost_pixel_nxn_func satd_8bit_8x8_generic;
-cost_pixel_nxn_func satd_8bit_16x16_generic;
-cost_pixel_nxn_func satd_8bit_32x32_generic;
-cost_pixel_nxn_func satd_8bit_64x64_generic;
+cost_pixel_nxn_func satd_4x4_generic;
+cost_pixel_nxn_func satd_8x8_generic;
+cost_pixel_nxn_func satd_16x16_generic;
+cost_pixel_nxn_func satd_32x32_generic;
+cost_pixel_nxn_func satd_64x64_generic;
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, kvz_pixel, 8bit)
-SATD_NXN(16, kvz_pixel, 8bit)
-SATD_NXN(32, kvz_pixel, 8bit)
-SATD_NXN(64, kvz_pixel, 8bit)
+SATD_NXN(8, kvz_pixel)
+SATD_NXN(16, kvz_pixel)
+SATD_NXN(32, kvz_pixel)
+SATD_NXN(64, kvz_pixel)
 
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
-#define SAD_NXN(n, pixel_type, suffix) \
-static unsigned sad_ ## suffix ## _ ##  n ## x ## n ## _generic( \
+#define SAD_NXN(n, pixel_type) \
+static unsigned sad_ ##  n ## x ## n ## _generic( \
   const pixel_type * const block1, const pixel_type * const block2) \
 { \
   unsigned i; \
@@ -327,20 +327,20 @@ static unsigned sad_ ## suffix ## _ ##  n ## x ## n ## _generic( \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
-static cost_pixel_nxn_func sad_8bit_4x4_generic;
-static cost_pixel_nxn_func sad_8bit_8x8_generic;
-static cost_pixel_nxn_func sad_8bit_16x16_generic;
-static cost_pixel_nxn_func sad_8bit_32x32_generic;
-static cost_pixel_nxn_func sad_8bit_64x64_generic;
+static cost_pixel_nxn_func sad_4x4_generic;
+static cost_pixel_nxn_func sad_8x8_generic;
+static cost_pixel_nxn_func sad_16x16_generic;
+static cost_pixel_nxn_func sad_32x32_generic;
+static cost_pixel_nxn_func sad_64x64_generic;
 
 // These macros define sad_16bit_nxn functions for n = 4, 8, 16, 32, 64
 // with function signatures of cost_16bit_nxn_func.
 // They are used through get_pixel_sad_func.
-SAD_NXN(4, kvz_pixel, 8bit)
-SAD_NXN(8, kvz_pixel, 8bit)
-SAD_NXN(16, kvz_pixel, 8bit)
-SAD_NXN(32, kvz_pixel, 8bit)
-SAD_NXN(64, kvz_pixel, 8bit)
+SAD_NXN(4, kvz_pixel)
+SAD_NXN(8, kvz_pixel)
+SAD_NXN(16, kvz_pixel)
+SAD_NXN(32, kvz_pixel)
+SAD_NXN(64, kvz_pixel)
 
 
 int strategy_register_picture_generic(void* opaque)
@@ -349,17 +349,17 @@ int strategy_register_picture_generic(void* opaque)
 
   success &= strategyselector_register(opaque, "reg_sad", "generic", 0, &reg_sad_generic);
 
-  success &= strategyselector_register(opaque, "sad_8bit_4x4", "generic", 0, &sad_8bit_4x4_generic);
-  success &= strategyselector_register(opaque, "sad_8bit_8x8", "generic", 0, &sad_8bit_8x8_generic);
-  success &= strategyselector_register(opaque, "sad_8bit_16x16", "generic", 0, &sad_8bit_16x16_generic);
-  success &= strategyselector_register(opaque, "sad_8bit_32x32", "generic", 0, &sad_8bit_32x32_generic);
-  success &= strategyselector_register(opaque, "sad_8bit_64x64", "generic", 0, &sad_8bit_64x64_generic);
+  success &= strategyselector_register(opaque, "sad_4x4", "generic", 0, &sad_4x4_generic);
+  success &= strategyselector_register(opaque, "sad_8x8", "generic", 0, &sad_8x8_generic);
+  success &= strategyselector_register(opaque, "sad_16x16", "generic", 0, &sad_16x16_generic);
+  success &= strategyselector_register(opaque, "sad_32x32", "generic", 0, &sad_32x32_generic);
+  success &= strategyselector_register(opaque, "sad_64x64", "generic", 0, &sad_64x64_generic);
 
-  success &= strategyselector_register(opaque, "satd_8bit_4x4", "generic", 0, &satd_8bit_4x4_generic);
-  success &= strategyselector_register(opaque, "satd_8bit_8x8", "generic", 0, &satd_8bit_8x8_generic);
-  success &= strategyselector_register(opaque, "satd_8bit_16x16", "generic", 0, &satd_8bit_16x16_generic);
-  success &= strategyselector_register(opaque, "satd_8bit_32x32", "generic", 0, &satd_8bit_32x32_generic);
-  success &= strategyselector_register(opaque, "satd_8bit_64x64", "generic", 0, &satd_8bit_64x64_generic);
+  success &= strategyselector_register(opaque, "satd_4x4", "generic", 0, &satd_4x4_generic);
+  success &= strategyselector_register(opaque, "satd_8x8", "generic", 0, &satd_8x8_generic);
+  success &= strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
+  success &= strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
+  success &= strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
 
   return success;
 }

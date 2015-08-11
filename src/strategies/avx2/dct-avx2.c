@@ -357,6 +357,7 @@ int strategy_register_dct_avx2(void* opaque)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
+  #if KVZ_BIT_DEPTH == 8
   success &= strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
 
   success &= strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
@@ -370,6 +371,7 @@ int strategy_register_dct_avx2(void* opaque)
   success &= strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
   success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
   success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+  #endif //KVZ_BIT_DEPTH == 8
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }
