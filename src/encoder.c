@@ -141,7 +141,8 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
 
   // Config pointer to config struct
   encoder->cfg = cfg;
-  encoder->bitdepth = BIT_DEPTH;
+
+  encoder->bitdepth = KVZ_BIT_DEPTH;
 
   // deblocking filter
   encoder->deblock_enable    = 1;
@@ -398,8 +399,7 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
   encoder->pu_depth_intra.min = cfg->pu_depth_intra.min;
   encoder->pu_depth_intra.max = cfg->pu_depth_intra.max;
 
-  // input init (TODO: read from commandline / config)
-  encoder->bitdepth = 8;
+  // input init (TODO: read from commandline / config)  
   encoder->in.video_format = FORMAT_420;
 
   // deblocking filter

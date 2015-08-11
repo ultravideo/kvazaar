@@ -398,7 +398,7 @@ int quantize_residual(encoder_state_t *const state,
     for (y = 0; y < width; ++y) {
       for (x = 0; x < width; ++x) {
         int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
-        rec_out[x + y * out_stride] = (pixel_t)CLIP(0, PIXEL_MAX, val);
+        rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
       }
     }
   } else if (rec_out != pred_in) {

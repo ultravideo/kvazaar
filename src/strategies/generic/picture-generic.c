@@ -35,7 +35,7 @@ kvz_pixel fast_clip_16bit_to_pixel(int16_t value)
 
   if (value & ~PIXEL_MAX) {
     int16_t temp = (-value) >> 15;
-#if BIT_DEPTH == 10
+#if KVZ_BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
     return temp;
@@ -57,7 +57,7 @@ kvz_pixel fast_clip_32bit_to_pixel(int32_t value)
 
   if (value & ~PIXEL_MAX) {
     int32_t temp = (-value) >> 31;
-#if BIT_DEPTH == 10
+#if KVZ_BIT_DEPTH == 10
     temp &= PIXEL_MAX;
 #endif
     return temp;
@@ -296,7 +296,7 @@ unsigned satd_ ## suffix ## _ ## n ## x ## n ## _generic( \
   sum += satd_16bit_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
   } \
   } \
-  return sum>>(BIT_DEPTH-8); \
+  return sum>>(KVZ_BIT_DEPTH-8); \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
@@ -323,7 +323,7 @@ static unsigned sad_ ## suffix ## _ ##  n ## x ## n ## _generic( \
   for (i = 0; i < (n)*(n); ++i) { \
   sum += abs(block1[i] - block2[i]); \
   } \
-  return sum>>(BIT_DEPTH-8); \
+  return sum>>(KVZ_BIT_DEPTH-8); \
 }
 
 // Declare these functions to make sure the signature of the macro matches.

@@ -713,7 +713,7 @@ static void add_checksum(encoder_state_t * const state)
 
   nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
 
-  image_checksum(state->encoder_control->bitdepth,frame->rec, checksum);
+  image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
   WRITE_U(stream, 132, 8, "sei_type");
   WRITE_U(stream, 13, 8, "size");
