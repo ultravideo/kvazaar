@@ -69,9 +69,7 @@ void inter_recon_frac_luma(const encoder_state_t * const state, const kvz_pictur
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
 
-  int y, x;
-
-  #define FILTER_SIZE_Y 8 //Luma filter size
+ #define FILTER_SIZE_Y 8 //Luma filter size
 
   // Fractional luma 1/4-pel
   kvz_pixel qpel_src_y[(LCU_WIDTH + FILTER_SIZE_Y) * (LCU_WIDTH + FILTER_SIZE_Y)];
@@ -88,8 +86,6 @@ void inter_recon_14bit_frac_luma(const encoder_state_t * const state, const kvz_
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
-
-  int y, x;
 
 #define FILTER_SIZE_Y 8 //Luma filter size
 
