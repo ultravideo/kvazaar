@@ -209,8 +209,6 @@ void sample_14bit_quarterpel_luma_generic(const encoder_control_t * const encode
   int32_t x, y;
   int16_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
-  int32_t offset23 = 1 << (shift2 + shift3 - 1);
 
   //coefficients for 1/4, 2/4 and 3/4 positions
   int8_t *hor_filter = g_luma_filter[mv[0] & 3];
@@ -457,9 +455,6 @@ void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder,
   int32_t x, y;
   int16_t shift1 = KVZ_BIT_DEPTH - 8;
   int32_t shift2 = 6;
-  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
-  int32_t offset23 = 1 << (shift2 + shift3 - 1);
-
   int8_t *hor_filter = g_chroma_filter[mv[0] & 7];
   int8_t *ver_filter = g_chroma_filter[mv[1] & 7];
 
