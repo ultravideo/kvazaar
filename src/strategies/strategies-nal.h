@@ -37,7 +37,7 @@ typedef void (*array_checksum_func)(const kvz_pixel* data,
 extern array_checksum_func array_checksum;
 
 
-int strategy_register_nal(void* opaque);
+int strategy_register_nal(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_NAL_EXPORTS \

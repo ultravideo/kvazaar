@@ -20,7 +20,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_picture_generic(void* opaque);
+int strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1

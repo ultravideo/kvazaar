@@ -151,7 +151,7 @@ static void array_checksum_generic8(const kvz_pixel* data,
   checksum_out[3] = (checksum) & 0xff;
 }
 
-int strategy_register_nal_generic(void* opaque) {
+int strategy_register_nal_generic(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
   success &= strategyselector_register(opaque, "array_checksum", "generic", 0, &array_checksum_generic);

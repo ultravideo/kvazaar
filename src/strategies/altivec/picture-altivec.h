@@ -19,7 +19,8 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+#include  "global.h"
 
-int strategy_register_picture_altivec(void* opaque);
+int strategy_register_picture_altivec(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_PICTURE_ALTIVEC_H_

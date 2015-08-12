@@ -518,7 +518,7 @@ void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, i
 }
 
 
-int strategy_register_ipol_generic(void* opaque)
+int strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 

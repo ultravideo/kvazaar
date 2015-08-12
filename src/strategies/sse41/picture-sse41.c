@@ -93,12 +93,12 @@ static unsigned reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * c
 #endif //COMPILE_INTEL_SSE41
 
 
-int strategy_register_picture_sse41(void* opaque) {
+int strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE41
-  #if KVZ_BIT_DEPTH == 8
-  success &= strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
-  #endif //KVZ_BIT_DEPTH == 8
+  if (bitdepth == 8){
+    success &= strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
+  }
 #endif
   return success;
 }

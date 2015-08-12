@@ -46,25 +46,25 @@ cost_pixel_nxn_func * satd_64x64 = 0;
 #include "x86_asm/picture-x86-asm.h"
 
 
-int strategy_register_picture(void* opaque) {
+int strategy_register_picture(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= strategy_register_picture_generic(opaque);
+  success &= strategy_register_picture_generic(opaque, bitdepth);
 
   if (g_hardware_flags.intel_flags.sse2) {
-    success &= strategy_register_picture_sse2(opaque);
+    success &= strategy_register_picture_sse2(opaque, bitdepth);
   }
   if (g_hardware_flags.intel_flags.sse41) {
-    success &= strategy_register_picture_sse41(opaque);
+    success &= strategy_register_picture_sse41(opaque, bitdepth);
   }
   if (g_hardware_flags.intel_flags.avx) {
-    success &= strategy_register_picture_x86_asm_avx(opaque);
+    success &= strategy_register_picture_x86_asm_avx(opaque, bitdepth);
   }
   if (g_hardware_flags.intel_flags.avx2) {
-    success &= strategy_register_picture_avx2(opaque);
+    success &= strategy_register_picture_avx2(opaque, bitdepth);
   }
   if (g_hardware_flags.powerpc_flags.altivec) {
-    success &= strategy_register_picture_altivec(opaque);
+    success &= strategy_register_picture_altivec(opaque, bitdepth);
   }
 
   return success;

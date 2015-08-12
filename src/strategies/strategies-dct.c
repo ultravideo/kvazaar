@@ -42,13 +42,13 @@ dct_func * idct_32x32 = 0;
 #include "avx2/dct-avx2.h"
 
 
-int strategy_register_dct(void* opaque) {
+int strategy_register_dct(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= strategy_register_dct_generic(opaque);
+  success &= strategy_register_dct_generic(opaque, bitdepth);
 
   if (g_hardware_flags.intel_flags.avx2) {
-    success &= strategy_register_dct_avx2(opaque);
+    success &= strategy_register_dct_avx2(opaque, bitdepth);
   }
 
   return success;

@@ -77,10 +77,12 @@ static unsigned reg_sad_altivec(const pixel * const data1, const pixel * const d
 
 #endif //COMPILE_POWERPC_ALTIVEC
 
-int strategy_register_picture_altivec(void* opaque) {
+int strategy_register_picture_altivec(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_POWERPC_ALTIVEC
-  success &= strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec);
+  if(bitdepth == 8){
+    success &= strategyselector_register(opaque, "reg_sad", "altivec", 10, &reg_sad_altivec);
+  }
 #endif
   return success;
 }

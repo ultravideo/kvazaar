@@ -19,7 +19,8 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+#include  "global.h"
 
-int strategy_register_nal_generic(void* opaque);
+int strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_NAL_GENERIC_H_

@@ -140,7 +140,7 @@ static unsigned sad_8bit_64x64_avx2(const kvz_pixel * buf1, const kvz_pixel * bu
 #endif //COMPILE_INTEL_AVX2
 
 
-int strategy_register_picture_avx2(void* opaque)
+int strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
@@ -148,12 +148,12 @@ int strategy_register_picture_avx2(void* opaque)
   // transform skip, but we might again one day and this is some of the
   // simplest code to look at for anyone interested in doing more
   // optimizations, so it's worth it to keep this maintained.
-  #if KVZ_BIT_DEPTH == 8
-  success &= strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
-  success &= strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
-  success &= strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
-  success &= strategyselector_register(opaque, "sad_64x64", "avx2", 40, &sad_8bit_64x64_avx2);
-  #endif //KVZ_BIT_DEPTH == 8
+  if (bitdepth == 8){
+    success &= strategyselector_register(opaque, "sad_8x8", "avx2", 40, &sad_8bit_8x8_avx2);
+    success &= strategyselector_register(opaque, "sad_16x16", "avx2", 40, &sad_8bit_16x16_avx2);
+    success &= strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
+    success &= strategyselector_register(opaque, "sad_64x64", "avx2", 40, &sad_8bit_64x64_avx2);
+  }
 #endif
   return success;
 }

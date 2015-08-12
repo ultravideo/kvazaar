@@ -45,7 +45,7 @@ extern cost_pixel_nxn_func * satd_32x32;
 extern cost_pixel_nxn_func * satd_64x64;
 
 
-int strategy_register_picture(void* opaque);
+int strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * pixels_get_satd_func(unsigned n);
 cost_pixel_nxn_func * pixels_get_sad_func(unsigned n);
 

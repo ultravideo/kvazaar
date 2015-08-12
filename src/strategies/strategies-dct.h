@@ -41,7 +41,7 @@ extern dct_func * idct_16x16;
 extern dct_func * idct_32x32;
 
 
-int strategy_register_dct(void* opaque);
+int strategy_register_dct(void* opaque, uint8_t bitdepth);
 dct_func * get_dct_func(int8_t width, int32_t mode);
 dct_func * get_idct_func(int8_t width, int32_t mode);
 
