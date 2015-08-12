@@ -39,7 +39,7 @@ extern ipol_func * filter_inter_octpel_chroma;
 extern epol_func * extend_borders;
 
 
-int strategy_register_ipol(void* opaque);
+int strategy_register_ipol(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_IPOL_EXPORTS \

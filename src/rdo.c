@@ -208,7 +208,7 @@ uint32_t rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixe
     // SSD between original and reconstructed
     for (i = 0; i < width*width; i++) {
       //int diff = temp_block[i]-block[i];
-      int diff = orig_block[i] - CLIP(0, 255, pred[i] + temp_block[i]);
+      int diff = orig_block[i] - CLIP(0, PIXEL_MAX, pred[i] + temp_block[i]);
 
       ssd += diff*diff;
     }
@@ -559,7 +559,7 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
   uint32_t max_num_coeff   = width * height;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
   uint32_t abs_sum = 0;
 
   

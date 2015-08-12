@@ -1,5 +1,7 @@
 #ifndef STRATEGIES_PICTURE_SSE41_H_
 #define STRATEGIES_PICTURE_SSE41_H_
+
+#include  "global.h"
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -20,6 +22,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_picture_sse41(void* opaque);
+int strategy_register_picture_sse41(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_PICTURE_SSE41_H_

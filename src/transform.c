@@ -133,14 +133,14 @@ void itransform2d(const encoder_control_t * const encoder, int16_t *block, int16
  * \brief quantize transformed coefficents
  *
  */
-void quant(const encoder_state_t * const state, int16_t *coef, int16_t *q_coef, int32_t width,
+void quant(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
            int32_t height, int8_t type, int8_t scan_idx, int8_t block_type )
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
   const uint32_t * const scan = g_sig_last_scan[ scan_idx ][ log2_block_size - 1 ];
 
-  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
 
   const uint32_t log2_tr_size = g_convert_to_bit[ width ] + 2;
   const int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
@@ -163,7 +163,7 @@ void quant(const encoder_state_t * const state, int16_t *coef, int16_t *q_coef, 
     ac_sum += level;
 
     level *= sign;
-    q_coef[n] = (int16_t)(CLIP( -32768, 32767, level));
+    q_coef[n] = (coeff_t)(CLIP( -32768, 32767, level));
   }
 
   if (!(encoder->sign_hiding && ac_sum >= 2)) return;
@@ -262,14 +262,14 @@ void quant(const encoder_state_t * const state, int16_t *coef, int16_t *q_coef, 
  * \brief inverse quantize transformed and quantized coefficents
  *
  */
-void dequant(const encoder_state_t * const state, int16_t *q_coef, int16_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
+void dequant(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   int32_t shift,add,coeff_q;
   int32_t n;
   int32_t transform_shift = 15 - encoder->bitdepth - (g_convert_to_bit[ width ] + 2);
 
-  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, 0);
+  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
 
   shift = 20 - QUANT_SHIFT - transform_shift;
 
@@ -286,13 +286,13 @@ void dequant(const encoder_state_t * const state, int16_t *q_coef, int16_t *coef
 
       for (n = 0; n < width * height; n++) {
         coeff_q = ((q_coef[n] * dequant_coef[n]) + add ) >> (shift -  qp_scaled/6);
-        coef[n] = (int16_t)CLIP(-32768,32767,coeff_q);
+        coef[n] = (coeff_t)CLIP(-32768,32767,coeff_q);
       }
     } else {
       for (n = 0; n < width * height; n++) {
         // Clip to avoid possible overflow in following shift left operation
         coeff_q   = CLIP(-32768, 32767, q_coef[n] * dequant_coef[n]);
-        coef[n] = (int16_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
+        coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
       }
     }
   } else {
@@ -301,7 +301,7 @@ void dequant(const encoder_state_t * const state, int16_t *q_coef, int16_t *coef
 
     for (n = 0; n < width*height; n++) {
       coeff_q   = (q_coef[n] * scale + add) >> shift;
-      coef[n] = (int16_t)CLIP(-32768, 32767, coeff_q);
+      coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q);
     }
   }
 }
@@ -398,7 +398,7 @@ int quantize_residual(encoder_state_t *const state,
     for (y = 0; y < width; ++y) {
       for (x = 0; x < width; ++x) {
         int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
-        rec_out[x + y * out_stride] = (uint8_t)CLIP(0, 255, val);
+        rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
       }
     }
   } else if (rec_out != pred_in) {

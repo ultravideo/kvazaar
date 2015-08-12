@@ -940,6 +940,7 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
     gop_pictures_available = MAX(0, gop_pictures_available - cfg->gop_len);
     gop_buf_read_idx = (gop_buf_read_idx + cfg->gop_len) % gop_buf_size;
   }
+
   return 1;
 }
 

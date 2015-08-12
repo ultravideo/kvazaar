@@ -172,6 +172,28 @@ void yuv_t_free(yuv_t * yuv)
   free(yuv);
 }
 
+hi_prec_buf_t * hi_prec_buf_t_alloc(int luma_size)
+{
+  // Get buffers with separate mallocs in order to take advantage of
+  // automatic buffer overrun checks.
+  hi_prec_buf_t *yuv = (hi_prec_buf_t *)malloc(sizeof(*yuv));
+  yuv->y = (int16_t *)malloc(luma_size * sizeof(*yuv->y));
+  yuv->u = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->u));
+  yuv->v = (int16_t *)malloc(luma_size / 2 * sizeof(*yuv->v));
+  yuv->size = luma_size;
+
+  return yuv;
+}
+
+void hi_prec_buf_t_free(hi_prec_buf_t * yuv)
+{
+  free(yuv->y);
+  free(yuv->u);
+  free(yuv->v);
+  free(yuv);
+}
+
+
 /**
  * \brief Diagonally interpolate SAD outside the frame.
  *
@@ -426,10 +448,10 @@ unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_
     // SAD directly. This is the most common case, which is why it's first.
     const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
     const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
-    return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
+    return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride)>>(KVZ_BIT_DEPTH-8);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
-    return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height);
+    return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height) >> (KVZ_BIT_DEPTH - 8);
   }
 }
 

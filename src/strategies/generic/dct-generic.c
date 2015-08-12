@@ -620,7 +620,7 @@ static void fast_inverse_dst_4x4_generic(int8_t bitdepth, const int16_t *input, 
   fast_inverse_dst_4_generic(tmp, output, shift_2nd);
 }
 
-int strategy_register_dct_generic(void* opaque)
+int strategy_register_dct_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 

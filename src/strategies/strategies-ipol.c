@@ -32,13 +32,13 @@ epol_func *extend_borders;
 #include "avx2/ipol-avx2.h"
 
 
-int strategy_register_ipol(void* opaque) {
+int strategy_register_ipol(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= strategy_register_ipol_generic(opaque);
+  success &= strategy_register_ipol_generic(opaque, bitdepth);
 
   if (g_hardware_flags.intel_flags.avx2) {
-    success &= strategy_register_ipol_avx2(opaque);
+    success &= strategy_register_ipol_avx2(opaque, bitdepth);
   }
   return success;
 }

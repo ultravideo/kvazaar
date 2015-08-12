@@ -139,7 +139,7 @@ typedef struct {
 extern hardware_flags_t g_hardware_flags;
 
 
-int strategyselector_init(int32_t cpuid);
+int strategyselector_init(int32_t cpuid, uint8_t bitdepth);
 int strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
 
 

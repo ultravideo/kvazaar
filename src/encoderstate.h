@@ -220,7 +220,7 @@ void encode_last_significant_xy(encoder_state_t *state,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan);
-void encode_coeff_nxn(encoder_state_t *state, int16_t *coeff, uint8_t width,
+void encode_coeff_nxn(encoder_state_t *state, coeff_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
 void encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);

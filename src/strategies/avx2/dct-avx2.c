@@ -353,23 +353,25 @@ ITRANSFORM(dct, 32);
 
 #endif //COMPILE_INTEL_AVX2
 
-int strategy_register_dct_avx2(void* opaque)
+int strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-  success &= strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
+  if (bitdepth == 8){
+    success &= strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
 
-  success &= strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
-  success &= strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
-  success &= strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
-  success &= strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
+    success &= strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
+    success &= strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
+    success &= strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
+    success &= strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
 
-  success &= strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
+    success &= strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
 
-  success &= strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
-  success &= strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
-  success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
-  success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+    success &= strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
+    success &= strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
+    success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
+    success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+  }
 #endif //COMPILE_INTEL_AVX2  
   return success;
 }

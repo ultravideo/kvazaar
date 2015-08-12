@@ -39,7 +39,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
 //Strategies to include (add new file here)
 
 //Returns 1 if successful
-int strategyselector_init(int32_t cpuid) {
+int strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
   const strategy_to_select_t *cur_strategy_to_select = strategies_to_select;
   strategy_list_t strategies;
   
@@ -50,22 +50,22 @@ int strategyselector_init(int32_t cpuid) {
   set_hardware_flags(cpuid);
   
   //Add new register function here
-  if (!strategy_register_picture(&strategies)) {
+  if (!strategy_register_picture(&strategies, bitdepth)) {
     fprintf(stderr, "strategy_register_picture failed!\n");
     return 0;
   }
   
-  if (!strategy_register_nal(&strategies)) {
+  if (!strategy_register_nal(&strategies, bitdepth)) {
     fprintf(stderr, "strategy_register_nal failed!\n");
     return 0;
   }
 
-  if (!strategy_register_dct(&strategies)) {
+  if (!strategy_register_dct(&strategies, bitdepth)) {
     fprintf(stderr, "strategy_register_dct failed!\n");
     return 0;
   }
 
-  if (!strategy_register_ipol(&strategies)) {
+  if (!strategy_register_ipol(&strategies, bitdepth)) {
     fprintf(stderr, "strategy_register_ipol failed!\n");
     return 0;
   }

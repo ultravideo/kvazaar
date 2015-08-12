@@ -53,8 +53,8 @@ static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
   // Profile Tier
   WRITE_U(stream, 0, 2, "general_profile_space");
   WRITE_U(stream, 0, 1, "general_tier_flag");
-  // Main Profile == 1
-  WRITE_U(stream, 1, 5, "general_profile_idc");
+  // Main Profile == 1,  Main 10 profile == 2
+  WRITE_U(stream, (state->encoder_control->bitdepth == 8)?1:2, 5, "general_profile_idc");
   /* Compatibility flags should be set at general_profile_idc
    *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
    * According to specification, when compatibility_flag[1] is set,
@@ -327,8 +327,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   //IF window flag
   //END IF
 
-  WRITE_UE(stream, encoder->in.bitdepth-8, "bit_depth_luma_minus8");
-  WRITE_UE(stream, encoder->in.bitdepth-8, "bit_depth_chroma_minus8");
+  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
+  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
   WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
@@ -713,7 +713,7 @@ static void add_checksum(encoder_state_t * const state)
 
   nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
 
-  image_checksum(frame->rec, checksum);
+  image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
   WRITE_U(stream, 132, 8, "sei_type");
   WRITE_U(stream, 13, 8, "size");
