@@ -118,7 +118,7 @@ double select_picture_lambda(encoder_state_t * const state)
 
   assert(encoder->cfg->target_bitrate > 0);
 
-  if (state->global->frame > encoder->cfg->owf) {
+  if (state->global->frame > encoder->owf) {
     // At least one frame has been written.
     update_rc_parameters(state);
   }
