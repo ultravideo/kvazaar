@@ -151,7 +151,6 @@ OBJS = \
   bitstream.o \
   cabac.o \
   checkpoint.o \
-  cli.o \
   config.o \
   context.o \
   cu.o \
@@ -179,7 +178,6 @@ OBJS = \
   encoder_state-geometry.o \
   image.o \
   videoframe.o \
-  yuv_io.o \
   strategies/strategies-picture.o \
   strategies/strategies-nal.o \
   strategies/strategies-dct.o \
@@ -214,7 +212,10 @@ TEST_OBJS := \
   $(TESTDIR)/tests_main.o \
   $(TESTDIR)/test_strategies.o
 
-MAIN_OBJS := encmain.o interface_main.o
+MAIN_OBJS := \
+    encmain.o \
+    cli.o \
+    yuv_io.o
 
 RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
 # Compile separate PIC objects for Linux/OSX.
