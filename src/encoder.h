@@ -55,6 +55,7 @@ typedef struct encoder_control_t
     int8_t video_format;
     int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
     int64_t pixels_per_pic;
+    int8_t source_scan_type;
   } in;
   
   /* TODO: add ME data */
