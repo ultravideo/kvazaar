@@ -253,7 +253,7 @@ $(DYLIB): LDFLAGS += -dynamiclib \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
 
-$(PROG): $(RELEASE_OBJS)
+$(PROG): $(MAIN_OBJS) $(STATIC)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(STATIC): $(OBJS)
