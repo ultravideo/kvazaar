@@ -481,40 +481,56 @@ void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder,
   }
 }
 
-void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, kvz_pixel *dst) {
 
-  int16_t mv[2] = { mv_x, mv_y };
+void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
+  int filterSize, int width, int height, extended_block *out) {
+
   int halfFilterSize = filterSize >> 1;
 
-  int dst_y; int y; int dst_x; int x; int coord_x; int coord_y;
-  int8_t overflow_neg_y_temp, overflow_pos_y_temp, overflow_neg_x_temp, overflow_pos_x_temp;
+  out->buffer = ref + (ypos - halfFilterSize + off_y + mv_y) * ref_width + (xpos - halfFilterSize + off_x + mv_x);
+  out->stride = ref_width;
+  out->orig_topleft = out->buffer + out->stride * halfFilterSize + halfFilterSize;
+  out->malloc_used = 0;
 
-  for (dst_y = 0, y = ypos - halfFilterSize; y < ((ypos + height)) + halfFilterSize; dst_y++, y++) {
+  int min_y = ypos - halfFilterSize + off_y + mv_y;
+  int max_y = min_y + height + filterSize;
+  int out_of_bounds_y = (min_y < 0) || (max_y >= ref_height);
 
-    // calculate y-pixel offset
-    coord_y = y + off_y + mv[1];
+  int min_x = xpos - halfFilterSize + off_x + mv_x;
+  int max_x = min_x + width + filterSize;
+  int out_of_bounds_x = (min_x < 0) || (max_x >= ref_width);
 
-    // On y-overflow set coord_y accordingly
-    overflow_neg_y_temp = (coord_y < 0) ? 1 : 0;
-    overflow_pos_y_temp = (coord_y >= ref_height) ? 1 : 0;
-    if (overflow_neg_y_temp)      coord_y = 0;
-    else if (overflow_pos_y_temp) coord_y = (ref_height)-1;
-    coord_y *= ref_width;
+  int sample_out_of_bounds = out_of_bounds_y || out_of_bounds_x;
 
-    for (dst_x = 0, x = (xpos)-halfFilterSize; x < ((xpos + width)) + halfFilterSize; dst_x++, x++) {
-      coord_x = x + off_x + mv[0];
+  if (sample_out_of_bounds){
+    out->buffer = MALLOC(kvz_pixel, (width + filterSize) * (width + filterSize));
+    out->stride = width + filterSize;
+    out->orig_topleft = out->buffer + out->stride * halfFilterSize + halfFilterSize;
+    out->malloc_used = 1;
 
-      // On x-overflow set coord_x accordingly
-      overflow_neg_x_temp = (coord_x < 0) ? 1 : 0;
-      overflow_pos_x_temp = (coord_x >= ref_width) ? 1 : 0;
-      if (overflow_neg_x_temp)      coord_x = 0;
-      else if (overflow_pos_x_temp) coord_x = ref_width - 1;
+    int dst_y; int y; int dst_x; int x; int coord_x; int coord_y;
 
-      // Store source block data (with extended borders)
-      dst[dst_y*(width + filterSize) + dst_x] = ref[coord_y + coord_x];
+    for (dst_y = 0, y = ypos - halfFilterSize; y < ((ypos + height)) + halfFilterSize; dst_y++, y++) {
+
+      // calculate y-pixel offset
+      coord_y = y + off_y + mv_y;
+      coord_y = CLIP(0, (ref_height)-1, coord_y);
+      coord_y *= ref_width;
+
+      if (!out_of_bounds_x){
+        memcpy(&out->buffer[dst_y*(width + filterSize) + 0], &ref[coord_y + min_x], (width + filterSize) * sizeof(kvz_pixel));
+      } else {
+        for (dst_x = 0, x = (xpos)-halfFilterSize; x < ((xpos + width)) + halfFilterSize; dst_x++, x++) {
+
+          coord_x = x + off_x + mv_x;
+          coord_x = CLIP(0, (ref_width)-1, coord_x);
+
+          // Store source block data (with extended borders)
+          out->buffer[dst_y*(width + filterSize) + dst_x] = ref[coord_y + coord_x];
+        }
+      }
     }
-  }
+  } 
 }
 
 
