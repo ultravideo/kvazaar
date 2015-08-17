@@ -504,6 +504,10 @@ void get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int off_
 
   if (sample_out_of_bounds){
     out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (width + filter_size));
+    if (!out->buffer){
+      printf("Memory allocation failed!\n");
+      assert(0);
+    }
     out->stride = width + filter_size;
     out->orig_topleft = out->buffer + out->stride * half_filter_size + half_filter_size;
     out->malloc_used = 1;
