@@ -144,7 +144,7 @@ void filter_inter_quarterpel_luma_generic(const encoder_control_t * const encode
 
   // Filter horizontally and flip x and y
   for (x = 0; x < width; ++x) {
-    for (y = 0; y < height + FILTER_SIZE; ++y) {
+    for (y = 0; y < height + FILTER_SIZE - 1; ++y) {
       int ypos = y - FILTER_OFFSET;
       int xpos = x - FILTER_OFFSET;
       // Original pixel
@@ -186,7 +186,7 @@ void sample_quarterpel_luma_generic(const encoder_control_t * const encoder, kvz
 
   // Filter horizontally and flip x and y
   for (x = 0; x < width; ++x) {
-    for (y = 0; y < height + FILTER_SIZE; ++y) {
+    for (y = 0; y < height + FILTER_SIZE - 1; ++y) {
       int ypos = y - FILTER_OFFSET;
       int xpos = x - FILTER_OFFSET;
       flipped_hor_filtered[x][y] = eight_tap_filter_hor_generic(hor_filter, &src[src_stride*ypos + xpos]) >> shift1;
@@ -218,7 +218,7 @@ void sample_14bit_quarterpel_luma_generic(const encoder_control_t * const encode
 
   // Filter horizontally and flip x and y
   for (x = 0; x < width; ++x) {
-    for (y = 0; y < height + FILTER_SIZE; ++y) {
+    for (y = 0; y < height + FILTER_SIZE - 1; ++y) {
       int ypos = y - FILTER_OFFSET;
       int xpos = x - FILTER_OFFSET;
       flipped_hor_filtered[x][y] = eight_tap_filter_hor_generic(hor_filter, &src[src_stride*ypos + xpos]) >> shift1;
@@ -432,7 +432,7 @@ void sample_octpel_chroma_generic(const encoder_control_t * const encoder, kvz_p
 
   // Filter horizontally and flip x and y
   for (x = 0; x < width; ++x) {
-    for (y = 0; y < height + FILTER_SIZE_C; ++y) {
+    for (y = 0; y < height + FILTER_SIZE_C - 1; ++y) {
       int ypos = y - FILTER_OFFSET_C;
       int xpos = x - FILTER_OFFSET_C;
       flipped_hor_filtered[x][y] = four_tap_filter_hor_generic(hor_filter, &src[src_stride*ypos + xpos]) >> shift1;
@@ -464,7 +464,7 @@ void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder,
 
   // Filter horizontally and flip x and y
   for (x = 0; x < width; ++x) {
-    for (y = 0; y < height + FILTER_SIZE_C; ++y) {
+    for (y = 0; y < height + FILTER_SIZE_C - 1; ++y) {
       int ypos = y - FILTER_OFFSET_C;
       int xpos = x - FILTER_OFFSET_C;
       flipped_hor_filtered[x][y] = four_tap_filter_hor_generic(hor_filter, &src[src_stride*ypos + xpos]) >> shift1;

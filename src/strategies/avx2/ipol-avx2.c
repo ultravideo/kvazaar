@@ -280,7 +280,7 @@ void filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, 
     
     }
 
-    for (; y < height + FILTER_SIZE; ++y) {
+    for (; y < height + FILTER_SIZE - 1; ++y) {
       int ypos = y - FILTER_OFFSET;
       int xpos = x - FILTER_OFFSET;
       flipped_hor_filtered[4 * x + 0][y] = eight_tap_filter_hor_avx2(c0, &src[src_stride*ypos + xpos]) << shift1;
