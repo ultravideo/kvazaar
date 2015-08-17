@@ -815,24 +815,22 @@ static unsigned search_frac(const encoder_state_t * const state,
   #define FILTER_SIZE 8
   #define HALF_FILTER (FILTER_SIZE>>1)
 
-  //create buffer for block + extra for filter
-  int src_stride = block_width+FILTER_SIZE+1;
-  kvz_pixel src[(LCU_WIDTH+FILTER_SIZE+1) * (LCU_WIDTH+FILTER_SIZE+1)];
-  kvz_pixel* src_off = &src[HALF_FILTER+HALF_FILTER*(block_width+FILTER_SIZE+1)];
+  kvz_extended_block src = { 0, 0, 0 };
 
   //destination buffer for interpolation
   int dst_stride = (block_width+1)*4;
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
-  extend_borders(orig->x, orig->y, mv.x-1, mv.y-1,
+  get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
                 state->tile->lcu_offset_x * LCU_WIDTH,
                 state->tile->lcu_offset_y * LCU_WIDTH,
-                ref->y, ref->width, ref->height, FILTER_SIZE, block_width+1, block_width+1, src);
+                ref->y, ref->width, ref->height, FILTER_SIZE, block_width+1, block_width+1, &src);
 
-  filter_inter_quarterpel_luma(state->encoder_control, src_off, src_stride, block_width+1,
+  filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, block_width+1,
       block_width+1, dst, dst_stride, 1, 1);
 
+  if (src.malloc_used) free(src.buffer);
 
   //Set mv to half-pixel precision
   mv.x <<= 1;
