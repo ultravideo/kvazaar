@@ -30,7 +30,7 @@ typedef unsigned(ipol_func)(const encoder_control_t * encoder, kvz_pixel *src, i
   int16_t dst_stride, int8_t hor_flag, int8_t ver_flag);
 
 typedef unsigned(epol_func)(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, kvz_extended_block *out);
+  int filter_size, int width, int height, kvz_extended_block *out);
 
 
 // Declare function pointers.

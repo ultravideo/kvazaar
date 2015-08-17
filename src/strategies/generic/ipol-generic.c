@@ -483,34 +483,34 @@ void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder,
 
 
 void get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, kvz_extended_block *out) {
+  int filter_size, int width, int height, kvz_extended_block *out) {
 
-  int halfFilterSize = filterSize >> 1;
+  int half_filter_size = filter_size >> 1;
 
-  out->buffer = ref + (ypos - halfFilterSize + off_y + mv_y) * ref_width + (xpos - halfFilterSize + off_x + mv_x);
+  out->buffer = ref + (ypos - half_filter_size + off_y + mv_y) * ref_width + (xpos - half_filter_size + off_x + mv_x);
   out->stride = ref_width;
-  out->orig_topleft = out->buffer + out->stride * halfFilterSize + halfFilterSize;
+  out->orig_topleft = out->buffer + out->stride * half_filter_size + half_filter_size;
   out->malloc_used = 0;
 
-  int min_y = ypos - halfFilterSize + off_y + mv_y;
-  int max_y = min_y + height + filterSize;
+  int min_y = ypos - half_filter_size + off_y + mv_y;
+  int max_y = min_y + height + filter_size;
   int out_of_bounds_y = (min_y < 0) || (max_y >= ref_height);
 
-  int min_x = xpos - halfFilterSize + off_x + mv_x;
-  int max_x = min_x + width + filterSize;
+  int min_x = xpos - half_filter_size + off_x + mv_x;
+  int max_x = min_x + width + filter_size;
   int out_of_bounds_x = (min_x < 0) || (max_x >= ref_width);
 
   int sample_out_of_bounds = out_of_bounds_y || out_of_bounds_x;
 
   if (sample_out_of_bounds){
-    out->buffer = MALLOC(kvz_pixel, (width + filterSize) * (width + filterSize));
-    out->stride = width + filterSize;
-    out->orig_topleft = out->buffer + out->stride * halfFilterSize + halfFilterSize;
+    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (width + filter_size));
+    out->stride = width + filter_size;
+    out->orig_topleft = out->buffer + out->stride * half_filter_size + half_filter_size;
     out->malloc_used = 1;
 
     int dst_y; int y; int dst_x; int x; int coord_x; int coord_y;
 
-    for (dst_y = 0, y = ypos - halfFilterSize; y < ((ypos + height)) + halfFilterSize; dst_y++, y++) {
+    for (dst_y = 0, y = ypos - half_filter_size; y < ((ypos + height)) + half_filter_size; dst_y++, y++) {
 
       // calculate y-pixel offset
       coord_y = y + off_y + mv_y;
@@ -518,15 +518,15 @@ void get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int off_
       coord_y *= ref_width;
 
       if (!out_of_bounds_x){
-        memcpy(&out->buffer[dst_y*(width + filterSize) + 0], &ref[coord_y + min_x], (width + filterSize) * sizeof(kvz_pixel));
+        memcpy(&out->buffer[dst_y*(width + filter_size) + 0], &ref[coord_y + min_x], (width + filter_size) * sizeof(kvz_pixel));
       } else {
-        for (dst_x = 0, x = (xpos)-halfFilterSize; x < ((xpos + width)) + halfFilterSize; dst_x++, x++) {
+        for (dst_x = 0, x = (xpos)-half_filter_size; x < ((xpos + width)) + half_filter_size; dst_x++, x++) {
 
           coord_x = x + off_x + mv_x;
           coord_x = CLIP(0, (ref_width)-1, coord_x);
 
           // Store source block data (with extended borders)
-          out->buffer[dst_y*(width + filterSize) + dst_x] = ref[coord_y + coord_x];
+          out->buffer[dst_y*(width + filter_size) + dst_x] = ref[coord_y + coord_x];
         }
       }
     }
