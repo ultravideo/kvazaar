@@ -24,20 +24,20 @@
 
 #include "encoder.h"
 
-typedef struct { kvz_pixel *buffer; kvz_pixel *orig_topleft; unsigned stride; unsigned malloc_used; } extended_block;
+typedef struct { kvz_pixel *buffer; kvz_pixel *orig_topleft; unsigned stride; unsigned malloc_used; } kvz_extended_block;
 
 typedef unsigned(ipol_func)(const encoder_control_t * encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst,
   int16_t dst_stride, int8_t hor_flag, int8_t ver_flag);
 
 typedef unsigned(epol_func)(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, extended_block *out);
+  int filterSize, int width, int height, kvz_extended_block *out);
 
 
 // Declare function pointers.
 extern ipol_func * filter_inter_quarterpel_luma;
 extern ipol_func * filter_inter_halfpel_chroma;
 extern ipol_func * filter_inter_octpel_chroma;
-extern epol_func * extend_borders;
+extern epol_func * get_extended_block;
 
 
 int strategy_register_ipol(void* opaque, uint8_t bitdepth);
@@ -47,7 +47,7 @@ int strategy_register_ipol(void* opaque, uint8_t bitdepth);
   {"filter_inter_quarterpel_luma", (void**) &filter_inter_quarterpel_luma}, \
   {"filter_inter_halfpel_chroma", (void**) &filter_inter_halfpel_chroma}, \
   {"filter_inter_octpel_chroma", (void**) &filter_inter_octpel_chroma}, \
-  {"extend_borders", (void**) &extend_borders}, \
+  {"get_extended_block", (void**) &get_extended_block}, \
 
 
 

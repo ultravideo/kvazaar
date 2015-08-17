@@ -482,8 +482,8 @@ void sample_14bit_octpel_chroma_generic(const encoder_control_t * const encoder,
 }
 
 
-void extend_borders_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, extended_block *out) {
+void get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
+  int filterSize, int width, int height, kvz_extended_block *out) {
 
   int halfFilterSize = filterSize >> 1;
 
@@ -541,7 +541,7 @@ int strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)
   success &= strategyselector_register(opaque, "filter_inter_quarterpel_luma", "generic", 0, &filter_inter_quarterpel_luma_generic);
   success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "generic", 0, &filter_inter_halfpel_chroma_generic);
   success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "generic", 0, &filter_inter_octpel_chroma_generic);
-  success &= strategyselector_register(opaque, "extend_borders", "generic", 0, &extend_borders_generic);
+  success &= strategyselector_register(opaque, "get_extended_block", "generic", 0, &get_extended_block_generic);
 
   return success;
 }

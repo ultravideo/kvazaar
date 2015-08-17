@@ -25,7 +25,7 @@
 ipol_func *filter_inter_quarterpel_luma;
 ipol_func *filter_inter_halfpel_chroma;
 ipol_func *filter_inter_octpel_chroma;
-epol_func *extend_borders;
+epol_func *get_extended_block;
 
 // Headers for platform optimizations.
 #include "generic/ipol-generic.h"

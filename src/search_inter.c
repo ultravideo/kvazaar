@@ -815,14 +815,14 @@ static unsigned search_frac(const encoder_state_t * const state,
   #define FILTER_SIZE 8
   #define HALF_FILTER (FILTER_SIZE>>1)
 
-  extended_block src = {0, 0, 0};
+  kvz_extended_block src = { 0, 0, 0 };
 
   //destination buffer for interpolation
   int dst_stride = (block_width+1)*4;
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
-  extend_borders(orig->x, orig->y, mv.x-1, mv.y-1,
+  get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
                 state->tile->lcu_offset_x * LCU_WIDTH,
                 state->tile->lcu_offset_y * LCU_WIDTH,
                 ref->y, ref->width, ref->height, FILTER_SIZE, block_width+1, block_width+1, &src);

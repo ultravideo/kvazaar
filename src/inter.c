@@ -72,10 +72,10 @@ void inter_recon_frac_luma(const encoder_state_t * const state, const kvz_pictur
  #define FILTER_SIZE_Y 8 //Luma filter size
 
   // Fractional luma 1/4-pel
-  extended_block src = {0, 0, 0};
+  kvz_extended_block src = {0, 0, 0};
 
   // Fractional luma
-  extend_borders(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
+  get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
     ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, &src);
   sample_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
     block_width, lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
@@ -91,10 +91,10 @@ void inter_recon_14bit_frac_luma(const encoder_state_t * const state, const kvz_
 #define FILTER_SIZE_Y 8 //Luma filter size
 
   // Fractional luma 1/4-pel
-  extended_block src = {0, 0, 0};
+  kvz_extended_block src = { 0, 0, 0 };
 
   // Fractional luma
-  extend_borders(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
+  get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
     ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, &src);
   sample_14bit_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
     block_width, hi_prec_out->y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
@@ -115,17 +115,17 @@ void inter_recon_frac_chroma(const encoder_state_t * const state, const kvz_pict
 #define FILTER_SIZE_C 4 //Chroma filter size
 
   // Fractional chroma 1/8-pel
-  extended_block src_u = { 0, 0, 0 };
-  extended_block src_v = { 0, 0, 0 };
+  kvz_extended_block src_u = { 0, 0, 0 };
+  kvz_extended_block src_v = { 0, 0, 0 };
 
   //Fractional chroma U
-  extend_borders(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_u);
   sample_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
     block_width, lcu->rec.u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   //Fractional chroma V
-  extend_borders(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_v);
   sample_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_u.stride, block_width,
     block_width, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
@@ -147,17 +147,17 @@ void inter_recon_14bit_frac_chroma(const encoder_state_t * const state, const kv
 #define FILTER_SIZE_C 4 //Chroma filter size
 
   // Fractional chroma 1/8-pel
-  extended_block src_u = {0, 0, 0};
-  extended_block src_v = { 0, 0, 0 };
+  kvz_extended_block src_u = { 0, 0, 0 };
+  kvz_extended_block src_v = { 0, 0, 0 };
 
   //Fractional chroma U
-  extend_borders(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_u);
   sample_14bit_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
     block_width, hi_prec_out->u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   //Fractional chroma V
-  extend_borders(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_v);
   sample_14bit_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
     block_width, hi_prec_out->v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);

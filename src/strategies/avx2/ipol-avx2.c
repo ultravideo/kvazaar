@@ -481,8 +481,8 @@ void filter_inter_octpel_chroma_avx2(const encoder_control_t * const encoder, kv
   }
 }
 
-void extend_borders_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
-  int filterSize, int width, int height, extended_block *out) {
+void get_extended_block_avx2(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
+  int filterSize, int width, int height, kvz_extended_block *out) {
 
   int halfFilterSize = filterSize >> 1;
 
@@ -543,7 +543,7 @@ int strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
     success &= strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 40, &filter_inter_halfpel_chroma_avx2);
     success &= strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 40, &filter_inter_octpel_chroma_avx2);
   }
-  success &= strategyselector_register(opaque, "extend_borders", "avx2", 40, &extend_borders_avx2);
+  success &= strategyselector_register(opaque, "get_extended_block", "avx2", 40, &get_extended_block_avx2);
 #endif //COMPILE_INTEL_AVX2
   return success;
 }
