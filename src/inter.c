@@ -127,7 +127,7 @@ void inter_recon_frac_chroma(const encoder_state_t * const state, const kvz_pict
   //Fractional chroma V
   get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_v);
-  sample_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_u.stride, block_width,
+  sample_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
     block_width, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   if (src_u.malloc_used) free(src_u.buffer);
