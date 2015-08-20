@@ -20,6 +20,7 @@
 *.log
 .kdev4
 src/kvazaar
+src/libkvazaar.a
 src/libkvazaar.so.*
 src/kvazaar.dll
 src/libkvazaar.dll.a
