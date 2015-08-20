@@ -191,8 +191,9 @@ int main(int argc, char *argv[])
       }
 
       kvz_data_chunk* chunks_out = NULL;
+      kvz_picture *img_rec = NULL;
       uint32_t len_out = 0;
-      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, NULL)) {
+      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, &img_rec)) {
         fprintf(stderr, "Failed to encode image.\n");
         api->picture_free(img_in);
         goto exit_failure;
@@ -231,7 +232,18 @@ int main(int argc, char *argv[])
           enc->num_encoder_states
         ];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_compute_stats(state, recout, frame_psnr);
+        encoder_compute_stats(state, frame_psnr);
+
+        if (recout) {
+          // Since chunks_out was not NULL, img_rec should have been set.
+          assert(img_rec);
+          if (!yuv_io_write(recout,
+                            img_rec,
+                            opts->config->width,
+                            opts->config->height)) {
+            fprintf(stderr, "Failed to write reconstructed picture!\n");
+          }
+        }
 
         frames_done += 1;
         psnr_sum[0] += frame_psnr[0];
@@ -243,6 +255,7 @@ int main(int argc, char *argv[])
 
       api->picture_free(img_in);
       api->chunk_free(chunks_out);
+      api->picture_free(img_rec);
     }
 
     GET_TIME(&encoding_end_real_time);

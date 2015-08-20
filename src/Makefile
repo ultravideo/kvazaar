@@ -21,6 +21,7 @@ DEBUG  = kvazaar_debug
 TESTS  = kvazaar_tests
 
 NAME   = libkvazaar
+STATIC = $(NAME).a
 SO     = $(NAME).so
 LIB    = $(SO).$(VER_MAJOR).$(VER_MINOR).$(VER_RELEASE)
 DYLIB  = $(NAME).$(VER_MAJOR).dylib
@@ -34,6 +35,7 @@ AS = yasm
 LD = $(CC)
 INSTALL = install
 LN_S = ln -s
+RANLIB = ranlib
 
 # Do not use variable length arrays because they don't work in Visual Studio 2013.
 WARNINGS = -Werror -Wall -Wtype-limits -Wvla
@@ -137,13 +139,17 @@ endif
 
 # Compile files in strategy directories with appropriate flags.
 ifeq ($(ARCH), ppc64)
-  strategies/altivec/%.o: EXTRA_FLAGS += -maltivec -fno-lto
+  strategies/altivec/%.o:  EXTRA_FLAGS += -maltivec -fno-lto
+  strategies/altivec/%.lo: EXTRA_FLAGS += -maltivec -fno-lto
 else
-  strategies/sse2/%.o: EXTRA_FLAGS += -msse2 -fno-lto
-  strategies/sse41/%.o: EXTRA_FLAGS += -msse4.1 -fno-lto
+  strategies/sse2/%.o:   EXTRA_FLAGS += -msse2   -fno-lto
+  strategies/sse41/%.o:  EXTRA_FLAGS += -msse4.1 -fno-lto
+  strategies/sse2/%.lo:  EXTRA_FLAGS += -msse2   -fno-lto
+  strategies/sse41/%.lo: EXTRA_FLAGS += -msse4.1 -fno-lto
   # Needs to be defined on Travis
   ifndef KVZ_DISABLE_AVX2
-    strategies/avx2/%.o: EXTRA_FLAGS += -mavx2 -fno-lto
+    strategies/avx2/%.o:  EXTRA_FLAGS += -mavx2 -fno-lto
+    strategies/avx2/%.lo: EXTRA_FLAGS += -mavx2 -fno-lto
   endif
 endif
 
@@ -151,7 +157,6 @@ OBJS = \
   bitstream.o \
   cabac.o \
   checkpoint.o \
-  cli.o \
   config.o \
   context.o \
   cu.o \
@@ -179,7 +184,6 @@ OBJS = \
   encoder_state-geometry.o \
   image.o \
   videoframe.o \
-  yuv_io.o \
   strategies/strategies-picture.o \
   strategies/strategies-nal.o \
   strategies/strategies-dct.o \
@@ -214,15 +218,14 @@ TEST_OBJS := \
   $(TESTDIR)/tests_main.o \
   $(TESTDIR)/test_strategies.o
 
-MAIN_OBJS := encmain.o interface_main.o
+MAIN_OBJS := \
+    encmain.o \
+    cli.o \
+    yuv_io.o
 
 RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
-# Compile separate PIC objects for Linux/OSX.
-ifeq ($(SYSTEM), Windows)
-  LIB_OBJS = $(OBJS)
-else
-  LIB_OBJS = $(OBJS:.o=.lo)
-endif
+# Compile separate PIC objects for shared libraries
+SHARED_OBJS = $(OBJS:.o=.lo)
 DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
 TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
@@ -231,7 +234,7 @@ DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 .PHONY: cli lib-shared lib-static debug tests build_tests
 cli: $(PROG)
 lib-shared: $(LIBKVAZAAR_SHARED)
-lib-static: # TODO
+lib-static: $(STATIC)
 
 debug: LDFLAGS := $(filter-out -O3 -O2 -flto, $(LDFLAGS))
 debug: CFLAGS := $(filter-out -O3 -O2 -flto, $(CFLAGS))
@@ -250,10 +253,15 @@ $(DYLIB): LDFLAGS += -dynamiclib \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
 
-$(PROG): $(RELEASE_OBJS)
+$(PROG): $(MAIN_OBJS) $(STATIC)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-$(LIB) $(DLL) $(DYLIB): $(LIB_OBJS)
+$(STATIC): $(OBJS)
+	$(RM) $@
+	$(AR) rcD $@ $^
+	$(RANLIB) $@
+
+$(LIB) $(DLL) $(DYLIB): $(SHARED_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(DEBUG): $(DEBUG_OBJS)
@@ -274,15 +282,22 @@ $(TESTS): $(TESTS_OBJS)
 %_debug.lo: %.asm Makefile
 	$(AS) $(ASFLAGS) -o $@ $<
 
+# Object files not meant for shared libs need KVZ_STATIC_LIB defined so
+# that the names of the API functions don't get mangled on Windows.
+%.o: CFLAGS += -DKVZ_STATIC_LIB
 %.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 %_debug.o: %.c Makefile
 	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
+ifneq ($(SYSTEM), Windows)
+  # Only use -fpic when not on Windows
+  %.lo: CFLAGS += -fpic
+endif
 %.lo: %.c Makefile
-	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 %_debug.lo: %.c Makefile
-	$(CC) -fpic $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
 
 .PHONY: kvazaar.pc init_submodules install install-pc install-prog install-lib
@@ -305,6 +320,12 @@ install-pc: kvazaar.pc
 install-prog: $(PROG)
 	$(INSTALL) -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m755 $(PROG) $(DESTDIR)$(BINDIR)
+
+install-static: $(STATIC)
+	$(INSTALL) -d $(DESTDIR)$(INCDIR)
+	$(INSTALL) -d $(DESTDIR)$(LIBDIR)
+	$(INSTALL) -m644 $(INC) $(DESTDIR)$(INCDIR)
+	$(INSTALL) -m644 $(STATIC) $(DESTDIR)$(LIBDIR)
 
 install-lib: $(LIB)
 	$(INSTALL) -d $(DESTDIR)$(INCDIR)
@@ -330,8 +351,8 @@ install-dll: $(DLL)
 	$(INSTALL) -m644 $(IMPLIB) $(DESTDIR)$(LIBDIR)
 
 clean:
-	$(RM) $(RELEASE_OBJS) $(LIB_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
-	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB) $(DYLIB)
+	$(RM) $(RELEASE_OBJS) $(SHARED_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
+	$(RM) $(PROG) $(DEBUG) $(TESTS) $(STATIC) $(LIB) $(DLL) $(IMPLIB) $(DYLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPS)

@@ -14,12 +14,15 @@
 # Other files
 *.exe
 *.o
+*.lo
 *.d
 
 *.log
 .kdev4
 src/kvazaar
+src/libkvazaar.a
 src/libkvazaar.so.*
 src/kvazaar.dll
 src/libkvazaar.dll.a
 src/libkvazaar.*.dylib
+src/kvazaar.pc
