@@ -220,9 +220,9 @@ MAIN_OBJS := \
 RELEASE_OBJS = $(MAIN_OBJS) $(OBJS)
 # Compile separate PIC objects for Linux/OSX.
 ifeq ($(SYSTEM), Windows)
-  LIB_OBJS = $(OBJS)
+  SHARED_OBJS = $(OBJS)
 else
-  LIB_OBJS = $(OBJS:.o=.lo)
+  SHARED_OBJS = $(OBJS:.o=.lo)
 endif
 DEBUG_OBJS = $(RELEASE_OBJS:.o=_debug.o)
 TESTS_OBJS = $(TEST_OBJS) $(OBJS)
@@ -254,7 +254,7 @@ $(DYLIB): LDFLAGS += -dynamiclib \
 $(PROG): $(RELEASE_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
-$(LIB) $(DLL) $(DYLIB): $(LIB_OBJS)
+$(LIB) $(DLL) $(DYLIB): $(SHARED_OBJS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(DEBUG): $(DEBUG_OBJS)
@@ -331,7 +331,7 @@ install-dll: $(DLL)
 	$(INSTALL) -m644 $(IMPLIB) $(DESTDIR)$(LIBDIR)
 
 clean:
-	$(RM) $(RELEASE_OBJS) $(LIB_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
+	$(RM) $(RELEASE_OBJS) $(SHARED_OBJS) $(DEBUG_OBJS) $(TESTS_OBJS) $(DEPS)
 	$(RM) $(PROG) $(DEBUG) $(TESTS) $(LIB) $(DLL) $(IMPLIB) $(DYLIB)
 
 ifneq ($(MAKECMDGOALS),clean)
