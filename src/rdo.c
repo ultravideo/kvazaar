@@ -32,6 +32,7 @@
 #include "cabac.h"
 #include "transform.h"
 #include "strategies/strategies-quant.h"
+#include "inter.h"
 
 
 #define QUANT_SHIFT          14
@@ -889,4 +890,233 @@ void  kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff
                      delta_u, rate_inc_up, rate_inc_down, sig_rate_delta,
                      width, coef, dest_coeff);
   }
+}
+
+static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count) {
+  int32_t num_bins = 0;
+  while (symbol >= (uint32_t)(1 << count)) {
+    ++num_bins;
+    symbol -= 1 << count;
+    ++count;
+  }
+  num_bins++;
+
+  return num_bins;
+}
+
+static uint32_t get_mvd_coding_cost(vector2d_t *mvd) {
+  uint32_t bitcost = 0;
+  const int32_t mvd_hor = mvd->x;
+  const int32_t mvd_ver = mvd->y;
+  const int8_t hor_abs_gr0 = mvd_hor != 0;
+  const int8_t ver_abs_gr0 = mvd_ver != 0;
+  const uint32_t mvd_hor_abs = abs(mvd_hor);
+  const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+  // Greater than 0 for x/y
+  bitcost += 2;
+
+  if (hor_abs_gr0) {
+    if (mvd_hor_abs > 1) {
+      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs - 2, 1) - 2; // TODO: tune the costs
+    }
+    // Greater than 1 + sign
+    bitcost += 2;
+  }
+
+  if (ver_abs_gr0) {
+    if (mvd_ver_abs > 1) {
+      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs - 2, 1) - 2; // TODO: tune the costs
+    }
+    // Greater than 1 + sign
+    bitcost += 2;
+  }
+
+  return bitcost;
+}
+
+int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, int mv_shift,
+  int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+  int16_t num_cand, int32_t ref_idx, uint32_t *bitcost) {
+
+  cabac_data_t state_cabac_copy;
+  cabac_data_t* cabac;
+  uint32_t temp_bitcost = 0;
+  uint32_t merge_idx;
+  int cand1_cost, cand2_cost;
+  vector2d_t mvd_temp1, mvd_temp2, mvd;
+  int8_t merged = 0;
+  int8_t cur_mv_cand = 0;
+
+  x <<= mv_shift;
+  y <<= mv_shift;
+
+  // Check every candidate to find a match
+  for (merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
+    if (merge_cand[merge_idx].dir == 3) continue;
+    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
+      merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
+      merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
+      merged = 1;
+      break;
+    }
+  }
+
+  if (!merged) {
+    mvd_temp1.x = x - mv_cand[0][0];
+    mvd_temp1.y = y - mv_cand[0][1];
+    cand1_cost = get_mvd_coding_cost(&mvd_temp1);
+
+    mvd_temp2.x = x - mv_cand[1][0];
+    mvd_temp2.y = y - mv_cand[1][1];
+    cand2_cost = get_mvd_coding_cost(&mvd_temp2);
+
+    // Select candidate 1 if it has lower cost
+    if (cand2_cost < cand1_cost) {
+      cur_mv_cand = 1;
+      mvd = mvd_temp2;
+    } else {
+      mvd = mvd_temp1;
+    }
+  }
+
+  // Store cabac state and contexts
+  memcpy(&state_cabac_copy, &state->cabac, sizeof(cabac_data_t));
+
+  // Clear bytes and bits and set mode to "count"
+  state_cabac_copy.only_count = 1;
+  state_cabac_copy.num_buffered_bytes = 0;
+  state_cabac_copy.bits_left = 23;
+
+  cabac = &state_cabac_copy;
+  cabac->stream = NULL;
+
+  cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
+
+  CABAC_BIN(cabac, merged, "MergeFlag");
+  num_cand = MRG_MAX_NUM_CANDS;
+  if (merged) { //merge
+    if (num_cand > 1) {
+      int32_t ui;
+      for (ui = 0; ui < num_cand - 1; ui++) {
+        int32_t symbol = (ui != merge_idx);
+        if (ui == 0) {
+          cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
+          CABAC_BIN(cabac, symbol, "MergeIndex");
+        } else {
+          CABAC_BIN_EP(cabac, symbol, "MergeIndex");
+        }
+        if (symbol == 0) break;
+      }
+    }
+  } else {
+    uint32_t ref_list_idx;
+    uint32_t j;
+    int ref_list[2] = { 0, 0 };
+    for (j = 0; j < state->global->ref->used_size; j++) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
+        ref_list[0]++;
+      } else {
+        ref_list[1]++;
+      }
+    }
+
+    // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
+    /*
+    if (state->global->slicetype == SLICE_B) {
+    // Code Inter Dir
+    uint8_t inter_dir = cur_cu->inter.mv_dir - 1;
+    uint8_t ctx = depth;
+
+
+    if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8) {
+    cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
+    CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
+    }
+    if (inter_dir < 2) {
+    cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
+    CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
+    }
+    }*/
+
+    for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
+      if (/*cur_cu->inter.mv_dir*/ 1 & (1 << ref_list_idx)) {
+        if (ref_list[ref_list_idx] > 1) {
+          // parseRefFrmIdx
+          int32_t ref_frame = ref_idx /*cur_cu->inter.mv_ref_coded[ref_list_idx]*/;
+
+          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
+          CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+
+          if (ref_frame > 0) {
+            int32_t i;
+            int32_t ref_num = ref_list[ref_list_idx] - 2;
+
+            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+            ref_frame--;
+
+            for (i = 0; i < ref_num; ++i) {
+              const uint32_t symbol = (i == ref_frame) ? 0 : 1;
+
+              if (i == 0) {
+                CABAC_BIN(cabac, symbol, "ref_idx_lX");
+              } else {
+                CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+              }
+              if (symbol == 0) break;
+            }
+          }
+        }
+
+        if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
+          const int32_t mvd_hor = mvd.x;
+          const int32_t mvd_ver = mvd.y;
+          const int8_t hor_abs_gr0 = mvd_hor != 0;
+          const int8_t ver_abs_gr0 = mvd_ver != 0;
+          const uint32_t mvd_hor_abs = abs(mvd_hor);
+          const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
+          CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+          CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+
+          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
+
+          if (hor_abs_gr0) {
+            CABAC_BIN(cabac, (mvd_hor_abs > 1), "abs_mvd_greater1_flag_hor");
+          }
+
+          if (ver_abs_gr0) {
+            CABAC_BIN(cabac, (mvd_ver_abs > 1), "abs_mvd_greater1_flag_ver");
+          }
+
+          if (hor_abs_gr0) {
+            if (mvd_hor_abs > 1) {
+              cabac_write_ep_ex_golomb(cabac, mvd_hor_abs - 2, 1);
+            }
+
+            CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
+          }
+
+          if (ver_abs_gr0) {
+            if (mvd_ver_abs > 1) {
+              cabac_write_ep_ex_golomb(cabac, mvd_ver_abs - 2, 1);
+            }
+
+            CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
+          }
+        }
+
+        // Signal which candidate MV to use
+        cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, /*mv_cand[ref_list_idx]*/cur_mv_cand, 1,
+          AMVP_MAX_NUM_CANDS - 1);
+      }
+
+    }
+  }
+  
+  *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
+
+  // Store bitcost before restoring cabac
+  return *bitcost * (int32_t)(state->global->cur_lambda_cost_sqrt + 0.5);
 }
