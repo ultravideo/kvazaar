@@ -55,6 +55,10 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
               --subme <integer>      : Set fractional pixel motion estimation level [1].
                                          0: only integer motion estimation
                                          1: fractional pixel motion estimation enabled
+              --source-scan-type <string> : Set source scan type [\"progressive\"].
+                                              "progressive": progressive scan
+                                              "tff": top field first
+                                              "bff": bottom field first
               --pu-depth-inter <int>-<int> : Range for sizes of inter prediction units to try.
                                          0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8
               --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.

@@ -57,6 +57,7 @@ static const struct option long_options[] = {
   { "tr-depth-intra",     required_argument, NULL, 0 },
   { "me",                 required_argument, NULL, 0 },
   { "subme",              required_argument, NULL, 0 },
+  { "source-scan-type",   required_argument, NULL, 0 },
   { "sar",                required_argument, NULL, 0 },
   { "overscan",           required_argument, NULL, 0 },
   { "videoformat",        required_argument, NULL, 0 },
@@ -285,6 +286,10 @@ void print_help(void)
     "          --subme <integer>      : Set fractional pixel motion estimation level [1].\n"
     "                                     0: only integer motion estimation\n"
     "                                     1: fractional pixel motion estimation enabled\n"
+    "          --source-scan-type <string> : Set source scan type [\"progressive\"].\n"
+    "                                     \"progressive\": progressive scan\n"
+    "                                     \"tff\": top field first\n"
+    "                                     \"bff\": bottom field first\n"
     "          --pu-depth-inter <int>-<int> : Range for sizes of inter prediction units to try.\n"
     "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8\n"
     "          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.\n"

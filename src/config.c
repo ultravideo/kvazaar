@@ -70,6 +70,7 @@ int config_init(kvz_config *cfg)
   cfg->tr_depth_intra  = 0;
   cfg->ime_algorithm   = 0; /* hexbs */
   cfg->fme_level       = 1;
+  cfg->source_scan_type = 0; /* progressive */
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
   cfg->vui.overscan    = 0; /* undef */
@@ -276,6 +277,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
 int config_parse(kvz_config *cfg, const char *name, const char *value)
 {
   static const char * const me_names[]          = { "hexbs", "tz", NULL };
+  static const char * const source_scan_type_names[] = { "progressive", "tff", "bff", NULL };
 
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
   static const char * const videoformat_names[] = { "component", "pal", "ntsc", "secam", "mac", "undef", NULL };
@@ -356,6 +358,8 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("subme")
     cfg->fme_level = atoi(value);
+  else if OPT("source-scan-type")
+    return parse_enum(value, source_scan_type_names, &cfg->source_scan_type);
   else if OPT("sar")
     return sscanf(value, "%d:%d", &cfg->vui.sar_width, &cfg->vui.sar_height) == 2;
   else if OPT("overscan")

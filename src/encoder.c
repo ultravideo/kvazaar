@@ -153,6 +153,8 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
   // Rate-distortion optimization level
   encoder->rdo        = 1;
   encoder->full_intra_search = 0;
+  // INTERLACING
+  encoder->in.source_scan_type = (int8_t)cfg->source_scan_type;
 
   // Initialize the scaling list
   scalinglist_init(&encoder->scaling_list);
@@ -472,8 +474,11 @@ void encoder_control_free(encoder_control_t *const encoder) {
 }
 
 void encoder_control_input_init(encoder_control_t * const encoder,
-                        const int32_t width, const int32_t height)
+                        const int32_t width, int32_t height)
 {
+  // Halve for interlaced content
+  if (encoder->in.source_scan_type != 0) height /= 2;
+
   encoder->in.width = width;
   encoder->in.height = height;
   encoder->in.real_width = width;

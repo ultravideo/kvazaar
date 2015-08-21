@@ -55,6 +55,7 @@ typedef struct encoder_control_t
     int8_t video_format;
     int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
     int64_t pixels_per_pic;
+    int8_t source_scan_type;
   } in;
   
   /* TODO: add ME data */
@@ -91,6 +92,9 @@ typedef struct encoder_control_t
     int8_t transfer;
     int8_t colormatrix;
     int8_t chroma_loc;
+
+    int8_t field_seq_flag;
+    int8_t frame_field_info_present_flag;
   } vui;
 
   int8_t aud_enable;

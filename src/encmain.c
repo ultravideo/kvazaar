@@ -155,6 +155,8 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
     goto exit_failure;
   }
+  encoder->vui.field_seq_flag = encoder->cfg->source_scan_type != 0;
+  encoder->vui.frame_field_info_present_flag = encoder->cfg->source_scan_type != 0;
 
   //Now, do the real stuff
   {
@@ -167,26 +169,41 @@ int main(int argc, char *argv[])
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
+    int8_t field_parity = 0;
+    kvz_picture *frame_in = NULL;
+
     for (;;) {
+
       kvz_picture *img_in = NULL;
-      if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames)) {
+
+      if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames || field_parity == 1) ) {
         // Try to read an input frame.
-        img_in = api->picture_alloc(encoder->in.width, encoder->in.height);
-        if (!img_in) {
+        if(field_parity == 0) frame_in = api->picture_alloc(opts->config->width, opts->config->height);
+        if (!frame_in) {
           fprintf(stderr, "Failed to allocate image.\n");
           goto exit_failure;
         }
 
-        if (yuv_io_read(input, opts->config->width, opts->config->height, img_in)) {
-          frames_read += 1;
-        } else {
-          // EOF or some error
-          api->picture_free(img_in);
-          img_in = NULL;
-          if (!feof(input)) {
-            fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-            goto exit_failure;
+        if (field_parity == 0){
+          if (yuv_io_read(input, opts->config->width, opts->config->height, frame_in)) {
+            frames_read += 1;
+            img_in = frame_in;
+          } else {
+            // EOF or some error
+            api->picture_free(img_in);
+            img_in = NULL;
+            if (!feof(input)) {
+              fprintf(stderr, "Failed to read a frame %d\n", frames_read);
+              goto exit_failure;
+            }
           }
+        }
+
+        if (encoder->cfg->source_scan_type != 0){
+          img_in = api->picture_alloc(encoder->in.width, encoder->in.height);
+          yuv_io_extract_field(frame_in, encoder->cfg->source_scan_type, field_parity, img_in);
+          if (field_parity == 1) api->picture_free(frame_in);
+          field_parity ^= 1; //0->1 or 1->0
         }
       }
 

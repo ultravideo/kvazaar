@@ -39,4 +39,6 @@ int yuv_io_write(FILE* file,
                 const kvz_picture *img,
                 unsigned output_width, unsigned output_height);
 
+int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_scan_type, unsigned field_parity, kvz_picture *field_out);
+
 #endif // YUV_IO_H_
