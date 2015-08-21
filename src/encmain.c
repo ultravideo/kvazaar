@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
             img_in = frame_in;
           } else {
             // EOF or some error
-            api->picture_free(img_in);
+            api->picture_free(frame_in);
             img_in = NULL;
             if (!feof(input)) {
               fprintf(stderr, "Failed to read a frame %d\n", frames_read);
