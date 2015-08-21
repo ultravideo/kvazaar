@@ -171,6 +171,8 @@ int main(int argc, char *argv[])
 
     int8_t field_parity = 0;
     kvz_picture *frame_in = NULL;
+    uint8_t padding_x = get_padding(opts->config->width);
+    uint8_t padding_y = get_padding(opts->config->height);
 
     for (;;) {
 
@@ -178,7 +180,7 @@ int main(int argc, char *argv[])
 
       if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames || field_parity == 1) ) {
         // Try to read an input frame.
-        if(field_parity == 0) frame_in = api->picture_alloc(opts->config->width, opts->config->height);
+        if(field_parity == 0) frame_in = api->picture_alloc(opts->config->width + padding_x, opts->config->height + padding_y);
         if (!frame_in) {
           fprintf(stderr, "Failed to allocate image.\n");
           goto exit_failure;

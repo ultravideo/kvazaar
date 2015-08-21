@@ -159,4 +159,5 @@ encoder_control_t* encoder_control_init(const kvz_config *cfg);
 void encoder_control_free(encoder_control_t *encoder);
 
 void encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
+unsigned get_padding(unsigned width_or_height);
 #endif
