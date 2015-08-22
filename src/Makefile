@@ -93,6 +93,7 @@ ifeq ($(SYSTEM), Windows)
   endif
   CFLAGS += -D__USE_MINGW_ANSI_STDIO=1
   LIBKVAZAAR_SHARED = $(DLL)
+  KVAZAAR_LIBS = $(STATIC)
   INSTALL_TARGETS += install-dll
 
 # OS X specific flags
@@ -104,17 +105,21 @@ else ifeq ($(SYSTEM), Darwin)
   endif
   ASFLAGS += -DPREFIX
   LIBKVAZAAR_SHARED = $(DYLIB)
+  KVAZAAR_LIBS = $(STATIC)
   INSTALL_TARGETS += install-dylib
 
 # Default to Linux/elf specific flags
 else
   LIBS += -lrt
+  CFLAGS += -ffunction-sections -fdata-sections
+  LDFLAGS += -Wl,--gc-sections
   ifeq ($(ARCH), x86_64)
     ASFLAGS += -f elf64
   else
     ASFLAGS += -f elf32
   endif
   LIBKVAZAAR_SHARED = $(LIB)
+  KVAZAAR_LIBS = $(LIBKVAZAAR_SHARED) $(STATIC)
   INSTALL_TARGETS += install-lib
 endif
 
@@ -253,7 +258,7 @@ $(DYLIB): LDFLAGS += -dynamiclib \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
 
-$(PROG): $(MAIN_OBJS) $(STATIC)
+$(PROG): $(MAIN_OBJS) $(KVAZAAR_LIBS)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(STATIC): $(OBJS)
