@@ -45,7 +45,7 @@ INCLUDEDIRS = -I. -I./strategies -I./extras -I..
 ASFLAGS += $(patsubst %,%/,$(INCLUDEDIRS))
 
 # Notes about optimization levels:
-# Overall, kvazaar seems to run 15-20 % faster when compiler with gcc.
+# Overall, kvazaar seems to run 15-20 % faster when compiled with gcc.
 # gcc-5.1.1: no benefit from -flto, slight harm from -O3
 # clang-4.3.0: slight benefit from -O3, more from -flto
 CFLAGS += -O2 -g -ftree-vectorize
@@ -109,13 +109,14 @@ else ifeq ($(SYSTEM), Darwin)
 # Default to Linux/elf specific flags
 else
   LIBS += -lrt
+  LDFLAGS += -Wl,-z,noexecstack
   ifeq ($(ARCH), x86_64)
     ASFLAGS += -f elf64
   else
     ASFLAGS += -f elf32
   endif
   LIBKVAZAAR_SHARED = $(LIB)
-  INSTALL_TARGETS += install-lib
+  INSTALL_TARGETS += install-lib install-static
 endif
 
 # Flags shared across systems
@@ -286,18 +287,18 @@ $(TESTS): $(TESTS_OBJS)
 # that the names of the API functions don't get mangled on Windows.
 %.o: CFLAGS += -DKVZ_STATIC_LIB
 %.o: %.c Makefile
-	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 %_debug.o: %.c Makefile
-	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
 ifneq ($(SYSTEM), Windows)
   # Only use -fpic when not on Windows
   %.lo: CFLAGS += -fpic
 endif
 %.lo: %.c Makefile
-	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 %_debug.lo: %.c Makefile
-	$(CC) $(CFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(EXTRA_FLAGS) -MMD -MP -c $< -o $@
 
 
 .PHONY: kvazaar.pc init_submodules install install-pc install-prog install-lib
