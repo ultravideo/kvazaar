@@ -99,14 +99,16 @@ typedef struct kvz_gop_config {
 
 /**
  * \brief Struct which contains all configuration data
+ *
+ * Function config_alloc in kvz_api must be used for allocation.
  */
 typedef struct kvz_config
 {
   int32_t qp;        /*!< \brief Quantization parameter */
   int32_t intra_period; /*!< \brief the period of intra frames in stream */
   int32_t vps_period; /*!< \brief how often the vps is re-sent */
-  int32_t width;   /*!< \brief frame width */
-  int32_t height;  /*!< \brief frame height */
+  int32_t width;   /*!< \brief frame width, must be a multiple of 8 */
+  int32_t height;  /*!< \brief frame height, must be a multiple of 8 */
   double framerate; /*!< \brief Input framerate */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
@@ -165,8 +167,10 @@ typedef struct kvz_config
 } kvz_config;
 
 /**
-* \brief Struct which contains all picture data
-*/
+ * \brief Struct which contains all picture data
+ *
+ * Function picture_alloc in kvz_api must be used for allocation.
+ */
 typedef struct kvz_picture {
   kvz_pixel *fulldata;         //!< \brief Allocated buffer (only used in the base_image)
 
@@ -201,36 +205,123 @@ typedef struct kvz_data_chunk {
 } kvz_data_chunk;
 
 typedef struct kvz_api {
-  kvz_config *  (*config_alloc)(void);
-  int           (*config_destroy)(kvz_config *);
-  int           (*config_init)(kvz_config *);
-  int           (*config_parse)(kvz_config *, const char *name, const char *value);
 
+  /**
+   * \brief Allocate a kvz_config structure.
+   *
+   * The returned structure should be deallocated by calling config_destroy.
+   *
+   * \return allocated config, or NULL if allocation failed.
+   */
+  kvz_config *  (*config_alloc)(void);
+
+  /**
+   * \brief Deallocate a kvz_config structure.
+   *
+   * If cfg is NULL, do nothing. Otherwise, the given structure must have been
+   * returned from config_alloc.
+   *
+   * \param cfg   configuration
+   * \return      1 on success, 0 on failure
+   */
+  int           (*config_destroy)(kvz_config *cfg);
+
+  /**
+   * \brief Initialize a config structure
+   *
+   * Set all fields in the given config to default values.
+   *
+   * \param cfg   configuration
+   * \return      1 on success, 0 on failure
+   */
+  int           (*config_init)(kvz_config *cfg);
+
+  /**
+   * \brief Set an option.
+   *
+   * \param cfg   configuration
+   * \param name  name of the option to set
+   * \param value value to set
+   * \return      1 on success, 0 on failure
+   */
+  int           (*config_parse)(kvz_config *cfg, const char *name, const char *value);
+
+  /**
+   * \brief Allocate a kvz_picture.
+   *
+   * The returned kvz_picture should be deallocated by calling picture_free.
+   *
+   * \param width   width of luma pixel array to allocate
+   * \param height  height of luma pixel array to allocate
+   * \return        allocated picture, or NULL if allocation failed.
+   */
   kvz_picture * (*picture_alloc)(int32_t width, int32_t height);
+
+  /**
+   * \brief Deallocate a kvz_picture.
+   *
+   * If pic is NULL, do nothing. Otherwise, the picture must have been returned
+   * from picture_alloc.
+   */
   void          (*picture_free)(kvz_picture *pic);
 
   /**
-   * \brief Free a list of data chunks.
+   * \brief Deallocate a list of data chunks.
+   *
+   * Deallocates the given chunk and all chunks that follow it in the linked
+   * list.
    */
   void          (*chunk_free)(kvz_data_chunk *chunk);
 
-  kvz_encoder * (*encoder_open)(const kvz_config *);
-  void          (*encoder_close)(kvz_encoder *);
+  /**
+   * \brief Create an encoder.
+   *
+   * The returned encoder should be closed by calling encoder_close.
+   *
+   * Only one encoder may be open at a time.
+   *
+   * The caller must not modify the config between passing it to this function
+   * and calling encoder_close.
+   *
+   * \param cfg   encoder configuration
+   * \return      created encoder, or NULL if creation failed.
+   */
+  kvz_encoder * (*encoder_open)(const kvz_config *cfg);
 
   /**
-   * \brief Encode one picture.
+   * \brief Deallocate an encoder.
+   *
+   * If encoder is NULL, do nothing. Otherwise, the encoder must have been
+   * returned from encoder_open.
+   */
+  void          (*encoder_close)(kvz_encoder *encoder);
+
+  /**
+   * \brief Encode one frame.
+   *
+   * Add pic_in to the encoding pipeline. If an encoded frame is ready, return
+   * the bitstream, length of the bitstream and the reconstructed frame in
+   * data_out, len_out and pic_out, respectively. Otherwise, set the output
+   * parameters to NULL.
+   *
+   * After passing all of the input frames, the caller should keep calling this
+   * function with pic_in set to NULL, until no more data is returned in the
+   * output parameters.
    *
    * The caller must not modify pic_in after passing it to this function.
    *
    * If pic_out and data_out are set to non-NULL values, the caller is
    * responsible for calling picture_free and chunk_free on them.
    *
-   * \param encoder   Encoder
-   * \param pic_in    Input frame
+   * A null pointer may be passed in place of any of the parameters data_out,
+   * len_out or pic_out to skip returning the corresponding value.
+   *
+   * \param encoder   encoder
+   * \param pic_in    input frame or NULL
    * \param data_out  Returns the encoded data.
    * \param len_out   Returns number of bytes in the encoded data.
    * \param pic_out   Returns the reconstructed picture.
-   * \return 1 on success, 0 on error.
+   * \return          1 on success, 0 on error.
    */
   int           (*encoder_encode)(kvz_encoder *encoder,
                                   kvz_picture *pic_in,

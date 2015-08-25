@@ -28,10 +28,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/**
- * \brief Allocate memory for config object
- * \return pointer to allocated memory
- */
 kvz_config *config_alloc(void)
 {
   kvz_config *cfg = (kvz_config *)malloc(sizeof(kvz_config));
@@ -45,11 +41,6 @@ kvz_config *config_alloc(void)
   return cfg;
 }
 
-/**
- * \brief Initialize config structure
- * \param cfg config object
- * \return 1 on success, 0 on failure
- */
 int config_init(kvz_config *cfg)
 {
   cfg->width           = 0;
@@ -112,11 +103,6 @@ int config_init(kvz_config *cfg)
   return 1;
 }
 
-/**
- * \brief Free memory allocated to the config
- * \param cfg config object
- * \return 1 on success, 0 on failure
- */
 int config_destroy(kvz_config *cfg)
 {
   if (cfg) {
