@@ -119,10 +119,12 @@ int config_init(kvz_config *cfg)
  */
 int config_destroy(kvz_config *cfg)
 {
-  FREE_POINTER(cfg->cqmfile);
-  FREE_POINTER(cfg->tiles_width_split);
-  FREE_POINTER(cfg->tiles_height_split);
-  FREE_POINTER(cfg->slice_addresses_in_ts);
+  if (cfg) {
+    FREE_POINTER(cfg->cqmfile);
+    FREE_POINTER(cfg->tiles_width_split);
+    FREE_POINTER(cfg->tiles_height_split);
+    FREE_POINTER(cfg->slice_addresses_in_ts);
+  }
   free(cfg);
 
   return 1;
