@@ -947,6 +947,7 @@ uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
 
   cabac_data_t cabac_copy;
   memcpy(&cabac_copy, cabac, sizeof(cabac_data_t));
+  cabac->only_count = 1;
 
   cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
   CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
