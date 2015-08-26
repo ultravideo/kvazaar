@@ -34,20 +34,20 @@ typedef unsigned(epol_func)(int xpos, int ypos, int mv_x, int mv_y, int off_x, i
 
 
 // Declare function pointers.
-extern ipol_func * filter_inter_quarterpel_luma;
-extern ipol_func * filter_inter_halfpel_chroma;
-extern ipol_func * filter_inter_octpel_chroma;
-extern epol_func * get_extended_block;
+extern ipol_func * kvz_filter_inter_quarterpel_luma;
+extern ipol_func * kvz_filter_inter_halfpel_chroma;
+extern ipol_func * kvz_filter_inter_octpel_chroma;
+extern epol_func * kvz_get_extended_block;
 
 
-int strategy_register_ipol(void* opaque, uint8_t bitdepth);
+int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_IPOL_EXPORTS \
-  {"filter_inter_quarterpel_luma", (void**) &filter_inter_quarterpel_luma}, \
-  {"filter_inter_halfpel_chroma", (void**) &filter_inter_halfpel_chroma}, \
-  {"filter_inter_octpel_chroma", (void**) &filter_inter_octpel_chroma}, \
-  {"get_extended_block", (void**) &get_extended_block}, \
+  {"filter_inter_quarterpel_luma", (void**) &kvz_filter_inter_quarterpel_luma}, \
+  {"filter_inter_halfpel_chroma", (void**) &kvz_filter_inter_halfpel_chroma}, \
+  {"filter_inter_octpel_chroma", (void**) &kvz_filter_inter_octpel_chroma}, \
+  {"get_extended_block", (void**) &kvz_get_extended_block}, \
 
 
 

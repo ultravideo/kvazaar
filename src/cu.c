@@ -29,7 +29,7 @@
 #include "threads.h"
 
 
-void coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
+void kvz_coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
@@ -40,7 +40,7 @@ void coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
   }
 }
 
-unsigned coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
+unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
                         const int width)
 {
   int sum = 0;
@@ -55,7 +55,7 @@ unsigned coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
   return sum;
 }
 
-cu_array_t * cu_array_alloc(const int width_in_scu, const int height_in_scu) {
+cu_array_t * kvz_cu_array_alloc(const int width_in_scu, const int height_in_scu) {
   unsigned cu_array_size = height_in_scu * width_in_scu;
   cu_array_t *cua;
   cua = MALLOC(cu_array_t, 1);
@@ -65,7 +65,7 @@ cu_array_t * cu_array_alloc(const int width_in_scu, const int height_in_scu) {
   return cua;
 }
 
-int cu_array_free(cu_array_t * const cua)
+int kvz_cu_array_free(cu_array_t * const cua)
 {
   int32_t new_refcount;
   if (!cua) return 1;

@@ -97,24 +97,24 @@ typedef struct {
 } threadqueue_queue_t;
 
 //Init a threadqueue (if fifo, then behave as a FIFO with dependencies, otherwise as a LIFO with dependencies)
-int threadqueue_init(threadqueue_queue_t * threadqueue, int thread_count, int fifo);
+int kvz_threadqueue_init(threadqueue_queue_t * threadqueue, int thread_count, int fifo);
 
-//Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run threadqueue_job_unwait_job in order to have it run
-threadqueue_job_t * threadqueue_submit(threadqueue_queue_t * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
+//Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run kvz_threadqueue_job_unwait_job in order to have it run
+threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
 
-int threadqueue_job_unwait_job(threadqueue_queue_t * threadqueue, threadqueue_job_t *job);
+int kvz_threadqueue_job_unwait_job(threadqueue_queue_t * threadqueue, threadqueue_job_t *job);
 
 //Add a dependency between two jobs.
-int threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on);
+int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on);
 
 //Blocking call until the queue is empty. Previously set threadqueue_job handles should not be used anymore
-int threadqueue_flush(threadqueue_queue_t * threadqueue);
+int kvz_threadqueue_flush(threadqueue_queue_t * threadqueue);
 
 //Blocking call until job is executed. Job handles submitted before job should not be used any more as they are removed from the queue.
-int threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
+int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
 
 //Free ressources in a threadqueue
-int threadqueue_finalize(threadqueue_queue_t * threadqueue);
+int kvz_threadqueue_finalize(threadqueue_queue_t * threadqueue);
 
 #ifdef _DEBUG
 int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);

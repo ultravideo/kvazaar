@@ -43,7 +43,7 @@
  * \param cur_cu CU to take the settings from
  * \returns Void
 */
-void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info_t* cur_cu)
+void kvz_inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info_t* cur_cu)
 {
   uint32_t x, y;
   // Width in smallest CU
@@ -52,7 +52,7 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
   // Loop through all the block in the area of cur_cu
   for (y = y_cu; y < y_cu + block_scu_width; y++) {
     for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info_t * const cu = videoframe_get_cu(frame, x, y);
+      cu_info_t * const cu = kvz_videoframe_get_cu(frame, x, y);
       // Set all SCU's to this blocks values at the bottom most depth.
       cu->depth = depth;
       cu->type  = CU_INTER;
@@ -64,7 +64,7 @@ void inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t 
   }
 }
 
-void inter_recon_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
+void kvz_inter_recon_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
@@ -75,15 +75,15 @@ void inter_recon_frac_luma(const encoder_state_t * const state, const kvz_pictur
   kvz_extended_block src = {0, 0, 0};
 
   // Fractional luma
-  get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
+  kvz_get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
     ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, &src);
-  sample_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
+  kvz_sample_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
     block_width, lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
 
   if (src.malloc_used) free(src.buffer);
 }
 
-void inter_recon_14bit_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], hi_prec_buf_t *hi_prec_out)
+void kvz_inter_recon_14bit_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
@@ -94,15 +94,15 @@ void inter_recon_14bit_frac_luma(const encoder_state_t * const state, const kvz_
   kvz_extended_block src = { 0, 0, 0 };
 
   // Fractional luma
-  get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
+  kvz_get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
     ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, &src);
-  sample_14bit_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
+  kvz_sample_14bit_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
     block_width, hi_prec_out->y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
 
   if (src.malloc_used) free(src.buffer);
 }
 
-void inter_recon_frac_chroma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
+void kvz_inter_recon_frac_chroma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
@@ -119,22 +119,22 @@ void inter_recon_frac_chroma(const encoder_state_t * const state, const kvz_pict
   kvz_extended_block src_v = { 0, 0, 0 };
 
   //Fractional chroma U
-  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_u);
-  sample_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
+  kvz_sample_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
     block_width, lcu->rec.u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   //Fractional chroma V
-  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_v);
-  sample_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
+  kvz_sample_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
     block_width, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   if (src_u.malloc_used) free(src_u.buffer);
   if (src_v.malloc_used) free(src_v.buffer);
 }
 
-void inter_recon_14bit_frac_chroma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], hi_prec_buf_t *hi_prec_out)
+void kvz_inter_recon_14bit_frac_chroma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
@@ -151,15 +151,15 @@ void inter_recon_14bit_frac_chroma(const encoder_state_t * const state, const kv
   kvz_extended_block src_v = { 0, 0, 0 };
 
   //Fractional chroma U
-  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_u);
-  sample_14bit_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
+  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
     block_width, hi_prec_out->u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   //Fractional chroma V
-  get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
+  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_v);
-  sample_14bit_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
+  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
     block_width, hi_prec_out->v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   if (src_u.malloc_used) free(src_u.buffer);
@@ -177,7 +177,7 @@ void inter_recon_14bit_frac_chroma(const encoder_state_t * const state, const kv
  * \param hi_prec destination of high precision output (null if not needed)
  * \returns Void
 */
-void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu, hi_prec_buf_t *hi_prec_out)
+void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu, hi_prec_buf_t *hi_prec_out)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -199,11 +199,11 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
 
   if(fractional_mv) {
     if (state->encoder_control->cfg->bipred && hi_prec_out){
-      inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
-      inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+      kvz_inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+      kvz_inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
     } else {
-      inter_recon_frac_luma(state, ref, xpos, ypos, width, mv_param, lcu);
-      inter_recon_frac_chroma(state, ref, xpos, ypos, width, mv_param, lcu);
+      kvz_inter_recon_frac_luma(state, ref, xpos, ypos, width, mv_param, lcu);
+      kvz_inter_recon_frac_chroma(state, ref, xpos, ypos, width, mv_param, lcu);
     }
   }
 
@@ -215,9 +215,9 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
   if(!fractional_mv) {
     if(chroma_halfpel) {
       if (state->encoder_control->cfg->bipred && hi_prec_out){
-        inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+        kvz_inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
       } else {
-        inter_recon_frac_chroma(state, ref, xpos, ypos, width, mv_param, lcu);
+        kvz_inter_recon_frac_chroma(state, ref, xpos, ypos, width, mv_param, lcu);
       }
     }
 
@@ -333,7 +333,7 @@ void inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * co
 * \returns Void
 */
 
-void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
+void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
   kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH];
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
   kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
@@ -349,10 +349,10 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
 
   hi_prec_buf_t* high_precision_rec0 = 0;
   hi_prec_buf_t* high_precision_rec1 = 0;
-  if (hi_prec_chroma_rec0) high_precision_rec0 = hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
-  if (hi_prec_chroma_rec1) high_precision_rec1 = hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
+  if (hi_prec_chroma_rec0) high_precision_rec0 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
+  if (hi_prec_chroma_rec1) high_precision_rec1 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
   //Reconstruct both predictors
-  inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu, high_precision_rec0);
+  kvz_inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu, high_precision_rec0);
   if (!hi_prec_luma_rec0){
     memcpy(temp_lcu_y, lcu->rec.y, sizeof(kvz_pixel) * 64 * 64);
   }
@@ -360,7 +360,7 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
     memcpy(temp_lcu_u, lcu->rec.u, sizeof(kvz_pixel) * 32 * 32);
     memcpy(temp_lcu_v, lcu->rec.v, sizeof(kvz_pixel) * 32 * 32);
   }
-  inter_recon_lcu(state, ref2, xpos, ypos, width, mv_param[1], lcu, high_precision_rec1);
+  kvz_inter_recon_lcu(state, ref2, xpos, ypos, width, mv_param[1], lcu, high_precision_rec1);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
   for (temp_y = 0; temp_y < width; ++temp_y) {
@@ -369,7 +369,7 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
       int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
       int16_t sample0_y = (hi_prec_luma_rec0 ? high_precision_rec0->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (temp_lcu_y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
       int16_t sample1_y = (hi_prec_luma_rec1 ? high_precision_rec1->y[y_in_lcu * LCU_WIDTH + x_in_lcu] : (lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
+      lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_y + sample1_y + offset) >> shift);
     }
 
   }
@@ -379,15 +379,15 @@ void inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_pictu
       int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));
       int16_t sample0_u = (hi_prec_chroma_rec0 ? high_precision_rec0->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (temp_lcu_u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
       int16_t sample1_u = (hi_prec_chroma_rec1 ? high_precision_rec1->u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-      lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
+      lcu->rec.u[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_u + sample1_u + offset) >> shift);
 
       int16_t sample0_v = (hi_prec_chroma_rec0 ? high_precision_rec0->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (temp_lcu_v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
       int16_t sample1_v = (hi_prec_chroma_rec1 ? high_precision_rec1->v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] : (lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] << (14 - KVZ_BIT_DEPTH)));
-      lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
+      lcu->rec.v[y_in_lcu * LCU_WIDTH_C + x_in_lcu] = (kvz_pixel)kvz_fast_clip_32bit_to_pixel((sample0_v + sample1_v + offset) >> shift);
     }
   }
-  if (high_precision_rec0 != 0) hi_prec_buf_t_free(high_precision_rec0);
-  if (high_precision_rec1 != 0) hi_prec_buf_t_free(high_precision_rec1);
+  if (high_precision_rec0 != 0) kvz_hi_prec_buf_t_free(high_precision_rec0);
+  if (high_precision_rec1 != 0) kvz_hi_prec_buf_t_free(high_precision_rec1);
 }
 
 /**
@@ -419,7 +419,7 @@ static void inter_clear_cu_unused(cu_info_t* cu) {
  * \param a0 candidate a0
  * \param a1 candidate a1
  */
-void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
+void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
                                         cu_info_t **b2,cu_info_t **a0,cu_info_t **a1, lcu_t *lcu)
 {
   uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS; //!< the width of the current block on SCU
@@ -481,7 +481,7 @@ void inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_i
  * \param depth current block depth
  * \param mv_pred[2][2] 2x motion vector prediction
  */
-void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu, int8_t reflist)
+void kvz_inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu, int8_t reflist)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
@@ -489,7 +489,7 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
 
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
+  kvz_inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
@@ -662,7 +662,7 @@ void inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y
  * \param depth current block depth
  * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
  */
-uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu)
+uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -670,7 +670,7 @@ uint8_t inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
+  kvz_inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \

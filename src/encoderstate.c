@@ -44,13 +44,13 @@
 #include "rdo.h"
 #include "rate_control.h"
 
-int encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
+int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     //Child should also exist for previous encoder
     assert(state->previous_encoder_state->children[i].encoder_control);
     state->children[i].previous_encoder_state = &state->previous_encoder_state->children[i];
-    encoder_state_match_children_of_previous_frame(&state->children[i]);
+    kvz_encoder_state_match_children_of_previous_frame(&state->children[i]);
   }
   return 1;
 }
@@ -64,13 +64,13 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const l
     const int by = lcu->position.y;
     
     //Copy the bottom row of this LCU to the horizontal buffer
-    pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
+    kvz_pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
                         &hor_buf->y[lcu->position_px.x + by * frame->width],
                         lcu->size.x, 1, frame->rec->stride, frame->width);
-    pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
+    kvz_pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &hor_buf->u[lcu->position_px.x / 2 + by * frame->width / 2],
                         lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
-    pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
+    kvz_pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &hor_buf->v[lcu->position_px.x / 2 + by * frame->width / 2],
                         lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
   }
@@ -82,13 +82,13 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const l
     
     
     //Copy the right row of this LCU to the vertical buffer.
-    pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
+    kvz_pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
                         &ver_buf->y[lcu->position_px.y + bx * frame->height],
                         1, lcu->size.y, frame->rec->stride, 1);
-    pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
+    kvz_pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &ver_buf->u[lcu->position_px.y / 2 + bx * frame->height / 2],
                         1, lcu->size.y / 2, frame->rec->stride / 2, 1);
-    pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
+    kvz_pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
                         &ver_buf->v[lcu->position_px.y / 2 + bx * frame->height / 2],
                         1, lcu->size.y / 2, frame->rec->stride / 2, 1);
   }
@@ -126,7 +126,7 @@ static void encode_sao_color(encoder_state_t * const state, sao_info_t *sao,
   /// sao_offset_abs[][][][]: TR, cMax = (1 << (Min(bitDepth, 10) - 5)) - 1,
   ///                         cRiceParam = 0, bins = {bypass x N}
   for (i = SAO_EO_CAT1; i <= SAO_EO_CAT4; ++i) {
-    cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
+    kvz_cabac_write_unary_max_symbol_ep(cabac, abs(sao->offsets[i + offset_index]), SAO_ABS_OFFSET_MAX);
   }
 
   /// sao_offset_sign[][][][]: FL, cMax = 1, bins = {bypass}
@@ -190,12 +190,12 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   
   //This part doesn't write to bitstream, it's only search, deblock and sao
   
-  search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
+  kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
     
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
   if (encoder->deblock_enable) {
-    filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
+    kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
   if (encoder->sao_enable) {
@@ -211,8 +211,8 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     sao_info_t *sao_top_chroma = lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
     sao_info_t *sao_left_chroma = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
 
-    sao_search_luma(state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
-    sao_search_chroma(state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
+    kvz_sao_search_luma(state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
+    kvz_sao_search_chroma(state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
 
     sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
     // Check merge costs
@@ -267,8 +267,8 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   
   //First LCU, and we are in a slice. We need a slice header
   if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
-    encoder_state_write_bitstream_slice_header(state);
-    bitstream_align(&state->stream); 
+    kvz_encoder_state_write_bitstream_slice_header(state);
+    kvz_bitstream_align(&state->stream); 
   }
   
   //Encode SAO
@@ -277,13 +277,13 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   }
   
   //Encode coding tree
-  encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
+  kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
   //Terminator
   if (lcu->index < state->lcu_order_count - 1) {
     //Since we don't handle slice segments, end of slice segment == end of slice
     //Always 0 since otherwise it would be split
-    cabac_encode_bin_trm(&state->cabac, 0);  // end_of_slice_segment_flag
+    kvz_cabac_encode_bin_trm(&state->cabac, 0);  // end_of_slice_segment_flag
   }
   
   //Wavefronts need the context to be copied to the next row
@@ -293,7 +293,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     for (j=0; state->parent->children[j].encoder_control; ++j) {
       if (state->parent->children[j].wfrow->lcu_offset_y == state->wfrow->lcu_offset_y + 1) {
         //And copy context
-        context_copy(&state->parent->children[j], state);
+        kvz_context_copy(&state->parent->children[j], state);
       }
     }
   }
@@ -337,8 +337,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
     
     if (state->encoder_control->sao_enable) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME);
-      sao_reconstruct_frame(state);
-      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, state->encoder_control->threadqueue, "type=sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count-1].position.y + state->tile->lcu_offset_y,
+      kvz_sao_reconstruct_frame(state);
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, state->encoder_control->threadqueue, "type=kvz_sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count-1].position.y + state->tile->lcu_offset_y,
         state->tile->lcu_offset_x * LCU_WIDTH, state->tile->frame->width + state->tile->lcu_offset_x * LCU_WIDTH - 1,
         state->tile->lcu_offset_y * LCU_WIDTH, state->tile->frame->height + state->tile->lcu_offset_y * LCU_WIDTH - 1
       );
@@ -354,7 +354,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 #else
       char* job_description = NULL;
 #endif
-      state->tile->wf_jobs[lcu->id] = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
       
       // If job object was returned, add dependancies and allow it to run.
       if (state->tile->wf_jobs[lcu->id]) {
@@ -365,27 +365,27 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && state->global->slicetype != SLICE_I) {
           if (!lcu->left) {
             if (lcu->below) {
-              threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
             } else {
-              threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
             }
           }
         }
 
         // Add local WPP dependancy to the LCU on the left.
         if (lcu->left) {
-          threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
+          kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
         }
         // Add local WPP dependancy to the LCU on the top right.
         if (lcu->above) {
           if (lcu->above->right) {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
+            kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
           } else {
-            threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
+            kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
           }
         }
 
-        threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
+        kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
       }
 
       // In the case where SAO is not enabled, the wavefront row is
@@ -406,19 +406,19 @@ static void encoder_state_worker_encode_children(void * opaque) {
   if (sub_state->is_leaf) {
     if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
       PERFORMANCE_MEASURE_START(_DEBUG_PERF_WRITE_BITSTREAM_LEAF);
-      encoder_state_write_bitstream_leaf(sub_state);
-      PERFORMANCE_MEASURE_END(_DEBUG_PERF_WRITE_BITSTREAM_LEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
+      kvz_encoder_state_write_bitstream_leaf(sub_state);
+      PERFORMANCE_MEASURE_END(_DEBUG_PERF_WRITE_BITSTREAM_LEAF, sub_state->encoder_control->threadqueue, "type=kvz_encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
     } else {
       threadqueue_job_t *job;
 #ifdef _DEBUG
       char job_description[256];
-      sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
+      sprintf(job_description, "type=kvz_encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
 #else
       char* job_description = NULL;
 #endif
-      job = threadqueue_submit(sub_state->encoder_control->threadqueue, encoder_state_worker_write_bitstream_leaf, sub_state, 1, job_description);
-      threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->frame->width_in_lcu + sub_state->lcu_order_count - 1]);
-      threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
+      job = kvz_threadqueue_submit(sub_state->encoder_control->threadqueue, kvz_encoder_state_worker_write_bitstream_leaf, sub_state, 1, job_description);
+      kvz_threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->frame->width_in_lcu + sub_state->lcu_order_count - 1]);
+      kvz_threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
       
       assert(!sub_state->tqj_bitstream_written);
       //Bitstream is written for the row, if we're at the last LCU
@@ -467,9 +467,9 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
     sao_info_t *sao_luma = &frame->sao_luma[data->y * stride + x];
     sao_info_t *sao_chroma = &frame->sao_chroma[data->y * stride + x];
-    sao_reconstruct(data->encoder_state->encoder_control, frame, new_y_data, x, data->y, sao_luma, COLOR_Y);
-    sao_reconstruct(data->encoder_state->encoder_control, frame, new_u_data, x, data->y, sao_chroma, COLOR_U);
-    sao_reconstruct(data->encoder_state->encoder_control, frame, new_v_data, x, data->y, sao_chroma, COLOR_V);
+    kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_y_data, x, data->y, sao_luma, COLOR_Y);
+    kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_u_data, x, data->y, sao_chroma, COLOR_U);
+    kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_v_data, x, data->y, sao_chroma, COLOR_V);
   }
   
   free(new_y_data);
@@ -503,18 +503,18 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         const int height = MIN(sub_state->tile->frame->height_in_lcu * LCU_WIDTH, main_state->tile->frame->height - offset_y);
         
         if (sub_state->tile->frame->source) {
-          image_free(sub_state->tile->frame->source);
+          kvz_image_free(sub_state->tile->frame->source);
           sub_state->tile->frame->source = NULL;
         }
         if (sub_state->tile->frame->rec) {
-          image_free(sub_state->tile->frame->rec);
+          kvz_image_free(sub_state->tile->frame->rec);
           sub_state->tile->frame->rec = NULL;
         }
         
         assert(!sub_state->tile->frame->source);
         assert(!sub_state->tile->frame->rec);
-        sub_state->tile->frame->source = image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
-        sub_state->tile->frame->rec = image_make_subimage(main_state->tile->frame->rec, offset_x, offset_y, width, height);
+        sub_state->tile->frame->source = kvz_image_make_subimage(main_state->tile->frame->source, offset_x, offset_y, width, height);
+        sub_state->tile->frame->rec = kvz_image_make_subimage(main_state->tile->frame->rec, offset_x, offset_y, width, height);
       }
       
       //To be the last split, we require that every child is a chain
@@ -543,15 +543,15 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 #else
           char* job_description = NULL;
 #endif
-          main_state->children[i].tqj_recon_done = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
+          main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_idr_frame) {
             // Add dependancy to each child in the previous frame.
             // TODO: Make it so that only adjacent tiles are dependet upon and search is constrained to those?
             for (int child_id = 0; main_state->children[child_id].encoder_control; ++child_id) {
-              threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[child_id].previous_encoder_state->tqj_recon_done);
+              kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[child_id].previous_encoder_state->tqj_recon_done);
             }
           }
-          threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
+          kvz_threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);
         } else {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
@@ -577,21 +577,21 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           data->y = y;
           data->encoder_state = main_state;
           
-          job = threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_sao_reconstruct_lcu, data, 1, job_description);
+          job = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_sao_reconstruct_lcu, data, 1, job_description);
           
           if (previous_job) {
-            threadqueue_job_dep_add(job, previous_job);
+            kvz_threadqueue_job_dep_add(job, previous_job);
           }
           previous_job = job;
           
           if (y < frame->height_in_lcu - 1) {
             //Not last row: depend on the last LCU of the row below
-            threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 1) * frame->width_in_lcu + frame->width_in_lcu - 1]);
+            kvz_threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 1) * frame->width_in_lcu + frame->width_in_lcu - 1]);
           } else {
             //Last row: depend on the last LCU of the row
-            threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 0) * frame->width_in_lcu + frame->width_in_lcu - 1]);
+            kvz_threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 0) * frame->width_in_lcu + frame->width_in_lcu - 1]);
           }
-          threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
+          kvz_threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
           
           //Set wfrow recon job
           main_state->children[y].tqj_recon_done = job;
@@ -622,7 +622,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 }
 
 
-void encoder_ref_insertion_sort(int reflist[16], int length) {
+void kvz_encoder_ref_insertion_sort(int reflist[16], int length) {
 
   for (uint8_t i = 1; i < length; ++i) {
     const int16_t cur_poc = reflist[i];
@@ -648,8 +648,8 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
     }
   }
 
-  encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
-  encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
+  kvz_encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+  kvz_encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
 
   for (j = 0; j < state->global->ref->used_size; j++) {
     if (state->global->ref->pocs[j] < state->global->poc) {
@@ -704,12 +704,12 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
           }
         }
         if (!found) {
-          image_list_rem(state->global->ref, ref);
+          kvz_image_list_rem(state->global->ref, ref);
           ref--;
         }
       }
       check_refs = 0;
-    } else image_list_rem(state->global->ref, ref_to_remove);
+    } else kvz_image_list_rem(state->global->ref, ref_to_remove);
   }
 
 }
@@ -718,7 +718,7 @@ static void encoder_state_reset_poc(encoder_state_t *state) {
   int i;
 
   state->global->poc = 0;
-  videoframe_set_poc(state->tile->frame, 0);
+  kvz_videoframe_set_poc(state->tile->frame, 0);
   
   for (i=0; state->children[i].encoder_control; ++i) {
     encoder_state_t *sub_state = &(state->children[i]);
@@ -742,7 +742,7 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       int32_t poc = state->global->frame - 1;
       int32_t poc_offset = encoder->cfg->gop[state->global->gop_offset].poc_offset;
       state->global->poc = poc - poc % encoder->cfg->gop_len + poc_offset;
-      videoframe_set_poc(state->tile->frame, state->global->poc);
+      kvz_videoframe_set_poc(state->tile->frame, state->global->poc);
     } else {
       bool is_i_idr = (encoder->cfg->intra_period == 1 && state->global->frame % 2 == 0);
       bool is_p_idr = (encoder->cfg->intra_period > 1 && (state->global->frame % encoder->cfg->intra_period) == 0);
@@ -769,8 +769,8 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     double lambda;
     if (encoder->cfg->target_bitrate > 0) {
       // Rate control enabled.
-      lambda = select_picture_lambda(state);
-      state->global->QP = lambda_to_QP(lambda);
+      lambda = kvz_select_picture_lambda(state);
+      state->global->QP = kvz_lambda_to_QP(lambda);
     } else {
       if (encoder->cfg->gop_len > 0 && state->global->slicetype != SLICE_I) {
         kvz_gop_config const * const gop =
@@ -780,18 +780,18 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       } else {
         state->global->QP = encoder->cfg->qp;
       }
-      lambda = select_picture_lambda_from_qp(state);
+      lambda = kvz_select_picture_lambda_from_qp(state);
     }
     state->global->cur_lambda_cost = lambda;
     state->global->cur_lambda_cost_sqrt = sqrt(lambda);
 
   }
-  bitstream_clear(&state->stream);
+  kvz_bitstream_clear(&state->stream);
   
   if (state->is_leaf) {
     //Leaf states have cabac and context
-    cabac_start(&state->cabac);
-    init_contexts(state, state->global->QP, state->global->slicetype);
+    kvz_cabac_start(&state->cabac);
+    kvz_init_contexts(state, state->global->QP, state->global->slicetype);
   }
   
   //Clear the jobs
@@ -811,15 +811,15 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
     _encode_one_frame_add_bitstream_deps(&state->children[i], job);
   }
   if (state->tqj_bitstream_written) {
-    threadqueue_job_dep_add(job, state->tqj_bitstream_written);
+    kvz_threadqueue_job_dep_add(job, state->tqj_bitstream_written);
   }
   if (state->tqj_recon_done) {
-    threadqueue_job_dep_add(job, state->tqj_recon_done);
+    kvz_threadqueue_job_dep_add(job, state->tqj_recon_done);
   }
 }
 
 
-void encode_one_frame(encoder_state_t * const state)
+void kvz_encode_one_frame(encoder_state_t * const state)
 {
   {
     PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
@@ -831,7 +831,7 @@ void encode_one_frame(encoder_state_t * const state)
     encoder_state_encode(state);
     PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=encode,frame=%d", state->global->frame);
   }
-  //threadqueue_flush(main_state->encoder_control->threadqueue);
+  //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
   {
     threadqueue_job_t *job;
 #ifdef _DEBUG
@@ -841,19 +841,19 @@ void encode_one_frame(encoder_state_t * const state)
     char* job_description = NULL;
 #endif
 
-    job = threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
+    job = kvz_threadqueue_submit(state->encoder_control->threadqueue, kvz_encoder_state_worker_write_bitstream, (void*) state, 1, job_description);
     
     _encode_one_frame_add_bitstream_deps(state, job);
     if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_bitstream_written) {
       //We need to depend on previous bitstream generation
-      threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
+      kvz_threadqueue_job_dep_add(job, state->previous_encoder_state->tqj_bitstream_written);
     }
-    threadqueue_job_unwait_job(state->encoder_control->threadqueue, job);
+    kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, job);
     assert(!state->tqj_bitstream_written);
     state->tqj_bitstream_written = job;
   }
   state->frame_done = 0;
-  //threadqueue_flush(main_state->encoder_control->threadqueue);
+  //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
 /**
@@ -868,7 +868,7 @@ void encode_one_frame(encoder_state_t * const state)
  * \param img_in  input frame or NULL
  * \return        1 if the source image was set, 0 if not
  */
-int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
+int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
   const kvz_config* const cfg = encoder->cfg;
@@ -887,7 +887,7 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 
   if (cfg->gop_len == 0 || state->global->frame == 0) {
     if (img_in == NULL) return 0;
-    state->tile->frame->source = image_copy_ref(img_in);
+    state->tile->frame->source = kvz_image_copy_ref(img_in);
     state->global->gop_offset = 0;
     return 1;
   }
@@ -897,7 +897,7 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
     // Save the input image in the buffer.
     assert(gop_pictures_available < gop_buf_size);
     assert(gop_buffer[gop_buf_write_idx] == NULL);
-    gop_buffer[gop_buf_write_idx] = image_copy_ref(img_in);
+    gop_buffer[gop_buf_write_idx] = kvz_image_copy_ref(img_in);
 
     ++gop_pictures_available;
     if (++gop_buf_write_idx >= gop_buf_size) {
@@ -944,20 +944,20 @@ int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
 }
 
 
-void encoder_compute_stats(encoder_state_t *state, double frame_psnr[3])
+void kvz_encoder_compute_stats(encoder_state_t *state, double frame_psnr[3])
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
   //Blocking call
-  threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
-  videoframe_compute_psnr(state->tile->frame, frame_psnr);
+  kvz_threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
+  kvz_videoframe_compute_psnr(state->tile->frame, frame_psnr);
 }
 
-void encoder_next_frame(encoder_state_t *state)
+void kvz_encoder_next_frame(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   //Blocking call
-  threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
+  kvz_threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
 
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
@@ -965,7 +965,7 @@ void encoder_next_frame(encoder_state_t *state)
     state->global->poc = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
-    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+    state->tile->frame->rec = kvz_image_alloc(state->tile->frame->width, state->tile->frame->height);
     assert(state->tile->frame->rec);
     state->prepared = 1;
     return;
@@ -978,24 +978,24 @@ void encoder_next_frame(encoder_state_t *state)
     state->global->frame = prev_state->global->frame + 1;
     state->global->poc = prev_state->global->poc + 1;
 
-    cu_array_free(state->tile->frame->cu_array);
-    image_free(state->tile->frame->source);
+    kvz_cu_array_free(state->tile->frame->cu_array);
+    kvz_image_free(state->tile->frame->source);
     state->tile->frame->source = NULL;
-    image_free(state->tile->frame->rec);
-    state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+    kvz_image_free(state->tile->frame->rec);
+    state->tile->frame->rec = kvz_image_alloc(state->tile->frame->width, state->tile->frame->height);
     assert(state->tile->frame->rec);
     {
       // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
       unsigned height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
       unsigned width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
-      state->tile->frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
+      state->tile->frame->cu_array = kvz_cu_array_alloc(width_in_scu, height_in_scu);
     }
-    videoframe_set_poc(state->tile->frame, state->global->poc);
-    image_list_copy_contents(state->global->ref, prev_state->global->ref);
+    kvz_videoframe_set_poc(state->tile->frame, state->global->poc);
+    kvz_image_list_copy_contents(state->global->ref, prev_state->global->ref);
     if (!encoder->cfg->gop_len ||
         !prev_state->global->poc ||
         encoder->cfg->gop[prev_state->global->gop_offset].is_ref) {
-      image_list_add(state->global->ref,
+      kvz_image_list_add(state->global->ref,
                      prev_state->tile->frame->rec,
                      prev_state->tile->frame->cu_array,
                      prev_state->global->poc);
@@ -1010,7 +1010,7 @@ void encoder_next_frame(encoder_state_t *state)
       !state->global->poc ||
       encoder->cfg->gop[state->global->gop_offset].is_ref) {
     // Add current reconstructed picture as reference
-    image_list_add(state->global->ref,
+    kvz_image_list_add(state->global->ref,
                    state->tile->frame->rec,
                    state->tile->frame->cu_array,
                    state->global->poc);
@@ -1021,25 +1021,25 @@ void encoder_next_frame(encoder_state_t *state)
   state->global->poc++;
 
   // Remove current source picture.
-  image_free(state->tile->frame->source);
+  kvz_image_free(state->tile->frame->source);
   state->tile->frame->source = NULL;
 
   // Remove current reconstructed picture, and alloc a new one
-  image_free(state->tile->frame->rec);
+  kvz_image_free(state->tile->frame->rec);
 
-  state->tile->frame->rec = image_alloc(state->tile->frame->width, state->tile->frame->height);
+  state->tile->frame->rec = kvz_image_alloc(state->tile->frame->width, state->tile->frame->height);
   assert(state->tile->frame->rec);
-  videoframe_set_poc(state->tile->frame, state->global->poc);
+  kvz_videoframe_set_poc(state->tile->frame, state->global->poc);
   state->prepared = 1;
 }
 
 
-void encode_coding_tree(encoder_state_t * const state,
+void kvz_encode_coding_tree(encoder_state_t * const state,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
 {
   cabac_data_t * const cabac = &state->cabac;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb);
+  const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
   
@@ -1059,11 +1059,11 @@ void encode_coding_tree(encoder_state_t * const state,
     // Implisit split flag when on border
     if (!border) {
       // Get left and top block split_flags and if they are present and true, increase model number
-      if (x_ctb > 0 && GET_SPLITDATA(videoframe_get_cu_const(frame, x_ctb - 1, y_ctb), depth) == 1) {
+      if (x_ctb > 0 && GET_SPLITDATA(kvz_videoframe_get_cu_const(frame, x_ctb - 1, y_ctb), depth) == 1) {
         split_model++;
       }
 
-      if (y_ctb > 0 && GET_SPLITDATA(videoframe_get_cu_const(frame, x_ctb, y_ctb - 1), depth) == 1) {
+      if (y_ctb > 0 && GET_SPLITDATA(kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb - 1), depth) == 1) {
         split_model++;
       }
 
@@ -1074,17 +1074,17 @@ void encode_coding_tree(encoder_state_t * const state,
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
       uint8_t change = 1<<(MAX_DEPTH-1-depth);
-      encode_coding_tree(state, x_ctb, y_ctb, depth + 1); // x,y
+      kvz_encode_coding_tree(state, x_ctb, y_ctb, depth + 1); // x,y
 
       // TODO: fix when other half of the block would not be completely over the border
       if (!border_x || border_split_x) {
-        encode_coding_tree(state, x_ctb + change, y_ctb, depth + 1);
+        kvz_encode_coding_tree(state, x_ctb + change, y_ctb, depth + 1);
       }
       if (!border_y || border_split_y) {
-        encode_coding_tree(state, x_ctb, y_ctb + change, depth + 1);
+        kvz_encode_coding_tree(state, x_ctb, y_ctb + change, depth + 1);
       }
       if (!border || (border_split_x && border_split_y)) {
-        encode_coding_tree(state, x_ctb + change, y_ctb + change, depth + 1);
+        kvz_encode_coding_tree(state, x_ctb + change, y_ctb + change, depth + 1);
       }
       return;
     }
@@ -1098,11 +1098,11 @@ void encode_coding_tree(encoder_state_t * const state,
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
     // Get left and top skipped flags and if they are present and true, increase context number
-    if (x_ctb > 0 && (videoframe_get_cu_const(frame, x_ctb - 1, y_ctb))->skipped) {
+    if (x_ctb > 0 && (kvz_videoframe_get_cu_const(frame, x_ctb - 1, y_ctb))->skipped) {
       ctx_skip++;
     }
 
-    if (y_ctb > 0 && (videoframe_get_cu_const(frame, x_ctb, y_ctb - 1))->skipped) {
+    if (y_ctb > 0 && (kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb - 1))->skipped) {
       ctx_skip++;
     }
 
@@ -1260,7 +1260,7 @@ void encode_coding_tree(encoder_state_t * const state,
 
             if (hor_abs_gr0) {
               if (mvd_hor_abs > 1) {
-                cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
+                kvz_cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
               }
 
               CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
@@ -1268,7 +1268,7 @@ void encode_coding_tree(encoder_state_t * const state,
 
             if (ver_abs_gr0) {
               if (mvd_ver_abs > 1) {
-                cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
+                kvz_cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
               }
 
               CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
@@ -1276,7 +1276,7 @@ void encode_coding_tree(encoder_state_t * const state,
           }
 
           // Signal which candidate MV to use
-          cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
+          kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
                                       AMVP_MAX_NUM_CANDS - 1);
         }
       } // for ref_list
@@ -1296,7 +1296,7 @@ void encode_coding_tree(encoder_state_t * const state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+        kvz_encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
       }
     }
 
@@ -1314,7 +1314,7 @@ void encode_coding_tree(encoder_state_t * const state,
 
     #if ENABLE_PCM == 1
     // Code must start after variable initialization
-    cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
+    kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
     #endif
 
     // PREDINFO CODING
@@ -1327,14 +1327,14 @@ void encode_coding_tree(encoder_state_t * const state,
       const cu_info_t *above_cu = NULL;
 
       if (x_ctb > 0) {
-        left_cu = videoframe_get_cu_const(frame, x_ctb - 1, y_ctb);
+        left_cu = kvz_videoframe_get_cu_const(frame, x_ctb - 1, y_ctb);
       }
       // Don't take the above CU across the LCU boundary.
       if (y_ctb > 0 && (y_ctb & 7) != 0) {
-        above_cu = videoframe_get_cu_const(frame, x_ctb, y_ctb - 1);
+        above_cu = kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb - 1);
       }
 
-      intra_get_dir_luma_predictor((x_ctb<<3) + (offset[j].x<<2),
+      kvz_intra_get_dir_luma_predictor((x_ctb<<3) + (offset[j].x<<2),
                                    (y_ctb<<3) + (offset[j].y<<2),
                                    intra_preds[j], cur_cu,
                                    left_cu, above_cu);
@@ -1422,15 +1422,15 @@ void encode_coding_tree(encoder_state_t * const state,
       }
     }  // end intra chroma pred mode coding
 
-    encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+    kvz_encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
   }
 
     #if ENABLE_PCM == 1
   // Code IPCM block
   if (cur_cu->type == CU_PCM) {
-    cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
-      cabac_finish(cabac);
-      bitstream_align(cabac.stream);
+    kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
+      kvz_cabac_finish(cabac);
+      kvz_bitstream_align(cabac.stream);
     // PCM sample
       {
       unsigned y, x;
@@ -1442,7 +1442,7 @@ void encode_coding_tree(encoder_state_t * const state,
       // Luma
       for (y = 0; y < LCU_WIDTH >> depth; y++) {
         for (x = 0; x < LCU_WIDTH >> depth; x++) {
-          bitstream_put(cabac.stream, base_y[x + y * encoder->in.width], 8);
+          kvz_bitstream_put(cabac.stream, base_y[x + y * encoder->in.width], 8);
           }
         }
 
@@ -1450,18 +1450,18 @@ void encode_coding_tree(encoder_state_t * const state,
       if (encoder->in.video_format != FORMAT_400) {
         for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
           for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
-            bitstream_put(cabac.stream, base_u[x + y * (encoder->in.width >> 1)], 8);
+            kvz_bitstream_put(cabac.stream, base_u[x + y * (encoder->in.width >> 1)], 8);
           }
         }
         for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
           for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
-            bitstream_put(cabac.stream, base_v[x + y * (encoder->in.width >> 1)], 8);
+            kvz_bitstream_put(cabac.stream, base_v[x + y * (encoder->in.width >> 1)], 8);
           }
         }
       }
     }
     // end PCM sample
-      cabac_start(cabac);
+      kvz_cabac_start(cabac);
   } // end Code IPCM block
 #endif /* END ENABLE_PCM */
   else { /* Should not happend */
@@ -1475,7 +1475,7 @@ void encode_coding_tree(encoder_state_t * const state,
 }
 
 
-coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth)
+coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
 {
   // Scan mode is diagonal, except for 4x4+8x8 luma and 4x4 chroma, where:
   // - angular 6-14 = vertical
@@ -1503,14 +1503,14 @@ static void encode_transform_unit(encoder_state_t * const state,
 
   int x_cu = x_pu / 2;
   int y_cu = y_pu / 2;
-  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
+  const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
 
   coeff_t coeff_y[LCU_WIDTH*LCU_WIDTH+1];
   coeff_t coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
   coeff_t coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
   int32_t coeff_stride = frame->width;
 
-  int8_t scan_idx = get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
+  int8_t scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
 
   int cbf_y = cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
 
@@ -1529,7 +1529,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   // CoeffNxN
   // Residual Coding
   if (cbf_y) {
-    encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
+    kvz_encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
@@ -1562,14 +1562,14 @@ static void encode_transform_unit(encoder_state_t * const state,
       orig_pos_v += coeff_stride>>1;
     }
 
-    scan_idx = get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
+    scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
 
     if (cbf_is_set(cur_cu->cbf.u, depth)) {
-      encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
     }
 
     if (cbf_is_set(cur_cu->cbf.v, depth)) {
-      encode_coeff_nxn(state, coeff_v, width_c, 2, scan_idx, 0);
+      kvz_encode_coeff_nxn(state, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
 }
@@ -1583,14 +1583,14 @@ static void encode_transform_unit(encoder_state_t * const state,
  * \param parent_coeff_u  What was signaled at previous level for cbf_cb.
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
-void encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int32_t y_pu,
+void kvz_encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int32_t y_pu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
   cabac_data_t * const cabac = &state->cabac;
   int32_t x_cu = x_pu / 2;
   int32_t y_cu = y_pu / 2;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cur_cu = videoframe_get_cu_const(frame, x_cu, y_cu);
+  const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
@@ -1617,7 +1617,7 @@ void encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int32_t 
       tr_depth < max_tr_depth &&
       !(intra_split_flag && tr_depth == 0))
   {
-    cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
+    cabac->cur_ctx = &(cabac->ctx.trans_subdiv_model[5 - ((kvz_g_convert_to_bit[LCU_WIDTH] + 2) - depth)]);
     CABAC_BIN(cabac, split, "split_transform_flag");
   }
 
@@ -1638,10 +1638,10 @@ void encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int32_t 
 
   if (split) {
     uint8_t pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
-    encode_transform_coeff(state, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    kvz_encode_transform_coeff(state, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    kvz_encode_transform_coeff(state, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    kvz_encode_transform_coeff(state, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    kvz_encode_transform_coeff(state, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 
@@ -1660,7 +1660,7 @@ void encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int32_t 
   }
 }
 
-void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t width,
+void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -1683,9 +1683,9 @@ void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t wid
 
   // CONSTANTS
   const uint32_t num_blk_side    = width >> shift;
-  const uint32_t log2_block_size = g_convert_to_bit[width] + 2;
+  const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t *scan           =
-    g_sig_last_scan[scan_mode][log2_block_size - 1];
+    kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
   const uint32_t *scan_cg = g_sig_last_scan_cg[log2_block_size - 2][scan_mode];
 
   // Init base contexts according to block type
@@ -1731,7 +1731,7 @@ void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t wid
   last_coeff_y = (uint8_t)(pos_last >> log2_block_size);
 
   // Code last_coeff_x and last_coeff_y
-  encode_last_significant_xy(state, last_coeff_x, last_coeff_y, width, width,
+  kvz_encode_last_significant_xy(state, last_coeff_x, last_coeff_y, width, width,
                              type, scan_mode);
 
   scan_pos_sig  = scan_pos_last;
@@ -1764,14 +1764,14 @@ void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t wid
       sig_coeffgroup_flag[cg_blk_pos] = 1;
     } else {
       uint32_t sig_coeff_group   = (sig_coeffgroup_flag[cg_blk_pos] != 0);
-      uint32_t ctx_sig  = context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
+      uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                       cg_pos_y, width);
       cabac->cur_ctx = &base_coeff_group_ctx[ctx_sig];
       CABAC_BIN(cabac, sig_coeff_group, "coded_sub_block_flag");
     }
 
     if (sig_coeffgroup_flag[cg_blk_pos]) {
-      int32_t pattern_sig_ctx = context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
+      int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
                                                              cg_pos_x, cg_pos_y, width);
 
       for (; scan_pos_sig >= sub_pos; scan_pos_sig--) {
@@ -1781,7 +1781,7 @@ void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t wid
         sig    = (coeff[blk_pos] != 0) ? 1 : 0;
 
         if (scan_pos_sig > sub_pos || i == 0 || num_non_zero) {
-          ctx_sig  = context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
+          ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                              log2_block_size, type);
           cabac->cur_ctx = &baseCtx[ctx_sig];
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
@@ -1861,7 +1861,7 @@ void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t wid
           int32_t base_level  = (idx < C1FLAG_NUMBER) ? (2 + first_coeff2) : 1;
 
           if (abs_coeff[idx] >= base_level) {
-            cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
+            kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
 
             if (abs_coeff[idx] > 3 * (1 << go_rice_param)) {
               go_rice_param = MIN(go_rice_param + 1, 4);
@@ -1888,7 +1888,7 @@ void encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t wid
 
  This method encodes the X and Y component within a block of the last significant coefficient.
 */
-void encode_last_significant_xy(encoder_state_t * const state,
+void kvz_encode_last_significant_xy(encoder_state_t * const state,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan)

@@ -22,6 +22,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_dct_avx2(void* opaque, uint8_t bitdepth);
+int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_DCT_AVX2_H_

@@ -40,13 +40,13 @@ typedef struct
   uint32_t used_size;
 } image_list_t;
 
-image_list_t * image_list_alloc(int size);
-int image_list_resize(image_list_t *list, unsigned size);
-int image_list_destroy(image_list_t *list);
-int image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
-int image_list_rem(image_list_t *list, unsigned n);
+image_list_t * kvz_image_list_alloc(int size);
+int kvz_image_list_resize(image_list_t *list, unsigned size);
+int kvz_image_list_destroy(image_list_t *list);
+int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
+int kvz_image_list_rem(image_list_t *list, unsigned n);
 
-int image_list_copy_contents(image_list_t *target, image_list_t *source);
+int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source);
 
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
 

@@ -37,7 +37,7 @@
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
  */
-void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
+void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
                const uint8_t temporal_id, const int long_start_code)
 {
   uint8_t byte;
@@ -49,21 +49,21 @@ void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
   // and PPS, or the first NALU of an access unit
   if(long_start_code)
-    bitstream_writebyte(bitstream, zero);
+    kvz_bitstream_writebyte(bitstream, zero);
 
   // start_code_prefix_one_3bytes
-  bitstream_writebyte(bitstream, zero);
-  bitstream_writebyte(bitstream, zero);
-  bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
+  kvz_bitstream_writebyte(bitstream, zero);
+  kvz_bitstream_writebyte(bitstream, zero);
+  kvz_bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
 
   // Handle header bits with full bytes instead of using bitstream
   // forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of nuh_layer_id
   byte = nal_type << 1;
-  bitstream_writebyte(bitstream, byte);
+  kvz_bitstream_writebyte(bitstream, byte);
 
   // 5bits of nuh_layer_id + nuh_temporal_id_plus1(3)
   byte = (temporal_id + 1) & 7;
-  bitstream_writebyte(bitstream, byte);
+  kvz_bitstream_writebyte(bitstream, byte);
 }
 
 /*!
@@ -72,11 +72,11 @@ void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
  \param checksum_out Result of the calculation.
  \returns Void
 */
-void image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
+void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
 {
-  array_checksum(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
+  kvz_array_checksum(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
-  array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
-  array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+  kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
+  kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
 }

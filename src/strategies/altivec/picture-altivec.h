@@ -21,6 +21,6 @@
  ****************************************************************************/
 #include  "global.h"
 
-int strategy_register_picture_altivec(void* opaque, uint8_t bitdepth);
+int kvz_strategy_register_picture_altivec(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_PICTURE_ALTIVEC_H_

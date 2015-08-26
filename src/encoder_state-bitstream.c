@@ -41,8 +41,8 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
 {
   bitstream_t * const stream = &state->stream;
   encoder_state_write_bitstream_access_unit_delimiter(state);
-  nal_write(stream, AUD_NUT, 0, 1);
-  bitstream_align(stream);
+  kvz_nal_write(stream, AUD_NUT, 0, 1);
+  kvz_bitstream_align(stream);
 }
 
 static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
@@ -128,7 +128,7 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const s
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
-    for (list_id = 0; list_id < g_scaling_list_num[size_id]; list_id++) {
+    for (list_id = 0; list_id < kvz_g_scaling_list_num[size_id]; list_id++) {
       uint8_t scaling_list_pred_mode_flag = 1;
       int32_t pred_list_idx;
       int32_t i;
@@ -136,10 +136,10 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const s
 
       for (pred_list_idx = list_id; pred_list_idx >= 0; pred_list_idx--) {
         const int32_t * const pred_list  = (list_id == pred_list_idx) ?
-                                     scalinglist_get_default(size_id, pred_list_idx) :
+                                     kvz_scalinglist_get_default(size_id, pred_list_idx) :
                                      encoder->scaling_list.scaling_list_coeff[size_id][pred_list_idx];
 
-        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, g_scaling_list_size[size_id])) &&
+        if (!memcmp(encoder->scaling_list.scaling_list_coeff[size_id][list_id], pred_list, sizeof(int32_t) * MIN(8, kvz_g_scaling_list_size[size_id])) &&
             ((size_id < SCALING_LIST_16x16) ||
              (encoder->scaling_list.scaling_list_dc[size_id][list_id] == encoder->scaling_list.scaling_list_dc[size_id][pred_list_idx]))) {
           ref_matrix_id = pred_list_idx;
@@ -153,7 +153,7 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const s
         WRITE_UE(stream, list_id - ref_matrix_id, "scaling_list_pred_matrix_id_delta");
       } else {
         int32_t delta;
-        const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, g_scaling_list_size[size_id]);
+        const int32_t coef_num = MIN(MAX_MATRIX_COEF_NUM, kvz_g_scaling_list_size[size_id]);
         const uint32_t * const scan_cg = (size_id == 0) ? g_sig_last_scan_16x16 : g_sig_last_scan_32x32;
         int32_t next_coef = 8;
         const int32_t * const coef_list = encoder->scaling_list.scaling_list_coeff[size_id][list_id];
@@ -543,7 +543,7 @@ static void encoder_state_write_active_parameter_sets_sei_message(encoder_state_
   WRITE_UE(stream, layer_sps_idx, "layer_sps_idx");
   //}
 
-  bitstream_align(stream); //rbsp_trailing_bits
+  kvz_bitstream_align(stream); //rbsp_trailing_bits
 }
 */
 
@@ -581,7 +581,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
     WRITE_U(stream, source_scan_type, 2, "source_scan_type");
     WRITE_U(stream, 0, 1, "duplicate_flag");
 
-    bitstream_align(stream); //rbsp_trailing_bits
+    kvz_bitstream_align(stream); //rbsp_trailing_bits
   }
 }
 
@@ -590,7 +590,7 @@ static void encoder_state_entry_points_explore(const encoder_state_t * const sta
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].is_leaf) {
-      const int my_length = bitstream_tell(&state->children[i].stream)/8;
+      const int my_length = kvz_bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       if (my_length > *r_max_length) {
         *r_max_length = my_length;
@@ -605,7 +605,7 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   int i;
   for (i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].is_leaf) {
-      const int my_length = bitstream_tell(&state->children[i].stream)/8;
+      const int my_length = kvz_bitstream_tell(&state->children[i].stream)/8;
       ++(*r_count);
       //Don't write the last one
       if (*r_count < num_entry_points) {
@@ -627,7 +627,7 @@ static int num_bitcount(unsigned int n) {
   return ((n == 0) ? (-1) : pos);
 }
 
-void encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
+void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
@@ -785,9 +785,9 @@ static void add_checksum(encoder_state_t * const state)
   uint32_t checksum_val;
   unsigned int i;
 
-  nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
+  kvz_nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
 
-  image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
+  kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
   WRITE_U(stream, 132, 8, "sei_type");
   WRITE_U(stream, 13, 8, "size");
@@ -802,7 +802,7 @@ static void add_checksum(encoder_state_t * const state)
     CHECKPOINT("checksum[%d] = %u", i, checksum_val);
   }
 
-  bitstream_align(stream);
+  kvz_bitstream_align(stream);
 }
 
 /**
@@ -811,8 +811,8 @@ static void add_checksum(encoder_state_t * const state)
 static void encoder_state_write_bitstream_children(encoder_state_t * const state)
 {
   for (int i = 0; state->children[i].encoder_control; ++i) {
-    encoder_state_write_bitstream(&state->children[i]);
-    bitstream_move(&state->stream, &state->children[i].stream);
+    kvz_encoder_state_write_bitstream(&state->children[i]);
+    kvz_bitstream_move(&state->stream, &state->children[i].stream);
   }
 }
 
@@ -820,7 +820,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
-  uint64_t curpos = bitstream_tell(stream);
+  uint64_t curpos = kvz_bitstream_tell(stream);
 
   // The first NAL unit of the access unit must use a long start code.
   bool first_nal_in_au = true;
@@ -837,44 +837,44 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     first_nal_in_au = false;
 
     // Video Parameter Set (VPS)
-    nal_write(stream, NAL_VPS_NUT, 0, 1);
+    kvz_nal_write(stream, NAL_VPS_NUT, 0, 1);
     encoder_state_write_bitstream_vid_parameter_set(state);
-    bitstream_align(stream);
+    kvz_bitstream_align(stream);
 
     // Sequence Parameter Set (SPS)
-    nal_write(stream, NAL_SPS_NUT, 0, 1);
+    kvz_nal_write(stream, NAL_SPS_NUT, 0, 1);
     encoder_state_write_bitstream_seq_parameter_set(state);
-    bitstream_align(stream);
+    kvz_bitstream_align(stream);
 
     // Picture Parameter Set (PPS)
-    nal_write(stream, NAL_PPS_NUT, 0, 1);
+    kvz_nal_write(stream, NAL_PPS_NUT, 0, 1);
     encoder_state_write_bitstream_pic_parameter_set(state);
-    bitstream_align(stream);
+    kvz_bitstream_align(stream);
   }
 
   // Send Kvazaar version information only in the first frame.
   if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
-    nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
+    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
-    bitstream_align(stream);
+    kvz_bitstream_align(stream);
   }
 
   //SEI messages for interlacing
   if (state->encoder_control->vui.frame_field_info_present_flag){
     // These should be optional, needed for earlier versions
     // of HM decoder to accept bitstream
-    //nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    //kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
     //encoder_state_write_active_parameter_sets_sei_message(state);
-    //bitstream_align(stream);
+    //kvz_bitstream_align(stream);
 
-    nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
     encoder_state_write_picture_timing_sei_message(state);
-    bitstream_align(stream);
+    kvz_bitstream_align(stream);
   }
 
   {
     uint8_t nal_type = (state->global->is_idr_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
-    nal_write(stream, nal_type, 0, first_nal_in_au);
+    kvz_nal_write(stream, nal_type, 0, first_nal_in_au);
   }
 
   {
@@ -891,7 +891,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
   
   //Get bitstream length for stats
-  uint64_t newpos = bitstream_tell(stream);
+  uint64_t newpos = kvz_bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
 
   if (state->global->frame > 0) {
@@ -907,7 +907,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   state->global->cur_gop_bits_coded += newpos - curpos;
 }
 
-void encoder_state_write_bitstream_leaf(encoder_state_t * const state)
+void kvz_encoder_state_write_bitstream_leaf(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   //Write terminator of the leaf
@@ -917,24 +917,24 @@ void encoder_state_write_bitstream_leaf(encoder_state_t * const state)
   {
     const lcu_order_element_t * const lcu = &state->lcu_order[state->lcu_order_count - 1];
     const int lcu_addr_in_ts = lcu->id + state->tile->lcu_offset_in_ts;
-    const int end_of_slice_segment_flag = lcu_at_slice_end(encoder, lcu_addr_in_ts);
+    const int end_of_slice_segment_flag = kvz_lcu_at_slice_end(encoder, lcu_addr_in_ts);
   
-    cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
+    kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
   
     if (!end_of_slice_segment_flag) {
-      assert(lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (state->tile->frame->width_in_lcu - 1));
-      cabac_encode_bin_trm(&state->cabac, 1); // end_of_sub_stream_one_bit == 1
-      cabac_flush(&state->cabac);
+      assert(kvz_lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (state->tile->frame->width_in_lcu - 1));
+      kvz_cabac_encode_bin_trm(&state->cabac, 1); // end_of_sub_stream_one_bit == 1
+      kvz_cabac_flush(&state->cabac);
     } else {
-      cabac_flush(&state->cabac);
-      bitstream_align_zero(&state->stream);
+      kvz_cabac_flush(&state->cabac);
+      kvz_bitstream_align_zero(&state->stream);
     }
   }
 }
 
-void encoder_state_worker_write_bitstream_leaf(void * opaque)
+void kvz_encoder_state_worker_write_bitstream_leaf(void * opaque)
 {
-  encoder_state_write_bitstream_leaf((encoder_state_t *) opaque);
+  kvz_encoder_state_write_bitstream_leaf((encoder_state_t *) opaque);
 }
 
 static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
@@ -944,12 +944,12 @@ static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
 
 static void encoder_state_write_bitstream_slice(encoder_state_t * const state)
 {
-  encoder_state_write_bitstream_slice_header(state);
-  bitstream_align(&state->stream);
+  kvz_encoder_state_write_bitstream_slice_header(state);
+  kvz_bitstream_align(&state->stream);
   encoder_state_write_bitstream_children(state);
 }
 
-void encoder_state_write_bitstream(encoder_state_t * const state)
+void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
 {
   if (!state->is_leaf) {
     switch (state->type) {
@@ -969,7 +969,7 @@ void encoder_state_write_bitstream(encoder_state_t * const state)
   }
 }
 
-void encoder_state_worker_write_bitstream(void * opaque)
+void kvz_encoder_state_worker_write_bitstream(void * opaque)
 {
-  encoder_state_write_bitstream((encoder_state_t *) opaque);
+  kvz_encoder_state_write_bitstream((encoder_state_t *) opaque);
 }

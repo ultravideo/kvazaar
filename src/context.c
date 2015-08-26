@@ -34,105 +34,105 @@
 
 // stuff
 
-const uint8_t INIT_SAO_MERGE_FLAG[3] = { 153, 153, 153 };
-const uint8_t INIT_SAO_TYPE_IDX[3] = { 160, 185, 200 };
+const uint8_t kvz_INIT_SAO_MERGE_FLAG[3] = { 153, 153, 153 };
+const uint8_t kvz_INIT_SAO_TYPE_IDX[3] = { 160, 185, 200 };
 
-const uint8_t INIT_QT_ROOT_CBF[3][1] = {
+const uint8_t kvz_INIT_QT_ROOT_CBF[3][1] = {
   {  79, },
   {  79, },
   { CNU, },
 };
 
-const uint8_t INIT_MVP_IDX[3][2] = {
+const uint8_t kvz_INIT_MVP_IDX[3][2] = {
   { 168,  CNU, },
   { 168,  CNU, },
   { CNU,  CNU, },
 };
 
-const uint8_t INIT_REF_PIC[3][2] = {
+const uint8_t kvz_INIT_REF_PIC[3][2] = {
   { 153,  153 },
   { 153,  153 },
   { CNU,  CNU },
 };
 
-const uint8_t INIT_MVD[3][2] = {
+const uint8_t kvz_INIT_MVD[3][2] = {
   { 169,  198, },
   { 140,  198, },
   { CNU,  CNU, },
 };
 
-const uint8_t INIT_MERGE_FLAG_EXT[3][1] = {
+const uint8_t kvz_INIT_MERGE_FLAG_EXT[3][1] = {
   { 154, },
   { 110, },
   { CNU, },
 };
 
-const uint8_t INIT_MERGE_IDX_EXT[3][1] = {
+const uint8_t kvz_INIT_MERGE_IDX_EXT[3][1] = {
   { 137, },
   { 122, },
   { CNU, },
 };
 
-const uint8_t INIT_SKIP_FLAG[3][3] =  {
+const uint8_t kvz_INIT_SKIP_FLAG[3][3] =  {
   { 197,  185,  201, },
   { 197,  185,  201, },
   { CNU,  CNU,  CNU, },
 };
 
-const uint8_t INIT_PRED_MODE[3][1] = {
+const uint8_t kvz_INIT_PRED_MODE[3][1] = {
   { 134, },
   { 149, },
   { CNU, },
 };
 
 
-const uint8_t INIT_PART_SIZE[3][4] = {
+const uint8_t kvz_INIT_PART_SIZE[3][4] = {
   { 154,  139,  CNU,  CNU, },
   { 154,  139,  CNU,  CNU, },
   { 184,  CNU,  CNU,  CNU, },
 };
 
-const uint8_t  INIT_SPLIT_FLAG[3][3] = {
+const uint8_t  kvz_INIT_SPLIT_FLAG[3][3] = {
   { 107,  139,  126 },
   { 107,  139,  126 },
   { 139,  141,  157 },
 };
 
-const uint8_t INIT_INTRA_PRED_MODE[3] = {
+const uint8_t kvz_INIT_INTRA_PRED_MODE[3] = {
   183, 154, 184
 };
 
-const uint8_t INIT_CHROMA_PRED_MODE[3][2] = {
+const uint8_t kvz_INIT_CHROMA_PRED_MODE[3][2] = {
   { 152,  139 },
   { 152,  139 },
   {  63,  139 },
 };
 
-const uint8_t INIT_INTER_DIR[3][5] = {
+const uint8_t kvz_INIT_INTER_DIR[3][5] = {
   {  95,  79,  63,  31,  31, },
   {  95,  79,  63,  31,  31, },
   { CNU, CNU, CNU, CNU, CNU, },
 };
 
-const uint8_t INIT_TRANS_SUBDIV_FLAG[3][3] = {
+const uint8_t kvz_INIT_TRANS_SUBDIV_FLAG[3][3] = {
   { 224,  167,  122 },
   { 124,  138,   94 },
   { 153,  138,  138 },
 };
 
-const uint8_t INIT_QT_CBF[3][8] = {
+const uint8_t kvz_INIT_QT_CBF[3][8] = {
   { 153,  111,  CNU,  CNU,   149,   92,  167,  154 },
   { 153,  111,  CNU,  CNU,   149,  107,  167,  154 },
   { 111,  141,  CNU,  CNU,    94,  138,  182,  154 },
 };
 
-const uint8_t INIT_SIG_CG_FLAG[3][4] = {
+const uint8_t kvz_INIT_SIG_CG_FLAG[3][4] = {
   { 121,  140,  61,  154  },
   { 121,  140,  61,  154 },
   {  91,  171,  134,  141  },
 };
 
-const uint8_t INIT_SIG_FLAG[3][42] = {
+const uint8_t kvz_INIT_SIG_FLAG[3][42] = {
    {170,154,139,153,139,123,123, 63,124,166,
     183,140,136,153,154,166,183,140,136,153,
     154,166,183,140,136,153,154,170,153,138,
@@ -150,7 +150,7 @@ const uint8_t INIT_SIG_FLAG[3][42] = {
    139,111},
 };
 
-const uint8_t INIT_LAST[3][30] = {
+const uint8_t kvz_INIT_LAST[3][30] = {
   { 125,  110,  124,  110,   95,   94,  125,  111,  111,   79,  125,  126,  111,  111,   79,
     108,  123,   93,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
   { 125,  110,   94,  110,   95,   79,  125,  111,  110,   78,  110,  111,  111,   95,   94,
@@ -159,14 +159,14 @@ const uint8_t INIT_LAST[3][30] = {
     108,  123,   63,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU,  CNU  },
 };
 
-const uint8_t INIT_ONE_FLAG[3][24] =
+const uint8_t kvz_INIT_ONE_FLAG[3][24] =
 {
   {154,196,167,167,154,152,167,182,182,134,149,136,153,121,136,122,169,208,166,167,154,152,167,182},
   {154,196,196,167,154,152,167,182,182,134,149,136,153,121,136,137,169,194,166,167,154,167,137,182},
   {140, 92,137,138,140,152,138,139,153, 74,149, 92,139,107,122,152,140,179,166,182,140,227,122,197},
 };
 
-const uint8_t INIT_ABS_FLAG[3][6] =
+const uint8_t kvz_INIT_ABS_FLAG[3][6] =
 {
   { 107,167, 91,107,107,167},
   { 107,167, 91,122,107,167},
@@ -186,7 +186,7 @@ static const uint8_t INIT_TRANSFORMSKIP_FLAG[3][2] =
 /**
  * \brief Initialize struct cabac_ctx.
  */
-void ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
+void kvz_ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
 {
   int slope = (init_value >> 4) * 5 - 45;
   int offset = ((init_value & 15) << 3) - 16;
@@ -205,87 +205,87 @@ void ctx_init(cabac_ctx_t *ctx, uint32_t qp, uint32_t init_value)
  * \param slice type of slice we are coding (P/B/I)
  */
 
-void init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
+void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
 {
   cabac_data_t * const cabac = &state->cabac;
   uint16_t i;
 
   // Initialize contexts
-  ctx_init(&cabac->ctx.transform_skip_model_luma, QP, INIT_TRANSFORMSKIP_FLAG[slice][0]);
-  ctx_init(&cabac->ctx.transform_skip_model_chroma, QP, INIT_TRANSFORMSKIP_FLAG[slice][1]);
+  kvz_ctx_init(&cabac->ctx.transform_skip_model_luma, QP, INIT_TRANSFORMSKIP_FLAG[slice][0]);
+  kvz_ctx_init(&cabac->ctx.transform_skip_model_chroma, QP, INIT_TRANSFORMSKIP_FLAG[slice][1]);
 
-  ctx_init(&cabac->ctx.sao_merge_flag_model, QP, INIT_SAO_MERGE_FLAG[slice]);
-  ctx_init(&cabac->ctx.sao_type_idx_model, QP, INIT_SAO_TYPE_IDX[slice]);
+  kvz_ctx_init(&cabac->ctx.sao_merge_flag_model, QP, kvz_INIT_SAO_MERGE_FLAG[slice]);
+  kvz_ctx_init(&cabac->ctx.sao_type_idx_model, QP, kvz_INIT_SAO_TYPE_IDX[slice]);
 
-  ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0]);
-  ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0]);
-  ctx_init(&cabac->ctx.cu_pred_mode_model, QP, INIT_PRED_MODE[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, kvz_INIT_MERGE_FLAG_EXT[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, kvz_INIT_MERGE_IDX_EXT[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_pred_mode_model, QP, kvz_INIT_PRED_MODE[slice][0]);
 
-  ctx_init(&cabac->ctx.cu_skip_flag_model[0], QP, INIT_SKIP_FLAG[slice][0]);
-  ctx_init(&cabac->ctx.cu_skip_flag_model[1], QP, INIT_SKIP_FLAG[slice][1]);
-  ctx_init(&cabac->ctx.cu_skip_flag_model[2], QP, INIT_SKIP_FLAG[slice][2]);
+  kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[0], QP, kvz_INIT_SKIP_FLAG[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[1], QP, kvz_INIT_SKIP_FLAG[slice][1]);
+  kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[2], QP, kvz_INIT_SKIP_FLAG[slice][2]);
 
-  ctx_init(&cabac->ctx.split_flag_model[0], QP, INIT_SPLIT_FLAG[slice][0]);
-  ctx_init(&cabac->ctx.split_flag_model[1], QP, INIT_SPLIT_FLAG[slice][1]);
-  ctx_init(&cabac->ctx.split_flag_model[2], QP, INIT_SPLIT_FLAG[slice][2]);
+  kvz_ctx_init(&cabac->ctx.split_flag_model[0], QP, kvz_INIT_SPLIT_FLAG[slice][0]);
+  kvz_ctx_init(&cabac->ctx.split_flag_model[1], QP, kvz_INIT_SPLIT_FLAG[slice][1]);
+  kvz_ctx_init(&cabac->ctx.split_flag_model[2], QP, kvz_INIT_SPLIT_FLAG[slice][2]);
 
-  ctx_init(&cabac->ctx.intra_mode_model, QP, INIT_INTRA_PRED_MODE[slice]);
+  kvz_ctx_init(&cabac->ctx.intra_mode_model, QP, kvz_INIT_INTRA_PRED_MODE[slice]);
 
-  ctx_init(&cabac->ctx.chroma_pred_model[0], QP, INIT_CHROMA_PRED_MODE[slice][0]);
-  ctx_init(&cabac->ctx.chroma_pred_model[1], QP, INIT_CHROMA_PRED_MODE[slice][1]);
+  kvz_ctx_init(&cabac->ctx.chroma_pred_model[0], QP, kvz_INIT_CHROMA_PRED_MODE[slice][0]);
+  kvz_ctx_init(&cabac->ctx.chroma_pred_model[1], QP, kvz_INIT_CHROMA_PRED_MODE[slice][1]);
 
-  ctx_init(&cabac->ctx.cu_abs_model_chroma[0], QP, INIT_ABS_FLAG[slice][4]);
-  ctx_init(&cabac->ctx.cu_abs_model_chroma[1], QP, INIT_ABS_FLAG[slice][5]);
+  kvz_ctx_init(&cabac->ctx.cu_abs_model_chroma[0], QP, kvz_INIT_ABS_FLAG[slice][4]);
+  kvz_ctx_init(&cabac->ctx.cu_abs_model_chroma[1], QP, kvz_INIT_ABS_FLAG[slice][5]);
 
   //TODO: ignore P/B contexts on intra frame
-  ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, INIT_QT_ROOT_CBF[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_qt_root_cbf_model, QP, kvz_INIT_QT_ROOT_CBF[slice][0]);
 
-  ctx_init(&cabac->ctx.cu_mvd_model[0], QP, INIT_MVD[slice][0]);
-  ctx_init(&cabac->ctx.cu_mvd_model[1], QP, INIT_MVD[slice][1]);
-  ctx_init(&cabac->ctx.cu_ref_pic_model[0], QP, INIT_REF_PIC[slice][0]);
-  ctx_init(&cabac->ctx.cu_ref_pic_model[1], QP, INIT_REF_PIC[slice][1]);
-  ctx_init(&cabac->ctx.mvp_idx_model[0], QP, INIT_MVP_IDX[slice][0]);
-  ctx_init(&cabac->ctx.mvp_idx_model[1], QP, INIT_MVP_IDX[slice][1]);
+  kvz_ctx_init(&cabac->ctx.cu_mvd_model[0], QP, kvz_INIT_MVD[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_mvd_model[1], QP, kvz_INIT_MVD[slice][1]);
+  kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[0], QP, kvz_INIT_REF_PIC[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[1], QP, kvz_INIT_REF_PIC[slice][1]);
+  kvz_ctx_init(&cabac->ctx.mvp_idx_model[0], QP, kvz_INIT_MVP_IDX[slice][0]);
+  kvz_ctx_init(&cabac->ctx.mvp_idx_model[1], QP, kvz_INIT_MVP_IDX[slice][1]);
 
   for (i = 0; i < 4; i++) {
-    ctx_init(&cabac->ctx.cu_sig_coeff_group_model[i], QP, INIT_SIG_CG_FLAG[slice][i]);
-    ctx_init(&cabac->ctx.cu_abs_model_luma[i], QP, INIT_ABS_FLAG[slice][i]);
-    ctx_init(&cabac->ctx.part_size_model[i], QP, INIT_PART_SIZE[slice][i]);
+    kvz_ctx_init(&cabac->ctx.cu_sig_coeff_group_model[i], QP, kvz_INIT_SIG_CG_FLAG[slice][i]);
+    kvz_ctx_init(&cabac->ctx.cu_abs_model_luma[i], QP, kvz_INIT_ABS_FLAG[slice][i]);
+    kvz_ctx_init(&cabac->ctx.part_size_model[i], QP, kvz_INIT_PART_SIZE[slice][i]);
   }
   for (i = 0; i < 3; i++) {
-    ctx_init(&cabac->ctx.trans_subdiv_model[i], QP, INIT_TRANS_SUBDIV_FLAG[slice][i]);
+    kvz_ctx_init(&cabac->ctx.trans_subdiv_model[i], QP, kvz_INIT_TRANS_SUBDIV_FLAG[slice][i]);
   }
   for (i = 0; i < 4; i++) {
-    ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, INIT_QT_CBF[slice][i]);
-    ctx_init(&cabac->ctx.qt_cbf_model_chroma[i], QP, INIT_QT_CBF[slice][i + 4]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_luma[i], QP, kvz_INIT_QT_CBF[slice][i]);
+    kvz_ctx_init(&cabac->ctx.qt_cbf_model_chroma[i], QP, kvz_INIT_QT_CBF[slice][i + 4]);
   }
 
   for (i = 0; i < 5; i++) {
-    ctx_init(&cabac->ctx.inter_dir[i], QP, INIT_INTER_DIR[slice][i]);
+    kvz_ctx_init(&cabac->ctx.inter_dir[i], QP, kvz_INIT_INTER_DIR[slice][i]);
   }
 
   for (i = 0; i < 8; i++) {
-    ctx_init(&cabac->ctx.cu_one_model_chroma[i], QP, INIT_ONE_FLAG[slice][i+16]);
+    kvz_ctx_init(&cabac->ctx.cu_one_model_chroma[i], QP, kvz_INIT_ONE_FLAG[slice][i+16]);
   }
 
   for (i = 0; i < 15; i++) {
-    ctx_init(&cabac->ctx.cu_ctx_last_y_luma[i], QP, INIT_LAST[slice][i] );
-    ctx_init(&cabac->ctx.cu_ctx_last_x_luma[i], QP, INIT_LAST[slice][i] );
+    kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_luma[i], QP, kvz_INIT_LAST[slice][i] );
+    kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_luma[i], QP, kvz_INIT_LAST[slice][i] );
 
-    ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, INIT_LAST[slice][i+15] );
-    ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, INIT_LAST[slice][i+15] );
+    kvz_ctx_init(&cabac->ctx.cu_ctx_last_y_chroma[i], QP, kvz_INIT_LAST[slice][i+15] );
+    kvz_ctx_init(&cabac->ctx.cu_ctx_last_x_chroma[i], QP, kvz_INIT_LAST[slice][i+15] );
 
-    ctx_init(&cabac->ctx.cu_one_model_luma[i], QP, INIT_ONE_FLAG[slice][i]);
+    kvz_ctx_init(&cabac->ctx.cu_one_model_luma[i], QP, kvz_INIT_ONE_FLAG[slice][i]);
   }
-  ctx_init(&cabac->ctx.cu_one_model_luma[15], QP, INIT_ONE_FLAG[slice][15]);
+  kvz_ctx_init(&cabac->ctx.cu_one_model_luma[15], QP, kvz_INIT_ONE_FLAG[slice][15]);
 
   for (i = 0; i < 27; i++) {
-    ctx_init(&cabac->ctx.cu_sig_model_luma[i], QP, INIT_SIG_FLAG[slice][i]);
-    if(i < 15) ctx_init(&cabac->ctx.cu_sig_model_chroma[i], QP, INIT_SIG_FLAG[slice][i+27]);
+    kvz_ctx_init(&cabac->ctx.cu_sig_model_luma[i], QP, kvz_INIT_SIG_FLAG[slice][i]);
+    if(i < 15) kvz_ctx_init(&cabac->ctx.cu_sig_model_chroma[i], QP, kvz_INIT_SIG_FLAG[slice][i+27]);
   }
 }
 
-void context_copy(encoder_state_t * const target_state, const encoder_state_t * const source_state) {
+void kvz_context_copy(encoder_state_t * const target_state, const encoder_state_t * const source_state) {
   cabac_data_t * const target_cabac = &target_state->cabac;
   const cabac_data_t * const source_cabac = &source_state->cabac;
   
@@ -295,7 +295,7 @@ void context_copy(encoder_state_t * const target_state, const encoder_state_t * 
 }
 
 
-uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
+uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
                                       uint32_t pos_x,
                                       uint32_t pos_y,
                                       int32_t width)
@@ -319,7 +319,7 @@ uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,
  * \returns pattern for current coefficient group
  */
 
-int32_t context_calc_pattern_sig_ctx(const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width)
+int32_t kvz_context_calc_pattern_sig_ctx(const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width)
 {
   uint32_t sigRight = 0;
   uint32_t sigLower = 0;
@@ -346,7 +346,7 @@ int32_t context_calc_pattern_sig_ctx(const uint32_t *sig_coeff_group_flag, uint3
  * \returns ctx_inc for current scan position
  */
 
-int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int32_t pos_x,
+int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx, uint32_t scan_idx, int32_t pos_x,
                                 int32_t pos_y, int32_t block_type, int8_t texture_type)
 {
   const int32_t ctx_ind_map[16] =

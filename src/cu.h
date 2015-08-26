@@ -104,8 +104,8 @@ typedef struct {
   int32_t refcount;        //!< \brief number of references in reflists to this cu_array
 } cu_array_t;
 
-cu_array_t * cu_array_alloc(int width_in_scu, int height_in_scu);
-int cu_array_free(cu_array_t *cua);
+cu_array_t * kvz_cu_array_alloc(int width_in_scu, int height_in_scu);
+int kvz_cu_array_free(cu_array_t *cua);
   
 
 #define SUB_SCU_BIT_MASK (64 - 1)
@@ -243,11 +243,11 @@ typedef struct {
 } while(0)
 
 
-void coefficients_blit(const coeff_t *orig, coeff_t *dst,
+void kvz_coefficients_blit(const coeff_t *orig, coeff_t *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
-unsigned coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
+unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
                         const int width);
 
 

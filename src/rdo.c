@@ -38,15 +38,15 @@
 #define LOG2_SCAN_SET_SIZE    4
 #define SBH_THRESHOLD         4
 
-const uint32_t g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
-const uint32_t g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
+const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
+const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
 
 
-#define CTX_ENTROPY_BITS(ctx,val) entropy_bits[(ctx)->uc_state ^ val]
+#define CTX_ENTROPY_BITS(ctx,val) kvz_entropy_bits[(ctx)->uc_state ^ val]
 /**
  * Entropy bits to estimate coded bits in RDO / RDOQ (From HM 12.0)
  */
-const uint32_t entropy_bits[128] =
+const uint32_t kvz_entropy_bits[128] =
 {
   0x08000, 0x08000, 0x076da, 0x089a0, 0x06e92, 0x09340, 0x0670a, 0x09cdf, 0x06029, 0x0a67f, 0x059dd, 0x0b01f, 0x05413, 0x0b9bf, 0x04ebf, 0x0c35f,
   0x049d3, 0x0ccff, 0x04546, 0x0d69e, 0x0410d, 0x0e03e, 0x03d22, 0x0e9de, 0x0397d, 0x0f37e, 0x03619, 0x0fd1e, 0x032ee, 0x106be, 0x02ffa, 0x1105d,
@@ -59,7 +59,7 @@ const uint32_t entropy_bits[128] =
 };
 
 // Entropy bits scaled so that 50% probability yields 1 bit.
-const float f_entropy_bits[128] =
+const float kvz_f_entropy_bits[128] =
 {
   1.0, 1.0,
   0.92852783203125, 1.0751953125,
@@ -136,7 +136,7 @@ const float f_entropy_bits[128] =
 
  This function derives the prediction samples for planar mode (intra coding).
 */
-int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost)
+int kvz_intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost)
 {
   int i;
   int found = 0;
@@ -170,7 +170,7 @@ int intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32
 
  ** Only for luma
  */
-uint32_t rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixel *orig_block, int width, int8_t mode, int tr_depth)
+uint32_t kvz_rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixel *orig_block, int width, int8_t mode, int tr_depth)
 {
     const encoder_control_t * const encoder = state->encoder_control;
     coeff_t pre_quant_coeff[LCU_WIDTH*LCU_WIDTH>>2];
@@ -195,14 +195,14 @@ uint32_t rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixe
         luma_scan_mode = SCAN_HOR;
       }
     }
-    transform2d(encoder, block,pre_quant_coeff,width,0);
+    kvz_transform2d(encoder, block,pre_quant_coeff,width,0);
     if(encoder->rdoq_enable) {
-      rdoq(state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA, tr_depth);
+      kvz_rdoq(state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA, tr_depth);
     } else {
-      quant(state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA);
+      kvz_quant(state, pre_quant_coeff, temp_coeff, width, width, 0, luma_scan_mode, CU_INTRA);
     }
-    dequant(state, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
-    itransform2d(encoder, temp_block,pre_quant_coeff,width,0);
+    kvz_dequant(state, temp_coeff, pre_quant_coeff, width, width, 0, CU_INTRA);
+    kvz_itransform2d(encoder, temp_block,pre_quant_coeff,width,0);
 
     unsigned ssd = 0;
     // SSD between original and reconstructed
@@ -213,7 +213,7 @@ uint32_t rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixe
       ssd += diff*diff;
     }
 
-    double coeff_bits = get_coeff_cost(state, temp_coeff, width, 0, luma_scan_mode);
+    double coeff_bits = kvz_get_coeff_cost(state, temp_coeff, width, 0, luma_scan_mode);
 
     return (uint32_t)(0.5 + ssd + coeff_bits * state->global->cur_lambda_cost);
 }
@@ -225,7 +225,7 @@ uint32_t rdo_cost_intra(encoder_state_t * const state, kvz_pixel *pred, kvz_pixe
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t get_coeff_cost(const encoder_state_t * const state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode)
+int32_t kvz_get_coeff_cost(const encoder_state_t * const state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode)
 {
   int32_t cost = 0;
   int i;
@@ -251,7 +251,7 @@ int32_t get_coeff_cost(const encoder_state_t * const state, coeff_t *coeff, int3
   state_copy.cabac.bits_left = 23;
 
   // Execute the coding function
-  encode_coeff_nxn(&state_copy, coeff, width, type, scan_mode, 0);
+  kvz_encode_coeff_nxn(&state_copy, coeff, width, type, scan_mode, 0);
 
   // Store bitcost before restoring cabac
   cost = (23-state_copy.cabac.bits_left) + (state_copy.cabac.num_buffered_bytes << 3);
@@ -270,7 +270,7 @@ int32_t get_coeff_cost(const encoder_state_t * const state, coeff_t *coeff, int3
  * \returns cost of given absolute transform level
  * From HM 12.0
  */
-int32_t get_ic_rate(encoder_state_t * const state,
+int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint32_t abs_level,
                     uint16_t ctx_num_one,
                     uint16_t ctx_num_abs,
@@ -334,7 +334,7 @@ int32_t get_ic_rate(encoder_state_t * const state,
  * This method calculates the best quantized transform level for a given scan position.
  * From HM 12.0
  */
-uint32_t get_coded_level ( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
+uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                            uint16_t abs_go_rice,
@@ -364,7 +364,7 @@ uint32_t get_coded_level ( encoder_state_t * const state, double *coded_cost, do
   for (abs_level = max_abs_level; abs_level >= min_abs_level ; abs_level-- ) {
     double err       = (double)(level_double - ( abs_level << q_bits ) );
     double cur_cost  = err * err * temp + state->global->cur_lambda_cost *
-                       get_ic_rate( state, abs_level, ctx_num_one, ctx_num_abs,
+                       kvz_get_ic_rate( state, abs_level, ctx_num_one, ctx_num_abs,
                                     abs_go_rice, c1_idx, c2_idx, type);
     cur_cost        += cur_cost_sig;
 
@@ -414,10 +414,10 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
-  blk_size_offset_x = type ? 0: (g_convert_to_bit[ width ] *3 + ((g_convert_to_bit[ width ] +1)>>2));
-  blk_size_offset_y = type ? 0: (g_convert_to_bit[ height ]*3 + ((g_convert_to_bit[ height ]+1)>>2));
-  shiftX = type ? g_convert_to_bit[ width  ] :((g_convert_to_bit[ width  ]+3)>>2);
-  shiftY = type ? g_convert_to_bit[ height ] :((g_convert_to_bit[ height ]+3)>>2);
+  blk_size_offset_x = type ? 0: (kvz_g_convert_to_bit[ width ] *3 + ((kvz_g_convert_to_bit[ width ] +1)>>2));
+  blk_size_offset_y = type ? 0: (kvz_g_convert_to_bit[ height ]*3 + ((kvz_g_convert_to_bit[ height ]+1)>>2));
+  shiftX = type ? kvz_g_convert_to_bit[ width  ] :((kvz_g_convert_to_bit[ width  ]+3)>>2);
+  shiftY = type ? kvz_g_convert_to_bit[ height ] :((kvz_g_convert_to_bit[ height ]+3)>>2);
 
 
   for (ctx = 0; ctx < g_group_idx[ width - 1 ]; ctx++) {
@@ -434,7 +434,7 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   last_y_bits[ctx] = bits_y;
 }
 
-void rdoq_sign_hiding(const encoder_state_t *const state,
+void kvz_rdoq_sign_hiding(const encoder_state_t *const state,
                       const int32_t qp_scaled,
                       const uint32_t *const scan,
                       const int32_t delta_u[32 * 32],
@@ -449,7 +449,7 @@ void rdoq_sign_hiding(const encoder_state_t *const state,
   const int32_t size = width * width;
   
   int64_t rd_factor = (int64_t)(
-    g_inv_quant_scales[qp_scaled % 6] * g_inv_quant_scales[qp_scaled % 6] * (1 << (2 * (qp_scaled / 6)))
+    kvz_g_inv_quant_scales[qp_scaled % 6] * kvz_g_inv_quant_scales[qp_scaled % 6] * (1 << (2 * (qp_scaled / 6)))
     / state->global->cur_lambda_cost / 16 / (1 << (2 * (encoder->bitdepth - 8)))
     + 0.5);
   int32_t lastCG = -1;
@@ -547,19 +547,19 @@ void rdoq_sign_hiding(const encoder_state_t *const state,
  * coding engines using probability models like CABAC
  * From HM 12.0
  */
-void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
+void  kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   cabac_data_t * const cabac = &state->cabac;
-  uint32_t log2_tr_size    = g_convert_to_bit[ width ] + 2;
+  uint32_t log2_tr_size    = kvz_g_convert_to_bit[ width ] + 2;
   int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param   = 0;
-  uint32_t log2_block_size = g_convert_to_bit[ width ] + 2;
+  uint32_t log2_block_size = kvz_g_convert_to_bit[ width ] + 2;
   uint32_t max_num_coeff   = width * height;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
-  int32_t qp_scaled = get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
   uint32_t abs_sum = 0;
 
   
@@ -599,7 +599,7 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
   uint32_t    c2_idx     = 0;
   int32_t     base_level;
 
-  const uint32_t *scan = g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
+  const uint32_t *scan = kvz_g_sig_last_scan[ scan_mode ][ log2_block_size - 1 ];
 
 
   uint32_t cg_num = width * height >> 4;
@@ -646,7 +646,7 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
     uint32_t cg_pos_x   = cg_blkpos - (cg_pos_y * num_blk_side);
     int32_t  scanpos_in_cg;
 
-    int32_t pattern_sig_ctx = context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
+    int32_t pattern_sig_ctx = kvz_context_calc_pattern_sig_ctx(sig_coeffgroup_flag,
                                                            cg_pos_x, cg_pos_y, width);
 
     FILL(rd_stats, 0);
@@ -683,15 +683,15 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
         uint16_t  abs_ctx = ctx_set + c2;
 
         if( scanpos == last_scanpos ) {
-          level            = get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
+          level            = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, 0, one_ctx, abs_ctx, go_rice_param,
                                                c1_idx, c2_idx, q_bits, temp, 1, type );
         } else {
           uint32_t  pos_y    = blkpos >> log2_block_size;
           uint32_t  pos_x    = blkpos - ( pos_y << log2_block_size );
-          uint16_t  ctx_sig  = (uint16_t)context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
+          uint16_t  ctx_sig  = (uint16_t)kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                                        log2_block_size, type);
-          level              = get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
+          level              = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                                level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
                                                c1_idx, c2_idx, q_bits, temp, 0, type );
           if (encoder->sign_hiding) {
@@ -702,9 +702,9 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
         if (encoder->sign_hiding) {
           delta_u[blkpos] = (level_double - ((int32_t)level << q_bits)) >> (q_bits - 8);
           if (level > 0) {
-            int32_t rate_now = get_ic_rate(state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
-            rate_inc_up[blkpos] = get_ic_rate(state, level + 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
-            rate_inc_down[blkpos] = get_ic_rate(state, level - 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
+            int32_t rate_now = kvz_get_ic_rate(state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
+            rate_inc_up[blkpos] = kvz_get_ic_rate(state, level + 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
+            rate_inc_down[blkpos] = kvz_get_ic_rate(state, level - 1, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type) - rate_now;
           } else { // level == 0
             rate_inc_up[blkpos] = CTX_ENTROPY_BITS(&base_one_ctx[one_ctx], 0);
           }
@@ -763,7 +763,7 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
     if (cg_last_scanpos >= 0) {
       if( cg_scanpos ) {
         if (sig_coeffgroup_flag[ cg_blkpos ] == 0) {
-          uint32_t ctx_sig  = context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
+          uint32_t ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                           cg_pos_y, width);
           cost_coeffgroup_sig[ cg_scanpos ] = state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],0);
           base_cost += cost_coeffgroup_sig[ cg_scanpos ]  - rd_stats.sig_cost;
@@ -779,7 +779,7 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
             cost_zero_cg = base_cost;
 
             // add SigCoeffGroupFlag cost to total cost
-            ctx_sig  = context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
+            ctx_sig  = kvz_context_get_sig_coeff_group(sig_coeffgroup_flag, cg_pos_x,
                                                             cg_pos_y, width);
             if (cg_scanpos < cg_last_scanpos) {
               cost_coeffgroup_sig[cg_scanpos] = state->global->cur_lambda_cost*CTX_ENTROPY_BITS(&base_coeff_group_ctx[ctx_sig],1);
@@ -884,7 +884,7 @@ void  rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, in
   }
 
   if (encoder->sign_hiding && abs_sum >= 2) {
-    rdoq_sign_hiding(state, qp_scaled, scan,
+    kvz_rdoq_sign_hiding(state, qp_scaled, scan,
                      delta_u, rate_inc_up, rate_inc_down, sig_rate_delta,
                      width, coef, dest_coeff);
   }

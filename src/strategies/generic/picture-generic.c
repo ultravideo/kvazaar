@@ -28,7 +28,7 @@
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel fast_clip_16bit_to_pixel(int16_t value)
+kvz_pixel kvz_fast_clip_16bit_to_pixel(int16_t value)
 {
   // Ensure that compiler generates arithmetic shift from ">>" 
 #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
@@ -50,7 +50,7 @@ kvz_pixel fast_clip_16bit_to_pixel(int16_t value)
 
 // Function to clip int32_t to pixel. (0-255 or 0-1023)
 // Assumes PIXEL_MAX to be 2^n-1
-kvz_pixel fast_clip_32bit_to_pixel(int32_t value)
+kvz_pixel kvz_fast_clip_32bit_to_pixel(int32_t value)
 {
   // Ensure that compiler generates arithmetic shift from ">>" 
 #if defined(_MSC_VER) || defined(__GNUC__) || defined(__clang__)
@@ -191,7 +191,7 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-unsigned satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
+unsigned kvz_satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
   const kvz_pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
@@ -293,7 +293,7 @@ static unsigned satd_ ## n ## x ## n ## _generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += satd_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
+  sum += kvz_satd_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
   } \
   } \
   return sum>>(KVZ_BIT_DEPTH-8); \
@@ -343,23 +343,23 @@ SAD_NXN(32, kvz_pixel)
 SAD_NXN(64, kvz_pixel)
 
 
-int strategy_register_picture_generic(void* opaque)
+int kvz_strategy_register_picture_generic(void* opaque)
 {
   bool success = true;
 
-  success &= strategyselector_register(opaque, "reg_sad", "generic", 0, &reg_sad_generic);
+  success &= kvz_strategyselector_register(opaque, "reg_sad", "generic", 0, &reg_sad_generic);
 
-  success &= strategyselector_register(opaque, "sad_4x4", "generic", 0, &sad_4x4_generic);
-  success &= strategyselector_register(opaque, "sad_8x8", "generic", 0, &sad_8x8_generic);
-  success &= strategyselector_register(opaque, "sad_16x16", "generic", 0, &sad_16x16_generic);
-  success &= strategyselector_register(opaque, "sad_32x32", "generic", 0, &sad_32x32_generic);
-  success &= strategyselector_register(opaque, "sad_64x64", "generic", 0, &sad_64x64_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_4x4", "generic", 0, &sad_4x4_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_8x8", "generic", 0, &sad_8x8_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_16x16", "generic", 0, &sad_16x16_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_32x32", "generic", 0, &sad_32x32_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_64x64", "generic", 0, &sad_64x64_generic);
 
-  success &= strategyselector_register(opaque, "satd_4x4", "generic", 0, &satd_4x4_generic);
-  success &= strategyselector_register(opaque, "satd_8x8", "generic", 0, &satd_8x8_generic);
-  success &= strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
-  success &= strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
-  success &= strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_4x4", "generic", 0, &satd_4x4_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_8x8", "generic", 0, &satd_8x8_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
 
   return success;
 }

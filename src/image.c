@@ -39,7 +39,7 @@
  * \brief Allocate a new image.
  * \return image pointer or NULL on failure
  */
-kvz_picture *image_alloc(const int32_t width, const int32_t height)
+kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
 {
   //Assert that we have a well defined image
   assert((width % 2) == 0);
@@ -79,7 +79,7 @@ kvz_picture *image_alloc(const int32_t width, const int32_t height)
  *
  * \param im image to free
  */
-void image_free(kvz_picture *const im)
+void kvz_image_free(kvz_picture *const im)
 {
   if (im == NULL) return;
 
@@ -91,7 +91,7 @@ void image_free(kvz_picture *const im)
 
   if (im->base_image != im) {
     // Free our reference to the base image.
-    image_free(im->base_image);
+    kvz_image_free(im->base_image);
   } else {
     free(im->fulldata);
   }
@@ -109,7 +109,7 @@ void image_free(kvz_picture *const im)
  *
  * Increment reference count and return the image.
  */
-kvz_picture *image_copy_ref(kvz_picture *im)
+kvz_picture *kvz_image_copy_ref(kvz_picture *im)
 {
   int32_t new_refcount = ATOMIC_INC(&(im->refcount));
 
@@ -119,7 +119,7 @@ kvz_picture *image_copy_ref(kvz_picture *im)
   return im;
 }
 
-kvz_picture *image_make_subimage(kvz_picture *const orig_image,
+kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
@@ -138,7 +138,7 @@ kvz_picture *image_make_subimage(kvz_picture *const orig_image,
   kvz_picture *im = MALLOC(kvz_picture, 1);
   if (!im) return NULL;
 
-  im->base_image = image_copy_ref(orig_image->base_image);
+  im->base_image = kvz_image_copy_ref(orig_image->base_image);
   im->refcount = 1; // We give a reference to caller
   im->width = width;
   im->height = height;
@@ -151,7 +151,7 @@ kvz_picture *image_make_subimage(kvz_picture *const orig_image,
   return im;
 }
 
-yuv_t * yuv_t_alloc(int luma_size)
+yuv_t * kvz_yuv_t_alloc(int luma_size)
 {
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
@@ -164,7 +164,7 @@ yuv_t * yuv_t_alloc(int luma_size)
   return yuv;
 }
 
-void yuv_t_free(yuv_t * yuv)
+void kvz_yuv_t_free(yuv_t * yuv)
 {
   free(yuv->y);
   free(yuv->u);
@@ -172,7 +172,7 @@ void yuv_t_free(yuv_t * yuv)
   free(yuv);
 }
 
-hi_prec_buf_t * hi_prec_buf_t_alloc(int luma_size)
+hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)
 {
   // Get buffers with separate mallocs in order to take advantage of
   // automatic buffer overrun checks.
@@ -185,7 +185,7 @@ hi_prec_buf_t * hi_prec_buf_t_alloc(int luma_size)
   return yuv;
 }
 
-void hi_prec_buf_t_free(hi_prec_buf_t * yuv)
+void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv)
 {
   free(yuv->y);
   free(yuv->u);
@@ -336,7 +336,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += hor_sad(&pic_data[top * pic->stride],
                       &ref_data[top * ref->stride + left],
                       left, block_height - top, pic->stride, ref->stride);
-    result += reg_sad(&pic_data[top * pic->stride + left],
+    result += kvz_reg_sad(&pic_data[top * pic->stride + left],
                       &ref_data[top * ref->stride + left],
                       block_width - left, block_height - top, pic->stride, ref->stride);
   } else if (top && right) {
@@ -346,7 +346,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += cor_sad(&pic_data[block_width - right],
                       &ref_data[top * ref->stride + (block_width - right - 1)],
                       right, top, pic->stride);
-    result += reg_sad(&pic_data[top * pic->stride],
+    result += kvz_reg_sad(&pic_data[top * pic->stride],
                       &ref_data[top * ref->stride],
                       block_width - right, block_height - top, pic->stride, ref->stride);
     result += hor_sad(&pic_data[top * pic->stride + (block_width - right)],
@@ -356,7 +356,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += hor_sad(pic_data,
                       &ref_data[left],
                       left, block_height - bottom, pic->stride, ref->stride);
-    result += reg_sad(&pic_data[left],
+    result += kvz_reg_sad(&pic_data[left],
                       &ref_data[left],
                       block_width - left, block_height - bottom, pic->stride, ref->stride);
     result += cor_sad(&pic_data[(block_height - bottom) * pic->stride],
@@ -366,7 +366,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
                       &ref_data[(block_height - bottom - 1) * ref->stride + left],
                       block_width - left, bottom, pic->stride);
   } else if (bottom && right) {
-    result += reg_sad(pic_data,
+    result += kvz_reg_sad(pic_data,
                       ref_data,
                       block_width - right, block_height - bottom, pic->stride, ref->stride);
     result += hor_sad(&pic_data[block_width - right],
@@ -382,11 +382,11 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += ver_sad(pic_data,
                       &ref_data[top * ref->stride],
                       block_width, top, pic->stride);
-    result += reg_sad(&pic_data[top * pic->stride],
+    result += kvz_reg_sad(&pic_data[top * pic->stride],
                       &ref_data[top * ref->stride],
                       block_width, block_height - top, pic->stride, ref->stride);
   } else if (bottom) {
-    result += reg_sad(pic_data,
+    result += kvz_reg_sad(pic_data,
                       ref_data,
                       block_width, block_height - bottom, pic->stride, ref->stride);
     result += ver_sad(&pic_data[(block_height - bottom) * pic->stride],
@@ -396,18 +396,18 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
     result += hor_sad(pic_data,
                       &ref_data[left],
                       left, block_height, pic->stride, ref->stride);
-    result += reg_sad(&pic_data[left],
+    result += kvz_reg_sad(&pic_data[left],
                       &ref_data[left],
                       block_width - left, block_height, pic->stride, ref->stride);
   } else if (right) {
-    result += reg_sad(pic_data,
+    result += kvz_reg_sad(pic_data,
                       ref_data,
                       block_width - right, block_height, pic->stride, ref->stride);
     result += hor_sad(&pic_data[block_width - right],
                       &ref_data[block_width - right - 1],
                       right, block_height, pic->stride, ref->stride);
   } else {
-    result += reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
+    result += kvz_reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride);
   }
 
   return result;
@@ -422,7 +422,7 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 *
 * \returns  
 */
-unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
@@ -448,7 +448,7 @@ unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_
     // SAD directly. This is the most common case, which is why it's first.
     const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
     const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
-    return reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride)>>(KVZ_BIT_DEPTH-8);
+    return kvz_reg_sad(pic_data, ref_data, block_width, block_height, pic->stride, ref->stride)>>(KVZ_BIT_DEPTH-8);
   } else {
     // Call a routine that knows how to interpolate pixels outside the frame.
     return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height) >> (KVZ_BIT_DEPTH - 8);
@@ -456,7 +456,7 @@ unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_
 }
 
 
-unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
+unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
                  const int ref_stride, const int rec_stride,
                  const int width)
 {
@@ -489,7 +489,7 @@ unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
  * This should be inlined, but it's defined here for now to see if Visual
  * Studios LTCG will inline it.
  */
-void pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
+void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
@@ -506,7 +506,7 @@ void pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
       sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
     }
     buffer[3*width] = 0;
-    CHECKPOINT("pixels_blit: %04d: %s", y, buffer);
+    CHECKPOINT("kvz_pixels_blit: %04d: %s", y, buffer);
   }
   FREE_POINTER(buffer);
 #endif //CHECKPOINTS

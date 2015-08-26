@@ -22,16 +22,16 @@
 
 #include "generic/nal-generic.h"
 
-void (*array_checksum)(const kvz_pixel* data,
+void (*kvz_array_checksum)(const kvz_pixel* data,
                        const int height, const int width,
                        const int stride,
                        unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
 
 
-int strategy_register_nal(void* opaque, uint8_t bitdepth) {
+int kvz_strategy_register_nal(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= strategy_register_nal_generic(opaque, bitdepth);
+  success &= kvz_strategy_register_nal_generic(opaque, bitdepth);
   
   return success;
 }

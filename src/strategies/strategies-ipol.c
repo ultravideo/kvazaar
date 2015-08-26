@@ -22,23 +22,23 @@
 #include "strategyselector.h"
 
 // Define function pointers.
-ipol_func *filter_inter_quarterpel_luma;
-ipol_func *filter_inter_halfpel_chroma;
-ipol_func *filter_inter_octpel_chroma;
-epol_func *get_extended_block;
+ipol_func *kvz_filter_inter_quarterpel_luma;
+ipol_func *kvz_filter_inter_halfpel_chroma;
+ipol_func *kvz_filter_inter_octpel_chroma;
+epol_func *kvz_get_extended_block;
 
 // Headers for platform optimizations.
 #include "generic/ipol-generic.h"
 #include "avx2/ipol-avx2.h"
 
 
-int strategy_register_ipol(void* opaque, uint8_t bitdepth) {
+int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
-  success &= strategy_register_ipol_generic(opaque, bitdepth);
+  success &= kvz_strategy_register_ipol_generic(opaque, bitdepth);
 
-  if (g_hardware_flags.intel_flags.avx2) {
-    success &= strategy_register_ipol_avx2(opaque, bitdepth);
+  if (kvz_g_hardware_flags.intel_flags.avx2) {
+    success &= kvz_strategy_register_ipol_avx2(opaque, bitdepth);
   }
   return success;
 }

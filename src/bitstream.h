@@ -57,39 +57,39 @@ typedef struct
   uint32_t value;
 } bit_table_t;
 
-extern bit_table_t g_exp_table[EXP_GOLOMB_TABLE_SIZE];
+extern bit_table_t kvz_g_exp_table[EXP_GOLOMB_TABLE_SIZE];
 
-void init_exp_golomb();
+void kvz_init_exp_golomb();
 
-void bitstream_init(bitstream_t * stream);
-kvz_data_chunk * bitstream_alloc_chunk();
-kvz_data_chunk * bitstream_take_chunks(bitstream_t *stream);
-void bitstream_free_chunks(kvz_data_chunk *chunk);
-void bitstream_finalize(bitstream_t * stream);
+void kvz_bitstream_init(bitstream_t * stream);
+kvz_data_chunk * kvz_bitstream_alloc_chunk();
+kvz_data_chunk * kvz_bitstream_take_chunks(bitstream_t *stream);
+void kvz_bitstream_free_chunks(kvz_data_chunk *chunk);
+void kvz_bitstream_finalize(bitstream_t * stream);
 
-uint64_t bitstream_tell(const bitstream_t * stream);
+uint64_t kvz_bitstream_tell(const bitstream_t * stream);
 
-void bitstream_writebyte(bitstream_t *stream, uint8_t byte);
-void bitstream_move(bitstream_t *dst, bitstream_t *src);
-void bitstream_clear(bitstream_t *stream);
+void kvz_bitstream_writebyte(bitstream_t *stream, uint8_t byte);
+void kvz_bitstream_move(bitstream_t *dst, bitstream_t *src);
+void kvz_bitstream_clear(bitstream_t *stream);
 
-void bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
+void kvz_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
 /* Use macros to force inlining */
-#define bitstream_put_ue(stream, data) { bitstream_put(stream,g_exp_table[data].value,g_exp_table[data].len); }
+#define bitstream_put_ue(stream, data) { kvz_bitstream_put(stream,kvz_g_exp_table[data].value,kvz_g_exp_table[data].len); }
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
-                                         bitstream_put(stream,g_exp_table[index].value,g_exp_table[index].len); }
+                                         kvz_bitstream_put(stream,kvz_g_exp_table[index].value,kvz_g_exp_table[index].len); }
 
-void bitstream_align(bitstream_t *stream);
-void bitstream_align_zero(bitstream_t *stream);
+void kvz_bitstream_align(bitstream_t *stream);
+void kvz_bitstream_align_zero(bitstream_t *stream);
 
 /* In debug mode print out some extra info */
 #ifdef NOTDEFINED//_DEBUG
 /* Counter to keep up with bits written */
-#define WRITE_U(stream, data, bits, name) { printf("%-40s u(%d) : %d\n", name,bits,data); bitstream_put(stream,data,bits);}
+#define WRITE_U(stream, data, bits, name) { printf("%-40s u(%d) : %d\n", name,bits,data); kvz_bitstream_put(stream,data,bits);}
 #define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); bitstream_put_ue(stream,data);}
 #define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); bitstream_put_se(stream,(data));}
 #else
-#define WRITE_U(stream, data, bits, name) { bitstream_put(stream,data,bits); }
+#define WRITE_U(stream, data, bits, name) { kvz_bitstream_put(stream,data,bits); }
 #define WRITE_UE(stream, data, name) { bitstream_put_ue(stream,data); }
 #define WRITE_SE(stream, data, name) { bitstream_put_se(stream,data); }
 #endif

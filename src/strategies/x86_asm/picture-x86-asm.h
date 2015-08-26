@@ -20,6 +20,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-int strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth);
+int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_PICTURE_X86_ASM_H_

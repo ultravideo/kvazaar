@@ -37,7 +37,7 @@
  * \param size  initial array size
  * \return image_list pointer, NULL on failure
  */
-image_list_t * image_list_alloc(int size)
+image_list_t * kvz_image_list_alloc(int size)
 {
   image_list_t *list = (image_list_t *)malloc(sizeof(image_list_t));
   list->size = size;
@@ -58,7 +58,7 @@ image_list_t * image_list_alloc(int size)
  * \param size  new array size
  * \return 1 on success, 0 on failure
  */
-int image_list_resize(image_list_t *list, unsigned size)
+int kvz_image_list_resize(image_list_t *list, unsigned size)
 {
   list->images = (kvz_picture**)realloc(list->images, sizeof(kvz_picture*) * size);
   list->cu_arrays = (cu_array_t**)realloc(list->cu_arrays, sizeof(cu_array_t*) * size);
@@ -72,14 +72,14 @@ int image_list_resize(image_list_t *list, unsigned size)
  * \param list image_list pointer
  * \return 1 on success, 0 on failure
  */
-int image_list_destroy(image_list_t *list)
+int kvz_image_list_destroy(image_list_t *list)
 {
   unsigned int i;
   if (list->used_size > 0) {
     for (i = 0; i < list->used_size; ++i) {
-      image_free(list->images[i]);
+      kvz_image_free(list->images[i]);
       list->images[i] = NULL;
-      cu_array_free(list->cu_arrays[i]);
+      kvz_cu_array_free(list->cu_arrays[i]);
       list->cu_arrays[i] = NULL;
       list->pocs[i] = 0;
     }
@@ -103,7 +103,7 @@ int image_list_destroy(image_list_t *list)
  * \param picture_list list to use
  * \return 1 on success
  */
-int image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc)
+int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc)
 {
   int i = 0;
   if (ATOMIC_INC(&(im->refcount)) == 1) {
@@ -119,7 +119,7 @@ int image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t
   }
 
   if (list->size == list->used_size) {
-    if (!image_list_resize(list, list->size*2)) return 0;
+    if (!kvz_image_list_resize(list, list->size*2)) return 0;
   }
 
   for (i = list->used_size; i > 0; i--) {
@@ -142,7 +142,7 @@ int image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t
  * \param n index to remove
  * \return 1 on success
  */
-int image_list_rem(image_list_t * const list, const unsigned n)
+int kvz_image_list_rem(image_list_t * const list, const unsigned n)
 {
   // Must be within list boundaries
   if (n >= list->used_size)
@@ -150,9 +150,9 @@ int image_list_rem(image_list_t * const list, const unsigned n)
     return 0;
   }
 
-  image_free(list->images[n]);
+  kvz_image_free(list->images[n]);
 
-  if (!cu_array_free(list->cu_arrays[n])) {
+  if (!kvz_cu_array_free(list->cu_arrays[n])) {
     fprintf(stderr, "Could not free cu_array!\n");
     assert(0); //Stop here
     return 0;
@@ -181,14 +181,14 @@ int image_list_rem(image_list_t * const list, const unsigned n)
   return 1;
 }
 
-int image_list_copy_contents(image_list_t *target, image_list_t *source) {
+int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source) {
   int i;
   while (target->used_size > 0) {
-    image_list_rem(target, 0);
+    kvz_image_list_rem(target, 0);
   }
   
   for (i = source->used_size - 1; i >= 0; --i) {
-    image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i]);
+    kvz_image_list_add(target, source->images[i], source->cu_arrays[i], source->pocs[i]);
   }
   return 1;
 }

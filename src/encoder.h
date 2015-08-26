@@ -155,9 +155,9 @@ typedef struct encoder_control_t
 
 } encoder_control_t;
 
-encoder_control_t* encoder_control_init(const kvz_config *cfg);
-void encoder_control_free(encoder_control_t *encoder);
+encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);
+void kvz_encoder_control_free(encoder_control_t *encoder);
 
-void encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
-unsigned get_padding(unsigned width_or_height);
+void kvz_encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
+unsigned kvz_get_padding(unsigned width_or_height);
 #endif

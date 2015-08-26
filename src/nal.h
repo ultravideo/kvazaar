@@ -94,9 +94,9 @@ enum {
 
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
-void nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
+void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
                const uint8_t temporal_id, const int long_start_code);
-void image_checksum(const kvz_picture *im,
+void kvz_image_checksum(const kvz_picture *im,
                       unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
 
 

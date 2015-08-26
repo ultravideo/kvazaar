@@ -112,7 +112,7 @@ static double pic_allocate_bits(const encoder_state_t * const state)
  * Rate control must be enabled (i.e. cfg->target_bitrate > 0) when this
  * function is called.
  */
-double select_picture_lambda(encoder_state_t * const state)
+double kvz_select_picture_lambda(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
@@ -140,7 +140,7 @@ double select_picture_lambda(encoder_state_t * const state)
   return CLIP(0.1, 10000, lambda);
 }
 
-int8_t lambda_to_QP(const double lambda)
+int8_t kvz_lambda_to_QP(const double lambda)
 {
   const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
   return CLIP(0, 51, qp);
@@ -154,7 +154,7 @@ int8_t lambda_to_QP(const double lambda)
  * This function should be used to select lambda when rate control is
  * disabled.
  */
-double select_picture_lambda_from_qp(encoder_state_t const * const state)
+double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state)
 {
   const int gop_len = state->encoder_control->cfg->gop_len;
   const double qp_temp = state->global->QP - 12;

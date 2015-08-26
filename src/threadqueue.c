@@ -74,7 +74,7 @@ typedef struct {
 } while (0);
 #endif //PTHREAD_DUMP
 
-const struct timespec time_to_wait = {1, 0};
+const struct timespec kvz_time_to_wait = {1, 0};
 
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   threadqueue_worker_spec * const threadqueue_worker_spec = threadqueue_worker_spec_opaque;
@@ -230,7 +230,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   
   return NULL;
 }
-int threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, int fifo) {
+int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_count, int fifo) {
   int i;
   if (pthread_mutex_init(&threadqueue->lock, NULL) != 0) {
     fprintf(stderr, "pthread_mutex_init failed!\n");
@@ -345,11 +345,11 @@ static void threadqueue_free_jobs(threadqueue_queue_t * const threadqueue) {
 #endif
 }
 
-int threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
+int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
   int i;
   
   //Flush the queue
-  if (!threadqueue_flush(threadqueue)) {
+  if (!kvz_threadqueue_flush(threadqueue)) {
     fprintf(stderr, "Unable to flush threadqueue!\n");
     return 0;
   }
@@ -426,7 +426,7 @@ int threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
   return 1;
 }
 
-int threadqueue_flush(threadqueue_queue_t * const threadqueue) {
+int kvz_threadqueue_flush(threadqueue_queue_t * const threadqueue) {
   int notdone = 1;
   
   //Lock the queue
@@ -441,7 +441,7 @@ int threadqueue_flush(threadqueue_queue_t * const threadqueue) {
       PTHREAD_UNLOCK(&threadqueue->lock);
       SLEEP();
       PTHREAD_LOCK(&threadqueue->lock);
-      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &time_to_wait);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &kvz_time_to_wait);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
         assert(0); 
@@ -459,7 +459,7 @@ int threadqueue_flush(threadqueue_queue_t * const threadqueue) {
   return 1;
 }
 
-int threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job_t * const job) {
+int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job_t * const job) {
   int job_done = 0;
   
   //NULL job is clearly OK :-)
@@ -479,7 +479,7 @@ int threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job
       PTHREAD_UNLOCK(&threadqueue->lock);
       SLEEP();
       PTHREAD_LOCK(&threadqueue->lock);
-      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &time_to_wait);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &kvz_time_to_wait);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
         assert(0); 
@@ -507,7 +507,7 @@ int threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue_job
   return 1;
 }
 
-threadqueue_job_t * threadqueue_submit(threadqueue_queue_t * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
+threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* const debug_description) {
   threadqueue_job_t *job;
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
@@ -590,7 +590,7 @@ threadqueue_job_t * threadqueue_submit(threadqueue_queue_t * const threadqueue, 
   return job;
 }
 
-int threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on) {
+int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on) {
   //If we are not using threads, job are NULL pointers, so we can skip that
   if (!job && !depends_on) return 1;
   
@@ -622,7 +622,7 @@ int threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_o
   return 1;
 }
 
-int threadqueue_job_unwait_job(threadqueue_queue_t * const threadqueue, threadqueue_job_t *job) {
+int kvz_threadqueue_job_unwait_job(threadqueue_queue_t * const threadqueue, threadqueue_job_t *job) {
   int ndepends = 0;
   
   //NULL job =>  no threads, nothing to do

@@ -103,7 +103,7 @@ static int select_owf_auto(const kvz_config *const cfg)
  * \param cfg   encoder configuration
  * \return      initialized encoder control or NULL on failure
  */
-encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
+encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   encoder_control_t *encoder = NULL;
 
   if (!cfg) {
@@ -112,7 +112,7 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
   }
 
   // Make sure that the parameters make sense.
-  if (!config_validate(cfg)) {
+  if (!kvz_config_validate(cfg)) {
     goto init_failed;
   }
 
@@ -132,7 +132,7 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
 
   encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
   if (!encoder->threadqueue ||
-      !threadqueue_init(encoder->threadqueue,
+      !kvz_threadqueue_init(encoder->threadqueue,
                         cfg->threads,
                         encoder->owf > 0)) {
     fprintf(stderr, "Could not initialize threadqueue.\n");
@@ -157,20 +157,20 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
   encoder->in.source_scan_type = (int8_t)cfg->source_scan_type;
 
   // Initialize the scaling list
-  scalinglist_init(&encoder->scaling_list);
+  kvz_scalinglist_init(&encoder->scaling_list);
 
   // CQM
   {
     FILE* cqmfile;
     cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
     if (cqmfile) {
-      scalinglist_parse(&encoder->scaling_list, cqmfile);
+      kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
       fclose(cqmfile);
     }
   }
-  scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
+  kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
   
-  encoder_control_input_init(encoder, cfg->width, cfg->height);
+  kvz_encoder_control_input_init(encoder, cfg->width, cfg->height);
 
   encoder->target_avg_bppic = cfg->target_bitrate / cfg->framerate;
   encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
@@ -375,8 +375,8 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
       for (x = 0; x < encoder->in.width_in_lcu; ++x) {
         const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
         const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
-        const char slice_start = lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
-        const char slice_end = lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
+        const char slice_start = kvz_lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
+        const char slice_end = kvz_lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
 
         printf("%c%03d%c", slice_start, encoder->tiles_tile_id[lcu_id_ts], slice_end);
       }
@@ -438,14 +438,14 @@ encoder_control_t* encoder_control_init(const kvz_config *const cfg) {
   return encoder;
 
 init_failed:
-  encoder_control_free(encoder);
+  kvz_encoder_control_free(encoder);
   return NULL;
 }
 
 /**
  * \brief Free an encoder control structure.
  */
-void encoder_control_free(encoder_control_t *const encoder) {
+void kvz_encoder_control_free(encoder_control_t *const encoder) {
   if (!encoder) return;
 
   //Slices
@@ -463,17 +463,17 @@ void encoder_control_free(encoder_control_t *const encoder) {
 
   FREE_POINTER(encoder->tiles_tile_id);
 
-  scalinglist_destroy(&encoder->scaling_list);
+  kvz_scalinglist_destroy(&encoder->scaling_list);
 
   if (encoder->threadqueue) {
-    threadqueue_finalize(encoder->threadqueue);
+    kvz_threadqueue_finalize(encoder->threadqueue);
   }
   FREE_POINTER(encoder->threadqueue);
 
   free(encoder);
 }
 
-void encoder_control_input_init(encoder_control_t * const encoder,
+void kvz_encoder_control_input_init(encoder_control_t * const encoder,
                         const int32_t width, int32_t height)
 {
   // Halve for interlaced content
@@ -585,7 +585,7 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
   return 1;
 }
 
-unsigned get_padding(unsigned width_or_height){
+unsigned kvz_get_padding(unsigned width_or_height){
   if (width_or_height % CU_MIN_SIZE_PIXELS){
     return CU_MIN_SIZE_PIXELS - (width_or_height % CU_MIN_SIZE_PIXELS);
   }else{

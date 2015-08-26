@@ -30,38 +30,38 @@ typedef unsigned (cost_pixel_nxn_func)(const kvz_pixel *block1, const kvz_pixel 
 
 
 // Declare function pointers.
-extern reg_sad_func * reg_sad;
+extern reg_sad_func * kvz_reg_sad;
 
-extern cost_pixel_nxn_func * sad_4x4;
-extern cost_pixel_nxn_func * sad_8x8;
-extern cost_pixel_nxn_func * sad_16x16;
-extern cost_pixel_nxn_func * sad_32x32;
-extern cost_pixel_nxn_func * sad_64x64;
+extern cost_pixel_nxn_func * kvz_sad_4x4;
+extern cost_pixel_nxn_func * kvz_sad_8x8;
+extern cost_pixel_nxn_func * kvz_sad_16x16;
+extern cost_pixel_nxn_func * kvz_sad_32x32;
+extern cost_pixel_nxn_func * kvz_sad_64x64;
 
-extern cost_pixel_nxn_func * satd_4x4;
-extern cost_pixel_nxn_func * satd_8x8;
-extern cost_pixel_nxn_func * satd_16x16;
-extern cost_pixel_nxn_func * satd_32x32;
-extern cost_pixel_nxn_func * satd_64x64;
+extern cost_pixel_nxn_func * kvz_satd_4x4;
+extern cost_pixel_nxn_func * kvz_satd_8x8;
+extern cost_pixel_nxn_func * kvz_satd_16x16;
+extern cost_pixel_nxn_func * kvz_satd_32x32;
+extern cost_pixel_nxn_func * kvz_satd_64x64;
 
 
-int strategy_register_picture(void* opaque, uint8_t bitdepth);
-cost_pixel_nxn_func * pixels_get_satd_func(unsigned n);
-cost_pixel_nxn_func * pixels_get_sad_func(unsigned n);
+int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
+cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
+cost_pixel_nxn_func * kvz_pixels_get_sad_func(unsigned n);
 
 
 #define STRATEGIES_PICTURE_EXPORTS \
-  {"reg_sad", (void**) &reg_sad}, \
-  {"sad_4x4", (void**) &sad_4x4}, \
-  {"sad_8x8", (void**) &sad_8x8}, \
-  {"sad_16x16", (void**) &sad_16x16}, \
-  {"sad_32x32", (void**) &sad_32x32}, \
-  {"sad_64x64", (void**) &sad_64x64}, \
-  {"satd_4x4", (void**) &satd_4x4}, \
-  {"satd_8x8", (void**) &satd_8x8}, \
-  {"satd_16x16", (void**) &satd_16x16}, \
-  {"satd_32x32", (void**) &satd_32x32}, \
-  {"satd_64x64", (void**) &satd_64x64}, \
+  {"reg_sad", (void**) &kvz_reg_sad}, \
+  {"sad_4x4", (void**) &kvz_sad_4x4}, \
+  {"sad_8x8", (void**) &kvz_sad_8x8}, \
+  {"sad_16x16", (void**) &kvz_sad_16x16}, \
+  {"sad_32x32", (void**) &kvz_sad_32x32}, \
+  {"sad_64x64", (void**) &kvz_sad_64x64}, \
+  {"satd_4x4", (void**) &kvz_satd_4x4}, \
+  {"satd_8x8", (void**) &kvz_satd_8x8}, \
+  {"satd_16x16", (void**) &kvz_satd_16x16}, \
+  {"satd_32x32", (void**) &kvz_satd_32x32}, \
+  {"satd_64x64", (void**) &kvz_satd_64x64}, \
 
 
 

@@ -70,12 +70,12 @@ static unsigned sad_8bit_4x4_sse2(const kvz_pixel *buf1, const kvz_pixel *buf2)
 
 #endif //COMPILE_INTEL_SSE2
 
-int strategy_register_picture_sse2(void* opaque, uint8_t bitdepth) {
+int kvz_strategy_register_picture_sse2(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE2
   if (bitdepth == 8){
-    success &= strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
-    success &= strategyselector_register(opaque, "sad_4x4", "sse2", 10, &sad_8bit_4x4_sse2);
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "sse2", 10, &reg_sad_sse2);
+    success &= kvz_strategyselector_register(opaque, "sad_4x4", "sse2", 10, &sad_8bit_4x4_sse2);
   }
 #endif
   return success;

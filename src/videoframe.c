@@ -35,7 +35,7 @@
  * \param pic picture pointer
  * \return picture pointer
  */
-videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const int32_t poc) {
+videoframe_t *kvz_videoframe_alloc(const int32_t width, const int32_t height, const int32_t poc) {
   videoframe_t *frame = MALLOC(videoframe_t, 1);
 
   if (!frame) return 0;
@@ -53,7 +53,7 @@ videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const 
     // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
     unsigned height_in_scu = frame->height_in_lcu << MAX_DEPTH;
     unsigned width_in_scu = frame->width_in_lcu << MAX_DEPTH;
-    frame->cu_array = cu_array_alloc(width_in_scu, height_in_scu);
+    frame->cu_array = kvz_cu_array_alloc(width_in_scu, height_in_scu);
   }
 
   frame->coeff_y = NULL; frame->coeff_u = NULL; frame->coeff_v = NULL;
@@ -69,14 +69,14 @@ videoframe_t *videoframe_alloc(const int32_t width, const int32_t height, const 
  * \param pic picture pointer
  * \return 1 on success, 0 on failure
  */
-int videoframe_free(videoframe_t * const frame)
+int kvz_videoframe_free(videoframe_t * const frame)
 {
-  image_free(frame->source);
+  kvz_image_free(frame->source);
   frame->source = NULL;
-  image_free(frame->rec);
+  kvz_image_free(frame->rec);
   frame->rec = NULL;
 
-  cu_array_free(frame->cu_array);
+  kvz_cu_array_free(frame->cu_array);
 
   FREE_POINTER(frame->coeff_y);
   FREE_POINTER(frame->coeff_u);
@@ -90,11 +90,11 @@ int videoframe_free(videoframe_t * const frame)
   return 1;
 }
 
-void videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
+void kvz_videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
   frame->poc = poc;
 }
 
-const cu_info_t* videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu)
+const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu)
 {
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
@@ -102,7 +102,7 @@ const cu_info_t* videoframe_get_cu_const(const videoframe_t * const frame, unsig
   return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
 }
 
-cu_info_t* videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
+cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
 {
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
@@ -119,7 +119,7 @@ cu_info_t* videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in
 /**
  * \brief Calculates image PSNR value
  */
-void videoframe_compute_psnr(const videoframe_t * const frame, double psnr[NUM_COLORS])
+void kvz_videoframe_compute_psnr(const videoframe_t * const frame, double psnr[NUM_COLORS])
 {
   int32_t pixels = frame->width * frame->height;
   int32_t i, c;

@@ -171,8 +171,8 @@ int main(int argc, char *argv[])
 
     int8_t field_parity = 0;
     kvz_picture *frame_in = NULL;
-    uint8_t padding_x = get_padding(opts->config->width);
-    uint8_t padding_y = get_padding(opts->config->height);
+    uint8_t padding_x = kvz_get_padding(opts->config->width);
+    uint8_t padding_y = kvz_get_padding(opts->config->height);
 
     for (;;) {
 
@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
           enc->num_encoder_states
         ];
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        encoder_compute_stats(state, frame_psnr);
+        kvz_encoder_compute_stats(state, frame_psnr);
 
         if (recout) {
           // Since chunks_out was not NULL, img_rec should have been set.
@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
     GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
 
-    threadqueue_flush(encoder->threadqueue);
+    kvz_threadqueue_flush(encoder->threadqueue);
     // Coding finished
 
     // Print statistics of the coding

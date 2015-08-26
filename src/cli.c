@@ -186,7 +186,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       opts->seek = atoi(optarg);
     } else if (!strcmp(name, "frames")) {
       opts->frames = atoi(optarg);
-    } else if (!config_parse(opts->config, name, optarg)) {
+    } else if (!kvz_config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
       goto done;
@@ -377,8 +377,8 @@ void print_frame_info(encoder_state_t *state, double frame_psnr[3])
         ref_list[1]++;
       }
     }
-    encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
-    encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
+    kvz_encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
+    kvz_encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
 
     fprintf(stderr, " [L0 ");
     for (j = ref_list[0] - 1; j >= 0; j--) {

@@ -26,7 +26,7 @@
 
 
 static int encoder_state_config_global_init(encoder_state_t * const state) {
-  state->global->ref = image_list_alloc(MAX_REF_PIC_COUNT);
+  state->global->ref = kvz_image_list_alloc(MAX_REF_PIC_COUNT);
   if(!state->global->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
     return 0;
@@ -42,7 +42,7 @@ static int encoder_state_config_global_init(encoder_state_t * const state) {
 }
 
 static void encoder_state_config_global_finalize(encoder_state_t * const state) {
-  image_list_destroy(state->global->ref);
+  kvz_image_list_destroy(state->global->ref);
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 
@@ -50,7 +50,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
   const encoder_control_t * const encoder = state->encoder_control;
-  state->tile->frame = videoframe_alloc(width, height, 0);
+  state->tile->frame = kvz_videoframe_alloc(width, height, 0);
   
   state->tile->frame->rec = NULL;
   
@@ -74,12 +74,12 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   
   //Allocate buffers
   //order by row of (LCU_WIDTH * frame->width_in_lcu) pixels
-  state->tile->hor_buf_search = yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
+  state->tile->hor_buf_search = kvz_yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
-  state->tile->ver_buf_search = yuv_t_alloc(LCU_WIDTH * state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu);
+  state->tile->ver_buf_search = kvz_yuv_t_alloc(LCU_WIDTH * state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu);
   
   if (encoder->sao_enable) {
-    state->tile->hor_buf_before_sao = yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
+    state->tile->hor_buf_before_sao = kvz_yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
   } else {
     state->tile->hor_buf_before_sao = NULL;
   }
@@ -100,12 +100,12 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
 }
 
 static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
-  if (state->tile->hor_buf_before_sao) yuv_t_free(state->tile->hor_buf_before_sao);
+  if (state->tile->hor_buf_before_sao) kvz_yuv_t_free(state->tile->hor_buf_before_sao);
   
-  yuv_t_free(state->tile->hor_buf_search);
-  yuv_t_free(state->tile->ver_buf_search);
+  kvz_yuv_t_free(state->tile->hor_buf_search);
+  kvz_yuv_t_free(state->tile->ver_buf_search);
   
-  videoframe_free(state->tile->frame);
+  kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   
   FREE_POINTER(state->tile->wf_jobs);
@@ -269,7 +269,7 @@ static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
 }
 #endif //_DEBUG
 
-int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
+int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
   //We require that, if parent_state is NULL:
   //child_state->encoder_control is set
   //
@@ -320,7 +320,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
   }
   
-  bitstream_init(&child_state->stream);
+  kvz_bitstream_init(&child_state->stream);
   
   // Set CABAC output bitstream
   child_state->cabac.stream = &child_state->stream;
@@ -380,18 +380,18 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
       int range_end_slice = range_start; //Will be incremented to get the range of the "thing"
       int range_end_tile = range_start; //Will be incremented to get the range of the "thing"
       
-      int tile_allowed = lcu_at_tile_start(encoder, range_start) && children_allow_tile;
-      int slice_allowed = lcu_at_slice_start(encoder, range_start) && children_allow_slice;
+      int tile_allowed = kvz_lcu_at_tile_start(encoder, range_start) && children_allow_tile;
+      int slice_allowed = kvz_lcu_at_slice_start(encoder, range_start) && children_allow_slice;
       
       //Find the smallest structure following the cursor
       if (slice_allowed) {
-        while(!lcu_at_slice_end(encoder, range_end_slice)) {
+        while(!kvz_lcu_at_slice_end(encoder, range_end_slice)) {
           ++range_end_slice;
         }
       }
       
       if (tile_allowed) {
-        while(!lcu_at_tile_end(encoder, range_end_tile)) {
+        while(!kvz_lcu_at_tile_end(encoder, range_end_tile)) {
           ++range_end_tile;
         }
       }
@@ -463,7 +463,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
           }
         }
         
-        if (!encoder_state_init(&child_state->children[child_count], child_state)) {
+        if (!kvz_encoder_state_init(&child_state->children[child_count], child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
         }
@@ -523,7 +523,7 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
           return 0;
         }
         
-        if (!encoder_state_init(new_child, child_state)) {
+        if (!kvz_encoder_state_init(new_child, child_state)) {
           fprintf(stderr, "Unable to init child...\n");
           return 0;
         }
@@ -568,10 +568,10 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
         child_state->lcu_order[i].position_px.y = child_state->lcu_order[i].position.y * LCU_WIDTH;
         child_state->lcu_order[i].size.x = MIN(LCU_WIDTH, encoder->in.width - (child_state->tile->lcu_offset_x * LCU_WIDTH + child_state->lcu_order[i].position_px.x));
         child_state->lcu_order[i].size.y = MIN(LCU_WIDTH, encoder->in.height - (child_state->tile->lcu_offset_y * LCU_WIDTH + child_state->lcu_order[i].position_px.y));
-        child_state->lcu_order[i].first_row = lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
-        child_state->lcu_order[i].last_row = lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
-        child_state->lcu_order[i].first_column = lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
-        child_state->lcu_order[i].last_column = lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].first_row = kvz_lcu_in_first_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_row = kvz_lcu_in_last_row(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].first_column = kvz_lcu_in_first_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
+        child_state->lcu_order[i].last_column = kvz_lcu_in_last_column(child_state, child_state->tile->lcu_offset_in_ts + lcu_id);
         
         child_state->lcu_order[i].above = NULL;
         child_state->lcu_order[i].below = NULL;
@@ -641,11 +641,11 @@ int encoder_state_init(encoder_state_t * const child_state, encoder_state_t * co
   return 1;
 }
 
-void encoder_state_finalize(encoder_state_t * const state) {
+void kvz_encoder_state_finalize(encoder_state_t * const state) {
   if (state->children) {
     int i=0;
     for (i = 0; state->children[i].encoder_control; ++i) {
-      encoder_state_finalize(&state->children[i]);
+      kvz_encoder_state_finalize(&state->children[i]);
     }
     
     FREE_POINTER(state->children);
@@ -674,5 +674,5 @@ void encoder_state_finalize(encoder_state_t * const state) {
     FREE_POINTER(state->global);
   }
   
-  bitstream_finalize(&state->stream);
+  kvz_bitstream_finalize(&state->stream);
 }

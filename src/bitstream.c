@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-const uint32_t bit_set_mask[] =
+const uint32_t kvz_bit_set_mask[] =
 {
 0x00000001,0x00000002,0x00000004,0x00000008,
 0x00000010,0x00000020,0x00000040,0x00000080,
@@ -44,7 +44,7 @@ const uint32_t bit_set_mask[] =
 0x10000000,0x20000000,0x40000000,0x80000000
 };
 
-bit_table_t g_exp_table[EXP_GOLOMB_TABLE_SIZE];
+bit_table_t kvz_g_exp_table[EXP_GOLOMB_TABLE_SIZE];
 
 
 //#define VERBOSE
@@ -77,9 +77,9 @@ static int floor_log2(unsigned int n)
 /**
  * \brief Initialize the Exp Golomb code table.
  *
- * Fills g_exp_table with exponential golomb codes.
+ * Fills kvz_g_exp_table with exponential golomb codes.
  */
-void init_exp_golomb()
+void kvz_init_exp_golomb()
 {
   static int exp_table_initialized = 0;
   if (exp_table_initialized) return;
@@ -90,8 +90,8 @@ void init_exp_golomb()
   for (code_num = 0; code_num < EXP_GOLOMB_TABLE_SIZE; code_num++) {
     M = (uint8_t)floor_log2(code_num + 1);
     info = code_num + 1 - (uint32_t)pow(2, M);
-    g_exp_table[code_num].len = M * 2 + 1;
-    g_exp_table[code_num].value = (1<<M) | info;
+    kvz_g_exp_table[code_num].len = M * 2 + 1;
+    kvz_g_exp_table[code_num].value = (1<<M) | info;
   }
 
   exp_table_initialized = 1;
@@ -100,7 +100,7 @@ void init_exp_golomb()
 /**
  * \brief Initialize a new bitstream.
  */
-void bitstream_init(bitstream_t *const stream)
+void kvz_bitstream_init(bitstream_t *const stream)
 {
   memset(stream, 0, sizeof(bitstream_t));
 }
@@ -112,7 +112,7 @@ void bitstream_init(bitstream_t *const stream)
  *
  * The bitstream must be byte-aligned.
  */
-kvz_data_chunk * bitstream_take_chunks(bitstream_t *const stream)
+kvz_data_chunk * kvz_bitstream_take_chunks(bitstream_t *const stream)
 {
   assert(stream->cur_bit == 0);
   kvz_data_chunk *chunks = stream->first;
@@ -126,7 +126,7 @@ kvz_data_chunk * bitstream_take_chunks(bitstream_t *const stream)
  *
  * \return Pointer to the new chunk, or NULL.
  */
-kvz_data_chunk * bitstream_alloc_chunk()
+kvz_data_chunk * kvz_bitstream_alloc_chunk()
 {
     kvz_data_chunk *chunk = malloc(sizeof(kvz_data_chunk));
     if (chunk) {
@@ -139,7 +139,7 @@ kvz_data_chunk * bitstream_alloc_chunk()
 /**
  * \brief Free a list of chunks.
  */
-void bitstream_free_chunks(kvz_data_chunk *chunk)
+void kvz_bitstream_free_chunks(kvz_data_chunk *chunk)
 {
   while (chunk != NULL) {
     kvz_data_chunk *next = chunk->next;
@@ -151,9 +151,9 @@ void bitstream_free_chunks(kvz_data_chunk *chunk)
 /**
  * \brief Free resources used by a bitstream.
  */
-void bitstream_finalize(bitstream_t *const stream)
+void kvz_bitstream_finalize(bitstream_t *const stream)
 {
-  bitstream_clear(stream);
+  kvz_bitstream_clear(stream);
 }
 
 /**
@@ -161,7 +161,7 @@ void bitstream_finalize(bitstream_t *const stream)
  * \param stream  bitstream
  * \return        position
  */
-uint64_t bitstream_tell(const bitstream_t *const stream)
+uint64_t kvz_bitstream_tell(const bitstream_t *const stream)
 {
   uint64_t position = stream->len;
   return position * 8 + stream->cur_bit;
@@ -175,13 +175,13 @@ uint64_t bitstream_tell(const bitstream_t *const stream)
  * \param stream  pointer bitstream to put the data
  * \param byte    byte to write
  */
-void bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
+void kvz_bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
 {
   assert(stream->cur_bit == 0);
 
   if (stream->last == NULL || stream->last->len == KVZ_DATA_CHUNK_SIZE) {
     // Need to allocate a new chunk.
-    kvz_data_chunk *new_chunk = bitstream_alloc_chunk();
+    kvz_data_chunk *new_chunk = kvz_bitstream_alloc_chunk();
     assert(new_chunk);
 
     if (!stream->first) stream->first = new_chunk;
@@ -200,7 +200,7 @@ void bitstream_writebyte(bitstream_t *const stream, const uint8_t byte)
  *
  * Destination stream must be byte-aligned. Source stream will be cleared.
  */
-void bitstream_move(bitstream_t *const dst, bitstream_t *const src)
+void kvz_bitstream_move(bitstream_t *const dst, bitstream_t *const src)
 {
   assert(dst->cur_bit == 0);
 
@@ -222,16 +222,16 @@ void bitstream_move(bitstream_t *const dst, bitstream_t *const src)
   dst->zerocount = src->zerocount;
 
   src->first = src->last = NULL;
-  bitstream_clear(src);
+  kvz_bitstream_clear(src);
 }
 
 /**
  * Reset stream.
  */
-void bitstream_clear(bitstream_t *const stream)
+void kvz_bitstream_clear(bitstream_t *const stream)
 {
-  bitstream_free_chunks(stream->first);
-  bitstream_init(stream);
+  kvz_bitstream_free_chunks(stream->first);
+  kvz_bitstream_init(stream);
 }
 
 /**
@@ -240,13 +240,13 @@ void bitstream_clear(bitstream_t *const stream)
  * \param data input data
  * \param bits number of bits to write from data to stream
  */
-void bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
+void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
 {
   const uint8_t emulation_prevention_three_byte = 0x03;
   while(bits--) {
     stream->data <<= 1;
 
-    if (data & bit_set_mask[bits]) {
+    if (data & kvz_bit_set_mask[bits]) {
       stream->data |= 1;
     }
     stream->cur_bit++;
@@ -255,7 +255,7 @@ void bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
     if (stream->cur_bit==8) {
       stream->cur_bit = 0;
       if((stream->zerocount == 2) && (stream->data < 4)) {
-        bitstream_writebyte(stream, emulation_prevention_three_byte);
+        kvz_bitstream_writebyte(stream, emulation_prevention_three_byte);
         stream->zerocount = 0;
       }
       if(stream->data == 0) {
@@ -263,7 +263,7 @@ void bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
       } else {
         stream->zerocount = 0;
       }
-      bitstream_writebyte(stream, stream->data);
+      kvz_bitstream_writebyte(stream, stream->data);
     }
   }
 }
@@ -271,20 +271,20 @@ void bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
 /**
  * \brief Align the bitstream with one-bit padding
  */
-void bitstream_align(bitstream_t * const stream)
+void kvz_bitstream_align(bitstream_t * const stream)
 {
-  bitstream_put(stream, 1, 1);
+  kvz_bitstream_put(stream, 1, 1);
   if ((stream->cur_bit & 7) != 0) {
-    bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+    kvz_bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
   }
 }
 
 /**
  * \brief Align the bitstream with zero
  */
-void bitstream_align_zero(bitstream_t * const stream)
+void kvz_bitstream_align_zero(bitstream_t * const stream)
 {
   if ((stream->cur_bit & 7) != 0) {
-    bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+    kvz_bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
   }
 }

@@ -22,7 +22,7 @@
 
 #include "../nal.h"
 
-//Function pointer to array_checksum
+//Function pointer to kvz_array_checksum
 /**
  * \brief Calculate checksum for one color of the picture.
  * \param data Beginning of the pixel data for the picture.
@@ -34,13 +34,13 @@ typedef void (*array_checksum_func)(const kvz_pixel* data,
                                     const int height, const int width,
                                     const int stride,
                                     unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
-extern array_checksum_func array_checksum;
+extern array_checksum_func kvz_array_checksum;
 
 
-int strategy_register_nal(void* opaque, uint8_t bitdepth);
+int kvz_strategy_register_nal(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_NAL_EXPORTS \
-  {"array_checksum", (void**) &array_checksum},
+  {"array_checksum", (void**) &kvz_array_checksum},
 
 #endif //STRATEGIES_NAL_H_

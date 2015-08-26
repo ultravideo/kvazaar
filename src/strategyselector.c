@@ -31,7 +31,7 @@
 #include <immintrin.h>
 #endif
 
-hardware_flags_t g_hardware_flags;
+hardware_flags_t kvz_g_hardware_flags;
 
 static void set_hardware_flags(int32_t cpuid);
 static void* strategyselector_choose_for(const strategy_list_t * const strategies, const char * const strategy_type);
@@ -39,7 +39,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
 //Strategies to include (add new file here)
 
 //Returns 1 if successful
-int strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
+int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
   const strategy_to_select_t *cur_strategy_to_select = strategies_to_select;
   strategy_list_t strategies;
   
@@ -50,23 +50,23 @@ int strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
   set_hardware_flags(cpuid);
   
   //Add new register function here
-  if (!strategy_register_picture(&strategies, bitdepth)) {
-    fprintf(stderr, "strategy_register_picture failed!\n");
+  if (!kvz_strategy_register_picture(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_picture failed!\n");
     return 0;
   }
   
-  if (!strategy_register_nal(&strategies, bitdepth)) {
-    fprintf(stderr, "strategy_register_nal failed!\n");
+  if (!kvz_strategy_register_nal(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_nal failed!\n");
     return 0;
   }
 
-  if (!strategy_register_dct(&strategies, bitdepth)) {
-    fprintf(stderr, "strategy_register_dct failed!\n");
+  if (!kvz_strategy_register_dct(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_dct failed!\n");
     return 0;
   }
 
-  if (!strategy_register_ipol(&strategies, bitdepth)) {
-    fprintf(stderr, "strategy_register_ipol failed!\n");
+  if (!kvz_strategy_register_ipol(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_ipol failed!\n");
     return 0;
   }
   
@@ -89,7 +89,7 @@ int strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
 }
 
 //Returns 1 if successful, 0 otherwise
-int strategyselector_register(void * const opaque, const char * const type, const char * const strategy_name, int priority, void * const fptr) {
+int kvz_strategyselector_register(void * const opaque, const char * const type, const char * const strategy_name, int priority, void * const fptr) {
   strategy_list_t * const strategies = opaque;
   
   if (strategies->allocated == strategies->count) {
@@ -251,11 +251,11 @@ out_close:
 #endif //COMPILE_POWERPC
 
 static void set_hardware_flags(int32_t cpuid) {
-  FILL(g_hardware_flags, 0);
+  FILL(kvz_g_hardware_flags, 0);
   
-  g_hardware_flags.arm = COMPILE_ARM;
-  g_hardware_flags.intel = COMPILE_INTEL;
-  g_hardware_flags.powerpc = COMPILE_POWERPC;
+  kvz_g_hardware_flags.arm = COMPILE_ARM;
+  kvz_g_hardware_flags.intel = COMPILE_INTEL;
+  kvz_g_hardware_flags.powerpc = COMPILE_POWERPC;
 
 #if COMPILE_INTEL
   if (cpuid) {
@@ -287,14 +287,14 @@ static void set_hardware_flags(int32_t cpuid) {
     get_cpuid(1, 0, &cpuid1);
     
     // EDX
-    if (cpuid1.edx & CPUID1_EDX_MMX)   g_hardware_flags.intel_flags.mmx = 1;
-    if (cpuid1.edx & CPUID1_EDX_SSE)   g_hardware_flags.intel_flags.sse = 1;
-    if (cpuid1.edx & CPUID1_EDX_SSE2)  g_hardware_flags.intel_flags.sse2 = 1;
+    if (cpuid1.edx & CPUID1_EDX_MMX)   kvz_g_hardware_flags.intel_flags.mmx = 1;
+    if (cpuid1.edx & CPUID1_EDX_SSE)   kvz_g_hardware_flags.intel_flags.sse = 1;
+    if (cpuid1.edx & CPUID1_EDX_SSE2)  kvz_g_hardware_flags.intel_flags.sse2 = 1;
     // ECX
-    if (cpuid1.ecx & CPUID1_ECX_SSE3)  g_hardware_flags.intel_flags.sse3 = 1;;
-    if (cpuid1.ecx & CPUID1_ECX_SSSE3) g_hardware_flags.intel_flags.ssse3 = 1;
-    if (cpuid1.ecx & CPUID1_ECX_SSE41) g_hardware_flags.intel_flags.sse41 = 1;
-    if (cpuid1.ecx & CPUID1_ECX_SSE42) g_hardware_flags.intel_flags.sse42 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE3)  kvz_g_hardware_flags.intel_flags.sse3 = 1;;
+    if (cpuid1.ecx & CPUID1_ECX_SSSE3) kvz_g_hardware_flags.intel_flags.ssse3 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE41) kvz_g_hardware_flags.intel_flags.sse41 = 1;
+    if (cpuid1.ecx & CPUID1_ECX_SSE42) kvz_g_hardware_flags.intel_flags.sse42 = 1;
     
     // Check hardware and OS support for xsave and xgetbv.
     if (cpuid1.ecx & (CPUID1_ECX_XSAVE | CPUID1_ECX_OSXSAVE)) {
@@ -313,13 +313,13 @@ static void set_hardware_flags(int32_t cpuid) {
       bool ymm_support = xcr0 & XGETBV_XCR0_YMM || false;
 
       if (avx_support && xmm_support && ymm_support) {
-        g_hardware_flags.intel_flags.avx = 1;
+        kvz_g_hardware_flags.intel_flags.avx = 1;
       }
 
-      if (g_hardware_flags.intel_flags.avx) {
+      if (kvz_g_hardware_flags.intel_flags.avx) {
         cpuid_t cpuid7 = { 0, 0, 0, 0 };
         get_cpuid(7, 0, &cpuid7);
-        if (cpuid7.ebx & CPUID7_EBX_AVX2)  g_hardware_flags.intel_flags.avx2 = 1;
+        if (cpuid7.ebx & CPUID7_EBX_AVX2)  kvz_g_hardware_flags.intel_flags.avx2 = 1;
       }
     }
   }
@@ -353,22 +353,22 @@ static void set_hardware_flags(int32_t cpuid) {
   fprintf(stderr, " AVX2");
 #endif
   fprintf(stderr, "\nDetected: INTEL, flags:");
-  if (g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
-  if (g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
-  if (g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
-  if (g_hardware_flags.intel_flags.sse3) fprintf(stderr, " SSE3");
-  if (g_hardware_flags.intel_flags.ssse3) fprintf(stderr, " SSSE3");
-  if (g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
-  if (g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
-  if (g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
-  if (g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
+  if (kvz_g_hardware_flags.intel_flags.mmx) fprintf(stderr, " MMX");
+  if (kvz_g_hardware_flags.intel_flags.sse) fprintf(stderr, " SSE");
+  if (kvz_g_hardware_flags.intel_flags.sse2) fprintf(stderr, " SSE2");
+  if (kvz_g_hardware_flags.intel_flags.sse3) fprintf(stderr, " SSE3");
+  if (kvz_g_hardware_flags.intel_flags.ssse3) fprintf(stderr, " SSSE3");
+  if (kvz_g_hardware_flags.intel_flags.sse41) fprintf(stderr, " SSE41");
+  if (kvz_g_hardware_flags.intel_flags.sse42) fprintf(stderr, " SSE42");
+  if (kvz_g_hardware_flags.intel_flags.avx) fprintf(stderr, " AVX");
+  if (kvz_g_hardware_flags.intel_flags.avx2) fprintf(stderr, " AVX2");
   fprintf(stderr, "\n");
   
 #endif //COMPILE_INTEL
 
 #if COMPILE_POWERPC
   if (cpuid) {
-    g_hardware_flags.powerpc_flags.altivec = altivec_available();
+    kvz_g_hardware_flags.powerpc_flags.altivec = altivec_available();
   }
   
   fprintf(stderr, "Compiled: PowerPC, flags:");
@@ -376,7 +376,7 @@ static void set_hardware_flags(int32_t cpuid) {
   fprintf(stderr, " AltiVec");
 #endif
   fprintf(stderr, "\nDetected: PowerPC, flags:");
-  if (g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
+  if (kvz_g_hardware_flags.powerpc_flags.altivec) fprintf(stderr, " AltiVec");
   fprintf(stderr, "\n");
 #endif
   

@@ -32,15 +32,15 @@ void init_test_strategies()
   strategies.strategies = NULL;
 
   // Init strategyselector because it sets hardware flags.
-  strategyselector_init(1, KVZ_BIT_DEPTH);
+  kvz_strategyselector_init(1, KVZ_BIT_DEPTH);
 
   // Collect all strategies to be tested.
-  if (!strategy_register_picture(&strategies, KVZ_BIT_DEPTH)) {
+  if (!kvz_strategy_register_picture(&strategies, KVZ_BIT_DEPTH)) {
     fprintf(stderr, "strategy_register_picture failed!\n");
     return;
   }
 
-  if (!strategy_register_dct(&strategies, KVZ_BIT_DEPTH)) {
+  if (!kvz_strategy_register_dct(&strategies, KVZ_BIT_DEPTH)) {
     fprintf(stderr, "strategy_register_partial_butterfly failed!\n");
     return;
   }

@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-kvz_config *config_alloc(void)
+kvz_config *kvz_config_alloc(void)
 {
   kvz_config *cfg = (kvz_config *)malloc(sizeof(kvz_config));
   if (!cfg) {
@@ -41,7 +41,7 @@ kvz_config *config_alloc(void)
   return cfg;
 }
 
-int config_init(kvz_config *cfg)
+int kvz_config_init(kvz_config *cfg)
 {
   cfg->width           = 0;
   cfg->height          = 0;
@@ -103,7 +103,7 @@ int config_init(kvz_config *cfg)
   return 1;
 }
 
-int config_destroy(kvz_config *cfg)
+int kvz_config_destroy(kvz_config *cfg)
 {
   if (cfg) {
     FREE_POINTER(cfg->cqmfile);
@@ -262,7 +262,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
   return 1;
 }
 
-int config_parse(kvz_config *cfg, const char *name, const char *value)
+int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 {
   static const char * const me_names[]          = { "hexbs", "tz", NULL };
   static const char * const source_scan_type_names[] = { "progressive", "tff", "bff", NULL };
@@ -451,7 +451,7 @@ int config_parse(kvz_config *cfg, const char *name, const char *value)
  * \param cfg   config to check
  * \return      1 if the config is ok, otherwise 1
  */
-int config_validate(const kvz_config *const cfg)
+int kvz_config_validate(const kvz_config *const cfg)
 {
   int error = 0;
 

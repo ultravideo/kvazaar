@@ -36,16 +36,16 @@ typedef struct {
   const double *error_scale[4][6][6];
 } scaling_list_t;
 
-extern const uint8_t g_scaling_list_num[4];
-extern const uint16_t g_scaling_list_size[4];
+extern const uint8_t kvz_g_scaling_list_num[4];
+extern const uint16_t kvz_g_scaling_list_size[4];
 
-const int32_t *scalinglist_get_default(const uint32_t size_id, const uint32_t list_id);
+const int32_t *kvz_scalinglist_get_default(const uint32_t size_id, const uint32_t list_id);
 
-void scalinglist_init(scaling_list_t * const scaling_list);
-void scalinglist_destroy(scaling_list_t * const scaling_list);
+void kvz_scalinglist_init(scaling_list_t * const scaling_list);
+void kvz_scalinglist_destroy(scaling_list_t * const scaling_list);
 
-int  scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
-void scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
+int  kvz_scalinglist_parse(scaling_list_t * const scaling_list, FILE *fp);
+void kvz_scalinglist_process(scaling_list_t *scaling_list, uint8_t bitdepth);
 
 
 

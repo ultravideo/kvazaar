@@ -30,24 +30,24 @@
 #include "encoder.h"
 #include "encoderstate.h"
 
-extern const uint8_t g_chroma_scale[58];
-extern const int16_t g_inv_quant_scales[6];
+extern const uint8_t kvz_g_chroma_scale[58];
+extern const int16_t kvz_g_inv_quant_scales[6];
 
 
 
-void quant(const encoder_state_t *state, coeff_t *coef, coeff_t *q_coef, int32_t width,
+void kvz_quant(const encoder_state_t *state, coeff_t *coef, coeff_t *q_coef, int32_t width,
            int32_t height, int8_t type, int8_t scan_idx, int8_t block_type);
-void dequant(const encoder_state_t *state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height, int8_t type, int8_t block_type);
+void kvz_dequant(const encoder_state_t *state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height, int8_t type, int8_t block_type);
 
-void transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
-void itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
+void kvz_transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
+void kvz_itransformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);
 
-void transform2d(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
-void itransform2d(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
+void kvz_transform2d(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
+void kvz_itransform2d(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size, int32_t mode);
 
-int32_t get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
+int32_t kvz_get_scaled_qp(int8_t type, int8_t qp, int8_t qp_offset);
 
-void quantize_lcu_luma_residual(encoder_state_t *state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
-void quantize_lcu_chroma_residual(encoder_state_t *state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
+void kvz_quantize_lcu_luma_residual(encoder_state_t *state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
+void kvz_quantize_lcu_chroma_residual(encoder_state_t *state, int32_t x, int32_t y, uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu);
 
 #endif

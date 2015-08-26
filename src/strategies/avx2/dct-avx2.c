@@ -31,17 +31,17 @@
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
 
-extern const int16_t g_dst_4[4][4];
-extern const int16_t g_dct_4[4][4];
-extern const int16_t g_dct_8[8][8];
-extern const int16_t g_dct_16[16][16];
-extern const int16_t g_dct_32[32][32];
+extern const int16_t kvz_g_dst_4[4][4];
+extern const int16_t kvz_g_dct_4[4][4];
+extern const int16_t kvz_g_dct_8[8][8];
+extern const int16_t kvz_g_dct_16[16][16];
+extern const int16_t kvz_g_dct_32[32][32];
 
-extern const int16_t g_dst_4_t[4][4];
-extern const int16_t g_dct_4_t[4][4];
-extern const int16_t g_dct_8_t[8][8];
-extern const int16_t g_dct_16_t[16][16];
-extern const int16_t g_dct_32_t[32][32];
+extern const int16_t kvz_g_dst_4_t[4][4];
+extern const int16_t kvz_g_dct_4_t[4][4];
+extern const int16_t kvz_g_dct_8_t[8][8];
+extern const int16_t kvz_g_dct_16_t[16][16];
+extern const int16_t kvz_g_dct_32_t[32][32];
 
 /*
 * \file
@@ -312,11 +312,11 @@ static void mul_clip_matrix_32x32_avx2(const int16_t *left, const int16_t *right
 // block size. Performs matrix multiplication horizontally and vertically.
 #define TRANSFORM(type, n) static void matrix_ ## type ## _ ## n ## x ## n ## _avx2(int8_t bitdepth, const int16_t *input, int16_t *output)\
 {\
-  int32_t shift_1st = g_convert_to_bit[n] + 1 + (bitdepth - 8); \
-  int32_t shift_2nd = g_convert_to_bit[n] + 8; \
+  int32_t shift_1st = kvz_g_convert_to_bit[n] + 1 + (bitdepth - 8); \
+  int32_t shift_2nd = kvz_g_convert_to_bit[n] + 8; \
   int16_t tmp[n * n];\
-  const int16_t *tdct = &g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &g_ ## type ## _ ## n [0][0];\
+  const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
+  const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(input, tdct, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(dct, tmp, output, shift_2nd);\
@@ -331,8 +331,8 @@ static void matrix_i ## type ## _## n ## x ## n ## _avx2(int8_t bitdepth, const 
   int32_t shift_1st = 7; \
   int32_t shift_2nd = 12 - (bitdepth - 8); \
   int16_t tmp[n * n];\
-  const int16_t *tdct = &g_ ## type ## _ ## n ## _t[0][0];\
-  const int16_t *dct = &g_ ## type ## _ ## n [0][0];\
+  const int16_t *tdct = &kvz_g_ ## type ## _ ## n ## _t[0][0];\
+  const int16_t *dct = &kvz_g_ ## type ## _ ## n [0][0];\
 \
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tdct, input, tmp, shift_1st);\
   mul_clip_matrix_ ## n ## x ## n ## _avx2(tmp, dct, output, shift_2nd);\
@@ -353,24 +353,24 @@ ITRANSFORM(dct, 32);
 
 #endif //COMPILE_INTEL_AVX2
 
-int strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
+int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
   if (bitdepth == 8){
-    success &= strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
+    success &= kvz_strategyselector_register(opaque, "fast_forward_dst_4x4", "avx2", 40, &matrix_dst_4x4_avx2);
 
-    success &= strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
-    success &= strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
-    success &= strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
-    success &= strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
+    success &= kvz_strategyselector_register(opaque, "dct_4x4", "avx2", 40, &matrix_dct_4x4_avx2);
+    success &= kvz_strategyselector_register(opaque, "dct_8x8", "avx2", 40, &matrix_dct_8x8_avx2);
+    success &= kvz_strategyselector_register(opaque, "dct_16x16", "avx2", 40, &matrix_dct_16x16_avx2);
+    success &= kvz_strategyselector_register(opaque, "dct_32x32", "avx2", 40, &matrix_dct_32x32_avx2);
 
-    success &= strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
+    success &= kvz_strategyselector_register(opaque, "fast_inverse_dst_4x4", "avx2", 40, &matrix_idst_4x4_avx2);
 
-    success &= strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
-    success &= strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
-    success &= strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
-    success &= strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
+    success &= kvz_strategyselector_register(opaque, "idct_4x4", "avx2", 40, &matrix_idct_4x4_avx2);
+    success &= kvz_strategyselector_register(opaque, "idct_8x8", "avx2", 40, &matrix_idct_8x8_avx2);
+    success &= kvz_strategyselector_register(opaque, "idct_16x16", "avx2", 40, &matrix_idct_16x16_avx2);
+    success &= kvz_strategyselector_register(opaque, "idct_32x32", "avx2", 40, &matrix_idct_32x32_avx2);
   }
 #endif //COMPILE_INTEL_AVX2  
   return success;

@@ -49,36 +49,36 @@ typedef struct {
 } yuv_t;
 
 
-kvz_picture *image_alloc(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height);
 
-void image_free(kvz_picture *im);
+void kvz_image_free(kvz_picture *im);
 
-kvz_picture *image_copy_ref(kvz_picture *im);
+kvz_picture *kvz_image_copy_ref(kvz_picture *im);
 
-kvz_picture *image_make_subimage(kvz_picture *const orig_image,
+kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
                              const unsigned x_offset,
                              const unsigned y_offset,
                              const unsigned width,
                              const unsigned height);
 
-yuv_t * yuv_t_alloc(int luma_size);
-void yuv_t_free(yuv_t * yuv);
+yuv_t * kvz_yuv_t_alloc(int luma_size);
+void kvz_yuv_t_free(yuv_t * yuv);
 
-hi_prec_buf_t * hi_prec_buf_t_alloc(int luma_size);
-void hi_prec_buf_t_free(hi_prec_buf_t * yuv);
+hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size);
+void kvz_hi_prec_buf_t_free(hi_prec_buf_t * yuv);
 
 
 //Algorithms
-unsigned image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
+unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
                         int block_width, int block_height, int max_lcu_below);
 
 
-unsigned pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
+unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
                   const int ref_stride, const int rec_stride,
                   const int width);
 
 
-void pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
+void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 

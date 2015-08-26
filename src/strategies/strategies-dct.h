@@ -26,40 +26,40 @@ typedef unsigned (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *outp
 
 
 // Declare function pointers.
-extern dct_func * fast_forward_dst_4x4;
+extern dct_func * kvz_fast_forward_dst_4x4;
 
-extern dct_func * dct_4x4;
-extern dct_func * dct_8x8;
-extern dct_func * dct_16x16;
-extern dct_func * dct_32x32;
+extern dct_func * kvz_dct_4x4;
+extern dct_func * kvz_dct_8x8;
+extern dct_func * kvz_dct_16x16;
+extern dct_func * kvz_dct_32x32;
 
-extern dct_func * fast_inverse_dst_4x4;
+extern dct_func * kvz_fast_inverse_dst_4x4;
 
-extern dct_func * idct_4x4;
-extern dct_func * idct_8x8;
-extern dct_func * idct_16x16;
-extern dct_func * idct_32x32;
+extern dct_func * kvz_idct_4x4;
+extern dct_func * kvz_idct_8x8;
+extern dct_func * kvz_idct_16x16;
+extern dct_func * kvz_idct_32x32;
 
 
-int strategy_register_dct(void* opaque, uint8_t bitdepth);
-dct_func * get_dct_func(int8_t width, int32_t mode);
-dct_func * get_idct_func(int8_t width, int32_t mode);
+int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth);
+dct_func * kvz_get_dct_func(int8_t width, int32_t mode);
+dct_func * kvz_get_idct_func(int8_t width, int32_t mode);
 
 
 #define STRATEGIES_DCT_EXPORTS \
-  {"fast_forward_dst_4x4", (void**) &fast_forward_dst_4x4}, \
+  {"fast_forward_dst_4x4", (void**) &kvz_fast_forward_dst_4x4}, \
   \
-  {"dct_4x4", (void**) &dct_4x4}, \
-  {"dct_8x8", (void**) &dct_8x8}, \
-  {"dct_16x16", (void**) &dct_16x16}, \
-  {"dct_32x32", (void**) &dct_32x32}, \
+  {"dct_4x4", (void**) &kvz_dct_4x4}, \
+  {"dct_8x8", (void**) &kvz_dct_8x8}, \
+  {"dct_16x16", (void**) &kvz_dct_16x16}, \
+  {"dct_32x32", (void**) &kvz_dct_32x32}, \
   \
-  {"fast_inverse_dst_4x4", (void**) &fast_inverse_dst_4x4}, \
+  {"fast_inverse_dst_4x4", (void**) &kvz_fast_inverse_dst_4x4}, \
   \
-  {"idct_4x4", (void**)&idct_4x4}, \
-  {"idct_8x8", (void**)&idct_8x8}, \
-  {"idct_16x16", (void**)&idct_16x16}, \
-  {"idct_32x32", (void**)&idct_32x32}, \
+  {"idct_4x4", (void**)&kvz_idct_4x4}, \
+  {"idct_8x8", (void**)&kvz_idct_8x8}, \
+  {"idct_16x16", (void**)&kvz_idct_16x16}, \
+  {"idct_32x32", (void**)&kvz_idct_32x32}, \
 
 
 

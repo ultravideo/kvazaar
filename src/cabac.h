@@ -85,62 +85,62 @@ typedef struct
 
 
 // Globals
-extern const uint8_t g_auc_next_state_mps[128];
-extern const uint8_t g_auc_next_state_lps[128];
-extern const uint8_t g_auc_lpst_table[64][4];
-extern const uint8_t g_auc_renorm_table[32];
+extern const uint8_t kvz_g_auc_next_state_mps[128];
+extern const uint8_t kvz_g_auc_next_state_lps[128];
+extern const uint8_t kvz_g_auc_lpst_table[64][4];
+extern const uint8_t kvz_g_auc_renorm_table[32];
 
 
 // Functions
-void cabac_start(cabac_data_t *data);
-void cabac_encode_bin(cabac_data_t *data, uint32_t bin_value);
-void cabac_encode_bin_ep(cabac_data_t *data, uint32_t bin_value);
-void cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_bins);
-void cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
-void cabac_write(cabac_data_t *data);
-void cabac_finish(cabac_data_t *data);
-void cabac_flush(cabac_data_t *data);
-void cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
+void kvz_cabac_start(cabac_data_t *data);
+void kvz_cabac_encode_bin(cabac_data_t *data, uint32_t bin_value);
+void kvz_cabac_encode_bin_ep(cabac_data_t *data, uint32_t bin_value);
+void kvz_cabac_encode_bins_ep(cabac_data_t *data, uint32_t bin_values, int num_bins);
+void kvz_cabac_encode_bin_trm(cabac_data_t *data, uint8_t bin_value);
+void kvz_cabac_write(cabac_data_t *data);
+void kvz_cabac_finish(cabac_data_t *data);
+void kvz_cabac_flush(cabac_data_t *data);
+void kvz_cabac_write_coeff_remain(cabac_data_t *cabac, uint32_t symbol,
                               uint32_t r_param);
-void cabac_write_ep_ex_golomb(cabac_data_t *data, uint32_t symbol,
+void kvz_cabac_write_ep_ex_golomb(cabac_data_t *data, uint32_t symbol,
                               uint32_t count);
-void cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
+void kvz_cabac_write_unary_max_symbol(cabac_data_t *data, cabac_ctx_t *ctx,
                                   uint32_t symbol, int32_t offset,
                                   uint32_t max_symbol);
-void cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
+void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t *data, unsigned int symbol, unsigned int max_symbol);
 
 
 // Macros
 #define CTX_STATE(ctx) (ctx->uc_state >> 1)
 #define CTX_MPS(ctx) (ctx->uc_state & 1)
-#define CTX_UPDATE_LPS(ctx) { (ctx)->uc_state = g_auc_next_state_lps[ (ctx)->uc_state ]; }
-#define CTX_UPDATE_MPS(ctx) { (ctx)->uc_state = g_auc_next_state_mps[ (ctx)->uc_state ]; }
+#define CTX_UPDATE_LPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_lps[ (ctx)->uc_state ]; }
+#define CTX_UPDATE_MPS(ctx) { (ctx)->uc_state = kvz_g_auc_next_state_mps[ (ctx)->uc_state ]; }
 
 #ifdef VERBOSE
   #define CABAC_BIN(data, value, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
-    cabac_encode_bin(data, value); \
+    kvz_cabac_encode_bin(data, value); \
     printf("%s = %u, state = %u -> %u\n", \
            name, (uint32_t)value, (uint32_t)prev_state, (data)->ctx->uc_state); }
 
   #define CABAC_BINS_EP(data, value, bins, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
-    cabac_encode_bins_ep(data, value, bins); \
+    kvz_cabac_encode_bins_ep(data, value, bins); \
     printf("%s = %u(%u bins), state = %u -> %u\n", \
            name, (uint32_t)value, (uint32_t)bins, prev_state, (data)->ctx->uc_state); }
 
   #define CABAC_BIN_EP(data, value, name) { \
     uint32_t prev_state = (data)->ctx->uc_state; \
-    cabac_encode_bin_ep(data, value); \
+    kvz_cabac_encode_bin_ep(data, value); \
     printf("%s = %u, state = %u -> %u\n", \
            name, (uint32_t)value, (uint32_t)prev_state, (data)->ctx->uc_state); }
 #else
   #define CABAC_BIN(data, value, name) \
-    cabac_encode_bin(data, value);
+    kvz_cabac_encode_bin(data, value);
   #define CABAC_BINS_EP(data, value, bins, name) \
-    cabac_encode_bins_ep(data, value, bins);
+    kvz_cabac_encode_bins_ep(data, value, bins);
   #define CABAC_BIN_EP(data, value, name) \
-    cabac_encode_bin_ep(data, value);
+    kvz_cabac_encode_bin_ep(data, value);
 #endif
 
 #endif

@@ -29,11 +29,10 @@
 #include "global.h"
 
 /* Function definitions */
-kvz_config *config_alloc(void);
-int config_init(kvz_config *cfg);
-int config_destroy(kvz_config *cfg);
-int config_parse(kvz_config *cfg, const char *name, const char *value);
-int config_validate(const kvz_config *cfg);
-int config_set_owf_auto(kvz_config *cfg);
+kvz_config *kvz_config_alloc(void);
+int kvz_config_init(kvz_config *cfg);
+int kvz_config_destroy(kvz_config *cfg);
+int kvz_config_parse(kvz_config *cfg, const char *name, const char *value);
+int kvz_config_validate(const kvz_config *cfg);
 
 #endif

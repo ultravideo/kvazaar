@@ -186,7 +186,7 @@ typedef struct encoder_state_t {
 
   /**
    * \brief Indicates that this encoder state is ready for encoding the
-   * next frame i.e. encoder_next_frame has been called.
+   * next frame i.e. kvz_encoder_next_frame has been called.
    */
   int prepared;
 
@@ -206,32 +206,32 @@ typedef struct encoder_state_t {
 
 
 
-void encode_one_frame(encoder_state_t *state);
-int encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in);
+void kvz_encode_one_frame(encoder_state_t *state);
+int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in);
 
-void encoder_compute_stats(encoder_state_t *state, double psnr[3]);
-void encoder_next_frame(encoder_state_t *state);
+void kvz_encoder_compute_stats(encoder_state_t *state, double psnr[3]);
+void kvz_encoder_next_frame(encoder_state_t *state);
 
 
-void encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,
+void kvz_encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,
                         uint16_t y_ctb, uint8_t depth);
 
-void encode_last_significant_xy(encoder_state_t *state,
+void kvz_encode_last_significant_xy(encoder_state_t *state,
                                 uint8_t lastpos_x, uint8_t lastpos_y,
                                 uint8_t width, uint8_t height,
                                 uint8_t type, uint8_t scan);
-void encode_coeff_nxn(encoder_state_t *state, coeff_t *coeff, uint8_t width,
+void kvz_encode_coeff_nxn(encoder_state_t *state, coeff_t *coeff, uint8_t width,
                       uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
+void kvz_encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
 void encode_block_residual(const encoder_control_t * const encoder,
                            uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
-int encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
+int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
 
-coeff_scan_order_t get_scan_order(int8_t cu_type, int intra_mode, int depth);
+coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
 
-void encoder_ref_insertion_sort(int reflist[16], int length);
+void kvz_encoder_ref_insertion_sort(int reflist[16], int length);
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,

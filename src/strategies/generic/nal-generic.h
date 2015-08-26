@@ -21,6 +21,6 @@
  ****************************************************************************/
 #include  "global.h"
 
-int strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
+int kvz_strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_NAL_GENERIC_H_

@@ -35,12 +35,12 @@ static void kvazaar_close(kvz_encoder *encoder)
   if (encoder) {
     if (encoder->states) {
       for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-        encoder_state_finalize(&encoder->states[i]);
+        kvz_encoder_state_finalize(&encoder->states[i]);
       }
     }
     FREE_POINTER(encoder->states);
 
-    encoder_control_free(encoder->control);
+    kvz_encoder_control_free(encoder->control);
     encoder->control = NULL;
   }
   FREE_POINTER(encoder);
@@ -53,19 +53,19 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
   //Initialize strategies
   // TODO: Make strategies non-global
-  if (!strategyselector_init(cfg->cpuid, KVZ_BIT_DEPTH)) {
+  if (!kvz_strategyselector_init(cfg->cpuid, KVZ_BIT_DEPTH)) {
     fprintf(stderr, "Failed to initialize strategies.\n");
     goto kvazaar_open_failure;
   }
 
-  init_exp_golomb();
+  kvz_init_exp_golomb();
 
   encoder = calloc(1, sizeof(kvz_encoder));
   if (!encoder) {
     goto kvazaar_open_failure;
   }
 
-  encoder->control = encoder_control_init(cfg);
+  encoder->control = kvz_encoder_control_init(cfg);
   if (!encoder->control) {
     goto kvazaar_open_failure;
   }
@@ -83,7 +83,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
     encoder->states[i].encoder_control = encoder->control;
 
-    if (!encoder_state_init(&encoder->states[i], NULL)) {
+    if (!kvz_encoder_state_init(&encoder->states[i], NULL)) {
       goto kvazaar_open_failure;
     }
 
@@ -96,7 +96,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     } else {
       encoder->states[i].previous_encoder_state = &encoder->states[(i - 1) % encoder->num_encoder_states];
     }
-    encoder_state_match_children_of_previous_frame(&encoder->states[i]);
+    kvz_encoder_state_match_children_of_previous_frame(&encoder->states[i]);
   }
 
   encoder->states[encoder->cur_state_num].global->frame = -1;
@@ -122,7 +122,7 @@ static int kvazaar_encode(kvz_encoder *enc,
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
   if (!state->prepared) {
-    encoder_next_frame(state);
+    kvz_encoder_next_frame(state);
   }
 
   if (pic_in != NULL) {
@@ -130,10 +130,10 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
   }
 
-  if (encoder_feed_frame(state, pic_in)) {
+  if (kvz_encoder_feed_frame(state, pic_in)) {
     assert(state->global->frame == enc->frames_started);
     // Start encoding.
-    encode_one_frame(state);
+    kvz_encode_one_frame(state);
     enc->frames_started += 1;
   }
 
@@ -151,12 +151,12 @@ static int kvazaar_encode(kvz_encoder *enc,
   if (!output_state->frame_done &&
       (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
 
-    threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
+    kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
 
     // Get stream length before taking chunks since that clears the stream.
-    if (len_out) *len_out = bitstream_tell(&output_state->stream) / 8;
-    if (data_out) *data_out = bitstream_take_chunks(&output_state->stream);
-    if (pic_out) *pic_out = image_copy_ref(output_state->tile->frame->rec);
+    if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
+    if (data_out) *data_out = kvz_bitstream_take_chunks(&output_state->stream);
+    if (pic_out) *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
 
     output_state->frame_done = 1;
     output_state->prepared = 0;
@@ -170,15 +170,15 @@ static int kvazaar_encode(kvz_encoder *enc,
 
 
 static const kvz_api kvz_8bit_api = {
-  .config_alloc = config_alloc,
-  .config_init = config_init,
-  .config_destroy = config_destroy,
-  .config_parse = config_parse,
+  .config_alloc = kvz_config_alloc,
+  .config_init = kvz_config_init,
+  .config_destroy = kvz_config_destroy,
+  .config_parse = kvz_config_parse,
 
-  .picture_alloc = image_alloc,
-  .picture_free = image_free,
+  .picture_alloc = kvz_image_alloc,
+  .picture_free = kvz_image_free,
 
-  .chunk_free = bitstream_free_chunks,
+  .chunk_free = kvz_bitstream_free_chunks,
 
   .encoder_open = kvazaar_open,
   .encoder_close = kvazaar_close,

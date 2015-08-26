@@ -104,23 +104,23 @@ const int width, const int height, const unsigned stride1, const unsigned stride
 
 #endif //defined(KVZ_COMPILE_ASM)
 
-int strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth) {
+int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if defined(KVZ_COMPILE_ASM)
   if (bitdepth == 8){
-    success &= strategyselector_register(opaque, "reg_sad", "x86_asm_avx", 30, &reg_sad_x86_asm);
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "x86_asm_avx", 30, &reg_sad_x86_asm);
 
-    success &= strategyselector_register(opaque, "sad_4x4", "x86_asm_avx", 30, &kvz_sad_4x4_avx);
-    success &= strategyselector_register(opaque, "sad_8x8", "x86_asm_avx", 30, &kvz_sad_8x8_avx);
-    success &= strategyselector_register(opaque, "sad_16x16", "x86_asm_avx", 30, &kvz_sad_16x16_avx);
-    success &= strategyselector_register(opaque, "sad_32x32", "x86_asm_avx", 30, &kvz_sad_32x32_avx);
-    success &= strategyselector_register(opaque, "sad_64x64", "x86_asm_avx", 30, &kvz_sad_64x64_avx);
+    success &= kvz_strategyselector_register(opaque, "sad_4x4", "x86_asm_avx", 30, &kvz_sad_4x4_avx);
+    success &= kvz_strategyselector_register(opaque, "sad_8x8", "x86_asm_avx", 30, &kvz_sad_8x8_avx);
+    success &= kvz_strategyselector_register(opaque, "sad_16x16", "x86_asm_avx", 30, &kvz_sad_16x16_avx);
+    success &= kvz_strategyselector_register(opaque, "sad_32x32", "x86_asm_avx", 30, &kvz_sad_32x32_avx);
+    success &= kvz_strategyselector_register(opaque, "sad_64x64", "x86_asm_avx", 30, &kvz_sad_64x64_avx);
 
-    success &= strategyselector_register(opaque, "satd_4x4", "x86_asm_avx", 30, &kvz_satd_4x4_avx);
-    success &= strategyselector_register(opaque, "satd_8x8", "x86_asm_avx", 30, &kvz_satd_8x8_avx);
-    success &= strategyselector_register(opaque, "satd_16x16", "x86_asm_avx", 30, &kvz_satd_16x16_avx);
-    success &= strategyselector_register(opaque, "satd_32x32", "x86_asm_avx", 30, &kvz_satd_32x32_avx);
-    success &= strategyselector_register(opaque, "satd_64x64", "x86_asm_avx", 30, &kvz_satd_64x64_avx);
+    success &= kvz_strategyselector_register(opaque, "satd_4x4", "x86_asm_avx", 30, &kvz_satd_4x4_avx);
+    success &= kvz_strategyselector_register(opaque, "satd_8x8", "x86_asm_avx", 30, &kvz_satd_8x8_avx);
+    success &= kvz_strategyselector_register(opaque, "satd_16x16", "x86_asm_avx", 30, &kvz_satd_16x16_avx);
+    success &= kvz_strategyselector_register(opaque, "satd_32x32", "x86_asm_avx", 30, &kvz_satd_32x32_avx);
+    success &= kvz_strategyselector_register(opaque, "satd_64x64", "x86_asm_avx", 30, &kvz_satd_64x64_avx);
   }
 #endif //!defined(KVZ_COMPILE_ASM)
   return success;

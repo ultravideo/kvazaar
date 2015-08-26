@@ -33,16 +33,16 @@
 
 
 // Functions
-void ctx_init(cabac_ctx_t* ctx, uint32_t qp, uint32_t init_value);
-void init_contexts(encoder_state_t *state, int8_t QP, int8_t slice);
+void kvz_ctx_init(cabac_ctx_t* ctx, uint32_t qp, uint32_t init_value);
+void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice);
 
-void context_copy(encoder_state_t * target_state, const encoder_state_t * source_state);
-int32_t context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
+void kvz_context_copy(encoder_state_t * target_state, const encoder_state_t * source_state);
+int32_t kvz_context_calc_pattern_sig_ctx( const uint32_t *sig_coeff_group_flag, uint32_t pos_x, uint32_t pos_y, int32_t width);
 
-uint32_t context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
+uint32_t kvz_context_get_sig_coeff_group( uint32_t *sig_coeff_group_flag,uint32_t pos_x, uint32_t pos_y,int32_t width);
 
 
-int32_t context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
+int32_t kvz_context_get_sig_ctx_inc(int32_t pattern_sig_ctx,uint32_t scan_idx,int32_t pos_x,
                                 int32_t pos_y,int32_t block_type, int8_t texture_type);
 
 #define CNU 154

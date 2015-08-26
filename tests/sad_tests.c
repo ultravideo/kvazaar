@@ -31,7 +31,7 @@
 
 //////////////////////////////////////////////////////////////////////////
 // DEFINES
-#define TEST_SAD(X, Y) image_calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8, -1)
+#define TEST_SAD(X, Y) kvz_image_calc_sad(g_pic, g_ref, 0, 0, (X), (Y), 8, 8, -1)
 
 //////////////////////////////////////////////////////////////////////////
 // GLOBALS
@@ -64,12 +64,12 @@ static kvz_picture *g_ref = 0;
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
 static void setup_tests()
 {
-  g_pic = image_alloc(8, 8);
+  g_pic = kvz_image_alloc(8, 8);
   for (int i = 0; i < 64; ++i) {
     g_pic->y[i] = pic_data[i] + 48;
   }
 
-  g_ref = image_alloc(8, 8);
+  g_ref = kvz_image_alloc(8, 8);
   for (int i = 0; i < 64; ++i) {
     g_ref->y[i] = ref_data[i] + 48;
   }
@@ -77,8 +77,8 @@ static void setup_tests()
 
 static void tear_down_tests()
 {
-  image_free(g_pic);
-  image_free(g_ref);
+  kvz_image_free(g_pic);
+  kvz_image_free(g_ref);
 }
 
 
@@ -246,7 +246,7 @@ SUITE(sad_tests)
     }
 
     // Change the global reg_sad function pointer.
-    reg_sad = strategies.strategies[i].fptr;
+    kvz_reg_sad = strategies.strategies[i].fptr;
 
     // Tests for movement vectors that overlap frame.
     RUN_TEST(test_topleft);
