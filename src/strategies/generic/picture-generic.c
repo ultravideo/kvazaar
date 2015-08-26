@@ -285,7 +285,7 @@ unsigned satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
 // for fixed size blocks. They calculate hadamard for integer
 // multiples of 8x8 with the 8x8 hadamard function.
 #define SATD_NXN(n, pixel_type) \
-unsigned satd_ ## n ## x ## n ## _generic( \
+static unsigned satd_ ## n ## x ## n ## _generic( \
   const pixel_type * const block1, const pixel_type * const block2) \
 { \
   unsigned x, y; \
@@ -300,11 +300,11 @@ unsigned satd_ ## n ## x ## n ## _generic( \
 }
 
 // Declare these functions to make sure the signature of the macro matches.
-cost_pixel_nxn_func satd_4x4_generic;
-cost_pixel_nxn_func satd_8x8_generic;
-cost_pixel_nxn_func satd_16x16_generic;
-cost_pixel_nxn_func satd_32x32_generic;
-cost_pixel_nxn_func satd_64x64_generic;
+static cost_pixel_nxn_func satd_4x4_generic;
+static cost_pixel_nxn_func satd_8x8_generic;
+static cost_pixel_nxn_func satd_16x16_generic;
+static cost_pixel_nxn_func satd_32x32_generic;
+static cost_pixel_nxn_func satd_64x64_generic;
 
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
 SATD_NXN(8, kvz_pixel)
