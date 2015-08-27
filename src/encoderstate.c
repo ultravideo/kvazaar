@@ -268,7 +268,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   //First LCU, and we are in a slice. We need a slice header
   if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
     kvz_encoder_state_write_bitstream_slice_header(state);
-    kvz_bitstream_align(&state->stream); 
+    kvz_bitstream_add_rbsp_trailing_bits(&state->stream); 
   }
   
   //Encode SAO
@@ -1430,7 +1430,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   if (cur_cu->type == CU_PCM) {
     kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
       kvz_cabac_finish(cabac);
-      kvz_bitstream_align(cabac.stream);
+      kvz_bitstream_add_rbsp_trailing_bits(cabac.stream);
     // PCM sample
       {
       unsigned y, x;
