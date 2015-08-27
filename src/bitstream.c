@@ -269,13 +269,23 @@ void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t b
 }
 
 /**
- * \brief Align the bitstream with one-bit padding
+ * \brief Add rbsp_trailing_bits syntax element, which aligns the bitstream.
  */
-void kvz_bitstream_align(bitstream_t * const stream)
+void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t * const stream)
 {
   kvz_bitstream_put(stream, 1, 1);
   if ((stream->cur_bit & 7) != 0) {
     kvz_bitstream_put(stream, 0, 8 - (stream->cur_bit & 7));
+  }
+}
+
+/**
+* \brief Align the bitstream, unless it's already aligned.
+*/
+void kvz_bitstream_align(bitstream_t * const stream)
+{
+  if ((stream->cur_bit & 7) != 0) {
+    kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 }
 

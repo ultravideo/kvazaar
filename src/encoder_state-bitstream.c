@@ -28,21 +28,17 @@
 #include "nal.h"
 
 
-static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state_t * const state)
-{
-  bitstream_t * const stream = &state->stream;
-  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
-                   : state->global->slicetype == SLICE_P ? 1
-                   :                                             2;
-  WRITE_U(stream, pic_type, 3, "pic_type");
-}
-
 static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
 {
   bitstream_t * const stream = &state->stream;
-  encoder_state_write_bitstream_access_unit_delimiter(state);
   kvz_nal_write(stream, AUD_NUT, 0, 1);
-  kvz_bitstream_align(stream);
+
+  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
+                   : state->global->slicetype == SLICE_P ? 1
+                   :                                       2;
+  WRITE_U(stream, pic_type, 3, "pic_type");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
@@ -119,6 +115,8 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
   //END IF
 
   WRITE_U(stream, 0, 1, "vps_extension_flag");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const state)
@@ -382,6 +380,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   encoder_state_write_bitstream_VUI(state);
 
   WRITE_U(stream, 0, 1, "sps_extension_flag");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const state)
@@ -463,6 +463,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * co
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(stream, 0, 1, "pps_extension_flag");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const state)
@@ -509,6 +511,9 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   for (i = 0; i < length; i++)
     WRITE_U(stream, ((uint8_t *)buf)[i], 8, "sei_payload");
 
+  // The bitstream is already aligned, but align it anyway.
+  kvz_bitstream_align(stream);
+
 #undef STR_BUF_LEN
 }
 
@@ -543,7 +548,7 @@ static void encoder_state_write_active_parameter_sets_sei_message(encoder_state_
   WRITE_UE(stream, layer_sps_idx, "layer_sps_idx");
   //}
 
-  kvz_bitstream_align(stream); //rbsp_trailing_bits
+  kvz_bitstream_rbsp_trailing_bits(stream); //rbsp_trailing_bits
 }
 */
 
@@ -581,7 +586,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
     WRITE_U(stream, source_scan_type, 2, "source_scan_type");
     WRITE_U(stream, 0, 1, "duplicate_flag");
 
-    kvz_bitstream_align(stream); //rbsp_trailing_bits
+    kvz_bitstream_align(stream);
   }
 }
 
@@ -803,6 +808,9 @@ static void add_checksum(encoder_state_t * const state)
   }
 
   kvz_bitstream_align(stream);
+
+  // spec:sei_rbsp() rbsp_trailing_bits
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 /**
@@ -839,24 +847,23 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     // Video Parameter Set (VPS)
     kvz_nal_write(stream, NAL_VPS_NUT, 0, 1);
     encoder_state_write_bitstream_vid_parameter_set(state);
-    kvz_bitstream_align(stream);
 
     // Sequence Parameter Set (SPS)
     kvz_nal_write(stream, NAL_SPS_NUT, 0, 1);
     encoder_state_write_bitstream_seq_parameter_set(state);
-    kvz_bitstream_align(stream);
 
     // Picture Parameter Set (PPS)
     kvz_nal_write(stream, NAL_PPS_NUT, 0, 1);
     encoder_state_write_bitstream_pic_parameter_set(state);
-    kvz_bitstream_align(stream);
   }
 
   // Send Kvazaar version information only in the first frame.
   if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
     kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
-    kvz_bitstream_align(stream);
+
+    // spec:sei_rbsp() rbsp_trailing_bits
+    kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
   //SEI messages for interlacing
@@ -865,11 +872,13 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     // of HM decoder to accept bitstream
     //kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
     //encoder_state_write_active_parameter_sets_sei_message(state);
-    //kvz_bitstream_align(stream);
+    //kvz_bitstream_rbsp_trailing_bits(stream);
 
-    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_picture_timing_sei_message(state);
-    kvz_bitstream_align(stream);
+
+    // spec:sei_rbsp() rbsp_trailing_bits
+    kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
   {
@@ -945,7 +954,7 @@ static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
 static void encoder_state_write_bitstream_slice(encoder_state_t * const state)
 {
   kvz_encoder_state_write_bitstream_slice_header(state);
-  kvz_bitstream_align(&state->stream);
+  kvz_bitstream_add_rbsp_trailing_bits(&state->stream);
   encoder_state_write_bitstream_children(state);
 }
 
