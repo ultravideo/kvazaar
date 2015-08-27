@@ -874,7 +874,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     //encoder_state_write_active_parameter_sets_sei_message(state);
     //kvz_bitstream_rbsp_trailing_bits(stream);
 
-    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_picture_timing_sei_message(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
