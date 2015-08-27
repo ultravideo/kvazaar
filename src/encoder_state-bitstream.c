@@ -119,6 +119,8 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
   //END IF
 
   WRITE_U(stream, 0, 1, "vps_extension_flag");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const state)
@@ -382,6 +384,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   encoder_state_write_bitstream_VUI(state);
 
   WRITE_U(stream, 0, 1, "sps_extension_flag");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const state)
@@ -463,6 +467,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * co
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(stream, 0, 1, "pps_extension_flag");
+
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
 static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * const state)
@@ -508,6 +514,9 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
 
   for (i = 0; i < length; i++)
     WRITE_U(stream, ((uint8_t *)buf)[i], 8, "sei_payload");
+
+  // The bitstream is already aligned, but align it anyway.
+  kvz_bitstream_align(stream);
 
 #undef STR_BUF_LEN
 }
@@ -842,17 +851,14 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     // Video Parameter Set (VPS)
     kvz_nal_write(stream, NAL_VPS_NUT, 0, 1);
     encoder_state_write_bitstream_vid_parameter_set(state);
-    kvz_bitstream_add_rbsp_trailing_bits(stream);
 
     // Sequence Parameter Set (SPS)
     kvz_nal_write(stream, NAL_SPS_NUT, 0, 1);
     encoder_state_write_bitstream_seq_parameter_set(state);
-    kvz_bitstream_add_rbsp_trailing_bits(stream);
 
     // Picture Parameter Set (PPS)
     kvz_nal_write(stream, NAL_PPS_NUT, 0, 1);
     encoder_state_write_bitstream_pic_parameter_set(state);
-    kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
   // Send Kvazaar version information only in the first frame.
