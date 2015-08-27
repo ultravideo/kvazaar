@@ -28,20 +28,16 @@
 #include "nal.h"
 
 
-static void encoder_state_write_bitstream_access_unit_delimiter(encoder_state_t * const state)
-{
-  bitstream_t * const stream = &state->stream;
-  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
-                   : state->global->slicetype == SLICE_P ? 1
-                   :                                             2;
-  WRITE_U(stream, pic_type, 3, "pic_type");
-}
-
 static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
 {
   bitstream_t * const stream = &state->stream;
-  encoder_state_write_bitstream_access_unit_delimiter(state);
   kvz_nal_write(stream, AUD_NUT, 0, 1);
+
+  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
+                   : state->global->slicetype == SLICE_P ? 1
+                   :                                       2;
+  WRITE_U(stream, pic_type, 3, "pic_type");
+
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
