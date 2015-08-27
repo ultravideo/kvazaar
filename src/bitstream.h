@@ -80,6 +80,7 @@ void kvz_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
                                          kvz_bitstream_put(stream,kvz_g_exp_table[index].value,kvz_g_exp_table[index].len); }
 
 void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t *stream);
+void kvz_bitstream_align(bitstream_t *stream);
 void kvz_bitstream_align_zero(bitstream_t *stream);
 
 /* In debug mode print out some extra info */

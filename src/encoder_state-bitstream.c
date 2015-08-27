@@ -581,7 +581,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
     WRITE_U(stream, source_scan_type, 2, "source_scan_type");
     WRITE_U(stream, 0, 1, "duplicate_flag");
 
-    kvz_bitstream_add_rbsp_trailing_bits(stream); //rbsp_trailing_bits
+    kvz_bitstream_align(stream);
   }
 }
 
@@ -802,6 +802,9 @@ static void add_checksum(encoder_state_t * const state)
     CHECKPOINT("checksum[%d] = %u", i, checksum_val);
   }
 
+  kvz_bitstream_align(stream);
+
+  // spec:sei_rbsp() rbsp_trailing_bits
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
@@ -856,6 +859,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
     kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
+
+    // spec:sei_rbsp() rbsp_trailing_bits
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
@@ -869,6 +874,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
     kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
     encoder_state_write_picture_timing_sei_message(state);
+
+    // spec:sei_rbsp() rbsp_trailing_bits
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
