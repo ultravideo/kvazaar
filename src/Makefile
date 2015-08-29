@@ -259,7 +259,7 @@ $(PROG): $(MAIN_OBJS) $(STATIC)
 
 $(STATIC): $(OBJS)
 	$(RM) $@
-	$(AR) rcD $@ $^
+	$(AR) rc $@ $^
 	$(RANLIB) $@
 
 $(LIB) $(DLL) $(DYLIB): $(SHARED_OBJS)
