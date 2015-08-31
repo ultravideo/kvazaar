@@ -395,15 +395,12 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_p
  * \param cu coding unit to clear
  */
 static void inter_clear_cu_unused(cu_info_t* cu) {
-  if(!(cu->inter.mv_dir & 1)) {
-    cu->inter.mv[0][0] = 0;
-    cu->inter.mv[0][1] = 0;
-    cu->inter.mv_ref[0] = 255;
-  }
-  if(!(cu->inter.mv_dir & 2)) {
-    cu->inter.mv[1][0] = 0;
-    cu->inter.mv[1][1] = 0;
-    cu->inter.mv_ref[1] = 255;
+  for (unsigned i = 0; i < 2; ++i) {
+    if (cu->inter.mv_dir & (1 << i)) continue;
+
+    cu->inter.mv[i][0] = 0;
+    cu->inter.mv[i][1] = 0;
+    cu->inter.mv_ref[i] = 255;
   }
 }
 
