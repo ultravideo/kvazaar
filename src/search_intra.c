@@ -155,7 +155,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     kvz_pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
     kvz_pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
   } nosplit_pixels;
-  cu_cbf_t nosplit_cbf;
+  cu_cbf_t nosplit_cbf = { .y = 0, .u = 0, .v = 0 };
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
@@ -516,7 +516,6 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
 
-  kvz_pixel pred[LCU_WIDTH * LCU_WIDTH + 1];
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
   int rdo_mode;
   int pred_mode;
@@ -559,8 +558,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   for(rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
     costs[rdo_mode] = rdo_bitcost * (int)(state->global->cur_lambda_cost + 0.5);
-
-    if (0 && width != 4 && tr_depth == depth) {
+#if 0
+    if (width != 4 && tr_depth == depth) {
       // This code path has been disabled for now because it increases bdrate
       // by 1-2 %. Possibly due to not taking chroma into account during luma
       // mode search. Enabling separate chroma search compensates a little,
@@ -571,7 +570,9 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
       // where transform split or transform skip don't need to be handled.
       kvz_intra_get_pred(state->encoder_control, rec, recf, recstride, pred, width, modes[rdo_mode], 0);
       costs[rdo_mode] += kvz_rdo_cost_intra(state, pred, orig_block, width, modes[rdo_mode], width == 4 ? 1 : 0);
-    } else {
+    } else 
+#endif
+	{
       // Perform transform split search and save mode RD cost for the best one.
       cu_info_t pred_cu;
       pred_cu.depth = depth;

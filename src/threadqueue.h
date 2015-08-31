@@ -124,8 +124,8 @@ int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, con
 #define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) do {if (_DEBUG & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}}} while (0) \
 
 #else
-#define PERFORMANCE_MEASURE_START(mask) do {} while (0)
-#define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) do {} while (0)
+#define PERFORMANCE_MEASURE_START(mask) 
+#define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) 
 #endif
 
 /* Constraints: 

@@ -155,10 +155,10 @@ int yuv_io_seek(FILE* file, unsigned frames,
                 unsigned input_width, unsigned input_height)
 {
     const size_t frame_bytes = input_width * input_height * 3 / 2;
-    const size_t skip_bytes = frames * frame_bytes;
+    const int64_t skip_bytes = (int64_t)(frames * frame_bytes);
 
     // Attempt to seek normally.
-    int error = fseek(file, skip_bytes, SEEK_CUR);
+    size_t error = fseek(file, skip_bytes, SEEK_CUR);
     if (!error) return 1;
 
     // Seek failed. Skip data by reading.

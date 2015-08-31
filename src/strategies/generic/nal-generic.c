@@ -42,9 +42,9 @@ static void array_checksum_generic(const kvz_pixel* data,
     for (x = 0; x < width; ++x) {
       const uint8_t mask = (uint8_t)((x & 0xff) ^ (y & 0xff) ^ (x >> 8) ^ (y >> 8));
       checksum += (data[(y * stride) + x] & 0xff) ^ mask;
-      if(bitdepth > 8) {
-        checksum += ((data[(y * stride) + x]>>8) & 0xff) ^ mask;
-      }
+#if KVZ_BIT_DEPTH > 8
+      checksum += ((data[(y * stride) + x] >> 8) & 0xff) ^ mask;
+#endif
     }
   }
 

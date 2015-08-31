@@ -95,10 +95,10 @@ extern int g_ckpt_record; //Do we record?
 #endif
 
 #if !defined(CHECKPOINTS)
-#define CHECKPOINTS_INIT() do {} while (0)
-#define CHECKPOINTS_FINALIZE() do {} while (0)
-#define CHECKPOINT_MARK(str, ...) do {} while (0)
-#define CHECKPOINT(str, ...) do {} while (0)
+#define CHECKPOINTS_INIT() 
+#define CHECKPOINTS_FINALIZE() 
+#define CHECKPOINT_MARK(str, ...) 
+#define CHECKPOINT(str, ...) 
 #endif
 
 
