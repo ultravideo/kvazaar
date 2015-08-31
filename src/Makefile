@@ -243,8 +243,9 @@ TEST_OBJS := \
   $(TESTDIR)/sad_tests.o \
   $(TESTDIR)/satd_tests.o \
   $(TESTDIR)/speed_tests.o \
-  $(TESTDIR)/tests_main.o \
-  $(TESTDIR)/test_strategies.o
+  $(TESTDIR)/test_strategies.o \
+  $(TESTDIR)/mv_cand_tests.o \
+  $(TESTDIR)/tests_main.o
 
 MAIN_OBJS := \
     encmain.o \
