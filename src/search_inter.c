@@ -995,7 +995,7 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
   orig.y = y_cu * CU_MIN_SIZE_PIXELS;
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = ref_idx;
-  kvz_inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, ref_list);
+  kvz_inter_get_mv_cand(state, x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, mv_cand, cur_cu, lcu, ref_list);
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
 
@@ -1244,7 +1244,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
             // Each motion vector has its own candidate
             for (int reflist = 0; reflist < 2; reflist++) {
               cu_mv_cand = 0;
-              kvz_inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, reflist);
+              kvz_inter_get_mv_cand(state, x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, mv_cand, cur_cu, lcu, reflist);
               if ((mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
                 vector2d_t mvd_temp1, mvd_temp2;
                 int cand1_cost, cand2_cost;

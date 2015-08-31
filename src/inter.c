@@ -409,17 +409,29 @@ static void inter_clear_cu_unused(cu_info_t* cu) {
  * \param encoder encoder control struct to use
  * \param x_cu block x position in SCU
  * \param y_cu block y position in SCU
- * \param depth current block depth
+ * \param width current block width
+ * \param height current block height
  * \param b0 candidate b0
  * \param b1 candidate b1
  * \param b2 candidate b2
  * \param a0 candidate a0
  * \param a1 candidate a1
  */
-void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
-                                        cu_info_t **b2,cu_info_t **a0,cu_info_t **a1, lcu_t *lcu)
+void kvz_inter_get_spatial_merge_candidates(int32_t x,
+                                            int32_t y,
+                                            int32_t width,
+                                            int32_t height,
+                                            cu_info_t **b0,
+                                            cu_info_t **b1,
+                                            cu_info_t **b2,
+                                            cu_info_t **a0,
+                                            cu_info_t **a1,
+                                            lcu_t *lcu)
 {
-  uint8_t cur_block_in_scu = (LCU_WIDTH>>depth) / CU_MIN_SIZE_PIXELS; //!< the width of the current block on SCU
+  // the width and height of the current block on SCU
+  uint8_t width_in_scu = width / CU_MIN_SIZE_PIXELS;
+  uint8_t height_in_scu = height / CU_MIN_SIZE_PIXELS;
+
   /*
   Predictor block locations
   ____      _______
@@ -434,12 +446,12 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
   int32_t y_cu = SUB_SCU(y) >> MAX_DEPTH;
   // A0 and A1 availability testing
   if (x != 0) {
-    *a1 = LCU_GET_CU(lcu, x_cu - 1, y_cu + cur_block_in_scu - 1);
+    *a1 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu - 1);
     if (!(*a1)->coded) *a1 = NULL;
     if(*a1) inter_clear_cu_unused(*a1);
 
-    if (y_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *a0 = LCU_GET_CU(lcu, x_cu - 1, y_cu + cur_block_in_scu);
+    if (y_cu + height_in_scu < LCU_WIDTH>>3) {
+      *a0 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu);
       if (!(*a0)->coded) *a0 = NULL;
     }
     if(*a0) inter_clear_cu_unused(*a0);
@@ -447,8 +459,8 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
 
   // B0, B1 and B2 availability testing
   if (y != 0) {
-    if (x_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *b0 = LCU_GET_CU(lcu, x_cu + cur_block_in_scu, y_cu - 1);
+    if (x_cu + width_in_scu < LCU_WIDTH>>3) {
+      *b0 = LCU_GET_CU(lcu, x_cu + width_in_scu, y_cu - 1);
       if (!(*b0)->coded) *b0 = NULL;
     } else if(y_cu == 0) {
       // Special case, top-right CU
@@ -457,7 +469,7 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
     }
     if(*b0) inter_clear_cu_unused(*b0);
 
-    *b1 = LCU_GET_CU(lcu, x_cu + cur_block_in_scu - 1, y_cu - 1);
+    *b1 = LCU_GET_CU(lcu, x_cu + width_in_scu - 1, y_cu - 1);
     if (!(*b1)->coded) *b1 = NULL;
     if(*b1) inter_clear_cu_unused(*b1);
 
@@ -474,10 +486,19 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
  * \param encoder encoder control struct to use
  * \param x_cu block x position in SCU
  * \param y_cu block y position in SCU
- * \param depth current block depth
- * \param mv_pred[2][2] 2x motion vector prediction
+ * \param width current block width
+ * \param height current block height
+ * \param mv_cand[2][2] return the motion vector candidates
  */
-void kvz_inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu, int8_t reflist)
+void kvz_inter_get_mv_cand(const encoder_state_t * const state,
+                           int32_t x,
+                           int32_t y,
+                           int32_t width,
+                           int32_t height,
+                           int16_t mv_cand[2][2],
+                           cu_info_t* cur_cu,
+                           lcu_t *lcu,
+                           int8_t reflist)
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
@@ -485,7 +506,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state, int32_t x, int32
 
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  kvz_inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
+  kvz_inter_get_spatial_merge_candidates(x, y, width, height, &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
@@ -666,7 +687,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  kvz_inter_get_spatial_merge_candidates(x, y, depth, &b0, &b1, &b2, &a0, &a1, lcu);
+  kvz_inter_get_spatial_merge_candidates(x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
