@@ -173,7 +173,7 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
 void kvz_lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
-  const vector2d_t lcu_cu = { (x_px & (LCU_WIDTH - 1)) / 8, (y_px & (LCU_WIDTH - 1)) / 8 };
+  const vector2d_t lcu_cu = { SUB_SCU(x_px) / 8, SUB_SCU(y_px) / 8 };
   cu_info_t *const cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
   int x, y;
 
@@ -467,7 +467,7 @@ static double calc_mode_bits(const encoder_state_t *state,
 
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
-  vector2d_t lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
+  vector2d_t lcu_cu = { SUB_SCU(x) / 8, SUB_SCU(y) / 8 };
   const cu_info_t *cu_array = LCU_GET_CU(lcu, 0, 0);
   bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) + lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
   bool condL = y >= 8 && cu_array[lcu_cu.x + (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
@@ -494,7 +494,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
   lcu_t *const lcu = &work_tree[depth];
 
-  int x_local = (x&0x3f), y_local = (y&0x3f);
+  int x_local = SUB_SCU(x);
+  int y_local = SUB_SCU(y);
 #ifdef KVZ_DEBUG
   int debug_split = 0;
 #endif

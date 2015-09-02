@@ -145,7 +145,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
 
   const int offset = width / 2;
-  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
@@ -609,7 +609,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
 
   if (reconstruct_chroma) {
-    const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+    const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
     cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
     struct {
@@ -645,7 +645,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
 
   cu_info_t *cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
@@ -709,7 +709,7 @@ double kvz_search_cu_intra(encoder_state_t * const state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;

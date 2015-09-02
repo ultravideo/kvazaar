@@ -485,7 +485,7 @@ void kvz_intra_recon_lcu_luma(
   cu_info_t *cur_cu,
   lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
@@ -537,7 +537,7 @@ void kvz_intra_recon_lcu_chroma(
   cu_info_t *cur_cu,
   lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 

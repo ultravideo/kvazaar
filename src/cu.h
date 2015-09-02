@@ -106,10 +106,15 @@ typedef struct {
 
 cu_array_t * kvz_cu_array_alloc(int width_in_scu, int height_in_scu);
 int kvz_cu_array_free(cu_array_t *cua);
-  
 
-#define SUB_SCU_BIT_MASK (64 - 1)
-#define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
+/**
+ * \brief Return the 7 lowest-order bits of the pixel coordinate.
+ *
+ * The 7 lower-order bits correspond to the distance from the left or top edge
+ * of the containing LCU.
+ */
+#define SUB_SCU(xy) ((xy) & (LCU_WIDTH - 1))
+
 #define LCU_CU_WIDTH 8
 #define LCU_T_CU_WIDTH 9
 #define LCU_CU_OFFSET 10

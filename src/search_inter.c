@@ -959,7 +959,8 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 {
   const videoframe_t * const frame = state->tile->frame;
   uint32_t ref_idx = 0;
-  int x_local = (x&0x3f), y_local = (y&0x3f);
+  int x_local = SUB_SCU(x);
+  int y_local = SUB_SCU(y);
   int x_cu = x>>3;
   int y_cu = y>>3;
   cu_info_t *cur_cu = LCU_GET_CU(lcu, x_local >> 3, y_local >> 3);
@@ -1153,7 +1154,8 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
           for (int ypos = 0; ypos < LCU_WIDTH >> depth; ++ypos) {
             int dst_y = ypos*(LCU_WIDTH >> depth);
             for (int xpos = 0; xpos < (LCU_WIDTH >> depth); ++xpos) {
-              tmp_block[dst_y + xpos] = templcu->rec.y[((y + ypos)&(LCU_WIDTH - 1))*LCU_WIDTH + ((x + xpos)&(LCU_WIDTH - 1))];              
+              tmp_block[dst_y + xpos] = templcu->rec.y[
+                SUB_SCU(y + ypos) * LCU_WIDTH + SUB_SCU(x + xpos)];
               tmp_pic[dst_y + xpos] = frame->source->y[x + xpos + (y + ypos)*frame->source->width];
             }
           }
