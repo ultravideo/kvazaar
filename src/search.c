@@ -468,8 +468,8 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
   vector2d_t lcu_cu = { (x & 0x3f) / 8, (y & 0x3f) / 8 };
   const cu_info_t *cu_array = &(lcu)->cu[LCU_CU_OFFSET];
-  bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) * lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
-  bool condL = y >= 8 && cu_array[lcu_cu.x * (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
+  bool condA = x >= 8 && cu_array[(lcu_cu.x - 1) + lcu_cu.y * LCU_T_CU_WIDTH].depth > depth;
+  bool condL = y >= 8 && cu_array[lcu_cu.x + (lcu_cu.y - 1) * LCU_T_CU_WIDTH].depth > depth;
   return condA + condL;
 }
 
