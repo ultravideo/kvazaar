@@ -432,15 +432,14 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
   */
   int32_t x_cu = SUB_SCU(x) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
   int32_t y_cu = SUB_SCU(y) >> MAX_DEPTH;
-  cu_info_t* cu = LCU_GET_CU(lcu, 0, 0);
   // A0 and A1 availability testing
   if (x != 0) {
-    *a1 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu - 1) * LCU_T_CU_WIDTH];
+    *a1 = LCU_GET_CU(lcu, x_cu - 1, y_cu + cur_block_in_scu - 1);
     if (!(*a1)->coded) *a1 = NULL;
     if(*a1) inter_clear_cu_unused(*a1);
 
     if (y_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *a0 = &cu[x_cu - 1 + (y_cu + cur_block_in_scu) * LCU_T_CU_WIDTH];
+      *a0 = LCU_GET_CU(lcu, x_cu - 1, y_cu + cur_block_in_scu);
       if (!(*a0)->coded) *a0 = NULL;
     }
     if(*a0) inter_clear_cu_unused(*a0);
@@ -449,21 +448,21 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, 
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x_cu + cur_block_in_scu < LCU_WIDTH>>3) {
-      *b0 = &cu[x_cu + cur_block_in_scu + (y_cu - 1) * LCU_T_CU_WIDTH];
+      *b0 = LCU_GET_CU(lcu, x_cu + cur_block_in_scu, y_cu - 1);
       if (!(*b0)->coded) *b0 = NULL;
     } else if(y_cu == 0) {
-      // Special case, top-right cu from LCU is the last in lcu->cu array
-      *b0 = &lcu->cu[LCU_T_CU_WIDTH*LCU_T_CU_WIDTH];
+      // Special case, top-right CU
+      *b0 = LCU_GET_TOP_RIGHT_CU(lcu);
       if (!(*b0)->coded) *b0 = NULL;
     }
     if(*b0) inter_clear_cu_unused(*b0);
 
-    *b1 = &cu[x_cu + cur_block_in_scu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
+    *b1 = LCU_GET_CU(lcu, x_cu + cur_block_in_scu - 1, y_cu - 1);
     if (!(*b1)->coded) *b1 = NULL;
     if(*b1) inter_clear_cu_unused(*b1);
 
     if (x != 0) {
-      *b2 = &cu[x_cu - 1 + (y_cu - 1) * LCU_T_CU_WIDTH];
+      *b2 = LCU_GET_CU(lcu, x_cu - 1, y_cu - 1);
       if(!(*b2)->coded) *b2 = NULL;
     }
     if(*b2) inter_clear_cu_unused(*b2);
