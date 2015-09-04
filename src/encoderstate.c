@@ -977,6 +977,26 @@ void kvz_encoder_next_frame(encoder_state_t *state)
   state->prepared = 1;
 }
 
+static void encode_part_mode(cabac_data_t * const cabac,
+                             const cu_info_t * const cur_cu,
+                             int depth)
+{
+  if (cur_cu->type == CU_INTRA) {
+    if (depth == MAX_DEPTH) {
+      cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
+      if (cur_cu->part_size == SIZE_2Nx2N) {
+        CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
+      } else {
+        CABAC_BIN(cabac, 0, "part_mode NxN");
+      }
+    }
+  } else {
+    // TODO: Handle inter sizes other than 2Nx2N
+    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
+    CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
+  }
+}
+
 static void encode_inter_prediction_unit(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const cu_info_t * const cur_cu,
@@ -1213,22 +1233,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // part_mode
-  if (cur_cu->type == CU_INTRA) {
-    if (depth == MAX_DEPTH) {
-      cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-      if (cur_cu->part_size == SIZE_2Nx2N) {
-        CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
-      } else {
-        CABAC_BIN(cabac, 0, "part_mode NxN");
-      }
-    }
-  } else {
-    // TODO: Handle inter sizes other than 2Nx2N
-    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-    CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
-  }
+  encode_part_mode(cabac, cur_cu, depth);
 
-  //end partsize
   if (cur_cu->type == CU_INTER) {
     // FOR each part
     encode_inter_prediction_unit(state, cabac, cur_cu, x_ctb, y_ctb, depth);
