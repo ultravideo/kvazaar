@@ -977,6 +977,137 @@ void kvz_encoder_next_frame(encoder_state_t *state)
   state->prepared = 1;
 }
 
+static void encode_inter_prediction_unit(encoder_state_t * const state,
+                                         cabac_data_t * const cabac,
+                                         const cu_info_t * const cur_cu,
+                                         int x_ctb, int y_ctb, int depth)
+{
+  // Mergeflag
+  int16_t num_cand = 0;
+  cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
+  CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
+  num_cand = MRG_MAX_NUM_CANDS;
+  if (cur_cu->merged) { //merge
+    if (num_cand > 1) {
+      int32_t ui;
+      for (ui = 0; ui < num_cand - 1; ui++) {
+        int32_t symbol = (ui != cur_cu->merge_idx);
+        if (ui == 0) {
+          cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
+          CABAC_BIN(cabac, symbol, "MergeIndex");
+        } else {
+          CABAC_BIN_EP(cabac,symbol,"MergeIndex");
+        }
+        if (symbol == 0) break;
+      }
+    }
+  } else {
+    uint32_t ref_list_idx;
+    uint32_t j;
+    int ref_list[2] = { 0, 0 };
+    for (j = 0; j < state->global->ref->used_size; j++) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
+        ref_list[0]++;
+      } else {
+        ref_list[1]++;
+      }
+    }
+
+    // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
+    if (state->global->slicetype == KVZ_SLICE_B)
+    {
+      // Code Inter Dir
+      uint8_t inter_dir = cur_cu->inter.mv_dir-1;
+      uint8_t ctx = depth;
+      
+
+      if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8)
+      {
+        cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
+        CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
+      }
+      if (inter_dir < 2)
+      {
+        cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
+        CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
+      }
+    }
+
+    for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
+      if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
+        if (ref_list[ref_list_idx] > 1) {
+          // parseRefFrmIdx
+          int32_t ref_frame = cur_cu->inter.mv_ref_coded[ref_list_idx];
+
+          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
+          CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+
+          if (ref_frame > 0) {
+            int32_t i;
+            int32_t ref_num = ref_list[ref_list_idx] - 2;
+
+            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+            ref_frame--;
+
+            for (i = 0; i < ref_num; ++i) {
+              const uint32_t symbol = (i == ref_frame) ? 0 : 1;
+
+              if (i == 0) {
+                CABAC_BIN(cabac, symbol, "ref_idx_lX");
+              } else {
+                CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+              }
+              if (symbol == 0) break;
+            }
+          }
+        }
+
+        if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
+          const int32_t mvd_hor = cur_cu->inter.mvd[ref_list_idx][0];
+          const int32_t mvd_ver = cur_cu->inter.mvd[ref_list_idx][1];
+          const int8_t hor_abs_gr0 = mvd_hor != 0;
+          const int8_t ver_abs_gr0 = mvd_ver != 0;
+          const uint32_t mvd_hor_abs = abs(mvd_hor);
+          const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
+          CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+          CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+
+          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
+
+          if (hor_abs_gr0) {
+            CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
+          }
+
+          if (ver_abs_gr0) {
+            CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
+          }
+
+          if (hor_abs_gr0) {
+            if (mvd_hor_abs > 1) {
+              kvz_cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
+            }
+
+            CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
+          }
+
+          if (ver_abs_gr0) {
+            if (mvd_ver_abs > 1) {
+              kvz_cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
+            }
+
+            CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
+          }
+        }
+
+        // Signal which candidate MV to use
+        kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
+                                    AMVP_MAX_NUM_CANDS - 1);
+      }
+    } // for ref_list
+  } // if !merge
+}
 
 void kvz_encode_coding_tree(encoder_state_t * const state,
                         uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
@@ -1100,131 +1231,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   //end partsize
   if (cur_cu->type == CU_INTER) {
     // FOR each part
-    // Mergeflag
-    int16_t num_cand = 0;
-    cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
-    CABAC_BIN(cabac, cur_cu->merged, "MergeFlag");
-    num_cand = MRG_MAX_NUM_CANDS;
-    if (cur_cu->merged) { //merge
-      if (num_cand > 1) {
-        int32_t ui;
-        for (ui = 0; ui < num_cand - 1; ui++) {
-          int32_t symbol = (ui != cur_cu->merge_idx);
-          if (ui == 0) {
-            cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
-            CABAC_BIN(cabac, symbol, "MergeIndex");
-          } else {
-            CABAC_BIN_EP(cabac,symbol,"MergeIndex");
-          }
-          if (symbol == 0) break;
-        }
-      }
-    } else {
-      uint32_t ref_list_idx;
-      uint32_t j;
-      int ref_list[2] = { 0, 0 };
-      for (j = 0; j < state->global->ref->used_size; j++) {
-        if (state->global->ref->pocs[j] < state->global->poc) {
-          ref_list[0]++;
-        } else {
-          ref_list[1]++;
-        }
-      }
-
-      // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-      if (state->global->slicetype == KVZ_SLICE_B)
-      {
-        // Code Inter Dir
-        uint8_t inter_dir = cur_cu->inter.mv_dir-1;
-        uint8_t ctx = depth;
-        
-
-        if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8)
-        {
-          cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
-          CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
-        }
-        if (inter_dir < 2)
-        {
-          cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
-          CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
-        }
-      }
-
-      for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
-        if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
-          if (ref_list[ref_list_idx] > 1) {
-            // parseRefFrmIdx
-            int32_t ref_frame = cur_cu->inter.mv_ref_coded[ref_list_idx];
-
-            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
-            CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
-
-            if (ref_frame > 0) {
-              int32_t i;
-              int32_t ref_num = ref_list[ref_list_idx] - 2;
-
-              cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
-              ref_frame--;
-
-              for (i = 0; i < ref_num; ++i) {
-                const uint32_t symbol = (i == ref_frame) ? 0 : 1;
-
-                if (i == 0) {
-                  CABAC_BIN(cabac, symbol, "ref_idx_lX");
-                } else {
-                  CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
-                }
-                if (symbol == 0) break;
-              }
-            }
-          }
-
-          if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-            const int32_t mvd_hor = cur_cu->inter.mvd[ref_list_idx][0];
-            const int32_t mvd_ver = cur_cu->inter.mvd[ref_list_idx][1];
-            const int8_t hor_abs_gr0 = mvd_hor != 0;
-            const int8_t ver_abs_gr0 = mvd_ver != 0;
-            const uint32_t mvd_hor_abs = abs(mvd_hor);
-            const uint32_t mvd_ver_abs = abs(mvd_ver);
-
-            cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
-            CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
-            CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
-
-            cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
-
-            if (hor_abs_gr0) {
-              CABAC_BIN(cabac, (mvd_hor_abs>1), "abs_mvd_greater1_flag_hor");
-            }
-
-            if (ver_abs_gr0) {
-              CABAC_BIN(cabac, (mvd_ver_abs>1), "abs_mvd_greater1_flag_ver");
-            }
-
-            if (hor_abs_gr0) {
-              if (mvd_hor_abs > 1) {
-                kvz_cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
-              }
-
-              CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
-            }
-
-            if (ver_abs_gr0) {
-              if (mvd_ver_abs > 1) {
-                kvz_cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
-              }
-
-              CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
-            }
-          }
-
-          // Signal which candidate MV to use
-          kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
-                                      AMVP_MAX_NUM_CANDS - 1);
-        }
-      } // for ref_list
-    } // if !merge
+    encode_inter_prediction_unit(state, cabac, cur_cu, x_ctb, y_ctb, depth);
+    // END for each part
 
     {
       int cbf = (cbf_is_set(cur_cu->cbf.y, depth) ||
@@ -1243,8 +1251,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
         kvz_encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
       }
     }
-
-    // END for each part
   } else if (cur_cu->type == CU_INTRA) {
     uint8_t intra_pred_mode[4] = {
       cur_cu->intra[0].mode, cur_cu->intra[1].mode,
