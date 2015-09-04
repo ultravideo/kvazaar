@@ -991,9 +991,20 @@ static void encode_part_mode(cabac_data_t * const cabac,
       }
     }
   } else {
-    // TODO: Handle inter sizes other than 2Nx2N
-    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-    CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
+    switch (cur_cu->part_size) {
+      case SIZE_2Nx2N:
+        cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
+        CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
+        break;
+
+      case SIZE_2NxN:
+      case SIZE_Nx2N:
+        cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
+        CABAC_BIN(cabac, 0, "part_mode 2NxN");
+        cabac->cur_ctx = &(cabac->ctx.part_size_model[1]);
+        CABAC_BIN(cabac, (cur_cu->part_size == SIZE_2NxN), "part_mode 2NxN");
+        break;
+    }
   }
 }
 
@@ -1365,9 +1376,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   encode_part_mode(cabac, cur_cu, depth);
 
   if (cur_cu->type == CU_INTER) {
-    // FOR each part
-    encode_inter_prediction_unit(state, cabac, cur_cu, x_ctb, y_ctb, depth);
-    // END for each part
+    const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
+    const int cu_width_scu = LCU_CU_WIDTH >> depth;
+
+    for (int i = 0; i < num_pu; ++i) {
+      const int pu_x_scu = PU_GET_X(cur_cu->part_size, cu_width_scu, x_ctb, i);
+      const int pu_y_scu = PU_GET_Y(cur_cu->part_size, cu_width_scu, y_ctb, i);
+      const cu_info_t *cur_pu = kvz_videoframe_get_cu_const(frame, pu_x_scu, pu_y_scu);
+
+      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x_scu, pu_y_scu, depth);
+    }
 
     {
       int cbf = (cbf_is_set(cur_cu->cbf.y, depth) ||
@@ -1376,7 +1394,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
       // Only need to signal coded block flag if not skipped or merged
       // skip = no coded residual, merge = coded residual
-      if (!cur_cu->merged) {
+      if (cur_cu->part_size != SIZE_2Nx2N || !cur_cu->merged) {
         cabac->cur_ctx = &(cabac->ctx.cu_qt_root_cbf_model);
         CABAC_BIN(cabac, cbf, "rqt_root_cbf");
       }
