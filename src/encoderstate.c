@@ -946,18 +946,16 @@ int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_
 
 void kvz_encoder_compute_stats(encoder_state_t *state, double frame_psnr[3])
 {
-  const encoder_control_t * const encoder = state->encoder_control;
-
-  //Blocking call
-  kvz_threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
+  assert(state->frame_done);
   kvz_videoframe_compute_psnr(state->tile->frame, frame_psnr);
 }
 
 void kvz_encoder_next_frame(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  //Blocking call
-  kvz_threadqueue_waitfor(encoder->threadqueue, state->tqj_bitstream_written);
+
+  // The previous frame must be done before the next one is started.
+  assert(state->frame_done);
 
   if (state->global->frame == -1) {
     //We're at the first frame, so don't care about all this stuff;
