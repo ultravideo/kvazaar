@@ -186,6 +186,8 @@ typedef struct kvz_picture {
 
   struct kvz_picture *base_image; //!< \brief Pointer to the picture which owns the pixels
   int32_t refcount;        //!< \brief Number of references to the picture
+
+  int64_t pts;             //!< \brief Presentation timestamp. Should be set for input frames.
 } kvz_picture;
 
 /**

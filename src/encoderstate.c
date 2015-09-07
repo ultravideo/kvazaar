@@ -888,6 +888,7 @@ int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_
   if (cfg->gop_len == 0 || state->global->frame == 0) {
     if (img_in == NULL) return 0;
     state->tile->frame->source = kvz_image_copy_ref(img_in);
+    state->tile->frame->rec->pts = img_in->pts;
     state->global->gop_offset = 0;
     return 1;
   }
@@ -930,6 +931,7 @@ int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_
   assert(gop_buffer[buffer_index] != NULL);
   assert(state->tile->frame->source == NULL);
   state->tile->frame->source = gop_buffer[buffer_index];
+  state->tile->frame->rec->pts = gop_buffer[buffer_index]->pts;
   gop_buffer[buffer_index] = NULL;
 
   state->global->gop_offset = gop_offset;
