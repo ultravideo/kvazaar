@@ -46,8 +46,6 @@ struct kvz_encoder {
 
   unsigned frames_started;
   unsigned frames_done;
-
-  size_t bitstream_length;
 };
 
 #endif // KVAZAAR_INTERNAL_H_
