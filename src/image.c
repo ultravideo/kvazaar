@@ -69,6 +69,7 @@ kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
   im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
 
   im->pts = 0;
+  im->dts = 0;
 
   return im;
 }
@@ -151,6 +152,7 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   im->v = im->data[COLOR_V] = &orig_image->v[x_offset/2 + y_offset/2 * orig_image->stride/2];
 
   im->pts = 0;
+  im->dts = 0;
 
   return im;
 }

@@ -31,19 +31,30 @@ struct encoder_state_t;
 
 typedef struct input_frame_buffer_t {
   /** \brief An array for stroring the input frames. */
-  struct kvz_picture *pic_buffer[2 * KVZ_MAX_GOP_LENGTH];
+  struct kvz_picture *pic_buffer[3 * KVZ_MAX_GOP_LENGTH];
 
-  /** \brief Number of pictures in the buffer. */
-  int pictures_available;
+  /** \brief An array for stroring the timestamps. */
+  int64_t pts_buffer[3 * KVZ_MAX_GOP_LENGTH];
 
-  /** \brief Index where the next input frame is put to. */
-  int write_idx;
+  /** \brief Number of pictures input. */
+  uint64_t num_in;
 
-  /** \brief Index of the first frame of the current GOP. */
-  int read_idx;
+  /** \brief Number of pictures output. */
+  uint64_t num_out;
 
-  /** \brief Number of the next frame in the current GOP. */
-  int gop_offset;
+  /** \brief Value to subtract from the DTS values of the first frames.
+   *
+   * This will be set to the difference of the PTS values of the first and
+   * (cfg->gop_len)th frames, unless the sequence has less that cfg->gop_len
+   * frames.
+   */
+  int64_t delay;
+
+  /** \brief Number of GOP pictures skipped.
+   *
+   * This is used when the last GOP of the sequence is not full.
+   */
+  int gop_skipped;
 
 } input_frame_buffer_t;
 

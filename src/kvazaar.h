@@ -188,6 +188,7 @@ typedef struct kvz_picture {
   int32_t refcount;        //!< \brief Number of references to the picture
 
   int64_t pts;             //!< \brief Presentation timestamp. Should be set for input frames.
+  int64_t dts;             //!< \brief Decompression timestamp.
 } kvz_picture;
 
 /**

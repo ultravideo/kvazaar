@@ -29,10 +29,11 @@
 void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
 {
   FILL(input_buffer->pic_buffer, 0);
-  input_buffer->pictures_available = 0;
-  input_buffer->write_idx = 0;
-  input_buffer->read_idx = 0;
-  input_buffer->gop_offset = 0;
+  FILL(input_buffer->pts_buffer, 0);
+  input_buffer->num_in = 0;
+  input_buffer->num_out = 0;
+  input_buffer->delay = 0;
+  input_buffer->gop_skipped = 0;
 }
 
 /**
@@ -55,69 +56,126 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   const encoder_control_t* const encoder = state->encoder_control;
   const kvz_config* const cfg = encoder->cfg;
 
-  const int gop_buf_size = 2 * cfg->gop_len;
+  const int gop_buf_size = 3 * cfg->gop_len;
 
   assert(state->global->frame >= 0);
-  assert(state->tile->frame->source == NULL);
 
-  if (cfg->gop_len == 0 || state->global->frame == 0) {
+  videoframe_t *frame = state->tile->frame;
+  assert(frame->source == NULL);
+  assert(frame->rec    != NULL);
+
+  if (cfg->gop_len == 0) {
+    // GOP disabled, just return the input frame.
+
     if (img_in == NULL) return 0;
-    state->tile->frame->source = kvz_image_copy_ref(img_in);
-    state->tile->frame->rec->pts = img_in->pts;
+
+    img_in->dts = img_in->pts;
+    frame->source   = kvz_image_copy_ref(img_in);
+    frame->rec->pts = img_in->pts;
+    frame->rec->dts = img_in->dts;
     state->global->gop_offset = 0;
     return 1;
   }
-  // GOP enabled and not the first frame
 
   if (img_in != NULL) {
+    // Index of the next input picture, in range [-1, +inf). Values
+    // i and j refer to the same indices in buf->pic_buffer iff
+    // i === j (mod gop_buf_size).
+    int64_t idx_in = buf->num_in - 1;
+
+    // Index in buf->pic_buffer and buf->pts_buffer.
+    int buf_idx = (idx_in + gop_buf_size) % gop_buf_size;
+
     // Save the input image in the buffer.
-    assert(buf->pictures_available < gop_buf_size);
-    assert(buf->pic_buffer[buf->write_idx] == NULL);
-    buf->pic_buffer[buf->write_idx] = kvz_image_copy_ref(img_in);
+    assert(buf_idx >= 0 && buf_idx < gop_buf_size);
+    assert(buf->pic_buffer[buf_idx] == NULL);
+    buf->pic_buffer[buf_idx] = kvz_image_copy_ref(img_in);
+    buf->pts_buffer[buf_idx] = img_in->pts;
+    buf->num_in++;
 
-    buf->pictures_available++;
-    buf->write_idx++;
-    if (buf->write_idx >= gop_buf_size) {
-      buf->write_idx = 0;
-    }
-  }
-
-  if (buf->pictures_available < cfg->gop_len) {
-    if (img_in != NULL || buf->pictures_available == 0) {
-      // Either start of the sequence with no full GOP available yet, or the
-      // end of the sequence with all pics encoded.
+    if (buf->num_in < cfg->gop_len) {
+      // Not enough frames to start output.
       return 0;
-    }
-    // End of the sequence and a full GOP is not available.
-    // Skip pictures until an available one is found.
-    for (; buf->gop_offset < cfg->gop_len &&
-           cfg->gop[buf->gop_offset].poc_offset - 1 >= buf->pictures_available;
-           buf->gop_offset++) {}
 
-    if (buf->gop_offset >= cfg->gop_len) {
-      // All available pictures used.
-      buf->gop_offset = 0;
-      buf->pictures_available = 0;
-      return 0;
+    } else if (buf->num_in == cfg->gop_len) {
+      // Now we known the PTSs that are needed to compute the delay.
+      buf->delay = buf->pts_buffer[gop_buf_size - 1] - img_in->pts;
     }
   }
 
-  // Move image from buffer to state.
-  int buffer_index = buf->read_idx + cfg->gop[buf->gop_offset].poc_offset - 1;
-  assert(buf->pic_buffer[buffer_index] != NULL);
-  assert(state->tile->frame->source == NULL);
-  state->tile->frame->source = buf->pic_buffer[buffer_index];
-  state->tile->frame->rec->pts = buf->pic_buffer[buffer_index]->pts;
-  buf->pic_buffer[buffer_index] = NULL;
-
-  state->global->gop_offset = buf->gop_offset;
-
-  buf->gop_offset++;
-  if (buf->gop_offset >= cfg->gop_len) {
-    buf->gop_offset = 0;
-    buf->pictures_available = MAX(0, buf->pictures_available - cfg->gop_len);
-    buf->read_idx = (buf->read_idx + cfg->gop_len) % gop_buf_size;
+  if (buf->num_out == buf->num_in) {
+    // All frames returned.
+    return 0;
   }
 
+  if (img_in == NULL && buf->num_in < cfg->gop_len) {
+    // End of the sequence but we have less than a single GOP of frames. Use
+    // the difference between the PTSs of the first and the last frame as the
+    // delay.
+    int first_pic_idx = gop_buf_size - 1;
+    int last_pic_idx  = (buf->num_in - 2 + gop_buf_size) % gop_buf_size;
+    buf->delay = buf->pts_buffer[first_pic_idx] - buf->pts_buffer[last_pic_idx];
+  }
+
+  // Index of the next output picture, in range [-1, +inf). Values
+  // i and j refer to the same indices in buf->pic_buffer iff
+  // i === j (mod gop_buf_size).
+  int64_t idx_out;
+
+  // DTS of the output picture.
+  int64_t dts_out;
+
+  // Number of the next output picture in the GOP.
+  int gop_offset;
+
+  if (buf->num_out == 0) {
+    // Output the first frame.
+    idx_out = -1;
+    dts_out = buf->pts_buffer[gop_buf_size - 1] + buf->delay;
+    gop_offset = 0;
+
+  } else {
+    gop_offset = (buf->num_out - 1) % cfg->gop_len;
+
+    // Index of the first picture in the GOP that is being output.
+    int gop_start_idx = buf->num_out - 1 - gop_offset;
+
+    // Skip pictures until we find an available one.
+    gop_offset += buf->gop_skipped;
+    for (;;) {
+      assert(gop_offset < cfg->gop_len);
+
+      idx_out = gop_start_idx + cfg->gop[gop_offset].poc_offset - 1;
+      if (idx_out < buf->num_in - 1) {
+        // An available picture found.
+        break;
+      }
+      buf->gop_skipped++;
+      gop_offset++;
+    }
+
+    if (buf->num_out < cfg->gop_len - 1) {
+      // This picture needs a DTS that is less than the PTS of the first
+      // frame so the delay must be applied.
+      int dts_idx = buf->num_out - 1;
+      dts_out = buf->pts_buffer[dts_idx % gop_buf_size] + buf->delay;
+    } else {
+      int dts_idx = buf->num_out - (cfg->gop_len - 1);
+      dts_out = buf->pts_buffer[dts_idx % gop_buf_size];
+    }
+  }
+
+  // Index in buf->pic_buffer and buf->pts_buffer.
+  int buf_idx = (idx_out + gop_buf_size) % gop_buf_size;
+
+  assert(buf->pic_buffer[buf_idx] != NULL);
+  frame->source      = buf->pic_buffer[buf_idx];
+  frame->rec->pts    = frame->source->pts;
+  frame->source->dts = dts_out;
+  frame->rec->dts    = dts_out;
+  buf->pic_buffer[buf_idx] = NULL;
+  state->global->gop_offset = gop_offset;
+
+  buf->num_out++;
   return 1;
 }
