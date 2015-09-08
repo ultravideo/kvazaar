@@ -26,6 +26,15 @@
 #include "encoderstate.h"
 #include <assert.h>
 
+void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
+{
+  FILL(input_buffer->pic_buffer, 0);
+  input_buffer->pictures_available = 0;
+  input_buffer->write_idx = 0;
+  input_buffer->read_idx = 0;
+  input_buffer->gop_offset = 0;
+}
+
 /**
  * \brief Pass an input frame to the encoder state.
  *
@@ -34,21 +43,17 @@
  *
  * The caller must not modify img_in after calling this function.
  *
+ * \param buf     an input frame buffer
  * \param state   a main encoder state
  * \param img_in  input frame or NULL
  * \return        1 if the source image was set, 0 if not
  */
-int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_in)
+int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
+                           encoder_state_t *const state,
+                           kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
   const kvz_config* const cfg = encoder->cfg;
-
-  // TODO: Get rid of static variables.
-  static kvz_picture *gop_buffer[2 * KVZ_MAX_GOP_LENGTH] = { NULL };
-  static int gop_buf_write_idx = 0;
-  static int gop_buf_read_idx = 0;
-  static int gop_pictures_available = 0;
-  static int gop_offset = 0;
 
   const int gop_buf_size = 2 * cfg->gop_len;
 
@@ -66,50 +71,52 @@ int kvz_encoder_feed_frame(encoder_state_t *const state, kvz_picture *const img_
 
   if (img_in != NULL) {
     // Save the input image in the buffer.
-    assert(gop_pictures_available < gop_buf_size);
-    assert(gop_buffer[gop_buf_write_idx] == NULL);
-    gop_buffer[gop_buf_write_idx] = kvz_image_copy_ref(img_in);
+    assert(buf->pictures_available < gop_buf_size);
+    assert(buf->pic_buffer[buf->write_idx] == NULL);
+    buf->pic_buffer[buf->write_idx] = kvz_image_copy_ref(img_in);
 
-    ++gop_pictures_available;
-    if (++gop_buf_write_idx >= gop_buf_size) {
-      gop_buf_write_idx = 0;
+    buf->pictures_available++;
+    buf->write_idx++;
+    if (buf->write_idx >= gop_buf_size) {
+      buf->write_idx = 0;
     }
   }
 
-  if (gop_pictures_available < cfg->gop_len) {
-    if (img_in != NULL || gop_pictures_available == 0) {
+  if (buf->pictures_available < cfg->gop_len) {
+    if (img_in != NULL || buf->pictures_available == 0) {
       // Either start of the sequence with no full GOP available yet, or the
       // end of the sequence with all pics encoded.
       return 0;
     }
     // End of the sequence and a full GOP is not available.
     // Skip pictures until an available one is found.
-    for (; gop_offset < cfg->gop_len &&
-           cfg->gop[gop_offset].poc_offset - 1 >= gop_pictures_available;
-           ++gop_offset);
+    for (; buf->gop_offset < cfg->gop_len &&
+           cfg->gop[buf->gop_offset].poc_offset - 1 >= buf->pictures_available;
+           buf->gop_offset++) {}
 
-    if (gop_offset >= cfg->gop_len) {
+    if (buf->gop_offset >= cfg->gop_len) {
       // All available pictures used.
-      gop_offset = 0;
-      gop_pictures_available = 0;
+      buf->gop_offset = 0;
+      buf->pictures_available = 0;
       return 0;
     }
   }
 
   // Move image from buffer to state.
-  int buffer_index = gop_buf_read_idx + cfg->gop[gop_offset].poc_offset - 1;
-  assert(gop_buffer[buffer_index] != NULL);
+  int buffer_index = buf->read_idx + cfg->gop[buf->gop_offset].poc_offset - 1;
+  assert(buf->pic_buffer[buffer_index] != NULL);
   assert(state->tile->frame->source == NULL);
-  state->tile->frame->source = gop_buffer[buffer_index];
-  state->tile->frame->rec->pts = gop_buffer[buffer_index]->pts;
-  gop_buffer[buffer_index] = NULL;
+  state->tile->frame->source = buf->pic_buffer[buffer_index];
+  state->tile->frame->rec->pts = buf->pic_buffer[buffer_index]->pts;
+  buf->pic_buffer[buffer_index] = NULL;
 
-  state->global->gop_offset = gop_offset;
+  state->global->gop_offset = buf->gop_offset;
 
-  if (++gop_offset >= cfg->gop_len) {
-    gop_offset = 0;
-    gop_pictures_available = MAX(0, gop_pictures_available - cfg->gop_len);
-    gop_buf_read_idx = (gop_buf_read_idx + cfg->gop_len) % gop_buf_size;
+  buf->gop_offset++;
+  if (buf->gop_offset >= cfg->gop_len) {
+    buf->gop_offset = 0;
+    buf->pictures_available = MAX(0, buf->pictures_available - cfg->gop_len);
+    buf->read_idx = (buf->read_idx + cfg->gop_len) % gop_buf_size;
   }
 
   return 1;
