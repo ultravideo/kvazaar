@@ -28,6 +28,7 @@
 #include "encoderstate.h"
 #include "checkpoint.h"
 #include "bitstream.h"
+#include "input_frame_buffer.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)
