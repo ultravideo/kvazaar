@@ -246,7 +246,7 @@ void kvz_filter_deblock_edge_luma(encoder_state_t * const state,
         }
         
         // B-slice related checks
-        if(!strength && state->global->slicetype == SLICE_B) {
+        if(!strength && state->global->slicetype == KVZ_SLICE_B) {
 
           // Zero all undefined motion vectors for easier usage
           if(!(cu_q->inter.mv_dir & 1)) {

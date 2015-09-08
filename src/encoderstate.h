@@ -81,7 +81,7 @@ typedef struct {
   
   bool is_idr_frame;
   uint8_t pictype;
-  uint8_t slicetype;
+  enum kvz_slice_type slicetype;
 
   //! Total number of bits written.
   uint64_t total_bits_coded;

@@ -365,7 +365,7 @@ void print_frame_info(encoder_state_t *state, double frame_psnr[3])
           frame_psnr[0], frame_psnr[1], frame_psnr[2]);
 
   // Print reference picture lists
-  if (state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != KVZ_SLICE_I) {
     int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
     // List all pocs of lists
     for (j = 0; j < state->global->ref->used_size; j++) {

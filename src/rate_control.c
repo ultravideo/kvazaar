@@ -160,7 +160,7 @@ double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state)
   const double qp_temp = state->global->QP - 12;
 
   double qp_factor;
-  if (state->global->slicetype == SLICE_I) {
+  if (state->global->slicetype == KVZ_SLICE_I) {
     const double lambda_scale = 1.0 - CLIP(0.0, 0.5, 0.05 * gop_len);
     qp_factor = 0.57 * lambda_scale;
   } else if (gop_len > 0) {

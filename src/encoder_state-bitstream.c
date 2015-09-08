@@ -33,8 +33,8 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
   bitstream_t * const stream = &state->stream;
   kvz_nal_write(stream, AUD_NUT, 0, 1);
 
-  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
-                   : state->global->slicetype == SLICE_P ? 1
+  uint8_t pic_type = state->global->slicetype == KVZ_SLICE_I ? 0
+                   : state->global->slicetype == KVZ_SLICE_P ? 1
                    :                                       2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
@@ -745,10 +745,10 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
   }
 
-  if (state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != KVZ_SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
       WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
-        if (state->global->slicetype == SLICE_B) {
+        if (state->global->slicetype == KVZ_SLICE_B) {
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }

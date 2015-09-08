@@ -147,7 +147,7 @@ void kvz_quant(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_co
   const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
   const int32_t transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size; //!< Represents scaling through forward transform
   const int32_t q_bits = QUANT_SHIFT + qp_scaled/6 + transform_shift;
-  const int32_t add = ((state->global->slicetype == SLICE_I) ? 171 : 85) << (q_bits - 9);
+  const int32_t add = ((state->global->slicetype == KVZ_SLICE_I) ? 171 : 85) << (q_bits - 9);
   const int32_t q_bits8 = q_bits - 8;
 
   uint32_t ac_sum = 0;

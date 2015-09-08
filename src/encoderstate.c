@@ -369,7 +369,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         // once. The added dependancy is for the first LCU of each wavefront
         // row to depend on the reconstruction status of the row below in the
         // previous frame.
-        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && state->global->slicetype != SLICE_I) {
+        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && state->global->slicetype != KVZ_SLICE_I) {
           if (!lcu->left) {
             if (lcu->below) {
               kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
@@ -688,7 +688,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   if (encoder->cfg->gop_len) {
     refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
     check_refs = 1;
-  } else if (state->global->slicetype == SLICE_I) {
+  } else if (state->global->slicetype == KVZ_SLICE_I) {
     refnumber = 0;
   }
   // Remove the ref pic (if present)
@@ -758,14 +758,14 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
    
     if (state->global->is_idr_frame) {
       encoder_state_reset_poc(state);
-      state->global->slicetype = SLICE_I;
+      state->global->slicetype = KVZ_SLICE_I;
       state->global->pictype = NAL_IDR_W_RADL;
     } else {
-      state->global->slicetype = encoder->cfg->intra_period==1 ? SLICE_I : (state->encoder_control->cfg->gop_len?SLICE_B:SLICE_P);
+      state->global->slicetype = encoder->cfg->intra_period==1 ? KVZ_SLICE_I : (state->encoder_control->cfg->gop_len?KVZ_SLICE_B:KVZ_SLICE_P);
       state->global->pictype = NAL_TRAIL_R;
       if (state->encoder_control->cfg->gop_len) {
         if (encoder->cfg->intra_period > 1 && (state->global->poc % encoder->cfg->intra_period) == 0) {
-          state->global->slicetype = SLICE_I;
+          state->global->slicetype = KVZ_SLICE_I;
         }
       }
 
@@ -779,7 +779,7 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
       lambda = kvz_select_picture_lambda(state);
       state->global->QP = kvz_lambda_to_QP(lambda);
     } else {
-      if (encoder->cfg->gop_len > 0 && state->global->slicetype != SLICE_I) {
+      if (encoder->cfg->gop_len > 0 && state->global->slicetype != KVZ_SLICE_I) {
         kvz_gop_config const * const gop =
           encoder->cfg->gop + state->global->gop_offset;
         state->global->QP = encoder->cfg->qp + gop->qp_offset;
@@ -1011,7 +1011,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
 
     // Encode skip flag
-  if (state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != KVZ_SLICE_I) {
     int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
@@ -1050,7 +1050,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   // ENDIF SKIP
 
   // Prediction mode
-  if (state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != KVZ_SLICE_I) {
     cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }
@@ -1106,7 +1106,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       }
 
       // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-      if (state->global->slicetype == SLICE_B)
+      if (state->global->slicetype == KVZ_SLICE_B)
       {
         // Code Inter Dir
         uint8_t inter_dir = cur_cu->inter.mv_dir-1;
