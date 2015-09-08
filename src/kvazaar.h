@@ -191,6 +191,34 @@ typedef struct kvz_picture {
   int64_t dts;             //!< \brief Decompression timestamp.
 } kvz_picture;
 
+enum kvz_slice_type {
+  KVZ_SLICE_B = 0,
+  KVZ_SLICE_P = 1,
+  KVZ_SLICE_I = 2,
+};
+
+/**
+ * \brief Other information about an encoded frame
+ */
+typedef struct kvz_frame_info {
+
+  /**
+   * \brief Picture order count
+   */
+  int32_t poc;
+
+  /**
+   * \brief Quantization parameter
+   */
+  int8_t qp;
+
+  /**
+   * \brief Type of the slice
+   */
+  enum kvz_slice_type slice_type;
+
+} kvz_frame_info;
+
 /**
  * \brief A linked list of chunks of data.
  *
@@ -303,9 +331,9 @@ typedef struct kvz_api {
    * \brief Encode one frame.
    *
    * Add pic_in to the encoding pipeline. If an encoded frame is ready, return
-   * the bitstream, length of the bitstream and the reconstructed frame in
-   * data_out, len_out and pic_out, respectively. Otherwise, set the output
-   * parameters to NULL.
+   * the bitstream, length of the bitstream, the reconstructed frame and frame
+   * info in data_out, len_out, pic_out and info_out, respectively. Otherwise,
+   * set the output parameters to NULL.
    *
    * After passing all of the input frames, the caller should keep calling this
    * function with pic_in set to NULL, until no more data is returned in the
@@ -317,20 +345,22 @@ typedef struct kvz_api {
    * responsible for calling picture_free and chunk_free on them.
    *
    * A null pointer may be passed in place of any of the parameters data_out,
-   * len_out or pic_out to skip returning the corresponding value.
+   * len_out, pic_out or info_out to skip returning the corresponding value.
    *
    * \param encoder   encoder
    * \param pic_in    input frame or NULL
    * \param data_out  Returns the encoded data.
    * \param len_out   Returns number of bytes in the encoded data.
    * \param pic_out   Returns the reconstructed picture.
+   * \param info_out  Returns information about the encoded picture.
    * \return          1 on success, 0 on error.
    */
   int           (*encoder_encode)(kvz_encoder *encoder,
                                   kvz_picture *pic_in,
                                   kvz_data_chunk **data_out,
                                   uint32_t *len_out,
-                                  kvz_picture **pic_out);
+                                  kvz_picture **pic_out,
+                                  kvz_frame_info *info_out);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

@@ -212,7 +212,7 @@ int main(int argc, char *argv[])
       kvz_data_chunk* chunks_out = NULL;
       kvz_picture *img_rec = NULL;
       uint32_t len_out = 0;
-      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, &img_rec)) {
+      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, &img_rec, NULL)) {
         fprintf(stderr, "Failed to encode image.\n");
         api->picture_free(img_in);
         goto exit_failure;

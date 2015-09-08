@@ -216,10 +216,5 @@ typedef int16_t coeff_t;
 
 //Constants
 typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_t;
-enum kvz_slice_type {
-  KVZ_SLICE_B = 0,
-  KVZ_SLICE_P = 1,
-  KVZ_SLICE_I = 2,
-};
 
 #endif
