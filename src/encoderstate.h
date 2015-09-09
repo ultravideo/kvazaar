@@ -206,7 +206,6 @@ typedef struct encoder_state_t {
 
 void kvz_encode_one_frame(encoder_state_t *state);
 
-void kvz_encoder_compute_stats(encoder_state_t *state, double psnr[3]);
 void kvz_encoder_next_frame(encoder_state_t *state);
 
 

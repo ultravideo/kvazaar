@@ -889,12 +889,6 @@ void kvz_encode_one_frame(encoder_state_t * const state)
 }
 
 
-void kvz_encoder_compute_stats(encoder_state_t *state, double frame_psnr[3])
-{
-  assert(state->frame_done);
-  kvz_videoframe_compute_psnr(state->tile->frame, frame_psnr);
-}
-
 void kvz_encoder_next_frame(encoder_state_t *state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
