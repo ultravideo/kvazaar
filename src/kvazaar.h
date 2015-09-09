@@ -344,9 +344,9 @@ typedef struct kvz_api {
    * \brief Encode one frame.
    *
    * Add pic_in to the encoding pipeline. If an encoded frame is ready, return
-   * the bitstream, length of the bitstream, the reconstructed frame and frame
-   * info in data_out, len_out, pic_out and info_out, respectively. Otherwise,
-   * set the output parameters to NULL.
+   * the bitstream, length of the bitstream, the reconstructed frame, the
+   * original frame and frame info in data_out, len_out, pic_out, src_out and
+   * info_out, respectively. Otherwise, set the output parameters to NULL.
    *
    * After passing all of the input frames, the caller should keep calling this
    * function with pic_in set to NULL, until no more data is returned in the
@@ -354,17 +354,19 @@ typedef struct kvz_api {
    *
    * The caller must not modify pic_in after passing it to this function.
    *
-   * If pic_out and data_out are set to non-NULL values, the caller is
-   * responsible for calling picture_free and chunk_free on them.
+   * If data_out, pic_out and src_out are set to non-NULL values, the caller is
+   * responsible for calling chunk_free and picture_free on them.
    *
    * A null pointer may be passed in place of any of the parameters data_out,
-   * len_out, pic_out or info_out to skip returning the corresponding value.
+   * len_out, pic_out, src_out or info_out to skip returning the corresponding
+   * value.
    *
    * \param encoder   encoder
    * \param pic_in    input frame or NULL
    * \param data_out  Returns the encoded data.
    * \param len_out   Returns number of bytes in the encoded data.
    * \param pic_out   Returns the reconstructed picture.
+   * \param src_out   Returns the original picture.
    * \param info_out  Returns information about the encoded picture.
    * \return          1 on success, 0 on error.
    */
@@ -373,6 +375,7 @@ typedef struct kvz_api {
                                   kvz_data_chunk **data_out,
                                   uint32_t *len_out,
                                   kvz_picture **pic_out,
+                                  kvz_picture **src_out,
                                   kvz_frame_info *info_out);
 } kvz_api;
 

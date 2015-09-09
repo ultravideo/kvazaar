@@ -21,6 +21,6 @@
 ****************************************************************************/
 
 // KVZ_API_VERSION is incremented every time the public api changes.
-#define KVZ_API_VERSION 6
+#define KVZ_API_VERSION 7
 
 #endif // KVAZAAR_VERSION_H_
