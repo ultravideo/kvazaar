@@ -364,28 +364,19 @@ void print_frame_info(encoder_state_t *state, double frame_psnr[3])
           "BPI"[state->global->slicetype % 3], state->stats_bitstream_length << 3,
           frame_psnr[0], frame_psnr[1], frame_psnr[2]);
 
-  // Print reference picture lists
   if (state->global->slicetype != KVZ_SLICE_I) {
-    int j, ref_list[2] = { 0, 0 }, ref_list_poc[2][16];
-    // List all pocs of lists
-    for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->pocs[j] < state->global->poc) {
-        ref_list_poc[0][ref_list[0]] = state->global->ref->pocs[j];
-        ref_list[0]++;
-      } else {
-        ref_list_poc[1][ref_list[1]] = state->global->ref->pocs[j];
-        ref_list[1]++;
-      }
-    }
-    kvz_encoder_ref_insertion_sort(ref_list_poc[0], ref_list[0]);
-    kvz_encoder_ref_insertion_sort(ref_list_poc[1], ref_list[1]);
+    // Print reference picture lists
+    int ref_list_len[2];
+    int ref_list_poc[2][16];
+
+    kvz_encoder_get_ref_lists(state, ref_list_len, ref_list_poc);
 
     fprintf(stderr, " [L0 ");
-    for (j = ref_list[0] - 1; j >= 0; j--) {
+    for (int j = ref_list_len[0] - 1; j >= 0; j--) {
       fprintf(stderr, "%d ", ref_list_poc[0][j]);
     }
     fprintf(stderr, "] [L1 ");
-    for (j = 0; j < ref_list[1]; j++) {
+    for (int j = 0; j < ref_list_len[1]; j++) {
       fprintf(stderr, "%d ", ref_list_poc[1][j]);
     }
     fprintf(stderr, "]");

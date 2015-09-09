@@ -228,7 +228,9 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
 
-void kvz_encoder_ref_insertion_sort(int reflist[16], int length);
+void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
+                               int ref_list_len_out[2],
+                               int ref_list_poc_out[2][16]);
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
