@@ -217,6 +217,19 @@ typedef struct kvz_frame_info {
    */
   enum kvz_slice_type slice_type;
 
+  /**
+   * \brief Reference picture lists
+   *
+   * The first list contains the reference picture POCs that are less than the
+   * POC of this frame and the second one contains those that are greater.
+   */
+  int ref_list[2][16];
+
+  /**
+   * \brief Lengths of the reference picture lists
+   */
+  int ref_list_len[2];
+
 } kvz_frame_info;
 
 /**

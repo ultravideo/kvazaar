@@ -118,6 +118,7 @@ static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *co
   info->poc = state->global->poc,
   info->qp = state->global->QP;
   info->slice_type = state->global->slicetype;
+  kvz_encoder_get_ref_lists(state, info->ref_list_len, info->ref_list);
 }
 
 
