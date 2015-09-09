@@ -24,7 +24,6 @@
 */
 
 #include "cli.h"
-#include "encoderstate.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -356,28 +355,26 @@ void print_help(void)
 }
 
 
-void print_frame_info(encoder_state_t *state, double frame_psnr[3])
+void print_frame_info(const kvz_frame_info *const info,
+                      const double frame_psnr[3],
+                      const uint32_t bytes)
 {
   fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
-          state->global->poc,
-          state->global->QP,
-          "BPI"[state->global->slicetype % 3], state->stats_bitstream_length << 3,
+          info->poc,
+          info->qp,
+          "BPI"[info->slice_type % 3],
+          bytes << 3,
           frame_psnr[0], frame_psnr[1], frame_psnr[2]);
 
-  if (state->global->slicetype != KVZ_SLICE_I) {
+  if (info->slice_type != KVZ_SLICE_I) {
     // Print reference picture lists
-    int ref_list_len[2];
-    int ref_list_poc[2][16];
-
-    kvz_encoder_get_ref_lists(state, ref_list_len, ref_list_poc);
-
     fprintf(stderr, " [L0 ");
-    for (int j = ref_list_len[0] - 1; j >= 0; j--) {
-      fprintf(stderr, "%d ", ref_list_poc[0][j]);
+    for (int j = info->ref_list_len[0] - 1; j >= 0; j--) {
+      fprintf(stderr, "%d ", info->ref_list[0][j]);
     }
     fprintf(stderr, "] [L1 ");
-    for (int j = 0; j < ref_list_len[1]; j++) {
-      fprintf(stderr, "%d ", ref_list_poc[1][j]);
+    for (int j = 0; j < info->ref_list_len[1]; j++) {
+      fprintf(stderr, "%d ", info->ref_list[1][j]);
     }
     fprintf(stderr, "]");
   }

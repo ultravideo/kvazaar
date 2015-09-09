@@ -212,7 +212,8 @@ int main(int argc, char *argv[])
       kvz_data_chunk* chunks_out = NULL;
       kvz_picture *img_rec = NULL;
       uint32_t len_out = 0;
-      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, &img_rec, NULL)) {
+      kvz_frame_info info_out;
+      if (!api->encoder_encode(enc, img_in, &chunks_out, &len_out, &img_rec, &info_out)) {
         fprintf(stderr, "Failed to encode image.\n");
         api->picture_free(img_in);
         goto exit_failure;
@@ -269,7 +270,7 @@ int main(int argc, char *argv[])
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
 
-        print_frame_info(state, frame_psnr);
+        print_frame_info(&info_out, frame_psnr, len_out);
       }
 
       api->picture_free(img_in);
