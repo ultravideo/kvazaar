@@ -119,9 +119,26 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * threadqueue);
 #ifdef _DEBUG
 int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
 
-//This macro HAS TO BE at the beginning of a block
-#define PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if (_DEBUG & mask) GET_TIME(&start)
-#define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) do {if (_DEBUG & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}}} while (0) \
+#define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if (_DEBUG & mask) { GET_TIME(&start); }
+#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if (_DEBUG & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
+
+#ifdef _MSC_VER
+// Disable VS conditional expression warning from debug code.
+# define WITHOUT_CONSTANT_EXP_WARNING(macro) \
+  __pragma(warning(push)) \
+  __pragma(warning(disable:4127)) \
+  macro \
+  __pragma(warning(pop))
+# define PERFORMANCE_MEASURE_START(mask) \
+    WITHOUT_CONSTANT_EXP_WARNING(IMPL_PERFORMANCE_MEASURE_START(mask))
+# define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) \
+    WITHOUT_CONSTANT_EXP_WARNING(IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ##__VA_ARGS__))
+#else
+# define PERFORMANCE_MEASURE_START(mask) \
+    IMPL_PERFORMANCE_MEASURE_START(mask)
+# define PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) \
+    IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ##__VA_ARGS__)
+#endif
 
 #else
 #define PERFORMANCE_MEASURE_START(mask) 

@@ -524,7 +524,7 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
   
 #ifdef _DEBUG
   if (debug_description) {
-    int desc_len = MIN(255, strlen(debug_description));
+    size_t desc_len = MIN(255, strlen(debug_description));
     char* desc;
     
     //Copy description
