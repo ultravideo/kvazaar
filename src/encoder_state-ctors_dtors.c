@@ -146,7 +146,7 @@ static void encoder_state_config_wfrow_finalize(encoder_state_t * const state) {
   //Nothing to do (yet?)
 }
 
-#ifdef _DEBUG
+#ifdef _DEBUG_PRINT_THREADING_INFO
 static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
   int i;
   
@@ -635,7 +635,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     }
   }
   
-#ifdef _DEBUG
+#ifdef _DEBUG_PRINT_THREADING_INFO
   if (!parent_state) encoder_state_dump_graphviz(child_state);
 #endif //_DEBUG
   return 1;

@@ -359,7 +359,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
 
     encoder->wpp = encoder->cfg->wpp;
 
-#ifdef _DEBUG
+#ifdef _DEBUG_PRINT_THREADING_INFO
     printf("Tiles columns width:");
     for (i=0; i < encoder->tiles_num_tile_columns; ++i) {
       printf(" %d", encoder->tiles_col_width[i]);
