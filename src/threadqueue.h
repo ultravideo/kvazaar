@@ -119,8 +119,8 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * threadqueue);
 #ifdef _DEBUG
 int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
 
-#define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if (_DEBUG & mask) { GET_TIME(&start); }
-#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if (_DEBUG & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
+#define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if ((_DEBUG) & mask) { GET_TIME(&start); }
+#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((_DEBUG) & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
 
 #ifdef _MSC_VER
 // Disable VS conditional expression warning from debug code.
