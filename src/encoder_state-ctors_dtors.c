@@ -146,7 +146,7 @@ static void encoder_state_config_wfrow_finalize(encoder_state_t * const state) {
   //Nothing to do (yet?)
 }
 
-#ifdef _DEBUG_PRINT_THREADING_INFO
+#ifdef KVZ_DEBUG_PRINT_THREADING_INFO
 static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
   int i;
   
@@ -267,7 +267,7 @@ static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
     printf("\n\n\n\n\n");
   }
 }
-#endif //_DEBUG
+#endif //KVZ_DEBUG_PRINT_THREADING_INFO
 
 int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t * const parent_state) {
   //We require that, if parent_state is NULL:
@@ -635,9 +635,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     }
   }
   
-#ifdef _DEBUG_PRINT_THREADING_INFO
+#ifdef KVZ_DEBUG_PRINT_THREADING_INFO
   if (!parent_state) encoder_state_dump_graphviz(child_state);
-#endif //_DEBUG
+#endif //KVZ_DEBUG_PRINT_THREADING_INFO
   return 1;
 }
 

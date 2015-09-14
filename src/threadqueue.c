@@ -24,9 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
 #include <string.h>
-#endif //_DEBUG
+#endif //KVZ_DEBUG
 
 #include "global.h"
 #include "threadqueue.h"
@@ -81,9 +81,9 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   threadqueue_queue_t * const threadqueue = threadqueue_worker_spec->threadqueue;
   threadqueue_job_t * next_job = NULL;
   
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   GET_TIME(&threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]);
-#endif //_DEBUG
+#endif //KVZ_DEBUG
 
   for(;;) {
     int i = 0;
@@ -148,17 +148,17 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
       //Unlock the queue
       PTHREAD_UNLOCK(&threadqueue->lock);
       
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
       job->debug_worker_id = threadqueue_worker_spec->worker_id;
       GET_TIME(&job->debug_clock_start);
-#endif //_DEBUG
+#endif //KVZ_DEBUG
       
       job->fptr(job->arg);
       
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
       job->debug_worker_id = threadqueue_worker_spec->worker_id;
       GET_TIME(&job->debug_clock_stop);
-#endif //_DEBUG
+#endif //KVZ_DEBUG
       
       //Re-lock the job to update its status and treat its dependencies
       PTHREAD_LOCK(&job->lock);
@@ -216,11 +216,11 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque) {
   assert(threadqueue->stop);
   --threadqueue->threads_running;
   
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   GET_TIME(&threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]);
   
   fprintf(threadqueue->debug_log, "\t%d\t-\t%lf\t+%lf\t-\tthread\n", threadqueue_worker_spec->worker_id, CLOCK_T_AS_DOUBLE(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id]), CLOCK_T_DIFF(threadqueue->debug_clock_thread_start[threadqueue_worker_spec->worker_id], threadqueue->debug_clock_thread_end[threadqueue_worker_spec->worker_id]));
-#endif //_DEBUG
+#endif //KVZ_DEBUG
   
   PTHREAD_UNLOCK(&threadqueue->lock);
   
@@ -259,13 +259,13 @@ int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_cou
     fprintf(stderr, "Could not malloc threadqueue->threads!\n");
     return 0;
   }
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   threadqueue->debug_clock_thread_start = MALLOC(CLOCK_T, thread_count);
   assert(threadqueue->debug_clock_thread_start);
   threadqueue->debug_clock_thread_end = MALLOC(CLOCK_T, thread_count);
   assert(threadqueue->debug_clock_thread_end);
   threadqueue->debug_log = fopen("threadqueue.log", "w");
-#endif //_DEBUG
+#endif //KVZ_DEBUG
   
   threadqueue->queue = NULL;
   threadqueue->queue_size = 0;
@@ -306,8 +306,8 @@ int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_cou
  */
 static void threadqueue_free_job(threadqueue_queue_t * const threadqueue, int i)
 {
-#ifdef _DEBUG
-#if _DEBUG & KVZ_PERF_JOB
+#ifdef KVZ_DEBUG
+#if KVZ_DEBUG & KVZ_PERF_JOB
   int j;
   GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
   fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
@@ -333,8 +333,8 @@ static void threadqueue_free_jobs(threadqueue_queue_t * const threadqueue) {
   }
   threadqueue->queue_count = 0;
   threadqueue->queue_start = 0;
-#ifdef _DEBUG
-#if _DEBUG & KVZ_PERF_JOB
+#ifdef KVZ_DEBUG
+#if KVZ_DEBUG & KVZ_PERF_JOB
   {
     CLOCK_T time;
     GET_TIME(&time);
@@ -391,7 +391,7 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
     }
   }
   
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   FREE_POINTER(threadqueue->debug_clock_thread_start);
   FREE_POINTER(threadqueue->debug_clock_thread_end);
   fclose(threadqueue->debug_log);
@@ -522,7 +522,7 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
   
   job = MALLOC(threadqueue_job_t, 1);
   
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   if (debug_description) {
     size_t desc_len = MIN(255, strlen(debug_description));
     char* desc;
@@ -542,7 +542,7 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
     job->debug_description = desc;
   }
   GET_TIME(&job->debug_clock_enqueue);
-#endif //_DEBUG
+#endif //KVZ_DEBUG
   
   if (!job) {
     fprintf(stderr, "Could not alloc job!\n");
@@ -646,7 +646,7 @@ int kvz_threadqueue_job_unwait_job(threadqueue_queue_t * const threadqueue, thre
   return 1;
 }
 
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
 int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description) {
   int i, thread_id = -1;
   FILE* output;
@@ -690,4 +690,4 @@ int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, con
   }
   return 1;
 }
-#endif //_DEBUG
+#endif //KVZ_DEBUG

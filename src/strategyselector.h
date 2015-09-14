@@ -22,7 +22,7 @@
 
 #include "global.h"
 
-#if defined(_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
+#if defined(KVZ_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
 # define DEBUG_STRATEGYSELECTOR
 #endif
 

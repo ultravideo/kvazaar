@@ -85,7 +85,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
 {
   bitstream_t * const stream = &state->stream;
   int i;
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
 
@@ -181,7 +181,7 @@ static void encoder_state_write_bitstream_VUI(encoder_state_t * const state)
 {
   bitstream_t * const stream = &state->stream;
   const encoder_control_t * const encoder = state->encoder_control;
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
   if (encoder->vui.sar_width > 0 && encoder->vui.sar_height > 0) {
@@ -283,7 +283,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   bitstream_t * const stream = &state->stream;
   const encoder_control_t * encoder = state->encoder_control;
 
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
 #endif
 
@@ -388,7 +388,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * co
 {
   const encoder_control_t * const encoder = state->encoder_control;
   bitstream_t * const stream = &state->stream;
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
   WRITE_UE(stream, 0, "pic_parameter_set_id");
@@ -649,7 +649,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     }
   } else ref_negative = state->global->ref->used_size;
 
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   printf("=========== Slice ===========\n");
 #endif
   WRITE_U(stream, (state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");

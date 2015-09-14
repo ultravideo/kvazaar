@@ -389,7 +389,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
       printf("Wavefront Parallel Processing: disabled\n");
     }
     printf("\n");
-#endif //_DEBUG
+#endif //KVZ_DEBUG
   }
 
   assert(WITHIN(cfg->pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
@@ -512,7 +512,7 @@ void kvz_encoder_control_input_init(encoder_control_t * const encoder,
   encoder->in.pixels_per_pic = encoder->in.width * encoder->in.height;
 
 
-  #ifdef _DEBUG
+  #ifdef KVZ_DEBUG
   if (width != encoder->in.width || height != encoder->in.height) {
     printf("Picture buffer has been extended to be a multiple of the smallest block size:\r\n");
     printf("  Width = %d (%d), Height = %d (%d)\r\n", width, encoder->in.width, height,

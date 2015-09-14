@@ -494,7 +494,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   lcu_t *const lcu = &work_tree[depth];
 
   int x_local = (x&0x3f), y_local = (y&0x3f);
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   int debug_split = 0;
 #endif
   PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHCU);
@@ -678,7 +678,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Copy split modes to this depth.
       cost = split_cost;
       work_tree_copy_up(x, y, depth, work_tree);
-#if _DEBUG
+#if KVZ_DEBUG
       debug_split = 1;
 #endif
     } else if (depth > 0) {

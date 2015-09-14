@@ -46,7 +46,7 @@ typedef struct threadqueue_job_t {
   void (*fptr)(void *arg);
   void *arg;
   
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   const char* debug_description;
   
   int debug_worker_id;
@@ -82,7 +82,7 @@ typedef struct {
   unsigned int queue_waiting_dependency; //Number of jobs waiting for a dependency to complete
   unsigned int queue_running; //Number of jobs running
   
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
   //Format: pointer <tab> worker id <tab> time enqueued <tab> time started <tab> time stopped <tab> time dequeued <tab> job description
   //For threads, pointer = "" and job description == "thread", time enqueued and time dequeued are equal to "-"
   //For flush, pointer = "" and job description == "FLUSH", time enqueued, time dequeued and time started are equal to "-" 
@@ -116,7 +116,7 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t
 //Free ressources in a threadqueue
 int kvz_threadqueue_finalize(threadqueue_queue_t * threadqueue);
 
-#ifdef _DEBUG
+#ifdef KVZ_DEBUG
 int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
 
 // Bitmasks for PERFORMANCE_MEASURE_START and PERFORMANCE_MEASURE_END.
@@ -128,8 +128,8 @@ int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, con
 #define KVZ_PERF_SEARCHCU (1 << 5)
 #define KVZ_PERF_SEARCHPX (1 << 6)
 
-#define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if ((_DEBUG) & mask) { GET_TIME(&start); }
-#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((_DEBUG) & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
+#define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if ((KVZ_DEBUG) & mask) { GET_TIME(&start); }
+#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((KVZ_DEBUG) & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
 
 #ifdef _MSC_VER
 // Disable VS conditional expression warning from debug code.
