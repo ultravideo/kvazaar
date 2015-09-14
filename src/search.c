@@ -497,7 +497,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 #ifdef _DEBUG
   int debug_split = 0;
 #endif
-  PERFORMANCE_MEASURE_START(_DEBUG_PERF_SEARCH_CU);
+  PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHCU);
 
   // Stop recursion if the CU is completely outside the frame.
   if (x >= frame->width || y >= frame->height) {
@@ -688,7 +688,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     }
   }
   
-  PERFORMANCE_MEASURE_END(_DEBUG_PERF_SEARCH_CU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id, 
+  PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x + (LCU_WIDTH >> depth), 
                           (state->tile->lcu_offset_y * LCU_WIDTH) + y,

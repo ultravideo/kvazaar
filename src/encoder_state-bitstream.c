@@ -887,16 +887,16 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   {
-    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
+    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_write_bitstream_children(state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
   {
-    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
+    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
   //Get bitstream length for stats

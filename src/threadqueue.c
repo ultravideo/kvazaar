@@ -307,7 +307,7 @@ int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_cou
 static void threadqueue_free_job(threadqueue_queue_t * const threadqueue, int i)
 {
 #ifdef _DEBUG
-#if _DEBUG & _DEBUG_PERF_JOB
+#if _DEBUG & KVZ_PERF_JOB
   int j;
   GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
   fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
@@ -334,7 +334,7 @@ static void threadqueue_free_jobs(threadqueue_queue_t * const threadqueue) {
   threadqueue->queue_count = 0;
   threadqueue->queue_start = 0;
 #ifdef _DEBUG
-#if _DEBUG & _DEBUG_PERF_JOB
+#if _DEBUG & KVZ_PERF_JOB
   {
     CLOCK_T time;
     GET_TIME(&time);
@@ -512,9 +512,9 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
   //No lock here... this should be constant
   if (threadqueue->threads_count == 0) {
     //FIXME: This should be improved in order to handle dependencies
-    PERFORMANCE_MEASURE_START(_DEBUG_PERF_JOB);
+    PERFORMANCE_MEASURE_START(KVZ_PERF_JOB);
     fptr(arg);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_JOB, threadqueue, "%s", debug_description);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_JOB, threadqueue, "%s", debug_description);
     return NULL;
   }
   

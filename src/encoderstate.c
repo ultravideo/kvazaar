@@ -323,22 +323,22 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
     // frame is encoded. Deblocking and SAO search is done during LCU encoding.
 
     for (int i = 0; i < state->lcu_order_count; ++i) {
-      PERFORMANCE_MEASURE_START(_DEBUG_PERF_ENCODE_LCU);
+      PERFORMANCE_MEASURE_START(KVZ_PERF_LCU);
 
       encoder_state_worker_encode_lcu(&state->lcu_order[i]);
 
 #ifdef _DEBUG
       {
         const lcu_order_element_t * const lcu = &state->lcu_order[i];
-        PERFORMANCE_MEASURE_END(_DEBUG_PERF_ENCODE_LCU, state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
+        PERFORMANCE_MEASURE_END(KVZ_PERF_LCU, state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
       }
 #endif //_DEBUG
     }
     
     if (state->encoder_control->sao_enable) {
-      PERFORMANCE_MEASURE_START(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME);
+      PERFORMANCE_MEASURE_START(KVZ_PERF_SAOREC);
       kvz_sao_reconstruct_frame(state);
-      PERFORMANCE_MEASURE_END(_DEBUG_PERF_SAO_RECONSTRUCT_FRAME, state->encoder_control->threadqueue, "type=kvz_sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count-1].position.y + state->tile->lcu_offset_y,
+      PERFORMANCE_MEASURE_END(KVZ_PERF_SAOREC, state->encoder_control->threadqueue, "type=kvz_sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count - 1].position.y + state->tile->lcu_offset_y,
         state->tile->lcu_offset_x * LCU_WIDTH, state->tile->frame->width + state->tile->lcu_offset_x * LCU_WIDTH - 1,
         state->tile->lcu_offset_y * LCU_WIDTH, state->tile->frame->height + state->tile->lcu_offset_y * LCU_WIDTH - 1
       );
@@ -405,9 +405,9 @@ static void encoder_state_worker_encode_children(void * opaque) {
   encoder_state_encode(sub_state);
   if (sub_state->is_leaf) {
     if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-      PERFORMANCE_MEASURE_START(_DEBUG_PERF_WRITE_BITSTREAM_LEAF);
+      PERFORMANCE_MEASURE_START(KVZ_PERF_BSLEAF);
       kvz_encoder_state_write_bitstream_leaf(sub_state);
-      PERFORMANCE_MEASURE_END(_DEBUG_PERF_WRITE_BITSTREAM_LEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
+      PERFORMANCE_MEASURE_END(KVZ_PERF_BSLEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->global->frame, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count - 1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count - 1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count - 1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count - 1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
     } else {
       threadqueue_job_t *job;
 #ifdef _DEBUG
@@ -822,14 +822,14 @@ static void _encode_one_frame_add_bitstream_deps(const encoder_state_t * const s
 void kvz_encode_one_frame(encoder_state_t * const state)
 {
   {
-    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
+    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_new_frame(state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", state->global->frame, state->global->poc);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=new_frame,frame=%d,poc=%d", state->global->frame, state->global->poc);
   }
   {
-    PERFORMANCE_MEASURE_START(_DEBUG_PERF_FRAME_LEVEL);
+    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_encode(state);
-    PERFORMANCE_MEASURE_END(_DEBUG_PERF_FRAME_LEVEL, state->encoder_control->threadqueue, "type=encode,frame=%d", state->global->frame);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=encode,frame=%d", state->global->frame);
   }
   //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
   {

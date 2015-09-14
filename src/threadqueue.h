@@ -119,6 +119,15 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * threadqueue);
 #ifdef _DEBUG
 int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
 
+// Bitmasks for PERFORMANCE_MEASURE_START and PERFORMANCE_MEASURE_END.
+#define KVZ_PERF_FRAME    (1 << 0)
+#define KVZ_PERF_JOB      (1 << 1)
+#define KVZ_PERF_LCU      (1 << 2)
+#define KVZ_PERF_SAOREC   (1 << 3)
+#define KVZ_PERF_BSLEAF   (1 << 4)
+#define KVZ_PERF_SEARCHCU (1 << 5)
+#define KVZ_PERF_SEARCHPX (1 << 6)
+
 #define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if ((_DEBUG) & mask) { GET_TIME(&start); }
 #define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((_DEBUG) & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
 
