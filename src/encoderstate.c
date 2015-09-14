@@ -682,7 +682,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
     refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
     check_refs = 1;
   } else if (state->global->slicetype == SLICE_I) {
-    refnumber = 1;
+    refnumber = 0;
   }
   // Remove the ref pic (if present)
   while (check_refs || state->global->ref->used_size > (uint32_t)refnumber) {
@@ -762,10 +762,10 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
         }
       }
 
-      encoder_state_remove_refs(state);
-      encoder_state_ref_sort(state);
     }
 
+    encoder_state_remove_refs(state);
+    encoder_state_ref_sort(state);
     double lambda;
     if (encoder->cfg->target_bitrate > 0) {
       // Rate control enabled.
