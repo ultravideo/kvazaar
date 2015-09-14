@@ -165,6 +165,7 @@ OBJS = \
   encoderstate.o \
   rate_control.o \
   filter.o \
+  input_frame_buffer.o \
   inter.o \
   intra.o \
   kvazaar.o \

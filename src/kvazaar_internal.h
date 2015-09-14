@@ -21,6 +21,7 @@
 ****************************************************************************/
 
 #include "kvazaar.h"
+#include "input_frame_buffer.h"
 
 // Forward declarations.
 struct encoder_state_t;
@@ -44,10 +45,13 @@ struct kvz_encoder {
    */
   unsigned out_state_num;
 
+  /**
+   * \brief Buffer for input frames.
+   */
+  input_frame_buffer_t input_buffer;
+
   unsigned frames_started;
   unsigned frames_done;
-
-  size_t bitstream_length;
 };
 
 #endif // KVAZAAR_INTERNAL_H_

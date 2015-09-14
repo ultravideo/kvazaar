@@ -28,6 +28,7 @@
 #include "encoderstate.h"
 #include "checkpoint.h"
 #include "bitstream.h"
+#include "input_frame_buffer.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)
@@ -75,6 +76,9 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   encoder->out_state_num = 0;
   encoder->frames_started = 0;
   encoder->frames_done = 0;
+
+  kvz_init_input_frame_buffer(&encoder->input_buffer);
+
   encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
   if (!encoder->states) {
     goto kvazaar_open_failure;
@@ -130,7 +134,7 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
   }
 
-  if (kvz_encoder_feed_frame(state, pic_in)) {
+  if (kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in)) {
     assert(state->global->frame == enc->frames_started);
     // Start encoding.
     kvz_encode_one_frame(state);
