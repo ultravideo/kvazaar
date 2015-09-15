@@ -236,7 +236,7 @@ void print_version(void)
   fprintf(stderr,
     "/***********************************************/\n"
     " *   Kvazaar HEVC Encoder v. " VERSION_STRING "             *\n"
-    " *     Tampere University of Technology 2014   *\n"
+    " *     Tampere University of Technology 2015   *\n"
     "/***********************************************/\n\n");
 }
 
