@@ -137,7 +137,12 @@ typedef int16_t coeff_t;
 //#define SIGN3(x) ((x) > 0) ? +1 : ((x) == 0 ? 0 : -1)
 #define SIGN3(x) (((x) > 0) - ((x) < 0))
 
-#define VERSION_STRING "0.5.0"
+
+#define QUOTE(x) #x
+#define QUOTE_EXPAND(x) QUOTE(x)
+
+#define KVZ_VERSION 0.5.0
+#define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
 //#define VERBOSE 1
 
