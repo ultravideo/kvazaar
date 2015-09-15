@@ -40,51 +40,61 @@
  * \brief NAL unit type codes.
  *
  * These are the nal_unit_type codes from Table 7-1 ITU-T H.265 v1.0.
- * The type codes have been prefixed with "NAL_".
  */
-enum {
-  NAL_TRAIL_N = 0,
-  NAL_TRAIL_R = 1,
+enum kvz_nal_unit_type {
 
-  NAL_TSA_N = 2,
-  NAL_TSA_R = 3,
+  // Trailing pictures
 
-  NAL_STSA_N = 4,
-  NAL_STSA_R = 5,
+  KVZ_NAL_TRAIL_N = 0,
+  KVZ_NAL_TRAIL_R = 1,
 
-  NAL_RADL_N = 6,
-  NAL_RADL_R = 7,
+  KVZ_NAL_TSA_N = 2,
+  KVZ_NAL_TSA_R = 3,
 
-  NAL_RASL_N = 8,
-  NAL_RASL_R = 9,
+  KVZ_NAL_STSA_N = 4,
+  KVZ_NAL_STSA_R = 5,
 
-  // Reserved RSV_VCL_ N/R 10-15
+  // Leading pictures
 
-  NAL_BLA_W_LP = 16,
-  NAL_BLA_W_RADL = 17,
-  NAL_BLA_N_LP = 18,
+  KVZ_NAL_RADL_N = 6,
+  KVZ_NAL_RADL_R = 7,
 
-  NAL_IDR_W_RADL = 19,
-  NAL_IDR_N_LP = 20,
+  KVZ_NAL_RASL_N = 8,
+  KVZ_NAL_RASL_R = 9,
 
-  NAL_CRA_NUT = 21,
+  // Reserved non-IRAP RSV_VCL_N/R 10-15
 
-  // Reserved RSV_IRAP_VCL 22-23
-  NAL_RSV_IRAP_VCL23 = 23,
+  // Intra random access point pictures
 
-  // Reserved RSV_VCL 24-31
+  KVZ_NAL_BLA_W_LP   = 16,
+  KVZ_NAL_BLA_W_RADL = 17,
+  KVZ_NAL_BLA_N_LP   = 18,
 
-  NAL_VPS_NUT = 32,
-  NAL_SPS_NUT = 33,
-  NAL_PPS_NUT = 34,
+  KVZ_NAL_IDR_W_RADL = 19,
+  KVZ_NAL_IDR_N_LP   = 20,
 
-  AUD_NUT = 35,
-  EOS_NUT = 36,
-  EOB_NUT = 37,
-  FD_NUT = 38,
+  KVZ_NAL_CRA_NUT    = 21,
 
-  PREFIX_SEI_NUT = 39,
-  NAL_SUFFIT_SEI_NUT = 40,
+  // Reserved IRAP
+
+  KVZ_NAL_RSV_IRAP_VCL22 = 22,
+  KVZ_NAL_RSV_IRAP_VCL23 = 23,
+
+  // Reserved non-IRAP RSV_VCL 24-32
+
+  // non-VCL
+
+  KVZ_NAL_VPS_NUT = 32,
+  KVZ_NAL_SPS_NUT = 33,
+  KVZ_NAL_PPS_NUT = 34,
+
+  KVZ_NAL_AUD_NUT = 35,
+  KVZ_NAL_EOS_NUT = 36,
+  KVZ_NAL_EOB_NUT = 37,
+  KVZ_NAL_FD_NUT  = 38,
+
+  KVZ_NAL_PREFIX_SEI_NUT = 39,
+  KVZ_NAL_SUFFIX_SEI_NUT = 40,
 
   // Reserved RSV_NVCL 41-47
   // Unspecified UNSPEC 48-63

@@ -784,10 +784,10 @@ static void encoder_state_new_frame(encoder_state_t * const state) {
     if (state->global->is_idr_frame) {
       encoder_state_reset_poc(state);
       state->global->slicetype = KVZ_SLICE_I;
-      state->global->pictype = NAL_IDR_W_RADL;
+      state->global->pictype = KVZ_NAL_IDR_W_RADL;
     } else {
       state->global->slicetype = encoder->cfg->intra_period==1 ? KVZ_SLICE_I : (state->encoder_control->cfg->gop_len?KVZ_SLICE_B:KVZ_SLICE_P);
-      state->global->pictype = NAL_TRAIL_R;
+      state->global->pictype = KVZ_NAL_TRAIL_R;
       if (state->encoder_control->cfg->gop_len) {
         if (encoder->cfg->intra_period > 1 && (state->global->poc % encoder->cfg->intra_period) == 0) {
           state->global->slicetype = KVZ_SLICE_I;
