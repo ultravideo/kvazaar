@@ -254,7 +254,6 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     assert(main_state != state);
 
     unsigned child_width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
-    unsigned child_height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
     unsigned main_width_in_scu = main_state->tile->frame->width_in_lcu << MAX_DEPTH;
     unsigned tile_x = state->tile->lcu_offset_x;
     unsigned tile_y = state->tile->lcu_offset_y;
