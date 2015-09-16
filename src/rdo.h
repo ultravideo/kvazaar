@@ -58,7 +58,7 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
   int16_t num_cand, int32_t ref_idx, uint32_t *bitcost);
 uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac);
 
-extern const float f_entropy_bits[128];
-#define CTX_ENTROPY_FBITS(ctx,val) f_entropy_bits[(ctx)->uc_state ^ (val)]
+extern const float kvz_f_entropy_bits[128];
+#define CTX_ENTROPY_FBITS(ctx,val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
 
 #endif
