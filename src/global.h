@@ -141,7 +141,7 @@ typedef int16_t coeff_t;
 #define QUOTE(x) #x
 #define QUOTE_EXPAND(x) QUOTE(x)
 
-#define KVZ_VERSION 0.6.0
+#define KVZ_VERSION 0.6.1
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
 //#define VERBOSE 1
