@@ -172,12 +172,21 @@ void kvz_inter_recon_14bit_frac_chroma(const encoder_state_t * const state, cons
  * \param xpos block x position
  * \param ypos block y position
  * \param width block width
+ * \param height block height
  * \param mv[2] motion vector
  * \param lcu destination lcu
  * \param hi_prec destination of high precision output (null if not needed)
  * \returns Void
 */
-void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos,int32_t width, const int16_t mv_param[2], lcu_t *lcu, hi_prec_buf_t *hi_prec_out)
+void kvz_inter_recon_lcu(const encoder_state_t * const state,
+                         const kvz_picture * const ref,
+                         int32_t xpos,
+                         int32_t ypos,
+                         int32_t width,
+                         int32_t height,
+                         const int16_t mv_param[2],
+                         lcu_t *lcu,
+                         hi_prec_buf_t *hi_prec_out)
 {
   int x,y,coord_x,coord_y;
   int16_t mv[2] = { mv_param[0], mv_param[1] };
@@ -191,7 +200,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture 
 
   // positive overflow flag
   int8_t overflow_pos_x = (state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) + width > ref->width )?1:0;
-  int8_t overflow_pos_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) + width > ref->height)?1:0;
+  int8_t overflow_pos_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) + height > ref->height)?1:0;
 
   int8_t chroma_halfpel = ((mv[0]>>2)&1) || ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
   // Luma quarter-pel
@@ -224,7 +233,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture 
     // With overflow present, more checking
     if (overflow_neg_x || overflow_neg_y || overflow_pos_x || overflow_pos_y) {
       // Copy Luma with boundary checking
-      for (y = ypos; y < ypos + width; y++) {
+      for (y = ypos; y < ypos + height; y++) {
         for (x = xpos; x < xpos + width; x++) {
           int x_in_lcu = (x & ((LCU_WIDTH)-1));
           int y_in_lcu = (y & ((LCU_WIDTH)-1));
@@ -258,7 +267,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture 
 
       if(!chroma_halfpel) {
         // Copy Chroma with boundary checking
-        for (y = ypos>>1; y < (ypos + width)>>1; y++) {
+        for (y = ypos>>1; y < (ypos + height)>>1; y++) {
           for (x = xpos>>1; x < (xpos + width)>>1; x++) {
             int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
             int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
@@ -294,7 +303,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture 
       }
     } else { //If no overflow, we can copy without checking boundaries
       // Copy Luma
-      for (y = ypos; y < ypos + width; y++) {
+      for (y = ypos; y < ypos + height; y++) {
         int y_in_lcu = (y & ((LCU_WIDTH)-1));
         coord_y = ((y + state->tile->lcu_offset_y * LCU_WIDTH) + mv[1]) * ref->width; // pre-calculate
         for (x = xpos; x < xpos + width; x++) {
@@ -307,7 +316,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture 
       if(!chroma_halfpel) {
         // Copy Chroma
         // TODO: chroma fractional pixel interpolation
-        for (y = ypos>>1; y < (ypos + width)>>1; y++) {
+        for (y = ypos>>1; y < (ypos + height)>>1; y++) {
           int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
           coord_y = ((y + state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1)) * ref_width_c; // pre-calculate
           for (x = xpos>>1; x < (xpos + width)>>1; x++) {
@@ -328,12 +337,21 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture 
 * \param xpos block x position
 * \param ypos block y position
 * \param width block width
+* \param height block height
 * \param mv[2][2] motion vectors
 * \param lcu destination lcu
 * \returns Void
 */
 
-void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu) {
+void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
+                                const kvz_picture * ref1,
+                                const kvz_picture * ref2,
+                                int32_t xpos,
+                                int32_t ypos,
+                                int32_t width,
+                                int32_t height,
+                                int16_t mv_param[2][2],
+                                lcu_t* lcu) {
   kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH];
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
   kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
@@ -352,7 +370,7 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_p
   if (hi_prec_chroma_rec0) high_precision_rec0 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
   if (hi_prec_chroma_rec1) high_precision_rec1 = kvz_hi_prec_buf_t_alloc(LCU_WIDTH*LCU_WIDTH);
   //Reconstruct both predictors
-  kvz_inter_recon_lcu(state, ref1, xpos, ypos, width, mv_param[0], lcu, high_precision_rec0);
+  kvz_inter_recon_lcu(state, ref1, xpos, ypos, width, height, mv_param[0], lcu, high_precision_rec0);
   if (!hi_prec_luma_rec0){
     memcpy(temp_lcu_y, lcu->rec.y, sizeof(kvz_pixel) * 64 * 64);
   }
@@ -360,10 +378,10 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_p
     memcpy(temp_lcu_u, lcu->rec.u, sizeof(kvz_pixel) * 32 * 32);
     memcpy(temp_lcu_v, lcu->rec.v, sizeof(kvz_pixel) * 32 * 32);
   }
-  kvz_inter_recon_lcu(state, ref2, xpos, ypos, width, mv_param[1], lcu, high_precision_rec1);
+  kvz_inter_recon_lcu(state, ref2, xpos, ypos, width, height, mv_param[1], lcu, high_precision_rec1);
 
   // After reconstruction, merge the predictors by taking an average of each pixel
-  for (temp_y = 0; temp_y < width; ++temp_y) {
+  for (temp_y = 0; temp_y < height; ++temp_y) {
     int y_in_lcu = ((ypos + temp_y) & ((LCU_WIDTH)-1));
     for (temp_x = 0; temp_x < width; ++temp_x) {
       int x_in_lcu = ((xpos + temp_x) & ((LCU_WIDTH)-1));
@@ -373,7 +391,7 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_p
     }
 
   }
-  for (temp_y = 0; temp_y < width >> 1; ++temp_y) {
+  for (temp_y = 0; temp_y < height >> 1; ++temp_y) {
     int y_in_lcu = (((ypos >> 1) + temp_y) & (LCU_WIDTH_C - 1));
     for (temp_x = 0; temp_x < width >> 1; ++temp_x) {
       int x_in_lcu = (((xpos >> 1) + temp_x) & (LCU_WIDTH_C - 1));

@@ -573,9 +573,23 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
 
       if (cur_cu->inter.mv_dir == 3) {
-        kvz_inter_recon_lcu_bipred(state, state->global->ref->images[cur_cu->inter.mv_ref[0]], state->global->ref->images[cur_cu->inter.mv_ref[1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv, &work_tree[depth]);
+        kvz_inter_recon_lcu_bipred(state,
+                                   state->global->ref->images[cur_cu->inter.mv_ref[0]],
+                                   state->global->ref->images[cur_cu->inter.mv_ref[1]],
+                                   x, y,
+                                   LCU_WIDTH >> depth,
+                                   LCU_WIDTH >> depth,
+                                   cur_cu->inter.mv,
+                                   &work_tree[depth]);
       } else {
-        kvz_inter_recon_lcu(state, state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]], x, y, LCU_WIDTH >> depth, cur_cu->inter.mv[cur_cu->inter.mv_dir - 1], &work_tree[depth], 0);
+        kvz_inter_recon_lcu(state,
+                            state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]],
+                            x, y,
+                            LCU_WIDTH >> depth,
+                            LCU_WIDTH >> depth,
+                            cur_cu->inter.mv[cur_cu->inter.mv_dir - 1],
+                            &work_tree[depth],
+                            0);
       }
 
       kvz_quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);

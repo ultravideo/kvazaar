@@ -40,8 +40,26 @@ typedef struct {
 
 
 //void kvz_inter_set_block(image* im,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
-void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * ref, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2], lcu_t* lcu, hi_prec_buf_t *hi_prec_out);
-void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu);
+
+void kvz_inter_recon_lcu(const encoder_state_t * const state,
+                         const kvz_picture * ref,
+                         int32_t xpos,
+                         int32_t ypos,
+                         int32_t width,
+                         int32_t height,
+                         const int16_t mv_param[2],
+                         lcu_t* lcu,
+                         hi_prec_buf_t *hi_prec_out);
+
+void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
+                                const kvz_picture * ref1,
+                                const kvz_picture * ref2,
+                                int32_t xpos,
+                                int32_t ypos,
+                                int32_t width,
+                                int32_t height,
+                                int16_t mv_param[2][2],
+                                lcu_t* lcu);
 
 void kvz_inter_get_spatial_merge_candidates(int32_t x,
                                             int32_t y,

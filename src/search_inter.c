@@ -1199,7 +1199,14 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
             if (ceil_mv_l0 < max_mv || ceil_mv_l1 < max_mv) continue;
           }
 
-          kvz_inter_recon_lcu_bipred(state, state->global->ref->images[merge_cand[i].ref[0]], state->global->ref->images[merge_cand[j].ref[1]], x, y, LCU_WIDTH >> depth, mv, templcu);
+          kvz_inter_recon_lcu_bipred(state,
+                                     state->global->ref->images[merge_cand[i].ref[0]],
+                                     state->global->ref->images[merge_cand[j].ref[1]],
+                                     x, y,
+                                     LCU_WIDTH >> depth,
+                                     LCU_WIDTH >> depth,
+                                     mv,
+                                     templcu);
 
           for (int ypos = 0; ypos < LCU_WIDTH >> depth; ++ypos) {
             int dst_y = ypos*(LCU_WIDTH >> depth);
