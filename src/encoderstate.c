@@ -981,6 +981,37 @@ static void encode_part_mode(cabac_data_t * const cabac,
                              const cu_info_t * const cur_cu,
                              int depth)
 {
+  // Binarization from Table 9-34 of the HEVC spec:
+  //
+  //                |   log2CbSize >     |    log2CbSize ==
+  //                |   MinCbLog2SizeY   |    MinCbLog2SizeY
+  // -------+-------+----------+---------+-----------+----------
+  //  pred  | part  | AMP      | AMP     |           |
+  //  mode  | mode  | disabled | enabled | size == 8 | size > 8
+  // -------+-------+----------+---------+-----------+----------
+  //  intra | 2Nx2N |        -         - |         1          1
+  //        |   NxN |        -         - |         0          0
+  // -------+-------+--------------------+----------------------
+  //  inter | 2Nx2N |        1         1 |         1          1
+  //        |  2NxN |       01       011 |        01         01
+  //        |  Nx2N |       00       001 |        00        001
+  //        |   NxN |        -         - |         -        000
+  //        | 2NxnU |        -      0100 |         -          -
+  //        | 2NxnD |        -      0101 |         -          -
+  //        | nLx2N |        -      0000 |         -          -
+  //        | nRx2N |        -      0001 |         -          -
+  // -------+-------+--------------------+----------------------
+  //
+  //
+  // Context indices from Table 9-37 of the HEVC spec:
+  //
+  //                                      binIdx
+  //                               |  0  1  2       3
+  // ------------------------------+------------------
+  //  log2CbSize == MinCbLog2SizeY |  0  1  2  bypass
+  //  log2CbSize >  MinCbLog2SizeY |  0  1  3  bypass
+  // ------------------------------+------------------
+
   if (cur_cu->type == CU_INTRA) {
     if (depth == MAX_DEPTH) {
       cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
