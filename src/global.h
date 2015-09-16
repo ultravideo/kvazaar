@@ -151,13 +151,6 @@ typedef int16_t coeff_t;
 
 #define SAO_ABS_OFFSET_MAX ((1 << (MIN(KVZ_BIT_DEPTH, 10) - 5)) - 1)
 
-
-#define SIZE_2Nx2N 0
-#define SIZE_2NxN  1
-#define SIZE_Nx2N  2
-#define SIZE_NxN   3
-#define SIZE_NONE  15
-
 #define MAX_TILES_PER_DIM 48
 #define MAX_SLICES 16
 

@@ -28,6 +28,57 @@
 #include "cu.h"
 #include "threads.h"
 
+/**
+ * \brief Number of PUs in a CU.
+ *
+ * Indexed by part_mode_t values.
+ */
+const uint8_t kvz_part_mode_num_parts[] = {
+  1, // 2Nx2N
+  2, // 2NxN
+  2, // Nx2N
+  4, // NxN
+  2, // 2NxnU
+  2, // 2NxnD
+  2, // nLx2N
+  2, // nRx2N
+};
+
+/**
+ * \brief PU offsets.
+ *
+ * Indexed by [part mode][PU number][axis].
+ *
+ * Units are 1/4 of the width of the CU.
+ */
+const uint8_t kvz_part_mode_offsets[][4][2] = {
+  { {0, 0}                         }, // 2Nx2N
+  { {0, 0}, {0, 2}                 }, // 2NxN
+  { {0, 0}, {2, 0}                 }, // Nx2N
+  { {0, 0}, {2, 0}, {0, 2}, {2, 2} }, // NxN
+  { {0, 0}, {0, 1}                 }, // 2NxnU
+  { {0, 0}, {0, 3}                 }, // 2NxnD
+  { {0, 0}, {1, 0}                 }, // nLx2N
+  { {0, 0}, {3, 0}                 }, // nRx2N
+};
+
+/**
+ * \brief PU sizes.
+ *
+ * Indexed by [part mode][PU number][axis].
+ *
+ * Units are 1/4 of the width of the CU.
+ */
+const uint8_t kvz_part_mode_sizes[][4][2] = {
+  { {4, 4}                         }, // 2Nx2N
+  { {4, 2}, {4, 2}                 }, // 2NxN
+  { {2, 4}, {2, 4}                 }, // Nx2N
+  { {2, 2}, {2, 2}, {2, 2}, {2, 2} }, // NxN
+  { {4, 1}, {4, 3}                 }, // 2NxnU
+  { {4, 3}, {4, 1}                 }, // 2NxnD
+  { {1, 4}, {3, 4}                 }, // nLx2N
+  { {3, 4}, {1, 4}                 }, // nRx2N
+};
 
 void kvz_coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
                          const unsigned width, const unsigned height,
@@ -79,3 +130,4 @@ int kvz_cu_array_free(cu_array_t * const cua)
 
   return 1;
 }
+
