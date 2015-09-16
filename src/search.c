@@ -572,24 +572,40 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       int tr_depth = depth > 0 ? depth : 1;
       kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
 
-      if (cur_cu->inter.mv_dir == 3) {
-        kvz_inter_recon_lcu_bipred(state,
-                                   state->global->ref->images[cur_cu->inter.mv_ref[0]],
-                                   state->global->ref->images[cur_cu->inter.mv_ref[1]],
-                                   x, y,
-                                   LCU_WIDTH >> depth,
-                                   LCU_WIDTH >> depth,
-                                   cur_cu->inter.mv,
-                                   &work_tree[depth]);
-      } else {
-        kvz_inter_recon_lcu(state,
-                            state->global->ref->images[cur_cu->inter.mv_ref[cur_cu->inter.mv_dir - 1]],
-                            x, y,
-                            LCU_WIDTH >> depth,
-                            LCU_WIDTH >> depth,
-                            cur_cu->inter.mv[cur_cu->inter.mv_dir - 1],
-                            &work_tree[depth],
-                            0);
+      const int cu_width = LCU_WIDTH >> depth;
+      const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
+
+      for (int i = 0; i < num_pu; ++i) {
+        const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
+        const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
+        const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
+        const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
+
+        cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(pu_x), SUB_SCU(pu_y));
+
+        if (cur_pu->inter.mv_dir == 3) {
+          const kvz_picture *const refs[2] = {
+            state->global->ref->images[cur_pu->inter.mv_ref[0]],
+            state->global->ref->images[cur_pu->inter.mv_ref[1]],
+          };
+          kvz_inter_recon_lcu_bipred(state,
+                                     refs[0], refs[1],
+                                     pu_x, pu_y,
+                                     pu_w, pu_h,
+                                     cur_pu->inter.mv,
+                                     &work_tree[depth]);
+        } else {
+          const int mv_idx = cur_pu->inter.mv_dir - 1;
+          const kvz_picture *const ref =
+              state->global->ref->images[cur_pu->inter.mv_ref[mv_idx]];
+          kvz_inter_recon_lcu(state,
+                              ref,
+                              pu_x, pu_y,
+                              pu_w, pu_h,
+                              cur_pu->inter.mv[mv_idx],
+                              &work_tree[depth],
+                              0);
+        }
       }
 
       kvz_quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
