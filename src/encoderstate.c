@@ -247,6 +247,8 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   // Copy LCU cu_array to main states cu_array, because that is the only one
   // which is given to the next frame through image_list_t.
   {
+    PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
+
     encoder_state_t *main_state = state;
     while (main_state->parent) main_state = main_state->parent;
     assert(main_state != state);
@@ -256,11 +258,17 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     unsigned main_width_in_scu = main_state->tile->frame->width_in_lcu << MAX_DEPTH;
     unsigned tile_x = state->tile->lcu_offset_x;
     unsigned tile_y = state->tile->lcu_offset_y;
-    for (unsigned y = 0; y < child_height_in_scu; ++y) {
-      cu_info_t *main_row = &main_state->tile->frame->cu_array->data[tile_x + (tile_y + y) * main_width_in_scu];
-      cu_info_t *child_row = &state->tile->frame->cu_array->data[y * child_width_in_scu];
-      memcpy(main_row, child_row, sizeof(cu_info_t) * child_width_in_scu);
+
+    unsigned x = lcu->position.x << MAX_DEPTH;
+    unsigned y = lcu->position.y << MAX_DEPTH;
+
+    for (unsigned lcu_row = 0; lcu_row < 8; ++lcu_row) {
+      cu_info_t *main_row = &main_state->tile->frame->cu_array->data[x + tile_x + (y + tile_y + lcu_row) * main_width_in_scu];
+      cu_info_t *child_row = &state->tile->frame->cu_array->data[x + (y + lcu_row) * child_width_in_scu];
+      memcpy(main_row, child_row, sizeof(cu_info_t) * 8);
     }
+
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=copy_cuinfo,frame=%d,tile=%d", state->global->frame, state->tile->id);
   }
   
   //Now write data to bitstream (required to have a correct CABAC state)
