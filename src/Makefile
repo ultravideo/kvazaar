@@ -76,8 +76,12 @@ else
     TARGET_CPU_ARCH := x86
 endif
 
-CFLAGS += -m$(TARGET_CPU_BITS)
-LDFLAGS += -m$(TARGET_CPU_BITS)
+# The -m32 and -m64 flags are used for making sure the C files use the same
+# instruction set as the ASM files. They can't be used on ARM processors.
+ifneq (,$(filter-out armv7l armv6l,$(ARCH)))
+#    CFLAGS += -m$(TARGET_CPU_BITS)
+#    LDFLAGS += -m$(TARGET_CPU_BITS)
+endif
 
 INSTALL_TARGETS = install-prog install-pc
 
@@ -139,10 +143,10 @@ ifdef CHECKPOINTS
 endif
 
 # Compile files in strategy directories with appropriate flags.
-ifeq ($(ARCH), ppc64)
+ifeq ($(ARCH),ppc64)
   strategies/altivec/%.o:  EXTRA_FLAGS += -maltivec -fno-lto
   strategies/altivec/%.lo: EXTRA_FLAGS += -maltivec -fno-lto
-else
+else ifeq (,$(filter-out i386 i686 x86_64 amd64,$(ARCH)))
   strategies/sse2/%.o:   EXTRA_FLAGS += -msse2   -fno-lto
   strategies/sse41/%.o:  EXTRA_FLAGS += -msse4.1 -fno-lto
   strategies/sse2/%.lo:  EXTRA_FLAGS += -msse2   -fno-lto
