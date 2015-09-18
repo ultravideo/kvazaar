@@ -64,30 +64,36 @@ else
 endif
 
 # ARCH related flags
-ifeq ($(ARCH), x86_64)
-    TARGET_CPU_BITS := 64
-    TARGET_CPU_ARCH := x86
-else ifeq ($(ARCH), ppc64)
-    TARGET_CPU_BITS := 64
-    TARGET_CPU_ARCH := ppc
+ifeq (, $(filter-out i386 i686 x86_64 amd64, $(ARCH)))
+  TARGET_CPU_ARCH := x86
+else ifeq (, $(filter-out ppc ppc64, $(ARCH)))
+  TARGET_CPU_ARCH := ppc
+else ifeq (, $(filter-out armv7l armv6l, $(ARCH)))
+  TARGET_CPU_ARCH := arm
 else
-    #safe (?) defaults
-    TARGET_CPU_BITS := 32
-    TARGET_CPU_ARCH := x86
+  TARGET_CPU_ARCH := x86
+endif
+
+ifeq (, $(filter-out i386 i686 ppc, $(ARCH)))
+  TARGET_CPU_BITS := 32
+else ifeq (, $(filter-out x86_64 amd64 ppc64, $(ARCH)))
+  TARGET_CPU_BITS := 64
+else
+  TARGET_CPU_BITS := 0
 endif
 
 # The -m32 and -m64 flags are used for making sure the C files use the same
 # instruction set as the ASM files. They can't be used on ARM processors.
-ifneq (,$(filter-out armv7l armv6l,$(ARCH)))
-    CFLAGS += -m$(TARGET_CPU_BITS)
-    LDFLAGS += -m$(TARGET_CPU_BITS)
+ifneq (0, $(TARGET_CPU_BITS))
+  CFLAGS += -m$(TARGET_CPU_BITS)
+  LDFLAGS += -m$(TARGET_CPU_BITS)
 endif
 
 INSTALL_TARGETS = install-prog install-pc
 
 # Windows (cygwin/mingw) specific flags
 ifeq ($(SYSTEM), Windows)
-  ifeq ($(ARCH), x86_64)
+  ifeq ($(TARGET_CPU_BITS), 64)
     ASFLAGS += -f win64
     ASFLAGS += -DHAVE_ALIGNED_STACK=1
   else
@@ -101,7 +107,7 @@ ifeq ($(SYSTEM), Windows)
 
 # OS X specific flags
 else ifeq ($(SYSTEM), Darwin)
-  ifeq ($(ARCH), x86_64)
+  ifeq ($(TARGET_CPU_BITS), 64)
     ASFLAGS += -f macho64
   else
     ASFLAGS += -f macho32
@@ -114,7 +120,7 @@ else ifeq ($(SYSTEM), Darwin)
 else
   LIBS += -lrt
   LDFLAGS += -Wl,-z,noexecstack
-  ifeq ($(ARCH), x86_64)
+  ifeq ($(TARGET_CPU_BITS), 64)
     ASFLAGS += -f elf64
   else
     ASFLAGS += -f elf32
@@ -124,13 +130,13 @@ else
 endif
 
 # Flags shared across systems
-ifeq ($(ARCH), x86_64)
+ifeq ($(TARGET_CPU_ARCH) $(TARGET_CPU_BITS), x86 64)
   ASFLAGS += -DARCH_X86_64=1
 else
   ASFLAGS += -DARCH_X86_64=0
 endif
 
-# Compile asm files by default if yasm is present.
+# Disable ASM optimizations if YASM is not found on path.
 ifndef KVZ_DISABLE_ASM
   has_as := $(shell type $(AS) 2>/dev/null)
   ifeq ($(has_as),)
@@ -142,16 +148,19 @@ ifdef CHECKPOINTS
   CFLAGS += -DCHECKPOINTS
 endif
 
-# Compile files in strategy directories with appropriate flags.
-ifeq ($(ARCH),ppc64)
+# The optimized functions reside in these instruction set specific
+# directories. If the instruction set is supported by the
+# architecture, compile the files in these directories with the
+# apropriate flags to cause the intrinsics to work.
+ifeq ($(TARGET_CPU_ARCH), ppc)
   strategies/altivec/%.o:  EXTRA_FLAGS += -maltivec -fno-lto
   strategies/altivec/%.lo: EXTRA_FLAGS += -maltivec -fno-lto
-else ifeq (,$(filter-out i386 i686 x86_64 amd64,$(ARCH)))
+else ifeq ($(TARGET_CPU_ARCH), x86)
   strategies/sse2/%.o:   EXTRA_FLAGS += -msse2   -fno-lto
   strategies/sse41/%.o:  EXTRA_FLAGS += -msse4.1 -fno-lto
   strategies/sse2/%.lo:  EXTRA_FLAGS += -msse2   -fno-lto
   strategies/sse41/%.lo: EXTRA_FLAGS += -msse4.1 -fno-lto
-  # Needs to be defined on Travis
+  # To disable avx2 on old compilers that don't support it.
   ifndef KVZ_DISABLE_AVX2
     strategies/avx2/%.o:  EXTRA_FLAGS += -mavx2 -fno-lto
     strategies/avx2/%.lo: EXTRA_FLAGS += -mavx2 -fno-lto
@@ -207,8 +216,12 @@ OBJS = \
   strategies/avx2/ipol-avx2.o
 
 ifndef KVZ_DISABLE_ASM
+  # Compile C files in x86_asm folder with KVZ_COMPILE_ASM, which will cause
+  # the registration function to register the function pointers in the ASM 
+  # files.
   strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
 
+  # Add ASM files to the list of objects to be compiled.
   OBJS += \
     strategies/x86_asm/picture-x86-asm-sad.o \
     strategies/x86_asm/picture-x86-asm-satd.o
