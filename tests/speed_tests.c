@@ -277,25 +277,25 @@ SUITE(speed_tests)
     const strategy_t * strategy = &strategies.strategies[i];
 
     // Select buffer width according to function name for intra cost functions.
-    if (strcmp(strategy->type, "sad_8bit_4x4") == 0) {
+    if (strcmp(strategy->type, "sad_4x4") == 0) {
       test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "sad_8bit_8x8") == 0) {
+    } else if (strcmp(strategy->type, "sad_8x8") == 0) {
       test_env.log_width = 3;
-    } else if (strcmp(strategy->type, "sad_8bit_16x16") == 0) {
+    } else if (strcmp(strategy->type, "sad_16x16") == 0) {
       test_env.log_width = 4;
-    } else if (strcmp(strategy->type, "sad_8bit_32x32") == 0) {
+    } else if (strcmp(strategy->type, "sad_32x32") == 0) {
       test_env.log_width = 5;
-    } else if (strcmp(strategy->type, "sad_8bit_64x64") == 0) {
+    } else if (strcmp(strategy->type, "sad_64x64") == 0) {
       test_env.log_width = 6;
-    } else if (strcmp(strategy->type, "satd_8bit_4x4") == 0) {
+    } else if (strcmp(strategy->type, "satd_4x4") == 0) {
       test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "satd_8bit_8x8") == 0) {
+    } else if (strcmp(strategy->type, "satd_8x8") == 0) {
       test_env.log_width = 3;
-    } else if (strcmp(strategy->type, "satd_8bit_16x16") == 0) {
+    } else if (strcmp(strategy->type, "satd_16x16") == 0) {
       test_env.log_width = 4;
-    } else if (strcmp(strategy->type, "satd_8bit_32x32") == 0) {
+    } else if (strcmp(strategy->type, "satd_32x32") == 0) {
       test_env.log_width = 5;
-    } else if (strcmp(strategy->type, "satd_8bit_64x64") == 0) {
+    } else if (strcmp(strategy->type, "satd_64x64") == 0) {
       test_env.log_width = 6;
     } else if (strcmp(strategy->type, "dct_4x4") == 0) {
       test_env.log_width = 2;
@@ -326,9 +326,9 @@ SUITE(speed_tests)
 
     // Call different tests depending on type of function.
     // This allows for selecting a subset of tests with -t parameter.
-    if (strncmp(strategy->type, "satd_8bit_", 10) == 0) {
+    if (strncmp(strategy->type, "satd_", 5) == 0) {
       RUN_TEST(intra_satd);
-    } else if (strncmp(strategy->type, "sad_8bit_", 9) == 0) {
+    } else if (strncmp(strategy->type, "sad_", 4) == 0) {
       RUN_TEST(intra_sad);
     } else if (strcmp(strategy->type, "reg_sad") == 0) {
       // Call reg_sad with all the sizes it is actually called with.
