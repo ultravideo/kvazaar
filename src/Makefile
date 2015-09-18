@@ -79,8 +79,8 @@ endif
 # The -m32 and -m64 flags are used for making sure the C files use the same
 # instruction set as the ASM files. They can't be used on ARM processors.
 ifneq (,$(filter-out armv7l armv6l,$(ARCH)))
-#    CFLAGS += -m$(TARGET_CPU_BITS)
-#    LDFLAGS += -m$(TARGET_CPU_BITS)
+    CFLAGS += -m$(TARGET_CPU_BITS)
+    LDFLAGS += -m$(TARGET_CPU_BITS)
 endif
 
 INSTALL_TARGETS = install-prog install-pc
