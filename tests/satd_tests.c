@@ -170,19 +170,19 @@ SUITE(satd_tests)
   for (unsigned i = 0; i < strategies.count; ++i) {
     const char * type = strategies.strategies[i].type;
     
-    if (strcmp(type, "satd_8bit_4x4") == 0) {
+    if (strcmp(type, "satd_4x4") == 0) {
       satd_test_env.log_width = 2;
     }
-    else if (strcmp(type, "satd_8bit_8x8") == 0) {
+    else if (strcmp(type, "satd_8x8") == 0) {
       satd_test_env.log_width = 3;
     }
-    else if (strcmp(type, "satd_8bit_16x16") == 0) {
+    else if (strcmp(type, "satd_16x16") == 0) {
       satd_test_env.log_width = 4;
     }
-    else if (strcmp(type, "satd_8bit_32x32") == 0) {
+    else if (strcmp(type, "satd_32x32") == 0) {
       satd_test_env.log_width = 5;
     }
-    else if (strcmp(type, "satd_8bit_64x64") == 0) {
+    else if (strcmp(type, "satd_64x64") == 0) {
       satd_test_env.log_width = 6;
     }
     else {
