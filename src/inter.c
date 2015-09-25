@@ -34,36 +34,6 @@
 #include "strategies/generic/ipol-generic.h"
 #include "strategies/generic/picture-generic.h"
 
-/**
- * \brief Set block info to the CU structure
- * \param pic picture to use
- * \param x_cu x CU position (smallest CU)
- * \param y_cu y CU position (smallest CU)
- * \param depth current CU depth
- * \param cur_cu CU to take the settings from
- * \returns Void
-*/
-void kvz_inter_set_block(videoframe_t* frame, uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info_t* cur_cu)
-{
-  uint32_t x, y;
-  // Width in smallest CU
-  int block_scu_width = (LCU_WIDTH>>depth)/(LCU_WIDTH>>MAX_DEPTH);
-  int tr_depth = (depth == 0 ? 1 : depth);
-  // Loop through all the block in the area of cur_cu
-  for (y = y_cu; y < y_cu + block_scu_width; y++) {
-    for (x = x_cu; x < x_cu + block_scu_width; x++) {
-      cu_info_t * const cu = kvz_videoframe_get_cu(frame, x, y);
-      // Set all SCU's to this blocks values at the bottom most depth.
-      cu->depth = depth;
-      cu->type  = CU_INTER;
-      cu->part_size = SIZE_2Nx2N;
-      memcpy(&cu->inter, &cur_cu->inter, sizeof(cur_cu->inter));
-      
-      cu->tr_depth = tr_depth;
-    }
-  }
-}
-
 void kvz_inter_recon_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 3);

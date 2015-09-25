@@ -39,8 +39,6 @@ typedef struct {
 } inter_merge_cand_t;
 
 
-//void kvz_inter_set_block(image* im,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
-
 void kvz_inter_recon_lcu(const encoder_state_t * const state,
                          const kvz_picture * ref,
                          int32_t xpos,
