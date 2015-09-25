@@ -229,20 +229,31 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *
   const int width_cu = LCU_CU_WIDTH >> depth;
   const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
   const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
-  int x, y;
-  // Set mode in every CU covered by part_mode in this depth.
-  for (y = y_cu; y < y_cu + width_cu; ++y) {
-    for (x = x_cu; x < x_cu + width_cu; ++x) {
-      cu_info_t *cu = LCU_GET_CU(lcu, x, y);
-      //Check if this could be moved inside the if
-      cu->coded    = 1;
-      if (cu != cur_cu) {
-        cu->depth    = cur_cu->depth;
-        cu->type     = CU_INTER;
-        cu->tr_depth = cur_cu->tr_depth;
-        cu->merged   = cur_cu->merged;
-        cu->skipped  = cur_cu->skipped;
-        memcpy(&cu->inter, &cur_cu->inter, sizeof(cur_cu->inter));
+  const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
+
+  for (int i = 0; i < num_pu; ++i) {
+    const int x_pu = PU_GET_X(cur_cu->part_size, width_cu, x_cu, i);
+    const int y_pu = PU_GET_Y(cur_cu->part_size, width_cu, y_cu, i);
+    const int width_pu  = PU_GET_W(cur_cu->part_size, width_cu, i);
+    const int height_pu = PU_GET_H(cur_cu->part_size, width_cu, i);
+
+    cu_info_t *cur_pu = LCU_GET_CU(lcu, x_pu, y_pu);
+
+    // Set mode in every CU covered by part_mode in this depth.
+    for (int y = y_pu; y < y_pu + height_pu; ++y) {
+      for (int x = x_pu; x < x_pu + width_pu; ++x) {
+        cu_info_t *cu = LCU_GET_CU(lcu, x, y);
+        //Check if this could be moved inside the if
+        cu->coded    = 1;
+        if (cu != cur_pu) {
+          cu->depth     = cur_pu->depth;
+          cu->part_size = cur_pu->part_size;
+          cu->type      = CU_INTER;
+          cu->tr_depth  = cur_pu->tr_depth;
+          cu->merged    = cur_pu->merged;
+          cu->skipped   = cur_pu->skipped;
+          memcpy(&cu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+        }
       }
     }
   }
