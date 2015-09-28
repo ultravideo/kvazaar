@@ -118,23 +118,31 @@ cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int 
 
 /**
  * \brief Calculates image PSNR value
+ *
+ * \param src   source picture
+ * \param rec   reconstructed picture
+ * \prama psnr  returns the PSNR
  */
-void kvz_videoframe_compute_psnr(const videoframe_t * const frame, double psnr[NUM_COLORS])
+void kvz_videoframe_compute_psnr(const kvz_picture *const src,
+                                 const kvz_picture *const rec,
+                                 double psnr[NUM_COLORS])
 {
-  int32_t pixels = frame->width * frame->height;
-  int32_t i, c;
-  
-  for (c = 0; c < NUM_COLORS; ++c) {
+  assert(src->width  == rec->width);
+  assert(src->height == rec->height);
+
+  int32_t pixels = src->width * src->height;
+
+  for (int32_t c = 0; c < NUM_COLORS; ++c) {
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
       num_pixels >>= 2;
     }
     psnr[c] = 0;
-    for (i = 0; i < num_pixels; ++i) {
-      const int32_t error = frame->source->data[c][i] - frame->rec->data[c][i];
+    for (int32_t i = 0; i < num_pixels; ++i) {
+      const int32_t error = src->data[c][i] - rec->data[c][i];
       psnr[c] += error * error;
     }
-    
+
     // Avoid division by zero
     if (psnr[c] == 0) psnr[c] = 99.0;
     psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;

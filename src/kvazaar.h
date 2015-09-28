@@ -192,6 +192,116 @@ typedef struct kvz_picture {
 } kvz_picture;
 
 /**
+ * \brief NAL unit type codes.
+ *
+ * These are the nal_unit_type codes from Table 7-1 ITU-T H.265 v1.0.
+ */
+enum kvz_nal_unit_type {
+
+  // Trailing pictures
+
+  KVZ_NAL_TRAIL_N = 0,
+  KVZ_NAL_TRAIL_R = 1,
+
+  KVZ_NAL_TSA_N = 2,
+  KVZ_NAL_TSA_R = 3,
+
+  KVZ_NAL_STSA_N = 4,
+  KVZ_NAL_STSA_R = 5,
+
+  // Leading pictures
+
+  KVZ_NAL_RADL_N = 6,
+  KVZ_NAL_RADL_R = 7,
+
+  KVZ_NAL_RASL_N = 8,
+  KVZ_NAL_RASL_R = 9,
+
+  // Reserved non-IRAP RSV_VCL_N/R 10-15
+
+  // Intra random access point pictures
+
+  KVZ_NAL_BLA_W_LP   = 16,
+  KVZ_NAL_BLA_W_RADL = 17,
+  KVZ_NAL_BLA_N_LP   = 18,
+
+  KVZ_NAL_IDR_W_RADL = 19,
+  KVZ_NAL_IDR_N_LP   = 20,
+
+  KVZ_NAL_CRA_NUT    = 21,
+
+  // Reserved IRAP
+
+  KVZ_NAL_RSV_IRAP_VCL22 = 22,
+  KVZ_NAL_RSV_IRAP_VCL23 = 23,
+
+  // Reserved non-IRAP RSV_VCL 24-32
+
+  // non-VCL
+
+  KVZ_NAL_VPS_NUT = 32,
+  KVZ_NAL_SPS_NUT = 33,
+  KVZ_NAL_PPS_NUT = 34,
+
+  KVZ_NAL_AUD_NUT = 35,
+  KVZ_NAL_EOS_NUT = 36,
+  KVZ_NAL_EOB_NUT = 37,
+  KVZ_NAL_FD_NUT  = 38,
+
+  KVZ_NAL_PREFIX_SEI_NUT = 39,
+  KVZ_NAL_SUFFIX_SEI_NUT = 40,
+
+  // Reserved RSV_NVCL 41-47
+  // Unspecified UNSPEC 48-63
+};
+
+enum kvz_slice_type {
+  KVZ_SLICE_B = 0,
+  KVZ_SLICE_P = 1,
+  KVZ_SLICE_I = 2,
+};
+
+/**
+ * \brief Other information about an encoded frame
+ */
+typedef struct kvz_frame_info {
+
+  /**
+   * \brief Picture order count
+   */
+  int32_t poc;
+
+  /**
+   * \brief Quantization parameter
+   */
+  int8_t qp;
+
+  /**
+   * \brief Type of the NAL VCL unit
+   */
+  enum kvz_nal_unit_type nal_unit_type;
+
+  /**
+   * \brief Type of the slice
+   */
+  enum kvz_slice_type slice_type;
+
+  /**
+   * \brief Reference picture lists
+   *
+   * The first list contains the reference picture POCs that are less than the
+   * POC of this frame and the second one contains those that are greater.
+   */
+  int ref_list[2][16];
+
+  /**
+   * \brief Lengths of the reference picture lists
+   */
+  int ref_list_len[2];
+
+} kvz_frame_info;
+
+/**
  * \brief A linked list of chunks of data.
  *
  * Used for returning the encoded data.
@@ -303,9 +413,9 @@ typedef struct kvz_api {
    * \brief Encode one frame.
    *
    * Add pic_in to the encoding pipeline. If an encoded frame is ready, return
-   * the bitstream, length of the bitstream and the reconstructed frame in
-   * data_out, len_out and pic_out, respectively. Otherwise, set the output
-   * parameters to NULL.
+   * the bitstream, length of the bitstream, the reconstructed frame, the
+   * original frame and frame info in data_out, len_out, pic_out, src_out and
+   * info_out, respectively. Otherwise, set the output parameters to NULL.
    *
    * After passing all of the input frames, the caller should keep calling this
    * function with pic_in set to NULL, until no more data is returned in the
@@ -313,24 +423,29 @@ typedef struct kvz_api {
    *
    * The caller must not modify pic_in after passing it to this function.
    *
-   * If pic_out and data_out are set to non-NULL values, the caller is
-   * responsible for calling picture_free and chunk_free on them.
+   * If data_out, pic_out and src_out are set to non-NULL values, the caller is
+   * responsible for calling chunk_free and picture_free on them.
    *
    * A null pointer may be passed in place of any of the parameters data_out,
-   * len_out or pic_out to skip returning the corresponding value.
+   * len_out, pic_out, src_out or info_out to skip returning the corresponding
+   * value.
    *
    * \param encoder   encoder
    * \param pic_in    input frame or NULL
    * \param data_out  Returns the encoded data.
    * \param len_out   Returns number of bytes in the encoded data.
    * \param pic_out   Returns the reconstructed picture.
+   * \param src_out   Returns the original picture.
+   * \param info_out  Returns information about the encoded picture.
    * \return          1 on success, 0 on error.
    */
   int           (*encoder_encode)(kvz_encoder *encoder,
                                   kvz_picture *pic_in,
                                   kvz_data_chunk **data_out,
                                   uint32_t *len_out,
-                                  kvz_picture **pic_out);
+                                  kvz_picture **pic_out,
+                                  kvz_picture **src_out,
+                                  kvz_frame_info *info_out);
 } kvz_api;
 
 // Append API version to the getters name to prevent linking against incompatible versions.

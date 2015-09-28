@@ -31,10 +31,10 @@
 static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
 {
   bitstream_t * const stream = &state->stream;
-  kvz_nal_write(stream, AUD_NUT, 0, 1);
+  kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
 
-  uint8_t pic_type = state->global->slicetype == SLICE_I ? 0
-                   : state->global->slicetype == SLICE_P ? 1
+  uint8_t pic_type = state->global->slicetype == KVZ_SLICE_I ? 0
+                   : state->global->slicetype == KVZ_SLICE_P ? 1
                    :                                       2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
@@ -654,8 +654,8 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 #endif
   WRITE_U(stream, (state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
 
-  if (state->global->pictype >= NAL_BLA_W_LP
-      && state->global->pictype <= NAL_RSV_IRAP_VCL23) {
+  if (state->global->pictype >= KVZ_NAL_BLA_W_LP
+      && state->global->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
     WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
   }
 
@@ -674,8 +674,8 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       //WRITE_U(stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-  if (state->global->pictype != NAL_IDR_W_RADL
-      && state->global->pictype != NAL_IDR_N_LP) {
+  if (state->global->pictype != KVZ_NAL_IDR_W_RADL
+      && state->global->pictype != KVZ_NAL_IDR_N_LP) {
     int last_poc = 0;
     int poc_shift = 0;
 
@@ -745,10 +745,10 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
   }
 
-  if (state->global->slicetype != SLICE_I) {
+  if (state->global->slicetype != KVZ_SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
       WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
-        if (state->global->slicetype == SLICE_B) {
+        if (state->global->slicetype == KVZ_SLICE_B) {
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }
@@ -790,7 +790,7 @@ static void add_checksum(encoder_state_t * const state)
   uint32_t checksum_val;
   unsigned int i;
 
-  kvz_nal_write(stream, NAL_SUFFIT_SEI_NUT, 0, 0);
+  kvz_nal_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0);
 
   kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
@@ -845,21 +845,21 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     first_nal_in_au = false;
 
     // Video Parameter Set (VPS)
-    kvz_nal_write(stream, NAL_VPS_NUT, 0, 1);
+    kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
     encoder_state_write_bitstream_vid_parameter_set(state);
 
     // Sequence Parameter Set (SPS)
-    kvz_nal_write(stream, NAL_SPS_NUT, 0, 1);
+    kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
     encoder_state_write_bitstream_seq_parameter_set(state);
 
     // Picture Parameter Set (PPS)
-    kvz_nal_write(stream, NAL_PPS_NUT, 0, 1);
+    kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
     encoder_state_write_bitstream_pic_parameter_set(state);
   }
 
   // Send Kvazaar version information only in the first frame.
   if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
-    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
+    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
@@ -870,11 +870,11 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   if (state->encoder_control->vui.frame_field_info_present_flag){
     // These should be optional, needed for earlier versions
     // of HM decoder to accept bitstream
-    //kvz_nal_write(stream, PREFIX_SEI_NUT, 0, 0);
+    //kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, 0);
     //encoder_state_write_active_parameter_sets_sei_message(state);
     //kvz_bitstream_rbsp_trailing_bits(stream);
 
-    kvz_nal_write(stream, PREFIX_SEI_NUT, 0, first_nal_in_au);
+    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_picture_timing_sei_message(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
@@ -882,7 +882,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   {
-    uint8_t nal_type = (state->global->is_idr_frame ? NAL_IDR_W_RADL : NAL_TRAIL_R);
+    uint8_t nal_type = (state->global->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
     kvz_nal_write(stream, nal_type, 0, first_nal_in_au);
   }
 

@@ -517,7 +517,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       y + cu_width <= frame->height)
   {
 
-    if (state->global->slicetype != SLICE_I &&
+    if (state->global->slicetype != KVZ_SLICE_I &&
         WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max))
     {
       int mode_cost = kvz_search_cu_inter(state, x, y, depth, &work_tree[depth]);
@@ -606,7 +606,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
   
   // Recursively split all the way to max search depth.
-  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->global->slicetype != SLICE_I)) {
+  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->global->slicetype != KVZ_SLICE_I)) {
     int half_cu = cu_width / 2;
     // Using Cost = lambda * 9 to compensate on the price of the split
     double split_cost = state->global->cur_lambda_cost * CU_COST;

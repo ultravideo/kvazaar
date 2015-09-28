@@ -1052,7 +1052,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   }
 
   // Search bi-pred positions
-  if (state->global->slicetype == SLICE_B && state->encoder_control->cfg->bipred) {
+  if (state->global->slicetype == KVZ_SLICE_B && state->encoder_control->cfg->bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
     cost_pixel_nxn_func *satd = kvz_pixels_get_satd_func(LCU_WIDTH >> depth);
     #define NUM_PRIORITY_LIST 12;

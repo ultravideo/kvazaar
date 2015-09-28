@@ -113,15 +113,28 @@ kvazaar_open_failure:
 }
 
 
+static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *const state)
+{
+  info->poc = state->global->poc,
+  info->qp = state->global->QP;
+  info->nal_unit_type = state->global->pictype;
+  info->slice_type = state->global->slicetype;
+  kvz_encoder_get_ref_lists(state, info->ref_list_len, info->ref_list);
+}
+
+
 static int kvazaar_encode(kvz_encoder *enc,
                           kvz_picture *pic_in,
                           kvz_data_chunk **data_out,
                           uint32_t *len_out,
-                          kvz_picture **pic_out)
+                          kvz_picture **pic_out,
+                          kvz_picture **src_out,
+                          kvz_frame_info *info_out)
 {
   if (data_out) *data_out = NULL;
   if (len_out) *len_out = 0;
   if (pic_out) *pic_out = NULL;
+  if (src_out) *src_out = NULL;
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
@@ -164,6 +177,8 @@ static int kvazaar_encode(kvz_encoder *enc,
     if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
     if (data_out) *data_out = kvz_bitstream_take_chunks(&output_state->stream);
     if (pic_out) *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
+    if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
+    if (info_out) set_frame_info(info_out, output_state);
 
     output_state->frame_done = 1;
     output_state->prepared = 0;

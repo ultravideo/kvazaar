@@ -81,7 +81,7 @@ typedef struct {
   
   bool is_idr_frame;
   uint8_t pictype;
-  uint8_t slicetype;
+  enum kvz_slice_type slicetype;
 
   //! Total number of bits written.
   uint64_t total_bits_coded;
@@ -206,7 +206,6 @@ typedef struct encoder_state_t {
 
 void kvz_encode_one_frame(encoder_state_t *state);
 
-void kvz_encoder_compute_stats(encoder_state_t *state, double psnr[3]);
 void kvz_encoder_next_frame(encoder_state_t *state);
 
 
@@ -228,7 +227,9 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
 
-void kvz_encoder_ref_insertion_sort(int reflist[16], int length);
+void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
+                               int ref_list_len_out[2],
+                               int ref_list_poc_out[2][16]);
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,

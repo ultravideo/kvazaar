@@ -216,6 +216,5 @@ typedef int16_t coeff_t;
 
 //Constants
 typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_t;
-enum { SLICE_B = 0, SLICE_P = 1, SLICE_I = 2 };
 
 #endif

@@ -763,7 +763,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
   }
 #endif
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == SLICE_B) {
+  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == KVZ_SLICE_B) {
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -798,7 +798,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
 
   int num_ref = state->global->ref->used_size;
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == SLICE_B) {
+  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == KVZ_SLICE_B) {
     int j;
     int ref_negative = 0;
     int ref_positive = 0;
@@ -819,7 +819,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
     mv_cand[candidates].ref[0] = (zero_idx>=num_ref-1)?0:zero_idx;
     mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
     mv_cand[candidates].dir = 1;
-    if (state->global->slicetype == SLICE_B) {
+    if (state->global->slicetype == KVZ_SLICE_B) {
       mv_cand[candidates].mv[1][0] = 0;
       mv_cand[candidates].mv[1][1] = 0;
       mv_cand[candidates].dir = 3;
