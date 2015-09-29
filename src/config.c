@@ -157,7 +157,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   //If the arg starts with u, we want an uniform split
   if (arg[0]=='u') {
     *ntiles = atoi(arg+1)-1;
-    if (MAX_TILES_PER_DIM <= *ntiles || 0 >= *ntiles) {
+    if (MAX_TILES_PER_DIM <= *ntiles || 0 > *ntiles) {
       fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
       return 0;
     }
