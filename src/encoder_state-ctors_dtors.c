@@ -113,15 +113,14 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
 
 static int encoder_state_config_slice_init(encoder_state_t * const state, 
                                           const int start_address_in_ts, const int end_address_in_ts) {
-  int i = 0, slice_found=0;
-  for (i = 0; i < state->encoder_control->slice_count; ++i) {
+  state->slice->id = -1;
+  for (int i = 0; i < state->encoder_control->slice_count; ++i) {
     if (state->encoder_control->slice_addresses_in_ts[i] == start_address_in_ts) {
       state->slice->id = i;
-      slice_found = 1;
       break;
     }
   }
-  assert(slice_found);
+  assert(state->slice->id != -1);
 
   state->slice->start_in_ts = start_address_in_ts;
   state->slice->end_in_ts = end_address_in_ts;

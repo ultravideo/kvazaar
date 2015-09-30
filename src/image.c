@@ -114,10 +114,9 @@ void kvz_image_free(kvz_picture *const im)
  */
 kvz_picture *kvz_image_copy_ref(kvz_picture *im)
 {
-  int32_t new_refcount = ATOMIC_INC(&(im->refcount));
-
   // The caller should have had another reference.
-  assert(new_refcount > 1);
+  assert(im->refcount > 0);
+  ATOMIC_INC(&(im->refcount));
 
   return im;
 }
