@@ -26,6 +26,7 @@
 
 #if COMPILE_INTEL_AVX2
 #  include "image.h"
+#  include "strategies/strategies-common.h"
 #  include <immintrin.h>
 
 
@@ -171,32 +172,68 @@ static INLINE void ver_add_sub_avx2(__m128i temp_hor[8], __m128i temp_ver[8]){
   }
 }
 
+INLINE static void haddwd_accumulate_avx2(__m128i *accumulate, __m128i *ver_row)
+{
+  __m128i abs_value = _mm_abs_epi16(*ver_row);
+  *accumulate = _mm_add_epi32(*accumulate, _mm_madd_epi16(abs_value, _mm_set1_epi16(1)));
+}
+
+INLINE static unsigned sum_block_avx2(__m128i *ver_row)
+{
+  __m128i sad = _mm_setzero_si128();
+  haddwd_accumulate_avx2(&sad, ver_row + 0);
+  haddwd_accumulate_avx2(&sad, ver_row + 1);
+  haddwd_accumulate_avx2(&sad, ver_row + 2);
+  haddwd_accumulate_avx2(&sad, ver_row + 3); 
+  haddwd_accumulate_avx2(&sad, ver_row + 4);
+  haddwd_accumulate_avx2(&sad, ver_row + 5);
+  haddwd_accumulate_avx2(&sad, ver_row + 6);
+  haddwd_accumulate_avx2(&sad, ver_row + 7);
+
+  sad = _mm_add_epi32(sad, _mm_shuffle_epi32(sad, KVZ_PERMUTE(2, 3, 0, 1)));
+  sad = _mm_add_epi32(sad, _mm_shuffle_epi32(sad, KVZ_PERMUTE(1, 0, 1, 0)));
+
+  return _mm_cvtsi128_si32(sad);
+}
+
+INLINE static __m128i diff_row_avx2(__m128i *buf1, __m128i *buf2)
+{
+  __m128i buf1_row = _mm_cvtepu8_epi16(_mm_loadl_epi64(buf1));
+  __m128i buf2_row = _mm_cvtepu8_epi16(_mm_loadl_epi64(buf2));
+  return _mm_sub_epi16(buf1_row, buf2_row);
+}
+
+INLINE static void diff_blocks_and_hor_transform_avx2(__m128i row_diff[8], const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
+{
+  row_diff[0] = diff_row_avx2(buf1 + 0 * stride1, buf2 + 0 * stride2);
+  row_diff[1] = diff_row_avx2(buf1 + 1 * stride1, buf2 + 1 * stride2);
+  hor_add_sub_avx2(row_diff + 0, row_diff + 1);
+
+  row_diff[2] = diff_row_avx2(buf1 + 2 * stride1, buf2 + 2 * stride2);
+  row_diff[3] = diff_row_avx2(buf1 + 3 * stride1, buf2 + 3 * stride2);
+  hor_add_sub_avx2(row_diff + 2, row_diff + 3);
+
+  row_diff[4] = diff_row_avx2(buf1 + 4 * stride1, buf2 + 4 * stride2);
+  row_diff[5] = diff_row_avx2(buf1 + 5 * stride1, buf2 + 5 * stride2);
+  hor_add_sub_avx2(row_diff + 4, row_diff + 5);
+
+  row_diff[6] = diff_row_avx2(buf1 + 6 * stride1, buf2 + 6 * stride2);
+  row_diff[7] = diff_row_avx2(buf1 + 7 * stride1, buf2 + 7 * stride2);
+  hor_add_sub_avx2(row_diff + 6, row_diff + 7);
+}
+
 static unsigned kvz_satd_8bit_8x8_general_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
 {
   __m128i temp_hor[8];
   __m128i temp_ver[8];
 
-  for (int row = 0; row < 8; row += 2){
-    for (int i = 0; i < 2; ++i){
-      __m128i buf1_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(&buf1[(row + i) * stride1])));
-      __m128i buf2_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(&buf2[(row + i) * stride2])));
-      temp_hor[row + i] = _mm_sub_epi16(buf1_row, buf2_row);
-    }
-    hor_add_sub_avx2(&temp_hor[row], &temp_hor[row + 1]);
-  }
+  diff_blocks_and_hor_transform_avx2(temp_hor, buf1, stride1, buf2, stride2);
 
   ver_add_sub_avx2(temp_hor, temp_ver);
   
-  __m128i sad = _mm_setzero_si128();
-  for (int row = 0; row < 8; ++row){
-    __m128i abs_value = _mm_abs_epi16(temp_ver[row]);
-    sad = _mm_add_epi32(sad, _mm_madd_epi16(abs_value, _mm_set1_epi16(1)));
-  }
+  unsigned sad = sum_block_avx2(temp_ver);
 
-  sad = _mm_hadd_epi32(sad, sad);
-  sad = _mm_hadd_epi32(sad, sad);
-
-  unsigned result = (_mm_cvtsi128_si32(sad) + 2) >> 2;
+  unsigned result = (sad + 2) >> 2;
   return result;
 }
 
