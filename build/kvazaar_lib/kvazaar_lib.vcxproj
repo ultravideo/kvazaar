@@ -201,6 +201,7 @@
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <ItemGroup>

@@ -374,6 +374,9 @@
     <ClInclude Include="..\..\src\input_frame_buffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-common.h">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">
