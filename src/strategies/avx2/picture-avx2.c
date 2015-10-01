@@ -137,6 +137,50 @@ static unsigned sad_8bit_64x64_avx2(const kvz_pixel * buf1, const kvz_pixel * bu
   return m256i_horizontal_sum(sum0);
 }
 
+static unsigned satd_8bit_4x4_avx2(const kvz_pixel *org, const kvz_pixel *cur)
+{
+
+  __m128i original = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)org));
+  __m128i current = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)cur));
+
+  __m128i diff_lo = _mm_sub_epi16(current, original);
+
+  original = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(org + 8)));
+  current = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)(cur + 8)));
+
+  __m128i diff_hi = _mm_sub_epi16(current, original);
+
+
+  //Hor
+  __m128i row0 = _mm_hadd_epi16(diff_lo, diff_hi);
+  __m128i row1 = _mm_hsub_epi16(diff_lo, diff_hi);
+
+  __m128i row2 = _mm_hadd_epi16(row0, row1);
+  __m128i row3 = _mm_hsub_epi16(row0, row1);
+
+  //Ver
+  row0 = _mm_hadd_epi16(row2, row3);
+  row1 = _mm_hsub_epi16(row2, row3);
+
+  row2 = _mm_hadd_epi16(row0, row1);
+  row3 = _mm_hsub_epi16(row0, row1);
+
+  //Abs and sum
+  row2 = _mm_abs_epi16(row2);
+  row3 = _mm_abs_epi16(row3);
+
+  row3 = _mm_add_epi16(row2, row3);
+
+  row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, KVZ_PERMUTE(2, 3, 0, 1) ));
+  row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, KVZ_PERMUTE(1, 0, 1, 0) ));
+  row3 = _mm_add_epi16(row3, _mm_shufflelo_epi16(row3, KVZ_PERMUTE(1, 0, 1, 0) ));
+
+  unsigned sum = _mm_extract_epi16(row3, 0);
+  unsigned satd = (sum + 1) >> 1;
+
+  return satd;
+}
+
 static void hor_add_sub_avx2(__m128i *row0, __m128i *row1){
 
   __m128i a = _mm_hadd_epi16(*row0, *row1);
@@ -196,10 +240,10 @@ INLINE static unsigned sum_block_avx2(__m128i *ver_row)
   return _mm_cvtsi128_si32(sad);
 }
 
-INLINE static __m128i diff_row_avx2(__m128i *buf1, __m128i *buf2)
+INLINE static __m128i diff_row_avx2(const kvz_pixel *buf1, const kvz_pixel *buf2)
 {
-  __m128i buf1_row = _mm_cvtepu8_epi16(_mm_loadl_epi64(buf1));
-  __m128i buf2_row = _mm_cvtepu8_epi16(_mm_loadl_epi64(buf2));
+  __m128i buf1_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)buf1));
+  __m128i buf2_row = _mm_cvtepu8_epi16(_mm_loadl_epi64((__m128i*)buf2));
   return _mm_sub_epi16(buf1_row, buf2_row);
 }
 
@@ -269,7 +313,7 @@ static unsigned satd_8bit_8x8_avx2(
   return sum>>(KVZ_BIT_DEPTH-8); \
 }
 
-//SATD_NXN_AVX2(8)
+//SATD_NXN_AVX2(8) //Use the non-macro version
 SATD_NXN_AVX2(16)
 SATD_NXN_AVX2(32)
 SATD_NXN_AVX2(64)
@@ -291,6 +335,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "sad_32x32", "avx2", 40, &sad_8bit_32x32_avx2);
     success &= kvz_strategyselector_register(opaque, "sad_64x64", "avx2", 40, &sad_8bit_64x64_avx2);
 
+    success &= kvz_strategyselector_register(opaque, "satd_4x4", "avx2", 40, &satd_8bit_4x4_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_8x8", "avx2", 40, &satd_8bit_8x8_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_16x16", "avx2", 40, &satd_8bit_16x16_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_32x32", "avx2", 40, &satd_8bit_32x32_avx2);
