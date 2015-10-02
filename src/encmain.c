@@ -128,42 +128,40 @@ void *eventloop_main(void* temp) {
   }
 
   PTHREAD_UNLOCK(&sdl_mutex);
-
+  int locked = 0;
   for (;;) {
     SDL_Event event;
-      while (1) {
-      PTHREAD_LOCK(&sdl_mutex);
+      while (1) {      
 
       while (SDL_PollEvent(&event)) {
         if (event.type == SDL_KEYDOWN) {
           if (event.key.keysym.sym == SDLK_d) sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
+          if (event.key.keysym.sym == SDLK_p) {
+            if (locked) {
+              locked = 0;
+              PTHREAD_UNLOCK(&sdl_mutex);
+            } else {
+              locked = 1;
+              PTHREAD_LOCK(&sdl_mutex);
+            }
+            
+          }
         }
         if (event.type == SDL_QUIT) {
           SDL_Quit();
           exit(1);
         }
-        // On window resize, reset the screen to the new size
-
-        if (event.type == SDL_WINDOWEVENT) {
-          /*
-          SDL_LockSurface(screen);
-          screen_w = event.resize.w; screen_h = event.resize.h;
-          screen = SDL_SetVideoMode(screen_w, screen_h, 0, SDL_HWSURFACE | SDL_RESIZABLE);
-          if (screen == NULL) {
-          fprintf(stderr, "Couldn't set %dx%dx%d video mode: %s\n",
-          screen_w, screen_h, 0, SDL_GetError());
-          SDL_Quit();
-          exit(1);
-          }
-          SDL_UnlockSurface(screen);
-          */
-        }
       }
-      SDL_RenderClear(renderer);
-      SDL_RenderCopy(renderer, overlay, NULL, NULL);
-      SDL_RenderPresent(renderer);
-
-      PTHREAD_UNLOCK(&sdl_mutex);
+      if (!locked) {
+        PTHREAD_LOCK(&sdl_mutex);
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, overlay, NULL, NULL);
+        SDL_RenderPresent(renderer);
+        PTHREAD_UNLOCK(&sdl_mutex);
+      }
+      else {
+        SDL_RenderPresent(renderer);
+      }
       SDL_Delay(10);
       // printf("event");
     }
