@@ -92,80 +92,10 @@ static FILE* open_output_file(const char* filename)
 }
 
 #if KVZ_VISUALIZATION == 1
-typedef struct {
-  int argc;
-  char** argv;
-} main_args_t;
-/*
-int kvz_main(int argc, char *argv[]);
-
-static void *call_kvz_main(void *main_args_opaque) {
-  main_args_t *main_args = main_args_opaque;
-  return (void*)kvz_main(main_args->argc, main_args->argv);
-}
-
-int main(int argc, char **argv) {
-  pthread_t encoder_thread;
-  main_args_t main_args = { argc, argv };
-
-  pthread_mutex_init(&sdl_mutex, NULL);
-
-  if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-    fprintf(stderr,
-      "Couldn't initialize SDL: %s\n", SDL_GetError());
-    return(1);
-  }
-
-  if (pthread_create(&encoder_thread, NULL, call_kvz_main, (void*)&main_args) != 0) {
-    fprintf(stderr, "pthread_create failed!\n");
-    exit(EXIT_FAILURE);
-  }
-  
-  for (;;) {
-    SDL_Event event;
-
-    while (1) {
-    //while (SDL_WaitEventTimeout(&event, 30)) {
-
-      SDL_PollEvent(&event);
-      PTHREAD_LOCK(&sdl_mutex);
-      if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.sym == SDLK_d) sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
-      }
-      if (event.type == SDL_QUIT) {
-        SDL_Quit();
-        exit(1);
-      }
-      // On window resize, reset the screen to the new size
-
-      if (event.type == SDL_WINDOWEVENT) {
-        
-        SDL_LockSurface(screen);
-        screen_w = event.resize.w; screen_h = event.resize.h;
-        screen = SDL_SetVideoMode(screen_w, screen_h, 0, SDL_HWSURFACE | SDL_RESIZABLE);
-        if (screen == NULL) {
-          fprintf(stderr, "Couldn't set %dx%dx%d video mode: %s\n",
-            screen_w, screen_h, 0, SDL_GetError());
-          SDL_Quit();
-          exit(1);
-        }
-        SDL_UnlockSurface(screen);
-        
-      }
-      SDL_RenderClear(renderer);
-      SDL_RenderCopy(renderer, overlay, NULL, NULL);
-      SDL_RenderPresent(renderer);
-      
-      PTHREAD_UNLOCK(&sdl_mutex); 
-     // printf("event");
-    }
-  }
-}
-*/
 
 void *eventloop_main(void* temp) {
   /* Initialize the display */
-  //screen = SDL_SetVideoMode(screen_w, screen_h, 0, SDL_HWSURFACE | SDL_RESIZABLE);
+
   window = SDL_CreateWindow(
     "Kvazaar",                  // window title
     SDL_WINDOWPOS_UNDEFINED,           // initial x position
@@ -190,9 +120,7 @@ void *eventloop_main(void* temp) {
   sdl_pixels = (kvz_pixel*)malloc(screen_w*screen_h * 2 * sizeof(kvz_pixel));
   sdl_pixels_u = sdl_pixels + screen_w*screen_h;
   sdl_pixels_v = sdl_pixels_u + (screen_w*screen_h >> 2);
-  //overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
-  //overlay = SDL_CreateYUVOverlay(screen_w, screen_h, SDL_IYUV_OVERLAY, screen);
-  //overlay_blocks = SDL_CreateYUVOverlay(screen_w, screen_h, SDL_IYUV_OVERLAY, screen);
+
   if (overlay == NULL || overlay_blocks == NULL) {
     fprintf(stderr, "Couldn't create overlay: %s\n", SDL_GetError());
     SDL_Quit();
@@ -241,7 +169,7 @@ void *eventloop_main(void* temp) {
     }
   }
 }
-
+#endif
 
 /**
  * \brief Program main function.
@@ -249,10 +177,8 @@ void *eventloop_main(void* temp) {
  * \param argv Argument list
  * \return Program exit state
  */
-//int kvz_main(int argc, char *argv[])
-//#else
 int main(int argc, char *argv[])
-#endif
+
 {
   int retval = EXIT_SUCCESS;
 
@@ -334,45 +260,6 @@ int main(int argc, char *argv[])
 
   screen_w = encoder->in.width;
   screen_h = encoder->in.height;
-
-  /* Initialize the display */
-  /*
-  //screen = SDL_SetVideoMode(screen_w, screen_h, 0, SDL_HWSURFACE | SDL_RESIZABLE);
-  window = SDL_CreateWindow(
-    "Kvazaar",                  // window title
-    SDL_WINDOWPOS_UNDEFINED,           // initial x position
-    SDL_WINDOWPOS_UNDEFINED,           // initial y position
-    screen_w, screen_h,
-    SDL_WINDOW_RESIZABLE
-    );
-
-  if (window == NULL) {
-    fprintf(stderr, "Couldn't set %dx%dx%d video mode: %s\n",
-      screen_w, screen_h, 0, SDL_GetError());
-    SDL_Quit();
-    exit(1);
-  }
-
-  // Set the window manager title bar
-  renderer = SDL_CreateRenderer(window, -1, 0);
-  // Create overlays for reconstruction and reconstruction with block borders
-  overlay = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
-  overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
-
-  sdl_pixels = (kvz_pixel*)malloc(screen_w*screen_h * 2 * sizeof(kvz_pixel));
-  sdl_pixels_u = sdl_pixels + screen_w*screen_h;
-  sdl_pixels_v = sdl_pixels_u + (screen_w*screen_h>>2);
-  //overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
-  //overlay = SDL_CreateYUVOverlay(screen_w, screen_h, SDL_IYUV_OVERLAY, screen);
-  //overlay_blocks = SDL_CreateYUVOverlay(screen_w, screen_h, SDL_IYUV_OVERLAY, screen);
-  if (overlay == NULL || overlay_blocks == NULL) {
-    fprintf(stderr, "Couldn't create overlay: %s\n", SDL_GetError());
-    SDL_Quit();
-    exit(1);
-  }
-  */
-
-
   pthread_t sdl_thread;
 
   pthread_mutex_init(&sdl_mutex, NULL);
@@ -465,6 +352,7 @@ int main(int argc, char *argv[])
       memcpy(sdl_pixels_u, img_in->u, (encoder->cfg->width*encoder->cfg->height) >> 2);
       memcpy(sdl_pixels_v, img_in->v, (encoder->cfg->width*encoder->cfg->height) >> 2);
 
+      // ToDo: block overlay
       //memcpy(overlay_blocks->pixels[1], img_in->u, (encoder->cfg->width*encoder->cfg->height) >> 2);
       //memcpy(overlay_blocks->pixels[2], img_in->v, (encoder->cfg->width*encoder->cfg->height) >> 2);
 

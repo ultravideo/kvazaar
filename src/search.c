@@ -42,7 +42,6 @@
   extern SDL_Renderer *renderer;
   extern SDL_Surface *screen, *pic;
   extern SDL_Texture *overlay, *overlay_blocks;
-  //SDL_UpdateYUVTexture()
   extern int screen_w, screen_h;
   extern int sdl_draw_blocks;
   extern pthread_mutex_t sdl_mutex;
@@ -733,12 +732,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
       state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
 
-    //SDL_LockSurface(screen);
-    //SDL_LockYUVOverlay(overlay); SDL_LockYUVOverlay(overlay_blocks);
-    //SDL_LockTexture(overlay, NULL, NULL, NULL);
-
-    
-
     if (sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
       kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
         x_max, y_max, LCU_WIDTH, pic_width);
@@ -764,19 +757,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
       }
     }
-
-    //SDL_UnlockYUVOverlay(overlay_blocks);  SDL_UnlockYUVOverlay(overlay);
-    //SDL_UnlockSurface(screen);
-    //SDL_UnlockTexture(overlay);
     rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
     SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, pic_width, sdl_pixels_u, pic_width >> 1, sdl_pixels_v, pic_width >> 1);
-    /*
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, overlay, NULL, NULL);
-    SDL_RenderPresent(renderer);
-    */
-    //SDL_UpdateTexture(overlay, NULL, sdl_pixels, pic_width*pic_height);
-//    SDL_DisplayYUVOverlay(sdl_draw_blocks ? overlay_blocks : overlay, &rect);
   }
   PTHREAD_UNLOCK(&sdl_mutex);
 #endif
