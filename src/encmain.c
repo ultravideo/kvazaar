@@ -262,6 +262,7 @@ int main(int argc, char *argv[])
 
   pthread_mutex_init(&sdl_mutex, NULL);
 
+  // Lock for eventloop thread to unlock
   PTHREAD_LOCK(&sdl_mutex);
 
   if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
@@ -277,6 +278,7 @@ int main(int argc, char *argv[])
 
 #endif
 
+  // Wait for eventloop to handle opening the window etc
   PTHREAD_LOCK(&sdl_mutex);
   PTHREAD_UNLOCK(&sdl_mutex);
 

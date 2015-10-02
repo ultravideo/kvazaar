@@ -756,6 +756,20 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           sdl_pixels[luma_index + (cu_width - 1) + y*pic_width] = cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255;
         }
       }
+
+      // Intra directions
+      if (cur_cu->type == CU_INTRA) {
+        int i = 1;
+        int mode = cur_cu->intra->mode;
+        const int x_off[] = { 0, 0, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
+        const int y_off[] = { 0, 0,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};
+        if (mode > 1) {      
+          //printf("Mode: %d, %d\n", mode, ((cu_width >> 1) + ((i*y_off[mode]) >> 3))*pic_width + ((cu_width >> 1) + ((i*x_off[mode]) >> 3)));
+          for (i = -cu_width / 4; i < cu_width / 4; i++) {
+            sdl_pixels[luma_index + ((cu_width >> 1) + ((i*y_off[mode]) >>3))*pic_width + ((cu_width >> 1) + ((i*x_off[mode]) >> 3))] = 255;
+          }
+        }
+      }
     }
     rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
     SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, pic_width, sdl_pixels_u, pic_width >> 1, sdl_pixels_v, pic_width >> 1);
