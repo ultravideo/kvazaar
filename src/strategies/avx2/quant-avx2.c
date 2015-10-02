@@ -34,6 +34,7 @@
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+#include <smmintrin.h>
 
 /**
 * \brief quantize transformed coefficents
@@ -231,8 +232,21 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   {
     int y, x;
     for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
+      for (x = 0; x < width; x+=4) {
+
+#if KVZ_BIT_DEPTH==8
+
+        __m128i v_ref_in = _mm_cvtsi32_si128(*(int32_t*)&(ref_in[x + y * in_stride]));
+        __m128i v_pred_in = _mm_cvtsi32_si128(*(int32_t*)&(pred_in[x + y * in_stride]));
+        __m128i v_residual = _mm_sub_epi16(_mm_cvtepu8_epi16(v_ref_in), _mm_cvtepu8_epi16(v_pred_in) );
+        _mm_storel_epi64((__m128i*)&residual[x + y * width], v_residual);
+#else
+        __m128i v_ref_in = _mm_loadl_epi64((__m128i*)&ref_in[x + y * in_stride]));
+        __m128i v_pred_in = _mm_loadl_epi64((__m128i*)&pred_in[x + y * in_stride]));
+        __m128i v_residual = _mm_sub_epi16(v_ref_in, v_pred_in);
+        _mm_storel_pd((__m128i*)&residual[x + y * width], v_residual);
         residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
+#endif
       }
     }
   }
@@ -260,11 +274,10 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   // Check if there are any non-zero coefficients.
   {
     int i;
-    for (i = 0; i < width * width; ++i) {
-      if (quant_coeff[i] != 0) {
-        has_coeffs = 1;
-        break;
-      }
+    for (i = 0; i < width * width; i+=8) {
+      __m128i v_quant_coeff = _mm_loadu_si128((__m128i*)&(quant_coeff[i]));
+      has_coeffs = !_mm_testz_si128(_mm_set1_epi8(0xFF), v_quant_coeff);
+      if(has_coeffs) break;
     }
   }
 
@@ -287,9 +300,20 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
     for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; ++x) {
-        int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
-        rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
+      for (x = 0; x < width; x+=4) {
+        //int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
+        //rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
+
+#if KVZ_BIT_DEPTH==8
+
+        __m128i v_residual = _mm_loadl_epi64((__m128i*)&(residual[x + y * width]));
+        __m128i v_pred_in = _mm_cvtsi32_si128(*((int32_t*)&(pred_in[x + y * in_stride])));
+        __m128i v_val = _mm_add_epi16(v_residual, _mm_cvtepu8_epi16(v_pred_in));
+        *((int32_t*)&(rec_out[x + y * out_stride])) = _mm_cvtsi128_si32(_mm_packus_epi16(v_val, v_val));
+#else
+        assert(0); //TODO
+#endif
+
       }
     }
   }
