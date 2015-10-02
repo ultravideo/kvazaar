@@ -78,12 +78,15 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <YASM />
     <Lib>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>pthreadVC2.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\..\visualizer_extras\lib\x64;$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL2main.lib;SDL2.lib;pthreadVC2.lib</AdditionalDependencies>
     </Lib>
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>
     </YASM>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\..\visualizer_extras\include;$(SolutionDir)..\..\pthreads.2\include;$(SolutionDir)..\src;$(SolutionDir)..\src\extras;$(SolutionDir)..\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <YASM>

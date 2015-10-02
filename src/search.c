@@ -36,6 +36,23 @@
 #include "search_inter.h"
 #include "search_intra.h"
 
+#if KVZ_VISUALIZATION == 1
+#include "threadqueue.h"
+  #include <SDL.h>
+  extern SDL_Renderer *renderer;
+  extern SDL_Surface *screen, *pic;
+  extern SDL_Texture *overlay, *overlay_blocks;
+  //SDL_UpdateYUVTexture()
+  extern int screen_w, screen_h;
+  extern int sdl_draw_blocks;
+  extern pthread_mutex_t sdl_mutex;
+  extern kvz_pixel *sdl_pixels;
+  extern kvz_pixel *sdl_pixels_u;
+  extern kvz_pixel *sdl_pixels_v;
+#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
+#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
+#endif
+
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \
   && (x) + (block_width) <= (width) \
@@ -497,6 +514,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 #ifdef KVZ_DEBUG
   int debug_split = 0;
 #endif
+#if KVZ_VISUALIZATION == 1
+  int sdl_work_tree_copy = 0;
+#endif
   PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHCU);
 
   // Stop recursion if the CU is completely outside the frame.
@@ -681,12 +701,85 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 #if KVZ_DEBUG
       debug_split = 1;
 #endif
+#if KVZ_VISUALIZATION == 1
+      sdl_work_tree_copy = 0;
+#endif
     } else if (depth > 0) {
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       work_tree_copy_down(x, y, depth, work_tree);
+#if KVZ_VISUALIZATION == 1
+      sdl_work_tree_copy = 1;
+#endif
     }
   }
+
+#if KVZ_VISUALIZATION == 1
+  PTHREAD_LOCK(&sdl_mutex);
+  {
+    SDL_Rect rect;
+
+    lcu_t *lcu = &work_tree[depth];
+    kvz_picture * const pic = state->tile->frame->source;
+
+    const int pic_width = state->encoder_control->cfg->width;
+    const int pic_height = state->encoder_control->cfg->height;
+    const int x_max = MIN(x + cu_width, pic->width) - x;
+    const int y_max = MIN(y + cu_width, pic->height) - y;
+    const int luma_index = x + y * pic_width +
+      state->tile->lcu_offset_x*LCU_WIDTH +
+      state->tile->lcu_offset_y *LCU_WIDTH * pic_width;
+    const int chroma_index = (x / 2) + (y / 2) * (pic_width / 2) +
+      state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
+      state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
+
+    //SDL_LockSurface(screen);
+    //SDL_LockYUVOverlay(overlay); SDL_LockYUVOverlay(overlay_blocks);
+    //SDL_LockTexture(overlay, NULL, NULL, NULL);
+
+    
+
+    if (sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
+      kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
+        x_max, y_max, LCU_WIDTH, pic_width);
+      kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
+        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+      kvz_pixels_blit(&lcu->rec.v[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_v[chroma_index],
+        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+
+      kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
+        x_max, y_max, LCU_WIDTH, pic_width);
+      kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
+        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+      kvz_pixels_blit(&lcu->rec.v[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_v[chroma_index],
+        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+
+      // Add block borders
+      memset(&sdl_pixels[luma_index + (cu_width - 1)*pic_width],
+        cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255, cu_width);
+      {
+        int y;
+        for (y = 0; y < cu_width; y++) {
+          sdl_pixels[luma_index + (cu_width - 1) + y*pic_width] = cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255;
+        }
+      }
+    }
+
+    //SDL_UnlockYUVOverlay(overlay_blocks);  SDL_UnlockYUVOverlay(overlay);
+    //SDL_UnlockSurface(screen);
+    //SDL_UnlockTexture(overlay);
+    rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
+    SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, pic_width, sdl_pixels_u, pic_width >> 1, sdl_pixels_v, pic_width >> 1);
+    /*
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, overlay, NULL, NULL);
+    SDL_RenderPresent(renderer);
+    */
+    //SDL_UpdateTexture(overlay, NULL, sdl_pixels, pic_width*pic_height);
+//    SDL_DisplayYUVOverlay(sdl_draw_blocks ? overlay_blocks : overlay, &rect);
+  }
+  PTHREAD_UNLOCK(&sdl_mutex);
+#endif
   
   PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x,
