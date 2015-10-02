@@ -207,6 +207,15 @@
     <ClCompile Include="..\..\src\input_frame_buffer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\strategies-quant.c">
+      <Filter>Source Files\strategies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\quant-generic.c">
+      <Filter>Source Files\strategies\generic</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\quant-avx2.c">
+      <Filter>Source Files\strategies\avx2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -373,6 +382,18 @@
     </ClInclude>
     <ClInclude Include="..\..\src\input_frame_buffer.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-common.h">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\strategies-quant.h">
+      <Filter>Header Files\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\generic\quant-generic.h">
+      <Filter>Header Files\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h">
+      <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -31,6 +31,7 @@
 #include "context.h"
 #include "cabac.h"
 #include "transform.h"
+#include "strategies/strategies-quant.h"
 
 
 #define QUANT_SHIFT          14

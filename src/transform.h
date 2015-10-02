@@ -35,8 +35,6 @@ extern const int16_t kvz_g_inv_quant_scales[6];
 
 
 
-void kvz_quant(const encoder_state_t *state, coeff_t *coef, coeff_t *q_coef, int32_t width,
-           int32_t height, int8_t type, int8_t scan_idx, int8_t block_type);
 void kvz_dequant(const encoder_state_t *state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height, int8_t type, int8_t block_type);
 
 void kvz_transformskip(const encoder_control_t *encoder, int16_t *block,int16_t *coeff, int8_t block_size);

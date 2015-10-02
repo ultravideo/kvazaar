@@ -148,12 +148,14 @@ int kvz_strategyselector_register(void *opaque, const char *type, const char *st
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-dct.h"
 #include "strategies/strategies-ipol.h"
+#include "strategies/strategies-quant.h"
 
 static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
   STRATEGIES_PICTURE_EXPORTS
   STRATEGIES_DCT_EXPORTS
   STRATEGIES_IPOL_EXPORTS
+  STRATEGIES_QUANT_EXPORTS
   { NULL, NULL },
 };
 
