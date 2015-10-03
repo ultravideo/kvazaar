@@ -27,9 +27,19 @@
 
 #include "global.h"
 
-#include "image.h"
 #include "encoder.h"
 #include "encoderstate.h"
+
+typedef struct {
+  kvz_pixel left[2 * 32 + 1];
+  kvz_pixel top[2 * 32 + 1];
+} kvz_intra_ref;
+typedef struct
+{
+  kvz_intra_ref ref;
+  kvz_intra_ref filtered_ref;
+  bool filtered_initialized;
+} kvz_intra_references;
 
 //void kvz_intra_set_block_mode(image* im,uint32_t x_ctb, uint32_t y_ctb, uint8_t depth, uint8_t mode, uint8_t part_mode);
 
@@ -46,6 +56,40 @@ void kvz_intra_get_pred(const encoder_control_t * const encoder, const kvz_pixel
 kvz_pixel kvz_intra_get_dc_pred(const kvz_pixel* pic, uint16_t pic_width, uint8_t width);
 void kvz_intra_get_planar_pred(const kvz_pixel* src,int32_t srcstride, uint32_t width, kvz_pixel* dst, int32_t dststride);
 void kvz_intra_get_angular_pred(const encoder_control_t *encoder, const kvz_pixel* src, int32_t src_stride, kvz_pixel* dst, int32_t dst_stride, int32_t width, int32_t dir_mode, int8_t filter);
+
+/**
+* \brief Generage angular predictions.
+* \param width    Width in pixels, range 4..32.
+* \param color    What color pixels to use.
+* \param luma_px  Luma coordinates of the prediction block.
+* \param pic_px   Picture dimensions in luma pixels.
+* \param lcu      LCU struct.
+* \param out_left_ref  Left reference pixels, index 0 is the top-left.
+* \param out_top_ref   Top reference pixels, index 0 is the top-left.
+*/
+void kvz_intra_build_reference(
+  const int_fast8_t log2_width,
+  const color_t color,
+  const vector2d_t *const luma_px,
+  const vector2d_t *const pic_px,
+  const lcu_t *const lcu,
+  kvz_intra_references *const refs);
+
+/**
+ * \brief Generate intra predictions.
+ * \param refs   Reference pixels used for the prediction.     
+ * \param log2_width  Width of the predicted block.
+ * \param mode   Intra mode used for the prediction.
+ * \param color  Color of the prediction.
+ * \param dst    Buffer for the predicted pixels.
+ */
+void kvz_intra_get_pred_new(
+  kvz_intra_references *refs,
+  int_fast8_t log2_width,
+  int_fast8_t mode,
+  color_t color,
+  kvz_pixel *dst);
+
 
 void kvz_intra_recon(const encoder_control_t *encoder, kvz_pixel* rec, int32_t rec_stride, uint32_t width, kvz_pixel* dst, int32_t dst_stride, int8_t mode, int8_t chroma);
 
