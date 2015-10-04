@@ -504,8 +504,8 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->rdo < 0 || cfg->rdo > 2) {
-    fprintf(stderr, "Input error: --rd parameter out of range [0..2]\n");
+  if (cfg->rdo < 0 || cfg->rdo > 3) {
+    fprintf(stderr, "Input error: --rd parameter out of range [0..3]\n");
     error = 1;
   }
 
