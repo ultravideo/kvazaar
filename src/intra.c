@@ -1159,7 +1159,6 @@ void kvz_intra_get_planar_pred(const kvz_pixel* src, int32_t srcstride, uint32_t
 
 void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {
-  const encoder_control_t * const encoder = state->encoder_control;
   const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   if (cur_cu == NULL) {
     cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
@@ -1185,25 +1184,18 @@ void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int d
 
     return;
   }
-  {
-    const uint32_t pic_width = state->tile->frame->width;
-    const uint32_t pic_height = state->tile->frame->height;
 
-    // Pointers to reconstruction arrays
-    kvz_pixel *recbase_y = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+  vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
+  vector2d_t luma_px = { x, y };
+  kvz_intra_references refs;
+  const int_fast8_t log2_width = kvz_g_convert_to_bit[width] + 2;
+  kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
 
-    kvz_pixel rec[(LCU_WIDTH*2+8)*(LCU_WIDTH*2+8)];
-    kvz_pixel *rec_shift  = &rec[width * 2 + 8 + 1];
+  // Perform intra prediction and put the result in correct place lcu.
+  kvz_pixel *block_in_lcu = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
+  kvz_intra_recon_new(&refs, log2_width, block_in_lcu, LCU_WIDTH, intra_mode, COLOR_Y);
 
-    int32_t rec_stride = LCU_WIDTH;
-
-    kvz_intra_build_reference_border(encoder, x, y,(int16_t)width * 2 + 8, rec, (int16_t)width * 2 + 8, 0,
-                                 pic_width, pic_height, lcu);
-    kvz_intra_recon(encoder, rec_shift, width * 2 + 8,
-                width, recbase_y, rec_stride, intra_mode, 0);
-
-    kvz_quantize_lcu_luma_residual(state, x, y, depth, cur_cu, lcu);
-  }
+  kvz_quantize_lcu_luma_residual(state, x, y, depth, cur_cu, lcu);
 }
 
 void kvz_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
