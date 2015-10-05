@@ -41,7 +41,7 @@ void init_test_strategies()
   }
 
   if (!kvz_strategy_register_dct(&strategies, KVZ_BIT_DEPTH)) {
-    fprintf(stderr, "strategy_register_partial_butterfly failed!\n");
+    fprintf(stderr, "strategy_register_dct failed!\n");
     return;
   }
 }

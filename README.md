@@ -55,7 +55,7 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
               --subme <integer>      : Set fractional pixel motion estimation level [1].
                                          0: only integer motion estimation
                                          1: fractional pixel motion estimation enabled
-              --source-scan-type <string> : Set source scan type [\"progressive\"].
+              --source-scan-type <string> : Set source scan type ["progressive"].
                                               "progressive": progressive scan
                                               "tff": top field first
                                               "bff": bottom field first
