@@ -49,6 +49,7 @@
   extern kvz_pixel *sdl_pixels;
   extern kvz_pixel *sdl_pixels_u;
   extern kvz_pixel *sdl_pixels_v;
+  extern int32_t sdl_delay;
 #define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
 #define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
 #endif
@@ -726,6 +727,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
 
   PTHREAD_LOCK(&sdl_mutex);
+  
   if (x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)
   {
     SDL_Rect rect;
@@ -747,7 +749,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
       state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
 
-    if (sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
+    if ((depth == 0 && !(cur_cu->cbf.y) && cur_cu->type == CU_INTER) || sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
       kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
         x_max, y_max, LCU_WIDTH, pic_width);
       kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
@@ -757,24 +759,27 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
       // Clear RGB buffer area
       {
-        int y;
-        for (y = 0; y < cu_width; y++) {          
-          memset(&sdl_pixels_RGB[index_RGB + (y*pic_width << 2)], 0, cu_width << 2);
+        int temp_y;
+        for (temp_y = 0; temp_y < cu_width; temp_y++) {
+          memset(&sdl_pixels_RGB[index_RGB + (temp_y*pic_width << 2)], 0, cu_width << 2);
         }
       }
 
 
-      if (cu_width > 4) {
+      //if (cu_width > 4 || (!(x & 7) && !(y & 7))) 
+      {
         int temp_x;
         const uint32_t frame_r[4] = { 0, 100, 255, 255};
         const uint32_t frame_g[4] = { 255, 100, 255, 0};
         const uint32_t frame_b[4] = { 0, 255, 0, 100  };
         uint8_t framemod = state->global->frame % 4;
         // Add block borders
-        for (temp_x = 0; temp_x < cu_width; temp_x++) {
-          PUTPIXEL(temp_x, (cu_width - 1), frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
+        if ((y + cu_width) % 8 == 0) {
+          for (temp_x = 0; temp_x < cu_width; temp_x++) {
+            PUTPIXEL(temp_x, (cu_width - 1), frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
+          }
         }
-        {
+        if ((x + cu_width) % 8 == 0) {
           int y;
           for (y = 0; y < cu_width; y++) {
             PUTPIXEL((cu_width - 1), y, frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
@@ -805,6 +810,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels + luma_index, pic_width, sdl_pixels_u + chroma_index, pic_width >> 1, sdl_pixels_v + chroma_index, pic_width >> 1);
     SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB+index_RGB, pic_width * 4);
   }
+  if (sdl_delay) SDL_Delay(sdl_delay);
   PTHREAD_UNLOCK(&sdl_mutex);
 #endif
   

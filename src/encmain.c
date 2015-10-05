@@ -60,6 +60,7 @@ kvz_pixel *sdl_pixels_RGB;
 kvz_pixel *sdl_pixels;
 kvz_pixel *sdl_pixels_u;
 kvz_pixel *sdl_pixels_v;
+int32_t sdl_delay;
 #define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
 #define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
 #endif
@@ -109,8 +110,10 @@ void *eventloop_main(void* temp) {
     fprintf(stderr, "Couldn't set %dx%dx%d video mode: %s\n",
       screen_w, screen_h, 0, SDL_GetError());
     SDL_Quit();
-    exit(1);
+    exit(1);  
   }
+
+  sdl_delay = 0;
 
   // Set the window manager title bar
   renderer = SDL_CreateRenderer(window, -1, 0);
@@ -143,6 +146,8 @@ void *eventloop_main(void* temp) {
       while (SDL_PollEvent(&event)) {
         if (event.type == SDL_KEYDOWN) {
           if (event.key.keysym.sym == SDLK_d) sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
+          if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
+          if (event.key.keysym.sym == SDLK_KP_MINUS) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
           if (event.key.keysym.sym == SDLK_p) {
             if (locked) {
               locked = 0;
