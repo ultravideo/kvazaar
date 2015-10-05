@@ -153,8 +153,28 @@ void *eventloop_main(void* temp) {
 
       while (SDL_PollEvent(&event)) {
         if (event.type == SDL_KEYDOWN) {
-          if (event.key.keysym.sym == SDLK_d) sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
-          if (event.key.keysym.sym == SDLK_i) sdl_draw_intra = sdl_draw_intra ? 0 : 1;
+          if (event.key.keysym.sym == SDLK_d) {
+            sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
+            if (locked) {
+              SDL_RenderClear(renderer);
+              SDL_RenderCopy(renderer, overlay, NULL, NULL);
+              if (sdl_draw_blocks)
+                SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
+              if (sdl_draw_intra)
+                SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
+            }
+          }
+          if (event.key.keysym.sym == SDLK_i) {
+            sdl_draw_intra = sdl_draw_intra ? 0 : 1;
+            if (locked) {
+              SDL_RenderClear(renderer);
+              SDL_RenderCopy(renderer, overlay, NULL, NULL);
+              if (sdl_draw_blocks)
+                SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
+              if (sdl_draw_intra)
+                SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
+            }
+          }
           if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
           if (event.key.keysym.sym == SDLK_KP_MINUS) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
           if (event.key.keysym.sym == SDLK_p) {
