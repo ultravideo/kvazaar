@@ -40,8 +40,22 @@ typedef struct
   bool filtered_initialized;
 } kvz_intra_references;
 
-int8_t kvz_intra_get_dir_luma_predictor(uint32_t x, uint32_t y, int8_t* preds,
-                                    const cu_info_t* cur_cu, const cu_info_t* left_cu, const cu_info_t* above_cu);
+
+/**
+* \brief Function for deriving intra luma predictions
+* \param pic picture to use
+* \param x_cu x CU position (smallest CU)
+* \param y_cu y CU position (smallest CU)
+* \param preds output buffer for 3 predictions
+* \returns (predictions are found)?1:0
+*/
+int8_t kvz_intra_get_dir_luma_predictor(
+  const uint32_t x,
+  const uint32_t y,
+  int8_t *preds,
+  const cu_info_t *const cur_cu,
+  const cu_info_t *const left_cu,
+  const cu_info_t *const above_cu);
 
 /**
 * \brief Generage angular predictions.
@@ -76,7 +90,28 @@ void kvz_intra_predict(
   color_t color,
   kvz_pixel *dst);
 
-void kvz_intra_recon_lcu_luma(encoder_state_t *state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
-void kvz_intra_recon_lcu_chroma(encoder_state_t *state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu);
+/**
+ * \brief Do a full intra prediction cycle on a CU in lcu for luma.
+ */
+void kvz_intra_recon_lcu_luma(
+  encoder_state_t *const state,
+  int x,
+  int y,
+  int depth,
+  int8_t intra_mode,
+  cu_info_t *cur_cu,
+  lcu_t *lcu);
+
+/**
+* \brief Do a full intra prediction cycle on a CU in lcu for chroma.
+*/
+void kvz_intra_recon_lcu_chroma(
+  encoder_state_t *const state,
+  int x,
+  int y,
+  int depth,
+  int8_t intra_mode,
+  cu_info_t *cur_cu,
+  lcu_t *lcu);
 
 #endif

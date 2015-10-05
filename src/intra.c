@@ -33,16 +33,13 @@
 #include "transform.h"
 
 
-/**
- * \brief Function for deriving intra luma predictions
- * \param pic picture to use
- * \param x_cu x CU position (smallest CU)
- * \param y_cu y CU position (smallest CU)
- * \param preds output buffer for 3 predictions
- * \returns (predictions are found)?1:0
- */
-int8_t kvz_intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8_t* preds,
-                                    const cu_info_t * const cur_cu, const cu_info_t * const left_cu, const cu_info_t * const above_cu)
+int8_t kvz_intra_get_dir_luma_predictor(
+  const uint32_t x,
+  const uint32_t y,
+  int8_t *preds,
+  const cu_info_t *const cur_cu,
+  const cu_info_t *const left_cu,
+  const cu_info_t *const above_cu)
 {
   int y_cu = y>>3;
 
@@ -97,7 +94,9 @@ int8_t kvz_intra_get_dir_luma_predictor(const uint32_t x, const uint32_t y, int8
 }
 
 
-static void intra_filter_reference(int_fast8_t log2_width, kvz_intra_references *refs)
+static void intra_filter_reference(
+  int_fast8_t log2_width,
+  kvz_intra_references *refs)
 {
   if (refs->filtered_initialized) {
     return;
@@ -589,7 +588,14 @@ void kvz_intra_build_reference(
 }
 
 
-void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
+void kvz_intra_recon_lcu_luma(
+  encoder_state_t *const state,
+  int x,
+  int y,
+  int depth,
+  int8_t intra_mode,
+  cu_info_t *cur_cu,
+  lcu_t *lcu)
 {
   const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   if (cur_cu == NULL) {
@@ -634,7 +640,14 @@ void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int d
 }
 
 
-void kvz_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
+void kvz_intra_recon_lcu_chroma(
+  encoder_state_t *const state,
+  int x,
+  int y,
+  int depth,
+  int8_t intra_mode,
+  cu_info_t *cur_cu,
+  lcu_t *lcu)
 {
   const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
   const int8_t width = LCU_WIDTH >> depth;
