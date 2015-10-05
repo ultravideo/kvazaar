@@ -28,12 +28,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include "config.h"
 #include "encoder.h"
 #include "transform.h"
-#include "rdo.h"
 
 
 /**
@@ -129,7 +126,7 @@ static void intra_filter_reference(int_fast8_t log2_width, kvz_intra_references 
 }
 
 
-static void post_process_intra_angular(
+static void intra_post_process_angular(
   unsigned width,
   unsigned stride,
   const kvz_pixel *ref,
@@ -152,7 +149,7 @@ static void post_process_intra_angular(
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
-static void kvz_intra_pred_angular(
+static void intra_pred_angular(
   const int_fast8_t log2_width,
   const int_fast8_t intra_mode,
   const kvz_pixel *const in_ref_above,
@@ -265,7 +262,7 @@ static void kvz_intra_pred_angular(
  * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
  * \param dst           Buffer of size width*width.
  */
-static void kvz_intra_pred_planar(
+static void intra_pred_planar(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
@@ -311,7 +308,7 @@ static void kvz_intra_pred_planar(
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
 */
-static void kvz_intra_pred_dc(
+static void intra_pred_dc(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
@@ -341,7 +338,7 @@ static void kvz_intra_pred_dc(
 * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
 * \param dst           Buffer of size width*width.
 */
-static void kvz_intra_pred_filtered_dc(
+static void intra_pred_filtered_dc(
   const int_fast8_t log2_width,
   const kvz_pixel *const ref_top,
   const kvz_pixel *const ref_left,
@@ -406,21 +403,21 @@ void kvz_intra_predict(
   }
 
   if (mode == 0) {
-    kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
+    intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
     // Do extra post filtering for edge pixels of luma DC mode.
     if (color == COLOR_Y && width < 32) {
-      kvz_intra_pred_filtered_dc(log2_width, used_ref->top, used_ref->left, dst);
+      intra_pred_filtered_dc(log2_width, used_ref->top, used_ref->left, dst);
     } else {
-      kvz_intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
+      intra_pred_dc(log2_width, used_ref->top, used_ref->left, dst);
     }
   } else {
-    kvz_intra_pred_angular(log2_width, mode, used_ref->top, used_ref->left, dst);
+    intra_pred_angular(log2_width, mode, used_ref->top, used_ref->left, dst);
     if (color == COLOR_Y && width < 32) {
       if (mode == 10) {
-        post_process_intra_angular(width, 1, used_ref->top, dst);
+        intra_post_process_angular(width, 1, used_ref->top, dst);
       } else if (mode == 26) {
-        post_process_intra_angular(width, width, used_ref->left, dst);
+        intra_post_process_angular(width, width, used_ref->left, dst);
       }
     }
   }
@@ -635,6 +632,7 @@ void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int d
 
   kvz_quantize_lcu_luma_residual(state, x, y, depth, cur_cu, lcu);
 }
+
 
 void kvz_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int depth, int8_t intra_mode, cu_info_t *cur_cu, lcu_t *lcu)
 {

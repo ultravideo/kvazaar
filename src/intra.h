@@ -27,7 +27,6 @@
 
 #include "global.h"
 
-#include "encoder.h"
 #include "encoderstate.h"
 
 typedef struct {
