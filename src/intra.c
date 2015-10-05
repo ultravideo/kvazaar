@@ -375,7 +375,7 @@ static void kvz_intra_pred_filtered_dc(
 }
 
 
-void kvz_intra_get_pred_new(
+void kvz_intra_predict(
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
@@ -628,7 +628,7 @@ void kvz_intra_recon_lcu_luma(encoder_state_t * const state, int x, int y, int d
   kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
 
   kvz_pixel pred[32 * 32];
-  kvz_intra_get_pred_new(&refs, log2_width, intra_mode, COLOR_Y, pred);
+  kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred);
   
   kvz_pixel *block_in_lcu = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
   kvz_pixels_blit(pred, block_in_lcu, width, width, width, LCU_WIDTH);
@@ -680,7 +680,7 @@ void kvz_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int
       kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs);
 
       kvz_pixel pred[32 * 32];
-      kvz_intra_get_pred_new(&refs, log2_width_c, intra_mode, COLOR_U, pred);
+      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_U, pred);
 
       kvz_pixel *pu_in_lcu = &lcu->rec.u[lcu_px.x / 2 + (lcu_px.y * LCU_WIDTH) / 4];
       kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);
@@ -692,7 +692,7 @@ void kvz_intra_recon_lcu_chroma(encoder_state_t * const state, int x, int y, int
       kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs);
       
       kvz_pixel pred[32 * 32];
-      kvz_intra_get_pred_new(&refs, log2_width_c, intra_mode, COLOR_V, pred);
+      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_V, pred);
 
       kvz_pixel *pu_in_lcu = &lcu->rec.v[lcu_px.x / 2 + (lcu_px.y * LCU_WIDTH) / 4];
       kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);

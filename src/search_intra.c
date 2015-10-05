@@ -296,7 +296,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_get_pred_new(refs_u, log2_width_c, modes[i], COLOR_U, pred);
+    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -304,7 +304,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_get_pred_new(refs_v, log2_width_c, modes[i], COLOR_V, pred);
+    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -379,7 +379,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
   for (int mode = 2; mode <= 34; mode += offset) {
-    kvz_intra_get_pred_new(refs, log2_width, mode, COLOR_Y, pred);
+    kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
     costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
     modes[modes_selected] = mode;
 
@@ -402,7 +402,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
       int8_t center_node = best_mode;
       int8_t mode = center_node - offset;
       if (mode >= 2) {
-        kvz_intra_get_pred_new(refs, log2_width, mode, COLOR_Y, pred);
+        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
         costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         if (costs[modes_selected] < best_cost) {
@@ -414,7 +414,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
       mode = center_node + offset;
       if (mode <= 34) {
-        kvz_intra_get_pred_new(refs, log2_width, mode, COLOR_Y, pred);
+        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
         costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         if (costs[modes_selected] < best_cost) {
@@ -441,7 +441,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_get_pred_new(refs, log2_width, mode, COLOR_Y, pred);
+      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
       costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;

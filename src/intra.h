@@ -70,7 +70,7 @@ void kvz_intra_build_reference(
  * \param color  Color of the prediction.
  * \param dst    Buffer for the predicted pixels.
  */
-void kvz_intra_get_pred_new(
+void kvz_intra_predict(
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
