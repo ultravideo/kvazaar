@@ -56,6 +56,7 @@ SDL_Texture *overlay, *overlay_blocks;
 int screen_w, screen_h;
 int sdl_draw_blocks = 1;
 pthread_mutex_t sdl_mutex;
+kvz_pixel *sdl_pixels_RGB;
 kvz_pixel *sdl_pixels;
 kvz_pixel *sdl_pixels_u;
 kvz_pixel *sdl_pixels_v;
@@ -115,7 +116,13 @@ void *eventloop_main(void* temp) {
   renderer = SDL_CreateRenderer(window, -1, 0);
   // Create overlays for reconstruction and reconstruction with block borders
   overlay = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
-  overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
+  overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
+
+
+  SDL_SetTextureBlendMode(overlay_blocks, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureBlendMode(overlay, SDL_BLENDMODE_BLEND);
+  sdl_pixels_RGB = (kvz_pixel*)malloc(screen_w*screen_h * 4);
+  memset(sdl_pixels_RGB, 0, (screen_w*screen_h * 4));
 
   sdl_pixels = (kvz_pixel*)malloc(screen_w*screen_h * 2 * sizeof(kvz_pixel));
   sdl_pixels_u = sdl_pixels + screen_w*screen_h;
@@ -156,6 +163,8 @@ void *eventloop_main(void* temp) {
         PTHREAD_LOCK(&sdl_mutex);
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, overlay, NULL, NULL);
+        if (sdl_draw_blocks)
+          SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
         SDL_RenderPresent(renderer);
         PTHREAD_UNLOCK(&sdl_mutex);
       }
@@ -486,6 +495,7 @@ done:
   CHECKPOINTS_FINALIZE();
 #if KVZ_VISUALIZATION == 1
   free(sdl_pixels);
+  free(sdl_pixels_RGB);
   SDL_Quit();
 #endif
 

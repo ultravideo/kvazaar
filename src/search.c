@@ -45,6 +45,7 @@
   extern int screen_w, screen_h;
   extern int sdl_draw_blocks;
   extern pthread_mutex_t sdl_mutex;
+  extern kvz_pixel *sdl_pixels_RGB;
   extern kvz_pixel *sdl_pixels;
   extern kvz_pixel *sdl_pixels_u;
   extern kvz_pixel *sdl_pixels_v;
@@ -714,6 +715,16 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
 #if KVZ_VISUALIZATION == 1
+#define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
+#define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
+#define PUTPIXEL_V(pixel_x, pixel_y, color_v) sdl_pixels_v[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_v;
+#define PUTPIXEL(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)] = color_alpha; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_r; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_g; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +3] = color_b;
+#define PUTPIXEL_YUV(pixel_x, pixel_y, color_y, color_u, color_v) PUTPIXEL_Y(pixel_x,pixel_y, color_y); PUTPIXEL_U(pixel_x,pixel_y, color_u); PUTPIXEL_V(pixel_x,pixel_y, color_v);
+
+
   PTHREAD_LOCK(&sdl_mutex);
   {
     SDL_Rect rect;
@@ -725,6 +736,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     const int pic_height = state->encoder_control->cfg->height;
     const int x_max = MIN(x + cu_width, pic->width) - x;
     const int y_max = MIN(y + cu_width, pic->height) - y;
+    const int index_RGB = (x + y * pic_width +
+      state->tile->lcu_offset_x*LCU_WIDTH +
+      state->tile->lcu_offset_y *LCU_WIDTH * pic_width)<<2;
     const int luma_index = x + y * pic_width +
       state->tile->lcu_offset_x*LCU_WIDTH +
       state->tile->lcu_offset_y *LCU_WIDTH * pic_width;
@@ -747,13 +761,31 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       kvz_pixels_blit(&lcu->rec.v[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_v[chroma_index],
         x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
 
-      // Add block borders
-      memset(&sdl_pixels[luma_index + (cu_width - 1)*pic_width],
-        cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255, cu_width);
+      // Clear RBG buffer area
       {
         int y;
-        for (y = 0; y < cu_width; y++) {
-          sdl_pixels[luma_index + (cu_width - 1) + y*pic_width] = cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255;
+        for (y = 0; y < cu_width; y++) {          
+          memset(&sdl_pixels_RGB[index_RGB + (y*pic_width << 2)], 0, cu_width << 2);
+            //PUTPIXEL(x, y, 0, 0, 0, 0);
+
+        }
+      }
+
+
+      if (cu_width > 4) {
+
+        // Add block borders
+        for (x = 0; x < cu_width; x++) {
+          //PUTPIXEL(x, (cu_width - 1), 100, 150, 0);          
+          PUTPIXEL(x, (cu_width - 1), 100, 100, 255, 255);
+        }
+        //memset(&sdl_pixels[luma_index + (cu_width - 1)*pic_width], cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255, cu_width);
+        {
+          int y;
+          for (y = 0; y < cu_width; y++) {
+            //sdl_pixels[luma_index + (cu_width - 1) + y*pic_width] = cur_cu->type == CU_INTER ? (cur_cu->skipped ? 0 : 100) : 255;
+            PUTPIXEL((cu_width - 1), y, 0, 100, 255, 255);
+          }
         }
       }
 
@@ -766,13 +798,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         if (mode > 1) {      
           //printf("Mode: %d, %d\n", mode, ((cu_width >> 1) + ((i*y_off[mode]) >> 3))*pic_width + ((cu_width >> 1) + ((i*x_off[mode]) >> 3)));
           for (i = -cu_width / 4; i < cu_width / 4; i++) {
-            sdl_pixels[luma_index + ((cu_width >> 1) + ((i*y_off[mode]) >>3))*pic_width + ((cu_width >> 1) + ((i*x_off[mode]) >> 3))] = 255;
+            sdl_pixels[luma_index + ((cu_width >> 1) + ((i*y_off[mode]) >>3)-1)*pic_width + ((cu_width >> 1) + ((i*x_off[mode]) >> 3)-1)] = 255;
           }
+        } else {
+
         }
+      }
+      if (cur_cu->type == CU_INTER) {
+        int i = 1;
       }
     }
     rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
     SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, pic_width, sdl_pixels_u, pic_width >> 1, sdl_pixels_v, pic_width >> 1);
+    SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB, pic_width*4);
   }
   PTHREAD_UNLOCK(&sdl_mutex);
 #endif
