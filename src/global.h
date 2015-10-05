@@ -124,6 +124,7 @@ typedef int16_t coeff_t;
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))
+#define CLIP_TO_PIXEL(value) CLIP(0, PIXEL_MAX, (value))
 #define SWAP(a,b,swaptype) { swaptype tempval; tempval = a; a = b; b = tempval; }
 #define CU_WIDTH_FROM_DEPTH(depth) (LCU_WIDTH >> depth)
 #define WITHIN(val, min_val, max_val) ((min_val) <= (val) && (val) <= (max_val))

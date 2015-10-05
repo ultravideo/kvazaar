@@ -271,14 +271,14 @@ static double search_intra_trdepth(encoder_state_t * const state,
 static void search_intra_chroma_rough(encoder_state_t * const state,
                                       int x_px, int y_px, int depth,
                                       const kvz_pixel *orig_u, const kvz_pixel *orig_v, int16_t origstride,
-                                      const kvz_pixel *rec_u, const kvz_pixel *rec_v, int16_t recstride,
+                                      kvz_intra_references *refs_u, kvz_intra_references *refs_v,
                                       int8_t luma_mode,
                                       int8_t modes[5], double costs[5])
 {
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
-  if (!reconstruct_chroma) return;
+  assert(!(x_px & 4 || y_px & 4));
 
   const unsigned width = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
+  const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - (depth + 1), 2);
 
   for (int i = 0; i < 5; ++i) {
     costs[i] = 0;
@@ -287,16 +287,16 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   cost_pixel_nxn_func *const satd_func = kvz_pixels_get_satd_func(width);
   //cost_pixel_nxn_func *const sad_func = kvz_pixels_get_sad_func(width);
 
-  kvz_pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  kvz_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
   kvz_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
 
-  kvz_pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
   kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
 
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_get_pred(state->encoder_control, rec_u, NULL, recstride, pred, width, modes[i], 1);
+    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -304,7 +304,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_get_pred(state->encoder_control, rec_v, NULL, recstride, pred, width, modes[i], 2);
+    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -343,41 +343,25 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
  */
 static int8_t search_intra_rough(encoder_state_t * const state, 
                                  kvz_pixel *orig, int32_t origstride,
-                                 kvz_pixel *rec, int16_t recstride,
-                                 int width, int8_t *intra_preds,
+                                 kvz_intra_references *refs,
+                                 int log2_width, int8_t *intra_preds,
                                  int8_t modes[35], double costs[35])
 {
+  assert(log2_width >= 2 && log2_width <= 5);
+  int_fast8_t width = 1 << log2_width;
   cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
   cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
 
   // Temporary block arrays
-  kvz_pixel _pred[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  kvz_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
   kvz_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
   
-  kvz_pixel _orig_block[LCU_WIDTH * LCU_WIDTH + 1 + SIMD_ALIGNMENT];
+  kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
   kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
-  
-  kvz_pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-
-  kvz_pixel *recf = &rec_filtered_temp[recstride + 1];
-
-  assert(width == 4 || width == 8 || width == 16 || width == 32);
 
   // Store original block for SAD computation
   kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
 
-  // Generate filtered reference pixels.
-  {
-    int16_t x, y;
-    for (y = -1; y < recstride; y++) {
-      recf[y*recstride - 1] = rec[y*recstride - 1];
-    }
-    for (x = 0; x < recstride; x++) {
-      recf[x - recstride] = rec[x - recstride];
-    }
-    kvz_intra_filter(recf, recstride, width, 0);
-  }
-  
   int8_t modes_selected = 0;
   unsigned min_cost = UINT_MAX;
   unsigned max_cost = 0;
@@ -387,18 +371,15 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   int offset;
   if (state->encoder_control->full_intra_search) {
     offset = 1;
-  } else if (width == 4) {
-    offset = 2;
-  } else if (width == 8) {
-    offset = 4;
   } else {
-    offset = 8;
+    static const int8_t offsets[4] = { 2, 4, 8, 8 };
+    offset = offsets[log2_width - 2];
   }
 
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
   for (int mode = 2; mode <= 34; mode += offset) {
-    kvz_intra_get_pred(state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
+    kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
     costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
     modes[modes_selected] = mode;
 
@@ -421,7 +402,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
       int8_t center_node = best_mode;
       int8_t mode = center_node - offset;
       if (mode >= 2) {
-        kvz_intra_get_pred(state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
+        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
         costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         if (costs[modes_selected] < best_cost) {
@@ -433,7 +414,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
       mode = center_node + offset;
       if (mode <= 34) {
-        kvz_intra_get_pred(state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
+        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
         costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
         modes[modes_selected] = mode;
         if (costs[modes_selected] < best_cost) {
@@ -460,7 +441,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_get_pred(state->encoder_control, rec, recf, recstride, pred, width, mode, 0);
+      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
       costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;
@@ -507,7 +488,6 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 static int8_t search_intra_rdo(encoder_state_t * const state, 
                              int x_px, int y_px, int depth,
                              kvz_pixel *orig, int32_t origstride,
-                             kvz_pixel *rec, int16_t recstride,
                              int8_t *intra_preds,
                              int modes_to_check,
                              int8_t modes[35], double costs[35],
@@ -517,31 +497,14 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
   const int width = LCU_WIDTH >> depth;
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
-  int rdo_mode;
-  int pred_mode;
-
-  kvz_pixel rec_filtered_temp[(LCU_WIDTH * 2 + 8) * (LCU_WIDTH * 2 + 8) + 1];
-  kvz_pixel *recf = &rec_filtered_temp[recstride + 1];
-
-  // Generate filtered reference pixels.
-  {
-    int x, y;
-    for (y = -1; y < recstride; y++) {
-      recf[y*recstride - 1] = rec[y*recstride - 1];
-    }
-    for (x = 0; x < recstride; x++) {
-      recf[x - recstride] = rec[x - recstride];
-    }
-    kvz_intra_filter(recf, recstride, width, 0);
-  }
 
   kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
 
   // Check that the predicted modes are in the RDO mode list
   if (modes_to_check < 35) {
-    for (pred_mode = 0; pred_mode < 3; pred_mode++) {
+    for (int pred_mode = 0; pred_mode < 3; pred_mode++) {
       int mode_found = 0;
-      for (rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode++) {
+      for (int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode++) {
         if (intra_preds[pred_mode] == modes[rdo_mode]) {
           mode_found = 1;
           break;
@@ -555,42 +518,27 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     }
   }
 
-  for(rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
+  for(int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
     costs[rdo_mode] = rdo_bitcost * (int)(state->global->cur_lambda_cost + 0.5);
-#if 0
-    if (width != 4 && tr_depth == depth) {
-      // This code path has been disabled for now because it increases bdrate
-      // by 1-2 %. Possibly due to not taking chroma into account during luma
-      // mode search. Enabling separate chroma search compensates a little,
-      // but not enough.
 
-      // The idea for this code path is, that it would do the same thing as
-      // the more general search_intra_trdepth, but would only handle cases
-      // where transform split or transform skip don't need to be handled.
-      kvz_intra_get_pred(state->encoder_control, rec, recf, recstride, pred, width, modes[rdo_mode], 0);
-      costs[rdo_mode] += kvz_rdo_cost_intra(state, pred, orig_block, width, modes[rdo_mode], width == 4 ? 1 : 0);
-    } else 
-#endif
-	{
-      // Perform transform split search and save mode RD cost for the best one.
-      cu_info_t pred_cu;
-      pred_cu.depth = depth;
-      pred_cu.type = CU_INTRA;
-      pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
-      pred_cu.intra[0].mode = modes[rdo_mode];
-      pred_cu.intra[1].mode = modes[rdo_mode];
-      pred_cu.intra[2].mode = modes[rdo_mode];
-      pred_cu.intra[3].mode = modes[rdo_mode];
-      pred_cu.intra[0].mode_chroma = modes[rdo_mode];
-      FILL(pred_cu.cbf, 0);
+    // Perform transform split search and save mode RD cost for the best one.
+    cu_info_t pred_cu;
+    pred_cu.depth = depth;
+    pred_cu.type = CU_INTRA;
+    pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
+    pred_cu.intra[0].mode = modes[rdo_mode];
+    pred_cu.intra[1].mode = modes[rdo_mode];
+    pred_cu.intra[2].mode = modes[rdo_mode];
+    pred_cu.intra[3].mode = modes[rdo_mode];
+    pred_cu.intra[0].mode_chroma = modes[rdo_mode];
+    FILL(pred_cu.cbf, 0);
 
-      // Reset transform split data in lcu.cu for this area.
-      kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
+    // Reset transform split data in lcu.cu for this area.
+    kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
 
-      double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
-      costs[rdo_mode] += mode_cost;
-    }
+    double mode_cost = search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[rdo_mode], MAX_INT, &pred_cu, lcu);
+    costs[rdo_mode] += mode_cost;
   }
 
   // The best transform split hierarchy is not saved anywhere, so to get the
@@ -697,7 +645,6 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {
-  const videoframe_t * const frame = state->tile->frame;
   const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int cu_index = LCU_CU_OFFSET + lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH;
@@ -726,23 +673,15 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   // FIXME: It might make more sense to only disable rough search if
   // num_modes is 0.is 0.
   if (num_modes != 1 && num_modes != 5) {
-    kvz_pixel rec_u[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
-    kvz_pixel rec_v[(LCU_WIDTH_C * 2 + 8) * (LCU_WIDTH_C * 2 + 8)];
+    const int_fast8_t log2_width_c = MAX(LOG2_LCU_WIDTH - depth - 1, 2);
+    const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
+    const vector2d_t luma_px = { x_px, y_px };
 
-    const int16_t width_c = MAX(LCU_WIDTH_C >> depth, TR_MIN_WIDTH);
-    const int16_t rec_stride = width_c * 2 + 8;
-    const int16_t out_stride = rec_stride;
+    kvz_intra_references refs_u;
+    kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs_u);
 
-    kvz_intra_build_reference_border(state->encoder_control,
-                                 x_px, y_px, out_stride,
-                                 rec_u, rec_stride, COLOR_U,
-                                 frame->width / 2, frame->height / 2,
-                                 lcu);
-    kvz_intra_build_reference_border(state->encoder_control,
-                                 x_px, y_px, out_stride,
-                                 rec_v, rec_stride, COLOR_V,
-                                 frame->width / 2, frame->height / 2,
-                                 lcu);
+    kvz_intra_references refs_v;
+    kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs_v);
 
     vector2d_t lcu_cpx = { lcu_px.x / 2, lcu_px.y / 2 };
     kvz_pixel *ref_u = &lcu->ref.u[lcu_cpx.x + lcu_cpx.y * LCU_WIDTH_C];
@@ -750,7 +689,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 
     search_intra_chroma_rough(state, x_px, y_px, depth,
                               ref_u, ref_v, LCU_WIDTH_C,
-                              &rec_u[rec_stride + 1], &rec_v[rec_stride + 1], rec_stride,
+                              &refs_u, &refs_v,
                               intra_mode, modes, costs);
   }
 
@@ -771,16 +710,15 @@ double kvz_search_cu_intra(encoder_state_t * const state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
-  const videoframe_t * const frame = state->tile->frame;
   const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
   const int cu_index = LCU_CU_OFFSET + lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH;
+  const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
 
   cu_info_t *cur_cu = &lcu->cu[cu_index];
 
-  kvz_pixel rec_buffer[(LCU_WIDTH * 2 + 1) * (LCU_WIDTH * 2 + 1)];
-  kvz_pixel *cu_in_rec_buffer = &rec_buffer[cu_width * 2 + 8 + 1];
+  kvz_intra_references refs;
 
   int8_t candidate_modes[3];
 
@@ -798,12 +736,9 @@ double kvz_search_cu_intra(encoder_state_t * const state,
   kvz_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
   if (depth > 0) {
-  // Build reconstructed block to use in prediction with extrapolated borders
-  kvz_intra_build_reference_border(state->encoder_control, x_px, y_px, cu_width * 2 + 8,
-                               rec_buffer, cu_width * 2 + 8, 0,
-                               frame->width,
-                               frame->height,
-                               lcu);
+    const vector2d_t luma_px = { x_px, y_px };
+    const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
+    kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
   }
 
   int8_t modes[35];
@@ -817,10 +752,10 @@ double kvz_search_cu_intra(encoder_state_t * const state,
   bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
-                                              ref_pixels, LCU_WIDTH,
-                                              cu_in_rec_buffer, cu_width * 2 + 8,
-                                              cu_width, candidate_modes,
-                                              modes, costs);
+                                         ref_pixels, LCU_WIDTH,
+                                         &refs,
+                                         log2_width, candidate_modes,
+                                         modes, costs);
   } else {
     number_of_modes = 35;
     for (int i = 0; i < number_of_modes; ++i) {
@@ -849,7 +784,6 @@ double kvz_search_cu_intra(encoder_state_t * const state,
     number_of_modes = search_intra_rdo(state,
                       x_px, y_px, depth,
                       ref_pixels, LCU_WIDTH,
-                      cu_in_rec_buffer, cu_width * 2 + 8,
                       candidate_modes,
                       num_modes_to_check,
                       modes, costs, lcu);
