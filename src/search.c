@@ -726,7 +726,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
 
   PTHREAD_LOCK(&sdl_mutex);
-  if (x + cu_width < state->tile->frame->source->width && y + cu_width < state->tile->frame->source->height)
+  if (x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)
   {
     SDL_Rect rect;
 
