@@ -817,10 +817,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
             }
           }
           if (mode == 0) {
+            /*
             for (i = -cu_width / 3 +1; i < cu_width / 3; i++) {
               //PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
               PUTPIXEL(((cu_width >> 2) + ((i*x_off[mode]) >> 4) - 1), ((cu_width >> 2) + ((i*y_off[mode]) >> 4) - 1), 255, 255, 255, 255);
               //PUTPIXEL(((cu_width >> 1) + (cu_width >> 2) + ((i*x_off[mode]) >> 4) - 1), ((cu_width >> 1)+ (cu_width >> 2) + ((i*y_off[mode]) >> 4) - 1), 255, 255, 255, 255);
+            }
+            */
+            int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
+            for (i = -viz_width; i < viz_width + 1; i++) {
+              PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+            }
+            for (i = -viz_width; i < 0; i++) {
+              PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
             }
           }
         }
