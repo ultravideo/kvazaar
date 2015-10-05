@@ -52,11 +52,13 @@
 SDL_Renderer *renderer;
 SDL_Window *window;
 SDL_Surface *screen, *pic;
-SDL_Texture *overlay, *overlay_blocks;
+SDL_Texture *overlay, *overlay_blocks, *overlay_intra;
 int screen_w, screen_h;
 int sdl_draw_blocks = 1;
+int sdl_draw_intra = 1;
 pthread_mutex_t sdl_mutex;
 kvz_pixel *sdl_pixels_RGB;
+kvz_pixel *sdl_pixels_RGB_intra_dir;
 kvz_pixel *sdl_pixels;
 kvz_pixel *sdl_pixels_u;
 kvz_pixel *sdl_pixels_v;
@@ -120,12 +122,18 @@ void *eventloop_main(void* temp) {
   // Create overlays for reconstruction and reconstruction with block borders
   overlay = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
   overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
+  overlay_intra = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
 
 
+  SDL_SetTextureBlendMode(overlay_intra, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay_blocks, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay, SDL_BLENDMODE_BLEND);
   sdl_pixels_RGB = (kvz_pixel*)malloc(screen_w*screen_h * 4);
   memset(sdl_pixels_RGB, 0, (screen_w*screen_h * 4));
+
+
+  sdl_pixels_RGB_intra_dir = (kvz_pixel*)malloc(screen_w*screen_h * 4);
+  memset(sdl_pixels_RGB_intra_dir, 0, (screen_w*screen_h * 4));
 
   sdl_pixels = (kvz_pixel*)malloc(screen_w*screen_h * 2 * sizeof(kvz_pixel));
   sdl_pixels_u = sdl_pixels + screen_w*screen_h;
@@ -146,6 +154,7 @@ void *eventloop_main(void* temp) {
       while (SDL_PollEvent(&event)) {
         if (event.type == SDL_KEYDOWN) {
           if (event.key.keysym.sym == SDLK_d) sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
+          if (event.key.keysym.sym == SDLK_i) sdl_draw_intra = sdl_draw_intra ? 0 : 1;
           if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
           if (event.key.keysym.sym == SDLK_KP_MINUS) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
           if (event.key.keysym.sym == SDLK_p) {
@@ -170,6 +179,8 @@ void *eventloop_main(void* temp) {
         SDL_RenderCopy(renderer, overlay, NULL, NULL);
         if (sdl_draw_blocks)
           SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
+        if (sdl_draw_intra)
+          SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
         SDL_RenderPresent(renderer);
         PTHREAD_UNLOCK(&sdl_mutex);
       }
