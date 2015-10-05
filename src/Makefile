@@ -152,18 +152,21 @@ endif
 # directories. If the instruction set is supported by the
 # architecture, compile the files in these directories with the
 # apropriate flags to cause the intrinsics to work.
+# Note: Using LTO on strategies caused issues on some older
+# compilers, -fno-lto on these files seemed to fix the issue.
+# LTO is no longer used and -fno-lto shouldn't be needed.
 ifeq ($(TARGET_CPU_ARCH), ppc)
-  strategies/altivec/%.o:  EXTRA_FLAGS += -maltivec -fno-lto
-  strategies/altivec/%.lo: EXTRA_FLAGS += -maltivec -fno-lto
+  strategies/altivec/%.o:  EXTRA_FLAGS += -maltivec
+  strategies/altivec/%.lo: EXTRA_FLAGS += -maltivec
 else ifeq ($(TARGET_CPU_ARCH), x86)
-  strategies/sse2/%.o:   EXTRA_FLAGS += -msse2   -fno-lto
-  strategies/sse41/%.o:  EXTRA_FLAGS += -msse4.1 -fno-lto
-  strategies/sse2/%.lo:  EXTRA_FLAGS += -msse2   -fno-lto
-  strategies/sse41/%.lo: EXTRA_FLAGS += -msse4.1 -fno-lto
+  strategies/sse2/%.o:   EXTRA_FLAGS += -msse2
+  strategies/sse41/%.o:  EXTRA_FLAGS += -msse4.1
+  strategies/sse2/%.lo:  EXTRA_FLAGS += -msse2
+  strategies/sse41/%.lo: EXTRA_FLAGS += -msse4.1
   # To disable avx2 on old compilers that don't support it.
   ifndef KVZ_DISABLE_AVX2
-    strategies/avx2/%.o:  EXTRA_FLAGS += -mavx2 -fno-lto
-    strategies/avx2/%.lo: EXTRA_FLAGS += -mavx2 -fno-lto
+    strategies/avx2/%.o:  EXTRA_FLAGS += -mavx2
+    strategies/avx2/%.lo: EXTRA_FLAGS += -mavx2
   endif
 endif
 
