@@ -195,6 +195,17 @@ void *eventloop_main(void* temp) {
       }
       if (!locked) {
         PTHREAD_LOCK(&sdl_mutex);
+
+        for (int i = 0; i < screen_w*screen_h*4; i+=4) {
+          if (sdl_pixels_RGB[i+3]) {            
+            sdl_pixels_RGB[i+3] = MAX(0, sdl_pixels_RGB[i+3] - 2);
+          }
+        }
+        SDL_Rect rect;
+        rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
+        SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB, screen_w * 4);
+
+
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, overlay, NULL, NULL);
         if (sdl_draw_blocks)
