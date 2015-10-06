@@ -100,6 +100,7 @@ static FILE* open_output_file(const char* filename)
 void *eventloop_main(void* temp) {
 
   int sdl_fader = 0;
+  int sdl_faded_overlay = 0;
   /* Initialize the display */
 
   window = SDL_CreateWindow(
@@ -178,6 +179,11 @@ void *eventloop_main(void* temp) {
             }
           }
           if (event.key.keysym.sym == SDLK_f) sdl_fader = !sdl_fader;
+          if (event.key.keysym.sym == SDLK_o) {
+            sdl_faded_overlay = !sdl_faded_overlay;
+            SDL_SetTextureAlphaMod(overlay_blocks, sdl_faded_overlay?150:255);
+          }
+          
           if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
           if (event.key.keysym.sym == SDLK_KP_MINUS) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
           if (event.key.keysym.sym == SDLK_p) {
