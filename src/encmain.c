@@ -97,6 +97,17 @@ static FILE* open_output_file(const char* filename)
 
 #if KVZ_VISUALIZATION == 1
 
+static void sdl_force_redraw(int locked) {
+  if (locked) {
+    SDL_RenderClear(renderer);
+    SDL_RenderCopy(renderer, overlay, NULL, NULL);
+    if (sdl_draw_blocks)
+      SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
+    if (sdl_draw_intra)
+      SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
+  }
+}
+
 void *eventloop_main(void* temp) {
 
   int sdl_fader = 0;
@@ -158,30 +169,17 @@ void *eventloop_main(void* temp) {
         if (event.type == SDL_KEYDOWN) {
           if (event.key.keysym.sym == SDLK_d) {
             sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
-            if (locked) {
-              SDL_RenderClear(renderer);
-              SDL_RenderCopy(renderer, overlay, NULL, NULL);
-              if (sdl_draw_blocks)
-                SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
-              if (sdl_draw_intra)
-                SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
-            }
+            sdl_force_redraw(locked);
           }
           if (event.key.keysym.sym == SDLK_i) {
             sdl_draw_intra = sdl_draw_intra ? 0 : 1;
-            if (locked) {
-              SDL_RenderClear(renderer);
-              SDL_RenderCopy(renderer, overlay, NULL, NULL);
-              if (sdl_draw_blocks)
-                SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
-              if (sdl_draw_intra)
-                SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
-            }
+            sdl_force_redraw(locked);
           }
           if (event.key.keysym.sym == SDLK_f) sdl_fader = !sdl_fader;
           if (event.key.keysym.sym == SDLK_o) {
             sdl_faded_overlay = !sdl_faded_overlay;
             SDL_SetTextureAlphaMod(overlay_blocks, sdl_faded_overlay?150:255);
+            sdl_force_redraw(locked);
           }
           
           if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
@@ -194,7 +192,7 @@ void *eventloop_main(void* temp) {
               locked = 1;
               PTHREAD_LOCK(&sdl_mutex);
             }
-            
+            sdl_force_redraw(locked);
           }
         }
         if (event.type == SDL_QUIT) {
