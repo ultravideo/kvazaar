@@ -203,12 +203,10 @@ void *eventloop_main(void* temp) {
           SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
         SDL_RenderPresent(renderer);
         PTHREAD_UNLOCK(&sdl_mutex);
-      }
-      else {
+      } else {
         SDL_RenderPresent(renderer);
       }
-      SDL_Delay(10);
-      // printf("event");
+      SDL_Delay(10); // Limit loop CPU usage
     }
   }
 }

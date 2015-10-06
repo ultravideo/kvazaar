@@ -813,40 +813,30 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         int i = 1;
         int mode = cur_cu->intra->mode;
         const int x_off[] = { 8, 8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
-        const int y_off[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};
-        if (mode > 1) {      
-          //printf("Mode: %d, %d\n", mode, ((cu_width >> 1) + ((i*y_off[mode]) >> 3))*pic_width + ((cu_width >> 1) + ((i*x_off[mode]) >> 3)));
-          for (i = -cu_width / 4; i < cu_width / 4 +1; i++) {
+        const int y_off[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};        
+        if (mode == 0) { // Planar
+          int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
+          for (i = -viz_width; i < viz_width + 1; i++) {
+            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+          }
+          for (i = -viz_width; i < 0; i++) {
+            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+          }
+        } else if (mode == 1) { // DC
+          int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
+          for (i = -viz_width; i < viz_width + 1; i++) {
+            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+          }
+          for (i = -viz_width; i < viz_width + 1; i++) {
+            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+          }
+        } else { // Angular
+          for (i = -cu_width / 4; i < cu_width / 4 + 1; i++) {
             PUTPIXEL_intra(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-          }
-        } else {
-          if (mode == 1) {
-            int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
-            for (i = -viz_width; i < viz_width + 1; i++) {
-              PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-            }
-            for (i = -viz_width; i < viz_width + 1; i++) {
-              PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-            }
-          }
-          if (mode == 0) {
-            /*
-            for (i = -cu_width / 3 +1; i < cu_width / 3; i++) {
-              //PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-              PUTPIXEL(((cu_width >> 2) + ((i*x_off[mode]) >> 4) - 1), ((cu_width >> 2) + ((i*y_off[mode]) >> 4) - 1), 255, 255, 255, 255);
-              //PUTPIXEL(((cu_width >> 1) + (cu_width >> 2) + ((i*x_off[mode]) >> 4) - 1), ((cu_width >> 1)+ (cu_width >> 2) + ((i*y_off[mode]) >> 4) - 1), 255, 255, 255, 255);
-            }
-            */
-            int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
-            for (i = -viz_width; i < viz_width + 1; i++) {
-              PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-            }
-            for (i = -viz_width; i < 0; i++) {
-              PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-            }
           }
         }
       }
+      
       if (cur_cu->type == CU_INTER) {
         /*
         if (cur_cu->inter.mv_dir & 2) {
