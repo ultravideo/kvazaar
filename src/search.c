@@ -725,6 +725,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
   sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
 
+#define DRAW_LINE(x1, y1, x2, y2, color_r, color_g, color_b) \
+                                      { float temp_x = x1; float temp_y = y1; \
+                                      int len = sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2)); \
+                                      if(len > 0) { \
+                                       float x_off = ((float)(x2-x1))/(float)len; \
+                                       float y_off = (y2-y1)/(float)len;  \
+                                       for(int i = 0; i < len; i++) { \
+                                          PUTPIXEL(((int)temp_x), ((int)temp_y), color_r, color_g, color_b, 255);\
+                                          temp_x += x_off; temp_y += y_off; \
+                                       }\
+                                      }\
+                                  }
+
 #define PUTPIXEL_intra(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
   sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
   sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
