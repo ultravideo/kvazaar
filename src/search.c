@@ -848,7 +848,23 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
       }
       if (cur_cu->type == CU_INTER) {
-        int i = 1;
+        /*
+        if (cur_cu->inter.mv_dir & 2) {
+          int temp_x2 = ((cu_width >> 1) + (cur_cu->inter.mv[1][0] >> 2));
+          int temp_y2 = ((cu_width >> 1) + (cur_cu->inter.mv[1][1] >> 2));
+          temp_x2 = CLIP(0, state->tile->frame->source->width - 1, temp_x2);
+          temp_y2 = CLIP(0, state->tile->frame->source->height - 1, temp_y2);
+          DRAW_LINE((cu_width >> 1), (cu_width >> 1), temp_x2, temp_y2, 0, 255, 0);
+        }
+        if (cur_cu->inter.mv_dir & 1) {
+          int temp_x2 = ((cu_width >> 1) + (cur_cu->inter.mv[0][0] >> 2));
+          int temp_y2 = ((cu_width >> 1) + (cur_cu->inter.mv[0][1] >> 2));
+          temp_x2 = CLIP(0, state->tile->frame->source->width - 1, temp_x2);
+          temp_y2 = CLIP(0, state->tile->frame->source->height - 1, temp_y2);
+
+          DRAW_LINE((cu_width >> 1), (cu_width >> 1), temp_x2, temp_y2, 255, 0, 0);
+        }
+       */ 
       }
     }
     rect.w = cu_width; rect.h = cu_width; rect.x = x + state->tile->lcu_offset_x*LCU_WIDTH; rect.y = y + state->tile->lcu_offset_y*LCU_WIDTH;
