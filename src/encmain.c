@@ -98,6 +98,8 @@ static FILE* open_output_file(const char* filename)
 #if KVZ_VISUALIZATION == 1
 
 void *eventloop_main(void* temp) {
+
+  int sdl_fader = 0;
   /* Initialize the display */
 
   window = SDL_CreateWindow(
@@ -175,6 +177,7 @@ void *eventloop_main(void* temp) {
                 SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
             }
           }
+          if (event.key.keysym.sym == SDLK_f) sdl_fader = !sdl_fader;
           if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
           if (event.key.keysym.sym == SDLK_KP_MINUS) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
           if (event.key.keysym.sym == SDLK_p) {
@@ -196,15 +199,16 @@ void *eventloop_main(void* temp) {
       if (!locked) {
         PTHREAD_LOCK(&sdl_mutex);
 
-        for (int i = 0; i < screen_w*screen_h*4; i+=4) {
-          if (sdl_pixels_RGB[i+3]) {            
-            sdl_pixels_RGB[i+3] = MAX(0, sdl_pixels_RGB[i+3] - 2);
-          }
+        if (sdl_fader) {
+          for (int i = 0; i < screen_w*screen_h * 4; i += 4) {
+            if (sdl_pixels_RGB[i + 3]) {
+              sdl_pixels_RGB[i + 3] = MAX(0, sdl_pixels_RGB[i + 3] - 2);
+            }
+          }        
+          SDL_Rect rect;
+          rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
+          SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB, screen_w * 4);
         }
-        SDL_Rect rect;
-        rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
-        SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB, screen_w * 4);
-
 
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, overlay, NULL, NULL);
