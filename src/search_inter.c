@@ -952,6 +952,127 @@ static unsigned search_frac(const encoder_state_t * const state,
 
 
 /**
+ * \brief Perform inter search for a single reference frame.
+ */
+static void search_cu_inter_ref(const encoder_state_t * const state,
+                                int x, int y, int depth,
+                                lcu_t *lcu, cu_info_t *cur_cu,
+                                int16_t mv_cand[2][2],
+                                inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                                int16_t num_cand,
+                                unsigned ref_idx,
+                                uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*))
+{
+  const int x_cu = x >> 3;
+  const int y_cu = y >> 3;
+  const videoframe_t * const frame = state->tile->frame;
+  kvz_picture *ref_image = state->global->ref->images[ref_idx];
+  uint32_t temp_bitcost = 0;
+  uint32_t temp_cost = 0;
+  vector2d_t orig, mvd;
+  int32_t merged = 0;
+  uint8_t cu_mv_cand = 0;
+  int8_t merge_idx = 0;
+  int8_t ref_list = state->global->refmap[ref_idx].list-1;
+  int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
+  orig.x = x_cu * CU_MIN_SIZE_PIXELS;
+  orig.y = y_cu * CU_MIN_SIZE_PIXELS;
+  // Get MV candidates
+  cur_cu->inter.mv_ref[ref_list] = ref_idx;
+  kvz_inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, ref_list);
+  cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
+
+
+  vector2d_t mv = { 0, 0 };
+  {
+    // Take starting point for MV search from previous frame.
+    // When temporal motion vector candidates are added, there is probably
+    // no point to this anymore, but for now it helps.
+    int mid_x_cu = (x + (LCU_WIDTH >> (depth+1))) / 8;
+    int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
+    cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
+    if (ref_cu->type == CU_INTER) {
+      if (ref_cu->inter.mv_dir & 1) {
+        mv.x = ref_cu->inter.mv[0][0];
+        mv.y = ref_cu->inter.mv[0][1];
+      } else {
+        mv.x = ref_cu->inter.mv[1][0];
+        mv.y = ref_cu->inter.mv[1][1];
+      }
+    }
+  }
+
+#if SEARCH_MV_FULL_RADIUS
+  temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+#else
+  switch (state->encoder_control->cfg->ime_algorithm) {
+    case KVZ_IME_TZ:
+      temp_cost += tz_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+      break;
+
+    default:
+      temp_cost += hexagon_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+      break;
+    }
+#endif
+  if (state->encoder_control->cfg->fme_level > 0) {
+    temp_cost = search_frac(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+  }
+
+  merged = 0;
+  // Check every candidate to find a match
+  for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
+    if (merge_cand[merge_idx].dir != 3 &&
+        merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
+        merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&
+        (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
+      merged = 1;
+      break;
+    }
+  }
+
+  // Only check when candidates are different
+  if (!merged && (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
+    vector2d_t mvd_temp1, mvd_temp2;
+    int cand1_cost,cand2_cost;
+
+    mvd_temp1.x = mv.x - mv_cand[0][0];
+    mvd_temp1.y = mv.y - mv_cand[0][1];
+    cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
+
+    mvd_temp2.x = mv.x - mv_cand[1][0];
+    mvd_temp2.y = mv.y - mv_cand[1][1];
+    cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
+
+    // Select candidate 1 if it has lower cost
+    if (cand2_cost < cand1_cost) {
+      cu_mv_cand = 1;
+    }
+  }
+  mvd.x = mv.x - mv_cand[cu_mv_cand][0];
+  mvd.y = mv.y - mv_cand[cu_mv_cand][1];
+
+  if(temp_cost < cur_cu->inter.cost) {
+
+    // Map reference index to L0/L1 pictures
+    cur_cu->inter.mv_dir = ref_list+1;
+    cur_cu->inter.mv_ref_coded[ref_list] = state->global->refmap[ref_idx].idx;
+
+    cur_cu->merged        = merged;
+    cur_cu->merge_idx     = merge_idx;
+    cur_cu->inter.mv_ref[ref_list] = ref_idx;
+    cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
+    cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
+    cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
+    cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
+    cur_cu->inter.cost    = temp_cost;
+    cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
+    cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
+  }
+}
+
+
+/**
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
@@ -961,8 +1082,6 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   uint32_t ref_idx = 0;
   int x_local = SUB_SCU(x);
   int y_local = SUB_SCU(y);
-  int x_cu = x>>3;
-  int y_cu = y>>3;
   cu_info_t *cur_cu = LCU_GET_CU(lcu, x_local >> 3, y_local >> 3);
 
   int16_t mv_cand[2][2];
@@ -990,108 +1109,12 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   cur_cu->inter.cost = UINT_MAX;
 
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
-    kvz_picture *ref_image = state->global->ref->images[ref_idx];
-    uint32_t temp_bitcost = 0;
-    uint32_t temp_cost = 0;
-    vector2d_t orig, mvd;
-    int32_t merged = 0;
-    uint8_t cu_mv_cand = 0;
-    int8_t merge_idx = 0;
-    int8_t ref_list = state->global->refmap[ref_idx].list-1;
-    int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
-    orig.x = x_cu * CU_MIN_SIZE_PIXELS;
-    orig.y = y_cu * CU_MIN_SIZE_PIXELS;
-    // Get MV candidates
-    cur_cu->inter.mv_ref[ref_list] = ref_idx;
-    kvz_inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, ref_list);
-    cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
-
-    vector2d_t mv = { 0, 0 };
-    {
-      // Take starting point for MV search from previous frame.
-      // When temporal motion vector candidates are added, there is probably
-      // no point to this anymore, but for now it helps.
-      int mid_x_cu = (x + (LCU_WIDTH >> (depth+1))) / 8;
-      int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
-      cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
-      if (ref_cu->type == CU_INTER) {
-        if (ref_cu->inter.mv_dir & 1) {
-          mv.x = ref_cu->inter.mv[0][0];
-          mv.y = ref_cu->inter.mv[0][1];
-        } else {
-          mv.x = ref_cu->inter.mv[1][0];
-          mv.y = ref_cu->inter.mv[1][1];
-        }
-      }
-    }
-
-#if SEARCH_MV_FULL_RADIUS
-    temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
-#else
-    switch (state->encoder_control->cfg->ime_algorithm) {
-      case KVZ_IME_TZ:
-        temp_cost += tz_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
-        break;
-
-      default:
-        temp_cost += hexagon_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
-        break;
-      }
-#endif
-    if (state->encoder_control->cfg->fme_level > 0) {
-      temp_cost = search_frac(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
-    }
-
-    merged = 0;
-    // Check every candidate to find a match
-    for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
-      if (merge_cand[merge_idx].dir != 3 &&
-          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
-          merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&          
-          (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
-        merged = 1;
-        break;
-      }
-    }
-
-    // Only check when candidates are different
-    if (!merged && (mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
-      vector2d_t mvd_temp1, mvd_temp2;
-      int cand1_cost,cand2_cost;
-
-      mvd_temp1.x = mv.x - mv_cand[0][0];
-      mvd_temp1.y = mv.y - mv_cand[0][1];
-      cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
-
-      mvd_temp2.x = mv.x - mv_cand[1][0];
-      mvd_temp2.y = mv.y - mv_cand[1][1];
-      cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
-
-      // Select candidate 1 if it has lower cost
-      if (cand2_cost < cand1_cost) {
-        cu_mv_cand = 1;
-      }
-    }
-    mvd.x = mv.x - mv_cand[cu_mv_cand][0];
-    mvd.y = mv.y - mv_cand[cu_mv_cand][1];
-
-    if(temp_cost < cur_cu->inter.cost) {
-
-      // Map reference index to L0/L1 pictures
-      cur_cu->inter.mv_dir = ref_list+1;
-      cur_cu->inter.mv_ref_coded[ref_list] = state->global->refmap[ref_idx].idx;
-
-      cur_cu->merged        = merged;
-      cur_cu->merge_idx     = merge_idx;
-      cur_cu->inter.mv_ref[ref_list] = ref_idx;
-      cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
-      cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
-      cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
-      cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
-      cur_cu->inter.cost    = temp_cost;
-      cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
-      cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
-    }
+    search_cu_inter_ref(state,
+                        x, y, depth,
+                        lcu, cur_cu,
+                        mv_cand, merge_cand, num_cand,
+                        ref_idx,
+                        get_mvd_cost);
   }
 
   // Search bi-pred positions
