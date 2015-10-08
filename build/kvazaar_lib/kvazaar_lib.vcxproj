@@ -79,7 +79,7 @@
     <YASM />
     <Lib>
       <AdditionalLibraryDirectories>$(SolutionDir)..\..\visualizer_extras\lib\x64;$(SolutionDir)..\..\pthreads.2\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2main.lib;SDL2.lib;pthreadVC2.lib</AdditionalDependencies>
+      <AdditionalDependencies>SDL2main.lib;SDL2.lib;SDL2_ttf.lib;pthreadVC2.lib</AdditionalDependencies>
     </Lib>
     <YASM>
       <Defines>ARCH_X86_64=1;%(Defines)</Defines>

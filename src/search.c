@@ -51,6 +51,8 @@
   extern kvz_pixel *sdl_pixels_u;
   extern kvz_pixel *sdl_pixels_v;
   extern int32_t sdl_delay;
+  extern cu_info_t *sdl_cu_array;
+
 #define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
 #define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
 #endif
@@ -785,6 +787,20 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
       }
 
+
+      {
+        const int width_cu = cur_cu->part_size == SIZE_2Nx2N? LCU_CU_WIDTH >> depth: 1;
+        const int x_cu = (x / (LCU_WIDTH >> MAX_DEPTH));
+        const int y_cu = (y / (LCU_WIDTH >> MAX_DEPTH));
+        int temp_x, temp_y;
+        // Set mode in every CU covered by part_mode in this depth.
+        for (temp_y = y_cu; temp_y < y_cu + width_cu; ++temp_y) {
+          for (temp_x = x_cu; temp_x < x_cu + width_cu; ++temp_x) {
+            cu_info_t *cu = &sdl_cu_array[temp_x + temp_y *  (state->tile->frame->width_in_lcu << MAX_DEPTH)];
+            memcpy(cu, cur_cu, sizeof(cu_info_t));
+          }
+        }
+      }
 
       //if (cu_width > 4 || (!(x & 7) && !(y & 7))) 
       

@@ -49,20 +49,30 @@
 #if KVZ_VISUALIZATION == 1
 #include "threadqueue.h"
 #include <SDL.h>
+#include <SDL_ttf.h>
 SDL_Renderer *renderer;
 SDL_Window *window;
 SDL_Surface *screen, *pic;
-SDL_Texture *overlay, *overlay_blocks, *overlay_intra;
+SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_hilight;
 int screen_w, screen_h;
 int sdl_draw_blocks = 1;
 int sdl_draw_intra = 1;
+int sdl_block_info = 0;
 pthread_mutex_t sdl_mutex;
+kvz_pixel *sdl_pixels_hilight;
 kvz_pixel *sdl_pixels_RGB;
 kvz_pixel *sdl_pixels_RGB_intra_dir;
 kvz_pixel *sdl_pixels;
 kvz_pixel *sdl_pixels_u;
 kvz_pixel *sdl_pixels_v;
 int32_t sdl_delay;
+SDL_Surface* textSurface;
+SDL_Texture* text;
+
+cu_info_t *sdl_cu_array;
+TTF_Font* font;
+
+
 #define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
 #define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
 #endif
@@ -97,6 +107,11 @@ static FILE* open_output_file(const char* filename)
 
 #if KVZ_VISUALIZATION == 1
 
+#define PUTPIXEL_hilight(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2)+3] = color_alpha; \
+  sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2) +2] = color_r; \
+  sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2) +1] = color_g; \
+  sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2) +0] = color_b;
+
 static void sdl_force_redraw(int locked) {
   if (locked) {
     SDL_RenderClear(renderer);
@@ -105,13 +120,31 @@ static void sdl_force_redraw(int locked) {
       SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
     if (sdl_draw_intra)
       SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
+    if (sdl_block_info) {
+      SDL_RenderCopy(renderer, overlay_hilight, NULL, NULL);
+      SDL_Rect renderQuad;
+      renderQuad.w = textSurface->w; renderQuad.h = textSurface->h; renderQuad.x = 0; renderQuad.y = 0;
+      SDL_RenderCopy(renderer, text, NULL, &renderQuad);
+    }
   }
+}
+
+static void sdl_render_multiline_text(char* text, int x, int y) {
+  SDL_Color White = { 255, 255, 255 };
+  SDL_Surface* temp_surface = TTF_RenderText_Solid(font, text, White);
+  SDL_Rect src, dst;
+  src.x = 0; src.y = 0; src.w = temp_surface->w; src.h = temp_surface->h;
+  dst.x = x; dst.y = y; dst.w = temp_surface->w; dst.h = temp_surface->h;
+  SDL_BlitSurface(temp_surface, &src, textSurface, &dst);
 }
 
 void *eventloop_main(void* temp) {
 
   int sdl_fader = 0;
   int sdl_faded_overlay = 0;
+
+  int mouse_x = 0, mouse_y = 0;  
+
   /* Initialize the display */
 
   window = SDL_CreateWindow(
@@ -130,6 +163,20 @@ void *eventloop_main(void* temp) {
   }
 
   sdl_delay = 0;
+  
+  int height_in_lcu = screen_h / LCU_WIDTH;
+  int width_in_lcu = screen_w / LCU_WIDTH;
+
+  // Add one extra LCU when image not divisible by LCU_WIDTH
+  if (height_in_lcu * LCU_WIDTH < screen_h) {
+    height_in_lcu++;
+  }
+  if (width_in_lcu * LCU_WIDTH < screen_w) {
+    width_in_lcu++;
+  }
+
+  sdl_cu_array = MALLOC(cu_info_t, (height_in_lcu << MAX_DEPTH)*(width_in_lcu << MAX_DEPTH));
+  FILL_ARRAY(sdl_cu_array, 0, (height_in_lcu << MAX_DEPTH)*(width_in_lcu << MAX_DEPTH));
 
   // Set the window manager title bar
   renderer = SDL_CreateRenderer(window, -1, 0);
@@ -137,14 +184,18 @@ void *eventloop_main(void* temp) {
   overlay = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
   overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
   overlay_intra = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
+  overlay_hilight = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
 
 
+  SDL_SetTextureBlendMode(overlay_hilight, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay_intra, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay_blocks, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay, SDL_BLENDMODE_BLEND);
   sdl_pixels_RGB = (kvz_pixel*)malloc(screen_w*screen_h * 4);
   memset(sdl_pixels_RGB, 0, (screen_w*screen_h * 4));
 
+  sdl_pixels_hilight = (kvz_pixel*)malloc(screen_w*screen_h * 4);
+  memset(sdl_pixels_hilight, 0, (screen_w*screen_h * 4));
 
   sdl_pixels_RGB_intra_dir = (kvz_pixel*)malloc(screen_w*screen_h * 4);
   memset(sdl_pixels_RGB_intra_dir, 0, (screen_w*screen_h * 4));
@@ -159,6 +210,33 @@ void *eventloop_main(void* temp) {
     exit(1);
   }
 
+  if (TTF_Init() == -1) { printf("SDL_ttf could not initialize! SDL_ttf Error: %s\n", TTF_GetError()); }
+
+  font = TTF_OpenFont("arial.ttf", 24);
+  if (!font) {
+    printf("TTF_OpenFont: %s\n", TTF_GetError());
+    // handle error
+  }
+  SDL_Color White = { 255, 255, 255 };
+
+  Uint32 rmask, gmask, bmask, amask;
+#if SDL_BYTEORDER == SDL_BIG_ENDIAN
+  rmask = 0xff000000;
+  gmask = 0x00ff0000;
+  bmask = 0x0000ff00;
+  amask = 0x000000ff;
+#else
+  rmask = 0x000000ff;
+  gmask = 0x0000ff00;
+  bmask = 0x00ff0000;
+  amask = 0xff000000;
+#endif
+
+  textSurface = SDL_CreateRGBSurface(0, screen_w, screen_h, 32, rmask, gmask, bmask, amask);
+  SDL_SetSurfaceBlendMode(textSurface, SDL_BLENDMODE_BLEND);
+  cu_info_t* selected_cu = NULL;
+
+
   PTHREAD_UNLOCK(&sdl_mutex);
   int locked = 0;
   for (;;) {
@@ -166,9 +244,72 @@ void *eventloop_main(void* temp) {
       while (1) {      
 
       while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_MOUSEMOTION) {
+          // Update mouse coordinates
+          SDL_GetMouseState(&mouse_x, &mouse_y);
+          // If mouse inside the perimeters of the frame
+          if (mouse_x > 0 && mouse_x < screen_w && mouse_y > 0 && mouse_y < screen_h) {
+            
+            cu_info_t *over_cu = &sdl_cu_array[(mouse_x / (LCU_WIDTH >> MAX_DEPTH)) + (mouse_y / (LCU_WIDTH >> MAX_DEPTH))*(width_in_lcu << MAX_DEPTH)];
+            char* cu_types[5] = { "64x64", "32x32", "16x16", "8x8", "4x4" };
+
+            // If block has changed
+            if (sdl_block_info && selected_cu != over_cu) {
+              char temp[128];
+              selected_cu = over_cu;
+              sprintf(temp, "Block type: Intra\nIntra mode: %d", over_cu->intra->mode);
+
+              // Clear the hilight buffer
+              memset(sdl_pixels_hilight, 0, (screen_w*screen_h * 4));
+              int depth = over_cu->part_size == SIZE_2Nx2N ? over_cu->depth : 3;
+              int block_border_x = (mouse_x / (LCU_WIDTH >> (depth))) *(LCU_WIDTH >> (depth));
+              int block_border_y = (mouse_y / (LCU_WIDTH >> (depth))) *(LCU_WIDTH >> (depth));
+
+              
+
+              for (int y = block_border_y; y < block_border_y + (LCU_WIDTH >> over_cu->depth); y++) {
+                for (int x = block_border_x; x < block_border_x + (LCU_WIDTH >> over_cu->depth); x++) {
+                  PUTPIXEL_hilight(x, y, 255, 255, 255, 128);
+                }
+              }              
+              SDL_FillRect(textSurface, NULL, SDL_MapRGBA(textSurface->format, 0, 0, 0, 0));
+
+              if (over_cu->type == CU_INTRA) {
+                sprintf(temp, "Type: Intra");
+                sdl_render_multiline_text(temp, 0, 0);
+                sprintf(temp, "Type: %s", cu_types[over_cu->tr_depth]);
+                sdl_render_multiline_text(temp, 0, 20);
+                sprintf(temp, "Intra mode: %d", over_cu->intra->mode);
+                sdl_render_multiline_text(temp, 0, 40);
+              }
+              if (over_cu->type == CU_INTER) {
+                sprintf(temp, "Type: Inter");
+                sdl_render_multiline_text(temp, 0, 0);
+                sprintf(temp, "Type: %s", (over_cu->part_size == SIZE_2Nx2N) ? cu_types[over_cu->depth] : cu_types[4]);
+                sdl_render_multiline_text(temp, 0, 20);
+                sprintf(temp, "Dir: %d MV[0]: %f, %f MV[1]: %f, %f", over_cu->inter.mv_dir, 
+                  (float)over_cu->inter.mv[0][0] / 4.0, (float)over_cu->inter.mv[0][1] / 4.0,
+                  (float)over_cu->inter.mv[1][0] / 4.0, (float)over_cu->inter.mv[1][1] / 4.0);
+                sdl_render_multiline_text(temp, 0, 40);
+              }
+
+              text = SDL_CreateTextureFromSurface(renderer, textSurface);
+              SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
+              SDL_Rect rect;
+              rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
+              SDL_UpdateTexture(overlay_hilight, &rect, sdl_pixels_hilight, screen_w * 4);
+
+              sdl_force_redraw(locked);
+            }
+          }
+        }
         if (event.type == SDL_KEYDOWN) {
           if (event.key.keysym.sym == SDLK_d) {
             sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
+            sdl_force_redraw(locked);
+          }
+          if (event.key.keysym.sym == SDLK_b) {
+            sdl_block_info = sdl_block_info ? 0 : 1;
             sdl_force_redraw(locked);
           }
           if (event.key.keysym.sym == SDLK_i) {
@@ -200,6 +341,12 @@ void *eventloop_main(void* temp) {
           exit(1);
         }
       }
+
+
+
+
+
+
       if (!locked) {
         PTHREAD_LOCK(&sdl_mutex);
 
@@ -220,6 +367,14 @@ void *eventloop_main(void* temp) {
           SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
         if (sdl_draw_intra)
           SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
+
+        if (sdl_block_info) {
+          SDL_RenderCopy(renderer, overlay_hilight, NULL, NULL);
+          SDL_Rect renderQuad;
+          renderQuad.w = textSurface->w; renderQuad.h = textSurface->h; renderQuad.x = 0; renderQuad.y = 0;
+          SDL_RenderCopy(renderer, text, NULL, &renderQuad);          
+        }
+
         SDL_RenderPresent(renderer);
         PTHREAD_UNLOCK(&sdl_mutex);
       } else {
