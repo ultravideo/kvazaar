@@ -714,6 +714,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       work_tree_copy_down(x, y, depth, work_tree);
 #if KVZ_VISUALIZATION == 1
       sdl_work_tree_copy = 1;
+    } else if (depth == 0) {
+      sdl_work_tree_copy = 1;
 #endif
     }
   }
@@ -770,7 +772,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
       state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
 
-    if ((depth == 0 && !(cur_cu->cbf.y) && cur_cu->type == CU_INTER) || sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
+    if ((cur_cu->depth == 0) || sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
       kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
         x_max, y_max, LCU_WIDTH, pic_width);
       kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
@@ -789,7 +791,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
 
       {
-        const int width_cu = cur_cu->part_size == SIZE_2Nx2N? LCU_CU_WIDTH >> depth: 1;
+        const int width_cu = cur_cu->part_size == SIZE_2Nx2N ? LCU_CU_WIDTH >> cur_cu->depth : 1;
         const int x_cu = (x / (LCU_WIDTH >> MAX_DEPTH));
         const int y_cu = (y / (LCU_WIDTH >> MAX_DEPTH));
         int temp_x, temp_y;
@@ -827,7 +829,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Intra directions
       if (cur_cu->type == CU_INTRA) {
         int i = 1;
-        int mode = cur_cu->intra->mode;
+        int mode = cur_cu->intra[PU_INDEX(x / 4, y / 4)].mode;
         const int x_off[] = { 8, 8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
         const int y_off[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};        
         if (mode == 0) { // Planar
