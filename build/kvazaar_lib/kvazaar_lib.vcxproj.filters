@@ -222,6 +222,9 @@
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c">
       <Filter>Source Files\strategies\generic</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\intra-avx2.c">
+      <Filter>Source Files\strategies\avx2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\global.h">
@@ -406,6 +409,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h">
       <Filter>Header Files\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h">
+      <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
