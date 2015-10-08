@@ -26,7 +26,7 @@ angular_pred_func *kvz_angular_pred;
 
 // Headers for platform optimizations.
 #include "generic/intra-generic.h"
-//#include "avx2/intra-avx2.h"
+#include "avx2/intra-avx2.h"
 
 
 int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth) {
@@ -34,8 +34,8 @@ int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth) {
 
   success &= kvz_strategy_register_intra_generic(opaque, bitdepth);
 
-  //if (kvz_g_hardware_flags.intel_flags.avx2) {
-  //  success &= kvz_strategy_register_intra_avx2(opaque, bitdepth);
-  //}
+  if (kvz_g_hardware_flags.intel_flags.avx2) {
+    success &= kvz_strategy_register_intra_avx2(opaque, bitdepth);
+  }
   return success;
 }

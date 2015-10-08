@@ -112,16 +112,32 @@ static void kvz_angular_pred_avx2(
 
       if (delta_fract) {
         // Do linear filtering
-        for (int_fast8_t x = 0; x < width; ++x) {
-          kvz_pixel ref1 = ref_main[x + delta_int];
-          kvz_pixel ref2 = ref_main[x + delta_int + 1];
-          dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
+        if (width < 8) {
+          for (int_fast8_t x = 0; x < width; ++x) {
+            kvz_pixel ref1 = ref_main[x + delta_int];
+            kvz_pixel ref2 = ref_main[x + delta_int + 1];
+            dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
+          }
+        } else {
+          struct { uint8_t w1; uint8_t w2; } packed_weights = { 32 - delta_fract, delta_fract };
+          __m128i v_weights = _mm_set1_epi16(*(int16_t*)&packed_weights);
+
+          for (int_fast8_t x = 0; x < width; x += 8) {
+            __m128i v_ref1 = _mm_loadl_epi64((__m128i*)&(ref_main[x + delta_int]));
+            __m128i v_ref2 = _mm_loadl_epi64((__m128i*)&(ref_main[x + delta_int + 1]));
+            __m128i v_refs = _mm_unpacklo_epi8(v_ref1, v_ref2);  
+            __m128i v_tmp = _mm_maddubs_epi16(v_refs, v_weights);
+            v_tmp = _mm_add_epi16(v_tmp, _mm_set1_epi16(16));
+            v_tmp = _mm_srli_epi16(v_tmp, 5);
+            v_tmp = _mm_packus_epi16(v_tmp, v_tmp);
+            _mm_storel_epi64((__m128i*)(dst + y * width + x), v_tmp);
+          }
         }
       }
       else {
         // Just copy the integer samples
-        for (int_fast8_t x = 0; x < width; x++) {
-          dst[y * width + x] = ref_main[x + delta_int];
+        for (int_fast8_t x = 0; x < width; x+=4) {
+          *(int32_t*)(&dst[y * width + x]) = *(int32_t*)(&ref_main[x + delta_int]);
         }
       }
     }
@@ -130,8 +146,8 @@ static void kvz_angular_pred_avx2(
     // Mode is horizontal or vertical, just copy the pixels.
 
     for (int_fast8_t y = 0; y < width; ++y) {
-      for (int_fast8_t x = 0; x < width; ++x) {
-        dst[y * width + x] = ref_main[x];
+      for (int_fast8_t x = 0; x < width; x+=4) {
+        *(int32_t*)&(dst[y * width + x]) = *(int32_t*)&(ref_main[x]);
       }
     }
   }
@@ -152,7 +168,9 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 #if COMPILE_INTEL_AVX2
-  success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 0, &kvz_angular_pred_avx2);
+  if (bitdepth == 8) {
+    success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
+  }
 #endif //COMPILE_INTEL_AVX2
   return success;
 }
