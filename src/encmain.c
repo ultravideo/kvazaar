@@ -50,8 +50,10 @@
 #include "threadqueue.h"
 #include <SDL.h>
 #include <SDL_ttf.h>
-SDL_Renderer *renderer;
-SDL_Window *window;
+const int INFO_WIDTH = 480;
+const int INFO_HEIGHT = 240;
+SDL_Renderer *renderer, *info_renderer;
+SDL_Window *window, *info_window = NULL;
 SDL_Surface *screen, *pic;
 SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_hilight;
 int screen_w, screen_h;
@@ -120,11 +122,9 @@ static void sdl_force_redraw(int locked) {
       SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
     if (sdl_draw_intra)
       SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
+
     if (sdl_block_info) {
       SDL_RenderCopy(renderer, overlay_hilight, NULL, NULL);
-      SDL_Rect renderQuad;
-      renderQuad.w = textSurface->w; renderQuad.h = textSurface->h; renderQuad.x = 0; renderQuad.y = 0;
-      SDL_RenderCopy(renderer, text, NULL, &renderQuad);
     }
   }
 }
@@ -232,7 +232,7 @@ void *eventloop_main(void* temp) {
   amask = 0xff000000;
 #endif
 
-  textSurface = SDL_CreateRGBSurface(0, screen_w, screen_h, 32, rmask, gmask, bmask, amask);
+  textSurface = SDL_CreateRGBSurface(0, INFO_WIDTH, INFO_HEIGHT, 32, rmask, gmask, bmask, amask);
   SDL_SetSurfaceBlendMode(textSurface, SDL_BLENDMODE_BLEND);
   cu_info_t* selected_cu = NULL;
 
@@ -277,24 +277,29 @@ void *eventloop_main(void* temp) {
               if (over_cu->type == CU_INTRA) {
                 sprintf(temp, "Type: Intra");
                 sdl_render_multiline_text(temp, 0, 0);
-                sprintf(temp, "Type: %s", cu_types[over_cu->tr_depth]);
+                sprintf(temp, "Size: %s", cu_types[over_cu->tr_depth]);
                 sdl_render_multiline_text(temp, 0, 20);
                 sprintf(temp, "Intra mode: %d", over_cu->intra->mode);
                 sdl_render_multiline_text(temp, 0, 40);
               }
               if (over_cu->type == CU_INTER) {
-                sprintf(temp, "Type: Inter");
+                sprintf(temp, "Type: Inter %s", over_cu->skipped?"SKIP":over_cu->merged?"MERGE":"");
                 sdl_render_multiline_text(temp, 0, 0);
-                sprintf(temp, "Type: %s", (over_cu->part_size == SIZE_2Nx2N) ? cu_types[over_cu->depth] : cu_types[4]);
+                sprintf(temp, "Size: %s", cu_types[over_cu->depth]);
                 sdl_render_multiline_text(temp, 0, 20);
-                sprintf(temp, "Dir: %d MV[0]: %f, %f MV[1]: %f, %f", over_cu->inter.mv_dir, 
+                sprintf(temp, "Dir: %d", over_cu->inter.mv_dir);
+                sdl_render_multiline_text(temp, 0, 40);
+                sprintf(temp, "MV[0]: %.3f, %.3f MV[1]: %.3f, %.3f", over_cu->inter.mv_dir,
                   (float)over_cu->inter.mv[0][0] / 4.0, (float)over_cu->inter.mv[0][1] / 4.0,
                   (float)over_cu->inter.mv[1][0] / 4.0, (float)over_cu->inter.mv[1][1] / 4.0);
-                sdl_render_multiline_text(temp, 0, 40);
+                sdl_render_multiline_text(temp, 0, 60);
               }
 
-              text = SDL_CreateTextureFromSurface(renderer, textSurface);
+              if (text) SDL_DestroyTexture(text);
+              text = SDL_CreateTextureFromSurface(info_renderer, textSurface);
               SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
+
+
               SDL_Rect rect;
               rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
               SDL_UpdateTexture(overlay_hilight, &rect, sdl_pixels_hilight, screen_w * 4);
@@ -310,7 +315,23 @@ void *eventloop_main(void* temp) {
           }
           if (event.key.keysym.sym == SDLK_b) {
             sdl_block_info = sdl_block_info ? 0 : 1;
-            sdl_force_redraw(locked);
+
+            if (sdl_block_info) {
+              info_window = SDL_CreateWindow(
+                "Info",                  // window title
+                SDL_WINDOWPOS_UNDEFINED,           // initial x position
+                SDL_WINDOWPOS_UNDEFINED,           // initial y position
+                INFO_WIDTH, INFO_HEIGHT,
+                0
+                );
+                info_renderer = SDL_CreateRenderer(info_window, -1, 0);
+            }
+            else {
+              SDL_DestroyRenderer(info_renderer);
+              info_renderer = NULL;
+              SDL_DestroyWindow(info_window);
+              info_window = NULL;
+            }            
           }
           if (event.key.keysym.sym == SDLK_i) {
             sdl_draw_intra = sdl_draw_intra ? 0 : 1;
@@ -342,11 +363,6 @@ void *eventloop_main(void* temp) {
         }
       }
 
-
-
-
-
-
       if (!locked) {
         PTHREAD_LOCK(&sdl_mutex);
 
@@ -367,19 +383,24 @@ void *eventloop_main(void* temp) {
           SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
         if (sdl_draw_intra)
           SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
-
         if (sdl_block_info) {
           SDL_RenderCopy(renderer, overlay_hilight, NULL, NULL);
-          SDL_Rect renderQuad;
-          renderQuad.w = textSurface->w; renderQuad.h = textSurface->h; renderQuad.x = 0; renderQuad.y = 0;
-          SDL_RenderCopy(renderer, text, NULL, &renderQuad);          
         }
-
         SDL_RenderPresent(renderer);
+
         PTHREAD_UNLOCK(&sdl_mutex);
       } else {
         SDL_RenderPresent(renderer);
       }
+
+      if (sdl_block_info) {
+        SDL_Rect renderQuad;
+        renderQuad.w = textSurface->w; renderQuad.h = textSurface->h; renderQuad.x = 0; renderQuad.y = 0;
+        SDL_RenderClear(info_renderer);
+        SDL_RenderCopy(info_renderer, text, NULL, &renderQuad);
+        SDL_RenderPresent(info_renderer);
+      }
+
       SDL_Delay(10); // Limit loop CPU usage
     }
   }
@@ -578,7 +599,7 @@ int main(int argc, char *argv[])
       SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, encoder->cfg->width, sdl_pixels_u, encoder->cfg->width >> 1, sdl_pixels_v, encoder->cfg->width >> 1);
       SDL_RenderClear(renderer);
       SDL_RenderCopy(renderer, overlay, NULL, NULL);
-      SDL_RenderPresent(renderer);      
+      SDL_RenderPresent(renderer);
       PTHREAD_UNLOCK(&sdl_mutex);
 
     }
