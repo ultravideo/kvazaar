@@ -262,42 +262,62 @@ void *eventloop_main(void* temp) {
               // Clear the hilight buffer
               memset(sdl_pixels_hilight, 0, (screen_w*screen_h * 4));
               int depth = over_cu->part_size == SIZE_2Nx2N ? over_cu->depth : 3;
+              int tr_depth = over_cu->tr_depth;
               int block_border_x = (mouse_x / (LCU_WIDTH >> (depth))) *(LCU_WIDTH >> (depth));
               int block_border_y = (mouse_y / (LCU_WIDTH >> (depth))) *(LCU_WIDTH >> (depth));
 
-              
+              int block_border_tr_x = (mouse_x / (LCU_WIDTH >> (tr_depth))) *(LCU_WIDTH >> (tr_depth));
+              int block_border_tr_y = (mouse_y / (LCU_WIDTH >> (tr_depth))) *(LCU_WIDTH >> (tr_depth));
 
               for (int y = block_border_y; y < block_border_y + (LCU_WIDTH >> over_cu->depth); y++) {
                 for (int x = block_border_x; x < block_border_x + (LCU_WIDTH >> over_cu->depth); x++) {
                   PUTPIXEL_hilight(x, y, 255, 255, 255, 128);
                 }
-              }              
+              }       
+              if (over_cu->depth != over_cu->tr_depth) {
+                for (int y = block_border_tr_y; y < block_border_tr_y + (LCU_WIDTH >> over_cu->tr_depth); y++) {
+                  for (int x = block_border_tr_x; x < block_border_tr_x + (LCU_WIDTH >> over_cu->tr_depth); x++) {
+                    PUTPIXEL_hilight(x, y, 100, 100, 255, 128);
+                  }
+                }
+              }
               SDL_FillRect(textSurface, NULL, SDL_MapRGBA(textSurface->format, 0, 0, 0, 0));
 
               if (over_cu->type == CU_INTRA) {
                 sprintf(temp, "Type: Intra");
                 sdl_render_multiline_text(temp, 0, 0);
-                sprintf(temp, "Size: %s", cu_types[over_cu->tr_depth]);
+                sprintf(temp, "Size: %s", cu_types[over_cu->depth]);
                 sdl_render_multiline_text(temp, 0, 20);
-                sprintf(temp, "Intra mode: %d", over_cu->intra->mode);
+                sprintf(temp, "Tr-size: %s", cu_types[over_cu->tr_depth]);
                 sdl_render_multiline_text(temp, 0, 40);
+                if (over_cu->part_size == SIZE_2Nx2N) {
+                  sprintf(temp, "Intra mode: %d", over_cu->intra->mode);
+                  sdl_render_multiline_text(temp, 0, 60);
+                } else {
+                  sprintf(temp, "Intra mode: %d, %d, %d, %d", over_cu->intra[0].mode, over_cu->intra[1].mode
+                    , over_cu->intra[2].mode, over_cu->intra[3].mode);
+                  sdl_render_multiline_text(temp, 0, 60);
+                }
               }
               if (over_cu->type == CU_INTER) {
                 sprintf(temp, "Type: Inter %s", over_cu->skipped?"SKIP":over_cu->merged?"MERGE":"");
                 sdl_render_multiline_text(temp, 0, 0);
                 sprintf(temp, "Size: %s", cu_types[over_cu->depth]);
                 sdl_render_multiline_text(temp, 0, 20);
-                sprintf(temp, "Dir: %d", over_cu->inter.mv_dir);
+                sprintf(temp, "Tr-size: %s", cu_types[over_cu->tr_depth]);
                 sdl_render_multiline_text(temp, 0, 40);
+                sprintf(temp, "Dir: %d", over_cu->inter.mv_dir);
+                sdl_render_multiline_text(temp, 0, 60);
                 sprintf(temp, "MV[0]: %.3f, %.3f MV[1]: %.3f, %.3f", over_cu->inter.mv_dir,
                   (float)over_cu->inter.mv[0][0] / 4.0, (float)over_cu->inter.mv[0][1] / 4.0,
                   (float)over_cu->inter.mv[1][0] / 4.0, (float)over_cu->inter.mv[1][1] / 4.0);
-                sdl_render_multiline_text(temp, 0, 60);
+                sdl_render_multiline_text(temp, 0, 80);
               }
 
               if (text) SDL_DestroyTexture(text);
               text = SDL_CreateTextureFromSurface(info_renderer, textSurface);
               SDL_SetTextureBlendMode(text, SDL_BLENDMODE_BLEND);
+             
 
 
               SDL_Rect rect;
