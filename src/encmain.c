@@ -308,9 +308,17 @@ void *eventloop_main(void* temp) {
                 sdl_render_multiline_text(temp, 0, 40);
                 sprintf(temp, "Dir: %d", over_cu->inter.mv_dir);
                 sdl_render_multiline_text(temp, 0, 60);
-                sprintf(temp, "MV[0]: %.3f, %.3f MV[1]: %.3f, %.3f", over_cu->inter.mv_dir,
-                  (float)over_cu->inter.mv[0][0] / 4.0, (float)over_cu->inter.mv[0][1] / 4.0,
-                  (float)over_cu->inter.mv[1][0] / 4.0, (float)over_cu->inter.mv[1][1] / 4.0);
+                if (over_cu->inter.mv_dir == 3) {
+                  sprintf(temp, "MV[L0]: %.3f, %.3f MV[L1]: %.3f, %.3f",
+                    (float)over_cu->inter.mv[0][0] / 4.0, (float)over_cu->inter.mv[0][1] / 4.0,
+                    (float)over_cu->inter.mv[1][0] / 4.0, (float)over_cu->inter.mv[1][1] / 4.0);
+                } else if (over_cu->inter.mv_dir & 1) {
+                  sprintf(temp, "MV[L0]: %.3f, %.3f",
+                    (float)over_cu->inter.mv[0][0] / 4.0, (float)over_cu->inter.mv[0][1] / 4.0);
+                } else if (over_cu->inter.mv_dir & 2) {
+                  sprintf(temp, "MV[L1]: %.3f, %.3f",
+                    (float)over_cu->inter.mv[1][0] / 4.0, (float)over_cu->inter.mv[1][1] / 4.0);
+                }
                 sdl_render_multiline_text(temp, 0, 80);
               }
 
