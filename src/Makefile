@@ -207,6 +207,7 @@ OBJS = \
   strategies/strategies-dct.o \
   strategies/strategies-ipol.o \
   strategies/strategies-quant.o \
+  strategies/strategies-intra.o \
   strategies/generic/nal-generic.o \
   strategies/generic/picture-generic.o \
   strategies/sse2/picture-sse2.o \
@@ -220,6 +221,7 @@ OBJS = \
   strategies/avx2/ipol-avx2.o \
   strategies/generic/quant-generic.o \
   strategies/avx2/quant-avx2.o \
+  strategies/generic/intra-generic.o
 
 ifndef KVZ_DISABLE_ASM
   # Compile C files in x86_asm folder with KVZ_COMPILE_ASM, which will cause

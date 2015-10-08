@@ -159,7 +159,9 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\intra-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\quant-generic.c" />
+    <ClCompile Include="..\..\src\strategies\strategies-intra.c" />
     <ClCompile Include="..\..\src\strategies\strategies-quant.c" />
     <ClCompile Include="..\..\src\yuv_io.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
@@ -209,9 +211,11 @@
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />
+    <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\quant-generic.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-intra.h" />
     <ClInclude Include="..\..\src\strategies\strategies-quant.h" />
     <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
