@@ -330,7 +330,7 @@ endif
 
 .PHONY: kvazaar.pc init_submodules install install-pc install-prog install-lib
 .PHONY: install-dylib install-dll clean
-kvazaar.pc: KVZ_VERSION = $(shell sed -n 's/^#define\s\+KVZ_VERSION\s\+\(.*\)/\1/ p' global.h)
+kvazaar.pc: KVZ_VERSION = $(shell awk '/#define KVZ_VERSION/ { print $$3 }' global.h)
 kvazaar.pc: kvazaar.pc.in Makefile
 	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
             -e "s;@VERSION@;$(KVZ_VERSION);" \
