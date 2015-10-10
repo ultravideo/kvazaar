@@ -226,7 +226,7 @@ OBJS = \
 
 ifndef KVZ_DISABLE_ASM
   # Compile C files in x86_asm folder with KVZ_COMPILE_ASM, which will cause
-  # the registration function to register the function pointers in the ASM 
+  # the registration function to register the function pointers in the ASM
   # files.
   strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
 
