@@ -226,7 +226,7 @@ OBJS = \
 
 ifndef KVZ_DISABLE_ASM
   # Compile C files in x86_asm folder with KVZ_COMPILE_ASM, which will cause
-  # the registration function to register the function pointers in the ASM 
+  # the registration function to register the function pointers in the ASM
   # files.
   strategies/x86_asm/%.o: EXTRA_FLAGS += -DKVZ_COMPILE_ASM
 
@@ -330,7 +330,7 @@ endif
 
 .PHONY: kvazaar.pc init_submodules install install-pc install-prog install-lib
 .PHONY: install-dylib install-dll clean
-kvazaar.pc: KVZ_VERSION = $(shell sed -n 's/^#define\s\+KVZ_VERSION\s\+\(.*\)/\1/ p' global.h)
+kvazaar.pc: KVZ_VERSION = $(shell awk '/#define KVZ_VERSION/ { print $$3 }' global.h)
 kvazaar.pc: kvazaar.pc.in Makefile
 	sed -e "s;@prefix@;$(PREFIX);" -e "s;@libdir@;$(LIBDIR);" \
             -e "s;@VERSION@;$(KVZ_VERSION);" \
