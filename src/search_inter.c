@@ -1104,7 +1104,13 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   // Search for merge mode candidate
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = kvz_inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
+  int16_t num_cand = kvz_inter_get_merge_cand(state,
+                                              x, y,
+                                              LCU_WIDTH >> depth,
+                                              LCU_WIDTH >> depth,
+                                              true, true,
+                                              merge_cand,
+                                              lcu);
 
   uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
   if (state->encoder_control->cfg->mv_rdo) {

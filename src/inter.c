@@ -407,8 +407,8 @@ static void inter_clear_cu_unused(cu_info_t* cu) {
 /**
  * \brief Get merge candidates for current block
  * \param encoder encoder control struct to use
- * \param x_cu block x position in SCU
- * \param y_cu block y position in SCU
+ * \param x block x position in SCU
+ * \param y block y position in SCU
  * \param width current block width
  * \param height current block height
  * \param b0 candidate b0
@@ -694,13 +694,23 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
 
 /**
  * \brief Get merge predictions for current block
- * \param encoder encoder control struct to use
- * \param x_cu block x position in SCU
- * \param y_cu block y position in SCU
- * \param depth current block depth
- * \param mv_pred[MRG_MAX_NUM_CANDS][2] MRG_MAX_NUM_CANDS motion vector prediction
+ * \param state     the encoder state
+ * \param x         block x position in SCU
+ * \param y         block y position in SCU
+ * \param width     block width
+ * \param height    block height
+ * \param use_a1    true, if candidate a1 can be used
+ * \param use_b1    true, if candidate b1 can be used
+ * \param mv_cand   Returns the merge candidates.
+ * \param lcu       lcu containing the block
+ * \return          number of merge candidates
  */
-uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu)
+uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
+                                 int32_t x, int32_t y,
+                                 int32_t width, int32_t height,
+                                 bool use_a1, bool use_b1,
+                                 inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
+                                 lcu_t *lcu)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -708,8 +718,10 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  kvz_inter_get_spatial_merge_candidates(x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, &b0, &b1, &b2, &a0, &a1, lcu);
+  kvz_inter_get_spatial_merge_candidates(x, y, width, height, &b0, &b1, &b2, &a0, &a1, lcu);
 
+  if (!use_a1) a1 = NULL;
+  if (!use_b1) b1 = NULL;
 
 #define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && \
                                                      (CU1)->inter.mv_dir == (CU2)->inter.mv_dir && \
