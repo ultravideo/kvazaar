@@ -841,18 +841,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
       || state->global->frame == 0)
   {
     first_nal_in_au = false;
-
-    // Video Parameter Set (VPS)
-    kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
-    encoder_state_write_bitstream_vid_parameter_set(&state->stream, state);
-
-    // Sequence Parameter Set (SPS)
-    kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
-    encoder_state_write_bitstream_seq_parameter_set(&state->stream, state);
-
-    // Picture Parameter Set (PPS)
-    kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
-    encoder_state_write_bitstream_pic_parameter_set(&state->stream, state);
+    kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
 
   // Send Kvazaar version information only in the first frame.
@@ -979,4 +968,20 @@ void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
 void kvz_encoder_state_worker_write_bitstream(void * opaque)
 {
   kvz_encoder_state_write_bitstream((encoder_state_t *) opaque);
+}
+
+void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
+                                            encoder_state_t * const state)
+{
+  // Video Parameter Set (VPS)
+  kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
+  encoder_state_write_bitstream_vid_parameter_set(stream, state);
+
+  // Sequence Parameter Set (SPS)
+  kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
+  encoder_state_write_bitstream_seq_parameter_set(stream, state);
+
+  // Picture Parameter Set (PPS)
+  kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
+  encoder_state_write_bitstream_pic_parameter_set(stream, state);
 }

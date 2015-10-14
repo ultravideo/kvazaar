@@ -123,6 +123,26 @@ static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *co
 }
 
 
+static int kvazaar_headers(kvz_encoder *enc,
+                           kvz_data_chunk **data_out,
+                           uint32_t *len_out)
+{
+  if (data_out) *data_out = NULL;
+  if (len_out) *len_out = 0;
+
+  bitstream_t stream;
+  kvz_bitstream_init(&stream);
+
+  kvz_encoder_state_write_parameter_sets(&stream, &enc->states[enc->cur_state_num]);
+
+  // Get stream length before taking chunks since that clears the stream.
+  if (len_out) *len_out = kvz_bitstream_tell(&stream) / 8;
+  if (data_out) *data_out = kvz_bitstream_take_chunks(&stream);
+
+  return 1;
+}
+
+
 static int kvazaar_encode(kvz_encoder *enc,
                           kvz_picture *pic_in,
                           kvz_data_chunk **data_out,
@@ -204,6 +224,7 @@ static const kvz_api kvz_8bit_api = {
 
   .encoder_open = kvazaar_open,
   .encoder_close = kvazaar_close,
+  .encoder_headers = kvazaar_headers,
   .encoder_encode = kvazaar_encode,
 };
 

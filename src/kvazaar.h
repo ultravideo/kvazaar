@@ -410,6 +410,26 @@ typedef struct kvz_api {
   void          (*encoder_close)(kvz_encoder *encoder);
 
   /**
+   * \brief Get parameter sets.
+   *
+   * Encode the VPS, SPS and PPS.
+   *
+   * If data_out is set to non-NULL values, the caller is responsible for
+   * calling chunk_free on it.
+   *
+   * A null pointer may be passed in place of the parameter data_out or len_out
+   * to skip returning the corresponding value.
+   *
+   * \param encoder   encoder
+   * \param data_out  Returns the encoded parameter sets.
+   * \param len_out   Returns number of bytes in the encoded data.
+   * \return          1 on success, 0 on error.
+   */
+  int           (*encoder_headers)(kvz_encoder *encoder,
+                                   kvz_data_chunk **data_out,
+                                   uint32_t *len_out);
+
+  /**
    * \brief Encode one frame.
    *
    * Add pic_in to the encoding pipeline. If an encoded frame is ready, return
