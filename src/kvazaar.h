@@ -106,7 +106,18 @@ typedef struct kvz_config
 {
   int32_t qp;        /*!< \brief Quantization parameter */
   int32_t intra_period; /*!< \brief the period of intra frames in stream */
-  int32_t vps_period; /*!< \brief how often the vps is re-sent */
+
+  /** \brief How often the VPS, SPS and PPS are re-sent
+   *
+   * -1: never
+   *  0: first frame only
+   *  1: every intra frame
+   *  2: every other intra frame
+   *  3: every third intra frame
+   *  and so on
+   */
+  int32_t vps_period;
+
   int32_t width;   /*!< \brief frame width, must be a multiple of 8 */
   int32_t height;  /*!< \brief frame height, must be a multiple of 8 */
   double framerate; /*!< \brief Input framerate */

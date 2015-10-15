@@ -140,7 +140,7 @@ typedef struct encoder_control_t
   } pu_depth_inter, pu_depth_intra;
   
   // How often Video Parameter Set is re-sent.
-  uint32_t vps_period;
+  int32_t vps_period;
 
   bool sign_hiding;
 
