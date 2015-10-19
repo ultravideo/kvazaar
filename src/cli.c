@@ -198,6 +198,14 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     goto done;
   }
 
+  if (opts->config->vps_period < 0) {
+    // Disabling parameter sets is only possible when using Kvazaar as
+    // a library.
+    fprintf(stderr, "Input error: vps_period must be non-negative\n");
+    ok = 0;
+    goto done;
+  }
+
   // Set resolution automatically if necessary
   if (opts->config->width == 0 && opts->config->width == 0){
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);

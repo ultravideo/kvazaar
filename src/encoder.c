@@ -433,7 +433,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   // AUD
   encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
 
-  encoder->vps_period = encoder->cfg->vps_period * encoder->cfg->intra_period;
+  if (encoder->cfg->vps_period >= 0) {
+    encoder->vps_period = encoder->cfg->vps_period * encoder->cfg->intra_period;
+  } else {
+    encoder->vps_period = -1;
+  }
 
   return encoder;
 

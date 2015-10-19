@@ -41,10 +41,9 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
-static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
+static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
+                                              encoder_state_t * const state)
 {
-  bitstream_t * const stream = &state->stream;
-  int i;
   // PTL
   // Profile Tier
   WRITE_U(stream, 0, 2, "general_profile_space");
@@ -74,17 +73,16 @@ static void encoder_state_write_bitstream_PTL(encoder_state_t * const state)
   WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
   WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
 
-  for (i = 1; i < 8; i++) {
+  for (int i = 1; i < 8; i++) {
     WRITE_U(stream, 0, 2, "reserved_zero_2bits");
   }
 
   // end PTL
 }
 
-static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * const state)
+static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
+                                                            encoder_state_t * const state)
 {
-  bitstream_t * const stream = &state->stream;
-  int i;
 #ifdef KVZ_DEBUG
   printf("=========== Video Parameter Set ID: 0 ===========\n");
 #endif
@@ -96,12 +94,12 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
   WRITE_U(stream, 0, 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
 
-  encoder_state_write_bitstream_PTL(state);
+  encoder_state_write_bitstream_PTL(stream, state);
 
   WRITE_U(stream, 0, 1, "vps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  for (i = 0; i < 1; i++) {
+  for (int i = 0; i < 1; i++) {
   WRITE_UE(stream, 1, "vps_max_dec_pic_buffering");
   WRITE_UE(stream, 0, "vps_num_reorder_pics");
   WRITE_UE(stream, 0, "vps_max_latency_increase");
@@ -119,10 +117,10 @@ static void encoder_state_write_bitstream_vid_parameter_set(encoder_state_t * co
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
-static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const state)
+static void encoder_state_write_bitstream_scaling_list(bitstream_t *stream,
+                                                       encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  bitstream_t * const stream = &state->stream;
   uint32_t size_id;
   for (size_id = 0; size_id < SCALING_LIST_SIZE_NUM; size_id++) {
     int32_t list_id;
@@ -177,9 +175,9 @@ static void encoder_state_write_bitstream_scaling_list(encoder_state_t * const s
 }
 
 
-static void encoder_state_write_bitstream_VUI(encoder_state_t * const state)
+static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
+                                              encoder_state_t * const state)
 {
-  bitstream_t * const stream = &state->stream;
   const encoder_control_t * const encoder = state->encoder_control;
 #ifdef KVZ_DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
@@ -260,8 +258,8 @@ static void encoder_state_write_bitstream_VUI(encoder_state_t * const state)
   //ENDIF
 
   WRITE_U(stream, 0, 1, "neutral_chroma_indication_flag");
-  WRITE_U(stream, state->encoder_control->vui.field_seq_flag, 1, "field_seq_flag"); // 0: frames, 1: fields
-  WRITE_U(stream, state->encoder_control->vui.frame_field_info_present_flag, 1, "frame_field_info_present_flag");
+  WRITE_U(stream, encoder->vui.field_seq_flag, 1, "field_seq_flag"); // 0: frames, 1: fields
+  WRITE_U(stream, encoder->vui.frame_field_info_present_flag, 1, "frame_field_info_present_flag");
   WRITE_U(stream, 0, 1, "default_display_window_flag");
 
   //IF default display window
@@ -278,9 +276,9 @@ static void encoder_state_write_bitstream_VUI(encoder_state_t * const state)
   //ENDIF
 }
 
-static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * const state)
+static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
+                                                            encoder_state_t * const state)
 {
-  bitstream_t * const stream = &state->stream;
   const encoder_control_t * encoder = state->encoder_control;
 
 #ifdef KVZ_DEBUG
@@ -292,13 +290,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
 
-  encoder_state_write_bitstream_PTL(state);
+  encoder_state_write_bitstream_PTL(stream, state);
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, state->encoder_control->in.video_format,
+  WRITE_UE(stream, encoder->in.video_format,
            "chroma_format_idc");
 
-  if (state->encoder_control->in.video_format == 3) {
+  if (encoder->in.video_format == 3) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
@@ -331,7 +329,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  WRITE_UE(stream, state->encoder_control->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
+  WRITE_UE(stream, encoder->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
   WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
@@ -344,14 +342,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   WRITE_UE(stream, encoder->tr_depth_intra, "max_transform_hierarchy_depth_intra");
 
   // scaling list
-  WRITE_U(stream, state->encoder_control->scaling_list.enable, 1, "scaling_list_enable_flag");
-  if (state->encoder_control->scaling_list.enable) {
+  WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
+  if (encoder->scaling_list.enable) {
     WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
-    encoder_state_write_bitstream_scaling_list(state);
+    encoder_state_write_bitstream_scaling_list(stream, state);
   }
 
   WRITE_U(stream, 0, 1, "amp_enabled_flag");
-  WRITE_U(stream, state->encoder_control->sao_enable ? 1 : 0, 1,
+  WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
@@ -377,17 +375,17 @@ static void encoder_state_write_bitstream_seq_parameter_set(encoder_state_t * co
   WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
-  encoder_state_write_bitstream_VUI(state);
+  encoder_state_write_bitstream_VUI(stream, state);
 
   WRITE_U(stream, 0, 1, "sps_extension_flag");
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
-static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * const state)
+static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
+                                                            encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  bitstream_t * const stream = &state->stream;
 #ifdef KVZ_DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
@@ -403,7 +401,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * co
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_SE(stream, ((int8_t)encoder->cfg->qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(stream, state->encoder_control->trskip_enable, 1, "transform_skip_enabled_flag");
+  WRITE_U(stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
   WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   //if cu_qp_delta_enabled_flag
   //WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
@@ -445,13 +443,13 @@ static void encoder_state_write_bitstream_pic_parameter_set(encoder_state_t * co
 
   //IF deblocking_filter
     WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
-  WRITE_U(stream, state->encoder_control->deblock_enable ? 0 : 1, 1,
+  WRITE_U(stream, encoder->deblock_enable ? 0 : 1, 1,
           "pps_disable_deblocking_filter_flag");
 
     //IF !disabled
-  if (state->encoder_control->deblock_enable) {
-     WRITE_SE(stream, state->encoder_control->beta_offset_div2, "beta_offset_div2");
-     WRITE_SE(stream, state->encoder_control->tc_offset_div2, "tc_offset_div2");
+  if (encoder->deblock_enable) {
+     WRITE_SE(stream, encoder->beta_offset_div2, "beta_offset_div2");
+     WRITE_SE(stream, encoder->tc_offset_div2, "tc_offset_div2");
     }
 
     //ENDIF
@@ -639,7 +637,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   int j;
   int ref_negative = 0;
   int ref_positive = 0;
-  if (state->encoder_control->cfg->gop_len) {
+  if (encoder->cfg->gop_len) {
     for (j = 0; j < state->global->ref->used_size; j++) {
       if (state->global->ref->pocs[j] < state->global->poc) {
         ref_negative++;
@@ -686,10 +684,10 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     for (j = 0; j < ref_negative; j++) {      
       int8_t delta_poc = 0;
       
-      if (state->encoder_control->cfg->gop_len) {
+      if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
+          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
           for (int i = 0; i < state->global->ref->used_size; i++) {
             if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
               found = 1;
@@ -704,7 +702,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
         } while (!found);
       }
 
-      WRITE_UE(stream, state->encoder_control->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
+      WRITE_UE(stream, encoder->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
       last_poc = delta_poc;
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
     }
@@ -713,10 +711,10 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     for (j = 0; j < ref_positive; j++) {      
       int8_t delta_poc = 0;
       
-      if (state->encoder_control->cfg->gop_len) {
+      if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = state->encoder_control->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
+          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
           for (int i = 0; i < state->global->ref->used_size; i++) {
             if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
               found = 1;
@@ -731,7 +729,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
         } while (!found);
       }
       
-      WRITE_UE(stream, state->encoder_control->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
       last_poc = delta_poc;
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
@@ -756,7 +754,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   }
 
   {
-    int slice_qp_delta = state->global->QP - state->encoder_control->cfg->qp;
+    int slice_qp_delta = state->global->QP - encoder->cfg->qp;
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
    
@@ -840,25 +838,14 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
   
   if ((encoder->vps_period > 0 && state->global->frame % encoder->vps_period == 0)
-      || state->global->frame == 0)
+      || (state->global->frame == 0 && encoder->vps_period >= 0))
   {
     first_nal_in_au = false;
-
-    // Video Parameter Set (VPS)
-    kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
-    encoder_state_write_bitstream_vid_parameter_set(state);
-
-    // Sequence Parameter Set (SPS)
-    kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
-    encoder_state_write_bitstream_seq_parameter_set(state);
-
-    // Picture Parameter Set (PPS)
-    kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
-    encoder_state_write_bitstream_pic_parameter_set(state);
+    kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
 
   // Send Kvazaar version information only in the first frame.
-  if (state->global->frame == 0 && state->encoder_control->cfg->add_encoder_info) {
+  if (state->global->frame == 0 && encoder->cfg->add_encoder_info) {
     kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
 
@@ -867,7 +854,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   //SEI messages for interlacing
-  if (state->encoder_control->vui.frame_field_info_present_flag){
+  if (encoder->vui.frame_field_info_present_flag){
     // These should be optional, needed for earlier versions
     // of HM decoder to accept bitstream
     //kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, 0);
@@ -889,14 +876,14 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_write_bitstream_children(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
   {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
   //Get bitstream length for stats
@@ -981,4 +968,20 @@ void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
 void kvz_encoder_state_worker_write_bitstream(void * opaque)
 {
   kvz_encoder_state_write_bitstream((encoder_state_t *) opaque);
+}
+
+void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
+                                            encoder_state_t * const state)
+{
+  // Video Parameter Set (VPS)
+  kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
+  encoder_state_write_bitstream_vid_parameter_set(stream, state);
+
+  // Sequence Parameter Set (SPS)
+  kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
+  encoder_state_write_bitstream_seq_parameter_set(stream, state);
+
+  // Picture Parameter Set (PPS)
+  kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
+  encoder_state_write_bitstream_pic_parameter_set(stream, state);
 }
