@@ -12,7 +12,7 @@ LIBDIR  = $(PREFIX)/lib
 DLLDIR  = $(BINDIR)
 
 # Library version number
-VER_MAJOR = 1
+VER_MAJOR = 2
 VER_MINOR = 0
 VER_RELEASE = 0
 
