@@ -210,6 +210,20 @@ static INLINE __m128i get_residual_8x1_avx2(const kvz_pixel *a_in, const kvz_pix
   return diff;
 }
 
+static INLINE int32_t get_quantized_recon_4x1_avx2(int16_t *residual, const kvz_pixel *pred_in){
+  __m128i res = _mm_loadl_epi64((__m128i*)residual);
+  __m128i pred = _mm_cvtsi32_si128(*(int32_t*)pred_in);
+  __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
+  return _mm_cvtsi128_si32(_mm_packus_epi16(rec, rec));
+}
+
+static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const kvz_pixel *pred_in){
+  __m128i res = _mm_loadu_si128((__m128i*)residual);
+  __m128i pred = _mm_cvtsi64_si128(*(int64_t*)pred_in);
+  __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
+  return _mm_cvtsi128_si64(_mm_packus_epi16(rec, rec));
+}
+
 static void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in, int16_t *residual, int width, int in_stride){
 
   __m128i diff = _mm_setzero_si128();
@@ -252,6 +266,36 @@ static void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in,
         }
       }
     break;
+  }
+}
+
+static void get_quantized_recon_avx2(int16_t *residual, const kvz_pixel *pred_in, int in_stride, kvz_pixel *rec_out, int out_stride, int width){
+
+  switch (width) {
+    case 4:
+      *(int32_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int32_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int32_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int32_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      break;
+    case 8:
+      *(int64_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int64_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int64_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int64_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      *(int64_t*)&(rec_out[4 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 4 * width, pred_in + 4 * in_stride);
+      *(int64_t*)&(rec_out[5 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 5 * width, pred_in + 5 * in_stride);
+      *(int64_t*)&(rec_out[6 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 6 * width, pred_in + 6 * in_stride);
+      *(int64_t*)&(rec_out[7 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 7 * width, pred_in + 7 * in_stride);
+      break;
+    default:
+      for (int y = 0; y < width; ++y) {
+        for (int x = 0; x < width; x += 16) {
+          *(int64_t*)&(rec_out[x + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + x + y * width, pred_in + x + y  * in_stride);
+          *(int64_t*)&(rec_out[(x + 8) + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + (x + 8) + y * width, pred_in + (x + 8) + y  * in_stride);
+        }
+      }
+      break;
   }
 }
 
@@ -326,7 +370,6 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
   if (has_coeffs) {
-    int y, x;
 
     // Get quantized residual. (quant_coeff -> coeff -> residual)
     kvz_dequant(state, quant_coeff, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)), cur_cu->type);
@@ -338,23 +381,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
     }
 
     // Get quantized reconstruction. (residual + pred_in -> rec_out)
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; x+=4) {
-        //int16_t val = residual[x + y * width] + pred_in[x + y * in_stride];
-        //rec_out[x + y * out_stride] = (kvz_pixel)CLIP(0, PIXEL_MAX, val);
-
-#if KVZ_BIT_DEPTH==8
-
-        __m128i v_residual = _mm_loadl_epi64((__m128i*)&(residual[x + y * width]));
-        __m128i v_pred_in = _mm_cvtsi32_si128(*((int32_t*)&(pred_in[x + y * in_stride])));
-        __m128i v_val = _mm_add_epi16(v_residual, _mm_cvtepu8_epi16(v_pred_in));
-        *((int32_t*)&(rec_out[x + y * out_stride])) = _mm_cvtsi128_si32(_mm_packus_epi16(v_val, v_val));
-#else
-        assert(0); //TODO
-#endif
-
-      }
-    }
+    get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
   }
   else if (rec_out != pred_in) {
     // With no coeffs and rec_out == pred_int we skip copying the coefficients
