@@ -196,6 +196,65 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   }
 }
 
+static INLINE __m128i get_residual_4x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
+  __m128i a = _mm_cvtsi32_si128(*(int32_t*)a_in);
+  __m128i b = _mm_cvtsi32_si128(*(int32_t*)b_in);
+  __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
+  return diff;
+}
+
+static INLINE __m128i get_residual_8x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
+  __m128i a = _mm_cvtsi64_si128(*(int64_t*)a_in);
+  __m128i b = _mm_cvtsi64_si128(*(int64_t*)b_in);
+  __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
+  return diff;
+}
+
+static void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in, int16_t *residual, int width, int in_stride){
+
+  __m128i diff = _mm_setzero_si128();
+  switch (width) {
+    case 4:
+      diff = get_residual_4x1_avx2(ref_in + 0 * in_stride, pred_in + 0 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[0]), diff);
+      diff = get_residual_4x1_avx2(ref_in + 1 * in_stride, pred_in + 1 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[4]), diff);
+      diff = get_residual_4x1_avx2(ref_in + 2 * in_stride, pred_in + 2 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[8]), diff);
+      diff = get_residual_4x1_avx2(ref_in + 3 * in_stride, pred_in + 3 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[12]), diff);
+    break;
+    case 8:
+      diff = get_residual_8x1_avx2(&ref_in[0 * in_stride], &pred_in[0 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[0]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[1 * in_stride], &pred_in[1 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[8]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[2 * in_stride], &pred_in[2 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[16]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[3 * in_stride], &pred_in[3 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[24]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[4 * in_stride], &pred_in[4 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[32]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[5 * in_stride], &pred_in[5 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[40]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[6 * in_stride], &pred_in[6 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[48]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[7 * in_stride], &pred_in[7 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[56]), diff);
+    break;
+    default:
+      for (int y = 0; y < width; ++y) {
+        for (int x = 0; x < width; x+=16) {
+          diff = get_residual_8x1_avx2(&ref_in[x + y * in_stride], &pred_in[x + y * in_stride]);
+          _mm_storeu_si128((__m128i*)&residual[x + y * width], diff);
+          diff = get_residual_8x1_avx2(&ref_in[(x+8) + y * in_stride], &pred_in[(x+8) + y * in_stride]);
+          _mm_storeu_si128((__m128i*)&residual[(x+8) + y * width], diff);
+        }
+      }
+    break;
+  }
+}
+
 /**
 * \brief Quantize residual and get both the reconstruction and coeffs.
 *
@@ -229,27 +288,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   assert(width >= TR_MIN_WIDTH);
 
   // Get residual. (ref_in - pred_in -> residual)
-  {
-    int y, x;
-    for (y = 0; y < width; ++y) {
-      for (x = 0; x < width; x+=4) {
-
-#if KVZ_BIT_DEPTH==8
-
-        __m128i v_ref_in = _mm_cvtsi32_si128(*(int32_t*)&(ref_in[x + y * in_stride]));
-        __m128i v_pred_in = _mm_cvtsi32_si128(*(int32_t*)&(pred_in[x + y * in_stride]));
-        __m128i v_residual = _mm_sub_epi16(_mm_cvtepu8_epi16(v_ref_in), _mm_cvtepu8_epi16(v_pred_in) );
-        _mm_storel_epi64((__m128i*)&residual[x + y * width], v_residual);
-#else
-        __m128i v_ref_in = _mm_loadl_epi64((__m128i*)&ref_in[x + y * in_stride]));
-        __m128i v_pred_in = _mm_loadl_epi64((__m128i*)&pred_in[x + y * in_stride]));
-        __m128i v_residual = _mm_sub_epi16(v_ref_in, v_pred_in);
-        _mm_storel_pd((__m128i*)&residual[x + y * width], v_residual);
-        residual[x + y * width] = (int16_t)(ref_in[x + y * in_stride] - pred_in[x + y * in_stride]);
-#endif
-      }
-    }
-  }
+  get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
 
   // Transform residual. (residual -> coeff)
   if (use_trskip) {
@@ -352,7 +391,9 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 
 #if COMPILE_INTEL_AVX2
   success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
-  success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
+  if (bitdepth == 8) {
+    success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
+  }
 #endif //COMPILE_INTEL_AVX2
 
   return success;
