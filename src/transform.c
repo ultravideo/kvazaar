@@ -130,54 +130,6 @@ void kvz_itransform2d(const encoder_control_t * const encoder, int16_t *block, i
 }
 
 /**
- * \brief inverse quantize transformed and quantized coefficents
- *
- */
-void kvz_dequant(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
-{
-  const encoder_control_t * const encoder = state->encoder_control;
-  int32_t shift,add,coeff_q;
-  int32_t n;
-  int32_t transform_shift = 15 - encoder->bitdepth - (kvz_g_convert_to_bit[ width ] + 2);
-
-  int32_t qp_scaled = kvz_get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
-
-  shift = 20 - QUANT_SHIFT - transform_shift;
-
-  if (encoder->scaling_list.enable)
-  {
-    uint32_t log2_tr_size = kvz_g_convert_to_bit[ width ] + 2;
-    int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
-
-    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
-    shift += 4;
-
-    if (shift >qp_scaled / 6) {
-      add = 1 << (shift - qp_scaled/6 - 1);
-
-      for (n = 0; n < width * height; n++) {
-        coeff_q = ((q_coef[n] * dequant_coef[n]) + add ) >> (shift -  qp_scaled/6);
-        coef[n] = (coeff_t)CLIP(-32768,32767,coeff_q);
-      }
-    } else {
-      for (n = 0; n < width * height; n++) {
-        // Clip to avoid possible overflow in following shift left operation
-        coeff_q   = CLIP(-32768, 32767, q_coef[n] * dequant_coef[n]);
-        coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
-      }
-    }
-  } else {
-    int32_t scale = kvz_g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
-    add = 1 << (shift-1);
-
-    for (n = 0; n < width*height; n++) {
-      coeff_q   = (q_coef[n] * scale + add) >> shift;
-      coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q);
-    }
-  }
-}
-
-/**
  * \brief Like kvz_quantize_residual except that this uses trskip if that is better.
  *
  * Using this function saves one step of quantization and inverse quantization

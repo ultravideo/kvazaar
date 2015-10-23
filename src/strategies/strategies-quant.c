@@ -24,6 +24,7 @@
 // Define function pointers.
 quant_func *kvz_quant;
 quant_residual_func *kvz_quantize_residual;
+dequant_func *kvz_dequant;
 
 // Headers for platform optimizations.
 #include "generic/quant-generic.h"
