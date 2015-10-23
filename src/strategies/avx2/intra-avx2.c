@@ -29,6 +29,351 @@
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+#include "strategies/strategies-common.h"
+
+ /**
+ * \brief Linear interpolation for 4 pixels. Returns 4 filtered pixels in lowest 32-bits of the register.
+ * \param ref_main      Reference pixels
+ * \param delta_pos     Fractional pixel precise position of sample displacement
+ * \param x             Sample offset in direction x in ref_main array
+ */
+static INLINE __m128i filter_4x1_avx2(const kvz_pixel *ref_main, int16_t delta_pos, int x){
+
+  int8_t delta_int = delta_pos >> 5;
+  int8_t delta_fract = delta_pos & (32-1);
+  __m128i sample0 = _mm_cvtsi32_si128(*(uint32_t*)&(ref_main[x + delta_int]));
+  __m128i sample1 = _mm_cvtsi32_si128(*(uint32_t*)&(ref_main[x + delta_int + 1]));
+  __m128i pairs = _mm_unpacklo_epi8(sample0, sample1);
+  __m128i weight = _mm_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
+  sample0 = _mm_maddubs_epi16(pairs, weight);
+  sample0 = _mm_add_epi16(sample0, _mm_set1_epi16(16));
+  sample0 = _mm_srli_epi16(sample0, 5);
+  sample0 = _mm_packus_epi16(sample0, sample0);
+
+  return sample0;
+}
+
+ /**
+ * \brief Linear interpolation for 4x4 block. Writes filtered 4x4 block to dst.
+ * \param dst           Destination buffer
+ * \param ref_main      Reference pixels
+ * \param sample_disp   Sample displacement per row
+ * \param vertical_mode Mode direction, true if vertical
+ */
+void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+
+  __m128i row0 = filter_4x1_avx2(ref_main, 1 * sample_disp, 0);
+  __m128i row1 = filter_4x1_avx2(ref_main, 2 * sample_disp, 0);
+  __m128i row2 = filter_4x1_avx2(ref_main, 3 * sample_disp, 0);
+  __m128i row3 = filter_4x1_avx2(ref_main, 4 * sample_disp, 0);
+
+  //Transpose if horizontal mode
+  if (!vertical_mode) {
+    __m128i temp = _mm_unpacklo_epi16(_mm_unpacklo_epi8(row0, row1), _mm_unpacklo_epi8(row2, row3));
+    row0 = _mm_cvtsi32_si128(_mm_extract_epi32(temp, 0));
+    row1 = _mm_cvtsi32_si128(_mm_extract_epi32(temp, 1));
+    row2 = _mm_cvtsi32_si128(_mm_extract_epi32(temp, 2));
+    row3 = _mm_cvtsi32_si128(_mm_extract_epi32(temp, 3));
+  }
+
+  *(int32_t*)(dst + 0 * 4) = _mm_cvtsi128_si32(row0);
+  *(int32_t*)(dst + 1 * 4) = _mm_cvtsi128_si32(row1);
+  *(int32_t*)(dst + 2 * 4) = _mm_cvtsi128_si32(row2);
+  *(int32_t*)(dst + 3 * 4) = _mm_cvtsi128_si32(row3);
+}
+
+ /**
+ * \brief Linear interpolation for 8 pixels. Returns 8 filtered pixels in lower 64-bits of the register.
+ * \param ref_main      Reference pixels
+ * \param delta_pos     Fractional pixel precise position of sample displacement
+ * \param x             Sample offset in direction x in ref_main array
+ */
+static INLINE __m128i filter_8x1_avx2(const kvz_pixel *ref_main, int16_t delta_pos, int x){
+
+  int8_t delta_int = delta_pos >> 5;
+  int8_t delta_fract = delta_pos & (32-1);
+  __m128i sample0 = _mm_cvtsi64_si128(*(uint64_t*)&(ref_main[x + delta_int]));
+  __m128i sample1 = _mm_cvtsi64_si128(*(uint64_t*)&(ref_main[x + delta_int + 1]));
+  __m128i pairs_lo = _mm_unpacklo_epi8(sample0, sample1);
+  __m128i pairs_hi = _mm_unpackhi_epi8(sample0, sample1);
+
+  __m128i weight = _mm_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
+  __m128i v_temp_lo = _mm_maddubs_epi16(pairs_lo, weight);
+  __m128i v_temp_hi = _mm_maddubs_epi16(pairs_hi, weight);
+  v_temp_lo = _mm_add_epi16(v_temp_lo, _mm_set1_epi16(16));
+  v_temp_hi = _mm_add_epi16(v_temp_hi, _mm_set1_epi16(16));
+  v_temp_lo = _mm_srli_epi16(v_temp_lo, 5);
+  v_temp_hi = _mm_srli_epi16(v_temp_hi, 5);
+  sample0 = _mm_packus_epi16(v_temp_lo, v_temp_hi);
+
+  return sample0;
+}
+
+ /**
+ * \brief Linear interpolation for 8x8 block. Writes filtered 8x8 block to dst.
+ * \param dst           Destination buffer
+ * \param ref_main      Reference pixels
+ * \param sample_disp   Sample displacement per row
+ * \param vertical_mode Mode direction, true if vertical
+ */
+static void filter_8x8_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+  __m128i row0 = filter_8x1_avx2(ref_main, 1 * sample_disp, 0);
+  __m128i row1 = filter_8x1_avx2(ref_main, 2 * sample_disp, 0);
+  __m128i row2 = filter_8x1_avx2(ref_main, 3 * sample_disp, 0);
+  __m128i row3 = filter_8x1_avx2(ref_main, 4 * sample_disp, 0);
+  __m128i row4 = filter_8x1_avx2(ref_main, 5 * sample_disp, 0);
+  __m128i row5 = filter_8x1_avx2(ref_main, 6 * sample_disp, 0);
+  __m128i row6 = filter_8x1_avx2(ref_main, 7 * sample_disp, 0);
+  __m128i row7 = filter_8x1_avx2(ref_main, 8 * sample_disp, 0);
+
+  //Transpose if horizontal mode
+  if (!vertical_mode) {
+    __m128i q0 = _mm_unpacklo_epi8(row0, row1);
+    __m128i q1 = _mm_unpacklo_epi8(row2, row3);
+    __m128i q2 = _mm_unpacklo_epi8(row4, row5);
+    __m128i q3 = _mm_unpacklo_epi8(row6, row7);
+
+    __m128i h0 = _mm_unpacklo_epi16(q0, q1);
+    __m128i h1 = _mm_unpacklo_epi16(q2, q3);
+    __m128i h2 = _mm_unpackhi_epi16(q0, q1);
+    __m128i h3 = _mm_unpackhi_epi16(q2, q3);
+
+    __m128i temp0 = _mm_unpacklo_epi32(h0, h1);
+    __m128i temp1 = _mm_unpackhi_epi32(h0, h1);
+    __m128i temp2 = _mm_unpacklo_epi32(h2, h3);
+    __m128i temp3 = _mm_unpackhi_epi32(h2, h3);
+
+    row0 = _mm_cvtsi64_si128(_mm_extract_epi64(temp0, 0));
+    row1 = _mm_cvtsi64_si128(_mm_extract_epi64(temp0, 1));
+    row2 = _mm_cvtsi64_si128(_mm_extract_epi64(temp1, 0));
+    row3 = _mm_cvtsi64_si128(_mm_extract_epi64(temp1, 1));
+    row4 = _mm_cvtsi64_si128(_mm_extract_epi64(temp2, 0));
+    row5 = _mm_cvtsi64_si128(_mm_extract_epi64(temp2, 1));
+    row6 = _mm_cvtsi64_si128(_mm_extract_epi64(temp3, 0));
+    row7 = _mm_cvtsi64_si128(_mm_extract_epi64(temp3, 1));
+  }
+      
+  _mm_storel_epi64((__m128i*)(dst + 0 * 8), row0);
+  _mm_storel_epi64((__m128i*)(dst + 1 * 8), row1);
+  _mm_storel_epi64((__m128i*)(dst + 2 * 8), row2);
+  _mm_storel_epi64((__m128i*)(dst + 3 * 8), row3);
+  _mm_storel_epi64((__m128i*)(dst + 4 * 8), row4);
+  _mm_storel_epi64((__m128i*)(dst + 5 * 8), row5);
+  _mm_storel_epi64((__m128i*)(dst + 6 * 8), row6);
+  _mm_storel_epi64((__m128i*)(dst + 7 * 8), row7);
+} 
+
+ /**
+ * \brief Linear interpolation for two 16 pixels. Returns 8 filtered pixels in lower 64-bits of both lanes of the YMM register.
+ * \param ref_main      Reference pixels
+ * \param delta_pos     Fractional pixel precise position of sample displacement
+ * \param x             Sample offset in direction x in ref_main array
+ */
+static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_pos, int x){
+
+  int8_t delta_int = delta_pos >> 5;
+  int8_t delta_fract = delta_pos & (32-1);
+  __m256i sample0 = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&(ref_main[x + delta_int])));
+  sample0 = _mm256_packus_epi16(sample0, sample0);
+  __m256i sample1 = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&(ref_main[x + delta_int + 1])));
+  sample1 = _mm256_packus_epi16(sample1, sample1);
+  __m256i pairs_lo = _mm256_unpacklo_epi8(sample0, sample1);
+  __m256i pairs_hi = _mm256_unpackhi_epi8(sample0, sample1);
+
+  __m256i weight = _mm256_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
+  __m256i v_temp_lo = _mm256_maddubs_epi16(pairs_lo, weight);
+  __m256i v_temp_hi = _mm256_maddubs_epi16(pairs_hi, weight);
+  v_temp_lo = _mm256_add_epi16(v_temp_lo, _mm256_set1_epi16(16));
+  v_temp_hi = _mm256_add_epi16(v_temp_hi, _mm256_set1_epi16(16));
+  v_temp_lo = _mm256_srli_epi16(v_temp_lo, 5);
+  v_temp_hi = _mm256_srli_epi16(v_temp_hi, 5);
+  sample0 = _mm256_packus_epi16(v_temp_lo, v_temp_hi);
+
+  return sample0;
+}
+
+ /**
+ * \brief Linear interpolation for 16x16 block. Writes filtered 16x16 block to dst.
+ * \param dst           Destination buffer
+ * \param ref_main      Reference pixels
+ * \param sample_disp   Sample displacement per row
+ * \param vertical_mode Mode direction, true if vertical
+ */
+void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+  for (int y = 0; y < 16; y += 8) {
+    __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, 0);
+    __m256i row1 = filter_16x1_avx2(ref_main, (y + 2) * sample_disp, 0);
+    __m256i row2 = filter_16x1_avx2(ref_main, (y + 3) * sample_disp, 0);
+    __m256i row3 = filter_16x1_avx2(ref_main, (y + 4) * sample_disp, 0);
+    __m256i row4 = filter_16x1_avx2(ref_main, (y + 5) * sample_disp, 0);
+    __m256i row5 = filter_16x1_avx2(ref_main, (y + 6) * sample_disp, 0);
+    __m256i row6 = filter_16x1_avx2(ref_main, (y + 7) * sample_disp, 0);
+    __m256i row7 = filter_16x1_avx2(ref_main, (y + 8) * sample_disp, 0);
+
+    if (!vertical_mode) {
+      __m256i q0 = _mm256_unpacklo_epi8(row0, row1);
+      __m256i q1 = _mm256_unpacklo_epi8(row2, row3);
+      __m256i q2 = _mm256_unpacklo_epi8(row4, row5);
+      __m256i q3 = _mm256_unpacklo_epi8(row6, row7);
+
+      __m256i h0 = _mm256_unpacklo_epi16(q0, q1);
+      __m256i h1 = _mm256_unpacklo_epi16(q2, q3);
+      __m256i h2 = _mm256_unpackhi_epi16(q0, q1);
+      __m256i h3 = _mm256_unpackhi_epi16(q2, q3);
+
+      __m256i temp0 = _mm256_unpacklo_epi32(h0, h1);
+      __m256i temp1 = _mm256_unpackhi_epi32(h0, h1);
+      __m256i temp2 = _mm256_unpacklo_epi32(h2, h3);
+      __m256i temp3 = _mm256_unpackhi_epi32(h2, h3);
+
+      row0 = _mm256_unpacklo_epi64(temp0, temp0);
+      row1 = _mm256_unpackhi_epi64(temp0, temp0);
+      row2 = _mm256_unpacklo_epi64(temp1, temp1);
+      row3 = _mm256_unpackhi_epi64(temp1, temp1);
+      row4 = _mm256_unpacklo_epi64(temp2, temp2);
+      row5 = _mm256_unpackhi_epi64(temp2, temp2);
+      row6 = _mm256_unpacklo_epi64(temp3, temp3);
+      row7 = _mm256_unpackhi_epi64(temp3, temp3);
+
+      //x and y must be flipped due to transpose
+      int rx = y;
+      int ry = 0;
+
+      *(int64_t*)(dst + (ry + 0) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row0));
+      *(int64_t*)(dst + (ry + 1) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row1));
+      *(int64_t*)(dst + (ry + 2) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row2));
+      *(int64_t*)(dst + (ry + 3) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row3));
+      *(int64_t*)(dst + (ry + 4) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row4));
+      *(int64_t*)(dst + (ry + 5) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row5));
+      *(int64_t*)(dst + (ry + 6) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row6));
+      *(int64_t*)(dst + (ry + 7) * 16 + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row7));
+
+      *(int64_t*)(dst + (ry + 8) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row0, 1));
+      *(int64_t*)(dst + (ry + 9) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row1, 1));
+      *(int64_t*)(dst + (ry + 10) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row2, 1));
+      *(int64_t*)(dst + (ry + 11) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row3, 1));
+      *(int64_t*)(dst + (ry + 12) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row4, 1));
+      *(int64_t*)(dst + (ry + 13) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row5, 1));
+      *(int64_t*)(dst + (ry + 14) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row6, 1));
+      *(int64_t*)(dst + (ry + 15) * 16 + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row7, 1));
+    } else {
+
+      //Set ry for the lower half of the block
+      int rx = 0;
+      int ry = y;
+
+      row0 = _mm256_permute4x64_epi64(row0, KVZ_PERMUTE(0,2,1,3));
+      row1 = _mm256_permute4x64_epi64(row1, KVZ_PERMUTE(1,3,0,2));
+      row2 = _mm256_permute4x64_epi64(row2, KVZ_PERMUTE(0,2,1,3));
+      row3 = _mm256_permute4x64_epi64(row3, KVZ_PERMUTE(1,3,0,2));
+      row4 = _mm256_permute4x64_epi64(row4, KVZ_PERMUTE(0,2,1,3));
+      row5 = _mm256_permute4x64_epi64(row5, KVZ_PERMUTE(1,3,0,2));
+      row6 = _mm256_permute4x64_epi64(row6, KVZ_PERMUTE(0,2,1,3));
+      row7 = _mm256_permute4x64_epi64(row7, KVZ_PERMUTE(1,3,0,2));
+
+      _mm_storeu_si128((__m128i*)(dst + (ry + 0) * 16 + rx), _mm256_castsi256_si128(row0));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 1) * 16 + rx), _mm256_castsi256_si128(row1));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 2) * 16 + rx), _mm256_castsi256_si128(row2));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 3) * 16 + rx), _mm256_castsi256_si128(row3));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 4) * 16 + rx), _mm256_castsi256_si128(row4));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 5) * 16 + rx), _mm256_castsi256_si128(row5));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 6) * 16 + rx), _mm256_castsi256_si128(row6));
+      _mm_storeu_si128((__m128i*)(dst + (ry + 7) * 16 + rx), _mm256_castsi256_si128(row7));
+    }
+  }
+}
+
+ /**
+ * \brief Linear interpolation for NxN blocks 16x16 and larger. Writes filtered NxN block to dst.
+ * \param dst           Destination buffer
+ * \param ref_main      Reference pixels
+ * \param sample_disp   Sample displacement per row
+ * \param vertical_mode Mode direction, true if vertical
+ * \param width         Block width
+ */
+void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode, int width){
+  for (int y = 0; y < width; y += 8) {
+    for (int x = 0; x < width; x += 16) {
+      __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, x);
+      __m256i row1 = filter_16x1_avx2(ref_main, (y + 2) * sample_disp, x);
+      __m256i row2 = filter_16x1_avx2(ref_main, (y + 3) * sample_disp, x);
+      __m256i row3 = filter_16x1_avx2(ref_main, (y + 4) * sample_disp, x);
+      __m256i row4 = filter_16x1_avx2(ref_main, (y + 5) * sample_disp, x);
+      __m256i row5 = filter_16x1_avx2(ref_main, (y + 6) * sample_disp, x);
+      __m256i row6 = filter_16x1_avx2(ref_main, (y + 7) * sample_disp, x);
+      __m256i row7 = filter_16x1_avx2(ref_main, (y + 8) * sample_disp, x);
+
+      //Transpose if horizontal mode
+      if (!vertical_mode) {
+        __m256i q0 = _mm256_unpacklo_epi8(row0, row1);
+        __m256i q1 = _mm256_unpacklo_epi8(row2, row3);
+        __m256i q2 = _mm256_unpacklo_epi8(row4, row5);
+        __m256i q3 = _mm256_unpacklo_epi8(row6, row7);
+
+        __m256i h0 = _mm256_unpacklo_epi16(q0, q1);
+        __m256i h1 = _mm256_unpacklo_epi16(q2, q3);
+        __m256i h2 = _mm256_unpackhi_epi16(q0, q1);
+        __m256i h3 = _mm256_unpackhi_epi16(q2, q3);
+
+        __m256i temp0 = _mm256_unpacklo_epi32(h0, h1);
+        __m256i temp1 = _mm256_unpackhi_epi32(h0, h1);
+        __m256i temp2 = _mm256_unpacklo_epi32(h2, h3);
+        __m256i temp3 = _mm256_unpackhi_epi32(h2, h3);
+
+        row0 = _mm256_unpacklo_epi64(temp0, temp0);
+        row1 = _mm256_unpackhi_epi64(temp0, temp0);
+        row2 = _mm256_unpacklo_epi64(temp1, temp1);
+        row3 = _mm256_unpackhi_epi64(temp1, temp1);
+        row4 = _mm256_unpacklo_epi64(temp2, temp2);
+        row5 = _mm256_unpackhi_epi64(temp2, temp2);
+        row6 = _mm256_unpacklo_epi64(temp3, temp3);
+        row7 = _mm256_unpackhi_epi64(temp3, temp3);
+
+        //x and y must be flipped due to transpose
+        int rx = y;
+        int ry = x;
+
+        *(int64_t*)(dst + (ry + 0) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row0));
+        *(int64_t*)(dst + (ry + 1) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row1));
+        *(int64_t*)(dst + (ry + 2) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row2));
+        *(int64_t*)(dst + (ry + 3) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row3));
+        *(int64_t*)(dst + (ry + 4) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row4));
+        *(int64_t*)(dst + (ry + 5) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row5));
+        *(int64_t*)(dst + (ry + 6) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row6));
+        *(int64_t*)(dst + (ry + 7) * width + rx) = _mm_cvtsi128_si64(_mm256_castsi256_si128(row7));
+
+        *(int64_t*)(dst + (ry + 8) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row0, 1));
+        *(int64_t*)(dst + (ry + 9) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row1, 1));
+        *(int64_t*)(dst + (ry + 10) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row2, 1));
+        *(int64_t*)(dst + (ry + 11) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row3, 1));
+        *(int64_t*)(dst + (ry + 12) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row4, 1));
+        *(int64_t*)(dst + (ry + 13) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row5, 1));
+        *(int64_t*)(dst + (ry + 14) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row6, 1));
+        *(int64_t*)(dst + (ry + 15) * width + rx) = _mm_cvtsi128_si64(_mm256_extracti128_si256(row7, 1));
+      } else {
+
+        //Move all filtered pixels to the lower lane to reduce memory accesses
+        row0 = _mm256_permute4x64_epi64(row0, KVZ_PERMUTE(0,2,1,3));
+        row1 = _mm256_permute4x64_epi64(row1, KVZ_PERMUTE(1,3,0,2));
+        row2 = _mm256_permute4x64_epi64(row2, KVZ_PERMUTE(0,2,1,3));
+        row3 = _mm256_permute4x64_epi64(row3, KVZ_PERMUTE(1,3,0,2));
+        row4 = _mm256_permute4x64_epi64(row4, KVZ_PERMUTE(0,2,1,3));
+        row5 = _mm256_permute4x64_epi64(row5, KVZ_PERMUTE(1,3,0,2));
+        row6 = _mm256_permute4x64_epi64(row6, KVZ_PERMUTE(0,2,1,3));
+        row7 = _mm256_permute4x64_epi64(row7, KVZ_PERMUTE(1,3,0,2));
+
+        _mm_storeu_si128((__m128i*)(dst + (y + 0) * width + x), _mm256_castsi256_si128(row0));
+        _mm_storeu_si128((__m128i*)(dst + (y + 1) * width + x), _mm256_castsi256_si128(row1));
+        _mm_storeu_si128((__m128i*)(dst + (y + 2) * width + x), _mm256_castsi256_si128(row2));
+        _mm_storeu_si128((__m128i*)(dst + (y + 3) * width + x), _mm256_castsi256_si128(row3));
+        _mm_storeu_si128((__m128i*)(dst + (y + 4) * width + x), _mm256_castsi256_si128(row4));
+        _mm_storeu_si128((__m128i*)(dst + (y + 5) * width + x), _mm256_castsi256_si128(row5));
+        _mm_storeu_si128((__m128i*)(dst + (y + 6) * width + x), _mm256_castsi256_si128(row6));
+        _mm_storeu_si128((__m128i*)(dst + (y + 7) * width + x), _mm256_castsi256_si128(row7));
+      }
+    }
+  }
+}
 
  /**
  * \brief Generage angular predictions.
@@ -101,64 +446,21 @@ static void kvz_angular_pred_avx2(
     ref_side = (vertical_mode ? in_ref_left : in_ref_above) + 1;
   }
 
-  if (sample_disp != 0) {
-    // The mode is not horizontal or vertical, we have to do interpolation.
 
-    int_fast16_t delta_pos = 0;
-    for (int_fast8_t y = 0; y < width; ++y) {
-      delta_pos += sample_disp;
-      int_fast8_t delta_int = delta_pos >> 5;
-      int_fast8_t delta_fract = delta_pos & (32 - 1);
-
-      if (delta_fract) {
-        // Do linear filtering
-        if (width < 8) {
-          for (int_fast8_t x = 0; x < width; ++x) {
-            kvz_pixel ref1 = ref_main[x + delta_int];
-            kvz_pixel ref2 = ref_main[x + delta_int + 1];
-            dst[y * width + x] = ((32 - delta_fract) * ref1 + delta_fract * ref2 + 16) >> 5;
-          }
-        } else {
-          struct { uint8_t w1; uint8_t w2; } packed_weights = { 32 - delta_fract, delta_fract };
-          __m128i v_weights = _mm_set1_epi16(*(int16_t*)&packed_weights);
-
-          for (int_fast8_t x = 0; x < width; x += 8) {
-            __m128i v_ref1 = _mm_loadl_epi64((__m128i*)&(ref_main[x + delta_int]));
-            __m128i v_ref2 = _mm_loadl_epi64((__m128i*)&(ref_main[x + delta_int + 1]));
-            __m128i v_refs = _mm_unpacklo_epi8(v_ref1, v_ref2);  
-            __m128i v_tmp = _mm_maddubs_epi16(v_refs, v_weights);
-            v_tmp = _mm_add_epi16(v_tmp, _mm_set1_epi16(16));
-            v_tmp = _mm_srli_epi16(v_tmp, 5);
-            v_tmp = _mm_packus_epi16(v_tmp, v_tmp);
-            _mm_storel_epi64((__m128i*)(dst + y * width + x), v_tmp);
-          }
-        }
-      }
-      else {
-        // Just copy the integer samples
-        for (int_fast8_t x = 0; x < width; x+=4) {
-          *(int32_t*)(&dst[y * width + x]) = *(int32_t*)(&ref_main[x + delta_int]);
-        }
-      }
-    }
-  }
-  else {
-    // Mode is horizontal or vertical, just copy the pixels.
-
-    for (int_fast8_t y = 0; y < width; ++y) {
-      for (int_fast8_t x = 0; x < width; x+=4) {
-        *(int32_t*)&(dst[y * width + x]) = *(int32_t*)&(ref_main[x]);
-      }
-    }
-  }
-
-  // Flip the block if this is was a horizontal mode.
-  if (!vertical_mode) {
-    for (int_fast8_t y = 0; y < width - 1; ++y) {
-      for (int_fast8_t x = y + 1; x < width; ++x) {
-        SWAP(dst[y * width + x], dst[x * width + y], kvz_pixel);
-      }
-    }
+  // The mode is not horizontal or vertical, we have to do interpolation.
+  switch (width) {
+    case 4:
+      filter_4x4_avx2(dst, ref_main, sample_disp, vertical_mode);
+      break;
+    case 8:
+      filter_8x8_avx2(dst, ref_main, sample_disp, vertical_mode);
+      break;
+    case 16:
+      filter_16x16_avx2(dst, ref_main, sample_disp, vertical_mode);
+      break;
+    default:
+      filter_NxN_avx2(dst, ref_main, sample_disp, vertical_mode, width);
+      break;
   }
 }
 
