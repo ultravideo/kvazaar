@@ -450,9 +450,23 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
     int32_t scale = kvz_g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
     add = 1 << (shift-1);
 
-    for (n = 0; n < width*height; n++) {
-      coeff_q   = (q_coef[n] * scale + add) >> shift;
-      coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q);
+    __m256i v_scale = _mm256_set1_epi32(scale);
+    __m256i v_add = _mm256_set1_epi32(add);
+
+    for (n = 0; n < width*height; n+=16) {
+      __m128i temp0 = _mm_loadu_si128((__m128i*)&(q_coef[n]));
+      __m128i temp1 = _mm_loadu_si128((__m128i*)&(q_coef[n + 8]));
+      __m256i v_coeff_q_lo = _mm256_cvtepi16_epi32(_mm_unpacklo_epi64(temp0, temp1));
+      __m256i v_coeff_q_hi = _mm256_cvtepi16_epi32(_mm_unpackhi_epi64(temp0, temp1));
+      v_coeff_q_lo = _mm256_mullo_epi32(v_coeff_q_lo, v_scale);
+      v_coeff_q_hi = _mm256_mullo_epi32(v_coeff_q_hi, v_scale);
+      v_coeff_q_lo = _mm256_add_epi32(v_coeff_q_lo, v_add);
+      v_coeff_q_hi = _mm256_add_epi32(v_coeff_q_hi, v_add);
+      v_coeff_q_lo = _mm256_srai_epi32(v_coeff_q_lo, shift);
+      v_coeff_q_hi = _mm256_srai_epi32(v_coeff_q_hi, shift);
+      v_coeff_q_lo = _mm256_packs_epi32(v_coeff_q_lo, v_coeff_q_hi);
+      _mm_storeu_si128((__m128i*)&(coef[n]), _mm256_castsi256_si128(v_coeff_q_lo) );
+      _mm_storeu_si128((__m128i*)&(coef[n + 8]), _mm256_extracti128_si256(v_coeff_q_lo, 1) );
     }
   }
 }
