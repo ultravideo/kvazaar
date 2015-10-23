@@ -139,6 +139,7 @@ static int kvazaar_headers(kvz_encoder *enc,
   if (len_out) *len_out = kvz_bitstream_tell(&stream) / 8;
   if (data_out) *data_out = kvz_bitstream_take_chunks(&stream);
 
+  kvz_bitstream_finalize(&stream);
   return 1;
 }
 
