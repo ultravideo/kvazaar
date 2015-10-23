@@ -30,9 +30,11 @@
 #include "strategyselector.h"
 #include "encoder.h"
 #include "transform.h"
+#include "rdo.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+#include <smmintrin.h>
 
 /**
 * \brief quantize transformed coefficents
@@ -194,6 +196,208 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   }
 }
 
+static INLINE __m128i get_residual_4x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
+  __m128i a = _mm_cvtsi32_si128(*(int32_t*)a_in);
+  __m128i b = _mm_cvtsi32_si128(*(int32_t*)b_in);
+  __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
+  return diff;
+}
+
+static INLINE __m128i get_residual_8x1_avx2(const kvz_pixel *a_in, const kvz_pixel *b_in){
+  __m128i a = _mm_cvtsi64_si128(*(int64_t*)a_in);
+  __m128i b = _mm_cvtsi64_si128(*(int64_t*)b_in);
+  __m128i diff = _mm_sub_epi16(_mm_cvtepu8_epi16(a), _mm_cvtepu8_epi16(b) );
+  return diff;
+}
+
+static INLINE int32_t get_quantized_recon_4x1_avx2(int16_t *residual, const kvz_pixel *pred_in){
+  __m128i res = _mm_loadl_epi64((__m128i*)residual);
+  __m128i pred = _mm_cvtsi32_si128(*(int32_t*)pred_in);
+  __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
+  return _mm_cvtsi128_si32(_mm_packus_epi16(rec, rec));
+}
+
+static INLINE int64_t get_quantized_recon_8x1_avx2(int16_t *residual, const kvz_pixel *pred_in){
+  __m128i res = _mm_loadu_si128((__m128i*)residual);
+  __m128i pred = _mm_cvtsi64_si128(*(int64_t*)pred_in);
+  __m128i rec = _mm_add_epi16(res, _mm_cvtepu8_epi16(pred));
+  return _mm_cvtsi128_si64(_mm_packus_epi16(rec, rec));
+}
+
+static void get_residual_avx2(const kvz_pixel *ref_in, const kvz_pixel *pred_in, int16_t *residual, int width, int in_stride){
+
+  __m128i diff = _mm_setzero_si128();
+  switch (width) {
+    case 4:
+      diff = get_residual_4x1_avx2(ref_in + 0 * in_stride, pred_in + 0 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[0]), diff);
+      diff = get_residual_4x1_avx2(ref_in + 1 * in_stride, pred_in + 1 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[4]), diff);
+      diff = get_residual_4x1_avx2(ref_in + 2 * in_stride, pred_in + 2 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[8]), diff);
+      diff = get_residual_4x1_avx2(ref_in + 3 * in_stride, pred_in + 3 * in_stride);
+      _mm_storel_epi64((__m128i*)&(residual[12]), diff);
+    break;
+    case 8:
+      diff = get_residual_8x1_avx2(&ref_in[0 * in_stride], &pred_in[0 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[0]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[1 * in_stride], &pred_in[1 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[8]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[2 * in_stride], &pred_in[2 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[16]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[3 * in_stride], &pred_in[3 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[24]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[4 * in_stride], &pred_in[4 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[32]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[5 * in_stride], &pred_in[5 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[40]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[6 * in_stride], &pred_in[6 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[48]), diff);
+      diff = get_residual_8x1_avx2(&ref_in[7 * in_stride], &pred_in[7 * in_stride]);
+      _mm_storeu_si128((__m128i*)&(residual[56]), diff);
+    break;
+    default:
+      for (int y = 0; y < width; ++y) {
+        for (int x = 0; x < width; x+=16) {
+          diff = get_residual_8x1_avx2(&ref_in[x + y * in_stride], &pred_in[x + y * in_stride]);
+          _mm_storeu_si128((__m128i*)&residual[x + y * width], diff);
+          diff = get_residual_8x1_avx2(&ref_in[(x+8) + y * in_stride], &pred_in[(x+8) + y * in_stride]);
+          _mm_storeu_si128((__m128i*)&residual[(x+8) + y * width], diff);
+        }
+      }
+    break;
+  }
+}
+
+static void get_quantized_recon_avx2(int16_t *residual, const kvz_pixel *pred_in, int in_stride, kvz_pixel *rec_out, int out_stride, int width){
+
+  switch (width) {
+    case 4:
+      *(int32_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int32_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int32_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int32_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_4x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      break;
+    case 8:
+      *(int64_t*)&(rec_out[0 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 0 * width, pred_in + 0 * in_stride);
+      *(int64_t*)&(rec_out[1 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 1 * width, pred_in + 1 * in_stride);
+      *(int64_t*)&(rec_out[2 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 2 * width, pred_in + 2 * in_stride);
+      *(int64_t*)&(rec_out[3 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 3 * width, pred_in + 3 * in_stride);
+      *(int64_t*)&(rec_out[4 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 4 * width, pred_in + 4 * in_stride);
+      *(int64_t*)&(rec_out[5 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 5 * width, pred_in + 5 * in_stride);
+      *(int64_t*)&(rec_out[6 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 6 * width, pred_in + 6 * in_stride);
+      *(int64_t*)&(rec_out[7 * out_stride]) = get_quantized_recon_8x1_avx2(residual + 7 * width, pred_in + 7 * in_stride);
+      break;
+    default:
+      for (int y = 0; y < width; ++y) {
+        for (int x = 0; x < width; x += 16) {
+          *(int64_t*)&(rec_out[x + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + x + y * width, pred_in + x + y  * in_stride);
+          *(int64_t*)&(rec_out[(x + 8) + y * out_stride]) = get_quantized_recon_8x1_avx2(residual + (x + 8) + y * width, pred_in + (x + 8) + y  * in_stride);
+        }
+      }
+      break;
+  }
+}
+
+/**
+* \brief Quantize residual and get both the reconstruction and coeffs.
+*
+* \param width  Transform width.
+* \param color  Color.
+* \param scan_order  Coefficient scan order.
+* \param use_trskip  Whether transform skip is used.
+* \param stride  Stride for ref_in, pred_in rec_out and coeff_out.
+* \param ref_in  Reference pixels.
+* \param pred_in  Predicted pixels.
+* \param rec_out  Reconstructed pixels.
+* \param coeff_out  Coefficients used for reconstruction of rec_out.
+*
+* \returns  Whether coeff_out contains any non-zero coefficients.
+*/
+int kvz_quantize_residual_avx2(encoder_state_t *const state,
+  const cu_info_t *const cur_cu, const int width, const color_t color,
+  const coeff_scan_order_t scan_order, const int use_trskip,
+  const int in_stride, const int out_stride,
+  const kvz_pixel *const ref_in, const kvz_pixel *const pred_in,
+  kvz_pixel *rec_out, coeff_t *coeff_out)
+{
+  // Temporary arrays to pass data to and from kvz_quant and transform functions.
+  int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coeff_t quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+  coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
+
+  int has_coeffs = 0;
+
+  assert(width <= TR_MAX_WIDTH);
+  assert(width >= TR_MIN_WIDTH);
+
+  // Get residual. (ref_in - pred_in -> residual)
+  get_residual_avx2(ref_in, pred_in, residual, width, in_stride);
+
+  // Transform residual. (residual -> coeff)
+  if (use_trskip) {
+    kvz_transformskip(state->encoder_control, residual, coeff, width);
+  }
+  else {
+    kvz_transform2d(state->encoder_control, residual, coeff, width, (color == COLOR_Y ? 0 : 65535));
+  }
+
+  // Quantize coeffs. (coeff -> quant_coeff)
+  if (state->encoder_control->rdoq_enable) {
+    int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
+    tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
+    kvz_rdoq(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
+      scan_order, cur_cu->type, tr_depth);
+  }
+  else {
+    kvz_quant(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
+      scan_order, cur_cu->type);
+  }
+
+  // Check if there are any non-zero coefficients.
+  {
+    int i;
+    for (i = 0; i < width * width; i+=8) {
+      __m128i v_quant_coeff = _mm_loadu_si128((__m128i*)&(quant_coeff[i]));
+      has_coeffs = !_mm_testz_si128(_mm_set1_epi8(0xFF), v_quant_coeff);
+      if(has_coeffs) break;
+    }
+  }
+
+  // Copy coefficients to coeff_out.
+  kvz_coefficients_blit(quant_coeff, coeff_out, width, width, width, out_stride);
+
+  // Do the inverse quantization and transformation and the reconstruction to
+  // rec_out.
+  if (has_coeffs) {
+
+    // Get quantized residual. (quant_coeff -> coeff -> residual)
+    kvz_dequant(state, quant_coeff, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)), cur_cu->type);
+    if (use_trskip) {
+      kvz_itransformskip(state->encoder_control, residual, coeff, width);
+    }
+    else {
+      kvz_itransform2d(state->encoder_control, residual, coeff, width, (color == COLOR_Y ? 0 : 65535));
+    }
+
+    // Get quantized reconstruction. (residual + pred_in -> rec_out)
+    get_quantized_recon_avx2(residual, pred_in, in_stride, rec_out, out_stride, width);
+  }
+  else if (rec_out != pred_in) {
+    // With no coeffs and rec_out == pred_int we skip copying the coefficients
+    // because the reconstruction is just the prediction.
+    int y, x;
+
+    for (y = 0; y < width; ++y) {
+      for (x = 0; x < width; ++x) {
+        rec_out[x + y * out_stride] = pred_in[x + y * in_stride];
+      }
+    }
+  }
+
+  return has_coeffs;
+}
+
 void kvz_quant_avx2(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {
@@ -202,6 +406,68 @@ void kvz_quant_avx2(const encoder_state_t * const state, coeff_t *coef, coeff_t 
   }
   else {
     kvz_quant_flat_avx2(state, coef, q_coef, width, height, type, scan_idx, block_type);
+  }
+}
+
+/**
+ * \brief inverse quantize transformed and quantized coefficents
+ *
+ */
+void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coeff_t *coef, int32_t width, int32_t height,int8_t type, int8_t block_type)
+{
+  const encoder_control_t * const encoder = state->encoder_control;
+  int32_t shift,add,coeff_q;
+  int32_t n;
+  int32_t transform_shift = 15 - encoder->bitdepth - (kvz_g_convert_to_bit[ width ] + 2);
+
+  int32_t qp_scaled = kvz_get_scaled_qp(type, state->global->QP, (encoder->bitdepth-8)*6);
+
+  shift = 20 - QUANT_SHIFT - transform_shift;
+
+  if (encoder->scaling_list.enable)
+  {
+    uint32_t log2_tr_size = kvz_g_convert_to_bit[ width ] + 2;
+    int32_t scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+
+    const int32_t *dequant_coef = encoder->scaling_list.de_quant_coeff[log2_tr_size-2][scalinglist_type][qp_scaled%6];
+    shift += 4;
+
+    if (shift >qp_scaled / 6) {
+      add = 1 << (shift - qp_scaled/6 - 1);
+
+      for (n = 0; n < width * height; n++) {
+        coeff_q = ((q_coef[n] * dequant_coef[n]) + add ) >> (shift -  qp_scaled/6);
+        coef[n] = (coeff_t)CLIP(-32768,32767,coeff_q);
+      }
+    } else {
+      for (n = 0; n < width * height; n++) {
+        // Clip to avoid possible overflow in following shift left operation
+        coeff_q   = CLIP(-32768, 32767, q_coef[n] * dequant_coef[n]);
+        coef[n] = (coeff_t)CLIP(-32768, 32767, coeff_q << (qp_scaled/6 - shift));
+      }
+    }
+  } else {
+    int32_t scale = kvz_g_inv_quant_scales[qp_scaled%6] << (qp_scaled/6);
+    add = 1 << (shift-1);
+
+    __m256i v_scale = _mm256_set1_epi32(scale);
+    __m256i v_add = _mm256_set1_epi32(add);
+
+    for (n = 0; n < width*height; n+=16) {
+      __m128i temp0 = _mm_loadu_si128((__m128i*)&(q_coef[n]));
+      __m128i temp1 = _mm_loadu_si128((__m128i*)&(q_coef[n + 8]));
+      __m256i v_coeff_q_lo = _mm256_cvtepi16_epi32(_mm_unpacklo_epi64(temp0, temp1));
+      __m256i v_coeff_q_hi = _mm256_cvtepi16_epi32(_mm_unpackhi_epi64(temp0, temp1));
+      v_coeff_q_lo = _mm256_mullo_epi32(v_coeff_q_lo, v_scale);
+      v_coeff_q_hi = _mm256_mullo_epi32(v_coeff_q_hi, v_scale);
+      v_coeff_q_lo = _mm256_add_epi32(v_coeff_q_lo, v_add);
+      v_coeff_q_hi = _mm256_add_epi32(v_coeff_q_hi, v_add);
+      v_coeff_q_lo = _mm256_srai_epi32(v_coeff_q_lo, shift);
+      v_coeff_q_hi = _mm256_srai_epi32(v_coeff_q_hi, shift);
+      v_coeff_q_lo = _mm256_packs_epi32(v_coeff_q_lo, v_coeff_q_hi);
+      _mm_storeu_si128((__m128i*)&(coef[n]), _mm256_castsi256_si128(v_coeff_q_lo) );
+      _mm_storeu_si128((__m128i*)&(coef[n + 8]), _mm256_extracti128_si256(v_coeff_q_lo, 1) );
+    }
   }
 }
 
@@ -214,6 +480,10 @@ int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 
 #if COMPILE_INTEL_AVX2
   success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
+  if (bitdepth == 8) {
+    success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
+    success &= kvz_strategyselector_register(opaque, "dequant", "avx2", 40, &kvz_dequant_avx2);
+  }
 #endif //COMPILE_INTEL_AVX2
 
   return success;
