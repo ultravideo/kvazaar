@@ -32,7 +32,7 @@
 #include "transform.h"
 #include "rdo.h"
 
-#if COMPILE_INTEL_AVX2
+#if COMPILE_INTEL_AVX2 && defined X86_64
 #include <immintrin.h>
 #include <smmintrin.h>
 
@@ -471,20 +471,20 @@ void kvz_dequant_avx2(const encoder_state_t * const state, coeff_t *q_coef, coef
   }
 }
 
-#endif //COMPILE_INTEL_AVX2
+#endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
-#if COMPILE_INTEL_AVX2
+#if COMPILE_INTEL_AVX2 && defined X86_64
   success &= kvz_strategyselector_register(opaque, "quant", "avx2", 40, &kvz_quant_avx2);
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "quantize_residual", "avx2", 40, &kvz_quantize_residual_avx2);
     success &= kvz_strategyselector_register(opaque, "dequant", "avx2", 40, &kvz_dequant_avx2);
   }
-#endif //COMPILE_INTEL_AVX2
+#endif //COMPILE_INTEL_AVX2 && defined X86_64
 
   return success;
 }

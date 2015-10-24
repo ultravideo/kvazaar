@@ -27,7 +27,7 @@
 #include "intra-avx2.h"
 #include "strategyselector.h"
 
-#if COMPILE_INTEL_AVX2
+#if COMPILE_INTEL_AVX2 && defined X86_64
 #include <immintrin.h>
 #include "strategies/strategies-common.h"
 
@@ -464,15 +464,15 @@ static void kvz_angular_pred_avx2(
   }
 }
 
-#endif //COMPILE_INTEL_AVX2
+#endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
-#if COMPILE_INTEL_AVX2
+#if COMPILE_INTEL_AVX2 && defined X86_64
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
   }
-#endif //COMPILE_INTEL_AVX2
+#endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
 }
