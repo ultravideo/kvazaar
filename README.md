@@ -3,7 +3,8 @@ An open-source HEVC encoder licensed under LGPLv2.1
 
 Join channel #kvazaar_hevc in Freenode IRC network to contact us.
 
-Kvazaar is not yet finished and does not implement all the features of HEVC. Compression performance will increase as we add more coding tools.
+Kvazaar is not yet finished and does not implement all the features of
+HEVC. Compression performance will increase as we add more coding tools.
 
 http://ultravideo.cs.tut.fi/#encoder for more information.
 
@@ -94,12 +95,12 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
                                        Disable threads if set to 0.
 
       Tiles:
-              --tiles-width-split <string>|u<int> : 
+              --tiles-width-split <string>|u<int> :
                                        Specifies a comma separated list of pixel
                                        positions of tiles columns separation coordinates.
                                        Can also be u followed by and a single int n,
                                        in which case it produces columns of uniform width.
-              --tiles-height-split <string>|u<int> : 
+              --tiles-height-split <string>|u<int> :
                                        Specifies a comma separated list of pixel
                                        positions of tiles rows separation coordinates.
                                        Can also be u followed by and a single int n,
@@ -110,7 +111,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.
 
       Slices:
-              --slice-addresses <string>|u<int>: 
+              --slice-addresses <string>|u<int>:
                                        Specifies a comma separated list of LCU
                                        positions in tile scan order of tile separations.
                                        Can also be u followed by and a single int n,
@@ -139,12 +140,20 @@ The needed linker and compiler flags can be obtained with pkg-config.
 
 ##Compiling Kvazaar
 
-If you have trouble regarding compiling the source code, please make an [issue](https://github.com/ultravideo/kvazaar/issues) about in Github. Others might encounter the same problem and there is probably much to improve in the build process. We want to make this as simple as possible.
+If you have trouble regarding compiling the source code, please make an
+[issue](https://github.com/ultravideo/kvazaar/issues) about in Github.
+Others might encounter the same problem and there is probably much to
+improve in the build process. We want to make this as simple as
+possible.
 
 ###Required libraries
-- For Visual Studio, the pthreads-w32 library is required. Platforms with native POSIX thread support don't need anything.
-  - The project file expects the library to be in ../pthreads.2/ relative to Kvazaar. You can just extract the pre-built library there.
-  - The executable needs pthreadVC2.dll to be present. Either install it somewhere or ship it with the executable.
+- For Visual Studio, the pthreads-w32 library is required. Platforms
+  with native POSIX thread support don't need anything.
+  - The project file expects the library to be in ../pthreads.2/
+    relative to Kvazaar. You can just extract the pre-built library
+    there.
+  - The executable needs pthreadVC2.dll to be present. Either install it
+    somewhere or ship it with the executable.
 
 ###GCC
 - Makefile can be found in the src directory.
@@ -159,13 +168,18 @@ platforms.
 The default targets can be installed by running `make install`.
 
 ###OS X
-- The program should compile and work on OS X but you might need a newer version of GCC than what comes with the platform.
+- The program should compile and work on OS X but you might need a newer
+  version of GCC than what comes with the platform.
 
 ###Visual Studio
-- VS2010 and older do not have support for some of the C99 features that we use. Please use VS2013 or newer or GCC (MinGW) to compile on Windows.
+- VS2010 and older do not have support for some of the C99 features that
+  we use. Please use VS2013 or newer or GCC (MinGW) to compile on
+  Windows.
 - Project files can be found under build/.
-- Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html) in %PATH%
-  - Run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to user variables
+- Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html)
+  in %PATH%
+  - Run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to
+    user variables
 - Building the Kvazaar library is not yet supported.
 
 
@@ -173,27 +187,45 @@ The default targets can be installed by running `make install`.
 
 See http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics
 for a list of topics you might want to examine if you would like to do
-something bigger than a bug fix but don't know what yet.
+    something bigger than a bug fix but don't know what yet.
 
 ###For version control we try to follow these conventions:
 
-- Master branch always produces a working bitstream (can be decoded with HM).
-- Commits for new features and major changes/fixes put to a sensibly named feature branch first and later merged to the master branch.
-- Always merge the feature branch to the master branch, not the other way around, with fast-forwarding disabled if necessary. We have found that this differentiates between working and unfinished versions nicely.
-- Every commit should at least compile. Producing a working bitstream is nice as well, but not always possible. Features may be temporarily disabled to produce a working bitstream, but remember to re-enbable them before merging to master.
+- Master branch always produces a working bitstream (can be decoded with
+  HM).
+- Commits for new features and major changes/fixes put to a sensibly
+  named feature branch first and later merged to the master branch.
+- Always merge the feature branch to the master branch, not the other
+  way around, with fast-forwarding disabled if necessary. We have found
+  that this differentiates between working and unfinished versions
+  nicely.
+- Every commit should at least compile. Producing a working bitstream is
+  nice as well, but not always possible. Features may be temporarily
+  disabled to produce a working bitstream, but remember to re-enbable
+  them before merging to master.
 
 
 ###Testing
 
-- We do not have a proper testing framework yet. We test mainly by decoding the bitstream with HM and checking that the result matches the encoders own reconstruction.
-- You should at least test that HM decodes a bitstream file made with your changes without throwing checksum errors. If your changes shouldn't alter the bitstream, you should check that they don't.
-- We would like to have a suite of automatic tests that also check for BD-rate increase and speed decrease in addition to checking that the bitstream is valid. As of yet there is no such suite.
+- We do not have a proper testing framework yet. We test mainly by
+  decoding the bitstream with HM and checking that the result matches
+  the encoders own reconstruction.
+- You should at least test that HM decodes a bitstream file made with
+  your changes without throwing checksum errors. If your changes
+  shouldn't alter the bitstream, you should check that they don't.
+- We would like to have a suite of automatic tests that also check for
+  BD-rate increase and speed decrease in addition to checking that the
+  bitstream is valid. As of yet there is no such suite.
 
 
 ###Unit tests
-- There are some unit tests located in the tests directory. We would like to have more.
-- The Visual Studio project links the unit tests against the actual .lib file used by the encoder. There is no Makefile as of yet.
-- The unit tests use "greatest" unit testing framework. It is included as a submodule, but getting it requires the following commands to be run in the root directory of kvazaar:
+- There are some unit tests located in the tests directory. We would
+  like to have more.
+- The Visual Studio project links the unit tests against the actual .lib
+  file used by the encoder. There is no Makefile as of yet.
+- The unit tests use "greatest" unit testing framework. It is included
+  as a submodule, but getting it requires the following commands to be
+  run in the root directory of kvazaar:
 
         git submodule init
         git submodule update
@@ -210,11 +242,19 @@ We try to follow the following conventions:
 - Reference and deference next to the variable name.
 - Variable names in lowered characters with words divided by underscore.
 - Maximum line length 79 characters when possible.
-- Functions only used inside the module shouldn't be defined in the module header. They can be defined in the beginning of the .c file if necessary.
+- Functions only used inside the module shouldn't be defined in the
+  module header. They can be defined in the beginning of the .c file if
+  necessary.
 
 
 ###Resources for HEVC bitstream features
 
-- A good first resource for HEVC bitstream is JCTVC-N1002 High Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder Description
-- Many good articles regarding specific parts of HEVC can be found on IEEE Transactions on Circuits and Systems for Video Technology, Combined issue on High Efficiency Video Coding (HEVC) Standards and Research
-- The specification tends to follow the reference implementation, not the other way around, so check HM if the specification is unclear. 
+- A good first resource for HEVC bitstream is JCTVC-N1002 High
+  Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder
+  Description
+- Many good articles regarding specific parts of HEVC can be found on
+  IEEE Transactions on Circuits and Systems for Video Technology,
+  Combined issue on High Efficiency Video Coding (HEVC) Standards and
+  Research
+- The specification tends to follow the reference implementation, not
+  the other way around, so check HM if the specification is unclear.
