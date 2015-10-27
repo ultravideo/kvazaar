@@ -7,8 +7,6 @@ Kvazaar is not yet finished and does not implement all the features of HEVC. Com
 
 http://ultravideo.cs.tut.fi/#encoder for more information.
 
-http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of topics you might want to examine if you would like to do something bigger than a bug fix but don't know what yet.
-
 [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
 
 ##Using Kvazaar
@@ -123,44 +121,59 @@ http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics for a list of
            -w, --width               : Width of input in pixels
            -h, --height              : Height of input in pixels
 
-Example:
-    kvazaar -i <INPUT_YUV> --input-res <WIDTH>x<HEIGHT> -o <OUTPUT.BIN> -n <NUMBER_OF_FRAMES> -q <QP>
+For example:
 
-eg. `kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.bin -n 600 -q 32`
+    kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.hevc -n 600 -q 32
 
 The only accepted input format so far is 8-bit YUV 4:2:0.
 
+##Kvazaar library
+
+See [kvazaar.h](src/kvazaar.h) for the library API and its
+documentation.
+
+When using the static Kvazaar library on Windows, macro `KVZ_STATIC_LIB`
+must be defined. On other platforms it's not strictly required.
+
+The needed linker and compiler flags can be obtained with pkg-config.
 
 ##Compiling Kvazaar
 
 If you have trouble regarding compiling the source code, please make an [issue](https://github.com/ultravideo/kvazaar/issues) about in Github. Others might encounter the same problem and there is probably much to improve in the build process. We want to make this as simple as possible.
 
 ###Required libraries
-- For Visual Studio pthreads-w32 library is required. Platforms with native posix thread support don't need anything.
-  - The project file expects the library to be in ../pthreads.2/ relative to kvazaar. You can just extract the pre-built library there.
+- For Visual Studio, the pthreads-w32 library is required. Platforms with native POSIX thread support don't need anything.
+  - The project file expects the library to be in ../pthreads.2/ relative to Kvazaar. You can just extract the pre-built library there.
   - The executable needs pthreadVC2.dll to be present. Either install it somewhere or ship it with the executable.
 
-###Visual Studio 2010
-- VS2010 and older does not have support for some of the c99 features that we use. Please use VS2013 or newer or GCC (MinGW) to compile on windows.
-
-###Visual Studio 2013
-- project files included
-- requires external [vsyasm.exe](http://yasm.tortall.net/Download.html) in %PATH%
-  - run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to user variables
-
 ###GCC
-- Simple Makefile included in src/
-- Yasm is expected to be in PATH
+- Makefile can be found in the src directory.
+- Yasm is expected to be in PATH.
+    - Alternatively, NASM can be used by passing `AS=nasm` to make.
+
+On Linux, both the shared and the static library are built and installed
+by default. On Windows and OS&nbsp;X, the default is to only build the
+DLL/dylib. The static command line program is built by default on all
+platforms.
+
+The default targets can be installed by running `make install`.
 
 ###OS X
 - The program should compile and work on OS X but you might need a newer version of GCC than what comes with the platform.
 
-###Other
-- There is a scons SConstruct file that should work on both Windows and Linux.
-- Contact us for support or write an [issue in Github](https://github.com/ultravideo/kvazaar/issues)
+###Visual Studio
+- VS2010 and older do not have support for some of the C99 features that we use. Please use VS2013 or newer or GCC (MinGW) to compile on Windows.
+- Project files can be found under build/.
+- Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html) in %PATH%
+  - Run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to user variables
+- Building the Kvazaar library is not yet supported.
 
 
 ##Contributing to Kvazaar
+
+See http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics
+for a list of topics you might want to examine if you would like to do
+something bigger than a bug fix but don't know what yet.
 
 ###For version control we try to follow these conventions:
 
@@ -170,14 +183,14 @@ If you have trouble regarding compiling the source code, please make an [issue](
 - Every commit should at least compile. Producing a working bitstream is nice as well, but not always possible. Features may be temporarily disabled to produce a working bitstream, but remember to re-enbable them before merging to master.
 
 
-###Testing:
+###Testing
 
 - We do not have a proper testing framework yet. We test mainly by decoding the bitstream with HM and checking that the result matches the encoders own reconstruction.
 - You should at least test that HM decodes a bitstream file made with your changes without throwing checksum errors. If your changes shouldn't alter the bitstream, you should check that they don't.
 - We would like to have a suite of automatic tests that also check for BD-rate increase and speed decrease in addition to checking that the bitstream is valid. As of yet there is no such suite.
 
 
-###Unit tests:
+###Unit tests
 - There are some unit tests located in the tests directory. We would like to have more.
 - The Visual Studio project links the unit tests against the actual .lib file used by the encoder. There is no Makefile as of yet.
 - The unit tests use "greatest" unit testing framework. It is included as a submodule, but getting it requires the following commands to be run in the root directory of kvazaar:
@@ -186,7 +199,7 @@ If you have trouble regarding compiling the source code, please make an [issue](
         git submodule update
 
 
-###Code style:
+###Code style
 
 We try to follow the following conventions:
 - C99 without features not supported by Visual Studio 2013 (VLAs).
@@ -200,7 +213,7 @@ We try to follow the following conventions:
 - Functions only used inside the module shouldn't be defined in the module header. They can be defined in the beginning of the .c file if necessary.
 
 
-###Resources for HEVC bitstream features:
+###Resources for HEVC bitstream features
 
 - A good first resource for HEVC bitstream is JCTVC-N1002 High Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder Description
 - Many good articles regarding specific parts of HEVC can be found on IEEE Transactions on Circuits and Systems for Video Technology, Combined issue on High Efficiency Video Coding (HEVC) Standards and Research
