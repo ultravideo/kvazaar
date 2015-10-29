@@ -77,9 +77,4 @@ unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const 
                   const int ref_stride, const int rec_stride,
                   const int width);
 
-
-void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride);
-
 #endif

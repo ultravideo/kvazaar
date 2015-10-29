@@ -36,6 +36,8 @@ cost_pixel_nxn_func * kvz_satd_16x16 = 0;
 cost_pixel_nxn_func * kvz_satd_32x32 = 0;
 cost_pixel_nxn_func * kvz_satd_64x64 = 0;
 
+pixels_blit_func * kvz_pixels_blit = 0;
+
 
 // Headers for platform optimizations.
 #include "generic/picture-generic.h"

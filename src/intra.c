@@ -32,6 +32,7 @@
 #include "encoder.h"
 #include "transform.h"
 #include "strategies/strategies-intra.h"
+#include "strategies/strategies-picture.h"
 
 
 int8_t kvz_intra_get_dir_luma_predictor(

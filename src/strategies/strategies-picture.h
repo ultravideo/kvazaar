@@ -28,6 +28,10 @@ typedef unsigned(reg_sad_func)(const kvz_pixel *const data1, const kvz_pixel *co
   const unsigned stride1, const unsigned stride2);
 typedef unsigned (cost_pixel_nxn_func)(const kvz_pixel *block1, const kvz_pixel *block2);
 
+typedef void pixels_blit_func(const kvz_pixel* orig, kvz_pixel *dst,
+                         unsigned width, unsigned height,
+                         unsigned orig_stride, unsigned dst_stride);
+
 
 // Declare function pointers.
 extern reg_sad_func * kvz_reg_sad;
@@ -43,6 +47,8 @@ extern cost_pixel_nxn_func * kvz_satd_8x8;
 extern cost_pixel_nxn_func * kvz_satd_16x16;
 extern cost_pixel_nxn_func * kvz_satd_32x32;
 extern cost_pixel_nxn_func * kvz_satd_64x64;
+
+extern pixels_blit_func * kvz_pixels_blit;
 
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
@@ -62,6 +68,7 @@ cost_pixel_nxn_func * kvz_pixels_get_sad_func(unsigned n);
   {"satd_16x16", (void**) &kvz_satd_16x16}, \
   {"satd_32x32", (void**) &kvz_satd_32x32}, \
   {"satd_64x64", (void**) &kvz_satd_64x64}, \
+  {"pixels_blit", (void**) &kvz_pixels_blit}, \
 
 
 

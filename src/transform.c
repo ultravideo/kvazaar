@@ -35,6 +35,7 @@
 #include "strategies/strategies-dct.h"
 #include "strategies/strategies-quant.h"
 #include "strategies/generic/quant-generic.h"
+#include "strategies/strategies-picture.h"
 
 //////////////////////////////////////////////////////////////////////////
 // INITIALIZATIONS
