@@ -13,7 +13,7 @@ DLLDIR  = $(BINDIR)
 
 # Library version number
 VER_MAJOR = 2
-VER_MINOR = 0
+VER_MINOR = 1
 VER_RELEASE = 0
 
 PROG   = kvazaar
