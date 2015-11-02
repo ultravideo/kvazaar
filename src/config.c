@@ -396,6 +396,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("gop") {
     // TODO: Defining the whole GOP structure via parameters
     if(atoi(value) == 8) {
+      cfg->gop_lowdelay = 0;
       // GOP
       cfg->gop_len = 8;
       cfg->gop[0].poc_offset = 8; cfg->gop[0].qp_offset = 1; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.442;  cfg->gop[0].is_ref = 1;
@@ -430,8 +431,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
     } else if(!strcmp(value, "lb")) { // Low-delay B
+      cfg->gop_lowdelay = 1;
       cfg->gop_len = 4;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 4; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 1;      
+      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 1;      
       cfg->gop[0].ref_neg_count = 4; cfg->gop[0].ref_neg[0] = 1; cfg->gop[0].ref_neg[1] = 5; cfg->gop[0].ref_neg[2] = 9; cfg->gop[0].ref_neg[3] = 13;
       cfg->gop[0].ref_pos_count = 0;
 
@@ -447,8 +449,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[3].ref_neg_count = 4; cfg->gop[3].ref_neg[0] = 1; cfg->gop[3].ref_neg[1] = 4; cfg->gop[3].ref_neg[2] = 8; cfg->gop[3].ref_neg[3] = 12;
       cfg->gop[3].ref_pos_count = 0;
     } else if (!strcmp(value, "ultralow")) { // Low-delay B with 1 ref frame
+      cfg->gop_lowdelay = 1;
       cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.68;  cfg->gop[0].is_ref = 1;
+      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.68;  cfg->gop[0].is_ref = 1;
       cfg->gop[0].ref_pos_count = 0;
       cfg->gop[0].ref_neg_count = 1; cfg->gop[0].ref_neg[0] = 1;
 
@@ -460,23 +463,23 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[2].ref_neg_count = 1; cfg->gop[2].ref_neg[0] = 1;
       cfg->gop[2].ref_pos_count = 0;
 
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 4; cfg->gop[3].qp_factor = 0.3536;   cfg->gop[3].is_ref = 1;
+      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 2; cfg->gop[3].qp_factor = 0.3536;   cfg->gop[3].is_ref = 1;
       cfg->gop[3].ref_neg_count = 1; cfg->gop[3].ref_neg[0] = 1;
       cfg->gop[3].ref_pos_count = 0;
 
-      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 3; cfg->gop[4].layer = 4; cfg->gop[4].qp_factor = 0.68;   cfg->gop[4].is_ref = 1;
+      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 3; cfg->gop[4].layer = 3; cfg->gop[4].qp_factor = 0.68;   cfg->gop[4].is_ref = 1;
       cfg->gop[4].ref_neg_count = 1; cfg->gop[4].ref_neg[0] = 1;
       cfg->gop[4].ref_pos_count = 0;
 
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 2; cfg->gop[5].layer = 3; cfg->gop[5].qp_factor = 0.3536; cfg->gop[5].is_ref = 1;
+      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 2; cfg->gop[5].layer = 2; cfg->gop[5].qp_factor = 0.3536; cfg->gop[5].is_ref = 1;
       cfg->gop[5].ref_neg_count = 1; cfg->gop[5].ref_neg[0] = 1;
       cfg->gop[5].ref_pos_count = 0;
 
-      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 3; cfg->gop[6].layer = 4; cfg->gop[6].qp_factor = 0.68;   cfg->gop[6].is_ref = 1;
+      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 3; cfg->gop[6].layer = 3; cfg->gop[6].qp_factor = 0.68;   cfg->gop[6].is_ref = 1;
       cfg->gop[6].ref_neg_count = 1;  cfg->gop[6].ref_neg[0] = 1;
       cfg->gop[6].ref_pos_count = 0;
 
-      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 1;
+      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 1; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 1;
       cfg->gop[7].ref_neg_count = 1; cfg->gop[7].ref_neg[0] = 1;
       cfg->gop[7].ref_pos_count = 0;
     } else if (atoi(value)) {

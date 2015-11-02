@@ -172,6 +172,7 @@ typedef struct kvz_config
 
   int32_t add_encoder_info;
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
+  int8_t gop_lowdelay;       /*!< \brief specifies that the GOP does not use future pictures */
   kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
 
   int32_t target_bitrate;
