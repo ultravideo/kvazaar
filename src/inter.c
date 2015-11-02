@@ -447,37 +447,58 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x,
   // A0 and A1 availability testing
   if (x != 0) {
     *a1 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu - 1);
-    if (!(*a1)->coded) *a1 = NULL;
-    if(*a1) inter_clear_cu_unused(*a1);
+    // Do not check (*a1)->coded because the block above is always coded before
+    // the current one and the flag is not set when searching an SMP block.
+    if ((*a1)->type == CU_INTER) {
+      inter_clear_cu_unused(*a1);
+    } else {
+      *a1 = NULL;
+    }
 
     if (y_cu + height_in_scu < LCU_WIDTH>>3) {
       *a0 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu);
-      if (!(*a0)->coded) *a0 = NULL;
+      if ((*a0)->coded && (*a0)->type == CU_INTER) {
+        inter_clear_cu_unused(*a0);
+      } else {
+        *a0 = NULL;
+      }
     }
-    if(*a0) inter_clear_cu_unused(*a0);
   }
 
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x_cu + width_in_scu < LCU_WIDTH>>3) {
       *b0 = LCU_GET_CU(lcu, x_cu + width_in_scu, y_cu - 1);
-      if (!(*b0)->coded) *b0 = NULL;
-    } else if(y_cu == 0) {
+    } else if (y_cu == 0) {
       // Special case, top-right CU
       *b0 = LCU_GET_TOP_RIGHT_CU(lcu);
-      if (!(*b0)->coded) *b0 = NULL;
     }
-    if(*b0) inter_clear_cu_unused(*b0);
+    if ((*b0) && (*b0)->coded && (*b0)->type == CU_INTER) {
+      inter_clear_cu_unused(*b0);
+    } else {
+      *b0 = NULL;
+    }
 
     *b1 = LCU_GET_CU(lcu, x_cu + width_in_scu - 1, y_cu - 1);
-    if (!(*b1)->coded) *b1 = NULL;
-    if(*b1) inter_clear_cu_unused(*b1);
+    // Do not check (*b1)->coded because the block to the left is always coded
+    // before the current one and the flag is not set when searching an SMP
+    // block.
+    if ((*b1)->type == CU_INTER) {
+      inter_clear_cu_unused(*b1);
+    } else {
+      *b1 = NULL;
+    }
 
     if (x != 0) {
       *b2 = LCU_GET_CU(lcu, x_cu - 1, y_cu - 1);
-      if(!(*b2)->coded) *b2 = NULL;
+      // Do not check (*b2)->coded because the block above and to the left is
+      // always coded before the current one.
+      if ((*b2)->type == CU_INTER) {
+        inter_clear_cu_unused(*b2);
+      } else {
+        *b2 = NULL;
+      }
     }
-    if(*b2) inter_clear_cu_unused(*b2);
   }
 }
 
@@ -517,7 +538,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                                        mv_cand[cand][1] = ((scale * (cu)->inter.mv[list][1] + 127 + (scale * (cu)->inter.mv[list][1] < 0)) >> 8 ); }}
 
   // Left predictors
-  if (a0 && a0->type == CU_INTER && (
+  if (a0 && (
     ((a0->inter.mv_dir & 1) && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
     ((a0->inter.mv_dir & 2) && a0->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
     if (a0->inter.mv_dir & (1 << reflist) && a0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
@@ -528,7 +549,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
       mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
     }
     candidates++;
-  } else if (a1 && a1->type == CU_INTER && (
+  } else if (a1 && (
     ((a1->inter.mv_dir & 1) && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
     ((a1->inter.mv_dir & 2) && a1->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
     if (a1->inter.mv_dir & (1 << reflist) && a1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
@@ -543,7 +564,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
 
   if(!candidates) {
       // Left predictors
-    if (a0 && a0->type == CU_INTER) {
+    if (a0) {
       if (a0->inter.mv_dir & (1 << reflist)) {
         mv_cand[candidates][0] = a0->inter.mv[reflist][0];
         mv_cand[candidates][1] = a0->inter.mv[reflist][1];
@@ -554,7 +575,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
         APPLY_MV_SCALING(a0, candidates, reflist2nd);
       }
       candidates++;
-    } else if (a1 && a1->type == CU_INTER) {
+    } else if (a1) {
       if (a1->inter.mv_dir & (1 << reflist)) {
         mv_cand[candidates][0] = a1->inter.mv[reflist][0];
         mv_cand[candidates][1] = a1->inter.mv[reflist][1];
@@ -569,7 +590,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
   }
 
   // Top predictors
-  if (b0 && b0->type == CU_INTER && (
+  if (b0 && (
     ((b0->inter.mv_dir & 1) && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
     ((b0->inter.mv_dir & 2) && b0->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
     if (b0->inter.mv_dir & (1 << reflist) && b0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
@@ -580,7 +601,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
       mv_cand[candidates][1] = b0->inter.mv[reflist2nd][1];
     }
     b_candidates++;
-  } else if (b1 && b1->type == CU_INTER && (
+  } else if (b1 && (
     ((b1->inter.mv_dir & 1) && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
     ((b1->inter.mv_dir & 2) && b1->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
     if (b1->inter.mv_dir & (1 << reflist) && b1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
@@ -591,7 +612,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
       mv_cand[candidates][1] = b1->inter.mv[reflist2nd][1];
     }
     b_candidates++;
-  } else if (b2 && b2->type == CU_INTER && (
+  } else if (b2 && (
     ((b2->inter.mv_dir & 1) && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
     ((b2->inter.mv_dir & 2) && b2->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
     if (b2->inter.mv_dir & (1 << reflist) && b2->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
@@ -606,7 +627,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
   candidates += b_candidates;
 
   // When a1 or a0 is available, we dont check for secondary B candidates
-  if((a1 && a1->type == CU_INTER) || (a0 && a0->type == CU_INTER)) {
+  if (a1 || a0) {
     b_candidates = 1;
   } else if(candidates != 2) {
     b_candidates = 0;
@@ -614,7 +635,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
 
   if(!b_candidates) {
     // Top predictors
-    if (b0 && b0->type == CU_INTER) {
+    if (b0) {
       if (b0->inter.mv_dir & (1 << reflist)) {
         mv_cand[candidates][0] = b0->inter.mv[reflist][0];
         mv_cand[candidates][1] = b0->inter.mv[reflist][1];
@@ -625,7 +646,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
         APPLY_MV_SCALING(b0, candidates, reflist2nd);
       }
       candidates++;
-    } else if (b1 && b1->type == CU_INTER) {
+    } else if (b1) {
       if (b1->inter.mv_dir & (1 << reflist)) {
         mv_cand[candidates][0] = b1->inter.mv[reflist][0];
         mv_cand[candidates][1] = b1->inter.mv[reflist][1];
@@ -636,7 +657,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
         APPLY_MV_SCALING(b1, candidates, reflist2nd);
       }
       candidates++;
-    } else if(b2 && b2->type == CU_INTER) {
+    } else if (b2) {
       if (b2->inter.mv_dir & (1 << reflist)) {
         mv_cand[candidates][0] = b2->inter.mv[reflist][0];
         mv_cand[candidates][1] = b2->inter.mv[reflist][1];
@@ -690,7 +711,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
   kvz_inter_get_spatial_merge_candidates(x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, &b0, &b1, &b2, &a0, &a1, lcu);
 
 
-#define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && (CU2)->type == CU_INTER && \
+#define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && \
                                                      (CU1)->inter.mv_dir == (CU2)->inter.mv_dir && \
                                                     (!(((CU1)->inter.mv_dir & 1) && ((CU2)->inter.mv_dir & 1)) || \
                                                       ((CU1)->inter.mv[0][0] == (CU2)->inter.mv[0][0] && \
@@ -702,7 +723,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
                                                        (CU1)->inter.mv_ref[1] == (CU2)->inter.mv_ref[1]) ) \
                                                       ) duplicate = 1; }
 
-  if (a1 && a1->type == CU_INTER) {
+  if (a1) {
     mv_cand[candidates].mv[0][0] = a1->inter.mv[0][0];
     mv_cand[candidates].mv[0][1] = a1->inter.mv[0][1];
     mv_cand[candidates].mv[1][0] = a1->inter.mv[1][0];
@@ -713,7 +734,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
     candidates++;
   }
 
-  if (b1 && b1->type == CU_INTER) {
+  if (b1) {
     if(candidates) CHECK_DUPLICATE(b1, a1);
     if(!duplicate) {
       mv_cand[candidates].mv[0][0] = b1->inter.mv[0][0];
@@ -727,7 +748,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
     }
   }
 
-  if (b0 && b0->type == CU_INTER) {
+  if (b0) {
     if(candidates) CHECK_DUPLICATE(b0,b1);
     if(!duplicate) {
       mv_cand[candidates].mv[0][0] = b0->inter.mv[0][0];
@@ -741,7 +762,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
     }
   }
 
-  if (a0 && a0->type == CU_INTER) {
+  if (a0) {
     if(candidates) CHECK_DUPLICATE(a0,a1);
     if(!duplicate) {
       mv_cand[candidates].mv[0][0] = a0->inter.mv[0][0];
@@ -756,7 +777,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state, int32_t x,
   }
 
   if (candidates != 4) {
-    if(b2 && b2->type == CU_INTER) {
+    if (b2) {
       CHECK_DUPLICATE(b2,a1);
       if(!duplicate) {
         CHECK_DUPLICATE(b2,b1);

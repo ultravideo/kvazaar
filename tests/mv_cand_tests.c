@@ -28,6 +28,10 @@ TEST test_get_spatial_merge_cand(void)
 {
   lcu_t lcu;
   memset(&lcu, 0, sizeof(lcu));
+  for (int i = 0; i < sizeof(lcu.cu) / sizeof(cu_info_t); i++) {
+    lcu.cu[i].coded = 1;
+    lcu.cu[i].type = CU_INTER;
+  }
   lcu.cu[20].coded = 1;
   lcu.cu[22].coded = 1;
   lcu.cu[23].coded = 1;
