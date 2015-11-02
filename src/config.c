@@ -429,6 +429,24 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
+    } else if(!strcmp(value, "lb")) { // Low-delay B
+      cfg->gop_len = 4;
+      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 4; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 1;      
+      cfg->gop[0].ref_neg_count = 4; cfg->gop[0].ref_neg[0] = 1; cfg->gop[0].ref_neg[1] = 5; cfg->gop[0].ref_neg[2] = 9; cfg->gop[0].ref_neg[3] = 13;
+      cfg->gop[0].ref_pos_count = 0;
+
+      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
+      cfg->gop[1].ref_neg_count = 4; cfg->gop[1].ref_neg[0] = 1; cfg->gop[1].ref_neg[1] = 2; cfg->gop[1].ref_neg[2] = 6; cfg->gop[1].ref_neg[3] = 10;
+      cfg->gop[1].ref_pos_count = 0;
+
+      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.4624; cfg->gop[2].is_ref = 1;
+      cfg->gop[2].ref_neg_count = 4; cfg->gop[2].ref_neg[0] = 1; cfg->gop[2].ref_neg[1] = 3; cfg->gop[2].ref_neg[2] = 7; cfg->gop[2].ref_neg[3] = 11;
+      cfg->gop[2].ref_pos_count = 0;
+
+      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 1; cfg->gop[3].layer = 1; cfg->gop[3].qp_factor = 0.578;   cfg->gop[3].is_ref = 1;
+      cfg->gop[3].ref_neg_count = 4; cfg->gop[3].ref_neg[0] = 1; cfg->gop[3].ref_neg[1] = 4; cfg->gop[3].ref_neg[2] = 8; cfg->gop[3].ref_neg[3] = 12;
+      cfg->gop[3].ref_pos_count = 0;
+
     } else if (atoi(value)) {
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
