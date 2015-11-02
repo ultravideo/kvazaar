@@ -343,7 +343,7 @@ SAD_NXN(32, kvz_pixel)
 SAD_NXN(64, kvz_pixel)
 
 
-int kvz_strategy_register_picture_generic(void* opaque)
+int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
   bool success = true;
 
