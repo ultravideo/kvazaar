@@ -541,17 +541,20 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
 
       if (depth < MAX_DEPTH) {
-
         // Try SMP partitioning.
-        mode_cost = kvz_search_cu_smp(state,
-                                      x, y,
-                                      depth,
-                                      SIZE_2NxN,
-                                      &work_tree[depth + 1]);
-        if (mode_cost < cost) {
-          cost = mode_cost;
-          // TODO: only copy inter prediction info, not pixels
-          work_tree_copy_up(x, y, depth, work_tree);
+        static const part_mode_t smp_modes[] = {SIZE_2NxN, SIZE_Nx2N};
+        for (int i = 0; i < 2; ++i) {
+          mode_cost = kvz_search_cu_smp(state,
+                                        x, y,
+                                        depth,
+                                        smp_modes[i],
+                                        &work_tree[depth + 1]);
+          // TODO: take cost of coding part mode into account
+          if (mode_cost < cost) {
+            cost = mode_cost;
+            // TODO: only copy inter prediction info, not pixels
+            work_tree_copy_up(x, y, depth, work_tree);
+          }
         }
       }
     }
