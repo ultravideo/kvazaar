@@ -81,6 +81,7 @@ static const struct option long_options[] = {
   { "gop",                required_argument, NULL, 0 },
   { "bipred",                   no_argument, NULL, 0 },
   { "bitrate",            required_argument, NULL, 0 },
+  { "preset",             required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -307,6 +308,9 @@ void print_help(void)
     "          --bitrate <integer>    : Target bitrate. [0]\n"
     "                                     0: disable rate-control\n"
     "                                     N: target N bits per second\n"
+    "          --preset <string>      : Use preset\n"
+    "                                     ultrafast, superfast,veryfast, faster,\n"
+    "                                     fast, medium, slow, slower, veryslow, placebo\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

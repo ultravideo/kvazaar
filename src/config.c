@@ -278,6 +278,22 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
 
+  static const char * const preset_values[11][21] = {
+      { "ultrafast", "subme","0",  "rd","1",   "transform-skip","0",  "pu-depth-intra", "2-3",  
+          "pu-depth-inter","1-3",  "sao","0",  "rdoq","0", "deblock", "0", "ref", "1", NULL },
+      { "superfast", "subme","0",  "rd","1",   "transform-skip","0",  "pu-depth-intra", "2-3", 
+          "pu-depth-inter","1-3",  "rdoq","0", "ref", "2", NULL },
+      { "veryfast",  "subme","0",  "rd","1",  "pu-depth-intra","1-3", NULL },
+      { "faster",    "subme","0",  "rd","1",  NULL },
+      { "fast",      "subme","0",  "rd","1",  NULL },
+      { "medium",    "subme","0",  "rd","1",  "bipred","1", NULL },
+      { "slow",      "subme","0",  "rd","2",  "bipred","1", NULL },
+      { "slower",    "subme","1",  "rd","2",  "bipred","1", "me","tz", NULL },
+      { "veryslow",  "subme","1",  "rd","2",  "bipred","1", "me","tz", NULL },
+      { "placebo",   "subme","1",  "rd","2",  "bipred","1", "me","tz", "full-intra-search","1",  "ref", "15", NULL },
+      { NULL }
+  };
+
   if (!name)
     return 0;
 
@@ -438,6 +454,30 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->bipred = atobool(value);
   else if OPT("bitrate")
     cfg->target_bitrate = atoi(value);
+  else if OPT("preset") {
+    bool preset_found = false;
+    int preset_line = 0;
+    int preset_value = 0;
+    // Find the selected preset from the list
+    while (preset_values[preset_line][0] != NULL) {      
+      if (!strcmp(value, preset_values[preset_line][0])) {
+        preset_found = true;
+        fprintf(stderr, "Using preset %s: ", value);
+        // Loop all the name and value pairs and push to the config parser
+        for (preset_value = 1; preset_values[preset_line][preset_value] != NULL; preset_value+=2) {
+          fprintf(stderr, "--%s=%s ", preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+          kvz_config_parse(cfg, preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+        }
+        fprintf(stderr, "\n");
+        break;
+      }
+      preset_line++;
+    }
+    if (!preset_found) {
+      fprintf(stderr, "Input error: unknown preset \"%s\"\n", value);
+      return 0;
+    }
+  }
   else
     return 0;
 #undef OPT

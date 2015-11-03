@@ -68,6 +68,9 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --bitrate <integer>    : Target bitrate. [0]
                                          0: disable rate-control
                                          N: target N bits per second
+              --preset <string>      : Use preset
+                                         ultrafast, superfast,veryfast, faster,
+                                         fast, medium, slow, slower, veryslow, placebo
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio
