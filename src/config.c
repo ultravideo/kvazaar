@@ -278,6 +278,170 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
 
+  static const char * const preset_values[11][26] = {
+      { 
+        "ultrafast", 
+        "pu-depth-intra", "2-3",
+        "pu-depth-inter", "1-3",
+        "rd", "0",
+        "me", "hexbs",
+        "ref", "1",
+        "deblock", "0",
+        "signhide", "0",
+        "subme", "0",
+        "sao", "0",
+        "rdoq", "0",
+        "transform-skip", "0", 
+        "full-intra-search", "0",
+        NULL 
+      },
+      { 
+        "superfast",
+        "pu-depth-intra", "1-3",
+        "pu-depth-inter", "1-3",
+        "rd", "1",
+        "me", "hexbs",
+        "ref", "1",
+        "deblock", "0",
+        "signhide", "0",
+        "subme", "0",
+        "sao", "0",
+        "rdoq", "0",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "veryfast",
+        "pu-depth-intra", "1-3",
+        "pu-depth-inter", "0-3",
+        "rd", "1",
+        "me", "hexbs",
+        "ref", "2",
+        "deblock", "1",
+        "signhide", "0",
+        "subme", "0",
+        "sao", "0",
+        "rdoq", "0",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "faster",
+        "pu-depth-intra", "1-3",
+        "pu-depth-inter", "0-3",
+        "rd", "1",
+        "me", "hexbs",
+        "ref", "2",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "0",
+        "sao", "0",
+        "rdoq", "0",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "fast",
+        "pu-depth-intra", "1-3",
+        "pu-depth-inter", "0-3",
+        "rd", "1",
+        "me", "hexbs",
+        "ref", "2",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "1",
+        "sao", "0",
+        "rdoq", "0",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "medium",
+        "pu-depth-intra", "1-4",
+        "pu-depth-inter", "0-3",
+        "rd", "1",
+        "me", "hexbs",
+        "ref", "3",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "1",
+        "sao", "0",
+        "rdoq", "0",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "slow",
+        "pu-depth-intra", "1-4",
+        "pu-depth-inter", "0-3",
+        "rd", "2",
+        "me", "hexbs",
+        "ref", "3",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "1",
+        "sao", "1",
+        "rdoq", "0",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "slower",
+        "pu-depth-intra", "1-4",
+        "pu-depth-inter", "0-3",
+        "rd", "2",
+        "me", "tz",
+        "ref", "4",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "1",
+        "sao", "1",
+        "rdoq", "1",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "veryslow",
+        "pu-depth-intra", "1-4",
+        "pu-depth-inter", "0-3",
+        "rd", "2",
+        "me", "tz",
+        "ref", "4",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "1",
+        "sao", "1",
+        "rdoq", "1",
+        "transform-skip", "1",
+        "full-intra-search", "0",
+        NULL
+      },
+      {
+        "placebo",
+        "pu-depth-intra", "0-4",
+        "pu-depth-inter", "0-3",
+        "rd", "3",
+        "me", "tz",
+        "ref", "6",
+        "deblock", "1",
+        "signhide", "1",
+        "subme", "1",
+        "sao", "1",
+        "rdoq", "1",
+        "transform-skip", "1",
+        "full-intra-search", "1",
+        NULL
+      },
+      { NULL }
+  };
+
   if (!name)
     return 0;
 
@@ -438,6 +602,35 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->bipred = atobool(value);
   else if OPT("bitrate")
     cfg->target_bitrate = atoi(value);
+  else if OPT("preset") {
+    int preset_line = 0;
+
+    // Accept numbers from 0 to 9.
+    if ((atoi(value) == 0 && !strcmp(value, "0")) || (atoi(value) >= 1 && atoi(value) <= 9)) {
+      preset_line = atoi(value);
+    } else {
+      // Find the selected preset from the list
+      while (preset_values[preset_line][0] != NULL) {
+        if (!strcmp(value, preset_values[preset_line][0])) {
+          break;
+        }
+        preset_line++;
+      }
+    }
+
+    if (preset_values[preset_line][0] != NULL) {
+      fprintf(stderr, "Using preset %s: ", value);
+      // Loop all the name and value pairs and push to the config parser
+      for (int preset_value = 1; preset_values[preset_line][preset_value] != NULL; preset_value += 2) {
+        fprintf(stderr, "--%s=%s ", preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+        kvz_config_parse(cfg, preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+      }
+      fprintf(stderr, "\n");
+    } else {
+      fprintf(stderr, "Input error: unknown preset \"%s\"\n", value);
+      return 0;
+    }
+  }
   else
     return 0;
 #undef OPT
