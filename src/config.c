@@ -603,25 +603,30 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("bitrate")
     cfg->target_bitrate = atoi(value);
   else if OPT("preset") {
-    bool preset_found = false;
     int preset_line = 0;
-    int preset_value = 0;
-    // Find the selected preset from the list
-    while (preset_values[preset_line][0] != NULL) {      
-      if (!strcmp(value, preset_values[preset_line][0])) {
-        preset_found = true;
-        fprintf(stderr, "Using preset %s: ", value);
-        // Loop all the name and value pairs and push to the config parser
-        for (preset_value = 1; preset_values[preset_line][preset_value] != NULL; preset_value+=2) {
-          fprintf(stderr, "--%s=%s ", preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
-          kvz_config_parse(cfg, preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+
+    // Accept numbers from 0 to 9.
+    if ((atoi(value) == 0 && !strcmp(value, "0")) || (atoi(value) >= 1 && atoi(value) <= 9)) {
+      preset_line = atoi(value);
+    } else {
+      // Find the selected preset from the list
+      while (preset_values[preset_line][0] != NULL) {
+        if (!strcmp(value, preset_values[preset_line][0])) {
+          break;
         }
-        fprintf(stderr, "\n");
-        break;
+        preset_line++;
       }
-      preset_line++;
     }
-    if (!preset_found) {
+
+    if (preset_values[preset_line][0] != NULL) {
+      fprintf(stderr, "Using preset %s: ", value);
+      // Loop all the name and value pairs and push to the config parser
+      for (int preset_value = 1; preset_values[preset_line][preset_value] != NULL; preset_value += 2) {
+        fprintf(stderr, "--%s=%s ", preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+        kvz_config_parse(cfg, preset_values[preset_line][preset_value], preset_values[preset_line][preset_value + 1]);
+      }
+      fprintf(stderr, "\n");
+    } else {
       fprintf(stderr, "Input error: unknown preset \"%s\"\n", value);
       return 0;
     }
