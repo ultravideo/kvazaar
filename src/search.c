@@ -522,20 +522,37 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   cur_cu->depth = depth > MAX_DEPTH ? MAX_DEPTH : depth;
   cur_cu->tr_depth = depth > 0 ? depth : 1;
   cur_cu->type = CU_NOTSET;
-  cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
+  cur_cu->part_size = SIZE_2Nx2N;
   // If the CU is completely inside the frame at this depth, search for
   // prediction modes at this depth.
   if (x + cu_width <= frame->width &&
       y + cu_width <= frame->height)
   {
 
-    if (state->global->slicetype != KVZ_SLICE_I &&
-        WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max))
-    {
+    bool can_use_inter =
+        state->global->slicetype != KVZ_SLICE_I
+        && WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max);
+
+    if (can_use_inter) {
       int mode_cost = kvz_search_cu_inter(state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTER;
+      }
+
+      if (depth < MAX_DEPTH) {
+
+        // Try SMP partitioning.
+        mode_cost = kvz_search_cu_smp(state,
+                                      x, y,
+                                      depth,
+                                      SIZE_2NxN,
+                                      &work_tree[depth + 1]);
+        if (mode_cost < cost) {
+          cost = mode_cost;
+          // TODO: only copy inter prediction info, not pixels
+          work_tree_copy_up(x, y, depth, work_tree);
+        }
       }
     }
 
@@ -552,12 +569,14 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTRA;
+        cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
       }
     }
 
     // Reconstruct best mode because we need the reconstructed pixels for
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
+      assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
       int8_t intra_mode = cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode;
       lcu_set_intra_mode(&work_tree[depth], x, y, depth,
                          intra_mode,
@@ -628,7 +647,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
       int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
 
-      if(cur_cu->merged && !cbf) {
+      if(cur_cu->merged && !cbf && cur_cu->part_size == SIZE_2Nx2N) {
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
         // Selecting skip reduces bits needed to code the CU
@@ -696,6 +715,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         cur_cu->intra[0] = cu_d1->intra[0];
         cur_cu->type = CU_INTRA;
+        cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
 
         kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, cur_cu->tr_depth);
         lcu_set_intra_mode(&work_tree[depth], x, y, depth,
@@ -727,8 +747,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // search.
       work_tree_copy_down(x, y, depth, work_tree);
     }
+  } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
+    // Need to copy modes down since the lower level of the work tree is used
+    // when searching SMP and AMP blocks.
+    work_tree_copy_down(x, y, depth, work_tree);
   }
-  
+
   PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x + (LCU_WIDTH >> depth), 

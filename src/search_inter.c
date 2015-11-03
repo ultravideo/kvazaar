@@ -971,8 +971,10 @@ static unsigned search_frac(const encoder_state_t * const state,
 /**
  * \brief Perform inter search for a single reference frame.
  */
-static void search_cu_inter_ref(const encoder_state_t * const state,
-                                int x, int y, int depth,
+static void search_pu_inter_ref(const encoder_state_t * const state,
+                                int x, int y,
+                                int width, int height,
+                                int depth,
                                 lcu_t *lcu, cu_info_t *cur_cu,
                                 int16_t mv_cand[2][2],
                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
@@ -996,7 +998,7 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
   orig.y = y_cu * CU_MIN_SIZE_PIXELS;
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = ref_idx;
-  kvz_inter_get_mv_cand(state, x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, mv_cand, cur_cu, lcu, ref_list);
+  kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
 
@@ -1005,8 +1007,9 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
     // Take starting point for MV search from previous frame.
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
-    int mid_x_cu = (x + (LCU_WIDTH >> (depth+1))) / 8;
-    int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
+    // TODO: Update this to work with SMP/AMP blocks.
+    int mid_x_cu = (x + (width >> 1)) / 8;
+    int mid_y_cu = (y + (height >> 1)) / 8;
     cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
@@ -1024,13 +1027,13 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
 #else
   switch (state->encoder_control->cfg->ime_algorithm) {
     case KVZ_IME_TZ:
+      // TODO: Make tz search work with non-square blocks.
       temp_cost += tz_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
       break;
 
     default:
       temp_cost += hexagon_search(state,
-                                  CU_WIDTH_FROM_DEPTH(depth),
-                                  CU_WIDTH_FROM_DEPTH(depth),
+                                  width, height,
                                   frame->source,
                                   ref_image,
                                   &orig,
@@ -1101,16 +1104,42 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
 
 
 /**
- * Update lcu to have best modes at this depth.
- * \return Cost of best mode.
+ * \brief Update PU to have best modes at this depth.
+ *
+ * \param state       encoder state
+ * \param x_cu        x-coordinate of the containing CU
+ * \param y_cu        y-coordinate of the containing CU
+ * \param depth       depth of the CU in the quadtree
+ * \param part_mode   partition mode of the CU
+ * \param i_pu        index of the PU in the CU
+ * \param lcu         containing LCU
+ *
+ * \return            cost of the best mode
  */
-int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
+static int search_pu_inter(const encoder_state_t * const state,
+                           int x_cu, int y_cu,
+                           int depth,
+                           part_mode_t part_mode,
+                           int i_pu,
+                           lcu_t *lcu)
 {
   const videoframe_t * const frame = state->tile->frame;
-  uint32_t ref_idx = 0;
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
-  cu_info_t *cur_cu = LCU_GET_CU(lcu, x_local >> 3, y_local >> 3);
+  const int width_cu  = LCU_WIDTH >> depth;
+  const int x         = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
+  const int y         = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);
+  const int width     = PU_GET_W(part_mode, width_cu, i_pu);
+  const int height    = PU_GET_H(part_mode, width_cu, i_pu);
+
+  // Merge candidate A1 may not be used for the second PU of Nx2N, nLx2N and
+  // nRx2N partitions.
+  const bool merge_a1 = i_pu == 0 || width >= height;
+  // Merge candidate B1 may not be used for the second PU of 2NxN, 2NxnU and
+  // 2NxnD partitions.
+  const bool merge_b1 = i_pu == 0 || width <= height;
+
+  const int x_local   = SUB_SCU(x);
+  const int y_local   = SUB_SCU(y);
+  cu_info_t *cur_cu   = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
 
   int16_t mv_cand[2][2];
   // Search for merge mode candidate
@@ -1118,9 +1147,8 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   // Get list of candidates
   int16_t num_cand = kvz_inter_get_merge_cand(state,
                                               x, y,
-                                              LCU_WIDTH >> depth,
-                                              LCU_WIDTH >> depth,
-                                              true, true,
+                                              width, height,
+                                              merge_a1, merge_b1,
                                               merge_cand,
                                               lcu);
 
@@ -1148,9 +1176,12 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
   cur_cu->inter.cost = UINT_MAX;
 
+  uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
-    search_cu_inter_ref(state,
-                        x, y, depth,
+    search_pu_inter_ref(state,
+                        x, y,
+                        width, height,
+                        depth,
                         lcu, cur_cu,
                         mv_cand, merge_cand, num_cand,
                         ref_idx,
@@ -1200,29 +1231,30 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
           // Check boundaries when using owf to process multiple frames at the same time
           if (max_px_below_lcu >= 0) {
-            // The following has been modified to fit testing two mv's, but it's
-            // equivalent to: y + mv + block_height - next_lcu_row_px > max_px_below_lcu
-            int next_lcu_row_px = ((y >> LOG2_LCU_WIDTH) + 1) << LOG2_LCU_WIDTH;
-            int block_height = LCU_WIDTH >> depth;
-            int max_mv = next_lcu_row_px - y - block_height + max_px_below_lcu;
-            int ceil_mv_l0 = ((mv[0][1] + 3) >> 2);
-            int ceil_mv_l1 = ((mv[1][1] + 3) >> 2);
-
-            if (ceil_mv_l0 < max_mv || ceil_mv_l1 < max_mv) continue;
+            // When SAO is off, row is considered reconstructed when the last LCU
+            // is done, although the bottom 2 pixels might still need deblocking.
+            // To work around this, add 2 luma pixels to the reach of the mv
+            // in order to avoid referencing those possibly non-deblocked pixels.
+            int mv_lcu_row_reach_1 = ((y+(mv[0][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
+            int mv_lcu_row_reach_2 = ((y+(mv[1][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
+            int cur_lcu_row = y / LCU_WIDTH;
+            if (mv_lcu_row_reach_1 > cur_lcu_row + max_px_below_lcu || mv_lcu_row_reach_2 > cur_lcu_row + max_px_below_lcu) {
+              continue;
+            }
           }
 
           kvz_inter_recon_lcu_bipred(state,
                                      state->global->ref->images[merge_cand[i].ref[0]],
                                      state->global->ref->images[merge_cand[j].ref[1]],
                                      x, y,
-                                     LCU_WIDTH >> depth,
-                                     LCU_WIDTH >> depth,
+                                     width,
+                                     height,
                                      mv,
                                      templcu);
 
-          for (int ypos = 0; ypos < LCU_WIDTH >> depth; ++ypos) {
-            int dst_y = ypos*(LCU_WIDTH >> depth);
-            for (int xpos = 0; xpos < (LCU_WIDTH >> depth); ++xpos) {
+          for (int ypos = 0; ypos < height; ++ypos) {
+            int dst_y = ypos * width;
+            for (int xpos = 0; xpos < width; ++xpos) {
               tmp_block[dst_y + xpos] = templcu->rec.y[
                 SUB_SCU(y + ypos) * LCU_WIDTH + SUB_SCU(x + xpos)];
               tmp_pic[dst_y + xpos] = frame->source->y[x + xpos + (y + ypos)*frame->source->width];
@@ -1269,7 +1301,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
             // Each motion vector has its own candidate
             for (int reflist = 0; reflist < 2; reflist++) {
               cu_mv_cand = 0;
-              kvz_inter_get_mv_cand(state, x, y, LCU_WIDTH >> depth, LCU_WIDTH >> depth, mv_cand, cur_cu, lcu, reflist);
+              kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, reflist);
               if ((mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
                 vector2d_t mvd_temp1, mvd_temp2;
                 int cand1_cost, cand2_cost;
@@ -1301,4 +1333,75 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   }
 
   return cur_cu->inter.cost;
+}
+
+
+/**
+ * \brief Update CU to have best modes at this depth.
+ *
+ * Only searches the 2Nx2N partition mode.
+ *
+ * \param state       encoder state
+ * \param x           x-coordinate of the CU
+ * \param y           y-coordinate of the CU
+ * \param depth       depth of the CU in the quadtree
+ * \param lcu         containing LCU
+ *
+ * \return            cost of the best mode
+ */
+int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
+{
+  return search_pu_inter(state, x, y, depth, SIZE_2Nx2N, 0, lcu);
+}
+
+
+/**
+ * \brief Update CU to have best modes at this depth.
+ *
+ * Only searches the given partition mode.
+ *
+ * \param state       encoder state
+ * \param x           x-coordinate of the CU
+ * \param y           y-coordinate of the CU
+ * \param depth       depth of the CU in the quadtree
+ * \param part_mode   partition mode to search
+ * \param lcu         containing LCU
+ *
+ * \return            cost of the best mode
+ */
+int kvz_search_cu_smp(const encoder_state_t * const state,
+                      int x, int y,
+                      int depth,
+                      part_mode_t part_mode,
+                      lcu_t *lcu)
+{
+  const int num_pu    = kvz_part_mode_num_parts[part_mode];
+  const int width_scu = (LCU_WIDTH >> depth) >> MAX_DEPTH;
+  const int y_scu     = SUB_SCU(y) >> MAX_DEPTH;
+  const int x_scu     = SUB_SCU(x) >> MAX_DEPTH;
+
+  int cost = 0;
+  for (int i = 0; i < num_pu; ++i) {
+    const int x_pu      = PU_GET_X(part_mode, width_scu, x_scu, i);
+    const int y_pu      = PU_GET_Y(part_mode, width_scu, y_scu, i);
+    const int width_pu  = PU_GET_W(part_mode, width_scu, i);
+    const int height_pu = PU_GET_H(part_mode, width_scu, i);
+    cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
+
+    cur_pu->type = CU_INTER;
+    cur_pu->part_size = part_mode;
+    cur_pu->depth = depth;
+
+    cost += search_pu_inter(state, x, y, depth, part_mode, i, lcu);
+
+    for (int y = y_pu; y < y_pu + height_pu; ++y) {
+      for (int x = x_pu; x < x_pu + width_pu; ++x) {
+        cu_info_t *scu = LCU_GET_CU(lcu, x, y);
+        scu->type = CU_INTER;
+        memcpy(&scu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+      }
+    }
+  }
+
+  return cost;
 }
