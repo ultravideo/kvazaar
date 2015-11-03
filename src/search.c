@@ -224,6 +224,28 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
 }
 
 
+static void lcu_set_inter_pu(lcu_t *lcu, int x_pu, int y_pu, int width_pu, int height_pu, cu_info_t *cur_pu)
+{
+  // Set mode in every CU covered by part_mode in this depth.
+  for (int y = y_pu; y < y_pu + height_pu; ++y) {
+    for (int x = x_pu; x < x_pu + width_pu; ++x) {
+      cu_info_t *cu = LCU_GET_CU(lcu, x, y);
+      //Check if this could be moved inside the if
+      cu->coded    = 1;
+      if (cu != cur_pu) {
+        cu->depth     = cur_pu->depth;
+        cu->part_size = cur_pu->part_size;
+        cu->type      = CU_INTER;
+        cu->tr_depth  = cur_pu->tr_depth;
+        cu->merged    = cur_pu->merged;
+        cu->skipped   = cur_pu->skipped;
+        memcpy(&cu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+      }
+    }
+  }
+}
+
+
 static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *cur_cu)
 {
   const int width_cu = LCU_CU_WIDTH >> depth;
@@ -232,30 +254,12 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *
   const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
 
   for (int i = 0; i < num_pu; ++i) {
-    const int x_pu = PU_GET_X(cur_cu->part_size, width_cu, x_cu, i);
-    const int y_pu = PU_GET_Y(cur_cu->part_size, width_cu, y_cu, i);
+    const int x_pu      = PU_GET_X(cur_cu->part_size, width_cu, x_cu, i);
+    const int y_pu      = PU_GET_Y(cur_cu->part_size, width_cu, y_cu, i);
     const int width_pu  = PU_GET_W(cur_cu->part_size, width_cu, i);
     const int height_pu = PU_GET_H(cur_cu->part_size, width_cu, i);
-
-    cu_info_t *cur_pu = LCU_GET_CU(lcu, x_pu, y_pu);
-
-    // Set mode in every CU covered by part_mode in this depth.
-    for (int y = y_pu; y < y_pu + height_pu; ++y) {
-      for (int x = x_pu; x < x_pu + width_pu; ++x) {
-        cu_info_t *cu = LCU_GET_CU(lcu, x, y);
-        //Check if this could be moved inside the if
-        cu->coded    = 1;
-        if (cu != cur_pu) {
-          cu->depth     = cur_pu->depth;
-          cu->part_size = cur_pu->part_size;
-          cu->type      = CU_INTER;
-          cu->tr_depth  = cur_pu->tr_depth;
-          cu->merged    = cur_pu->merged;
-          cu->skipped   = cur_pu->skipped;
-          memcpy(&cu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
-        }
-      }
-    }
+    cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
+    lcu_set_inter_pu(lcu, x_pu, y_pu, width_pu, height_pu, cur_pu);
   }
 }
 
