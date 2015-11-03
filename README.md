@@ -68,7 +68,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --bitrate <integer>    : Target bitrate. [0]
                                          0: disable rate-control
                                          N: target N bits per second
-              --preset <string>      : Use preset
+              --preset <string>      : Use preset. This will override previous options.
                                          ultrafast, superfast,veryfast, faster,
                                          fast, medium, slow, slower, veryslow, placebo
 
@@ -130,6 +130,26 @@ For example:
     kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.hevc -n 600 -q 32
 
 The only accepted input format so far is 8-bit YUV 4:2:0.
+
+
+##Presets
+The names of the presets are the same as with x264: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo. The effects of the presets are listed in the following table, where the names have been abreviated to fit the layout in GitHub.
+
+                  | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p
+----------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -----
+rd                | 0     | 1     | 1     | 1     | 1     | 1     | 2     | 2     | 2     | 3
+pu-depth-intra    | 2-3   | 1-3   | 1-3   | 1-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 0-4
+pu-depth-inter    | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3
+me                | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    | tz    | tz
+ref               | 1     | 1     | 2     | 2     | 2     | 3     | 3     | 4     | 4     | 6
+deblock           | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1
+signhide          | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1
+subme             | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1
+sao               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1
+rdoq              | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1
+transform-skip    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1
+full-intra-search | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
+
 
 ##Kvazaar library
 
