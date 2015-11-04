@@ -166,7 +166,7 @@ INLINE void kvz_filter_deblock_chroma(const encoder_control_t * const encoder, k
  */
 void kvz_filter_deblock_edge_luma(encoder_state_t * const state,
                               int32_t xpos, int32_t ypos,
-                              int8_t depth, int8_t dir)
+                              int8_t depth, edge_dir dir)
 {
   videoframe_t * const frame = state->tile->frame;
   const encoder_control_t * const encoder = state->encoder_control;
@@ -355,7 +355,7 @@ void kvz_filter_deblock_edge_luma(encoder_state_t * const state,
  */
 void kvz_filter_deblock_edge_chroma(encoder_state_t * const state,
                                 int32_t x, int32_t y,
-                                int8_t depth, int8_t dir)
+                                int8_t depth, edge_dir dir)
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
@@ -438,17 +438,22 @@ void kvz_filter_deblock_edge_chroma(encoder_state_t * const state,
 
 /**
  * \brief function to split LCU into smaller CU blocks
- * \param encoder the encoder info structure
- * \param xCtb block x-position (as SCU)
- * \param yCtb block y-position (as SCU)
- * \param depth block depth
- * \param edge which edge we are filtering
+ *
+ * \param encoder   the encoder info structure
+ * \param x         block x-position (as SCU)
+ * \param y         block y-position (as SCU)
+ * \param depth     block depth
+ * \param dir       direction of the edges to filter
  *
  * This function takes (SCU) block position as input and splits the block
  * until the coded block size has been achived. Calls luma and chroma filtering
  * functions for each coded CU size.
  */
-void kvz_filter_deblock_cu(encoder_state_t * const state, int32_t x, int32_t y, int8_t depth, int32_t edge)
+void kvz_filter_deblock_cu(encoder_state_t * const state,
+                           int32_t x,
+                           int32_t y,
+                           int8_t depth,
+                           edge_dir dir)
 {
   const videoframe_t * const frame = state->tile->frame;
   const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x, y);
@@ -468,25 +473,25 @@ void kvz_filter_deblock_cu(encoder_state_t * const state, int32_t x, int32_t y, 
     assert(depth >= 0);  // for clang-analyzer
     change = 1 << (MAX_DEPTH - 1 - depth);
 
-    kvz_filter_deblock_cu(state, x, y, depth + 1, edge);
+    kvz_filter_deblock_cu(state, x, y, depth + 1, dir);
     if(!border_x || border_split_x) {
-      kvz_filter_deblock_cu(state, x + change, y, depth + 1, edge);
+      kvz_filter_deblock_cu(state, x + change, y, depth + 1, dir);
     }
     if(!border_y || border_split_y) {
-      kvz_filter_deblock_cu(state, x , y + change, depth + 1, edge);
+      kvz_filter_deblock_cu(state, x , y + change, depth + 1, dir);
     }
     if((!border_x && !border_y) || (border_split_x && border_split_y)) {
-      kvz_filter_deblock_cu(state, x + change, y + change, depth + 1, edge);
+      kvz_filter_deblock_cu(state, x + change, y + change, depth + 1, dir);
     }
     return;
   }
 
   // no filtering on borders (where filter would use pixels outside the picture)
-  if ((x == 0 && edge == EDGE_VER) || (y == 0 && edge == EDGE_HOR)) return;
+  if ((x == 0 && dir == EDGE_VER) || (y == 0 && dir == EDGE_HOR)) return;
 
   // do the filtering for block edge
-  kvz_filter_deblock_edge_luma(state,   x*(LCU_WIDTH >> MAX_DEPTH),       y*(LCU_WIDTH >> MAX_DEPTH),       depth, edge);
-  kvz_filter_deblock_edge_chroma(state, x*(LCU_WIDTH >> (MAX_DEPTH + 1)), y*(LCU_WIDTH >> (MAX_DEPTH + 1)), depth, edge);
+  kvz_filter_deblock_edge_luma(state,   x*(LCU_WIDTH >> MAX_DEPTH),       y*(LCU_WIDTH >> MAX_DEPTH),       depth, dir);
+  kvz_filter_deblock_edge_chroma(state, x*(LCU_WIDTH >> (MAX_DEPTH + 1)), y*(LCU_WIDTH >> (MAX_DEPTH + 1)), depth, dir);
 }
 
 
@@ -522,4 +527,3 @@ void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 
   kvz_filter_deblock_cu(state, lcu.x << MAX_DEPTH, lcu.y << MAX_DEPTH, 0, EDGE_HOR);
 }
-

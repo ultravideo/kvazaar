@@ -31,17 +31,26 @@
 #include "encoderstate.h"
 
 
+/**
+ * \brief Edge direction.
+ */
+typedef enum edge_dir {
+  EDGE_VER = 0, // vertical
+  EDGE_HOR = 1, // horizontal
+} edge_dir;
+
+
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
 // Deblocking
 void kvz_filter_deblock_cu(encoder_state_t *state, int32_t x_px, int32_t y_px,
-                       int8_t depth, int32_t edge);
+                       int8_t depth, edge_dir dir);
 void kvz_filter_deblock_edge_luma(encoder_state_t *state,
                               int32_t x_pos, int32_t y_pos,
-                              int8_t depth, int8_t dir);
+                              int8_t depth, edge_dir dir);
 void kvz_filter_deblock_edge_chroma(encoder_state_t *state,
                                 int32_t xpos, int32_t ypos,
-                                int8_t depth, int8_t dir);
+                                int8_t depth, edge_dir dir);
 void kvz_filter_deblock_lcu(encoder_state_t *state, int x_px, int y_px);
 void kvz_filter_deblock_luma(const encoder_control_t * const encoder, kvz_pixel *src, int32_t offset, int32_t tc , int8_t sw,
                          int8_t part_p_nofilter, int8_t part_q_nofilter,
@@ -49,12 +58,5 @@ void kvz_filter_deblock_luma(const encoder_control_t * const encoder, kvz_pixel 
                          int8_t filter_second_p, int8_t filter_second_q);
 void kvz_filter_deblock_chroma(const encoder_control_t * const encoder, kvz_pixel *src, int32_t offset, int32_t tc,
                            int8_t part_p_nofilter, int8_t part_q_nofilter);
-
-// SAO
-
-//////////////////////////////////////////////////////////////////////////
-// MACROS
-#define EDGE_VER 0
-#define EDGE_HOR 1
 
 #endif
