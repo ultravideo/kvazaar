@@ -574,6 +574,12 @@ int main(int argc, char *argv[])
 
       kvz_picture *img_in = NULL;
 
+      if (feof(input)) {
+        // Temporary hack to loop the input forever.
+        fclose(input);
+        input = open_input_file(opts->input);
+      }
+
       if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames || field_parity == 1) ) {
         // Try to read an input frame.
         if(field_parity == 0) frame_in = api->picture_alloc(opts->config->width + padding_x, opts->config->height + padding_y);
