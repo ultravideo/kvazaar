@@ -899,7 +899,14 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB+index_RGB, pic_width * 4);
     SDL_UpdateTexture(overlay_intra, &rect, sdl_pixels_RGB_intra_dir + index_RGB, pic_width * 4);
   }
-  if (sdl_delay) SDL_Delay(sdl_delay);
+  volatile int64_t i = 0;
+  if (sdl_delay) {
+    //SDL_Delay(sdl_delay);
+    int64_t wait_cycles = pow(2, sdl_delay) * 1000;
+    while (i < wait_cycles) {
+      ++i;
+    }
+  }
   PTHREAD_UNLOCK(&sdl_mutex);
 #endif
   
