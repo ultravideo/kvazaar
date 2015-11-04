@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include "intra.h"
 #include "inter.h"
@@ -494,6 +495,41 @@ static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
   return condA + condL;
 }
 
+
+#if KVZ_VISUALIZATION == 1
+#define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
+#define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
+#define PUTPIXEL_V(pixel_x, pixel_y, color_v) sdl_pixels_v[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_v;
+#define PUTPIXEL(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
+
+#define PUTPIXEL_intra(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
+  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
+  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
+  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
+#define PUTPIXEL_YUV(pixel_x, pixel_y, color_y, color_u, color_v) PUTPIXEL_Y(pixel_x,pixel_y, color_y); PUTPIXEL_U(pixel_x,pixel_y, color_u); PUTPIXEL_V(pixel_x,pixel_y, color_v);
+
+
+static void draw_line(int pic_width, int index_RGB, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
+{
+  float temp_x = x1; float temp_y = y1;
+  int len = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2));
+  if (len > 0) {
+    float x_off = ((float)(x2 - x1)) / (float)len;
+    float y_off = (y2 - y1) / (float)len;
+    for (int i = 0; i < len; i++) {
+      int xx1 = temp_x;
+      int yy1 = temp_y;
+      PUTPIXEL(xx1, yy1, color_r, color_g, color_b, 255);
+      temp_x += x_off; temp_y += y_off;
+    }
+  }
+}
+#endif
+
+
 /**
  * Search every mode from 0 to MAX_PU_DEPTH and return cost of best mode.
  * - The recursion is started at depth 0 and goes in Z-order to MAX_PU_DEPTH.
@@ -721,34 +757,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
 #if KVZ_VISUALIZATION == 1
-#define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
-#define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
-#define PUTPIXEL_V(pixel_x, pixel_y, color_v) sdl_pixels_v[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_v;
-#define PUTPIXEL(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
-  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
-  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
-  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
-
-#define DRAW_LINE(x1, y1, x2, y2, color_r, color_g, color_b) \
-                                      { float temp_x = x1; float temp_y = y1; \
-                                      int len = sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2)); \
-                                      if(len > 0) { \
-                                       float x_off = ((float)(x2-x1))/(float)len; \
-                                       float y_off = (y2-y1)/(float)len;  \
-                                       for(int i = 0; i < len; i++) { \
-                                          PUTPIXEL(((int)temp_x), ((int)temp_y), color_r, color_g, color_b, 255);\
-                                          temp_x += x_off; temp_y += y_off; \
-                                       }\
-                                      }\
-                                  }
-
-#define PUTPIXEL_intra(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
-  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
-  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
-  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
-#define PUTPIXEL_YUV(pixel_x, pixel_y, color_y, color_u, color_v) PUTPIXEL_Y(pixel_x,pixel_y, color_y); PUTPIXEL_U(pixel_x,pixel_y, color_u); PUTPIXEL_V(pixel_x,pixel_y, color_v);
-
-
   PTHREAD_LOCK(&sdl_mutex);
   
   if (x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)
@@ -856,23 +864,34 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
       
       if (cur_cu->type == CU_INTER) {
-        /*
+        
+        const int cu_x_in_frame = x + state->tile->lcu_offset_x * LCU_WIDTH;
+        const int cu_y_in_frame = y + state->tile->lcu_offset_y * LCU_WIDTH;
+        const int x1 = cu_width >> 1;
+        const int y1 = cu_width >> 1;
+        const int frame_x1 = cu_x_in_frame + x1;
+        const int frame_y1 = cu_y_in_frame + y1;
+
         if (cur_cu->inter.mv_dir & 2) {
-          int temp_x2 = ((cu_width >> 1) + (cur_cu->inter.mv[1][0] >> 2));
-          int temp_y2 = ((cu_width >> 1) + (cur_cu->inter.mv[1][1] >> 2));
-          temp_x2 = CLIP(0, state->tile->frame->source->width - 1, temp_x2);
-          temp_y2 = CLIP(0, state->tile->frame->source->height - 1, temp_y2);
-          DRAW_LINE((cu_width >> 1), (cu_width >> 1), temp_x2, temp_y2, 0, 255, 0);
+          // FIXME: clip the length of the vector instead of clipping X and Y separately.
+          const int frame_x2 = CLIP(0, state->tile->frame->source->width - 1, frame_x1 + (cur_cu->inter.mv[1][0] >> 2));
+          const int frame_y2 = CLIP(0, state->tile->frame->source->height - 1, frame_y1 + (cur_cu->inter.mv[1][1] >> 2));
+          const int x2 = frame_x2 - cu_x_in_frame;
+          const int y2 = frame_y2 - cu_y_in_frame;
+
+          draw_line(pic_width, index_RGB, x1, y1, x2, y2, 0, 255, 0);
         }
         if (cur_cu->inter.mv_dir & 1) {
-          int temp_x2 = ((cu_width >> 1) + (cur_cu->inter.mv[0][0] >> 2));
-          int temp_y2 = ((cu_width >> 1) + (cur_cu->inter.mv[0][1] >> 2));
-          temp_x2 = CLIP(0, state->tile->frame->source->width - 1, temp_x2);
-          temp_y2 = CLIP(0, state->tile->frame->source->height - 1, temp_y2);
+          // FIXME: clip the length of the vector instead of clipping X and Y separately.
+          const int frame_x2 = CLIP(0, state->tile->frame->source->width - 1, frame_x1 + (cur_cu->inter.mv[0][0] >> 2));
+          const int frame_y2 = CLIP(0, state->tile->frame->source->height - 1, frame_y1 + (cur_cu->inter.mv[0][1] >> 2));
+          const int x2 = frame_x2 - cu_x_in_frame;
+          const int y2 = frame_y2 - cu_y_in_frame;
 
-          DRAW_LINE((cu_width >> 1), (cu_width >> 1), temp_x2, temp_y2, 255, 0, 0);
+          draw_line(pic_width, index_RGB, x1, y1, x2, y2, 255, 0, 0);
+          const int c = 2;
         }
-       */ 
+       
       }
     }
     rect.w = cu_width; rect.h = cu_width; rect.x = x + state->tile->lcu_offset_x*LCU_WIDTH; rect.y = y + state->tile->lcu_offset_y*LCU_WIDTH;
