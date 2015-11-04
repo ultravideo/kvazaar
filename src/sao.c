@@ -24,6 +24,7 @@
 
 #include "sao.h"
 #include "rdo.h"
+#include "strategies/strategies-picture.h"
 
 #include <string.h>
 #include <stdlib.h>

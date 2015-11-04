@@ -35,6 +35,7 @@
 #include "transform.h"
 #include "search_inter.h"
 #include "search_intra.h"
+#include "strategies/strategies-picture.h"
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \

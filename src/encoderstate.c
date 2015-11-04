@@ -43,6 +43,7 @@
 #include "sao.h"
 #include "rdo.h"
 #include "rate_control.h"
+#include "strategies/strategies-picture.h"
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
