@@ -337,6 +337,12 @@ void *eventloop_main(void* temp) {
           }
         }
         if (event.type == SDL_KEYDOWN) {
+          if (event.key.keysym.sym == SDLK_RETURN) {
+            Uint32 flags = SDL_GetWindowFlags(window) ^ SDL_WINDOW_FULLSCREEN_DESKTOP;
+            if (SDL_SetWindowFullscreen(window, flags) < 0) {
+              fprintf(stderr, "Toggling fullscreen failed.\n");
+            }
+          }
           if (event.key.keysym.sym == SDLK_d) {
             sdl_draw_blocks = sdl_draw_blocks ? 0 : 1;
             sdl_force_redraw(locked);
