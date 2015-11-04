@@ -34,7 +34,13 @@
 #include "strategies/generic/ipol-generic.h"
 #include "strategies/generic/picture-generic.h"
 
-void kvz_inter_recon_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], lcu_t *lcu)
+static void inter_recon_frac_luma(const encoder_state_t * const state,
+                                  const kvz_picture * const ref,
+                                  int32_t xpos,
+                                  int32_t ypos,
+                                  int32_t block_width,
+                                  const int16_t mv_param[2],
+                                  lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
@@ -53,7 +59,13 @@ void kvz_inter_recon_frac_luma(const encoder_state_t * const state, const kvz_pi
   if (src.malloc_used) free(src.buffer);
 }
 
-void kvz_inter_recon_14bit_frac_luma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], hi_prec_buf_t *hi_prec_out)
+static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
+                                        const kvz_picture * const ref,
+                                        int32_t xpos,
+                                        int32_t ypos,
+                                        int32_t block_width,
+                                        const int16_t mv_param[2],
+                                        hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 3);
   int mv_frac_y = (mv_param[1] & 3);
@@ -72,14 +84,14 @@ void kvz_inter_recon_14bit_frac_luma(const encoder_state_t * const state, const 
   if (src.malloc_used) free(src.buffer);
 }
 
-void kvz_inter_recon_frac_chroma(const encoder_state_t * const state,
-                                 const kvz_picture * const ref,
-                                 int32_t xpos,
-                                 int32_t ypos,
-                                 int32_t block_width,
-                                 int32_t block_height,
-                                 const int16_t mv_param[2],
-                                 lcu_t *lcu)
+static void inter_recon_frac_chroma(const encoder_state_t * const state,
+                                    const kvz_picture * const ref,
+                                    int32_t xpos,
+                                    int32_t ypos,
+                                    int32_t block_width,
+                                    int32_t block_height,
+                                    const int16_t mv_param[2],
+                                    lcu_t *lcu)
 {
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
@@ -112,7 +124,13 @@ void kvz_inter_recon_frac_chroma(const encoder_state_t * const state,
   if (src_v.malloc_used) free(src_v.buffer);
 }
 
-void kvz_inter_recon_14bit_frac_chroma(const encoder_state_t * const state, const kvz_picture * const ref, int32_t xpos, int32_t ypos, int32_t block_width, const int16_t mv_param[2], hi_prec_buf_t *hi_prec_out)
+static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
+                                          const kvz_picture * const ref,
+                                          int32_t xpos,
+                                          int32_t ypos,
+                                          int32_t block_width,
+                                          const int16_t mv_param[2],
+                                          hi_prec_buf_t *hi_prec_out)
 {
   int mv_frac_x = (mv_param[0] & 7);
   int mv_frac_y = (mv_param[1] & 7);
@@ -186,11 +204,11 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
 
   if(fractional_mv) {
     if (state->encoder_control->cfg->bipred && hi_prec_out){
-      kvz_inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
-      kvz_inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+      inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+      inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
     } else {
-      kvz_inter_recon_frac_luma(state, ref, xpos, ypos, width, mv_param, lcu);
-      kvz_inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
+      inter_recon_frac_luma(state, ref, xpos, ypos, width, mv_param, lcu);
+      inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
     }
   }
 
@@ -202,9 +220,9 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
   if(!fractional_mv) {
     if(chroma_halfpel) {
       if (state->encoder_control->cfg->bipred && hi_prec_out){
-        kvz_inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+        inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
       } else {
-        kvz_inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
+        inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
       }
     }
 
@@ -329,7 +347,8 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
                                 int32_t width,
                                 int32_t height,
                                 int16_t mv_param[2][2],
-                                lcu_t* lcu) {
+                                lcu_t* lcu)
+{
   kvz_pixel temp_lcu_y[LCU_WIDTH*LCU_WIDTH];
   kvz_pixel temp_lcu_u[LCU_WIDTH_C*LCU_WIDTH_C];
   kvz_pixel temp_lcu_v[LCU_WIDTH_C*LCU_WIDTH_C];
