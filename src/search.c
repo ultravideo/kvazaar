@@ -814,10 +814,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
       //if (cu_width > 4 || (!(x & 7) && !(y & 7))) 
 
-      const uint32_t frame_r[4] = { 0, 100, 255, 255 };
-      const uint32_t frame_g[4] = { 255, 100, 255, 0 };
-      const uint32_t frame_b[4] = { 0, 255, 0, 100 };
-      uint8_t framemod = state->global->frame % 4;
+      static const uint32_t frame_r[8] = { 0, 128, 100, 128, 255, 128, 255, 128 };
+      static const uint32_t frame_g[8] = { 255, 128, 100, 128, 255, 128, 0, 128 };
+      static const uint32_t frame_b[8] = { 0, 128, 255, 128, 0, 128, 100, 128 };
+      uint8_t framemod = state->global->frame % 8;
       
       {
         int temp_x;
@@ -892,7 +892,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           const int ref_idx = MIN(2, cur_cu->inter.mv_ref[0]);
           const int ref_poc = state->global->ref->pocs[ref_idx];
           const int frame_poc = state->global->poc;
-          const int ref_framemod = ref_poc % 4;
+          const int ref_framemod = ref_poc % 8;
 
           draw_line(pic_width, index_RGB, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
         }
