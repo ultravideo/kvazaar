@@ -39,6 +39,7 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
                                   int32_t xpos,
                                   int32_t ypos,
                                   int32_t block_width,
+                                  int32_t block_height,
                                   const int16_t mv_param[2],
                                   lcu_t *lcu)
 {
@@ -51,10 +52,29 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
   kvz_extended_block src = {0, 0, 0};
 
   // Fractional luma
-  kvz_get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
-    ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, &src);
-  kvz_sample_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
-    block_width, lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
+  kvz_get_extended_block(xpos,
+                         ypos,
+                         mv_param[0] >> 2,
+                         mv_param[1] >> 2,
+                         state->tile->lcu_offset_x * LCU_WIDTH,
+                         state->tile->lcu_offset_y * LCU_WIDTH,
+                         ref->y,
+                         ref->width,
+                         ref->height,
+                         FILTER_SIZE_Y,
+                         block_width,
+                         block_height,
+                         &src);
+  kvz_sample_quarterpel_luma_generic(state->encoder_control,
+                                     src.orig_topleft,
+                                     src.stride,
+                                     block_width,
+                                     block_height,
+                                     lcu->rec.y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH),
+                                     LCU_WIDTH,
+                                     mv_frac_x,
+                                     mv_frac_y,
+                                     mv_param);
 
   if (src.malloc_used) free(src.buffer);
 }
@@ -64,6 +84,7 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
                                         int32_t xpos,
                                         int32_t ypos,
                                         int32_t block_width,
+                                        int32_t block_height,
                                         const int16_t mv_param[2],
                                         hi_prec_buf_t *hi_prec_out)
 {
@@ -76,10 +97,29 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
   kvz_extended_block src = { 0, 0, 0 };
 
   // Fractional luma
-  kvz_get_extended_block(xpos, ypos, mv_param[0] >> 2, mv_param[1] >> 2, state->tile->lcu_offset_x * LCU_WIDTH, state->tile->lcu_offset_y * LCU_WIDTH,
-    ref->y, ref->width, ref->height, FILTER_SIZE_Y, block_width, block_width, &src);
-  kvz_sample_14bit_quarterpel_luma_generic(state->encoder_control, src.orig_topleft, src.stride, block_width,
-    block_width, hi_prec_out->y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH), LCU_WIDTH, mv_frac_x, mv_frac_y, mv_param);
+  kvz_get_extended_block(xpos,
+                         ypos,
+                         mv_param[0] >> 2,
+                         mv_param[1] >> 2,
+                         state->tile->lcu_offset_x * LCU_WIDTH,
+                         state->tile->lcu_offset_y * LCU_WIDTH,
+                         ref->y,
+                         ref->width,
+                         ref->height,
+                         FILTER_SIZE_Y,
+                         block_width,
+                         block_height,
+                         &src);
+  kvz_sample_14bit_quarterpel_luma_generic(state->encoder_control,
+                                           src.orig_topleft,
+                                           src.stride,
+                                           block_width,
+                                           block_height,
+                                           hi_prec_out->y + (ypos%LCU_WIDTH)*LCU_WIDTH + (xpos%LCU_WIDTH),
+                                           LCU_WIDTH,
+                                           mv_frac_x,
+                                           mv_frac_y,
+                                           mv_param);
 
   if (src.malloc_used) free(src.buffer);
 }
@@ -129,6 +169,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                                           int32_t xpos,
                                           int32_t ypos,
                                           int32_t block_width,
+                                          int32_t block_height,
                                           const int16_t mv_param[2],
                                           hi_prec_buf_t *hi_prec_out)
 {
@@ -139,6 +180,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
   xpos >>= 1;
   ypos >>= 1;
   block_width >>= 1;
+  block_height >>= 1;
 
 #define FILTER_SIZE_C 4 //Chroma filter size
 
@@ -147,16 +189,54 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
   kvz_extended_block src_v = { 0, 0, 0 };
 
   //Fractional chroma U
-  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
-    ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_u);
-  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
-    block_width, hi_prec_out->u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+  kvz_get_extended_block(xpos,
+                         ypos,
+                         (mv_param[0] >> 2) >> 1,
+                         (mv_param[1] >> 2) >> 1,
+                         state->tile->lcu_offset_x * LCU_WIDTH_C,
+                         state->tile->lcu_offset_y * LCU_WIDTH_C,
+                         ref->u,
+                         ref->width >> 1,
+                         ref->height >> 1,
+                         FILTER_SIZE_C,
+                         block_width,
+                         block_height,
+                         &src_u);
+  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control,
+                                         src_u.orig_topleft,
+                                         src_u.stride,
+                                         block_width,
+                                         block_height,
+                                         hi_prec_out->u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
+                                         LCU_WIDTH_C,
+                                         mv_frac_x,
+                                         mv_frac_y,
+                                         mv_param);
 
   //Fractional chroma V
-  kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
-    ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_width, &src_v);
-  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
-    block_width, hi_prec_out->v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
+  kvz_get_extended_block(xpos,
+                         ypos,
+                         (mv_param[0] >> 2) >> 1,
+                         (mv_param[1] >> 2) >> 1,
+                         state->tile->lcu_offset_x * LCU_WIDTH_C,
+                         state->tile->lcu_offset_y * LCU_WIDTH_C,
+                         ref->v,
+                         ref->width >> 1,
+                         ref->height >> 1,
+                         FILTER_SIZE_C,
+                         block_width,
+                         block_height,
+                         &src_v);
+  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control,
+                                         src_v.orig_topleft,
+                                         src_v.stride,
+                                         block_width,
+                                         block_height,
+                                         hi_prec_out->v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C),
+                                         LCU_WIDTH_C,
+                                         mv_frac_x,
+                                         mv_frac_y,
+                                         mv_param);
 
   if (src_u.malloc_used) free(src_u.buffer);
   if (src_v.malloc_used) free(src_v.buffer);
@@ -204,10 +284,10 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
 
   if(fractional_mv) {
     if (state->encoder_control->cfg->bipred && hi_prec_out){
-      inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
-      inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+      inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, height, mv_param, hi_prec_out);
+      inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, hi_prec_out);
     } else {
-      inter_recon_frac_luma(state, ref, xpos, ypos, width, mv_param, lcu);
+      inter_recon_frac_luma(state, ref, xpos, ypos, width, height, mv_param, lcu);
       inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
     }
   }
@@ -220,7 +300,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
   if(!fractional_mv) {
     if(chroma_halfpel) {
       if (state->encoder_control->cfg->bipred && hi_prec_out){
-        inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, mv_param, hi_prec_out);
+        inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, hi_prec_out);
       } else {
         inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
       }
