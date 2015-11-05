@@ -892,50 +892,10 @@ void  kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff
   }
 }
 
-static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count) {
-  int32_t num_bins = 0;
-  while (symbol >= (uint32_t)(1 << count)) {
-    ++num_bins;
-    symbol -= 1 << count;
-    ++count;
-  }
-  num_bins++;
-
-  return num_bins;
-}
-
-static uint32_t get_mvd_coding_cost(vector2d_t *mvd) {
-  uint32_t bitcost = 0;
-  const int32_t mvd_hor = mvd->x;
-  const int32_t mvd_ver = mvd->y;
-  const int8_t hor_abs_gr0 = mvd_hor != 0;
-  const int8_t ver_abs_gr0 = mvd_ver != 0;
-  const uint32_t mvd_hor_abs = abs(mvd_hor);
-  const uint32_t mvd_ver_abs = abs(mvd_ver);
-
-  // Greater than 0 for x/y
-  bitcost += 2;
-
-  if (hor_abs_gr0) {
-    if (mvd_hor_abs > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(mvd_hor_abs - 2, 1) - 2; // TODO: tune the costs
-    }
-    // Greater than 1 + sign
-    bitcost += 2;
-  }
-
-  if (ver_abs_gr0) {
-    if (mvd_ver_abs > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(mvd_ver_abs - 2, 1) - 2; // TODO: tune the costs
-    }
-    // Greater than 1 + sign
-    bitcost += 2;
-  }
-
-  return bitcost;
-}
-
-
+/** MVD cost calculation with CABAC
+* \returns int
+* Calculates cost of actual motion vectors using CABAC coding
+*/
 uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -978,7 +938,10 @@ uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
   return bitcost;
 }
 
-
+/** MVD cost calculation with CABAC
+* \returns int
+* Calculates Motion Vector cost and related costs using CABAC coding
+*/
 int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, int mv_shift,
   int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
   int16_t num_cand, int32_t ref_idx, uint32_t *bitcost) {
@@ -1037,7 +1000,7 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
 
   CABAC_BIN(cabac, merged, "MergeFlag");
   num_cand = MRG_MAX_NUM_CANDS;
-  if (merged) { //merge
+  if (merged) {
     if (num_cand > 1) {
       int32_t ui;
       for (ui = 0; ui < num_cand - 1; ui++) {
@@ -1063,29 +1026,12 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
       }
     }
 
-    // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-    /*
-    if (state->global->slicetype == SLICE_B) {
-    // Code Inter Dir
-    uint8_t inter_dir = cur_cu->inter.mv_dir - 1;
-    uint8_t ctx = depth;
-
-
-    if (cur_cu->part_size == SIZE_2Nx2N || (LCU_WIDTH >> depth) != 8) {
-    cabac->cur_ctx = &(cabac->ctx.inter_dir[ctx]);
-    CABAC_BIN(cabac, (inter_dir == 2), "inter_pred_idc");
-    }
-    if (inter_dir < 2) {
-    cabac->cur_ctx = &(cabac->ctx.inter_dir[4]);
-    CABAC_BIN(cabac, inter_dir, "inter_pred_idc");
-    }
-    }*/
-
+    //ToDo: bidir mv support
     for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
       if (/*cur_cu->inter.mv_dir*/ 1 & (1 << ref_list_idx)) {
         if (ref_list[ref_list_idx] > 1) {
           // parseRefFrmIdx
-          int32_t ref_frame = ref_idx /*cur_cu->inter.mv_ref_coded[ref_list_idx]*/;
+          int32_t ref_frame = ref_idx;
 
           cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
           CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
@@ -1110,7 +1056,8 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
           }
         }
 
-        if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
+        // ToDo: Bidir vector support
+        if (!(state->global->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
           const int32_t mvd_hor = mvd.x;
           const int32_t mvd_ver = mvd.y;
           const int8_t hor_abs_gr0 = mvd_hor != 0;
@@ -1150,7 +1097,7 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
         }
 
         // Signal which candidate MV to use
-        kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, /*mv_cand[ref_list_idx]*/cur_mv_cand, 1,
+        kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_mv_cand, 1,
           AMVP_MAX_NUM_CANDS - 1);
       }
 
