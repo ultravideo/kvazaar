@@ -29,6 +29,7 @@
 #include "inter.h"
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-ipol.h"
+#include "rdo.h"
 
 
 // Temporarily for debugging.
@@ -49,7 +50,7 @@ static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 }
 
 
-static uint32_t get_mvd_coding_cost(vector2d_t *mvd)
+static uint32_t get_mvd_coding_cost(vector2d_t *mvd, cabac_data_t* cabac)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -112,11 +113,11 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
   if(!merged) {
     mvd_temp1.x = x - mv_cand[0][0];
     mvd_temp1.y = y - mv_cand[0][1];
-    cand1_cost = get_mvd_coding_cost(&mvd_temp1);
+    cand1_cost = get_mvd_coding_cost(&mvd_temp1, NULL);
 
     mvd_temp2.x = x - mv_cand[1][0];
     mvd_temp2.y = y - mv_cand[1][1];
-    cand2_cost = get_mvd_coding_cost(&mvd_temp2);
+    cand2_cost = get_mvd_coding_cost(&mvd_temp2, NULL);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -139,6 +140,14 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
   int i;
   
   vector2d_t mv_best = { 0, 0 };
+
+
+  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    calc_mvd = kvz_calc_mvd_cost_cabac;
+  }
 
   assert(pattern_type < 4);
 
@@ -251,7 +260,7 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
                             block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+      cost += calc_mvd(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
       PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
@@ -292,6 +301,13 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
   int k;
 
   vector2d_t mv_best = { 0, 0 };
+
+  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    calc_mvd = kvz_calc_mvd_cost_cabac;
+  }
   
   //compute SAD values for every point in the iRaster downsampled version of the current search area
   for (i = iSearchRange; i >= -iSearchRange; i -= iRaster)
@@ -308,7 +324,7 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
           (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
           (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
           block_width, block_width, max_lcu_below);
-        cost += calc_mvd_cost(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+        cost += calc_mvd(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
         PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
           (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
@@ -361,6 +377,13 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   unsigned best_index = num_cand;
   int max_lcu_below = -1;
 
+  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    calc_mvd = kvz_calc_mvd_cost_cabac;
+  }
+
   if (state->encoder_control->owf) {
     max_lcu_below = 1;
   }
@@ -376,7 +399,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
                                         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                         block_width, block_width, max_lcu_below);
-    best_cost += calc_mvd_cost(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
+    best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
 
     PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
@@ -401,7 +424,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                    block_width, block_width, max_lcu_below);
-    cost += calc_mvd_cost(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+    cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
@@ -530,6 +553,14 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   unsigned i;
   unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
   int max_lcu_below = -1;
+
+  int (*calc_mvd)(const encoder_state_t * const, int, int, int,
+    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    calc_mvd = kvz_calc_mvd_cost_cabac;
+  }
+
   
   if (state->encoder_control->owf) {
     max_lcu_below = 1;
@@ -553,7 +584,7 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
                                         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                         block_width, block_width, max_lcu_below);
-    best_cost += calc_mvd_cost(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+    best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     best_bitcost = bitcost;
     best_index = num_cand; 
 
@@ -577,7 +608,7 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                    block_width, block_width, max_lcu_below);
-    cost += calc_mvd_cost(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+    cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
@@ -610,7 +641,7 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
       PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
                               (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
@@ -653,7 +684,7 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
                                (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                block_width, block_width, max_lcu_below);
-        cost += calc_mvd_cost(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+        cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
         PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs_iterative,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
               (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
               (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + block_width, 
@@ -685,7 +716,7 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              block_width, block_width, max_lcu_below);
-      cost += calc_mvd_cost(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+      cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
       PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=small_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + block_width, 
@@ -822,6 +853,13 @@ static unsigned search_frac(const encoder_state_t * const state,
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
+  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    calc_mvd = kvz_calc_mvd_cost_cabac;
+  }
+
   kvz_get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
                 state->tile->lcu_offset_x * LCU_WIDTH,
                 state->tile->lcu_offset_y * LCU_WIDTH,
@@ -855,7 +893,7 @@ static unsigned search_frac(const encoder_state_t * const state,
 
     cost = satd(tmp_pic,tmp_filtered);
 
-    cost += calc_mvd_cost(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -891,7 +929,7 @@ static unsigned search_frac(const encoder_state_t * const state,
 
     cost = satd(tmp_pic,tmp_filtered);
 
-    cost += calc_mvd_cost(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+    cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -933,6 +971,12 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
   int16_t num_cand = kvz_inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
+
+  uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    get_mvd_cost = kvz_get_mvd_coding_cost_cabac;
+  }
+
 
   int max_lcu_below = -1;
   
@@ -1018,11 +1062,11 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
       mvd_temp1.x = mv.x - mv_cand[0][0];
       mvd_temp1.y = mv.y - mv_cand[0][1];
-      cand1_cost = get_mvd_coding_cost(&mvd_temp1);
+      cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
 
       mvd_temp2.x = mv.x - mv_cand[1][0];
       mvd_temp2.y = mv.y - mv_cand[1][1];
-      cand2_cost = get_mvd_coding_cost(&mvd_temp2);
+      cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
 
       // Select candidate 1 if it has lower cost
       if (cand2_cost < cand1_cost) {
@@ -1059,6 +1103,15 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
     uint8_t cutoff = num_cand;
+
+
+    int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+      int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+      int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+    if (state->encoder_control->cfg->mv_rdo) {
+      calc_mvd = kvz_calc_mvd_cost_cabac;
+    }
+
     for (int32_t idx = 0; idx<cutoff*(cutoff - 1); idx++) {
       uint8_t i = priorityList0[idx];
       uint8_t j = priorityList1[idx];
@@ -1109,8 +1162,8 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
           cost = satd(tmp_pic, tmp_block);
 
-          cost += calc_mvd_cost(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
-          cost += calc_mvd_cost(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
+          cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
+          cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
           if (cost < cur_cu->inter.cost) {
 
@@ -1154,11 +1207,11 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
                 mvd_temp1.x = cur_cu->inter.mv[reflist][0] - mv_cand[0][0];
                 mvd_temp1.y = cur_cu->inter.mv[reflist][1] - mv_cand[0][1];
-                cand1_cost = get_mvd_coding_cost(&mvd_temp1);
+                cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
 
                 mvd_temp2.x = cur_cu->inter.mv[reflist][0] - mv_cand[1][0];
                 mvd_temp2.y = cur_cu->inter.mv[reflist][1] - mv_cand[1][1];
-                cand2_cost = get_mvd_coding_cost(&mvd_temp2);
+                cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
 
                 // Select candidate 1 if it has lower cost
                 if (cand2_cost < cand1_cost) {

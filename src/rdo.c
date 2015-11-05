@@ -32,6 +32,7 @@
 #include "cabac.h"
 #include "transform.h"
 #include "strategies/strategies-quant.h"
+#include "inter.h"
 
 
 #define QUANT_SHIFT          14
@@ -889,4 +890,222 @@ void  kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff
                      delta_u, rate_inc_up, rate_inc_down, sig_rate_delta,
                      width, coef, dest_coeff);
   }
+}
+
+/** MVD cost calculation with CABAC
+* \returns int
+* Calculates cost of actual motion vectors using CABAC coding
+*/
+uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
+  uint32_t bitcost = 0;
+  const int32_t mvd_hor = mvd->x;
+  const int32_t mvd_ver = mvd->y;
+  const int8_t hor_abs_gr0 = mvd_hor != 0;
+  const int8_t ver_abs_gr0 = mvd_ver != 0;
+  const uint32_t mvd_hor_abs = abs(mvd_hor);
+  const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+  cabac_data_t cabac_copy;
+  memcpy(&cabac_copy, cabac, sizeof(cabac_data_t));
+  cabac->only_count = 1;
+
+  cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
+  CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+  CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+  cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
+  if (hor_abs_gr0) {
+    CABAC_BIN(cabac, (mvd_hor_abs > 1), "abs_mvd_greater1_flag_hor");
+  }
+  if (ver_abs_gr0) {
+    CABAC_BIN(cabac, (mvd_ver_abs > 1), "abs_mvd_greater1_flag_ver");
+  }
+  if (hor_abs_gr0) {
+    if (mvd_hor_abs > 1) {
+      kvz_cabac_write_ep_ex_golomb(cabac, mvd_hor_abs - 2, 1);
+    }
+    CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
+  }
+  if (ver_abs_gr0) {
+    if (mvd_ver_abs > 1) {
+      kvz_cabac_write_ep_ex_golomb(cabac, mvd_ver_abs - 2, 1);
+    }
+    CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
+  }
+  bitcost = ((23 - cabac->bits_left) + (cabac->num_buffered_bytes << 3)) - ((23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3));
+
+  memcpy(cabac, &cabac_copy, sizeof(cabac_data_t));
+
+  return bitcost;
+}
+
+/** MVD cost calculation with CABAC
+* \returns int
+* Calculates Motion Vector cost and related costs using CABAC coding
+*/
+int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, int mv_shift,
+  int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+  int16_t num_cand, int32_t ref_idx, uint32_t *bitcost) {
+
+  cabac_data_t state_cabac_copy;
+  cabac_data_t* cabac;
+  uint32_t merge_idx;
+  int cand1_cost, cand2_cost;
+  vector2d_t mvd_temp1, mvd_temp2, mvd = { 0, 0 };
+  int8_t merged = 0;
+  int8_t cur_mv_cand = 0;
+
+  x <<= mv_shift;
+  y <<= mv_shift;
+
+  // Check every candidate to find a match
+  for (merge_idx = 0; merge_idx < (uint32_t)num_cand; merge_idx++) {
+    if (merge_cand[merge_idx].dir == 3) continue;
+    if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
+      merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
+      merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
+      merged = 1;
+      break;
+    }
+  }
+
+  // Store cabac state and contexts
+  memcpy(&state_cabac_copy, &state->cabac, sizeof(cabac_data_t));
+
+  // Clear bytes and bits and set mode to "count"
+  state_cabac_copy.only_count = 1;
+  state_cabac_copy.num_buffered_bytes = 0;
+  state_cabac_copy.bits_left = 23;
+
+  cabac = &state_cabac_copy;
+
+  if (!merged) {
+    mvd_temp1.x = x - mv_cand[0][0];
+    mvd_temp1.y = y - mv_cand[0][1];
+    cand1_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp1, cabac);
+
+    mvd_temp2.x = x - mv_cand[1][0];
+    mvd_temp2.y = y - mv_cand[1][1];
+    cand2_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp2, cabac);
+
+    // Select candidate 1 if it has lower cost
+    if (cand2_cost < cand1_cost) {
+      cur_mv_cand = 1;
+      mvd = mvd_temp2;
+    } else {
+      mvd = mvd_temp1;
+    }
+  }
+
+  cabac->cur_ctx = &(cabac->ctx.cu_merge_flag_ext_model);
+
+  CABAC_BIN(cabac, merged, "MergeFlag");
+  num_cand = MRG_MAX_NUM_CANDS;
+  if (merged) {
+    if (num_cand > 1) {
+      int32_t ui;
+      for (ui = 0; ui < num_cand - 1; ui++) {
+        int32_t symbol = (ui != merge_idx);
+        if (ui == 0) {
+          cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
+          CABAC_BIN(cabac, symbol, "MergeIndex");
+        } else {
+          CABAC_BIN_EP(cabac, symbol, "MergeIndex");
+        }
+        if (symbol == 0) break;
+      }
+    }
+  } else {
+    uint32_t ref_list_idx;
+    uint32_t j;
+    int ref_list[2] = { 0, 0 };
+    for (j = 0; j < state->global->ref->used_size; j++) {
+      if (state->global->ref->pocs[j] < state->global->poc) {
+        ref_list[0]++;
+      } else {
+        ref_list[1]++;
+      }
+    }
+
+    //ToDo: bidir mv support
+    for (ref_list_idx = 0; ref_list_idx < 2; ref_list_idx++) {
+      if (/*cur_cu->inter.mv_dir*/ 1 & (1 << ref_list_idx)) {
+        if (ref_list[ref_list_idx] > 1) {
+          // parseRefFrmIdx
+          int32_t ref_frame = ref_idx;
+
+          cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
+          CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
+
+          if (ref_frame > 0) {
+            int32_t i;
+            int32_t ref_num = ref_list[ref_list_idx] - 2;
+
+            cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[1]);
+            ref_frame--;
+
+            for (i = 0; i < ref_num; ++i) {
+              const uint32_t symbol = (i == ref_frame) ? 0 : 1;
+
+              if (i == 0) {
+                CABAC_BIN(cabac, symbol, "ref_idx_lX");
+              } else {
+                CABAC_BIN_EP(cabac, symbol, "ref_idx_lX");
+              }
+              if (symbol == 0) break;
+            }
+          }
+        }
+
+        // ToDo: Bidir vector support
+        if (!(state->global->ref_list == REF_PIC_LIST_1 && /*cur_cu->inter.mv_dir == 3*/ 0)) {
+          const int32_t mvd_hor = mvd.x;
+          const int32_t mvd_ver = mvd.y;
+          const int8_t hor_abs_gr0 = mvd_hor != 0;
+          const int8_t ver_abs_gr0 = mvd_ver != 0;
+          const uint32_t mvd_hor_abs = abs(mvd_hor);
+          const uint32_t mvd_ver_abs = abs(mvd_ver);
+
+          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
+          CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
+          CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
+
+          cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[1]);
+
+          if (hor_abs_gr0) {
+            CABAC_BIN(cabac, (mvd_hor_abs > 1), "abs_mvd_greater1_flag_hor");
+          }
+
+          if (ver_abs_gr0) {
+            CABAC_BIN(cabac, (mvd_ver_abs > 1), "abs_mvd_greater1_flag_ver");
+          }
+
+          if (hor_abs_gr0) {
+            if (mvd_hor_abs > 1) {
+              kvz_cabac_write_ep_ex_golomb(cabac, mvd_hor_abs - 2, 1);
+            }
+
+            CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
+          }
+
+          if (ver_abs_gr0) {
+            if (mvd_ver_abs > 1) {
+              kvz_cabac_write_ep_ex_golomb(cabac, mvd_ver_abs - 2, 1);
+            }
+
+            CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
+          }
+        }
+
+        // Signal which candidate MV to use
+        kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_mv_cand, 1,
+          AMVP_MAX_NUM_CANDS - 1);
+      }
+
+    }
+  }
+  
+  *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
+
+  // Store bitcost before restoring cabac
+  return *bitcost * (int32_t)(state->global->cur_lambda_cost_sqrt + 0.5);
 }

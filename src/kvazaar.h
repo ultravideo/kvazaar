@@ -175,6 +175,8 @@ typedef struct kvz_config
   kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
 
   int32_t target_bitrate;
+
+  int8_t mv_rdo;            /*!< \brief MV RDO calculation in search (0: estimation, 1: RDO). */
 } kvz_config;
 
 /**

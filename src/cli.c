@@ -91,6 +91,8 @@ static const struct option long_options[] = {
   { "no-bipred",                no_argument, NULL, 0 },
   { "bitrate",            required_argument, NULL, 0 },
   { "preset",             required_argument, NULL, 0 },
+  { "mv-rdo",                   no_argument, NULL, 0 },
+  { "no-mv-rdo",                no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -291,6 +293,7 @@ void print_help(void)
     "                                     0: no RDO\n"
     "                                     1: estimated RDO\n"
     "                                     2: full RDO\n"
+    "          --mv-rdo               : Enable Rate-Distortion Optimized motion vector costs\n"
     "          --full-intra-search    : Try all intra modes.\n"
     "          --me <string>          : Set integer motion estimation algorithm [\"hexbs\"]\n"
     "                                     \"hexbs\": Hexagon Based Search (faster)\n"
