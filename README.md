@@ -42,6 +42,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
                                          0: no RDO
                                          1: estimated RDO
                                          2: full RDO
+              --mv-rdo               : Enable Rate-Distortion Optimized motion vector costs
               --full-intra-search    : Try all intra modes.
               --no-transform-skip    : Disable transform skip
               --aud                  : Use access unit delimiters
@@ -148,6 +149,7 @@ subme             | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1   
 sao               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1
 rdoq              | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1
 transform-skip    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1
+mv-rdo            | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1
 full-intra-search | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
 
 

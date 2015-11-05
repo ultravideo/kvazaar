@@ -56,6 +56,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->rdoq_enable     = 1;
   cfg->signhide_enable = true;
   cfg->rdo             = 1;
+  cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 1;
   cfg->tr_depth_intra  = 0;
@@ -278,7 +279,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
 
-  static const char * const preset_values[11][26] = {
+  static const char * const preset_values[11][28] = {
       { 
         "ultrafast", 
         "pu-depth-intra", "2-3",
@@ -293,6 +294,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0", 
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL 
       },
       { 
@@ -309,6 +311,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -325,6 +328,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -341,6 +345,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -357,6 +362,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -373,6 +379,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -389,6 +396,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -405,6 +413,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -421,6 +430,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "transform-skip", "1",
         "full-intra-search", "0",
+        "mv-rdo", "1",
         NULL
       },
       {
@@ -437,6 +447,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "transform-skip", "1",
         "full-intra-search", "1",
+        "mv-rdo", "1",
         NULL
       },
       { NULL }
@@ -631,6 +642,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       return 0;
     }
   }
+  else if OPT("mv-rdo")
+    cfg->mv_rdo = atobool(value);
   else
     return 0;
 #undef OPT
