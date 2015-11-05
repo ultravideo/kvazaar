@@ -50,7 +50,7 @@ static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 }
 
 
-static uint32_t get_mvd_coding_cost(vector2d_t *mvd)
+static uint32_t get_mvd_coding_cost(vector2d_t *mvd, cabac_data_t* cabac)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -113,11 +113,11 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
   if(!merged) {
     mvd_temp1.x = x - mv_cand[0][0];
     mvd_temp1.y = y - mv_cand[0][1];
-    cand1_cost = get_mvd_coding_cost(&mvd_temp1);
+    cand1_cost = get_mvd_coding_cost(&mvd_temp1, NULL);
 
     mvd_temp2.x = x - mv_cand[1][0];
     mvd_temp2.y = y - mv_cand[1][1];
-    cand2_cost = get_mvd_coding_cost(&mvd_temp2);
+    cand2_cost = get_mvd_coding_cost(&mvd_temp2, NULL);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -972,6 +972,12 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   // Get list of candidates
   int16_t num_cand = kvz_inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
 
+  uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
+  if (state->encoder_control->cfg->mv_rdo) {
+    get_mvd_cost = kvz_get_mvd_coding_cost_cabac;
+  }
+
+
   int max_lcu_below = -1;
   
   if (state->encoder_control->owf) {
@@ -1056,11 +1062,11 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
       mvd_temp1.x = mv.x - mv_cand[0][0];
       mvd_temp1.y = mv.y - mv_cand[0][1];
-      cand1_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp1, (cabac_data_t*)&state->cabac);
+      cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
 
       mvd_temp2.x = mv.x - mv_cand[1][0];
       mvd_temp2.y = mv.y - mv_cand[1][1];
-      cand2_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp2, (cabac_data_t*)&state->cabac);
+      cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
 
       // Select candidate 1 if it has lower cost
       if (cand2_cost < cand1_cost) {
@@ -1201,11 +1207,11 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
                 mvd_temp1.x = cur_cu->inter.mv[reflist][0] - mv_cand[0][0];
                 mvd_temp1.y = cur_cu->inter.mv[reflist][1] - mv_cand[0][1];
-                cand1_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp1, (cabac_data_t*)&state->cabac);
+                cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
 
                 mvd_temp2.x = cur_cu->inter.mv[reflist][0] - mv_cand[1][0];
                 mvd_temp2.y = cur_cu->inter.mv[reflist][1] - mv_cand[1][1];
-                cand2_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp2, (cabac_data_t*)&state->cabac);
+                cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
 
                 // Select candidate 1 if it has lower cost
                 if (cand2_cost < cand1_cost) {
