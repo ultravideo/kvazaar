@@ -20,7 +20,9 @@ matrix:
       env: KVZ_DISABLE_AVX2=""
 
     # Check for external symbols without kvz_ prefix.
-    - script:
+    - compiler: gcc-4.8
+      env: KVZ_DISABLE_AVX2=""
+      script:
         - cd src
         - make libkvazaar.a
         - (! nm -go --defined-only libkvazaar.a | grep -v ' kvz_')
