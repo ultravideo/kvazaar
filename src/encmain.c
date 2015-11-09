@@ -74,6 +74,14 @@ static FILE* open_output_file(const char* filename)
   return fopen(filename, "wb");
 }
 
+static unsigned get_padding(unsigned width_or_height){
+  if (width_or_height % CU_MIN_SIZE_PIXELS){
+    return CU_MIN_SIZE_PIXELS - (width_or_height % CU_MIN_SIZE_PIXELS);
+  }else{
+    return 0;
+  }
+}
+
 #if KVZ_BIT_DEPTH == 8
 #define PSNRMAX (255.0 * 255.0)
 #else
@@ -209,8 +217,8 @@ int main(int argc, char *argv[])
 
     int8_t field_parity = 0;
     kvz_picture *frame_in = NULL;
-    uint8_t padding_x = kvz_get_padding(opts->config->width);
-    uint8_t padding_y = kvz_get_padding(opts->config->height);
+    uint8_t padding_x = get_padding(opts->config->width);
+    uint8_t padding_y = get_padding(opts->config->height);
 
     for (;;) {
 

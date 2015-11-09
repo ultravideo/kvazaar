@@ -588,11 +588,3 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
 
   return 1;
 }
-
-unsigned kvz_get_padding(unsigned width_or_height){
-  if (width_or_height % CU_MIN_SIZE_PIXELS){
-    return CU_MIN_SIZE_PIXELS - (width_or_height % CU_MIN_SIZE_PIXELS);
-  }else{
-    return 0;
-  }
-}
