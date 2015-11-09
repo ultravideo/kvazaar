@@ -56,7 +56,7 @@
 
 #else //__GNUC__
 //TODO: we assume !GCC => Windows... this may be bad
-#include <Windows.h>
+#include <windows.h>
 
 #define CLOCK_T struct _FILETIME
 #define GET_TIME(clock_t) GetSystemTimeAsFileTime(clock_t)
