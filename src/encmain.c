@@ -41,7 +41,6 @@
 
 #include "checkpoint.h"
 #include "global.h"
-#include "threadqueue.h"
 #include "encoder.h"
 #include "cli.h"
 #include "yuv_io.h"
@@ -328,8 +327,6 @@ int main(int argc, char *argv[])
 
     GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
-
-    kvz_threadqueue_flush(encoder->threadqueue);
     // Coding finished
 
     // Print statistics of the coding
