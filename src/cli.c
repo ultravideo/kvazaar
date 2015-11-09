@@ -197,7 +197,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       opts->seek = atoi(optarg);
     } else if (!strcmp(name, "frames")) {
       opts->frames = atoi(optarg);
-    } else if (!kvz_config_parse(opts->config, name, optarg)) {
+    } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
       goto done;
