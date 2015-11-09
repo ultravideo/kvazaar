@@ -60,7 +60,7 @@ static INLINE __m128i filter_4x1_avx2(const kvz_pixel *ref_main, int16_t delta_p
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
 
   __m128i row0 = filter_4x1_avx2(ref_main, 1 * sample_disp, 0);
   __m128i row1 = filter_4x1_avx2(ref_main, 2 * sample_disp, 0);
@@ -199,7 +199,7 @@ static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
   for (int y = 0; y < 16; y += 8) {
     __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, 0);
     __m256i row1 = filter_16x1_avx2(ref_main, (y + 2) * sample_disp, 0);
@@ -291,7 +291,7 @@ void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_dis
  * \param vertical_mode Mode direction, true if vertical
  * \param width         Block width
  */
-void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode, int width){
+static void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode, int width){
   for (int y = 0; y < width; y += 8) {
     for (int x = 0; x < width; x += 16) {
       __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, x);
