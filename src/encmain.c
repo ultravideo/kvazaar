@@ -33,6 +33,7 @@
 
 #include "kvazaar_internal.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,7 +43,6 @@
 #include "global.h"
 #include "threadqueue.h"
 #include "encoder.h"
-#include "videoframe.h"
 #include "cli.h"
 #include "yuv_io.h"
 
@@ -72,6 +72,45 @@ static FILE* open_output_file(const char* filename)
 {
   if (!strcmp(filename, "-")) return stdout;
   return fopen(filename, "wb");
+}
+
+#if KVZ_BIT_DEPTH == 8
+#define PSNRMAX (255.0 * 255.0)
+#else
+  #define PSNRMAX ((double)PIXEL_MAX * (double)PIXEL_MAX)
+#endif
+
+/**
+ * \brief Calculates image PSNR value
+ *
+ * \param src   source picture
+ * \param rec   reconstructed picture
+ * \prama psnr  returns the PSNR
+ */
+static void compute_psnr(const kvz_picture *const src,
+                         const kvz_picture *const rec,
+                         double psnr[NUM_COLORS])
+{
+  assert(src->width  == rec->width);
+  assert(src->height == rec->height);
+
+  int32_t pixels = src->width * src->height;
+
+  for (int32_t c = 0; c < NUM_COLORS; ++c) {
+    int32_t num_pixels = pixels;
+    if (c != COLOR_Y) {
+      num_pixels >>= 2;
+    }
+    psnr[c] = 0;
+    for (int32_t i = 0; i < num_pixels; ++i) {
+      const int32_t error = src->data[c][i] - rec->data[c][i];
+      psnr[c] += error * error;
+    }
+
+    // Avoid division by zero
+    if (psnr[c] == 0) psnr[c] = 99.0;
+    psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;
+  }
 }
 
 /**
@@ -252,7 +291,7 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        kvz_videoframe_compute_psnr(img_src, img_rec, frame_psnr);
+        compute_psnr(img_src, img_rec, frame_psnr);
 
         if (recout) {
           // Since chunks_out was not NULL, img_rec should have been set.
