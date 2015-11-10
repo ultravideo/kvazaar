@@ -40,23 +40,6 @@ typedef enum edge_dir {
 } edge_dir;
 
 
-//////////////////////////////////////////////////////////////////////////
-// FUNCTIONS
-// Deblocking
-void kvz_filter_deblock_cu(encoder_state_t *state, int32_t x_px, int32_t y_px,
-                       int8_t depth, edge_dir dir);
-void kvz_filter_deblock_edge_luma(encoder_state_t *state,
-                              int32_t x_pos, int32_t y_pos,
-                              int32_t length, edge_dir dir);
-void kvz_filter_deblock_edge_chroma(encoder_state_t *state,
-                                int32_t xpos, int32_t ypos,
-                                int32_t length, edge_dir dir);
 void kvz_filter_deblock_lcu(encoder_state_t *state, int x_px, int y_px);
-void kvz_filter_deblock_luma(const encoder_control_t * const encoder, kvz_pixel *src, int32_t offset, int32_t tc , int8_t sw,
-                         int8_t part_p_nofilter, int8_t part_q_nofilter,
-                         int32_t thr_cut,
-                         int8_t filter_second_p, int8_t filter_second_q);
-void kvz_filter_deblock_chroma(const encoder_control_t * const encoder, kvz_pixel *src, int32_t offset, int32_t tc,
-                           int8_t part_p_nofilter, int8_t part_q_nofilter);
 
 #endif
