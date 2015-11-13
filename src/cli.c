@@ -204,6 +204,13 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     }
   }
 
+  // Check for extra arguments.
+  if (argc - optind > 0) {
+    fprintf(stderr, "Input error: Extra argument found: \"%s\"\n", argv[optind]);
+    ok = 0;
+    goto done;
+  }
+
   // Check that the required files were defined
   if (opts->input == NULL || opts->output == NULL) {
     ok = 0;
