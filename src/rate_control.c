@@ -157,19 +157,30 @@ int8_t kvz_lambda_to_QP(const double lambda)
 double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state)
 {
   const int gop_len = state->encoder_control->cfg->gop_len;
-  const double qp_temp = state->global->QP - 12;
+  const int intra_period = state->encoder_control->cfg->intra_period;
+  const int keyframe_period = gop_len > 0 ? gop_len : intra_period;
+  
+  double lambda = pow(2.0, (state->global->QP - 12) / 3.0);
 
-  double qp_factor;
   if (state->global->slicetype == KVZ_SLICE_I) {
-    const double lambda_scale = 1.0 - CLIP(0.0, 0.5, 0.05 * gop_len);
-    qp_factor = 0.57 * lambda_scale;
+    lambda *= 0.57;
+    
+    // Reduce lambda for I-frames according to the number of references.
+    if (keyframe_period == 0) {
+      lambda *= 0.5;
+    } else {
+      lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (keyframe_period - 1));
+    }
   } else if (gop_len > 0) {
-    qp_factor = 0.95 * state->global->QP_factor;
+    lambda *= state->global->QP_factor;
   } else {
-    // default QP factor from HM config
-    qp_factor = 0.95 * 0.4624;
+    lambda *= 0.4624;
   }
 
-  const double lambda = qp_factor * pow(2.0, qp_temp / 3.0);
+  // Increase lambda if not key-frame.
+  if (keyframe_period > 0 && state->global->poc % keyframe_period != 0) {
+    lambda *= CLIP(2.0, 4.0, (state->global->QP - 12) / 6.0);
+  }
+  
   return lambda;
 }

@@ -547,6 +547,7 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
     case 0:
       break;
 
+    case 3:
     case 4:
       // These weights were copied from http://doi.org/10.1109/TIP.2014.2336550
       if (encoder->target_avg_bpp <= 0.05) {

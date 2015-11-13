@@ -64,7 +64,7 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   assert(frame->source == NULL);
   assert(frame->rec    != NULL);
 
-  if (cfg->gop_len == 0) {
+  if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
     // GOP disabled, just return the input frame.
 
     if (img_in == NULL) return 0;
@@ -73,7 +73,7 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     frame->source   = kvz_image_copy_ref(img_in);
     frame->rec->pts = img_in->pts;
     frame->rec->dts = img_in->dts;
-    state->global->gop_offset = 0;
+    state->global->gop_offset = cfg->gop_lowdelay ? (state->global->frame-1) % cfg->gop_len : 0;
     return 1;
   }
 

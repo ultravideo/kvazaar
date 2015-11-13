@@ -565,8 +565,111 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
   else if OPT("gop") {
-    // TODO: Defining the whole GOP structure via parameters
-    if(atoi(value) == 8) {
+    if (!strncmp(value, "lp-", 3)) {  // Handle GOPs starting with "lp-".
+      struct {
+        unsigned g;  // length
+        unsigned d;  // depth
+        unsigned r;  // references 
+        unsigned t;  // temporal
+      } gop = { 0 };
+
+      if (sscanf(value, "lp-g%ud%ur%ut%u", &gop.g, &gop.d, &gop.r, &gop.t) != 4) {
+        fprintf(stderr, "Error in GOP syntax. Example: lp-g8d4r2t2\n");
+        return 0;
+      }
+
+      if (gop.g < 1 || gop.g > 32) {
+        fprintf(stderr, "gop.g must be between 1 and 32.\n");
+      }
+      if (gop.d < 1 || gop.d > 8) {
+        fprintf(stderr, "gop.d must be between 1 and 8.\n");
+      }
+      if (gop.r < 1 || gop.r > 15) {
+        fprintf(stderr, "gop.d must be between 1 and 15.\n");
+      }
+      if (gop.t < 1 || gop.t > 15) {
+        fprintf(stderr, "gop.t must be between 1 and 32.\n");
+      }
+      
+      // Initialize modulos for testing depth.
+      // The picture belong to the lowest depth in which (poc % modulo) == 0.
+      unsigned depth_modulos[8] = { 0 };
+      for (int d = 0; d < gop.d; ++d) {
+        depth_modulos[gop.d - 1 - d] = 1 << d;
+      }
+      depth_modulos[0] = gop.g;
+
+      cfg->gop_lowdelay = 1;
+      cfg->gop_len = gop.g;
+      for (int g = 1; g <= gop.g; ++g) {
+        kvz_gop_config *gop_pic = &cfg->gop[g - 1];
+
+        // Find gop depth for picture.
+        int gop_layer = 0;
+        while (gop_layer < gop.d && (g % depth_modulos[gop_layer])) {
+          ++gop_layer;
+        }
+
+        gop_pic->poc_offset = g;
+        gop_pic->layer = gop_layer + 1;
+        gop_pic->qp_offset = gop_layer + 1;
+        gop_pic->ref_pos_count = 0;
+        gop_pic->ref_neg_count = gop.r;
+        gop_pic->is_ref = 0;
+
+        // Set first ref to point to previous frame, and the rest to previous
+        // key-frames.
+        // If gop.t > 1, have (poc % gop.t) == 0 point gop.t frames away,
+        // instead of the previous frame. Set the frames in between to
+        // point to the nearest frame with a lower gop-depth.
+        if (gop.t > 1) {
+          if (gop_pic->poc_offset % gop.t == 0) {
+            gop_pic->ref_neg[0] = gop.t;
+          } else {
+            int r = gop_pic->poc_offset - 1;
+            while (r > 0) {
+              if (cfg->gop[r].layer < gop_pic->layer) break;
+              --r;
+            }
+            // Var r is now 0 or index of the pic with layer < depth.
+            if (cfg->gop[r].layer < gop_pic->layer) {
+              gop_pic->ref_neg[0] = gop_pic->poc_offset - cfg->gop[r].poc_offset;
+              cfg->gop[r].is_ref = 1;
+            } else {
+              // No ref was found, just refer to the previous key-frame.
+              gop_pic->ref_neg[0] = gop_pic->poc_offset % gop.g;
+            }
+          }
+        } else {
+          gop_pic->ref_neg[0] = 1;
+          if (gop_pic->poc_offset >= 2) {
+            cfg->gop[gop_pic->poc_offset - 2].is_ref = 1;
+          }
+        }
+
+        int keyframe = gop_pic->poc_offset % gop.g;
+        for (int i = 1; i < gop_pic->ref_neg_count; ++i) {
+          while (keyframe == gop_pic->ref_neg[i - 1]) {
+            keyframe += gop.g;
+          }
+          gop_pic->ref_neg[i] = keyframe;
+        }
+
+        gop_pic->qp_factor = 0.4624;  // from HM
+      }
+
+      for (int g = 0; g < gop.g; ++g) {
+        kvz_gop_config *gop_pic = &cfg->gop[g];
+        if (!gop_pic->is_ref) {
+          gop_pic->qp_factor = 0.68 * 1.31;  // derived from HM
+        }
+      }
+
+      // Key-frame is always a reference.
+      cfg->gop[gop.g - 1].is_ref = 1;
+      cfg->gop[gop.g - 1].qp_factor = 0.578;  // from HM
+    } else if (atoi(value) == 8) {
+      cfg->gop_lowdelay = 0;
       // GOP
       cfg->gop_len = 8;
       cfg->gop[0].poc_offset = 8; cfg->gop[0].qp_offset = 1; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.442;  cfg->gop[0].is_ref = 1;

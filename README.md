@@ -64,7 +64,10 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.
                                          0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4
               --no-info              : Don't add information about the encoder to settings.
-              --gop <int>            : Length of Group of Pictures, must be 8 or 0 [0]
+              --gop <string>         : Definition for GOP [0]
+                                         - 0 disabled
+                                         - 8 B-frame pyramid of length 8
+                                         - lp-gop syntax, defined below (example: g8d4r3t2)
               --bipred               : Enable bi-prediction search
               --bitrate <integer>    : Target bitrate. [0]
                                          0: disable rate-control
@@ -126,11 +129,23 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
            -w, --width               : Width of input in pixels
            -h, --height              : Height of input in pixels
 
-For example:
+
+###For example:
 
     kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.hevc -n 600 -q 32
 
 The only accepted input format so far is 8-bit YUV 4:2:0.
+
+
+### LP-GOP syntax
+The LP-GOP syntax is "lp-g(num)d(num)r(num)t(num)", where
+- g = GOP length.
+- d = Number of GOP layers.
+- r = Number of references, where one reference is always the previous picture,
+  unless temporal scaling is used. The others are key-frames.
+- t = How many references to skip for temporal scaling, where 4 means only
+  every fourth picture needs to be decoded.
+
 
 
 ##Presets
