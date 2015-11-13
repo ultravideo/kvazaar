@@ -312,6 +312,48 @@ SATD_NXN(16, kvz_pixel)
 SATD_NXN(32, kvz_pixel)
 SATD_NXN(64, kvz_pixel)
 
+// Declare these functions to make sure the signature of the macro matches.
+static cost_pixel_nxn_multi_func satd_4x4_dual_generic;
+static cost_pixel_nxn_multi_func satd_8x8_dual_generic;
+static cost_pixel_nxn_multi_func satd_16x16_dual_generic;
+static cost_pixel_nxn_multi_func satd_32x32_dual_generic;
+static cost_pixel_nxn_multi_func satd_64x64_dual_generic;
+
+#define SATD_DUAL_NXN(n, pixel_type) \
+static void satd_ ## n ## x ## n ## _dual_generic( \
+  const pred_buffer preds, const pixel_type * const orig, unsigned num_modes, unsigned *costs_out) \
+{ \
+  unsigned x, y; \
+  unsigned sum = 0; \
+  for (y = 0; y < (n); y += 8) { \
+  unsigned row = y * (n); \
+  for (x = 0; x < (n); x += 8) { \
+  sum += kvz_satd_8x8_general(&preds[0][row + x], (n), &orig[row + x], (n)); \
+  } \
+  } \
+  costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
+  \
+  sum = 0; \
+  for (y = 0; y < (n); y += 8) { \
+  unsigned row = y * (n); \
+  for (x = 0; x < (n); x += 8) { \
+  sum += kvz_satd_8x8_general(&preds[1][row + x], (n), &orig[row + x], (n)); \
+  } \
+  } \
+  costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
+}
+
+static void satd_4x4_dual_generic(const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *costs_out)
+{
+  costs_out[0] = satd_4x4_generic(orig, preds[0]);
+  costs_out[1] = satd_4x4_generic(orig, preds[1]);
+}
+
+SATD_DUAL_NXN(8, kvz_pixel)
+SATD_DUAL_NXN(16, kvz_pixel)
+SATD_DUAL_NXN(32, kvz_pixel)
+SATD_DUAL_NXN(64, kvz_pixel)
+
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
 #define SAD_NXN(n, pixel_type) \
@@ -341,6 +383,39 @@ SAD_NXN(8, kvz_pixel)
 SAD_NXN(16, kvz_pixel)
 SAD_NXN(32, kvz_pixel)
 SAD_NXN(64, kvz_pixel)
+
+// Declare these functions to make sure the signature of the macro matches.
+static cost_pixel_nxn_multi_func sad_4x4_dual_generic;
+static cost_pixel_nxn_multi_func sad_8x8_dual_generic;
+static cost_pixel_nxn_multi_func sad_16x16_dual_generic;
+static cost_pixel_nxn_multi_func sad_32x32_dual_generic;
+static cost_pixel_nxn_multi_func sad_64x64_dual_generic;
+
+// Function macro for defining SAD calculating functions
+// for fixed size blocks.
+#define SAD_DUAL_NXN(n, pixel_type) \
+static void sad_ ##  n ## x ## n ## _dual_generic( \
+  const pred_buffer preds, const pixel_type * const orig, unsigned num_modes, unsigned *costs_out) \
+{ \
+  unsigned i; \
+  unsigned sum = 0; \
+  for (i = 0; i < (n)*(n); ++i) { \
+  sum += abs(preds[0][i] - orig[i]); \
+  } \
+  costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
+  \
+  sum = 0; \
+  for (i = 0; i < (n)*(n); ++i) { \
+  sum += abs(preds[1][i] - orig[i]); \
+  } \
+  costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
+}
+
+SAD_DUAL_NXN(4, kvz_pixel)
+SAD_DUAL_NXN(8, kvz_pixel)
+SAD_DUAL_NXN(16, kvz_pixel)
+SAD_DUAL_NXN(32, kvz_pixel)
+SAD_DUAL_NXN(64, kvz_pixel)
 
 /**
  * \brief BLock Image Transfer from one buffer to another.
@@ -409,6 +484,18 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
   success &= kvz_strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
   success &= kvz_strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
+
+  success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "generic", 0, &sad_4x4_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "generic", 0, &sad_8x8_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "generic", 0, &sad_16x16_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "generic", 0, &sad_32x32_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "generic", 0, &sad_64x64_dual_generic);
+
+  success &= kvz_strategyselector_register(opaque, "satd_4x4_dual", "generic", 0, &satd_4x4_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "generic", 0, &satd_8x8_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "generic", 0, &satd_16x16_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
 
   success &= kvz_strategyselector_register(opaque, "pixels_blit", "generic", 0, &kvz_pixels_blit_generic);
 
