@@ -492,10 +492,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->deblock_enable = 1;
       cfg->deblock_beta   = beta;
       cfg->deblock_tc     = tc;
-    } else if (sscanf(value, "%d", &beta)) {
-      cfg->deblock_enable = 1;
-      cfg->deblock_beta   = beta;
-      cfg->deblock_tc     = cfg->deblock_beta;
     } else {
       cfg->deblock_enable = atobool(value);
     }
