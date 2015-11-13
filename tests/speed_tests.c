@@ -99,14 +99,14 @@ TEST test_intra_speed(const int width)
 {
   const int size = width * width;
   uint64_t call_cnt = 0;
-  CLOCK_T clock_now;
-  GET_TIME(&clock_now);
-  double test_end = CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
+  KVZ_CLOCK_T clock_now;
+  KVZ_GET_TIME(&clock_now);
+  double test_end = KVZ_CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
 
   // Loop until time allocated for test has passed.
   for (unsigned i = 0; 
-      test_end > CLOCK_T_AS_DOUBLE(clock_now);
-      ++i, GET_TIME(&clock_now))
+      test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
+      ++i, KVZ_GET_TIME(&clock_now))
   {
     int test = i % NUM_TESTS;
     uint64_t sum = 0;
@@ -137,14 +137,14 @@ TEST test_inter_speed(const int width)
 {
   const int size = width * width;
   unsigned call_cnt = 0;
-  CLOCK_T clock_now;
-  GET_TIME(&clock_now);
-  double test_end = CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
+  KVZ_CLOCK_T clock_now;
+  KVZ_GET_TIME(&clock_now);
+  double test_end = KVZ_CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
 
   // Loop until time allocated for test has passed.
   for (unsigned i = 0;
-      test_end > CLOCK_T_AS_DOUBLE(clock_now);
-      ++i, GET_TIME(&clock_now))
+      test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
+      ++i, KVZ_GET_TIME(&clock_now))
   {
     int test = i % NUM_TESTS;
     uint64_t sum = 0;
@@ -184,9 +184,9 @@ TEST dct_speed(const int width)
   uint64_t call_cnt = 0;
   dct_func * tested_func = test_env.strategy->fptr;
 
-  CLOCK_T clock_now;
-  GET_TIME(&clock_now);
-  double test_end = CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
+  KVZ_CLOCK_T clock_now;
+  KVZ_GET_TIME(&clock_now);
+  double test_end = KVZ_CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
 
   int16_t _tmp_residual[32 * 32 + SIMD_ALIGNMENT];
   int16_t _tmp_coeffs[32 * 32 + SIMD_ALIGNMENT];
@@ -195,8 +195,8 @@ TEST dct_speed(const int width)
   
   // Loop until time allocated for test has passed.
   for (unsigned i = 0;
-    test_end > CLOCK_T_AS_DOUBLE(clock_now);
-    ++i, GET_TIME(&clock_now))
+    test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
+    ++i, KVZ_GET_TIME(&clock_now))
   {
     int test = i % NUM_TESTS;
     uint64_t sum = 0;

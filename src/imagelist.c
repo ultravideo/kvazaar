@@ -106,13 +106,13 @@ int kvz_image_list_destroy(image_list_t *list)
 int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int32_t poc)
 {
   int i = 0;
-  if (ATOMIC_INC(&(im->refcount)) == 1) {
+  if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {
     fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
     assert(0); //Stop for debugging
     return 0;
   }
   
-  if (ATOMIC_INC(&(cua->refcount)) == 1) {
+  if (KVZ_ATOMIC_INC(&(cua->refcount)) == 1) {
     fprintf(stderr, "Tried to add an unreferenced cu_array. This is a bug!\n");
     assert(0); //Stop for debugging
     return 0;

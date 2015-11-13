@@ -86,7 +86,7 @@ void kvz_image_free(kvz_picture *const im)
 {
   if (im == NULL) return;
 
-  int32_t new_refcount = ATOMIC_DEC(&(im->refcount));
+  int32_t new_refcount = KVZ_ATOMIC_DEC(&(im->refcount));
   if (new_refcount > 0) {
     // There are still references so we don't free the data yet.
     return;
@@ -116,7 +116,7 @@ kvz_picture *kvz_image_copy_ref(kvz_picture *im)
 {
   // The caller should have had another reference.
   assert(im->refcount > 0);
-  ATOMIC_INC(&(im->refcount));
+  KVZ_ATOMIC_INC(&(im->refcount));
 
   return im;
 }

@@ -70,7 +70,7 @@ int kvz_cu_array_free(cu_array_t * const cua)
   int32_t new_refcount;
   if (!cua) return 1;
   
-  new_refcount = ATOMIC_DEC(&(cua->refcount));
+  new_refcount = KVZ_ATOMIC_DEC(&(cua->refcount));
   //Still we have some references, do nothing
   if (new_refcount > 0) return 1;
   

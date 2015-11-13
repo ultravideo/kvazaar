@@ -137,10 +137,10 @@ int main(int argc, char *argv[])
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
-  CLOCK_T encoding_start_real_time;
+  KVZ_CLOCK_T encoding_start_real_time;
   
   clock_t encoding_end_cpu_time;
-  CLOCK_T encoding_end_real_time;
+  KVZ_CLOCK_T encoding_end_real_time;
 
   // Stdin and stdout need to be binary for input and output to work.
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -206,7 +206,7 @@ int main(int argc, char *argv[])
   //Now, do the real stuff
   {
 
-    GET_TIME(&encoding_start_real_time);
+    KVZ_GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
 
     uint64_t bitstream_length = 0;
@@ -325,7 +325,7 @@ int main(int argc, char *argv[])
       api->picture_free(img_src);
     }
 
-    GET_TIME(&encoding_end_real_time);
+    KVZ_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     // Coding finished
 
@@ -344,7 +344,7 @@ int main(int argc, char *argv[])
 
     {
       double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
-      double wall_time = CLOCK_T_AS_DOUBLE(encoding_end_real_time) - CLOCK_T_AS_DOUBLE(encoding_start_real_time);
+      double wall_time = KVZ_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - KVZ_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
       fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
