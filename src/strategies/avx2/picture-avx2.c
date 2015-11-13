@@ -429,25 +429,31 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned
   *sum0 = (*sum0 + 2) >> 2;
   *sum1 = (*sum1 + 2) >> 2;
 }
-/*
+
 // Function macro for defining hadamard calculating functions
 // for fixed size blocks. They calculate hadamard for integer
 // multiples of 8x8 with the 8x8 hadamard function.
-#define SATD_NXN_AVX2(n) \
-static unsigned satd_8bit_ ## n ## x ## n ## _dual_avx2( \
-  const kvz_pixel * const block1, const kvz_pixel * const block2) \
+#define SATD_NXN_DUAL_AVX2(n) \
+static void satd_8bit_ ## n ## x ## n ## _dual_avx2( \
+  const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *satds_out)  \
 { \
   unsigned x, y; \
-  unsigned sum = 0; \
+  satds_out[0] = 0; \
+  satds_out[1] = 0; \
+  unsigned sum1 = 0; \
+  unsigned sum2 = 0; \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += kvz_satd_8bit_8x8_general_avx2(&block1[row + x], (n), &block2[row + x], (n); \
+  kvz_satd_8bit_8x8_general_dual_avx2(&preds[0][row + x], (n), &preds[1][row + x], (n), &orig[row + x], (n), &sum1, &sum2); \
+  satds_out[0] += sum1; \
+  satds_out[1] += sum2; \
     } \
     } \
-  return sum>>(KVZ_BIT_DEPTH-8); \
+  satds_out[0] >>= (KVZ_BIT_DEPTH-8); \
+  satds_out[1] >>= (KVZ_BIT_DEPTH-8); \
 }
-*/
+
 static void satd_8bit_8x8_dual_avx2(
   const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *satds_out) 
 { 
@@ -464,15 +470,15 @@ static void satd_8bit_8x8_dual_avx2(
   satds_out[1] += sum2;
       } 
       } 
-  satds_out[0] = satds_out[0] >>(KVZ_BIT_DEPTH-8);
-  satds_out[1] = satds_out[1] >>(KVZ_BIT_DEPTH-8);
+  satds_out[0] >>= (KVZ_BIT_DEPTH-8);
+  satds_out[1] >>= (KVZ_BIT_DEPTH-8);
 }
-/*
-//SATD_NXN_AVX2(8) //Use the non-macro version
-SATD_NXN_AVX2(16)
-SATD_NXN_AVX2(32)
-SATD_NXN_AVX2(64)
-*/
+
+//SATD_NXN_DUAL_AVX2(8) //Use the non-macro version
+SATD_NXN_DUAL_AVX2(16)
+SATD_NXN_DUAL_AVX2(32)
+SATD_NXN_DUAL_AVX2(64)
+
 void kvz_pixels_blit_avx2(const kvz_pixel * const orig, kvz_pixel * const dst,
                          const unsigned width, const unsigned height,
                          const unsigned orig_stride, const unsigned dst_stride)
@@ -578,9 +584,9 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_64x64", "avx2", 40, &satd_8bit_64x64_avx2);
 
     success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "avx2", 40, &satd_8bit_8x8_dual_avx2);
-    //success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
-    //success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
-    //success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
+    success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
+    success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
+    success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
 
     success &= kvz_strategyselector_register(opaque, "pixels_blit", "avx2", 40, &kvz_pixels_blit_avx2);
   }
