@@ -45,7 +45,7 @@ static const struct option long_options[] = {
   { "vps-period",         required_argument, NULL, 0 },
   { "input-res",          required_argument, NULL, 0 },
   { "input-fps",          required_argument, NULL, 0 },
-  { "deblock",                  no_argument, NULL, 0 },
+  { "deblock",            required_argument, NULL, 0 },
   { "no-deblock",               no_argument, NULL, 0 },
   { "sao",                      no_argument, NULL, 0 },
   { "no-sao",                   no_argument, NULL, 0 },
