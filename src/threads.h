@@ -44,7 +44,7 @@
   (clock_t)->tv_nsec = mts.tv_nsec; \
 }
 #else
-#define KVZ_GET_TIME(clock_t) clock_gettime(CLOCK_MONOTONIC, (clock_t))
+#define KVZ_GET_TIME(clock_t) { clock_gettime(CLOCK_MONOTONIC, (clock_t)); }
 #endif
 
 #define KVZ_CLOCK_T_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / (double)1000000000L)
@@ -59,7 +59,7 @@
 #include <windows.h>
 
 #define KVZ_CLOCK_T struct _FILETIME
-#define KVZ_GET_TIME(clock_t) GetSystemTimeAsFileTime(clock_t)
+#define KVZ_GET_TIME(clock_t) { GetSystemTimeAsFileTime(clock_t); }
 // _FILETIME has 32bit low and high part of 64bit 100ns resolution timestamp (since 12:00 AM January 1, 1601)
 #define KVZ_CLOCK_T_AS_DOUBLE(ts) ((double)(((uint64_t)(ts).dwHighDateTime)<<32 | (uint64_t)(ts).dwLowDateTime) / (double)10000000L)
 #define KVZ_CLOCK_T_DIFF(start, stop) ((double)((((uint64_t)(stop).dwHighDateTime)<<32 | (uint64_t)(stop).dwLowDateTime) - \

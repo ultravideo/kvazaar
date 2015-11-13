@@ -106,7 +106,7 @@ TEST test_intra_speed(const int width)
   // Loop until time allocated for test has passed.
   for (unsigned i = 0; 
       test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
-      ++i, KVZ_GET_TIME(&clock_now))
+      ++i)
   {
     int test = i % NUM_TESTS;
     uint64_t sum = 0;
@@ -123,6 +123,7 @@ TEST test_intra_speed(const int width)
     }
 
     ASSERT(sum > 0);
+    KVZ_GET_TIME(&clock_now)
   }
 
   sprintf(test_env.msg, "%.3fM x %s:%s",
@@ -144,7 +145,7 @@ TEST test_inter_speed(const int width)
   // Loop until time allocated for test has passed.
   for (unsigned i = 0;
       test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
-      ++i, KVZ_GET_TIME(&clock_now))
+      ++i)
   {
     int test = i % NUM_TESTS;
     uint64_t sum = 0;
@@ -166,6 +167,7 @@ TEST test_inter_speed(const int width)
       }
     }
     ASSERT(sum > 0);
+    KVZ_GET_TIME(&clock_now)
   }
 
   sprintf(test_env.msg, "%.3fM x %s(%ix%i):%s",
@@ -196,7 +198,7 @@ TEST dct_speed(const int width)
   // Loop until time allocated for test has passed.
   for (unsigned i = 0;
     test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
-    ++i, KVZ_GET_TIME(&clock_now))
+    ++i)
   {
     int test = i % NUM_TESTS;
     uint64_t sum = 0;
@@ -216,6 +218,7 @@ TEST dct_speed(const int width)
     }
 
     ASSERT(sum > 0);
+    KVZ_GET_TIME(&clock_now)
   }
   
   sprintf(test_env.msg, "%.3fM x %s:%s",
