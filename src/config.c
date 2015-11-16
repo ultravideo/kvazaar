@@ -647,7 +647,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
           }
         }
 
-        int keyframe = gop_pic->poc_offset % gop.g;
+        int keyframe = gop_pic->poc_offset;
         for (int i = 1; i < gop_pic->ref_neg_count; ++i) {
           while (keyframe == gop_pic->ref_neg[i - 1]) {
             keyframe += gop.g;
