@@ -397,10 +397,9 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
                     useStrongFiltering(offset, 2*d3, (src+step*(block_idx*4+3)));
 
         // Filter four rows/columns
-        kvz_filter_deblock_luma(encoder, src + step * (4*block_idx + 0), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
-        kvz_filter_deblock_luma(encoder, src + step * (4*block_idx + 1), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
-        kvz_filter_deblock_luma(encoder, src + step * (4*block_idx + 2), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
-        kvz_filter_deblock_luma(encoder, src + step * (4*block_idx + 3), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        for (int i = 0; i < 4; i++) {
+          kvz_filter_deblock_luma(encoder, src + step * (4*block_idx + i), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        }
       }
     }
   }
@@ -445,8 +444,10 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     int32_t stride = frame->rec->stride >> 1;
     int32_t tc_offset_div2 = encoder->tc_offset_div2;
     // TODO: support 10+bits
-    kvz_pixel *src_u = &frame->rec->u[x + y*stride];
-    kvz_pixel *src_v = &frame->rec->v[x + y*stride];
+    kvz_pixel *src[] = {
+      &frame->rec->u[x + y*stride],
+      &frame->rec->v[x + y*stride],
+    };
     const cu_info_t *cu_p = NULL;
     int16_t x_cu = x >> (MIN_SIZE-1);
     int16_t y_cu = y >> (MIN_SIZE-1);
@@ -468,16 +469,11 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
 
       // Only filter when strenght == 2 (one of the blocks is intra coded)
       if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {
-        // Chroma U
-        kvz_filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 0), offset, Tc, 0, 0);
-        kvz_filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 1), offset, Tc, 0, 0);
-        kvz_filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 2), offset, Tc, 0, 0);
-        kvz_filter_deblock_chroma(encoder, src_u + step * (4*blk_idx + 3), offset, Tc, 0, 0);
-        // Chroma V
-        kvz_filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 0), offset, Tc, 0, 0);
-        kvz_filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 1), offset, Tc, 0, 0);
-        kvz_filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 2), offset, Tc, 0, 0);
-        kvz_filter_deblock_chroma(encoder, src_v + step * (4*blk_idx + 3), offset, Tc, 0, 0);
+        for (int component = 0; component < 2; component++) {
+          for (int i = 0; i < 4; i++) {
+            kvz_filter_deblock_chroma(encoder, src[component] + step * (4*blk_idx + i), offset, Tc, 0, 0);
+          }
+        }
       }
     }
   }
