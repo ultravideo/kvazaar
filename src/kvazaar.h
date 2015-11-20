@@ -80,6 +80,7 @@ typedef struct kvz_encoder kvz_encoder;
 enum kvz_ime_algorithm {
   KVZ_IME_HEXBS = 0,
   KVZ_IME_TZ = 1,
+  KVZ_IME_FULL = 2,
 };
 
 /**

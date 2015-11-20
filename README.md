@@ -54,6 +54,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --me <string>          : Set integer motion estimation algorithm ["hexbs"]
                                          "hexbs": Hexagon Based Search (faster)
                                          "tz":    Test Zone Search (better quality)
+                                         "full":  Full Search (super slow)
               --subme <integer>      : Set fractional pixel motion estimation level [1].
                                          0: only integer motion estimation
                                          1: fractional pixel motion estimation enabled

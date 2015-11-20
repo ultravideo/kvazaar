@@ -311,6 +311,7 @@ void print_help(void)
     "          --me <string>          : Set integer motion estimation algorithm [\"hexbs\"]\n"
     "                                     \"hexbs\": Hexagon Based Search (faster)\n"
     "                                     \"tz\":    Test Zone Search (better quality)\n"
+    "                                     \"full\":  Full Search (super slow)\n"
     "          --no-transform-skip    : Disable transform skip\n"
     "          --aud                  : Use access unit delimiters\n"
     "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"

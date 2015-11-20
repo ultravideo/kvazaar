@@ -32,10 +32,6 @@
 #include "rdo.h"
 
 
-// Temporarily for debugging.
-#define SEARCH_MV_FULL_RADIUS 0
-
-
 static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 {
   int32_t num_bins = 0;
@@ -761,21 +757,26 @@ static unsigned hexagon_search(const encoder_state_t * const state,
 }
 
 
-#if SEARCH_MV_FULL_RADIUS
-static unsigned search_mv_full(unsigned depth,
-                               const picture *pic, const picture *ref,
-                               const vector2d *orig, vector2d *mv_in_out,
-                               int16_t mv_cand[2][2], int16_t merge_cand[MRG_MAX_NUM_CANDS][3],
+#define IME_FULL_SEARCH_RADIUS 32
+static unsigned search_mv_full(const encoder_state_t * const state,
+                               unsigned width, unsigned height,
+                               const kvz_picture *pic, const kvz_picture *ref,
+                               const vector2d_t *orig, vector2d_t *mv_in_out,
+                               int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
-  vector2d mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
+  vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   unsigned best_cost = UINT32_MAX;
-  int x, y;
   uint32_t best_bitcost = 0, bitcost;
-  vector2d min_mv, max_mv;
+  const int max_lcu_below = state->encoder_control->owf ? 1 : -1;
 
-  /*if (abs(mv.x) > SEARCH_MV_FULL_RADIUS || abs(mv.y) > SEARCH_MV_FULL_RADIUS) {
+  int (*calc_mvd)(const encoder_state_t * const,
+                  int, int, int,
+                  int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+                  int16_t, int32_t, uint32_t *) =
+    state->encoder_control->cfg->mv_rdo ? kvz_calc_mvd_cost_cabac : calc_mvd_cost;
+
+  /*if (abs(mv.x) > IME_FULL_SEARCH_RADIUS || abs(mv.y) > IME_FULL_SEARCH_RADIUS) {
     best_cost = calc_sad(pic, ref, orig->x, orig->y,
                          orig->x, orig->y,
                          block_width, block_width);
@@ -783,18 +784,23 @@ static unsigned search_mv_full(unsigned depth,
     mv.y = 0;
   }*/
 
-  min_mv.x = mv.x - SEARCH_MV_FULL_RADIUS;
-  min_mv.y = mv.y - SEARCH_MV_FULL_RADIUS;
-  max_mv.x = mv.x + SEARCH_MV_FULL_RADIUS;
-  max_mv.y = mv.y + SEARCH_MV_FULL_RADIUS;
+  vector2d_t min_mv = {
+    mv.x - IME_FULL_SEARCH_RADIUS,
+    mv.y - IME_FULL_SEARCH_RADIUS,
+  };
+  vector2d_t max_mv = {
+    mv.x + IME_FULL_SEARCH_RADIUS,
+    mv.y + IME_FULL_SEARCH_RADIUS,
+  };
 
-  for (y = min_mv.y; y < max_mv.y; ++y) {
-    for (x = min_mv.x; x < max_mv.x; ++x) {
-      unsigned cost = calc_sad(pic, ref, orig->x, orig->y,
-                               orig->x + x,
-                               orig->y + y,
-                               block_width, block_width);
-      cost += calc_mvd_cost(x, y, mv_cand,merge_cand,num_cand,ref_idx, &bitcost);
+  for (int y = min_mv.y; y < max_mv.y; ++y) {
+    for (int x = min_mv.x; x < max_mv.x; ++x) {
+      unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+                                         orig->x + x,
+                                         orig->y + y,
+                                         width, height,
+                                         max_lcu_below);
+      cost += calc_mvd(state, x, y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
       if (cost < best_cost) {
         best_cost    = cost;
         best_bitcost = bitcost;
@@ -811,7 +817,6 @@ static unsigned search_mv_full(unsigned depth,
 
   return best_cost;
 }
-#endif
 
 
 /**
@@ -1023,12 +1028,8 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
     }
   }
 
-#if SEARCH_MV_FULL_RADIUS
-  temp_cost += search_mv_full(depth, frame, ref_pic, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
-#else
   switch (state->encoder_control->cfg->ime_algorithm) {
     case KVZ_IME_TZ:
-      // TODO: Make tz search work with non-square blocks.
       temp_cost += tz_search(state,
                              width, height,
                              frame->source,
@@ -1040,6 +1041,20 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                              num_cand,
                              ref_idx,
                              &temp_bitcost);
+      break;
+
+    case KVZ_IME_FULL:
+      temp_cost += search_mv_full(state,
+                                  width, height,
+                                  frame->source,
+                                  ref_image,
+                                  &orig,
+                                  &mv,
+                                  mv_cand,
+                                  merge_cand,
+                                  num_cand,
+                                  ref_idx,
+                                  &temp_bitcost);
       break;
 
     default:
@@ -1055,8 +1070,8 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                                   ref_idx,
                                   &temp_bitcost);
       break;
-    }
-#endif
+  }
+
   if (state->encoder_control->cfg->fme_level > 0) {
     temp_cost = search_frac(state,
                             width, height,
