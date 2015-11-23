@@ -145,8 +145,8 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const int width_c = width > TR_MIN_WIDTH ? width / 2 : width;
 
   const int offset = width / 2;
-  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
-  cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
+  cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
 
@@ -609,8 +609,8 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
   const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
 
   if (reconstruct_chroma) {
-    const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
-    cu_info_t *const tr_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+    const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
+    cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
     struct {
       double cost;
@@ -645,11 +645,10 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
-  const int cu_index = LCU_CU_OFFSET + lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH;
 
-  cu_info_t *cur_cu = &lcu->cu[cu_index];
+  cu_info_t *cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
   int8_t intra_mode = cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].mode;
 
   double costs[5];
@@ -710,13 +709,12 @@ double kvz_search_cu_intra(encoder_state_t * const state,
                            const int x_px, const int y_px,
                            const int depth, lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x_px & 0x3f, y_px & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
   const int8_t cu_width = (LCU_WIDTH >> (depth));
-  const int cu_index = LCU_CU_OFFSET + lcu_cu.x + lcu_cu.y * LCU_T_CU_WIDTH;
   const int_fast8_t log2_width = LOG2_LCU_WIDTH - depth;
 
-  cu_info_t *cur_cu = &lcu->cu[cu_index];
+  cu_info_t *cur_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y);
 
   kvz_intra_references refs;
 
@@ -728,10 +726,10 @@ double kvz_search_cu_intra(encoder_state_t * const state,
   // Select left and top CUs if they are available.
   // Top CU is not available across LCU boundary.
   if ((x_px >> 3) > 0) {
-    left_cu = &lcu->cu[cu_index - 1];
+    left_cu = LCU_GET_CU(lcu, lcu_cu.x - 1, lcu_cu.y);
   }
   if ((y_px >> 3) > 0 && lcu_cu.y != 0) {
-    above_cu = &lcu->cu[cu_index - LCU_T_CU_WIDTH];
+    above_cu = LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y - 1);
   }
   kvz_intra_get_dir_luma_predictor(x_px, y_px, candidate_modes, cur_cu, left_cu, above_cu);
 
