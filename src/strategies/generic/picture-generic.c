@@ -191,7 +191,7 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-unsigned kvz_satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
+static unsigned satd_8x8_subblock_generic(const kvz_pixel * piOrg, const int32_t iStrideOrg,
   const kvz_pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
@@ -281,36 +281,11 @@ unsigned kvz_satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
   return sad;
 }
 
-// Function macro for defining hadamard calculating functions
-// for fixed size blocks. They calculate hadamard for integer
-// multiples of 8x8 with the 8x8 hadamard function.
-#define SATD_NXN(n, pixel_type) \
-static unsigned satd_ ## n ## x ## n ## _generic( \
-  const pixel_type * const block1, const pixel_type * const block2) \
-{ \
-  unsigned x, y; \
-  unsigned sum = 0; \
-  for (y = 0; y < (n); y += 8) { \
-  unsigned row = y * (n); \
-  for (x = 0; x < (n); x += 8) { \
-  sum += kvz_satd_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
-  } \
-  } \
-  return sum>>(KVZ_BIT_DEPTH-8); \
-}
-
-// Declare these functions to make sure the signature of the macro matches.
-static cost_pixel_nxn_func satd_4x4_generic;
-static cost_pixel_nxn_func satd_8x8_generic;
-static cost_pixel_nxn_func satd_16x16_generic;
-static cost_pixel_nxn_func satd_32x32_generic;
-static cost_pixel_nxn_func satd_64x64_generic;
-
 // These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, kvz_pixel)
-SATD_NXN(16, kvz_pixel)
-SATD_NXN(32, kvz_pixel)
-SATD_NXN(64, kvz_pixel)
+SATD_NxN(generic,  8)
+SATD_NxN(generic, 16)
+SATD_NxN(generic, 32)
+SATD_NxN(generic, 64)
 
 // Declare these functions to make sure the signature of the macro matches.
 static cost_pixel_nxn_multi_func satd_4x4_dual_generic;
@@ -328,7 +303,7 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += kvz_satd_8x8_general(&preds[0][row + x], (n), &orig[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&preds[0][row + x], (n), &orig[row + x], (n)); \
   } \
   } \
   costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
@@ -337,7 +312,7 @@ static void satd_ ## n ## x ## n ## _dual_generic( \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += kvz_satd_8x8_general(&preds[1][row + x], (n), &orig[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&preds[1][row + x], (n), &orig[row + x], (n)); \
   } \
   } \
   costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \

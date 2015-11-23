@@ -24,6 +24,29 @@
 
 typedef kvz_pixel (*pred_buffer)[32 * 32];
 
+
+// Function macro for defining hadamard calculating functions
+// for fixed size blocks. They calculate hadamard for integer
+// multiples of 8x8 with the 8x8 hadamard function.
+#define SATD_NxN(suffix, n) \
+/* Declare the function in advance, hopefully reducing the probability that the
+ * macro expands to something unexpected and silently breaks things. */ \
+static cost_pixel_nxn_func satd_ ## n ## x ## n ## _ ## suffix;\
+static unsigned satd_ ## n ## x ## n ## _ ## suffix ( \
+    const kvz_pixel * const block1, \
+    const kvz_pixel * const block2) \
+{ \
+  unsigned sum = 0; \
+  for (unsigned y = 0; y < (n); y += 8) { \
+    unsigned row = y * (n); \
+    for (unsigned x = 0; x < (n); x += 8) { \
+      sum += satd_8x8_subblock_ ## suffix(&block1[row + x], (n), &block2[row + x], (n)); \
+    } \
+  } \
+  return sum >> (KVZ_BIT_DEPTH - 8); \
+}
+
+
 typedef unsigned(reg_sad_func)(const kvz_pixel *const data1, const kvz_pixel *const data2,
   const int width, const int height,
   const unsigned stride1, const unsigned stride2);
