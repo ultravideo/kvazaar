@@ -1639,10 +1639,28 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
   FILL(sig_coeffgroup_flag, 0);
 
   // Count non-zero coeffs
-  for (i = 0; i < width * width; i++) {
-    if (coeff[i] != 0) {
-      num_nonzero++;
-    }
+  for (i = 0; i < width * width; i+=4) {
+
+    // Load 4 coeffs
+    uint64_t packed = *(uint64_t*)(&coeff[i]);
+    // Or bits from upper byte to lower
+    packed |= packed >> 8;
+    // Zero upper byte for overflow
+    packed &= 0x00FF00FF00FF00FF;
+    // Any bits in lower byte results in overflow
+    packed += 0x00FF00FF00FF00FF;
+    // Pick only overflow bits, overflow means there were bits in that coeff
+    packed &= 0x0100010001000100;
+    // Add bits of two coeffs via possible overflow
+    packed += 0x00FFFF0000FFFF00;
+    // Preserve only the two numbers of nonzero coeffs
+    packed &= ~0x00FFFF0000FFFF00;
+    // Add these numbers
+    packed += (packed << 32);
+    // Shift to the right position and discard extra bits
+    packed >>= 56;
+
+    num_nonzero += packed;
   }
 
   // Transforms with no non-zero coefficients are indicated with CBFs.
