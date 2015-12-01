@@ -1,6 +1,6 @@
 # Simple Makefile for Kvazaar HEVC encoder
 
-all: cli lib-shared
+all: cli lib-static lib-shared
 .PHONY: all
 
 # Installation locations
@@ -259,6 +259,12 @@ TESTS_OBJS = $(TEST_OBJS) $(OBJS)
 
 DEPS = $(RELEASE_OBJS:.o=.d) $(DEBUG_OBJS:.o=.d) $(TESTS_OBJS:.o=.d)
 
+ifdef LINK_SHARED
+LINKLIB = $(LIBKVAZAAR_SHARED)
+else
+LINKLIB = $(STATIC)
+endif
+
 .PHONY: cli lib-shared lib-static debug tests build_tests
 cli: $(PROG)
 lib-shared: $(LIBKVAZAAR_SHARED)
@@ -281,7 +287,7 @@ $(DYLIB): LDFLAGS += -dynamiclib \
                      -compatibility_version $(VER_MAJOR) \
                      -install_name $(LIBDIR)/$@
 
-$(PROG): $(MAIN_OBJS) $(STATIC)
+$(PROG): $(MAIN_OBJS) $(LINKLIB)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@
 
 $(STATIC): $(OBJS)
