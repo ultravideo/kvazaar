@@ -977,7 +977,8 @@ void kvz_encoder_next_frame(encoder_state_t *state)
   state->prepared = 1;
 }
 
-static void encode_part_mode(cabac_data_t * const cabac,
+static void encode_part_mode(encoder_state_t * const state,
+                             cabac_data_t * const cabac,
                              const cu_info_t * const cur_cu,
                              int depth)
 {
@@ -1022,19 +1023,43 @@ static void encode_part_mode(cabac_data_t * const cabac,
       }
     }
   } else {
-    switch (cur_cu->part_size) {
-      case SIZE_2Nx2N:
-        cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-        CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
-        break;
 
-      case SIZE_2NxN:
-      case SIZE_Nx2N:
-        cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
-        CABAC_BIN(cabac, 0, "part_mode 2NxN");
-        cabac->cur_ctx = &(cabac->ctx.part_size_model[1]);
-        CABAC_BIN(cabac, (cur_cu->part_size == SIZE_2NxN), "part_mode 2NxN");
-        break;
+    cabac->cur_ctx = &(cabac->ctx.part_size_model[0]);
+    if (cur_cu->part_size == SIZE_2Nx2N) {
+      CABAC_BIN(cabac, 1, "part_mode 2Nx2N");
+      return;
+    }
+    CABAC_BIN(cabac, 0, "part_mode split");
+
+    cabac->cur_ctx = &(cabac->ctx.part_size_model[1]);
+    if (cur_cu->part_size == SIZE_2NxN ||
+        cur_cu->part_size == SIZE_2NxnU ||
+        cur_cu->part_size == SIZE_2NxnD) {
+      CABAC_BIN(cabac, 1, "part_mode vertical");
+    } else {
+      CABAC_BIN(cabac, 0, "part_mode horizontal");
+    }
+
+    if (state->encoder_control->cfg->amp_enable) {
+      if (depth == MAX_DEPTH) {
+        cabac->cur_ctx = &(cabac->ctx.part_size_model[2]);
+      } else {
+        cabac->cur_ctx = &(cabac->ctx.part_size_model[3]);
+      }
+
+      if (cur_cu->part_size == SIZE_2NxN ||
+          cur_cu->part_size == SIZE_Nx2N) {
+        CABAC_BIN(cabac, 1, "part_mode SMP");
+        return;
+      }
+      CABAC_BIN(cabac, 0, "part_mode AMP");
+
+      if (cur_cu->part_size == SIZE_2NxnU ||
+          cur_cu->part_size == SIZE_nLx2N) {
+        CABAC_BINS_EP(cabac, 0, 1, "part_mode AMP");
+      } else {
+        CABAC_BINS_EP(cabac, 1, 1, "part_mode AMP");
+      }
     }
   }
 }
@@ -1404,7 +1429,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   // part_mode
-  encode_part_mode(cabac, cur_cu, depth);
+  encode_part_mode(state, cabac, cur_cu, depth);
 
   if (cur_cu->type == CU_INTER) {
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];

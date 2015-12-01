@@ -56,6 +56,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->rdoq_enable     = 1;
   cfg->signhide_enable = true;
   cfg->smp_enable      = false;
+  cfg->amp_enable      = false;
   cfg->rdo             = 1;
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
@@ -505,6 +506,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->signhide_enable = (bool)atobool(value);
   else if OPT("smp")
     cfg->smp_enable = (bool)atobool(value);
+  else if OPT("amp")
+    cfg->amp_enable = (bool)atobool(value);
   else if OPT("rd")
     cfg->rdo = atoi(value);
   else if OPT("full-intra-search")

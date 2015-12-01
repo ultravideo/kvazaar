@@ -126,6 +126,7 @@ typedef struct kvz_config
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
   int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */
+  int32_t amp_enable;   /*!< \brief Flag to enable AMP blocks. */
   int32_t rdo;            /*!< \brief RD-calculation level (0..2) */
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */

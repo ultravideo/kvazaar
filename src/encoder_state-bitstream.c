@@ -353,7 +353,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     encoder_state_write_bitstream_scaling_list(stream, state);
   }
 
-  WRITE_U(stream, 0, 1, "amp_enabled_flag");
+  WRITE_U(stream, (encoder->cfg->amp_enable ? 1 : 0), 1, "amp_enabled_flag");
+
   WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
