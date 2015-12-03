@@ -11,6 +11,25 @@
 /doxygen_html
 /doxygen
 
+# Autotools generated
+.deps
+.dirstamp
+.libs
+/Makefile
+/Makefile.in
+/aclocal.m4
+/autom4te.cache
+/build-aux
+/config.h
+/config.h.in*
+/config.status
+/configure
+/kvazaar
+/libtool
+/libkvazaar.la
+/m4
+/stamp-h1
+
 # Other files
 *.exe
 *.o
@@ -19,6 +38,7 @@
 
 *.log
 .kdev4
+configure.scan
 src/kvazaar
 src/libkvazaar.a
 src/libkvazaar.so.*
