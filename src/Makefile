@@ -53,7 +53,8 @@ CFLAGS += -O2 -g -ftree-vectorize
 CFLAGS += -fvisibility=hidden -std=gnu99
 CFLAGS += -DKVZ_DLL_EXPORTS
 CFLAGS += $(INCLUDEDIRS) $(WARNINGS)
-LDFLAGS += -O2 -fvisibility=hidden -lm -pthread
+LDFLAGS += -O2 -fvisibility=hidden -pthread
+LIBS += -lm
 
 ARCH ?= $(shell uname -m)
 
