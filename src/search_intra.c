@@ -122,6 +122,51 @@ static double get_cost(encoder_state_t * const state,
 
 
 /**
+ * \brief Calculate quality of the reconstruction.
+ *
+ * \param a  bc
+ *
+ * \return  
+ */
+static void get_cost_dual(encoder_state_t * const state, 
+                       const pred_buffer preds, const kvz_pixel *orig_block,
+                       cost_pixel_nxn_multi_func *satd_twin_func,
+                       cost_pixel_nxn_multi_func *sad_twin_func,
+                       int width, double *costs_out)
+{
+  #define PARALLEL_BLKS 2
+  unsigned satd_costs[PARALLEL_BLKS] = { 0 };
+  satd_twin_func(preds, orig_block, PARALLEL_BLKS, satd_costs);
+  costs_out[0] = (double)satd_costs[0];
+  costs_out[1] = (double)satd_costs[1];
+
+  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->trskip_enable) {
+    // If the mode looks better with SAD than SATD it might be a good
+    // candidate for transform skip. How much better SAD has to be is
+    // controlled by TRSKIP_RATIO.
+
+    // Add the offset bit costs of signaling 'luma and chroma use trskip',
+    // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
+    const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
+    double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
+    ctx = &state->cabac.ctx.transform_skip_model_chroma;
+    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+
+    unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
+    double sad_costs[PARALLEL_BLKS] = { 0 };
+    sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->global->cur_lambda_cost_sqrt * trskip_bits;
+      if (sad_costs[i] < (double)satd_costs[i]) {
+        costs_out[i] = sad_costs[i];
+      }
+    }
+  }
+
+  #undef PARALLEL_BLKS
+}
+
+/**
 * \brief Perform search for best intra transform split configuration.
 *
 * This function does a recursive search for the best intra transform split
@@ -314,12 +359,14 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
 
 
 /**
- * \brief  Order the intra prediction modes according to a fast criteria.
+ * \brief  Order the intra prediction modes according to a fast criteria. 
  *
  * This function uses SATD to order the intra prediction modes. For 4x4 modes
  * SAD might be used instead, if the cost given by SAD is much better than the
  * one given by SATD, to take into account that 4x4 modes can be coded with
- * transform skip.
+ * transform skip. This version of the function calculates two costs
+ * simultaneously to better utilize large SIMD registers with AVX and newer
+ * extensions.
  *
  * The modes are searched using halving search and the total number of modes
  * that are tried is dependent on size of the predicted block. More modes
@@ -327,7 +374,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
  *
  * \param orig  Pointer to the top-left corner of current CU in the picture
  *     being encoded.
- * \param orig_stride  Stride of param orig.
+ * \param orig_stride  Stride of param orig..
  * \param rec  Pointer to the top-left corner of current CU in the picture
  *     being encoded.
  * \param rec_stride  Stride of param rec.
@@ -347,14 +394,17 @@ static int8_t search_intra_rough(encoder_state_t * const state,
                                  int log2_width, int8_t *intra_preds,
                                  int8_t modes[35], double costs[35])
 {
+  #define PARALLEL_BLKS 2 // TODO: use 4 for AVX-512 in the future?
   assert(log2_width >= 2 && log2_width <= 5);
   int_fast8_t width = 1 << log2_width;
   cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
   cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
+  cost_pixel_nxn_multi_func *satd_dual_func = kvz_pixels_get_satd_dual_func(width);
+  cost_pixel_nxn_multi_func *sad_dual_func = kvz_pixels_get_sad_dual_func(width);
 
   // Temporary block arrays
-  kvz_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
-  kvz_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
+  kvz_pixel _preds[PARALLEL_BLKS * 32 * 32 + SIMD_ALIGNMENT];
+  pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
   
   kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
   kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
@@ -378,15 +428,25 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Calculate SAD for evenly spaced modes to select the starting point for 
   // the recursive search.
-  for (int mode = 2; mode <= 34; mode += offset) {
-    kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-    costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-    modes[modes_selected] = mode;
+  for (int mode = 2; mode <= 34; mode += PARALLEL_BLKS * offset) {
+    
+    double costs_out[PARALLEL_BLKS] = { 0 };
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      if (mode + i * offset <= 34) kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i]);
+    }
+    
+    //TODO: add generic version of get cost  multi
+    get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
 
-    min_cost = MIN(min_cost, costs[modes_selected]);
-    max_cost = MAX(max_cost, costs[modes_selected]);
-
-    ++modes_selected;
+    for (int i = 0; i < PARALLEL_BLKS; ++i) {
+      if (mode + i * offset <= 34) {
+        costs[modes_selected] = costs_out[i];
+        modes[modes_selected] = mode + i * offset;
+        min_cost = MIN(min_cost, costs[modes_selected]);
+        max_cost = MAX(max_cost, costs[modes_selected]);
+        ++modes_selected;
+      }
+    }
   }
 
   int8_t best_mode = modes[select_best_mode_index(modes, costs, modes_selected)];
@@ -400,28 +460,32 @@ static int8_t search_intra_rough(encoder_state_t * const state,
       offset >>= 1;
 
       int8_t center_node = best_mode;
-      int8_t mode = center_node - offset;
-      if (mode >= 2) {
-        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-        costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-        modes[modes_selected] = mode;
-        if (costs[modes_selected] < best_cost) {
-          best_cost = costs[modes_selected];
-          best_mode = modes[modes_selected];
-        }
-        ++modes_selected;
-      }
+      int8_t test_modes[] = { center_node - offset, center_node + offset };
 
-      mode = center_node + offset;
-      if (mode <= 34) {
-        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-        costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-        modes[modes_selected] = mode;
-        if (costs[modes_selected] < best_cost) {
-          best_cost = costs[modes_selected];
-          best_mode = modes[modes_selected];
+      double costs_out[PARALLEL_BLKS] = { 0 };
+      char mode_in_range = 0;
+
+      for (int i = 0; i < PARALLEL_BLKS; ++i) mode_in_range |= (test_modes[i] >= 2 && test_modes[i] <= 34);
+
+      if (mode_in_range) {
+        for (int i = 0; i < PARALLEL_BLKS; ++i) {
+          if (test_modes[i] >= 2 && test_modes[i] <= 34) kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i]);
         }
-        ++modes_selected;
+
+        //TODO: add generic version of get cost multi
+        get_cost_dual(state, preds, orig_block, satd_dual_func, sad_dual_func, width, costs_out);
+
+        for (int i = 0; i < PARALLEL_BLKS; ++i) {
+          if (test_modes[i] >= 2 && test_modes[i] <= 34) {
+            costs[modes_selected] = costs_out[i];
+            modes[modes_selected] = test_modes[i];
+            if (costs[modes_selected] < best_cost) {
+              best_cost = costs[modes_selected];
+              best_mode = modes[modes_selected];
+            }
+            ++modes_selected;
+          }
+        }
       }
     }
   }
@@ -441,8 +505,8 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-      costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
+      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, preds[0]);
+      costs[modes_selected] = get_cost(state, preds[0], orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;
     }
@@ -455,9 +519,10 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     costs[mode_i] += lambda_cost * kvz_luma_mode_bits(state, modes[mode_i], intra_preds);
   }
 
+  #undef PARALLEL_BLKS
+
   return modes_selected;
 }
-
 
 /**
  * \brief  Find best intra mode out of the ones listed in parameter modes.
