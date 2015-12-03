@@ -359,152 +359,6 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
 
 
 /**
- * \brief  Order the intra prediction modes according to a fast criteria.
- *
- * This function uses SATD to order the intra prediction modes. For 4x4 modes
- * SAD might be used instead, if the cost given by SAD is much better than the
- * one given by SATD, to take into account that 4x4 modes can be coded with
- * transform skip.
- *
- * The modes are searched using halving search and the total number of modes
- * that are tried is dependent on size of the predicted block. More modes
- * are tried for smaller blocks.
- *
- * \param orig  Pointer to the top-left corner of current CU in the picture
- *     being encoded.
- * \param orig_stride  Stride of param orig.
- * \param rec  Pointer to the top-left corner of current CU in the picture
- *     being encoded.
- * \param rec_stride  Stride of param rec.
- * \param width  Width of the prediction block.
- * \param intra_preds  Array of the 3 predicted intra modes.
- *
- * \param[out] modes  The modes ordered according to their RD costs, from best
- *     to worst. The number of modes and costs output is given by parameter
- *     modes_to_check.
- * \param[out] costs  The RD costs of corresponding modes in param modes.
- *
- * \return  Number of prediction modes in param modes.
- */
-static int8_t search_intra_rough(encoder_state_t * const state, 
-                                 kvz_pixel *orig, int32_t origstride,
-                                 kvz_intra_references *refs,
-                                 int log2_width, int8_t *intra_preds,
-                                 int8_t modes[35], double costs[35])
-{
-  assert(log2_width >= 2 && log2_width <= 5);
-  int_fast8_t width = 1 << log2_width;
-  cost_pixel_nxn_func *satd_func = kvz_pixels_get_satd_func(width);
-  cost_pixel_nxn_func *sad_func = kvz_pixels_get_sad_func(width);
-
-  // Temporary block arrays
-  kvz_pixel _pred[32 * 32 + SIMD_ALIGNMENT];
-  kvz_pixel *pred = ALIGNED_POINTER(_pred, SIMD_ALIGNMENT);
-  
-  kvz_pixel _orig_block[32 * 32 + SIMD_ALIGNMENT];
-  kvz_pixel *orig_block = ALIGNED_POINTER(_orig_block, SIMD_ALIGNMENT);
-
-  // Store original block for SAD computation
-  kvz_pixels_blit(orig, orig_block, width, width, origstride, width);
-
-  int8_t modes_selected = 0;
-  unsigned min_cost = UINT_MAX;
-  unsigned max_cost = 0;
-  
-  // Initial offset decides how many modes are tried before moving on to the
-  // recursive search.
-  int offset;
-  if (state->encoder_control->full_intra_search) {
-    offset = 1;
-  } else {
-    static const int8_t offsets[4] = { 2, 4, 8, 8 };
-    offset = offsets[log2_width - 2];
-  }
-
-  // Calculate SAD for evenly spaced modes to select the starting point for 
-  // the recursive search.
-  for (int mode = 2; mode <= 34; mode += offset) {
-    kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-    costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-    modes[modes_selected] = mode;
-
-    min_cost = MIN(min_cost, costs[modes_selected]);
-    max_cost = MAX(max_cost, costs[modes_selected]);
-
-    ++modes_selected;
-  }
-
-  int8_t best_mode = modes[select_best_mode_index(modes, costs, modes_selected)];
-  double best_cost = min_cost;
-  
-  // Skip recursive search if all modes have the same cost.
-  if (min_cost != max_cost) {
-    // Do a recursive search to find the best mode, always centering on the
-    // current best mode.
-    while (offset > 1) {
-      offset >>= 1;
-
-      int8_t center_node = best_mode;
-      int8_t mode = center_node - offset;
-      if (mode >= 2) {
-        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-        costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-        modes[modes_selected] = mode;
-        if (costs[modes_selected] < best_cost) {
-          best_cost = costs[modes_selected];
-          best_mode = modes[modes_selected];
-        }
-        ++modes_selected;
-      }
-
-      mode = center_node + offset;
-      if (mode <= 34) {
-        kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-        costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-        modes[modes_selected] = mode;
-        if (costs[modes_selected] < best_cost) {
-          best_cost = costs[modes_selected];
-          best_mode = modes[modes_selected];
-        }
-        ++modes_selected;
-      }
-    }
-  }
-
-  int8_t add_modes[5] = {intra_preds[0], intra_preds[1], intra_preds[2], 0, 1};
-
-  // Add DC, planar and missing predicted modes.
-  for (int8_t pred_i = 0; pred_i < 5; ++pred_i) {
-    bool has_mode = false;
-    int8_t mode = add_modes[pred_i];
-
-    for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-      if (modes[mode_i] == add_modes[pred_i]) {
-        has_mode = true;
-        break;
-      }
-    }
-
-    if (!has_mode) {
-      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, pred);
-      costs[modes_selected] = get_cost(state, pred, orig_block, satd_func, sad_func, width);
-      modes[modes_selected] = mode;
-      ++modes_selected;
-    }
-  }
-
-  // Add prediction mode coding cost as the last thing. We don't want this
-  // affecting the halving search.
-  int lambda_cost = (int)(state->global->cur_lambda_cost_sqrt + 0.5);
-  for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
-    costs[mode_i] += lambda_cost * kvz_luma_mode_bits(state, modes[mode_i], intra_preds);
-  }
-
-  return modes_selected;
-}
-
-
-/**
  * \brief  Order the intra prediction modes according to a fast criteria. 
  *
  * This function uses SATD to order the intra prediction modes. For 4x4 modes
@@ -534,7 +388,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
  *
  * \return  Number of prediction modes in param modes.
  */
-static int8_t search_intra_rough_multi(encoder_state_t * const state, 
+static int8_t search_intra_rough(encoder_state_t * const state, 
                                  kvz_pixel *orig, int32_t origstride,
                                  kvz_intra_references *refs,
                                  int log2_width, int8_t *intra_preds,
@@ -962,7 +816,7 @@ double kvz_search_cu_intra(encoder_state_t * const state,
   int8_t number_of_modes;
   bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
   if (!skip_rough_search) {
-    number_of_modes = search_intra_rough_multi(state,
+    number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
                                          &refs,
                                          log2_width, candidate_modes,
