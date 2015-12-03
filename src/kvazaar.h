@@ -34,6 +34,10 @@
 extern "C" {
 #endif
 
+#if defined(KVZ_STATIC_LIB) && defined(PIC)
+  #undef KVZ_STATIC_LIB
+#endif
+
 #if defined(KVZ_STATIC_LIB)
   // Using or building kvazaar as a static library.
   #define KVZ_PUBLIC
