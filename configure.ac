@@ -1,9 +1,10 @@
 
-AC_INIT([kvazaar],
-        m4_esyscmd([printf $(awk '/#define KVZ_VERSION/ { print $3 }' src/global.h)]),
-)
+AC_INIT([kvazaar], m4_esyscmd([printf $(awk '/#define KVZ_VERSION/ { print $3 }' src/global.h)]))
 AC_CONFIG_SRCDIR([src/encmain.c])
+
+# not used, but it prevents configure from adding a lot of defines to the CFLAGS
 AC_CONFIG_HEADERS([config.h])
+
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 
@@ -83,7 +84,14 @@ AM_CONDITIONAL([ENABLE_ASM], [test "x$enable_asm" = "xyes" -a "x$have_yasm" = "x
 AC_ARG_VAR([ASFLAGS], [ASFLAGS to use for assembler])
 AC_SUBST([ASFLAGS])
 
-KVZ_API_VERSION="$($AWK '/#define KVZ_API_VERSION/ { print $3 }' $srcdir/src/kvazaar_version.h)"
+# use KVZ_API_VERSION for sonames
+#KVZ_API_VERSION="$($AWK '/#define KVZ_API_VERSION/ { print $3 }' $srcdir/src/kvazaar_version.h)"
+
+# use library version for sonames (specified in src/Makefile)
+ver_major="$($AWK '/^VER_MAJOR/ { print $3 }' $srcdir/src/Makefile)"
+ver_minor="$($AWK '/^VER_MINOR/ { print $3 }' $srcdir/src/Makefile)"
+ver_release="$($AWK '/^VER_RELEASE/ { print $3 }' $srcdir/src/Makefile)"
+KVZ_API_VERSION="$ver_major:$ver_minor:$ver_release"
 AC_SUBST([KVZ_API_VERSION])
 
 
