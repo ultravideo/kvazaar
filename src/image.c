@@ -428,20 +428,15 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 * \returns  
 */
 unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height, int max_lcu_below) {
+                        int block_width, int block_height, int max_px_below_lcu) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
   
   // Check that we are not referencing pixels that are not final.
-  if (max_lcu_below >= 0) {
-    // When SAO is off, row is considered reconstructed when the last LCU
-    // is done, although the bottom 2 pixels might still need deblocking.
-    // To work around this, add 2 luma pixels to the reach of the mv
-    // in order to avoid referencing those possibly non-deblocked pixels.
-    int mv_lcu_row_reach = (ref_y + block_height - 1 + 2) / LCU_WIDTH;
-    int cur_lcu_row = pic_y / LCU_WIDTH;
-    if (mv_lcu_row_reach > cur_lcu_row + max_lcu_below) {
-      //printf("OOB %d %d -> %d\n", ref_y + block_height, pic_y, ref_y + block_height - pic_y);
+  if (max_px_below_lcu >= 0) {
+    int next_lcu_row_px = ((pic_y >> LOG2_LCU_WIDTH) + 1) << LOG2_LCU_WIDTH;
+    int px_below_lcu = ref_y + block_height - next_lcu_row_px;
+    if (px_below_lcu > max_px_below_lcu) {
       return INT_MAX;
     }
   }
