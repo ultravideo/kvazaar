@@ -1613,12 +1613,10 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
   uint8_t last_coeff_x = 0;
   uint8_t last_coeff_y = 0;
   int32_t i;
-  uint32_t sig_coeffgroup_flag[64];
+  uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
 
   uint32_t num_nonzero = 0;
-  int32_t scan_pos_last = -1;
   int32_t pos_last = 0;
-  int32_t shift   = 4>>1;
   int8_t be_valid = encoder->sign_hiding;
   int32_t scan_pos_sig;
   int32_t last_scan_set;
@@ -1626,7 +1624,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
   uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;
 
   // CONSTANTS
-  const uint32_t num_blk_side    = width >> shift;
+  const uint32_t num_blk_side    = width >> 2;
   const uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
   const uint32_t *scan           =
     kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
@@ -1636,39 +1634,47 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx           = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) :
                                  &(cabac->ctx.cu_sig_model_chroma[0]);
-  FILL(sig_coeffgroup_flag, 0);
 
-  // Count non-zero coeffs
-  for (i = 0; i < width * width; i++) {
-    if (coeff[i] != 0) {
-      num_nonzero++;
+  // Scan all coeff groups to find out which of them have coeffs.
+  // Populate sig_coeffgroup_flag with that info.
+  unsigned sig_cg_cnt = 0;
+  for (int cg_y = 0; cg_y < width / 4; ++cg_y) {
+    for (int cg_x = 0; cg_x < width / 4; ++cg_x) {
+      unsigned cg_pos = cg_y * width * 4 + cg_x * 4;
+      for (int coeff_row = 0; coeff_row < 4; ++coeff_row) {
+        // Load four 16-bit coeffs and see if any of them are non-zero.
+        unsigned coeff_pos = cg_pos + coeff_row * width;
+        uint64_t four_coeffs = *(uint64_t*)(&coeff[coeff_pos]);
+        if (four_coeffs) {
+          ++sig_cg_cnt;
+          unsigned cg_pos_y = cg_pos >> log2_block_size;
+          unsigned cg_pos_x = cg_pos - (cg_pos_y << log2_block_size);
+          sig_coeffgroup_flag[(cg_pos_x >> 2) + (cg_pos_y >> 2) * num_blk_side] = 1;
+          break;
+        }
+      }
     }
   }
 
-  // Transforms with no non-zero coefficients are indicated with CBFs.
-  assert(num_nonzero != 0);
+  // Rest of the code assumes at least one non-zero coeff.
+  assert(sig_cg_cnt > 0);
+
+  // Find the last coeff group by going backwards in scan order.
+  unsigned scan_cg_last = num_blk_side * num_blk_side - 1;
+  while (!sig_coeffgroup_flag[scan_cg[scan_cg_last]]) {
+    --scan_cg_last;
+  }
+
+  // Find the last coeff by going backwards in scan order.
+  unsigned scan_coeff_last = scan_cg_last * 16 + 15;
+  while (!coeff[scan[scan_coeff_last]]) {
+    --scan_coeff_last;
+  }
 
   // transform skip flag
   if(width == 4 && encoder->trskip_enable) {
     cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
-  }
-
-  scan_pos_last = -1;
-
-  // Significance mapping
-  while (num_nonzero > 0) {
-    pos_last = scan[++scan_pos_last];
-#define POSY (pos_last >> log2_block_size)
-#define POSX (pos_last - ( POSY << log2_block_size ))
-
-    if (coeff[pos_last] != 0) {
-      sig_coeffgroup_flag[(num_blk_side * (POSY >> shift) + (POSX >> shift))] = 1;
-    }
-
-    num_nonzero -= (coeff[pos_last] != 0) ? 1 : 0;
-    #undef POSY
-    #undef POSX
   }
 
   last_coeff_x = pos_last & (width - 1);
@@ -1678,8 +1684,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
   kvz_encode_last_significant_xy(state, last_coeff_x, last_coeff_y, width, width,
                              type, scan_mode);
 
-  scan_pos_sig  = scan_pos_last;
-  last_scan_set = (scan_pos_last >> 4);
+  scan_pos_sig  = scan_coeff_last;
+  last_scan_set = scan_cg_last;
 
   // significant_coeff_flag
   for (i = last_scan_set; i >= 0; i--) {
@@ -1695,7 +1701,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
     int32_t num_non_zero = 0;
     go_rice_param = 0;
 
-    if (scan_pos_sig == scan_pos_last) {
+    if (scan_pos_sig == scan_coeff_last) {
       abs_coeff[0] = abs(coeff[pos_last]);
       coeff_signs  = (coeff[pos_last] < 0);
       num_non_zero = 1;
