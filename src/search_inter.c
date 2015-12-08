@@ -817,7 +817,8 @@ static unsigned search_mv_full(unsigned depth,
 /**
  * \brief Do fractional motion estimation
  *
- * \param depth      log2 depth of the search
+ * \param width      width of the block
+ * \param height     height of the block
  * \param pic        Picture motion vector is searched for.
  * \param ref        Picture motion vector is searched from.
  * \param orig       Top left corner of the searched for block.
@@ -829,7 +830,7 @@ static unsigned search_mv_full(unsigned depth,
  * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
  */
 static unsigned search_frac(const encoder_state_t * const state,
-                            unsigned depth,
+                            unsigned width, unsigned height,
                             const kvz_picture *pic, const kvz_picture *ref,
                             const vector2d_t *orig, vector2d_t *mv_in_out,
                             int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
@@ -847,7 +848,6 @@ static unsigned search_frac(const encoder_state_t * const state,
 
   //Set mv to halfpel precision
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
@@ -863,7 +863,7 @@ static unsigned search_frac(const encoder_state_t * const state,
   kvz_extended_block src = { 0, 0, 0 };
 
   //destination buffer for interpolation
-  int dst_stride = (block_width+1)*4;
+  int dst_stride = (width + 1) * 4;
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
@@ -877,10 +877,10 @@ static unsigned search_frac(const encoder_state_t * const state,
   kvz_get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
                 state->tile->lcu_offset_x * LCU_WIDTH,
                 state->tile->lcu_offset_y * LCU_WIDTH,
-                ref->y, ref->width, ref->height, FILTER_SIZE, block_width+1, block_width+1, &src);
+                ref->y, ref->width, ref->height, FILTER_SIZE, width+1, height+1, &src);
 
-  kvz_filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, block_width+1,
-      block_width+1, dst, dst_stride, 1, 1);
+  kvz_filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, width+1,
+      height+1, dst, dst_stride, 1, 1);
 
   if (src.malloc_used) free(src.buffer);
 
@@ -890,24 +890,24 @@ static unsigned search_frac(const encoder_state_t * const state,
 
   kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
   kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
-  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, block_width, block_width, pic->stride, block_width);
+  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, width, height, pic->stride, width);
 
   // Search halfpel positions around best integer mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
 
     int y,x;
-    for(y = 0; y < block_width; ++y) {
+    for(y = 0; y < height; ++y) {
       int dst_y = y*4+pattern->y*2;
-      for(x = 0; x < block_width; ++x) {
+      for(x = 0; x < width; ++x) {
         int dst_x = x*4+pattern->x*2;
-        tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
+        tmp_filtered[y*width+x] = dst_off[dst_y*dst_stride+dst_x];
       }
     }
 
-    cost = kvz_satd_any_size(block_width, block_width,
-                             tmp_pic, block_width,
-                             tmp_filtered, block_width);
+    cost = kvz_satd_any_size(width, height,
+                             tmp_pic, width,
+                             tmp_filtered, width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -935,17 +935,17 @@ static unsigned search_frac(const encoder_state_t * const state,
     const vector2d_t *pattern = &square[i];
 
     int y,x;
-    for(y = 0; y < block_width; ++y) {
+    for(y = 0; y < height; ++y) {
       int dst_y = y*4+halfpel_offset.y+pattern->y;
-      for(x = 0; x < block_width; ++x) {
+      for(x = 0; x < width; ++x) {
         int dst_x = x*4+halfpel_offset.x+pattern->x;
-        tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
+        tmp_filtered[y*width+x] = dst_off[dst_y*dst_stride+dst_x];
       }
     }
 
-    cost = kvz_satd_any_size(block_width, block_width,
-                             tmp_pic, block_width,
-                             tmp_filtered, block_width);
+    cost = kvz_satd_any_size(width, height,
+                             tmp_pic, width,
+                             tmp_filtered, width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -1058,7 +1058,17 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
     }
 #endif
   if (state->encoder_control->cfg->fme_level > 0) {
-    temp_cost = search_frac(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost = search_frac(state,
+                            width, height,
+                            frame->source,
+                            ref_image,
+                            &orig,
+                            &mv,
+                            mv_cand,
+                            merge_cand,
+                            num_cand,
+                            ref_idx,
+                            &temp_bitcost);
   }
 
   merged = 0;
