@@ -431,6 +431,7 @@ SATD_NxN(8bit_avx2,  8)
 SATD_NxN(8bit_avx2, 16)
 SATD_NxN(8bit_avx2, 32)
 SATD_NxN(8bit_avx2, 64)
+SATD_ANY_SIZE(8bit_avx2)
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -610,6 +611,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "avx2", 40, &satd_8bit_16x16_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
+    success &= kvz_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
 
     success &= kvz_strategyselector_register(opaque, "pixels_blit", "avx2", 40, &kvz_pixels_blit_avx2);
   }

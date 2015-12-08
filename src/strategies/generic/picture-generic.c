@@ -286,6 +286,8 @@ SATD_NxN(generic,  8)
 SATD_NxN(generic, 16)
 SATD_NxN(generic, 32)
 SATD_NxN(generic, 64)
+SATD_ANY_SIZE(generic)
+
 
 // Declare these functions to make sure the signature of the macro matches.
 static cost_pixel_nxn_multi_func satd_4x4_dual_generic;
@@ -471,6 +473,7 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "generic", 0, &satd_16x16_dual_generic);
   success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
   success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
 
   success &= kvz_strategyselector_register(opaque, "pixels_blit", "generic", 0, &kvz_pixels_blit_generic);
 
