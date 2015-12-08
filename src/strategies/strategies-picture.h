@@ -51,6 +51,7 @@ static unsigned satd_ ## n ## x ## n ## _ ## suffix ( \
 // blocks. They calculate hadamard for integer multiples of 8x8 with the 8x8
 // hadamard function.
 #define SATD_ANY_SIZE(suffix) \
+  static cost_pixel_any_size_func satd_any_size_ ## suffix; \
   static unsigned satd_any_size_ ## suffix ( \
       int width, int height, \
       const kvz_pixel *block1, int stride1, \
@@ -72,6 +73,11 @@ typedef unsigned(reg_sad_func)(const kvz_pixel *const data1, const kvz_pixel *co
   const int width, const int height,
   const unsigned stride1, const unsigned stride2);
 typedef unsigned (cost_pixel_nxn_func)(const kvz_pixel *block1, const kvz_pixel *block2);
+typedef unsigned (cost_pixel_any_size_func)(
+    int width, int height,
+    const kvz_pixel *block1, int stride1,
+    const kvz_pixel *block2, int stride2
+);
 typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const kvz_pixel *orig, unsigned num_modes, unsigned *costs_out);
 
 typedef void pixels_blit_func(const kvz_pixel* orig, kvz_pixel *dst,
@@ -93,9 +99,7 @@ extern cost_pixel_nxn_func * kvz_satd_8x8;
 extern cost_pixel_nxn_func * kvz_satd_16x16;
 extern cost_pixel_nxn_func * kvz_satd_32x32;
 extern cost_pixel_nxn_func * kvz_satd_64x64;
-extern unsigned (*kvz_satd_any_size)(int width, int height,
-                                     const kvz_pixel *block1, int stride1,
-                                     const kvz_pixel *block2, int stride2);
+extern cost_pixel_any_size_func *kvz_satd_any_size;
 
 extern cost_pixel_nxn_multi_func * kvz_sad_4x4_dual;
 extern cost_pixel_nxn_multi_func * kvz_sad_8x8_dual;

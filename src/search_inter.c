@@ -855,8 +855,6 @@ static unsigned search_frac(const encoder_state_t * const state,
 
   unsigned cost = 0;
 
-  cost_pixel_nxn_func *satd = kvz_pixels_get_satd_func(block_width);
-
   vector2d_t halfpel_offset;
 
   #define FILTER_SIZE 8
@@ -907,7 +905,9 @@ static unsigned search_frac(const encoder_state_t * const state,
       }
     }
 
-    cost = satd(tmp_pic,tmp_filtered);
+    cost = kvz_satd_any_size(block_width, block_width,
+                             tmp_pic, block_width,
+                             tmp_filtered, block_width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -943,7 +943,9 @@ static unsigned search_frac(const encoder_state_t * const state,
       }
     }
 
-    cost = satd(tmp_pic,tmp_filtered);
+    cost = kvz_satd_any_size(block_width, block_width,
+                             tmp_pic, block_width,
+                             tmp_filtered, block_width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -1200,7 +1202,7 @@ static int search_pu_inter(const encoder_state_t * const state,
   // Search bi-pred positions
   if (state->global->slicetype == KVZ_SLICE_B && state->encoder_control->cfg->bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
-    cost_pixel_nxn_func *satd = kvz_pixels_get_satd_func(LCU_WIDTH >> depth);
+    unsigned cu_width = LCU_WIDTH >> depth;
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -1270,7 +1272,7 @@ static int search_pu_inter(const encoder_state_t * const state,
             }
           }
 
-          cost = satd(tmp_pic, tmp_block);
+          cost = kvz_satd_any_size(cu_width, cu_width, tmp_pic, cu_width, tmp_block, cu_width);
 
           cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
