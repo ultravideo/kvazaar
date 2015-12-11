@@ -618,6 +618,45 @@ static void filter_deblock_lcu_inside(encoder_state_t * const state,
 
 
 /**
+ * \brief Filter rightmost 4 pixels of the horizontal egdes of an LCU.
+ *
+ * \param state     encoder state
+ * \param x_px      x-coordinate of the *right* edge of the LCU in pixels
+ * \param y_px      y-coordinate of the top edge of the LCU in pixels
+ */
+static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
+                                         int32_t x_px,
+                                         int32_t y_px)
+{
+  // Luma
+  const int x = x_px - 4;
+  const int end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
+  for (int y = y_px; y < end; y += 8) {
+    // The top edge of the whole frame is not filtered.
+    bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR);
+    bool pu_boundary = is_pu_boundary(state, x, y, EDGE_HOR);
+    if (y > 0 && (tu_boundary || pu_boundary)) {
+      filter_deblock_edge_luma(state, x, y, 4, EDGE_HOR, tu_boundary);
+    }
+  }
+
+  // Chroma
+  const int x_px_c = x_px >> 1;
+  const int y_px_c = y_px >> 1;
+  const int x_c = x_px_c - 4;
+  const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> 1);
+  for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
+    // The top edge of the whole frame is not filtered.
+    bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
+    bool pu_boundary = is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
+    if (y_c > 0 && (tu_boundary || pu_boundary)) {
+      filter_deblock_edge_chroma(state, x_c, y_c, 4, EDGE_HOR, tu_boundary);
+    }
+  }
+}
+
+
+/**
  * \brief Deblock a single LCU without using data from right or down.
  *
  * Filter the following vertical edges (horizontal filtering):
@@ -646,31 +685,7 @@ void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
   filter_deblock_lcu_inside(state, x_px, y_px, EDGE_VER);
   if (x_px > 0) {
-    // Luma
-    const int x = x_px - 4;
-    const int end = MIN(y_px + LCU_WIDTH, state->tile->frame->height);
-    for (int y = y_px; y < end; y += 8) {
-      // The top edge of the whole frame is not filtered.
-      bool tu_boundary = is_tu_boundary(state, x, y, EDGE_HOR);
-      bool pu_boundary = is_pu_boundary(state, x, y, EDGE_HOR);
-      if (y > 0 && (tu_boundary || pu_boundary)) {
-        filter_deblock_edge_luma(state, x, y, 4, EDGE_HOR, tu_boundary);
-      }
-    }
-
-    // Chroma
-    const int x_px_c = x_px >> 1;
-    const int y_px_c = y_px >> 1;
-    const int x_c = x_px_c - 4;
-    const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> 1);
-    for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
-      // The top edge of the whole frame is not filtered.
-      bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-      bool pu_boundary = is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-      if (y_c > 0 && (tu_boundary || pu_boundary)) {
-        filter_deblock_edge_chroma(state, x_c, y_c, 4, EDGE_HOR, tu_boundary);
-      }
-    }
+    filter_deblock_lcu_rightmost(state, x_px, y_px);
   }
   filter_deblock_lcu_inside(state, x_px, y_px, EDGE_HOR);
 }
