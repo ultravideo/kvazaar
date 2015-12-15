@@ -47,12 +47,6 @@
 # define INTRA_TRESHOLD 20
 #endif
 
-// Extra cost for CU split.
-// Compensates for missing or incorrect bit costs. Must be recalculated if
-// bits are added or removed from cu-tree search.
-#ifndef CU_COST
-#  define CU_COST 3
-#endif
 // Disable early cu-split pruning.
 #ifndef FULL_CU_SPLIT_SEARCH
 #  define FULL_CU_SPLIT_SEARCH false
@@ -681,22 +675,22 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   // Recursively split all the way to max search depth.
   if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->global->slicetype != KVZ_SLICE_I)) {
     int half_cu = cu_width / 2;
-    // Using Cost = lambda * 9 to compensate on the price of the split
-    double split_cost = state->global->cur_lambda_cost * CU_COST;
+    double split_cost = 0.0;
     int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
         
     if (depth < MAX_DEPTH) {
+      // Add cost of cu_split_flag.
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
-
       const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-      cost += CTX_ENTROPY_FBITS(ctx, 0);
-      split_cost += CTX_ENTROPY_FBITS(ctx, 1);
+      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->global->cur_lambda_cost;
+      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->global->cur_lambda_cost;
     }
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
+      // Add cost of intra part_size.
       const cabac_ctx_t *ctx = &(state->cabac.ctx.part_size_model[0]);
-      cost += CTX_ENTROPY_FBITS(ctx, 1);  // 2Nx2N
-      split_cost += CTX_ENTROPY_FBITS(ctx, 0);  // NxN
+      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->global->cur_lambda_cost;  // 2Nx2N
+      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->global->cur_lambda_cost;  // NxN
     }
 
     // If skip mode was selected for the block, skip further search.
@@ -738,10 +732,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
         cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
 
+        // Add the cost of coding no-split.
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
         const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-        cost += CTX_ENTROPY_FBITS(ctx, 0);
+        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->global->cur_lambda_cost;
 
+        // Add the cost of coding intra mode only once.
         double mode_bits = calc_mode_bits(state, cur_cu, x, y);
         cost += mode_bits * state->global->cur_lambda_cost;
       }
