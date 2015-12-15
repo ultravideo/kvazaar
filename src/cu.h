@@ -34,6 +34,67 @@
 
 typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu_type_t;
 
+typedef enum {
+  SIZE_2Nx2N = 0,
+  SIZE_2NxN  = 1,
+  SIZE_Nx2N  = 2,
+  SIZE_NxN   = 3,
+  SIZE_2NxnU = 4,
+  SIZE_2NxnD = 5,
+  SIZE_nLx2N = 6,
+  SIZE_nRx2N = 7,
+} part_mode_t;
+
+extern const uint8_t kvz_part_mode_num_parts[];
+extern const uint8_t kvz_part_mode_offsets[][4][2];
+extern const uint8_t kvz_part_mode_sizes[][4][2];
+
+/**
+ * \brief Get the x coordinate of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param cu_x        x coordinate of the containing CU
+ * \param i           number of the PU
+ * \return            location of the left edge of the PU
+ */
+#define PU_GET_X(part_mode, cu_width, cu_x, i) \
+  ((cu_x) + kvz_part_mode_offsets[(part_mode)][(i)][0] * (cu_width) / 4)
+
+/**
+ * \brief Get the y coordinate of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param cu_y        y coordinate of the containing CU
+ * \param i           number of the PU
+ * \return            location of the top edge of the PU
+ */
+#define PU_GET_Y(part_mode, cu_width, cu_y, i) \
+  ((cu_y) + kvz_part_mode_offsets[(part_mode)][(i)][1] * (cu_width) / 4)
+
+/**
+ * \brief Get the width of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param i           number of the PU
+ * \return            width of the PU
+ */
+#define PU_GET_W(part_mode, cu_width, i) \
+  (kvz_part_mode_sizes[(part_mode)][(i)][0] * (cu_width) / 4)
+
+/**
+ * \brief Get the height of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param i           number of the PU
+ * \return            height of the PU
+ */
+#define PU_GET_H(part_mode, cu_width, i) \
+  (kvz_part_mode_sizes[(part_mode)][(i)][1] * (cu_width) / 4)
+
 //////////////////////////////////////////////////////////////////////////
 // TYPES
 

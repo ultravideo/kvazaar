@@ -30,6 +30,8 @@ extern SUITE(speed_tests);
 extern SUITE(dct_tests);
 #endif //KVZ_BIT_DEPTH == 8
 
+extern SUITE(mv_cand_tests);
+
 int main(int argc, char **argv)
 {
   GREATEST_MAIN_BEGIN();
@@ -49,5 +51,8 @@ int main(int argc, char **argv)
 #else
   printf("10-bit tests are not yet supported\n");
 #endif //KVZ_BIT_DEPTH == 8
+
+  RUN_SUITE(mv_cand_tests);
+
   GREATEST_MAIN_END();
 }

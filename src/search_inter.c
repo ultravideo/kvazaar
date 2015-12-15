@@ -133,7 +133,7 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref, unsigned pattern_type,
                            const vector2d_t *orig, const int iDist, vector2d_t *mv, unsigned best_cost, int *best_dist,
                            int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
-                           int block_width, int max_px_below_lcu)
+                           int width, int height, int max_px_below_lcu)
 {
   int n_points;
   int best_index = -1;
@@ -259,14 +259,14 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
-                            block_width, block_width, max_px_below_lcu);
+                            width, height, max_px_below_lcu);
       cost += calc_mvd(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
-        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x + block_width,
+        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x + width,
         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
-        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y + block_width);
+        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y + height);
     }
 
     if (cost < best_cost)
@@ -295,7 +295,7 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
 unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref,
                           const vector2d_t *orig, vector2d_t *mv, unsigned best_cost,
                           int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
-                          int block_width, int iSearchRange, int iRaster, int max_px_below_lcu)
+                          int width, int height, int iSearchRange, int iRaster, int max_px_below_lcu)
 {
   int i;
   int k;
@@ -323,14 +323,14 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
           (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
           (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
-          block_width, block_width, max_px_below_lcu);
+          width, height, max_px_below_lcu);
         cost += calc_mvd(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
-        PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+        PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
           (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
-          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k + block_width,
+          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k + width,
           (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
-          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i + block_width);
+          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i + height);
       }
 
       if (cost < best_cost)
@@ -351,7 +351,8 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
 }
 
 
-static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
+static unsigned tz_search(const encoder_state_t * const state,
+                          unsigned width, unsigned height,
                           const kvz_picture *pic, const kvz_picture *ref,
                           const vector2d_t *orig, vector2d_t *mv_in_out,
                           int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
@@ -365,8 +366,6 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   const unsigned step4_type = 0;
   const bool bRasterRefinementEnable = true;  // enable step 4 mode 1
   const bool bStarRefinementEnable = false;   // enable step 4 mode 2 (only one mode will be executed)
-  
-  const int block_width = CU_WIDTH_FROM_DEPTH(depth);
 
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
 
@@ -406,14 +405,14 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                        block_width, block_width, max_px_below_lcu);
+                                        width, height, max_px_below_lcu);
     best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
 
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
   }
 
   int i;
@@ -431,14 +430,14 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                   block_width, block_width, max_px_below_lcu);
+                                   width, height, max_px_below_lcu);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
 
     if (cost < best_cost) {
       best_cost = cost;
@@ -459,7 +458,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
   {
     best_cost = kvz_tz_pattern_search(state, pic, ref, step2_type, orig, iDist, &mv, best_cost, &best_dist,
-                                  mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_px_below_lcu);
+                                  mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, width, height, max_px_below_lcu);
   }
 
   //step 3, raster scan
@@ -467,8 +466,8 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
   {
     best_dist = iRaster;
 
-    best_cost = kvz_tz_raster_search(state, pic, ref, orig, &mv, best_cost, mv_cand, merge_cand, 
-                                 num_cand, ref_idx, &best_bitcost, block_width, iSearchRange, iRaster, max_px_below_lcu);
+    best_cost = kvz_tz_raster_search(state, pic, ref, orig, &mv, best_cost, mv_cand, merge_cand,
+                                 num_cand, ref_idx, &best_bitcost, width, height, iSearchRange, iRaster, max_px_below_lcu);
   }
 
   //step 4
@@ -480,7 +479,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
     while (iDist > 0)
     {
       best_cost = kvz_tz_pattern_search(state, pic, ref, step4_type, orig, iDist, &mv, best_cost, &best_dist,
-                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_px_below_lcu);
+                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, width, height, max_px_below_lcu);
 
       iDist = iDist >> 1;
     }
@@ -492,7 +491,7 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
     for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
     {
       best_cost = kvz_tz_pattern_search(state, pic, ref, step4_type, orig, iDist, &mv, best_cost, &best_dist,
-                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, block_width, max_px_below_lcu);
+                                   mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost, width, height, max_px_below_lcu);
     }
   }
 
@@ -509,7 +508,8 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
 /**
  * \brief Do motion search using the HEXBS algorithm.
  *
- * \param depth      log2 depth of the search
+ * \param width      width of the block to search
+ * \param height     height of the block to search
  * \param pic        Picture motion vector is searched for.
  * \param ref        Picture motion vector is searched from.
  * \param orig       Top left corner of the searched for block.
@@ -526,7 +526,8 @@ static unsigned tz_search(const encoder_state_t * const state, unsigned depth,
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static unsigned hexagon_search(const encoder_state_t * const state, unsigned depth,
+static unsigned hexagon_search(const encoder_state_t * const state,
+                               unsigned width, unsigned height,
                                const kvz_picture *pic, const kvz_picture *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
                                int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
@@ -555,7 +556,6 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
   };
 
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
@@ -599,16 +599,16 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                        block_width, block_width, max_px_below_lcu);
+                                        width, height, max_px_below_lcu);
     best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     best_bitcost = bitcost;
     best_index = num_cand; 
 
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
   }
 
   // Select starting point from among merge candidates. These should include
@@ -623,14 +623,14 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                   block_width, block_width, max_px_below_lcu);
+                                   width, height, max_px_below_lcu);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + block_width,
+                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + block_width);
+                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
 
     if (cost < best_cost) {
       best_cost = cost;
@@ -656,14 +656,14 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
-                             block_width, block_width, max_px_below_lcu);
+                             width, height, max_px_below_lcu);
       cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
                               (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
-                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x + block_width, 
+                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x + width,
                               (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y, 
-                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y + block_width);
+                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y + height);
     }
 
     if (cost < best_cost) {
@@ -699,13 +699,13 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                               block_width, block_width, max_px_below_lcu);
+                               width, height, max_px_below_lcu);
         cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-        PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs_iterative,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+        PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs_iterative,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
               (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
-              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + block_width, 
+              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + width,
               (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y, 
-              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y + block_width);
+              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y + height);
       }
 
       if (cost < best_cost) {
@@ -731,13 +731,13 @@ static unsigned hexagon_search(const encoder_state_t * const state, unsigned dep
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                             block_width, block_width, max_px_below_lcu);
+                             width, height, max_px_below_lcu);
       cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=small_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + block_width, orig->y, orig->y + block_width,
+      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=small_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
-            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + block_width, 
+            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + width,
             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y, 
-            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y + block_width);
+            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y + height);
     }
 
     if (cost > 0 && cost < best_cost) {
@@ -817,7 +817,8 @@ static unsigned search_mv_full(unsigned depth,
 /**
  * \brief Do fractional motion estimation
  *
- * \param depth      log2 depth of the search
+ * \param width      width of the block
+ * \param height     height of the block
  * \param pic        Picture motion vector is searched for.
  * \param ref        Picture motion vector is searched from.
  * \param orig       Top left corner of the searched for block.
@@ -829,7 +830,7 @@ static unsigned search_mv_full(unsigned depth,
  * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
  */
 static unsigned search_frac(const encoder_state_t * const state,
-                            unsigned depth,
+                            unsigned width, unsigned height,
                             const kvz_picture *pic, const kvz_picture *ref,
                             const vector2d_t *orig, vector2d_t *mv_in_out,
                             int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
@@ -847,15 +848,12 @@ static unsigned search_frac(const encoder_state_t * const state,
 
   //Set mv to halfpel precision
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
-  int block_width = CU_WIDTH_FROM_DEPTH(depth);
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
   unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
 
   unsigned cost = 0;
-
-  cost_pixel_nxn_func *satd = kvz_pixels_get_satd_func(block_width);
 
   vector2d_t halfpel_offset;
 
@@ -865,7 +863,7 @@ static unsigned search_frac(const encoder_state_t * const state,
   kvz_extended_block src = { 0, 0, 0 };
 
   //destination buffer for interpolation
-  int dst_stride = (block_width+1)*4;
+  int dst_stride = (width + 1) * 4;
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
@@ -879,10 +877,10 @@ static unsigned search_frac(const encoder_state_t * const state,
   kvz_get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
                 state->tile->lcu_offset_x * LCU_WIDTH,
                 state->tile->lcu_offset_y * LCU_WIDTH,
-                ref->y, ref->width, ref->height, FILTER_SIZE, block_width+1, block_width+1, &src);
+                ref->y, ref->width, ref->height, FILTER_SIZE, width+1, height+1, &src);
 
-  kvz_filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, block_width+1,
-      block_width+1, dst, dst_stride, 1, 1);
+  kvz_filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, width+1,
+      height+1, dst, dst_stride, 1, 1);
 
   if (src.malloc_used) free(src.buffer);
 
@@ -892,22 +890,24 @@ static unsigned search_frac(const encoder_state_t * const state,
 
   kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
   kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
-  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, block_width, block_width, pic->stride, block_width);
+  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, width, height, pic->stride, width);
 
   // Search halfpel positions around best integer mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
 
     int y,x;
-    for(y = 0; y < block_width; ++y) {
+    for(y = 0; y < height; ++y) {
       int dst_y = y*4+pattern->y*2;
-      for(x = 0; x < block_width; ++x) {
+      for(x = 0; x < width; ++x) {
         int dst_x = x*4+pattern->x*2;
-        tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
+        tmp_filtered[y*width+x] = dst_off[dst_y*dst_stride+dst_x];
       }
     }
 
-    cost = satd(tmp_pic,tmp_filtered);
+    cost = kvz_satd_any_size(width, height,
+                             tmp_pic, width,
+                             tmp_filtered, width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -935,15 +935,17 @@ static unsigned search_frac(const encoder_state_t * const state,
     const vector2d_t *pattern = &square[i];
 
     int y,x;
-    for(y = 0; y < block_width; ++y) {
+    for(y = 0; y < height; ++y) {
       int dst_y = y*4+halfpel_offset.y+pattern->y;
-      for(x = 0; x < block_width; ++x) {
+      for(x = 0; x < width; ++x) {
         int dst_x = x*4+halfpel_offset.x+pattern->x;
-        tmp_filtered[y*block_width+x] = dst_off[dst_y*dst_stride+dst_x];
+        tmp_filtered[y*width+x] = dst_off[dst_y*dst_stride+dst_x];
       }
     }
 
-    cost = satd(tmp_pic,tmp_filtered);
+    cost = kvz_satd_any_size(width, height,
+                             tmp_pic, width,
+                             tmp_filtered, width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -970,8 +972,10 @@ static unsigned search_frac(const encoder_state_t * const state,
 /**
  * \brief Perform inter search for a single reference frame.
  */
-static void search_cu_inter_ref(const encoder_state_t * const state,
-                                int x, int y, int depth,
+static void search_pu_inter_ref(const encoder_state_t * const state,
+                                int x, int y,
+                                int width, int height,
+                                int depth,
                                 lcu_t *lcu, cu_info_t *cur_cu,
                                 int16_t mv_cand[2][2],
                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
@@ -995,7 +999,7 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
   orig.y = y_cu * CU_MIN_SIZE_PIXELS;
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = ref_idx;
-  kvz_inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, ref_list);
+  kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
 
@@ -1004,8 +1008,9 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
     // Take starting point for MV search from previous frame.
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
-    int mid_x_cu = (x + (LCU_WIDTH >> (depth+1))) / 8;
-    int mid_y_cu = (y + (LCU_WIDTH >> (depth+1))) / 8;
+    // TODO: Update this to work with SMP/AMP blocks.
+    int mid_x_cu = (x + (width >> 1)) / 8;
+    int mid_y_cu = (y + (height >> 1)) / 8;
     cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
@@ -1023,16 +1028,47 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
 #else
   switch (state->encoder_control->cfg->ime_algorithm) {
     case KVZ_IME_TZ:
-      temp_cost += tz_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+      // TODO: Make tz search work with non-square blocks.
+      temp_cost += tz_search(state,
+                             width, height,
+                             frame->source,
+                             ref_image,
+                             &orig,
+                             &mv,
+                             mv_cand,
+                             merge_cand,
+                             num_cand,
+                             ref_idx,
+                             &temp_bitcost);
       break;
 
     default:
-      temp_cost += hexagon_search(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+      temp_cost += hexagon_search(state,
+                                  width, height,
+                                  frame->source,
+                                  ref_image,
+                                  &orig,
+                                  &mv,
+                                  mv_cand,
+                                  merge_cand,
+                                  num_cand,
+                                  ref_idx,
+                                  &temp_bitcost);
       break;
     }
 #endif
   if (state->encoder_control->cfg->fme_level > 0) {
-    temp_cost = search_frac(state, depth, frame->source, ref_image, &orig, &mv, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    temp_cost = search_frac(state,
+                            width, height,
+                            frame->source,
+                            ref_image,
+                            &orig,
+                            &mv,
+                            mv_cand,
+                            merge_cand,
+                            num_cand,
+                            ref_idx,
+                            &temp_bitcost);
   }
 
   merged = 0;
@@ -1089,22 +1125,53 @@ static void search_cu_inter_ref(const encoder_state_t * const state,
 
 
 /**
- * Update lcu to have best modes at this depth.
- * \return Cost of best mode.
+ * \brief Update PU to have best modes at this depth.
+ *
+ * \param state       encoder state
+ * \param x_cu        x-coordinate of the containing CU
+ * \param y_cu        y-coordinate of the containing CU
+ * \param depth       depth of the CU in the quadtree
+ * \param part_mode   partition mode of the CU
+ * \param i_pu        index of the PU in the CU
+ * \param lcu         containing LCU
+ *
+ * \return            cost of the best mode
  */
-int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
+static int search_pu_inter(const encoder_state_t * const state,
+                           int x_cu, int y_cu,
+                           int depth,
+                           part_mode_t part_mode,
+                           int i_pu,
+                           lcu_t *lcu)
 {
   const videoframe_t * const frame = state->tile->frame;
-  uint32_t ref_idx = 0;
-  int x_local = SUB_SCU(x);
-  int y_local = SUB_SCU(y);
-  cu_info_t *cur_cu = LCU_GET_CU(lcu, x_local >> 3, y_local >> 3);
+  const int width_cu  = LCU_WIDTH >> depth;
+  const int x         = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
+  const int y         = PU_GET_Y(part_mode, width_cu, y_cu, i_pu);
+  const int width     = PU_GET_W(part_mode, width_cu, i_pu);
+  const int height    = PU_GET_H(part_mode, width_cu, i_pu);
+
+  // Merge candidate A1 may not be used for the second PU of Nx2N, nLx2N and
+  // nRx2N partitions.
+  const bool merge_a1 = i_pu == 0 || width >= height;
+  // Merge candidate B1 may not be used for the second PU of 2NxN, 2NxnU and
+  // 2NxnD partitions.
+  const bool merge_b1 = i_pu == 0 || width <= height;
+
+  const int x_local   = SUB_SCU(x);
+  const int y_local   = SUB_SCU(y);
+  cu_info_t *cur_cu   = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
 
   int16_t mv_cand[2][2];
   // Search for merge mode candidate
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = kvz_inter_get_merge_cand(state, x, y, depth, merge_cand, lcu);
+  int16_t num_cand = kvz_inter_get_merge_cand(state,
+                                              x, y,
+                                              width, height,
+                                              merge_a1, merge_b1,
+                                              merge_cand,
+                                              lcu);
 
   uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -1130,9 +1197,12 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
   cur_cu->inter.cost = UINT_MAX;
 
+  uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
-    search_cu_inter_ref(state,
-                        x, y, depth,
+    search_pu_inter_ref(state,
+                        x, y,
+                        width, height,
+                        depth,
                         lcu, cur_cu,
                         mv_cand, merge_cand, num_cand,
                         ref_idx,
@@ -1142,7 +1212,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   // Search bi-pred positions
   if (state->global->slicetype == KVZ_SLICE_B && state->encoder_control->cfg->bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
-    cost_pixel_nxn_func *satd = kvz_pixels_get_satd_func(LCU_WIDTH >> depth);
+    unsigned cu_width = LCU_WIDTH >> depth;
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -1182,29 +1252,37 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
 
           // Check boundaries when using owf to process multiple frames at the same time
           if (max_px_below_lcu >= 0) {
-            // The following has been modified to fit testing two mv's, but it's
-            // equivalent to: y + mv + block_height - next_lcu_row_px > max_px_below_lcu
-            int next_lcu_row_px = ((y >> LOG2_LCU_WIDTH) + 1) << LOG2_LCU_WIDTH;
-            int block_height = LCU_WIDTH >> depth;
-            int max_mv = next_lcu_row_px - y - block_height + max_px_below_lcu;
-            int ceil_mv_l0 = ((mv[0][1] + 3) >> 2);
-            int ceil_mv_l1 = ((mv[1][1] + 3) >> 2);
-
-            if (ceil_mv_l0 < max_mv || ceil_mv_l1 < max_mv) continue;
+            // When SAO is off, row is considered reconstructed when the last LCU
+            // is done, although the bottom 2 pixels might still need deblocking.
+            // To work around this, add 2 luma pixels to the reach of the mv
+            // in order to avoid referencing those possibly non-deblocked pixels.
+            int mv_lcu_row_reach_1 = ((y+(mv[0][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
+            int mv_lcu_row_reach_2 = ((y+(mv[1][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
+            int cur_lcu_row = y / LCU_WIDTH;
+            if (mv_lcu_row_reach_1 > cur_lcu_row + max_px_below_lcu || mv_lcu_row_reach_2 > cur_lcu_row + max_px_below_lcu) {
+              continue;
+            }
           }
 
-          kvz_inter_recon_lcu_bipred(state, state->global->ref->images[merge_cand[i].ref[0]], state->global->ref->images[merge_cand[j].ref[1]], x, y, LCU_WIDTH >> depth, mv, templcu);
+          kvz_inter_recon_lcu_bipred(state,
+                                     state->global->ref->images[merge_cand[i].ref[0]],
+                                     state->global->ref->images[merge_cand[j].ref[1]],
+                                     x, y,
+                                     width,
+                                     height,
+                                     mv,
+                                     templcu);
 
-          for (int ypos = 0; ypos < LCU_WIDTH >> depth; ++ypos) {
-            int dst_y = ypos*(LCU_WIDTH >> depth);
-            for (int xpos = 0; xpos < (LCU_WIDTH >> depth); ++xpos) {
+          for (int ypos = 0; ypos < height; ++ypos) {
+            int dst_y = ypos * width;
+            for (int xpos = 0; xpos < width; ++xpos) {
               tmp_block[dst_y + xpos] = templcu->rec.y[
                 SUB_SCU(y + ypos) * LCU_WIDTH + SUB_SCU(x + xpos)];
               tmp_pic[dst_y + xpos] = frame->source->y[x + xpos + (y + ypos)*frame->source->width];
             }
           }
 
-          cost = satd(tmp_pic, tmp_block);
+          cost = kvz_satd_any_size(cu_width, cu_width, tmp_pic, cu_width, tmp_block, cu_width);
 
           cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
@@ -1244,7 +1322,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
             // Each motion vector has its own candidate
             for (int reflist = 0; reflist < 2; reflist++) {
               cu_mv_cand = 0;
-              kvz_inter_get_mv_cand(state, x, y, depth, mv_cand, cur_cu, lcu, reflist);
+              kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, reflist);
               if ((mv_cand[0][0] != mv_cand[1][0] || mv_cand[0][1] != mv_cand[1][1])) {
                 vector2d_t mvd_temp1, mvd_temp2;
                 int cand1_cost, cand2_cost;
@@ -1276,4 +1354,75 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
   }
 
   return cur_cu->inter.cost;
+}
+
+
+/**
+ * \brief Update CU to have best modes at this depth.
+ *
+ * Only searches the 2Nx2N partition mode.
+ *
+ * \param state       encoder state
+ * \param x           x-coordinate of the CU
+ * \param y           y-coordinate of the CU
+ * \param depth       depth of the CU in the quadtree
+ * \param lcu         containing LCU
+ *
+ * \return            cost of the best mode
+ */
+int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
+{
+  return search_pu_inter(state, x, y, depth, SIZE_2Nx2N, 0, lcu);
+}
+
+
+/**
+ * \brief Update CU to have best modes at this depth.
+ *
+ * Only searches the given partition mode.
+ *
+ * \param state       encoder state
+ * \param x           x-coordinate of the CU
+ * \param y           y-coordinate of the CU
+ * \param depth       depth of the CU in the quadtree
+ * \param part_mode   partition mode to search
+ * \param lcu         containing LCU
+ *
+ * \return            cost of the best mode
+ */
+int kvz_search_cu_smp(const encoder_state_t * const state,
+                      int x, int y,
+                      int depth,
+                      part_mode_t part_mode,
+                      lcu_t *lcu)
+{
+  const int num_pu    = kvz_part_mode_num_parts[part_mode];
+  const int width_scu = (LCU_WIDTH >> depth) >> MAX_DEPTH;
+  const int y_scu     = SUB_SCU(y) >> MAX_DEPTH;
+  const int x_scu     = SUB_SCU(x) >> MAX_DEPTH;
+
+  int cost = 0;
+  for (int i = 0; i < num_pu; ++i) {
+    const int x_pu      = PU_GET_X(part_mode, width_scu, x_scu, i);
+    const int y_pu      = PU_GET_Y(part_mode, width_scu, y_scu, i);
+    const int width_pu  = PU_GET_W(part_mode, width_scu, i);
+    const int height_pu = PU_GET_H(part_mode, width_scu, i);
+    cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
+
+    cur_pu->type = CU_INTER;
+    cur_pu->part_size = part_mode;
+    cur_pu->depth = depth;
+
+    cost += search_pu_inter(state, x, y, depth, part_mode, i, lcu);
+
+    for (int y = y_pu; y < y_pu + height_pu; ++y) {
+      for (int x = x_pu; x < x_pu + width_pu; ++x) {
+        cu_info_t *scu = LCU_GET_CU(lcu, x, y);
+        scu->type = CU_INTER;
+        memcpy(&scu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+      }
+    }
+  }
+
+  return cost;
 }

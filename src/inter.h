@@ -39,12 +39,51 @@ typedef struct {
 } inter_merge_cand_t;
 
 
-//void kvz_inter_set_block(image* im,uint32_t x_cu, uint32_t y_cu, uint8_t depth, cu_info *cur_cu);
-void kvz_inter_recon_lcu(const encoder_state_t * const state, const kvz_picture * ref, int32_t xpos, int32_t ypos, int32_t width, const int16_t mv_param[2], lcu_t* lcu, hi_prec_buf_t *hi_prec_out);
-void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state, const kvz_picture * ref1, const kvz_picture * ref2, int32_t xpos, int32_t ypos, int32_t width, int16_t mv_param[2][2], lcu_t* lcu);
+void kvz_inter_recon_lcu(const encoder_state_t * const state,
+                         const kvz_picture * ref,
+                         int32_t xpos,
+                         int32_t ypos,
+                         int32_t width,
+                         int32_t height,
+                         const int16_t mv_param[2],
+                         lcu_t* lcu,
+                         hi_prec_buf_t *hi_prec_out);
 
-void kvz_inter_get_spatial_merge_candidates(int32_t x, int32_t y, int8_t depth, cu_info_t **b0, cu_info_t **b1,
-                                        cu_info_t **b2, cu_info_t **a0, cu_info_t **a1, lcu_t *lcu);
-void kvz_inter_get_mv_cand(const encoder_state_t *state, int32_t x, int32_t y, int8_t depth, int16_t mv_cand[2][2], cu_info_t* cur_cu, lcu_t *lcu, int8_t reflist);
-uint8_t kvz_inter_get_merge_cand(const encoder_state_t *state, int32_t x, int32_t y, int8_t depth, inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS], lcu_t *lcu);
+void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
+                                const kvz_picture * ref1,
+                                const kvz_picture * ref2,
+                                int32_t xpos,
+                                int32_t ypos,
+                                int32_t width,
+                                int32_t height,
+                                int16_t mv_param[2][2],
+                                lcu_t* lcu);
+
+void kvz_inter_get_spatial_merge_candidates(int32_t x,
+                                            int32_t y,
+                                            int32_t width,
+                                            int32_t height,
+                                            cu_info_t **b0,
+                                            cu_info_t **b1,
+                                            cu_info_t **b2,
+                                            cu_info_t **a0,
+                                            cu_info_t **a1,
+                                            lcu_t *lcu);
+
+void kvz_inter_get_mv_cand(const encoder_state_t * const state,
+                           int32_t x,
+                           int32_t y,
+                           int32_t width,
+                           int32_t height,
+                           int16_t mv_cand[2][2],
+                           cu_info_t* cur_cu,
+                           lcu_t *lcu,
+                           int8_t reflist);
+
+uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
+                                 int32_t x, int32_t y,
+                                 int32_t width, int32_t height,
+                                 bool use_a1, bool use_b1,
+                                 inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
+                                 lcu_t *lcu);
 #endif

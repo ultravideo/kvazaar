@@ -48,6 +48,8 @@ cost_pixel_nxn_multi_func * kvz_satd_16x16_dual = 0;
 cost_pixel_nxn_multi_func * kvz_satd_32x32_dual = 0;
 cost_pixel_nxn_multi_func * kvz_satd_64x64_dual = 0;
 
+cost_pixel_any_size_func * kvz_satd_any_size = 0;
+
 pixels_blit_func * kvz_pixels_blit = 0;
 
 

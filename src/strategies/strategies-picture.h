@@ -24,10 +24,60 @@
 
 typedef kvz_pixel (*pred_buffer)[32 * 32];
 
+
+// Function macro for defining hadamard calculating functions
+// for fixed size blocks. They calculate hadamard for integer
+// multiples of 8x8 with the 8x8 hadamard function.
+#define SATD_NxN(suffix, n) \
+/* Declare the function in advance, hopefully reducing the probability that the
+ * macro expands to something unexpected and silently breaks things. */ \
+static cost_pixel_nxn_func satd_ ## n ## x ## n ## _ ## suffix;\
+static unsigned satd_ ## n ## x ## n ## _ ## suffix ( \
+    const kvz_pixel * const block1, \
+    const kvz_pixel * const block2) \
+{ \
+  unsigned sum = 0; \
+  for (unsigned y = 0; y < (n); y += 8) { \
+    unsigned row = y * (n); \
+    for (unsigned x = 0; x < (n); x += 8) { \
+      sum += satd_8x8_subblock_ ## suffix(&block1[row + x], (n), &block2[row + x], (n)); \
+    } \
+  } \
+  return sum >> (KVZ_BIT_DEPTH - 8); \
+}
+
+
+// Function macro for defining hadamard calculating functions for dynamic size
+// blocks. They calculate hadamard for integer multiples of 8x8 with the 8x8
+// hadamard function.
+#define SATD_ANY_SIZE(suffix) \
+  static cost_pixel_any_size_func satd_any_size_ ## suffix; \
+  static unsigned satd_any_size_ ## suffix ( \
+      int width, int height, \
+      const kvz_pixel *block1, int stride1, \
+      const kvz_pixel *block2, int stride2) \
+  { \
+    unsigned sum = 0; \
+    for (int y = 0; y < height; y += 8) { \
+      const kvz_pixel *row1 = &block1[y * stride1]; \
+      const kvz_pixel *row2 = &block2[y * stride2]; \
+      for (int x = 0; x < width; x += 8) { \
+        sum += satd_8x8_subblock_ ## suffix(&row1[x], stride1, &row2[x], stride2); \
+      } \
+    } \
+    return sum >> (KVZ_BIT_DEPTH - 8); \
+  }
+
+
 typedef unsigned(reg_sad_func)(const kvz_pixel *const data1, const kvz_pixel *const data2,
   const int width, const int height,
   const unsigned stride1, const unsigned stride2);
 typedef unsigned (cost_pixel_nxn_func)(const kvz_pixel *block1, const kvz_pixel *block2);
+typedef unsigned (cost_pixel_any_size_func)(
+    int width, int height,
+    const kvz_pixel *block1, int stride1,
+    const kvz_pixel *block2, int stride2
+);
 typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const kvz_pixel *orig, unsigned num_modes, unsigned *costs_out);
 
 typedef void pixels_blit_func(const kvz_pixel* orig, kvz_pixel *dst,
@@ -49,6 +99,7 @@ extern cost_pixel_nxn_func * kvz_satd_8x8;
 extern cost_pixel_nxn_func * kvz_satd_16x16;
 extern cost_pixel_nxn_func * kvz_satd_32x32;
 extern cost_pixel_nxn_func * kvz_satd_64x64;
+extern cost_pixel_any_size_func *kvz_satd_any_size;
 
 extern cost_pixel_nxn_multi_func * kvz_sad_4x4_dual;
 extern cost_pixel_nxn_multi_func * kvz_sad_8x8_dual;
@@ -83,6 +134,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_16x16", (void**) &kvz_satd_16x16}, \
   {"satd_32x32", (void**) &kvz_satd_32x32}, \
   {"satd_64x64", (void**) &kvz_satd_64x64}, \
+  {"satd_any_size", (void**) &kvz_satd_any_size}, \
   {"sad_4x4_dual", (void**) &kvz_sad_4x4_dual}, \
   {"sad_8x8_dual", (void**) &kvz_sad_8x8_dual}, \
   {"sad_16x16_dual", (void**) &kvz_sad_16x16_dual}, \

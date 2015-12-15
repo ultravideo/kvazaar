@@ -38,6 +38,8 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --no-sao               : Disable sample adaptive offset
               --no-rdoq              : Disable RDO quantization
               --no-signhide          : Disable sign hiding in quantization
+              --smp                  : Enable Symmetric Motion Partition
+              --amp                  : Enable Asymmetric Motion Partition
               --rd <integer>         : Rate-Distortion Optimization level [1]
                                          0: no RDO
                                          1: estimated RDO
