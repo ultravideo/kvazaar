@@ -540,7 +540,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTER;
       }
 
-      if (depth < MAX_DEPTH) {
+      if (depth < MAX_DEPTH && ctrl->cfg->smp_enable) {
         // Try SMP partitioning.
         static const part_mode_t smp_modes[] = {SIZE_2NxN, SIZE_Nx2N};
         for (int i = 0; i < 2; ++i) {

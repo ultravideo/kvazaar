@@ -53,6 +53,8 @@ static const struct option long_options[] = {
   { "no-rdoq",                  no_argument, NULL, 0 },
   { "signhide",                 no_argument, NULL, 0 },
   { "no-signhide",              no_argument, NULL, 0 },
+  { "smp",                      no_argument, NULL, 0 },
+  { "no-smp",                   no_argument, NULL, 0 },
   { "rd",                 required_argument, NULL, 0 },
   { "full-intra-search",        no_argument, NULL, 0 },
   { "no-full-intra-search",     no_argument, NULL, 0 },
@@ -296,6 +298,7 @@ void print_help(void)
     "          --no-sao               : Disable sample adaptive offset\n"
     "          --no-rdoq              : Disable RDO quantization\n"
     "          --no-signhide          : Disable sign hiding in quantization\n"
+    "          --smp                  : Enable Symmetric Motion Partition\n"
     "          --rd <integer>         : Rate-Distortion Optimization level [1]\n"
     "                                     0: no RDO\n"
     "                                     1: estimated RDO\n"
