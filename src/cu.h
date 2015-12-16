@@ -178,12 +178,18 @@ typedef struct
   (cu).inter.mv_cand, (cu).inter.mv_ref, (cu).inter.mv_dir, (cu).inter.mode)
 
 typedef struct {
-  cu_info_t *data;           //!< \brief cu_info data
-  int32_t refcount;        //!< \brief number of references in reflists to this cu_array
+  cu_info_t *data; //!< \brief cu array
+  int32_t width;    //!< \brief width of the array in pixels
+  int32_t height;   //!< \brief height of the array in pixels
+  int32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
 cu_array_t * kvz_cu_array_alloc(int width_in_scu, int height_in_scu);
 int kvz_cu_array_free(cu_array_t *cua);
+void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
+                       const cu_array_t* src, int src_x, int src_y,
+                       int width, int height);
+
 
 /**
  * \brief Return the 7 lowest-order bits of the pixel coordinate.

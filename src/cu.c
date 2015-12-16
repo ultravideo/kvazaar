@@ -125,6 +125,8 @@ cu_array_t * kvz_cu_array_alloc(const int width_in_scu, const int height_in_scu)
   cu_array_t *cua;
   cua = MALLOC(cu_array_t, 1);
   cua->data = (cu_info_t*)malloc(sizeof(cu_info_t) * cu_array_size);
+  cua->width = width_in_scu << 3;
+  cua->height = height_in_scu << 3;
   cua->refcount = 1;
   FILL_ARRAY(cua->data, 0, cu_array_size);
   return cua;
@@ -145,3 +147,37 @@ int kvz_cu_array_free(cu_array_t * const cua)
   return 1;
 }
 
+
+/**
+ * \brief Copy part of a cu array to another cu array.
+ *
+ * All values are in luma pixels.
+ *
+ * \param dst     destination array
+ * \param dst_x   x-coordinate of the left edge of the copied area in dst
+ * \param dst_y   y-coordinate of the top edge of the copied area in dst
+ * \param src     source array
+ * \param src_x   x-coordinate of the left edge of the copied area in src
+ * \param src_y   y-coordinate of the top edge of the copied area in src
+ * \param width   width of the area to copy
+ * \param height  height of the area to copy
+ */
+void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
+                       const cu_array_t* src, int src_x, int src_y,
+                       int width, int height)
+{
+  // Convert values from pixel coordinates to array indices.
+  int src_stride = src->width >> 3;
+  int dst_stride = dst->width >> 3;
+  const cu_info_t* src_ptr = &src->data[(src_x >> 3) + (src_y >> 3) * src_stride];
+  cu_info_t* dst_ptr       = &dst->data[(dst_x >> 3) + (dst_y >> 3) * dst_stride];
+
+  // Number of bytes to copy per row.
+  const size_t row_size = sizeof(cu_info_t) * (width >> 3);
+
+  for (int i = 0; i < (height >> 3); ++i) {
+    memcpy(dst_ptr, src_ptr, row_size);
+    src_ptr += src_stride;
+    dst_ptr += dst_stride;
+  }
+}

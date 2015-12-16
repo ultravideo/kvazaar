@@ -207,18 +207,15 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     while (main_state->parent) main_state = main_state->parent;
     assert(main_state != state);
 
-    unsigned child_width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
-    unsigned main_width_in_scu = main_state->tile->frame->width_in_lcu << MAX_DEPTH;
-    unsigned tile_x = state->tile->lcu_offset_x << MAX_DEPTH;
-    unsigned tile_y = state->tile->lcu_offset_y << MAX_DEPTH;
-    unsigned x = lcu->position.x << MAX_DEPTH;
-    unsigned y = lcu->position.y << MAX_DEPTH;
-
-    for (unsigned lcu_row = 0; lcu_row < 8; ++lcu_row) {
-      cu_info_t *main_row = &main_state->tile->frame->cu_array->data[x + tile_x + (y + tile_y + lcu_row) * main_width_in_scu];
-      cu_info_t *child_row = &state->tile->frame->cu_array->data[x + (y + lcu_row) * child_width_in_scu];
-      memcpy(main_row, child_row, sizeof(cu_info_t) * 8);
-    }
+    const unsigned tile_x_px = state->tile->lcu_offset_x << LOG2_LCU_WIDTH;
+    const unsigned tile_y_px = state->tile->lcu_offset_y << LOG2_LCU_WIDTH;
+    const unsigned x_px = lcu->position_px.x;
+    const unsigned y_px = lcu->position_px.y;
+    kvz_cu_array_copy(main_state->tile->frame->cu_array,
+                      x_px + tile_x_px, y_px + tile_y_px,
+                      state->tile->frame->cu_array,
+                      x_px, y_px,
+                      LCU_WIDTH, LCU_WIDTH);
 
     PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, state->encoder_control->threadqueue, "type=copy_cuinfo,frame=%d,tile=%d", state->global->frame, state->tile->id);
   }
