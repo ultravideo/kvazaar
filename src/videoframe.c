@@ -95,7 +95,7 @@ const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame, u
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
   
-  return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
+  return CU_ARRAY_AT(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
 }
 
 cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
@@ -103,5 +103,5 @@ cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int 
   assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
   
-  return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
+  return CU_ARRAY_AT(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
 }

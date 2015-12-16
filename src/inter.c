@@ -766,6 +766,7 @@ static void get_spatial_merge_candidates(int32_t x,
  * corresponding cu_info_t struct in lcu->cu, or set to NULL, if the
  * candidate is not available.
  *
+ * \param cua             cu information
  * \param x               block x position in pixels
  * \param y               block y position in pixels
  * \param width           block width in pixels
@@ -777,10 +778,9 @@ static void get_spatial_merge_candidates(int32_t x,
  * \param b2              Returns the b2 candidate.
  * \param a0              Returns the a0 candidate.
  * \param a1              Returns the a1 candidate.
- * \param cu_data         array containing the cu data
- * \param stride          vertical stride of the cu_data array
  */
-static void get_spatial_merge_candidates_cua(int32_t x,
+static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
+                                             int32_t x,
                                              int32_t y,
                                              int32_t width,
                                              int32_t height,
@@ -790,16 +790,8 @@ static void get_spatial_merge_candidates_cua(int32_t x,
                                              const cu_info_t **b1,
                                              const cu_info_t **b2,
                                              const cu_info_t **a0,
-                                             const cu_info_t **a1,
-                                             const cu_info_t *cu_data,
-                                             int32_t stride)
+                                             const cu_info_t **a1)
 {
-  #define GET_CU(x, y) (&cu_data[(x) + (y) * stride])
-
-  // the width and height of the current block on SCU
-  uint8_t width_in_scu = width / CU_MIN_SIZE_PIXELS;
-  uint8_t height_in_scu = height / CU_MIN_SIZE_PIXELS;
-
   /*
   Predictor block locations
   ____      _______
@@ -810,19 +802,18 @@ static void get_spatial_merge_candidates_cua(int32_t x,
   |A1|_________|
   |A0|
   */
-  int32_t x_cu = SUB_SCU(x) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
-  int32_t y_cu = SUB_SCU(y) >> MAX_DEPTH;
+  int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
+  int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
-    *a1 = GET_CU(x_cu - 1, y_cu + height_in_scu - 1);
-    // Do not check (*a1)->coded because the block above is always coded before
-    // the current one and the flag is not set when searching an SMP block.
+    *a1 = CU_ARRAY_AT(cua, x - 1, y + height - 1);
+    // The block above is always coded before the current one.
     if ((*a1)->type != CU_INTER) {
       *a1 = NULL;
     }
 
-    if (y_cu + height_in_scu < LCU_WIDTH>>3 && y + height < picture_height) {
-      *a0 = GET_CU(x_cu - 1, y_cu + height_in_scu);
+    if (y_local + height < LCU_WIDTH && y + height < picture_height) {
+      *a0 = CU_ARRAY_AT(cua, x - 1, y + height);
       if ((*a0)->type != CU_INTER || !is_a0_cand_coded(x, y, width, height)) {
         *a0 = NULL;
       }
@@ -831,32 +822,28 @@ static void get_spatial_merge_candidates_cua(int32_t x,
 
   // B0, B1 and B2 availability testing
   if (y != 0) {
-    if (x + width < picture_width && (x_cu + width_in_scu < LCU_WIDTH >> 3 || y_cu == 0)) {
-      *b0 = GET_CU(x_cu + width_in_scu, y_cu - 1);
+    if (x + width < picture_width && (x_local + width < LCU_WIDTH || y_local == 0)) {
+      *b0 = CU_ARRAY_AT(cua, x + width, y - 1);
       if ((*b0)->type != CU_INTER || !is_b0_cand_coded(x, y, width, height)) {
         *b0 = NULL;
       }
     }
 
-    *b1 = GET_CU(x_cu + width_in_scu - 1, y_cu - 1);
-    // Do not check (*b1)->coded because the block to the left is always coded
-    // before the current one and the flag is not set when searching an SMP
-    // block.
+    *b1 = CU_ARRAY_AT(cua, x + width - 1, y - 1);
+    // The block to the left is always coded before the current one.
     if ((*b1)->type != CU_INTER) {
       *b1 = NULL;
     }
 
     if (x != 0) {
-      *b2 = GET_CU(x_cu - 1, y_cu - 1);
-      // Do not check (*b2)->coded because the block above and to the left is
-      // always coded before the current one.
+      *b2 = CU_ARRAY_AT(cua, x - 1, y - 1);
+      // The block above and to the left is always coded before the current
+      // one.
       if ((*b2)->type != CU_INTER) {
         *b2 = NULL;
       }
     }
   }
-
-  #undef GET_CU
 }
 
 /**
@@ -1095,11 +1082,10 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
   b0 = b1 = b2 = a0 = a1 = NULL;
 
   const cu_array_t *cua = state->tile->frame->cu_array;
-  const int32_t stride = state->tile->frame->width_in_lcu * 8;
-  get_spatial_merge_candidates_cua(x, y, width, height,
+  get_spatial_merge_candidates_cua(cua,
+                                   x, y, width, height,
                                    state->tile->frame->width, state->tile->frame->height,
-                                   &b0, &b1, &b2, &a0, &a1,
-                                   &cua->data[(x >> 6) * 8 + (y >> 6) * 8 * stride], stride);
+                                   &b0, &b1, &b2, &a0, &a1);
   get_mv_cand_from_spatial(state, b0, b1, b2, a0, a1, cur_cu, reflist, mv_cand);
 }
 
