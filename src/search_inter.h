@@ -20,10 +20,11 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-/*
-* \file
-* \brief Functions related to inter prediction mode search.
-*/
+/**
+ * \ingroup Compression
+ * \file
+ * Inter prediction parameter search.
+ */
 
 #include "global.h"
 

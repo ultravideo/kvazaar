@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Threading
+ * \file
+ * Abstractions for operating system specific stuff.
+ */
+
 #include "global.h"
 
 #include <pthread.h>

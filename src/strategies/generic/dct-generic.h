@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Optimization
+ * \file
+ * Generic C implementations of optimized functions.
+ */
+
 #include  "global.h"
 
 extern const int16_t kvz_g_dst_4[4][4];

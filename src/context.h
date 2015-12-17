@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup CABAC
  * \file
- * \brief Context derivation for CABAC.
+ * Context derivation for CABAC.
  */
 
 #include "global.h"

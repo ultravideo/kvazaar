@@ -21,8 +21,9 @@
  ****************************************************************************/
 
 /*
+ * \ingroup Bitstream
  * \file
- * \brief Network Abstraction Layer (NAL) messages.
+ * Network Abstraction Layer (NAL) messages.
  */
 
 #include "global.h"

@@ -18,11 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \file
- * \brief Functions for handling intra frames.
- */
-
 #include "intra.h"
 
 #include <assert.h>

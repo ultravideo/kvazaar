@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
- * \brief The highest level of the encoder.
+ * Initialization of encoder_control_t.
  */
 
 #include "global.h"

@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Compression
  * \file
- * \brief Handling Rate-Distortion Optimization related functionality
+ * Rate-Distortion Optimization related functionality.
  */
 
 #include "global.h"

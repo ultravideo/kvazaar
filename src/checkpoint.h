@@ -20,6 +20,11 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \file
+ * Printing of debug information.
+ */
+
 #ifdef CHECKPOINTS
 #ifdef NDEBUG
 #error "CHECKPOINTS require assertions to be enabled!"

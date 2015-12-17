@@ -20,10 +20,11 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- * \brief Handling Coding Units (CU's) for intra frames.
- */
+/**
+* \ingroup Reconstruction
+* \file
+* Intra prediction.
+*/
 
 #include "global.h"
 

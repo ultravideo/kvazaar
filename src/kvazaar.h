@@ -20,9 +20,10 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-/**
+/** 
+ * \ingroup Control
  * \file
- * \brief This file defines the public API of Kvazaar when used as a library.
+ * This file defines the public API of Kvazaar when used as a library.
  */
 
 #include <stddef.h>

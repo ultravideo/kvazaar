@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Reconstruction
+ * \file
+ * Various tables.
+ */
+
 #include "global.h"
 
 //4 8 16 32 64 128

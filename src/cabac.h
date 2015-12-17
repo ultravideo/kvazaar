@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup CABAC
  * \file
- * \brief The Content Adaptive Binary Arithmetic Coder (CABAC).
+ * Coding bins using CABAC.
  */
 
 #include "global.h"

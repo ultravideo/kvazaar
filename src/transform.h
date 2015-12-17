@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Reconstruction
  * \file
- * \brief Transformations, such as quantization and DST.
+ * Quantization and transform functions.
  */
 
 #include "global.h"

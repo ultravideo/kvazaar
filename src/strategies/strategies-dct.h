@@ -19,7 +19,13 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
- 
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Interface for transform functions.
+ */
+
 #include <stdint.h>
 
 typedef unsigned (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *output);

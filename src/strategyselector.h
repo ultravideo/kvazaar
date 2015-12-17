@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Optimization
+ * \file
+ * Dynamic dispatch based on cpuid.
+ */
+
 #include "global.h"
 
 #if defined(KVZ_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)

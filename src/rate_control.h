@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
- * \brief Functions related with rate control
+ * \brief Functions related to rate control.
  */
 
 #include "encoderstate.h"

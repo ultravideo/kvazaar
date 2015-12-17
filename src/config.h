@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
- * \brief Handles parsing and storing of configuration of the encoder.
+ * Runtime configuration through defaults and parsing of arguments.
  */
 
 #include "kvazaar.h"

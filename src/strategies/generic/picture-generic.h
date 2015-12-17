@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Optimization
+ * \file
+ * Generic C implementations of optimized functions.
+ */
+
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)

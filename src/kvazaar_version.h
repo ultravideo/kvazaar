@@ -20,6 +20,12 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
+/**
+ * \ingroup Control
+ * \file
+ * \brief Libkvazaar version numbers.
+ */
+
 // KVZ_API_VERSION is incremented every time the public api changes.
 #define KVZ_API_VERSION 10
 

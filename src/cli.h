@@ -20,10 +20,10 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-/*
-* \file
-* \brief Contains code related to command line interface.
-*/
+/**
+ * \file
+ * Command line interface
+ */
 
 #include "kvazaar.h"
 #include "global.h"

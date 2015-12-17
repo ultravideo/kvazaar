@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Optimization
+ * \file
+ * Interface for distortion metric functions.
+ */
+
 #include "../image.h"
 
 typedef kvz_pixel (*pred_buffer)[32 * 32];

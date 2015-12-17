@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup DataStructures
  * \file
- * \brief CU and coefficients related functions
+ * Coding Unit data structure and related functions.
  */
 
 #include "global.h"

@@ -20,9 +20,9 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
  * \file
- * \brief Header that is included in every other header.
+ * Header that is included in every other header.
  *
  * This file contains global constants that can be referred to from any header
  * or source file. It also contains some helper macros and includes stdint.h
@@ -38,6 +38,37 @@
 #include <limits.h>
 
 #include "kvazaar.h"
+
+
+/**
+ * \defgroup Bitstream
+ * HEVC bitstream coding
+ *
+ * \defgroup CABAC
+ * Context Adaptive Binary Arithmetic Encoder implementation
+ * 
+ * \defgroup Compression
+ * Prediction parameter decisions and ratedistortion optimization
+ *
+ * \defgroup Control
+ * Initialization and control flow of the encoder
+ * 
+ * \defgroup DataStructures
+ * Containers for images, predictions parameters and such
+ * 
+ * \defgroup Extras
+ * 3rd party modules not considered part of the encoder.
+ *
+ * \defgroup Optimization
+ * Architecture dependant SIMD optimizations and dynamic dispatch mechanism
+ *
+ * \defgroup Reconstruction
+ * Stuff required for creating the resulting image after lossy compression
+ *
+ * \defgroup Threading
+ * Stuff related to multi-threading using pthreads
+ */
+
 
 #if defined(_MSC_VER) && defined(_M_AMD64)
   #define X86_64

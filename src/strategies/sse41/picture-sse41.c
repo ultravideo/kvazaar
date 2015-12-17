@@ -18,9 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
 #include "picture-sse41.h"
 #include "strategyselector.h"
 

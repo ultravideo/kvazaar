@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup DataStructures
  * \file
- * \brief Video frame stuff
+ * \brief Container for the frame currently being encoded.
  */
 
 #include "global.h"

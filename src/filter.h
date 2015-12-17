@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Reconstruction
  * \file
- * \brief Filtering, such as deblocking.
+ * Deblocking filter.
  */
 
 #include "global.h"

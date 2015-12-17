@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Optimization
+ * \file
+ * Interface for hash functions.
+ */
+
 #include "../nal.h"
 
 //Function pointer to kvz_array_checksum

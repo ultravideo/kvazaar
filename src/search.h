@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Compression
  * \file
- * \brief Searching of parameters for intra and inter frames.
+ * \brief Compression of a single coding tree unit (CTU).
  */
 
 #include "global.h"

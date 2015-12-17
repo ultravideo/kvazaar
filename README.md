@@ -1,4 +1,5 @@
-#Kvazaar
+Kvazaar {#mainpage}
+=========
 An open-source HEVC encoder licensed under LGPLv2.1
 
 Join channel #kvazaar_hevc in Freenode IRC network to contact us.

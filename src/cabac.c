@@ -18,11 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- *
- */
-
 #include "cabac.h"
 
 #include <assert.h>

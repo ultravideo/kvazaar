@@ -19,6 +19,13 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for Altivec.
+ */
+
 #include  "global.h"
 
 int kvz_strategy_register_picture_altivec(void* opaque, uint8_t bitdepth);

@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup DataStructures
  * \file
- * \brief Image and pixel related functions
+ * A reference counted YUV pixel buffer.
  */
 
 #include "global.h"

@@ -1,7 +1,5 @@
 #ifndef STRATEGIES_DCT_AVX2_H_
 #define STRATEGIES_DCT_AVX2_H_
-
-#include  "global.h"
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -21,6 +19,14 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for AVX2.
+ */
+
+#include  "global.h"
 
 int kvz_strategy_register_dct_avx2(void* opaque, uint8_t bitdepth);
 

@@ -18,9 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
 #include "picture-altivec.h"
 #include "strategyselector.h"
 #include "image.h"

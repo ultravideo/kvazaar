@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup DataStructures
  * \file
- * \brief List of images (for reference pictures)
+ *  Container for a list of reference pictures.
  */
 
 #include "image.h"
