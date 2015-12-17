@@ -230,7 +230,14 @@ The default targets can be installed by running `make install`.
 
 See http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics
 for a list of topics you might want to examine if you would like to do
-    something bigger than a bug fix but don't know what yet.
+something bigger than a bug fix but don't know what yet.
+
+
+###Code documentation
+
+You can generate Doxygen documentation pages by running the command
+"doxygen docs.doxy". Here is a rough schetch of the module structure:
+![Kvazaar module hierarchy](https://github.com/ultravideo/kvazaar/blob/master/doc/kvazaar_module_hierarchy.png)
 
 ###For version control we try to follow these conventions:
 
