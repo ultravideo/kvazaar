@@ -15,8 +15,8 @@
 .deps
 .dirstamp
 .libs
-/Makefile
-/Makefile.in
+Makefile
+Makefile.in
 /aclocal.m4
 /autom4te.cache
 /build-aux
@@ -26,7 +26,6 @@
 /configure
 /kvazaar
 /libtool
-/libkvazaar.la
 /m4
 /stamp-h1
 
@@ -41,8 +40,11 @@
 configure.scan
 src/kvazaar
 src/libkvazaar.a
+src/libkvazaar.la
 src/libkvazaar.so.*
 src/kvazaar.dll
 src/libkvazaar.dll.a
 src/libkvazaar.*.dylib
 src/kvazaar.pc
+tests/kvazaar_tests
+tests/kvazaar_tests.trs

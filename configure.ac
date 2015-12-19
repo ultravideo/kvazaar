@@ -2,6 +2,11 @@
 AC_INIT([kvazaar], m4_esyscmd([printf $(awk '/#define KVZ_VERSION/ { print $3 }' src/global.h)]))
 AC_CONFIG_SRCDIR([src/encmain.c])
 
+# Library version number
+ver_major=2
+ver_minor=2
+ver_release=0
+
 # not used, but it prevents configure from adding a lot of defines to the CFLAGS
 AC_CONFIG_HEADERS([config.h])
 
@@ -18,7 +23,6 @@ LT_INIT([win32-dll])
 
 
 CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden -std=gnu99 -DKVZ_DLL_EXPORTS $CFLAGS"
-ASFLAGS="-I$srcdir/src/extras $ASFLAGS"
 LIBS="-lm $LIBS"
 
 
@@ -57,7 +61,7 @@ AS_CASE([$host_os],
          ASFLAGS="$ASFLAGS -f elf$BITS"
          CFLAGS="$CFLAGS -pthread"
          LDFLAGS="$LDFLAGS -pthread -Wl,-z,noexecstack"
-         LIBS="$LIBS -lpthread"
+         LIBS="$LIBS -lrt -lpthread"
         ]
 )
 
@@ -88,13 +92,13 @@ AC_SUBST([ASFLAGS])
 #KVZ_API_VERSION="$($AWK '/#define KVZ_API_VERSION/ { print $3 }' $srcdir/src/kvazaar_version.h)"
 
 # use library version for sonames (specified in src/Makefile)
-ver_major="$($AWK '/^VER_MAJOR/ { print $3 }' $srcdir/src/Makefile)"
-ver_minor="$($AWK '/^VER_MINOR/ { print $3 }' $srcdir/src/Makefile)"
-ver_release="$($AWK '/^VER_RELEASE/ { print $3 }' $srcdir/src/Makefile)"
 KVZ_API_VERSION="$ver_major:$ver_minor:$ver_release"
 AC_SUBST([KVZ_API_VERSION])
 
 
-AC_CONFIG_FILES([Makefile src/kvazaar.pc])
+AC_CONFIG_FILES([Makefile
+                 src/Makefile
+                 src/kvazaar.pc
+                 tests/Makefile])
 AC_OUTPUT
 
