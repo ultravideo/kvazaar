@@ -34,26 +34,30 @@
 extern "C" {
 #endif
 
-#if defined(KVZ_STATIC_LIB) && defined(PIC)
-  #undef KVZ_STATIC_LIB
-#endif
-
-#if defined(KVZ_STATIC_LIB)
-  // Using or building kvazaar as a static library.
-  #define KVZ_PUBLIC
-#elif defined(_WIN32) || defined(__CYGWIN__)
-  #ifdef KVZ_DLL_EXPORTS
-    // Building kvazaar on windows.
+#if defined(KVZ_DLL_EXPORTS)
+  #if !defined(PIC)
+    // Building static kvazaar library.
+    #define KVZ_PUBLIC
+  #elif defined(_WIN32) || defined(__CYGWIN__)
+    // Building kvazaar DLL on Windows.
     #define KVZ_PUBLIC __declspec(dllexport)
+  #elif defined(__GNUC__)
+    // Building kvazaar shared library with GCC.
+    #define KVZ_PUBLIC __attribute__ ((visibility ("default")))
   #else
-    // Using kvazaar as a DLL on windows.
-    #define KVZ_PUBLIC __declspec(dllimport)
+    #define KVZ_PUBLIC
   #endif
-#elif defined(__GNUC__)
-  // Using GCC and not on windows.
-  #define KVZ_PUBLIC __attribute__ ((visibility ("default")))
 #else
-  #define KVZ_PUBLIC
+  #if defined(KVZ_STATIC_LIB)
+    // Using static kvazaar library.
+    #define KVZ_PUBLIC
+  #elif defined(_WIN32) || defined(__CYGWIN__)
+    // Using kvazaar DLL on Windows.
+    #define KVZ_PUBLIC __declspec(dllimport)
+  #else
+    // Using kvazaar shared library and not on Windows.
+    #define KVZ_PUBLIC
+  #endif
 #endif
 
 /**
