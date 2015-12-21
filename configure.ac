@@ -25,7 +25,11 @@ LT_INIT([win32-dll])
 AX_PTHREAD
 CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden $PTHREAD_CFLAGS $CFLAGS"
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
-LIBS="-lm $PTHREAD_LIBS $LIBS"
+
+AC_SEARCH_LIBS([log], [m c], [], [exit 1])
+AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
+AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
+LIBS="$PTHREAD_LIBS $LIBS"
 
 
 # --disable-werror
