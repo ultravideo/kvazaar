@@ -17,13 +17,15 @@ AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 dist-xz foreign subdir-objects])
 AM_SILENT_RULES([yes])
 
 AC_PROG_CC
+AC_PROG_CC_C99
 AM_PROG_AR
 
 LT_INIT([win32-dll])
 
-
-CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden -std=gnu99 -DKVZ_DLL_EXPORTS $CFLAGS"
-LIBS="-lm $LIBS"
+AX_PTHREAD
+CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden $PTHREAD_CFLAGS $CFLAGS"
+CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
+LIBS="-lm $PTHREAD_LIBS $LIBS"
 
 
 # --disable-werror
@@ -40,8 +42,7 @@ AC_CHECK_HEADER([getopt.h], [], [CFLAGS="$CFLAGS -I$srcdir/src/extras"])
 AS_CASE([$host_cpu],
         [i?86], [BITS="32" ASFLAGS="$ASFLAGS -DARCH_X86_64=0" X86="true"],
         [x86_64], [BITS="64" ASFLAGS="$ASFLAGS -DARCH_X86_64=1 -m amd64" X86="true"],
-        [powerpc*], [PPC="true"],
-        [arm*], [ARM="true"]
+        [powerpc*], [PPC="true"]
 )
 
 AS_CASE([$host_os],
@@ -57,11 +58,14 @@ AS_CASE([$host_os],
                 ASFLAGS="$ASFLAGS -fwin64 -DHAVE_ALIGNED_STACK=1"
                ]
          )
+        ],
+        [linux*|*kfreebsd*], [
+         ASFLAGS="$ASFLAGS -f elf$BITS"
+         LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"
+         LIBS="$LIBS -lrt"
         ], [
          ASFLAGS="$ASFLAGS -f elf$BITS"
-         CFLAGS="$CFLAGS -pthread"
-         LDFLAGS="$LDFLAGS -pthread -Wl,-z,noexecstack"
-         LIBS="$LIBS -lrt -lpthread"
+         LDFLAGS="$LDFLAGS -Wl,-z,noexecstack"
         ]
 )
 
@@ -88,10 +92,6 @@ AM_CONDITIONAL([ENABLE_ASM], [test "x$enable_asm" = "xyes" -a "x$have_yasm" = "x
 AC_ARG_VAR([ASFLAGS], [ASFLAGS to use for assembler])
 AC_SUBST([ASFLAGS])
 
-# use KVZ_API_VERSION for sonames
-#KVZ_API_VERSION="$($AWK '/#define KVZ_API_VERSION/ { print $3 }' $srcdir/src/kvazaar_version.h)"
-
-# use library version for sonames (specified in src/Makefile)
 KVZ_API_VERSION="$ver_major:$ver_minor:$ver_release"
 AC_SUBST([KVZ_API_VERSION])
 
