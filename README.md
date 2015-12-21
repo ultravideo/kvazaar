@@ -195,17 +195,15 @@ possible.
   - The executable needs pthreadVC2.dll to be present. Either install it
     somewhere or ship it with the executable.
 
-###GCC
-- Makefile can be found in the src directory.
-- Yasm is expected to be in PATH.
-    - Alternatively, NASM can be used by passing `AS=nasm` to make.
+###Autotools
+Run the following commands to compile and install Kvazaar.
 
-On Linux, both the shared and the static library are built and installed
-by default. On Windows and OS&nbsp;X, the default is to only build the
-DLL/dylib. The static command line program is built by default on all
-platforms.
+    ./autogen.sh
+    ./configure
+    make
+    sudo make install
 
-The default targets can be installed by running `make install`.
+See `./configure --help` for more options.
 
 ###OS X
 - The program should compile and work on OS X but you might need a newer
