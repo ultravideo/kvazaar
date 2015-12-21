@@ -2,7 +2,6 @@ language: c
 
 env:
   global:
-  - AS=nasm
   - KVZ_DISABLE_AVX2=1
   - TEST_DIM=264x130
   - TEST_FRAMES=10
@@ -15,17 +14,14 @@ matrix:
   
   include:
     - compiler: clang
-      env: KVZ_DISABLE_AVX2=""
     - compiler: gcc-4.8
-      env: KVZ_DISABLE_AVX2=""
 
     # Check for external symbols without kvz_ prefix.
     - compiler: gcc-4.8
-      env: KVZ_DISABLE_AVX2=""
       script:
-        - cd src
-        - make libkvazaar.a
-        - (! nm -go --defined-only libkvazaar.a | grep -v ' kvz_')
+        - ./autogen.sh
+        - ./configure && make
+        - (! nm -go --defined-only src/.libs/libkvazaar.a | grep -v ' kvz_')
 
     # These valgrind tests are slow, so they are performed with the minimum
     # number of small frames and fast settings.
@@ -63,7 +59,7 @@ matrix:
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
 
     # Tests trying to use invalid input dimensions
-    - env: EXPECTED_STATUS=1 PARAMS="-i kvazaar --input-res=1x65 -o /dev/null"
+    - env: EXPECTED_STATUS=1 PARAMS="-i src/kvazaar --input-res=1x65 -o /dev/null"
 
 addons:
   apt:
@@ -71,11 +67,14 @@ addons:
     - ubuntu-toolchain-r-test
 
     packages:
+    - autoconf
     - gcc
     - gcc-4.8
+    - libtool
     - nasm
     - p7zip-full
     - valgrind
+    - yasm
 
 install:
   - source .travis-install.sh
