@@ -6,6 +6,7 @@ check_PROGRAMS = kvazaar_tests
 kvazaar_tests_SOURCES = \
 	dct_tests.c \
 	intra_sad_tests.c \
+	mv_cand_tests.c \
 	sad_tests.c \
 	sad_tests.h \
 	satd_tests.c \

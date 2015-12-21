@@ -64,7 +64,6 @@ libkvazaar_la_SOURCES = \
 	input_frame_buffer.c \
 	input_frame_buffer.h \
 	inter.c \
-	interface_main.c \
 	inter.h \
 	intra.c \
 	intra.h \
