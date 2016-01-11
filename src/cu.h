@@ -184,7 +184,7 @@ typedef struct {
   int32_t refcount; //!< \brief number of references to this cu_array
 } cu_array_t;
 
-cu_array_t * kvz_cu_array_alloc(int width_in_scu, int height_in_scu);
+cu_array_t * kvz_cu_array_alloc(int width, int height);
 int kvz_cu_array_free(cu_array_t *cua);
 void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
                        const cu_array_t* src, int src_x, int src_y,

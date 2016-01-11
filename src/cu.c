@@ -120,27 +120,38 @@ unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_strid
   return sum;
 }
 
-cu_array_t * kvz_cu_array_alloc(const int width_in_scu, const int height_in_scu) {
-  unsigned cu_array_size = height_in_scu * width_in_scu;
-  cu_array_t *cua;
-  cua = MALLOC(cu_array_t, 1);
-  cua->data = (cu_info_t*)malloc(sizeof(cu_info_t) * cu_array_size);
-  cua->width = width_in_scu << 3;
-  cua->height = height_in_scu << 3;
+/**
+ * \brief Allocate a CU array.
+ *
+ * \param width   width of the array in luma pixels
+ * \param height  height of the array in luma pixels
+ */
+cu_array_t * kvz_cu_array_alloc(const int width, const int height) {
+  cu_array_t *cua = MALLOC(cu_array_t, 1);
+
+  const int width_scu  = (width  + 7) >> 3;
+  const int height_scu = (height + 7) >> 3;
+  assert(width_scu * 8 >= width);
+  assert(height_scu * 8 >= height);
+  const unsigned cu_array_size = width_scu * height_scu;
+  cua->data = calloc(cu_array_size, sizeof(cu_info_t));
+  cua->width = width_scu << 3;
+  cua->height = height_scu << 3;
   cua->refcount = 1;
-  FILL_ARRAY(cua->data, 0, cu_array_size);
+
   return cua;
 }
+
 
 int kvz_cu_array_free(cu_array_t * const cua)
 {
   int32_t new_refcount;
   if (!cua) return 1;
-  
+
   new_refcount = KVZ_ATOMIC_DEC(&(cua->refcount));
   //Still we have some references, do nothing
   if (new_refcount > 0) return 1;
-  
+
   FREE_POINTER(cua->data);
   free(cua);
 
@@ -174,6 +185,14 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
 
   // Number of bytes to copy per row.
   const size_t row_size = sizeof(cu_info_t) * (width >> 3);
+
+  width = MIN(width,   MIN(src->width  - src_x, dst->width  - dst_x));
+  height = MIN(height, MIN(src->height - src_y, dst->height - dst_y));
+
+  assert(src_x + width  <= src->width);
+  assert(src_y + height <= src->height);
+  assert(dst_x + width  <= dst->width);
+  assert(dst_y + height <= dst->height);
 
   for (int i = 0; i < (height >> 3); ++i) {
     memcpy(dst_ptr, src_ptr, row_size);

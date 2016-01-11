@@ -956,10 +956,9 @@ void kvz_encoder_next_frame(encoder_state_t *state)
     state->tile->frame->rec = kvz_image_alloc(state->tile->frame->width, state->tile->frame->height);
     assert(state->tile->frame->rec);
     {
-      // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
-      unsigned height_in_scu = state->tile->frame->height_in_lcu << MAX_DEPTH;
-      unsigned width_in_scu = state->tile->frame->width_in_lcu << MAX_DEPTH;
-      state->tile->frame->cu_array = kvz_cu_array_alloc(width_in_scu, height_in_scu);
+      unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
+      unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
+      state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
     }
     kvz_videoframe_set_poc(state->tile->frame, state->global->poc);
     kvz_image_list_copy_contents(state->global->ref, prev_state->global->ref);
