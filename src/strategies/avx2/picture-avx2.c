@@ -232,7 +232,7 @@ static void satd_8bit_4x4_dual_avx2(
   satds_out[1] = sum2;
 }
 
-static void hor_transform_dual_avx2(__m256i* row){
+static void hor_transform_row_dual_avx2(__m256i* row){
   
   __m256i mask_pos = _mm256_set1_epi16(1);
   __m256i mask_neg = _mm256_set1_epi16(-1);
@@ -305,7 +305,7 @@ static INLINE void add_sub_dual_avx2(__m256i *out, __m256i *in, unsigned out_idx
   out[out_idx0] = _mm256_add_epi16(in[in_idx0], in[in_idx1]);
   out[out_idx1] = _mm256_sub_epi16(in[in_idx0], in[in_idx1]);
 }
-static INLINE void ver_transform_dual_avx2(__m256i (*rows)[8]){
+static INLINE void ver_transform_block_dual_avx2(__m256i (*rows)[8]){
 
   __m256i temp0[8];
   add_sub_dual_avx2(temp0, (*rows), 0, 1, 0, 1);
@@ -435,35 +435,32 @@ INLINE static void diff_blocks_and_hor_transform_avx2(__m128i (*row_diff)[8], co
   hor_add_sub_avx2((*row_diff) + 6, (*row_diff) + 7);
 }
 
-INLINE static void diff_blocks_and_hor_transform_dual_avx2(__m256i (*row_diff)[8],
+INLINE static void diff_blocks_dual_avx2(__m256i (*row_diff)[8],
                                                            const kvz_pixel * buf1, unsigned stride1,
                                                            const kvz_pixel * buf2, unsigned stride2,
                                                            const kvz_pixel * orig, unsigned stride_orig)
 {
   (*row_diff)[0] = diff_row_dual_avx2(buf1 + 0 * stride1, buf2 + 0 * stride2, orig + 0 * stride_orig);
   (*row_diff)[1] = diff_row_dual_avx2(buf1 + 1 * stride1, buf2 + 1 * stride2, orig + 1 * stride_orig);
-  //hor_add_sub_dual_avx2((*row_diff) + 0, (*row_diff) + 1);
-  hor_transform_dual_avx2((*row_diff) + 0);
-  hor_transform_dual_avx2((*row_diff) + 1);
-
   (*row_diff)[2] = diff_row_dual_avx2(buf1 + 2 * stride1, buf2 + 2 * stride2, orig + 2 * stride_orig);
   (*row_diff)[3] = diff_row_dual_avx2(buf1 + 3 * stride1, buf2 + 3 * stride2, orig + 3 * stride_orig);
-  //hor_add_sub_dual_avx2((*row_diff) + 2, (*row_diff) + 3);
-  hor_transform_dual_avx2((*row_diff) + 2);
-  hor_transform_dual_avx2((*row_diff) + 3);
-
   (*row_diff)[4] = diff_row_dual_avx2(buf1 + 4 * stride1, buf2 + 4 * stride2, orig + 4 * stride_orig);
   (*row_diff)[5] = diff_row_dual_avx2(buf1 + 5 * stride1, buf2 + 5 * stride2, orig + 5 * stride_orig);
-  //hor_add_sub_dual_avx2((*row_diff) + 4, (*row_diff) + 5);
-  hor_transform_dual_avx2((*row_diff) + 4);
-  hor_transform_dual_avx2((*row_diff) + 5);
-
   (*row_diff)[6] = diff_row_dual_avx2(buf1 + 6 * stride1, buf2 + 6 * stride2, orig + 6 * stride_orig);
   (*row_diff)[7] = diff_row_dual_avx2(buf1 + 7 * stride1, buf2 + 7 * stride2, orig + 7 * stride_orig);
-  //hor_add_sub_dual_avx2((*row_diff) + 6, (*row_diff) + 7);
-  hor_transform_dual_avx2((*row_diff) + 6);
-  hor_transform_dual_avx2((*row_diff) + 7);
 
+}
+
+INLINE static void hor_transform_block_dual_avx2(__m256i (*row_diff)[8])
+{
+  hor_transform_row_dual_avx2((*row_diff) + 0);
+  hor_transform_row_dual_avx2((*row_diff) + 1);
+  hor_transform_row_dual_avx2((*row_diff) + 2);
+  hor_transform_row_dual_avx2((*row_diff) + 3);
+  hor_transform_row_dual_avx2((*row_diff) + 4);
+  hor_transform_row_dual_avx2((*row_diff) + 5);
+  hor_transform_row_dual_avx2((*row_diff) + 6);
+  hor_transform_row_dual_avx2((*row_diff) + 7);
 }
 
 static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
@@ -495,16 +492,13 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned
                                                 const kvz_pixel * orig, unsigned stride_orig,
                                                 unsigned *sum0, unsigned *sum1)
 {
-  __m256i temp_hor[8];
-  __m256i temp_ver[8];
+  __m256i temp[8];
 
-  diff_blocks_and_hor_transform_dual_avx2(&temp_hor, buf1, stride1, buf2, stride2, orig, stride_orig);
-
-  //ver_add_sub_dual_avx2(&temp_hor, &temp_ver);
-  ver_transform_dual_avx2(&temp_hor);
+  diff_blocks_dual_avx2(&temp, buf1, stride1, buf2, stride2, orig, stride_orig);
+  hor_transform_block_dual_avx2(&temp);
+  ver_transform_block_dual_avx2(&temp);
   
-  //sum_block_dual_avx2(temp_ver, sum0, sum1);
-  sum_block_dual_avx2(temp_hor, sum0, sum1);
+  sum_block_dual_avx2(temp, sum0, sum1);
 
   *sum0 = (*sum0 + 2) >> 2;
   *sum1 = (*sum1 + 2) >> 2;
