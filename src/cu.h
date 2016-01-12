@@ -192,7 +192,7 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
 
 
 #define CU_ARRAY_AT(cua, x_px, y_px) \
-  (&(cua)->data[((x_px) >> 3) + ((y_px) >> 3) * ((cua)->width >> 3)])
+  (&(cua)->data[((x_px) >> 2) + ((y_px) >> 2) * ((cua)->width >> 2)])
 
 
 /**
