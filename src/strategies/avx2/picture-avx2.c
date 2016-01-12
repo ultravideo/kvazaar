@@ -232,7 +232,7 @@ static void satd_8bit_4x4_dual_avx2(
   satds_out[1] = sum2;
 }
 
-static void hor_transform_row_avx2(__m128i* row){
+static INLINE void hor_transform_row_avx2(__m128i* row){
   
   __m128i mask_pos = _mm_set1_epi16(1);
   __m128i mask_neg = _mm_set1_epi16(-1);
@@ -253,7 +253,7 @@ static void hor_transform_row_avx2(__m128i* row){
   *row = _mm_add_epi16(*row, temp);
 }
 
-static void hor_transform_row_dual_avx2(__m256i* row){
+static INLINE void hor_transform_row_dual_avx2(__m256i* row){
   
   __m256i mask_pos = _mm256_set1_epi16(1);
   __m256i mask_neg = _mm256_set1_epi16(-1);
