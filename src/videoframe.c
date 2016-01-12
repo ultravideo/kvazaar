@@ -89,18 +89,16 @@ void kvz_videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
   frame->poc = poc;
 }
 
-const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu)
+const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame,
+                                             unsigned int x_in_scu,
+                                             unsigned int y_in_scu)
 {
-  assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
-  assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
-  
-  return CU_ARRAY_AT(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
+  return kvz_cu_array_at_const(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
 }
 
-cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
+cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame,
+                                 const unsigned int x_in_scu,
+                                 const unsigned int y_in_scu)
 {
-  assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
-  assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
-  
-  return CU_ARRAY_AT(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
+  return kvz_cu_array_at(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
 }

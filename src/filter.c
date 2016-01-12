@@ -179,9 +179,8 @@ static bool is_tu_boundary(const encoder_state_t *const state,
                            int32_t y,
                            edge_dir dir)
 {
-  const cu_info_t *const scu = kvz_videoframe_get_cu(state->tile->frame,
-                                                     x >> MIN_SIZE,
-                                                     y >> MIN_SIZE);
+  const cu_info_t *const scu =
+    kvz_cu_array_at_const(state->tile->frame->cu_array, x, y);
   const int tu_width = LCU_WIDTH >> scu->tr_depth;
 
   if (dir == EDGE_HOR) {
@@ -206,16 +205,14 @@ static bool is_pu_boundary(const encoder_state_t *const state,
                            int32_t y,
                            edge_dir dir)
 {
-  const cu_info_t *const scu = kvz_videoframe_get_cu(state->tile->frame,
-                                                     x >> MIN_SIZE,
-                                                     y >> MIN_SIZE);
+  const cu_info_t *const scu =
+    kvz_cu_array_at_const(state->tile->frame->cu_array, x, y);
   // Get the containing CU.
   const int32_t cu_width = LCU_WIDTH >> scu->depth;
   const int32_t x_cu = x & ~(cu_width - 1);
   const int32_t y_cu = y & ~(cu_width - 1);
-  const cu_info_t *const cu = kvz_videoframe_get_cu(state->tile->frame,
-                                                    x_cu >> MIN_SIZE,
-                                                    y_cu >> MIN_SIZE);
+  const cu_info_t *const cu =
+    kvz_cu_array_at_const(state->tile->frame->cu_array, x_cu, y_cu);
 
   const int num_pu = kvz_part_mode_num_parts[cu->part_size];
   for (int i = 0; i < num_pu; i++) {
@@ -285,7 +282,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
   videoframe_t * const frame = state->tile->frame;
   const encoder_control_t * const encoder = state->encoder_control;
   
-  cu_info_t *cu_q = kvz_videoframe_get_cu(frame, x >> MIN_SIZE, y >> MIN_SIZE);
+  cu_info_t *cu_q = kvz_cu_array_at(frame->cu_array, x, y);
 
   {
     int32_t stride = frame->rec->stride;
@@ -295,8 +292,6 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
     kvz_pixel *orig_src = &frame->rec->y[x + y*stride];
     kvz_pixel *src = orig_src;
     cu_info_t *cu_p = NULL;
-    int16_t x_cu = x >> MIN_SIZE;
-    int16_t y_cu = y >> MIN_SIZE;
 
     int8_t strength = 0;
     int32_t qp              = state->global->QP;
@@ -321,7 +316,11 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
       {
         // CU in the side we are filtering, update every 8-pixels
-        cu_p = kvz_videoframe_get_cu(frame, x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? block_idx>>1 : 0), y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? block_idx>>1 : 0));
+        if (dir == EDGE_VER) {
+          cu_p = kvz_cu_array_at(frame->cu_array, x - 1, y + 4 * block_idx);
+        } else {
+          cu_p = kvz_cu_array_at(frame->cu_array, x + 4 * block_idx, y - 1);
+        }
 
         bool nonzero_coeffs = cbf_is_set(cu_q->cbf.y, cu_q->tr_depth)
                            || cbf_is_set(cu_p->cbf.y, cu_p->tr_depth);
@@ -475,7 +474,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
 {
   const encoder_control_t * const encoder = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cu_q = kvz_videoframe_get_cu_const(frame, x >> (MIN_SIZE - 1), y >> (MIN_SIZE - 1));
+  const cu_info_t *cu_q = kvz_cu_array_at_const(frame->cu_array, x << 1, y << 1);
 
   // For each subpart
   {
@@ -487,8 +486,6 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
       &frame->rec->v[x + y*stride],
     };
     const cu_info_t *cu_p = NULL;
-    int16_t x_cu = x >> (MIN_SIZE-1);
-    int16_t y_cu = y >> (MIN_SIZE-1);
     int8_t strength = 2;
 
     int32_t QP             = kvz_g_chroma_scale[state->global->QP];
@@ -503,7 +500,11 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
 
     for (uint32_t blk_idx = 0; blk_idx < num_4px_parts; ++blk_idx)
     {
-      cu_p = kvz_videoframe_get_cu_const(frame, x_cu - (dir == EDGE_VER) + (dir == EDGE_HOR ? blk_idx : 0), y_cu - (dir == EDGE_HOR) + (dir == EDGE_VER ? blk_idx : 0));
+      if (dir == EDGE_VER) {
+        cu_p = kvz_cu_array_at(frame->cu_array, 2 * (x - 1), 2 * (y + 4 * blk_idx));
+      } else {
+        cu_p = kvz_cu_array_at(frame->cu_array, 2 * (x + 4 * blk_idx), 2 * (y - 1));
+      }
 
       // Only filter when strenght == 2 (one of the blocks is intra coded)
       if (cu_q->type == CU_INTRA || cu_p->type == CU_INTRA) {

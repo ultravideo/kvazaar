@@ -186,13 +186,11 @@ typedef struct {
 
 cu_array_t * kvz_cu_array_alloc(int width, int height);
 int kvz_cu_array_free(cu_array_t *cua);
+cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px);
+const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px);
 void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
                        const cu_array_t* src, int src_x, int src_y,
                        int width, int height);
-
-
-#define CU_ARRAY_AT(cua, x_px, y_px) \
-  (&(cua)->data[((x_px) >> 2) + ((y_px) >> 2) * ((cua)->width >> 2)])
 
 
 /**

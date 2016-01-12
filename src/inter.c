@@ -806,14 +806,14 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
-    *a1 = CU_ARRAY_AT(cua, x - 1, y + height - 1);
+    *a1 = kvz_cu_array_at_const(cua, x - 1, y + height - 1);
     // The block above is always coded before the current one.
     if ((*a1)->type != CU_INTER) {
       *a1 = NULL;
     }
 
     if (y_local + height < LCU_WIDTH && y + height < picture_height) {
-      *a0 = CU_ARRAY_AT(cua, x - 1, y + height);
+      *a0 = kvz_cu_array_at_const(cua, x - 1, y + height);
       if ((*a0)->type != CU_INTER || !is_a0_cand_coded(x, y, width, height)) {
         *a0 = NULL;
       }
@@ -823,20 +823,20 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x + width < picture_width && (x_local + width < LCU_WIDTH || y_local == 0)) {
-      *b0 = CU_ARRAY_AT(cua, x + width, y - 1);
+      *b0 = kvz_cu_array_at_const(cua, x + width, y - 1);
       if ((*b0)->type != CU_INTER || !is_b0_cand_coded(x, y, width, height)) {
         *b0 = NULL;
       }
     }
 
-    *b1 = CU_ARRAY_AT(cua, x + width - 1, y - 1);
+    *b1 = kvz_cu_array_at_const(cua, x + width - 1, y - 1);
     // The block to the left is always coded before the current one.
     if ((*b1)->type != CU_INTER) {
       *b1 = NULL;
     }
 
     if (x != 0) {
-      *b2 = CU_ARRAY_AT(cua, x - 1, y - 1);
+      *b2 = kvz_cu_array_at_const(cua, x - 1, y - 1);
       // The block above and to the left is always coded before the current
       // one.
       if ((*b2)->type != CU_INTER) {

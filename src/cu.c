@@ -120,6 +120,21 @@ unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_strid
   return sum;
 }
 
+
+cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
+{
+  return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);
+}
+
+
+const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
+{
+  assert(x_px < cua->width);
+  assert(y_px < cua->height);
+  return &(cua)->data[(x_px >> 2) + (y_px >> 2) * ((cua)->width >> 2)];
+}
+
+
 /**
  * \brief Allocate a CU array.
  *

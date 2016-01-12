@@ -1195,7 +1195,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     const int mid_x = tile_top_left_corner.x + x + (width >> 1);
     const int mid_y = tile_top_left_corner.y + y + (height >> 1);
     const cu_array_t* ref_array = state->global->ref->cu_arrays[ref_idx];
-    const cu_info_t* ref_cu = CU_ARRAY_AT(ref_array, mid_x, mid_y);
+    const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
         mv.x = ref_cu->inter.mv[0][0];

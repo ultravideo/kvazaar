@@ -1093,8 +1093,7 @@ static void encode_part_mode(encoder_state_t * const state,
 static void encode_inter_prediction_unit(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const cu_info_t * const cur_cu,
-                                         int x_ctb, int y_ctb,
-                                         int width_ctb, int height_ctb,
+                                         int x, int y, int width, int height,
                                          int depth)
 {
   // Mergeflag
@@ -1182,8 +1181,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
           int16_t mv_cand[2][2];
           kvz_inter_get_mv_cand_cua(
               state,
-              x_ctb << 3, y_ctb << 3,
-              width_ctb << 3, height_ctb << 3,
+              x, y, width, height,
               mv_cand, cur_cu, ref_list_idx);
 
           uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
@@ -1480,16 +1478,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
   if (cur_cu->type == CU_INTER) {
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
-    const int cu_width_scu = LCU_CU_WIDTH >> depth;
+    const int cu_width = LCU_WIDTH >> depth;
 
     for (int i = 0; i < num_pu; ++i) {
-      const int pu_x_scu = PU_GET_X(cur_cu->part_size, cu_width_scu, x_ctb, i);
-      const int pu_y_scu = PU_GET_Y(cur_cu->part_size, cu_width_scu, y_ctb, i);
-      const int pu_w_scu = PU_GET_W(cur_cu->part_size, cu_width_scu, i);
-      const int pu_h_scu = PU_GET_H(cur_cu->part_size, cu_width_scu, i);
-      const cu_info_t *cur_pu = kvz_videoframe_get_cu_const(frame, pu_x_scu, pu_y_scu);
+      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x_ctb << 3, i);
+      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y_ctb << 3, i);
+      const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
+      const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
+      const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
-      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x_scu, pu_y_scu, pu_w_scu, pu_h_scu, depth);
+      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x, pu_y, pu_w, pu_h, depth);
     }
 
     {
