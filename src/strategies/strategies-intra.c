@@ -23,6 +23,7 @@
 
 // Define function pointers.
 angular_pred_func *kvz_angular_pred;
+intra_pred_planar_func *kvz_intra_pred_planar;
 
 // Headers for platform optimizations.
 #include "generic/intra-generic.h"
