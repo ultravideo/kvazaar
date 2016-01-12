@@ -480,11 +480,42 @@ static void kvz_intra_pred_planar_avx2(
   const kvz_pixel top_right = ref_top[width + 1];
   const kvz_pixel bottom_left = ref_left[width + 1];
 
-  for (int y = 0; y < width; ++y) {
-    for (int x = 0; x < width; ++x) {
-      int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
-      int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
-      dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
+  if (log2_width > 2) {
+    
+    __m128i v_width = _mm_set1_epi16(width);
+    __m128i v_top_right = _mm_set1_epi16(top_right);
+    __m128i v_bottom_left = _mm_set1_epi16(bottom_left);
+
+    for (int y = 0; y < width; ++y) {
+
+      __m128i x_plus_1 = _mm_setr_epi16(-7, -6, -5, -4, -3, -2, -1, 0);
+      __m128i v_ref_left = _mm_set1_epi16(ref_left[y + 1]);
+      __m128i y_plus_1 = _mm_set1_epi16(y + 1);
+
+      for (int x = 0; x < width; x += 8) {
+        x_plus_1 = _mm_add_epi16(x_plus_1, _mm_set1_epi16(8));
+        __m128i v_ref_top = _mm_loadl_epi64((__m128i*)&(ref_top[x + 1]));
+        v_ref_top = _mm_cvtepu8_epi16(v_ref_top);
+
+        __m128i hor = _mm_add_epi16(_mm_mullo_epi16(_mm_sub_epi16(v_width, x_plus_1), v_ref_left), _mm_mullo_epi16(x_plus_1, v_top_right));
+        __m128i ver = _mm_add_epi16(_mm_mullo_epi16(_mm_sub_epi16(v_width, y_plus_1), v_ref_top), _mm_mullo_epi16(y_plus_1, v_bottom_left));
+
+        //dst[y * width + x] = ho
+
+        __m128i chunk = _mm_srli_epi16(_mm_add_epi16(_mm_add_epi16(ver, hor), v_width), (log2_width + 1));
+        chunk = _mm_packus_epi16(chunk, chunk);
+        _mm_storel_epi64((__m128i*)&(dst[y * width + x]), chunk);
+      }
+    }
+
+  } else {
+    // Unoptimized version for reference.
+    for (int y = 0; y < width; ++y) {
+      for (int x = 0; x < width; ++x) {
+        int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
+        int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
+        dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
+      }
     }
   }
 }
