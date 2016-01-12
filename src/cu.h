@@ -202,8 +202,9 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
 #define SUB_SCU(xy) ((xy) & (LCU_WIDTH - 1))
 
 #define LCU_CU_WIDTH 8
-#define LCU_T_CU_WIDTH 9
-#define LCU_CU_OFFSET 10
+#define LCU_T_CU_WIDTH (LCU_CU_WIDTH + 1)
+#define LCU_CU_OFFSET (LCU_T_CU_WIDTH + 1)
+#define SCU_WIDTH (LCU_WIDTH / LCU_CU_WIDTH)
 
 // Width from top left of the LCU, so +1 for ref buffer size.
 #define LCU_REF_PX_WIDTH (LCU_WIDTH + LCU_WIDTH / 2)
@@ -263,21 +264,10 @@ typedef struct {
 
    \endverbatim
    */
-  cu_info_t cu[9*9+1];
+  cu_info_t cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH + 1];
 } lcu_t;
 
 void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
-
-/**
- * \brief Return pointer to a given CU.
- *
- * \param lcu   pointer to the containing LCU
- * \param x_cu  x-index of the CU
- * \param y_cu  y-index of the CU
- * \return      pointer to the CU
- */
-#define LCU_GET_CU(lcu, x_cu, y_cu) \
-  (&(lcu)->cu[LCU_CU_OFFSET + (x_cu) + (y_cu) * LCU_T_CU_WIDTH])
 
 /**
  * \brief Return pointer to the top right reference CU.
@@ -293,7 +283,8 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
  * \param y_px  y-coordinate relative to the upper left corner of the LCU
  * \return      pointer to the CU at coordinates (x_px, y_px)
  */
-#define LCU_GET_CU_AT_PX(lcu, x_px, y_px) LCU_GET_CU(lcu, (x_px) >> 3, (y_px) >> 3)
+#define LCU_GET_CU_AT_PX(lcu, x_px, y_px) \
+  (&(lcu)->cu[LCU_CU_OFFSET + ((x_px) >> 3) + ((y_px) >> 3) * LCU_T_CU_WIDTH])
 
 /**
  * \brief Return pointer to a CU relative to the given CU.

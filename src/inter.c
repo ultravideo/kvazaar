@@ -683,10 +683,6 @@ static void get_spatial_merge_candidates(int32_t x,
                                          cu_info_t **a1,
                                          lcu_t *lcu)
 {
-  // the width and height of the current block on SCU
-  uint8_t width_in_scu = width / CU_MIN_SIZE_PIXELS;
-  uint8_t height_in_scu = height / CU_MIN_SIZE_PIXELS;
-
   /*
   Predictor block locations
   ____      _______
@@ -697,11 +693,11 @@ static void get_spatial_merge_candidates(int32_t x,
   |A1|_________|
   |A0|
   */
-  int32_t x_cu = SUB_SCU(x) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
-  int32_t y_cu = SUB_SCU(y) >> MAX_DEPTH;
+  int32_t x_local = SUB_SCU(x); //!< coordinates from top-left of this LCU
+  int32_t y_local = SUB_SCU(y);
   // A0 and A1 availability testing
   if (x != 0) {
-    *a1 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu - 1);
+    *a1 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height - 1);
     // Do not check (*a1)->coded because the block above is always coded before
     // the current one and the flag is not set when searching an SMP block.
     if ((*a1)->type == CU_INTER) {
@@ -710,8 +706,8 @@ static void get_spatial_merge_candidates(int32_t x,
       *a1 = NULL;
     }
 
-    if (y_cu + height_in_scu < LCU_WIDTH>>3 && y + height < picture_height) {
-      *a0 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu);
+    if (y_local + height < LCU_WIDTH && y + height < picture_height) {
+      *a0 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local + height);
       if ((*a0)->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
         inter_clear_cu_unused(*a0);
       } else {
@@ -723,9 +719,9 @@ static void get_spatial_merge_candidates(int32_t x,
   // B0, B1 and B2 availability testing
   if (y != 0) {
     if (x + width < picture_width) {
-      if (x_cu + width_in_scu < LCU_WIDTH >> 3) {
-        *b0 = LCU_GET_CU(lcu, x_cu + width_in_scu, y_cu - 1);
-      } else if (y_cu == 0) {
+      if (x_local + width < LCU_WIDTH) {
+        *b0 = LCU_GET_CU_AT_PX(lcu, x_local + width, y_local - 1);
+      } else if (y_local == 0) {
         // Special case, top-right CU
         *b0 = LCU_GET_TOP_RIGHT_CU(lcu);
       }
@@ -736,7 +732,7 @@ static void get_spatial_merge_candidates(int32_t x,
       *b0 = NULL;
     }
 
-    *b1 = LCU_GET_CU(lcu, x_cu + width_in_scu - 1, y_cu - 1);
+    *b1 = LCU_GET_CU_AT_PX(lcu, x_local + width - 1, y_local - 1);
     // Do not check (*b1)->coded because the block to the left is always coded
     // before the current one and the flag is not set when searching an SMP
     // block.
@@ -747,7 +743,7 @@ static void get_spatial_merge_candidates(int32_t x,
     }
 
     if (x != 0) {
-      *b2 = LCU_GET_CU(lcu, x_cu - 1, y_cu - 1);
+      *b2 = LCU_GET_CU_AT_PX(lcu, x_local - 1, y_local - 1);
       // Do not check (*b2)->coded because the block above and to the left is
       // always coded before the current one.
       if ((*b2)->type == CU_INTER) {

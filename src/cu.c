@@ -229,14 +229,13 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
  */
 void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
 {
-  // Convert values from pixel coordinates to array indices.
-  const int dst_x_scu  = dst_x >> 2;
-  const int dst_y_scu  = dst_y >> 2;
   const int dst_stride = dst->width >> 2;
-  for (int y = 0; y < LCU_CU_WIDTH; ++y) {
-    for (int x = 0; x < LCU_CU_WIDTH; ++x) {
-      const cu_info_t *from_cu = LCU_GET_CU(src, x, y);
-      cu_info_t *to_cu = &dst->data[dst_x_scu + x * 2 + (dst_y_scu + y * 2) * dst_stride];
+  for (int y = 0; y < LCU_WIDTH; y += SCU_WIDTH) {
+    for (int x = 0; x < LCU_WIDTH; x += SCU_WIDTH) {
+      const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);
+      const int x_scu = (dst_x + x) >> 2;
+      const int y_scu = (dst_y + y) >> 2;
+      cu_info_t *to_cu = &dst->data[x_scu + y_scu * dst_stride];
       memcpy(to_cu,                  from_cu, sizeof(*to_cu));
       memcpy(to_cu + 1,              from_cu, sizeof(*to_cu));
       memcpy(to_cu + dst_stride,     from_cu, sizeof(*to_cu));

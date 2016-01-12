@@ -68,14 +68,13 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
 
   // Copy non-reference CUs.
   {
-    const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
-    const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
-    const int width_cu = LCU_WIDTH >> MAX_DEPTH >> depth;
-    int x, y;
-    for (y = y_cu; y < y_cu + width_cu; ++y) {
-      for (x = x_cu; x < x_cu + width_cu; ++x) {
-        const cu_info_t *from_cu = LCU_GET_CU(&work_tree[depth + 1], x, y);
-        cu_info_t *to_cu = LCU_GET_CU(&work_tree[depth], x, y);
+    const int x_orig = SUB_SCU(x_px);
+    const int y_orig = SUB_SCU(y_px);
+    const int width_cu = LCU_WIDTH >> depth;
+    for (int y = y_orig; y < y_orig + width_cu; y += SCU_WIDTH) {
+      for (int x = x_orig; x < x_orig + width_cu; x += SCU_WIDTH) {
+        const cu_info_t *from_cu = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x, y);
+        cu_info_t *to_cu = LCU_GET_CU_AT_PX(&work_tree[depth], x, y);
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -127,15 +126,13 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
   int d;
 
   for (d = depth + 1; d < MAX_PU_DEPTH + 1; ++d) {
-    const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
-    const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
-    const int width_cu = width_px >> MAX_DEPTH;
+    const int x_orig = SUB_SCU(x_px);
+    const int y_orig = SUB_SCU(y_px);
 
-    int x, y;
-    for (y = y_cu; y < y_cu + width_cu; ++y) {
-      for (x = x_cu; x < x_cu + width_cu; ++x) {
-        const cu_info_t *from_cu = LCU_GET_CU(&work_tree[depth], x, y);
-        cu_info_t *to_cu = LCU_GET_CU(&work_tree[d], x, y);
+    for (int y = y_orig; y < y_orig + width_px; y += SCU_WIDTH) {
+      for (int x = x_orig; x < x_orig + width_px; x += SCU_WIDTH) {
+        const cu_info_t *from_cu = LCU_GET_CU_AT_PX(&work_tree[depth], x, y);
+        cu_info_t *to_cu = LCU_GET_CU_AT_PX(&work_tree[d], x, y);
         memcpy(to_cu, from_cu, sizeof(*to_cu));
       }
     }
@@ -164,16 +161,15 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
 
 void kvz_lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
 {
-  const int width_cu = LCU_CU_WIDTH >> depth;
-  const vector2d_t lcu_cu = { SUB_SCU(x_px) / 8, SUB_SCU(y_px) / 8 };
-  int x, y;
+  const int width = LCU_WIDTH >> depth;
+  const vector2d_t lcu_cu = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
   // Depth 4 doesn't go inside the loop. Set the top-left CU.
-  LCU_GET_CU(lcu, lcu_cu.x, lcu_cu.y)->tr_depth = tr_depth;
+  LCU_GET_CU_AT_PX(lcu, lcu_cu.x, lcu_cu.y)->tr_depth = tr_depth;
 
-  for (y = 0; y < width_cu; ++y) {
-    for (x = 0; x < width_cu; ++x) {
-      cu_info_t *cu = LCU_GET_CU(lcu, lcu_cu.x + x, lcu_cu.y + y);
+  for (unsigned y = 0; y < width; y += SCU_WIDTH) {
+    for (unsigned x = 0; x < width; x += SCU_WIDTH) {
+      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, lcu_cu.x + x, lcu_cu.y + y);
       cu->tr_depth = tr_depth;
     }
   }
@@ -182,14 +178,14 @@ void kvz_lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth
 
 static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pred_mode, int chroma_mode, int part_mode)
 {
-  const int width_cu = LCU_CU_WIDTH >> depth;
-  const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
-  const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
+  const int width = LCU_WIDTH >> depth;
+  const int x_cu  = SUB_SCU(x_px);
+  const int y_cu  = SUB_SCU(y_px);
   int x, y;
 
   // NxN can only be applied to a single CU at a time.
   if (part_mode == SIZE_NxN) {
-    cu_info_t *cu = LCU_GET_CU(lcu, x_cu, y_cu);
+    cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x_cu, y_cu);
     cu->depth = MAX_DEPTH;
     cu->type = CU_INTRA;
     cu->intra[PU_INDEX(x_px / 4, y_px / 4)].mode = pred_mode;
@@ -199,9 +195,9 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
   }
 
   // Set mode in every CU covered by part_mode in this depth.
-  for (y = y_cu; y < y_cu + width_cu; ++y) {
-    for (x = x_cu; x < x_cu + width_cu; ++x) {
-      cu_info_t *cu = LCU_GET_CU(lcu, x, y);
+  for (y = y_cu; y < y_cu + width; y += SCU_WIDTH) {
+    for (x = x_cu; x < x_cu + width; x += SCU_WIDTH) {
+      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x, y);
       cu->depth = depth;
       cu->type = CU_INTRA;
       cu->intra[0].mode = pred_mode;
@@ -215,12 +211,12 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
 }
 
 
-static void lcu_set_inter_pu(lcu_t *lcu, int x_pu, int y_pu, int width_pu, int height_pu, cu_info_t *cur_pu)
+static void lcu_set_inter_pu(lcu_t *lcu, int x_px, int y_px, int width, int height, cu_info_t *cur_pu)
 {
   // Set mode in every CU covered by part_mode in this depth.
-  for (int y = y_pu; y < y_pu + height_pu; ++y) {
-    for (int x = x_pu; x < x_pu + width_pu; ++x) {
-      cu_info_t *cu = LCU_GET_CU(lcu, x, y);
+  for (int y = y_px; y < y_px + height; y += SCU_WIDTH) {
+    for (int x = x_px; x < x_px + width; x += SCU_WIDTH) {
+      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x, y);
       //Check if this could be moved inside the if
       if (cu != cur_pu) {
         cu->depth     = cur_pu->depth;
@@ -238,17 +234,17 @@ static void lcu_set_inter_pu(lcu_t *lcu, int x_pu, int y_pu, int width_pu, int h
 
 static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *cur_cu)
 {
-  const int width_cu = LCU_CU_WIDTH >> depth;
-  const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
-  const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
+  const int width = LCU_WIDTH >> depth;
+  const int x_local = SUB_SCU(x_px);
+  const int y_local = SUB_SCU(y_px);
   const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
 
   for (int i = 0; i < num_pu; ++i) {
-    const int x_pu      = PU_GET_X(cur_cu->part_size, width_cu, x_cu, i);
-    const int y_pu      = PU_GET_Y(cur_cu->part_size, width_cu, y_cu, i);
-    const int width_pu  = PU_GET_W(cur_cu->part_size, width_cu, i);
-    const int height_pu = PU_GET_H(cur_cu->part_size, width_cu, i);
-    cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
+    const int x_pu      = PU_GET_X(cur_cu->part_size, width, x_local, i);
+    const int y_pu      = PU_GET_Y(cur_cu->part_size, width, y_local, i);
+    const int width_pu  = PU_GET_W(cur_cu->part_size, width, i);
+    const int height_pu = PU_GET_H(cur_cu->part_size, width, i);
+    cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
     lcu_set_inter_pu(lcu, x_pu, y_pu, width_pu, height_pu, cur_pu);
   }
 }
@@ -256,19 +252,18 @@ static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *
 
 static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *cur_cu)
 {
-  const int width_cu = LCU_CU_WIDTH >> depth;
-  const int x_cu = SUB_SCU(x_px) >> MAX_DEPTH;
-  const int y_cu = SUB_SCU(y_px) >> MAX_DEPTH;
-  int x, y;
-  int tr_split = cur_cu->tr_depth-cur_cu->depth;
+  const uint32_t width = LCU_WIDTH >> depth;
+  const uint32_t x_local = SUB_SCU(x_px);
+  const uint32_t y_local = SUB_SCU(y_px);
+  const uint32_t tr_split = cur_cu->tr_depth-cur_cu->depth;
+  const uint32_t mask = ~((width >> tr_split)-1);
 
   // Set coeff flags in every CU covered by part_mode in this depth.
-  for (y = y_cu; y < y_cu + width_cu; ++y) {
-    for (x = x_cu; x < x_cu + width_cu; ++x) {
-      cu_info_t *cu = LCU_GET_CU(lcu, x, y);
+  for (uint32_t y = y_local; y < y_local + width; y += SCU_WIDTH) {
+    for (uint32_t x = x_local; x < x_local + width; x += SCU_WIDTH) {
+      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x, y);
       // Use TU top-left CU to propagate coeff flags
-      uint32_t mask = ~((width_cu>>tr_split)-1);
-      cu_info_t *cu_from = LCU_GET_CU(lcu, x & mask, y & mask);
+      cu_info_t *cu_from = LCU_GET_CU_AT_PX(lcu, x & mask, y & mask);
       if (cu != cu_from) {
         // Chroma coeff data is not used, luma is needed for deblocking
         cu->cbf.y = cu_from->cbf.y;
@@ -369,7 +364,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 {
   const vector2d_t lcu_px = { x_px / 2, y_px / 2 };
   const int width = (depth <= MAX_DEPTH) ? LCU_WIDTH >> (depth + 1) : LCU_WIDTH >> depth;
-  cu_info_t *const tr_cu = LCU_GET_CU(lcu, lcu_px.x / 4, lcu_px.y / 4);
+  cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, x_px, y_px);
 
   double tr_tree_bits = 0;
   double coeff_bits = 0;
@@ -463,9 +458,9 @@ static double calc_mode_bits(const encoder_state_t *state,
 
 static uint8_t get_ctx_cu_split_model(const lcu_t *lcu, int x, int y, int depth)
 {
-  vector2d_t lcu_cu = { SUB_SCU(x) / 8, SUB_SCU(y) / 8 };
-  bool condA = x >= 8 && LCU_GET_CU(lcu, lcu_cu.x - 1, lcu_cu.y    )->depth > depth;
-  bool condL = y >= 8 && LCU_GET_CU(lcu, lcu_cu.x,     lcu_cu.y - 1)->depth > depth;
+  vector2d_t lcu_cu = { SUB_SCU(x), SUB_SCU(y) };
+  bool condA = x >= 8 && LCU_GET_CU_AT_PX(lcu, lcu_cu.x - 1, lcu_cu.y    )->depth > depth;
+  bool condL = y >= 8 && LCU_GET_CU_AT_PX(lcu, lcu_cu.x,     lcu_cu.y - 1)->depth > depth;
   return condA + condL;
 }
 
@@ -724,8 +719,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (cur_cu->type == CU_NOTSET && depth < MAX_PU_DEPTH
         && x + cu_width <= frame->width && y + cu_width <= frame->height)
     {
-      vector2d_t lcu_cu = { x_local / 8, y_local / 8 };
-      cu_info_t *cu_d1 = LCU_GET_CU(&work_tree[depth + 1], lcu_cu.x, lcu_cu.y);
+      cu_info_t *cu_d1 = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x_local, y_local);
 
       // If the best CU in depth+1 is intra and the biggest it can be, try it.
       if (cu_d1->type == CU_INTRA && cu_d1->depth == depth + 1) {
@@ -797,41 +791,35 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
   FILL(*lcu, 0);
   
   // Copy reference cu_info structs from neighbouring LCUs.
-  {
-    const int x_cu = x >> MAX_DEPTH;
-    const int y_cu = y >> MAX_DEPTH;
 
-    // Copy top CU row.
-    if (y_cu > 0) {
-      int i;
-      for (i = 0; i < LCU_CU_WIDTH; ++i) {
-        const cu_info_t *from_cu = kvz_videoframe_get_cu_const(frame, x_cu + i, y_cu - 1);
-        cu_info_t *to_cu = LCU_GET_CU(lcu, i, -1);
-        memcpy(to_cu, from_cu, sizeof(*to_cu));
-      }
-    }
-    // Copy left CU column.
-    if (x_cu > 0) {
-      int i;
-      for (i = 0; i < LCU_CU_WIDTH; ++i) {
-        const cu_info_t *from_cu = kvz_videoframe_get_cu_const(frame, x_cu - 1, y_cu + i);
-        cu_info_t *to_cu = LCU_GET_CU(lcu, -1, i);
-        memcpy(to_cu, from_cu, sizeof(*to_cu));
-      }
-    }
-    // Copy top-left CU.
-    if (x_cu > 0 && y_cu > 0) {
-      const cu_info_t *from_cu = kvz_videoframe_get_cu_const(frame, x_cu - 1, y_cu - 1);
-      cu_info_t *to_cu = LCU_GET_CU(lcu, -1, -1);
+  // Copy top CU row.
+  if (y > 0) {
+    for (int i = 0; i < LCU_WIDTH; i += SCU_WIDTH) {
+      const cu_info_t *from_cu = kvz_cu_array_at_const(frame->cu_array, x + i, y - 1);
+      cu_info_t *to_cu = LCU_GET_CU_AT_PX(lcu, i, -1);
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
-
-    // Copy top-right CU.
-    if (y_cu > 0 && x + LCU_WIDTH < frame->width) {
-      const cu_info_t *from_cu = kvz_videoframe_get_cu_const(frame, x_cu + LCU_CU_WIDTH, y_cu - 1);
-      cu_info_t *to_cu = LCU_GET_TOP_RIGHT_CU(lcu);
+  }
+  // Copy left CU column.
+  if (x > 0) {
+    for (int i = 0; i < LCU_WIDTH; i += SCU_WIDTH) {
+      const cu_info_t *from_cu = kvz_cu_array_at_const(frame->cu_array, x - 1, y + i);
+      cu_info_t *to_cu = LCU_GET_CU_AT_PX(lcu, -1, i);
       memcpy(to_cu, from_cu, sizeof(*to_cu));
     }
+  }
+  // Copy top-left CU.
+  if (x > 0 && y > 0) {
+    const cu_info_t *from_cu = kvz_cu_array_at_const(frame->cu_array, x - 1, y - 1);
+    cu_info_t *to_cu = LCU_GET_CU_AT_PX(lcu, -1, -1);
+    memcpy(to_cu, from_cu, sizeof(*to_cu));
+  }
+
+  // Copy top-right CU.
+  if (y > 0 && x + LCU_WIDTH < frame->width) {
+    const cu_info_t *from_cu = kvz_cu_array_at_const(frame->cu_array, x + LCU_WIDTH, y - 1);
+    cu_info_t *to_cu = LCU_GET_TOP_RIGHT_CU(lcu);
+    memcpy(to_cu, from_cu, sizeof(*to_cu));
   }
 
   // Copy reference pixels.

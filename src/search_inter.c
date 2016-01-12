@@ -1619,20 +1619,20 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        double *inter_cost,
                        uint32_t *inter_bitcost)
 {
-  const int num_pu    = kvz_part_mode_num_parts[part_mode];
-  const int width_scu = (LCU_WIDTH >> depth) >> MAX_DEPTH;
-  const int y_scu     = SUB_SCU(y) >> MAX_DEPTH;
-  const int x_scu     = SUB_SCU(x) >> MAX_DEPTH;
+  const int num_pu  = kvz_part_mode_num_parts[part_mode];
+  const int width   = LCU_WIDTH >> depth;
+  const int y_local = SUB_SCU(y);
+  const int x_local = SUB_SCU(x);
 
   *inter_cost    = 0;
   *inter_bitcost = 0;
 
   for (int i = 0; i < num_pu; ++i) {
-    const int x_pu      = PU_GET_X(part_mode, width_scu, x_scu, i);
-    const int y_pu      = PU_GET_Y(part_mode, width_scu, y_scu, i);
-    const int width_pu  = PU_GET_W(part_mode, width_scu, i);
-    const int height_pu = PU_GET_H(part_mode, width_scu, i);
-    cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
+    const int x_pu      = PU_GET_X(part_mode, width, x_local, i);
+    const int y_pu      = PU_GET_Y(part_mode, width, y_local, i);
+    const int width_pu  = PU_GET_W(part_mode, width, i);
+    const int height_pu = PU_GET_H(part_mode, width, i);
+    cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
 
     cur_pu->type      = CU_INTER;
     cur_pu->part_size = part_mode;
@@ -1646,9 +1646,9 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     *inter_cost    += cost;
     *inter_bitcost += bitcost;
 
-    for (int y = y_pu; y < y_pu + height_pu; ++y) {
-      for (int x = x_pu; x < x_pu + width_pu; ++x) {
-        cu_info_t *scu = LCU_GET_CU(lcu, x, y);
+    for (int y = y_pu; y < y_pu + height_pu; y += SCU_WIDTH) {
+      for (int x = x_pu; x < x_pu + width_pu; x += SCU_WIDTH) {
+        cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x, y);
         scu->type = CU_INTER;
         scu->inter = cur_pu->inter;
       }
