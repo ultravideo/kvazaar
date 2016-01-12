@@ -300,31 +300,30 @@ static INLINE void ver_add_sub_avx2(__m128i (*temp_hor)[8], __m128i (*temp_ver)[
   }
 }
 
+static INLINE void add_sub_dual_avx2(__m256i *out, __m256i *in, unsigned out_idx0, unsigned out_idx1, unsigned in_idx0, unsigned in_idx1)
+{
+  out[out_idx0] = _mm256_add_epi16(in[in_idx0], in[in_idx1]);
+  out[out_idx1] = _mm256_sub_epi16(in[in_idx0], in[in_idx1]);
+}
 static INLINE void ver_transform_dual_avx2(__m256i (*rows)[8]){
 
-  __m256i temp[8];
+  __m256i temp0[8];
+  add_sub_dual_avx2(temp0, (*rows), 0, 1, 0, 1);
+  add_sub_dual_avx2(temp0, (*rows), 2, 3, 2, 3);
+  add_sub_dual_avx2(temp0, (*rows), 4, 5, 4, 5);
+  add_sub_dual_avx2(temp0, (*rows), 6, 7, 6, 7);
+
+  __m256i temp1[8];
+  add_sub_dual_avx2(temp1, temp0, 0, 1, 0, 2);
+  add_sub_dual_avx2(temp1, temp0, 2, 3, 1, 3);
+  add_sub_dual_avx2(temp1, temp0, 4, 5, 4, 6);
+  add_sub_dual_avx2(temp1, temp0, 6, 7, 5, 7);
+
+  add_sub_dual_avx2((*rows), temp1, 0, 1, 0, 4);
+  add_sub_dual_avx2((*rows), temp1, 2, 3, 1, 5);
+  add_sub_dual_avx2((*rows), temp1, 4, 5, 2, 6);
+  add_sub_dual_avx2((*rows), temp1, 6, 7, 3, 7);
   
-    // First stage
-  for (int i = 0; i < 8; i += 2){
-    temp[i+0] = _mm256_add_epi16((*rows)[i + 0], (*rows)[i + 1]);
-    temp[i+1] = _mm256_sub_epi16((*rows)[i + 0], (*rows)[i + 1]);
-  }
-
-  // Second stage
-  for (int i = 0; i < 8; i += 4){
-    (*rows)[i + 0] = _mm256_add_epi16(temp[i + 0], temp[i + 2]);
-    (*rows)[i + 1] = _mm256_add_epi16(temp[i + 1], temp[i + 3]);
-    (*rows)[i + 2] = _mm256_sub_epi16(temp[i + 0], temp[i + 2]);
-    (*rows)[i + 3] = _mm256_sub_epi16(temp[i + 1], temp[i + 3]);
-  }
-
-  // Third stage
-  for (int i = 0; i < 4; ++i){
-    __m256i a = (*rows)[0 + i];
-    __m256i b = (*rows)[4 + i];
-    (*rows)[i + 0] = _mm256_add_epi16(a, b);
-    (*rows)[i + 4] = _mm256_sub_epi16(a, b);
-  }
 }
 
 static INLINE void ver_add_sub_dual_avx2(__m256i (*temp_hor)[8], __m256i (*temp_ver)[8]){
