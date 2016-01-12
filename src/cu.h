@@ -268,6 +268,8 @@ typedef struct {
   cu_info_t cu[9*9+1];
 } lcu_t;
 
+void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src);
+
 /**
  * \brief Return pointer to a given CU.
  *

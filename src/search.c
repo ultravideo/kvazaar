@@ -883,20 +883,7 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, int y_px, const lcu_t *lcu)
 {
   // Copy non-reference CUs to picture.
-  {
-    const int x_cu = x_px >> MAX_DEPTH;
-    const int y_cu = y_px >> MAX_DEPTH;
-    videoframe_t * const frame = state->tile->frame;
-
-    int x, y;
-    for (y = 0; y < LCU_CU_WIDTH; ++y) {
-      for (x = 0; x < LCU_CU_WIDTH; ++x) {
-        const cu_info_t *from_cu = LCU_GET_CU(lcu, x, y);
-        cu_info_t *to_cu = kvz_videoframe_get_cu(frame, x_cu + x, y_cu + y);
-        memcpy(to_cu, from_cu, sizeof(*to_cu));
-      }
-    }
-  }
+  kvz_cu_array_copy_from_lcu(state->tile->frame->cu_array, x_px, y_px, lcu);
 
   // Copy pixels to picture.
   {

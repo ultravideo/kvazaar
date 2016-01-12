@@ -200,3 +200,28 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
     dst_ptr += dst_stride;
   }
 }
+
+/**
+ * \brief Copy an lcu to a cu array.
+ *
+ * All values are in luma pixels.
+ *
+ * \param dst     destination array
+ * \param dst_x   x-coordinate of the left edge of the copied area in dst
+ * \param dst_y   y-coordinate of the top edge of the copied area in dst
+ * \param src     source lcu
+ */
+void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
+{
+  // Convert values from pixel coordinates to array indices.
+  const int dst_x_scu  = dst_x >> 3;
+  const int dst_y_scu  = dst_y >> 3;
+  const int dst_stride = dst->width >> 3;
+  for (int y = 0; y < LCU_CU_WIDTH; ++y) {
+    for (int x = 0; x < LCU_CU_WIDTH; ++x) {
+      const cu_info_t *from_cu = LCU_GET_CU(src, x, y);
+      cu_info_t *to_cu = &dst->data[dst_x_scu + x + (dst_y_scu + y) * dst_stride];
+      memcpy(to_cu,                  from_cu, sizeof(*to_cu));
+    }
+  }
+}
