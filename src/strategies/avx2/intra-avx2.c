@@ -460,6 +460,36 @@ static void kvz_angular_pred_avx2(
   }
 }
 
+
+/**
+ * \brief Generate planar prediction.
+ * \param log2_width    Log2 of width, range 2..5.
+ * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
+ * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+ * \param dst           Buffer of size width*width.
+ */
+static void kvz_intra_pred_planar_avx2(
+  const int_fast8_t log2_width,
+  const kvz_pixel *const ref_top,
+  const kvz_pixel *const ref_left,
+  kvz_pixel *const dst)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+
+  const int_fast8_t width = 1 << log2_width;
+  const kvz_pixel top_right = ref_top[width + 1];
+  const kvz_pixel bottom_left = ref_left[width + 1];
+
+  for (int y = 0; y < width; ++y) {
+    for (int x = 0; x < width; ++x) {
+      int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
+      int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
+      dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
+    }
+  }
+}
+
+
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
@@ -468,6 +498,7 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 #if COMPILE_INTEL_AVX2 && defined X86_64
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
+    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
   }
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;
