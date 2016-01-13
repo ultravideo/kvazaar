@@ -232,75 +232,101 @@ static void satd_8bit_4x4_dual_avx2(
   satds_out[1] = sum2;
 }
 
+static INLINE void hor_transform_row_avx2(__m128i* row){
+  
+  __m128i mask_pos = _mm_set1_epi16(1);
+  __m128i mask_neg = _mm_set1_epi16(-1);
+  __m128i sign_mask = _mm_unpacklo_epi64(mask_pos, mask_neg);
+  __m128i temp = _mm_shuffle_epi32(*row, KVZ_PERMUTE(2, 3, 0, 1));
+  *row = _mm_sign_epi16(*row, sign_mask);
+  *row = _mm_add_epi16(*row, temp);
 
-static void hor_add_sub_avx2(__m128i *row0, __m128i *row1){
+  sign_mask = _mm_unpacklo_epi32(mask_pos, mask_neg);
+  temp = _mm_shuffle_epi32(*row, KVZ_PERMUTE(1, 0, 3, 2));
+  *row = _mm_sign_epi16(*row, sign_mask);
+  *row = _mm_add_epi16(*row, temp);
 
-  __m128i a = _mm_hadd_epi16(*row0, *row1);
-  __m128i b = _mm_hsub_epi16(*row0, *row1);
-
-  __m128i c = _mm_hadd_epi16(a, b);
-  __m128i d = _mm_hsub_epi16(a, b);
-
-  *row0 = _mm_hadd_epi16(c, d);
-  *row1 = _mm_hsub_epi16(c, d);
+  sign_mask = _mm_unpacklo_epi16(mask_pos, mask_neg);
+  temp = _mm_shufflelo_epi16(*row, KVZ_PERMUTE(1,0,3,2));
+  temp = _mm_shufflehi_epi16(temp, KVZ_PERMUTE(1,0,3,2));
+  *row = _mm_sign_epi16(*row, sign_mask);
+  *row = _mm_add_epi16(*row, temp);
 }
 
-static void hor_add_sub_dual_avx2(__m256i *row0, __m256i *row1){
+static INLINE void hor_transform_row_dual_avx2(__m256i* row){
+  
+  __m256i mask_pos = _mm256_set1_epi16(1);
+  __m256i mask_neg = _mm256_set1_epi16(-1);
+  __m256i sign_mask = _mm256_unpacklo_epi64(mask_pos, mask_neg);
+  __m256i temp = _mm256_shuffle_epi32(*row, KVZ_PERMUTE(2, 3, 0, 1));
+  *row = _mm256_sign_epi16(*row, sign_mask);
+  *row = _mm256_add_epi16(*row, temp);
 
-  __m256i a = _mm256_hadd_epi16(*row0, *row1);
-  __m256i b = _mm256_hsub_epi16(*row0, *row1);
+  sign_mask = _mm256_unpacklo_epi32(mask_pos, mask_neg);
+  temp = _mm256_shuffle_epi32(*row, KVZ_PERMUTE(1, 0, 3, 2));
+  *row = _mm256_sign_epi16(*row, sign_mask);
+  *row = _mm256_add_epi16(*row, temp);
 
-  __m256i c = _mm256_hadd_epi16(a, b);
-  __m256i d = _mm256_hsub_epi16(a, b);
-
-  *row0 = _mm256_hadd_epi16(c, d);
-  *row1 = _mm256_hsub_epi16(c, d);
+  sign_mask = _mm256_unpacklo_epi16(mask_pos, mask_neg);
+  temp = _mm256_shufflelo_epi16(*row, KVZ_PERMUTE(1,0,3,2));
+  temp = _mm256_shufflehi_epi16(temp, KVZ_PERMUTE(1,0,3,2));
+  *row = _mm256_sign_epi16(*row, sign_mask);
+  *row = _mm256_add_epi16(*row, temp);
 }
 
-static INLINE void ver_add_sub_avx2(__m128i (*temp_hor)[8], __m128i (*temp_ver)[8]){
-
-  // First stage
-  for (int i = 0; i < 8; i += 2){
-    (*temp_ver)[i+0] = _mm_hadd_epi16((*temp_hor)[i + 0], (*temp_hor)[i + 1]);
-    (*temp_ver)[i+1] = _mm_hsub_epi16((*temp_hor)[i + 0], (*temp_hor)[i + 1]);
-  }
-
-  // Second stage
-  for (int i = 0; i < 8; i += 4){
-    (*temp_hor)[i + 0] = _mm_add_epi16((*temp_ver)[i + 0], (*temp_ver)[i + 2]);
-    (*temp_hor)[i + 1] = _mm_add_epi16((*temp_ver)[i + 1], (*temp_ver)[i + 3]);
-    (*temp_hor)[i + 2] = _mm_sub_epi16((*temp_ver)[i + 0], (*temp_ver)[i + 2]);
-    (*temp_hor)[i + 3] = _mm_sub_epi16((*temp_ver)[i + 1], (*temp_ver)[i + 3]);
-  }
-
-  // Third stage
-  for (int i = 0; i < 4; ++i){
-    (*temp_ver)[i + 0] = _mm_add_epi16((*temp_hor)[0 + i], (*temp_hor)[4 + i]);
-    (*temp_ver)[i + 4] = _mm_sub_epi16((*temp_hor)[0 + i], (*temp_hor)[4 + i]);
-  }
+static INLINE void add_sub_avx2(__m128i *out, __m128i *in, unsigned out_idx0, unsigned out_idx1, unsigned in_idx0, unsigned in_idx1)
+{
+  out[out_idx0] = _mm_add_epi16(in[in_idx0], in[in_idx1]);
+  out[out_idx1] = _mm_sub_epi16(in[in_idx0], in[in_idx1]);
 }
 
-static INLINE void ver_add_sub_dual_avx2(__m256i (*temp_hor)[8], __m256i (*temp_ver)[8]){
+static INLINE void ver_transform_block_avx2(__m128i (*rows)[8]){
 
-  // First stage
-  for (int i = 0; i < 8; i += 2){
-    (*temp_ver)[i+0] = _mm256_hadd_epi16((*temp_hor)[i + 0], (*temp_hor)[i + 1]);
-    (*temp_ver)[i+1] = _mm256_hsub_epi16((*temp_hor)[i + 0], (*temp_hor)[i + 1]);
-  }
+  __m128i temp0[8];
+  add_sub_avx2(temp0, (*rows), 0, 1, 0, 1);
+  add_sub_avx2(temp0, (*rows), 2, 3, 2, 3);
+  add_sub_avx2(temp0, (*rows), 4, 5, 4, 5);
+  add_sub_avx2(temp0, (*rows), 6, 7, 6, 7);
 
-  // Second stage
-  for (int i = 0; i < 8; i += 4){
-    (*temp_hor)[i + 0] = _mm256_add_epi16((*temp_ver)[i + 0], (*temp_ver)[i + 2]);
-    (*temp_hor)[i + 1] = _mm256_add_epi16((*temp_ver)[i + 1], (*temp_ver)[i + 3]);
-    (*temp_hor)[i + 2] = _mm256_sub_epi16((*temp_ver)[i + 0], (*temp_ver)[i + 2]);
-    (*temp_hor)[i + 3] = _mm256_sub_epi16((*temp_ver)[i + 1], (*temp_ver)[i + 3]);
-  }
+  __m128i temp1[8];
+  add_sub_avx2(temp1, temp0, 0, 1, 0, 2);
+  add_sub_avx2(temp1, temp0, 2, 3, 1, 3);
+  add_sub_avx2(temp1, temp0, 4, 5, 4, 6);
+  add_sub_avx2(temp1, temp0, 6, 7, 5, 7);
 
-  // Third stage
-  for (int i = 0; i < 4; ++i){
-    (*temp_ver)[i + 0] = _mm256_add_epi16((*temp_hor)[0 + i], (*temp_hor)[4 + i]);
-    (*temp_ver)[i + 4] = _mm256_sub_epi16((*temp_hor)[0 + i], (*temp_hor)[4 + i]);
-  }
+  add_sub_avx2((*rows), temp1, 0, 1, 0, 4);
+  add_sub_avx2((*rows), temp1, 2, 3, 1, 5);
+  add_sub_avx2((*rows), temp1, 4, 5, 2, 6);
+  add_sub_avx2((*rows), temp1, 6, 7, 3, 7);
+  
+}
+
+static INLINE void add_sub_dual_avx2(__m256i *out, __m256i *in, unsigned out_idx0, unsigned out_idx1, unsigned in_idx0, unsigned in_idx1)
+{
+  out[out_idx0] = _mm256_add_epi16(in[in_idx0], in[in_idx1]);
+  out[out_idx1] = _mm256_sub_epi16(in[in_idx0], in[in_idx1]);
+}
+
+
+static INLINE void ver_transform_block_dual_avx2(__m256i (*rows)[8]){
+
+  __m256i temp0[8];
+  add_sub_dual_avx2(temp0, (*rows), 0, 1, 0, 1);
+  add_sub_dual_avx2(temp0, (*rows), 2, 3, 2, 3);
+  add_sub_dual_avx2(temp0, (*rows), 4, 5, 4, 5);
+  add_sub_dual_avx2(temp0, (*rows), 6, 7, 6, 7);
+
+  __m256i temp1[8];
+  add_sub_dual_avx2(temp1, temp0, 0, 1, 0, 2);
+  add_sub_dual_avx2(temp1, temp0, 2, 3, 1, 3);
+  add_sub_dual_avx2(temp1, temp0, 4, 5, 4, 6);
+  add_sub_dual_avx2(temp1, temp0, 6, 7, 5, 7);
+
+  add_sub_dual_avx2((*rows), temp1, 0, 1, 0, 4);
+  add_sub_dual_avx2((*rows), temp1, 2, 3, 1, 5);
+  add_sub_dual_avx2((*rows), temp1, 4, 5, 2, 6);
+  add_sub_dual_avx2((*rows), temp1, 6, 7, 3, 7);
+  
 }
 
 INLINE static void haddwd_accumulate_avx2(__m128i *accumulate, __m128i *ver_row)
@@ -370,57 +396,70 @@ INLINE static __m256i diff_row_dual_avx2(const kvz_pixel *buf1, const kvz_pixel 
   return _mm256_sub_epi16(buf1_row, buf2_row);
 }
 
-INLINE static void diff_blocks_and_hor_transform_avx2(__m128i (*row_diff)[8], const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
+INLINE static void diff_blocks_avx2(__m128i (*row_diff)[8],
+                                                           const kvz_pixel * buf1, unsigned stride1,
+                                                           const kvz_pixel * orig, unsigned stride_orig)
 {
-  (*row_diff)[0] = diff_row_avx2(buf1 + 0 * stride1, buf2 + 0 * stride2);
-  (*row_diff)[1] = diff_row_avx2(buf1 + 1 * stride1, buf2 + 1 * stride2);
-  hor_add_sub_avx2((*row_diff) + 0, (*row_diff) + 1);
+  (*row_diff)[0] = diff_row_avx2(buf1 + 0 * stride1, orig + 0 * stride_orig);
+  (*row_diff)[1] = diff_row_avx2(buf1 + 1 * stride1, orig + 1 * stride_orig);
+  (*row_diff)[2] = diff_row_avx2(buf1 + 2 * stride1, orig + 2 * stride_orig);
+  (*row_diff)[3] = diff_row_avx2(buf1 + 3 * stride1, orig + 3 * stride_orig);
+  (*row_diff)[4] = diff_row_avx2(buf1 + 4 * stride1, orig + 4 * stride_orig);
+  (*row_diff)[5] = diff_row_avx2(buf1 + 5 * stride1, orig + 5 * stride_orig);
+  (*row_diff)[6] = diff_row_avx2(buf1 + 6 * stride1, orig + 6 * stride_orig);
+  (*row_diff)[7] = diff_row_avx2(buf1 + 7 * stride1, orig + 7 * stride_orig);
 
-  (*row_diff)[2] = diff_row_avx2(buf1 + 2 * stride1, buf2 + 2 * stride2);
-  (*row_diff)[3] = diff_row_avx2(buf1 + 3 * stride1, buf2 + 3 * stride2);
-  hor_add_sub_avx2((*row_diff) + 2, (*row_diff) + 3);
-
-  (*row_diff)[4] = diff_row_avx2(buf1 + 4 * stride1, buf2 + 4 * stride2);
-  (*row_diff)[5] = diff_row_avx2(buf1 + 5 * stride1, buf2 + 5 * stride2);
-  hor_add_sub_avx2((*row_diff) + 4, (*row_diff) + 5);
-
-  (*row_diff)[6] = diff_row_avx2(buf1 + 6 * stride1, buf2 + 6 * stride2);
-  (*row_diff)[7] = diff_row_avx2(buf1 + 7 * stride1, buf2 + 7 * stride2);
-  hor_add_sub_avx2((*row_diff) + 6, (*row_diff) + 7);
 }
 
-INLINE static void diff_blocks_and_hor_transform_dual_avx2(__m256i (*row_diff)[8],
+INLINE static void diff_blocks_dual_avx2(__m256i (*row_diff)[8],
                                                            const kvz_pixel * buf1, unsigned stride1,
                                                            const kvz_pixel * buf2, unsigned stride2,
                                                            const kvz_pixel * orig, unsigned stride_orig)
 {
   (*row_diff)[0] = diff_row_dual_avx2(buf1 + 0 * stride1, buf2 + 0 * stride2, orig + 0 * stride_orig);
   (*row_diff)[1] = diff_row_dual_avx2(buf1 + 1 * stride1, buf2 + 1 * stride2, orig + 1 * stride_orig);
-  hor_add_sub_dual_avx2((*row_diff) + 0, (*row_diff) + 1);
-
   (*row_diff)[2] = diff_row_dual_avx2(buf1 + 2 * stride1, buf2 + 2 * stride2, orig + 2 * stride_orig);
   (*row_diff)[3] = diff_row_dual_avx2(buf1 + 3 * stride1, buf2 + 3 * stride2, orig + 3 * stride_orig);
-  hor_add_sub_dual_avx2((*row_diff) + 2, (*row_diff) + 3);
-
   (*row_diff)[4] = diff_row_dual_avx2(buf1 + 4 * stride1, buf2 + 4 * stride2, orig + 4 * stride_orig);
   (*row_diff)[5] = diff_row_dual_avx2(buf1 + 5 * stride1, buf2 + 5 * stride2, orig + 5 * stride_orig);
-  hor_add_sub_dual_avx2((*row_diff) + 4, (*row_diff) + 5);
-
   (*row_diff)[6] = diff_row_dual_avx2(buf1 + 6 * stride1, buf2 + 6 * stride2, orig + 6 * stride_orig);
   (*row_diff)[7] = diff_row_dual_avx2(buf1 + 7 * stride1, buf2 + 7 * stride2, orig + 7 * stride_orig);
-  hor_add_sub_dual_avx2((*row_diff) + 6, (*row_diff) + 7);
+
+}
+
+INLINE static void hor_transform_block_avx2(__m128i (*row_diff)[8])
+{
+  hor_transform_row_avx2((*row_diff) + 0);
+  hor_transform_row_avx2((*row_diff) + 1);
+  hor_transform_row_avx2((*row_diff) + 2);
+  hor_transform_row_avx2((*row_diff) + 3);
+  hor_transform_row_avx2((*row_diff) + 4);
+  hor_transform_row_avx2((*row_diff) + 5);
+  hor_transform_row_avx2((*row_diff) + 6);
+  hor_transform_row_avx2((*row_diff) + 7);
+}
+
+INLINE static void hor_transform_block_dual_avx2(__m256i (*row_diff)[8])
+{
+  hor_transform_row_dual_avx2((*row_diff) + 0);
+  hor_transform_row_dual_avx2((*row_diff) + 1);
+  hor_transform_row_dual_avx2((*row_diff) + 2);
+  hor_transform_row_dual_avx2((*row_diff) + 3);
+  hor_transform_row_dual_avx2((*row_diff) + 4);
+  hor_transform_row_dual_avx2((*row_diff) + 5);
+  hor_transform_row_dual_avx2((*row_diff) + 6);
+  hor_transform_row_dual_avx2((*row_diff) + 7);
 }
 
 static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
 {
-  __m128i temp_hor[8];
-  __m128i temp_ver[8];
+  __m128i temp[8];
 
-  diff_blocks_and_hor_transform_avx2(&temp_hor, buf1, stride1, buf2, stride2);
-
-  ver_add_sub_avx2(&temp_hor, &temp_ver);
+  diff_blocks_avx2(&temp, buf1, stride1, buf2, stride2);
+  hor_transform_block_avx2(&temp);
+  ver_transform_block_avx2(&temp);
   
-  unsigned sad = sum_block_avx2(temp_ver);
+  unsigned sad = sum_block_avx2(temp);
 
   unsigned result = (sad + 2) >> 2;
   return result;
@@ -440,14 +479,13 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned
                                                 const kvz_pixel * orig, unsigned stride_orig,
                                                 unsigned *sum0, unsigned *sum1)
 {
-  __m256i temp_hor[8];
-  __m256i temp_ver[8];
+  __m256i temp[8];
 
-  diff_blocks_and_hor_transform_dual_avx2(&temp_hor, buf1, stride1, buf2, stride2, orig, stride_orig);
-
-  ver_add_sub_dual_avx2(&temp_hor, &temp_ver);
+  diff_blocks_dual_avx2(&temp, buf1, stride1, buf2, stride2, orig, stride_orig);
+  hor_transform_block_dual_avx2(&temp);
+  ver_transform_block_dual_avx2(&temp);
   
-  sum_block_dual_avx2(temp_ver, sum0, sum1);
+  sum_block_dual_avx2(temp, sum0, sum1);
 
   *sum0 = (*sum0 + 2) >> 2;
   *sum1 = (*sum1 + 2) >> 2;
