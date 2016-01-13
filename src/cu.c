@@ -81,9 +81,60 @@ void kvz_coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
                          const unsigned orig_stride, const unsigned dst_stride)
 {
   unsigned y;
-
-  for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coeff_t));
+  
+  int nxn_width = (width == height) ? width : 0;
+  switch (nxn_width) {
+    case 4:
+      *(int64_t*)&dst[dst_stride*0] = *(int64_t*)&orig[orig_stride*0];
+      *(int64_t*)&dst[dst_stride*1] = *(int64_t*)&orig[orig_stride*1];
+      *(int64_t*)&dst[dst_stride*2] = *(int64_t*)&orig[orig_stride*2];
+      *(int64_t*)&dst[dst_stride*3] = *(int64_t*)&orig[orig_stride*3];
+      break;
+    case 8:
+#define KVZ_COPY_ROW_8(row_num) \
+*(int64_t*)&dst[dst_stride*(row_num)] = *(int64_t*)&orig[orig_stride*(row_num)]; \
+*(int64_t*)&dst[dst_stride*(row_num) + 4] = *(int64_t*)&orig[orig_stride*(row_num) + 4];
+      
+      KVZ_COPY_ROW_8(0);
+      KVZ_COPY_ROW_8(1);
+      KVZ_COPY_ROW_8(2);
+      KVZ_COPY_ROW_8(3);
+      KVZ_COPY_ROW_8(4);
+      KVZ_COPY_ROW_8(5);
+      KVZ_COPY_ROW_8(6);
+      KVZ_COPY_ROW_8(7);
+      break;
+#undef KVZ_COPY_ROW_8
+          case 16:
+#define KVZ_COPY_ROW_16(row_num) \
+*(int64_t*)&dst[dst_stride*(row_num)] = *(int64_t*)&orig[orig_stride*(row_num)]; \
+*(int64_t*)&dst[dst_stride*(row_num) + 4] = *(int64_t*)&orig[orig_stride*(row_num) + 4]; \
+*(int64_t*)&dst[dst_stride*(row_num) + 8] = *(int64_t*)&orig[orig_stride*(row_num) + 8]; \
+*(int64_t*)&dst[dst_stride*(row_num) + 12] = *(int64_t*)&orig[orig_stride*(row_num) + 12];
+      
+      KVZ_COPY_ROW_16(0);
+      KVZ_COPY_ROW_16(1);
+      KVZ_COPY_ROW_16(2);
+      KVZ_COPY_ROW_16(3);
+      KVZ_COPY_ROW_16(4);
+      KVZ_COPY_ROW_16(5);
+      KVZ_COPY_ROW_16(6);
+      KVZ_COPY_ROW_16(7);
+      KVZ_COPY_ROW_16(8);
+      KVZ_COPY_ROW_16(9);
+      KVZ_COPY_ROW_16(10);
+      KVZ_COPY_ROW_16(11);
+      KVZ_COPY_ROW_16(12);
+      KVZ_COPY_ROW_16(13);
+      KVZ_COPY_ROW_16(14);
+      KVZ_COPY_ROW_16(15);
+      break;
+#undef KVZ_COPY_ROW_16
+  default:
+    for (y = 0; y < height; ++y) {
+      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coeff_t));
+    }
+    break;
   }
 }
 
