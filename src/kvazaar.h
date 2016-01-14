@@ -130,7 +130,9 @@ typedef struct kvz_config
 
   int32_t width;   /*!< \brief frame width, must be a multiple of 8 */
   int32_t height;  /*!< \brief frame height, must be a multiple of 8 */
-  double framerate; /*!< \brief Input framerate */
+  double framerate; /*!< \brief Deprecated, will be removed. */
+  int32_t framerate_num; /*!< \brief Framerate numerator */
+  int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
@@ -158,9 +160,6 @@ typedef struct kvz_config
     int8_t transfer;     /*!< \brief Transfer characteristics */
     int8_t colormatrix;  /*!< \brief Color matrix coefficients */
     int32_t chroma_loc;   /*!< \brief Chroma sample location */
-    int32_t num_units_in_tick; /*!< \brief Timing scale numerator */
-    int32_t time_scale; /*!< \brief Timing scale denominator */
-    int8_t timing_info_present_flag;
   } vui;
   int32_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
   int32_t ref_frames;     /*!< \brief number of reference frames to use */

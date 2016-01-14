@@ -21,7 +21,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
           --seek <integer>           : First frame to code [0]
           --input-res <int>x<int>    : Input resolution (width x height) or
                       auto           : try to detect from file name [auto]
-          --input-fps <number>       : Framerate of the input video [25.0]
+          --input-fps <num>/<denom>  : Framerate of the input video [25.0]
           -q, --qp <integer>         : Quantization Parameter [32]
           -p, --period <integer>     : Period of intra pictures [0]
                                          0: only first picture is intra

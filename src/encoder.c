@@ -93,24 +93,6 @@ static int select_owf_auto(const kvz_config *const cfg)
   }
 }
 
-static int calculate_timescale_from_fps(kvz_config * cfg) {
-  int32_t basescale = 512;
-  double fps = cfg->framerate;
-  int32_t num = basescale*(int32_t)ceil(fps);
-  int32_t den = basescale;
-  
-  while (1) {
-    double cur_fps = (double)num / (double)den;
-    if (cur_fps <= fps) break;
-    den++;
-  }
-  cfg->vui.timing_info_present_flag = 1;
-  cfg->vui.num_units_in_tick = num;
-  cfg->vui.time_scale = den;
-
-  return 1;
-}
-
 /**
  * \brief Allocate and initialize an encoder control structure.
  *
@@ -186,18 +168,18 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   
   kvz_encoder_control_input_init(encoder, cfg->width, cfg->height);
 
-  encoder->target_avg_bppic = cfg->target_bitrate / cfg->framerate;
+  if (cfg->framerate_num != 0) {
+    double framerate = cfg->framerate_num / (double)cfg->framerate_denom;
+    encoder->target_avg_bppic = cfg->target_bitrate / (framerate);
+  } else {
+    encoder->target_avg_bppic = cfg->target_bitrate / cfg->framerate;
+  }
   encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
 
   if (!encoder_control_init_gop_layer_weights(encoder)) {
     goto init_failed;
   }
 
-  // Calculate timescale
-  if (!encoder->cfg->vui.timing_info_present_flag) {
-    calculate_timescale_from_fps((kvz_config *)encoder->cfg);
-  }
-  
   //Tiles
   encoder->tiles_enable = encoder->cfg->tiles_width_count > 0 ||
                           encoder->cfg->tiles_height_count > 0;
@@ -449,9 +431,14 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   encoder->vui.transfer = encoder->cfg->vui.transfer;
   encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
   encoder->vui.chroma_loc = (int8_t)encoder->cfg->vui.chroma_loc;
-  encoder->vui.timing_info_present_flag = encoder->cfg->vui.timing_info_present_flag;
-  encoder->vui.num_units_in_tick = encoder->cfg->vui.num_units_in_tick;
-  encoder->vui.time_scale = encoder->cfg->vui.time_scale;
+
+  // If fractional framerate is set, use that instead of the floating point framerate.
+  if (cfg->framerate_num != 0) {
+    encoder->vui.timing_info_present_flag = 1;
+    encoder->vui.num_units_in_tick = cfg->framerate_denom;
+    encoder->vui.time_scale = cfg->framerate_num;
+  }
+
   // AUD
   encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
 

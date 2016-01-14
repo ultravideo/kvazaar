@@ -41,7 +41,9 @@ int kvz_config_init(kvz_config *cfg)
 {
   cfg->width           = 0;
   cfg->height          = 0;
-  cfg->framerate       = 25;
+  cfg->framerate       = 25; // deprecated and will be removed.
+  cfg->framerate_num   = 0;
+  cfg->framerate_denom = 1;
   cfg->qp              = 32;
   cfg->intra_period    = 0;
   cfg->vps_period      = 0;
@@ -70,10 +72,6 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vui.transfer    = 2; /* undef */
   cfg->vui.colormatrix = 2; /* undef */
   cfg->vui.chroma_loc  = 0; /* left center */
-  cfg->vui.timing_info_present_flag = 0;
-  cfg->vui.num_units_in_tick = 0;
-  cfg->vui.time_scale = 0;
-
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
@@ -478,8 +476,17 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     } else {
       return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
     }
-  else if OPT("input-fps")
-    cfg->framerate = atof(value);
+  else if OPT("input-fps") {
+    int32_t fps_num, fps_denom;
+    if (sscanf(value, "%d/%d", &fps_num, &fps_denom) == 2) {
+      cfg->framerate_num = fps_num;
+      cfg->framerate_denom = fps_denom;
+    } else {
+      // Accept decimal notation, making sure not to round 0 to 1.
+      cfg->framerate_num = (int)(atof(value) * 1000 + 0.49);
+      cfg->framerate_denom = 1000;
+    }
+  }
   else if OPT("qp")
     cfg->qp = atoi(value);
   else if OPT("period")
@@ -786,8 +793,16 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->framerate <= 0.0) {
+  if (cfg->framerate < 0.0) {
     fprintf(stderr, "Input error: --input-fps must be positive\n");
+    error = 1;
+  }
+  if (cfg->framerate_num < 0) {
+    fprintf(stderr, "Input error: --input-fps must >=0\n");
+    error = 1;
+  }
+  if (cfg->framerate_denom <= 0) {
+    fprintf(stderr, "Input error: --input-fps denominator must be >0\n");
     error = 1;
   }
 
