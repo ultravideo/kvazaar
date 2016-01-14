@@ -265,11 +265,15 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   //IF default display window
   //ENDIF
 
-  WRITE_U(stream, 0, 1, "vui_timing_info_present_flag");
+  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "vui_timing_info_present_flag");
+  if (encoder->vui.timing_info_present_flag) {
+    WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "vui_num_units_in_tick");
+    WRITE_U(stream, encoder->vui.time_scale, 32, "vui_time_scale");
 
-  //IF timing info
-  //ENDIF
-
+    WRITE_U(stream, 0, 1, "vui_poc_proportional_to_timing_flag");
+    WRITE_U(stream, 0, 1, "vui_hrd_parameters_present_flag");    
+  }
+  
   WRITE_U(stream, 0, 1, "bitstream_restriction_flag");
 
   //IF bitstream restriction

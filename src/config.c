@@ -70,6 +70,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vui.transfer    = 2; /* undef */
   cfg->vui.colormatrix = 2; /* undef */
   cfg->vui.chroma_loc  = 0; /* left center */
+  cfg->vui.timing_info_present_flag = 0;
+  cfg->vui.num_units_in_tick = 0;
+  cfg->vui.time_scale = 0;
+
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;

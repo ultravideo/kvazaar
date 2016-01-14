@@ -158,6 +158,9 @@ typedef struct kvz_config
     int8_t transfer;     /*!< \brief Transfer characteristics */
     int8_t colormatrix;  /*!< \brief Color matrix coefficients */
     int32_t chroma_loc;   /*!< \brief Chroma sample location */
+    int32_t num_units_in_tick; /*!< \brief Timing scale numerator */
+    int32_t time_scale; /*!< \brief Timing scale denominator */
+    int8_t timing_info_present_flag;
   } vui;
   int32_t aud_enable;     /*!< \brief Flag to use access unit delimiters */
   int32_t ref_frames;     /*!< \brief number of reference frames to use */
