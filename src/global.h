@@ -175,7 +175,7 @@ typedef int16_t coeff_t;
 
 // NOTE: When making a release, remember to also bump library version in
 // Makefile, if necessary.
-#define KVZ_VERSION 0.7.2
+#define KVZ_VERSION 0.8.0
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
 //#define VERBOSE 1

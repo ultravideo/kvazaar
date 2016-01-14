@@ -4,7 +4,7 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 
 # Library version number
 ver_major=2
-ver_minor=2
+ver_minor=3
 ver_release=0
 
 # not used, but it prevents configure from adding a lot of defines to the CFLAGS
