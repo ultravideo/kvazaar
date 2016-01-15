@@ -46,19 +46,21 @@ typedef struct
 
 /**
 * \brief Function for deriving intra luma predictions
-* \param pic picture to use
-* \param x_cu x CU position (smallest CU)
-* \param y_cu y CU position (smallest CU)
-* \param preds output buffer for 3 predictions
-* \returns (predictions are found)?1:0
+* \param x          x-coordinate of the PU in pixels
+* \param y          y-coordinate of the PU in pixels
+* \param preds      output buffer for 3 predictions
+* \param cur_pu     PU to check
+* \param left_pu    PU to the left of cur_pu
+* \param above_pu   PU above cur_pu
+* \returns          1 if predictions are found, otherwise 0
 */
 int8_t kvz_intra_get_dir_luma_predictor(
   const uint32_t x,
   const uint32_t y,
   int8_t *preds,
-  const cu_info_t *const cur_cu,
-  const cu_info_t *const left_cu,
-  const cu_info_t *const above_cu);
+  const cu_info_t *const cur_pu,
+  const cu_info_t *const left_pu,
+  const cu_info_t *const above_pu);
 
 /**
 * \brief Generage angular predictions.

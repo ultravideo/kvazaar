@@ -1247,15 +1247,12 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
                                      int x_ctb, int y_ctb, int depth)
 {
   const videoframe_t * const frame = state->tile->frame;
-  uint8_t intra_pred_mode[4] = {
-    cur_cu->intra[0].mode, cur_cu->intra[1].mode,
-    cur_cu->intra[2].mode, cur_cu->intra[3].mode };
-    uint8_t intra_pred_mode_chroma = cur_cu->intra[0].mode_chroma;
+  uint8_t intra_pred_mode[4];
+
+  uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
   int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
   int8_t mpm_preds[4] = {-1, -1, -1, -1};
-  int i, j;
   uint32_t flag[4];
-  int num_pred_units = (cur_cu->part_size == SIZE_2Nx2N ? 1 : 4);
 
   #if ENABLE_PCM == 1
   // Code must start after variable initialization
@@ -1266,24 +1263,35 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   // If intra prediction mode is found from the predictors,
   // it can be signaled with two EP's. Otherwise we can send
   // 5 EP bins with the full predmode
-  for (j = 0; j < num_pred_units; ++j) {
-    static const vector2d_t offset[4] = {{0,0},{1,0},{0,1},{1,1}};
-    const cu_info_t *left_cu = NULL;
-    const cu_info_t *above_cu = NULL;
+  const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
+  const int cu_width = LCU_WIDTH >> depth;
 
-    if (x_ctb > 0) {
-      left_cu = kvz_videoframe_get_cu_const(frame, x_ctb - 1, y_ctb);
+  for (int j = 0; j < num_pred_units; ++j) {
+    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x_ctb << 3, j);
+    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y_ctb << 3, j);
+    const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
+
+    const cu_info_t *left_pu = NULL;
+    const cu_info_t *above_pu = NULL;
+
+    if (pu_x > 0) {
+      assert(pu_x >> 2 > 0);
+      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y);
     }
-    // Don't take the above CU across the LCU boundary.
-    if (y_ctb > 0 && (y_ctb & 7) != 0) {
-      above_cu = kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb - 1);
+    // Don't take the above PU across the LCU boundary.
+    if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
+      assert(pu_y >> 2 > 0);
+      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
     }
 
-    kvz_intra_get_dir_luma_predictor((x_ctb<<3) + (offset[j].x<<2),
-                                 (y_ctb<<3) + (offset[j].y<<2),
-                                 intra_preds[j], cur_cu,
-                                 left_cu, above_cu);
-    for (i = 0; i < 3; i++) {
+    kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
+                                     intra_preds[j],
+                                     cur_pu,
+                                     left_pu, above_pu);
+
+    intra_pred_mode[j] = cur_pu->intra.mode;
+
+    for (int i = 0; i < 3; i++) {
       if (intra_preds[j][i] == intra_pred_mode[j]) {
         mpm_preds[j] = (int8_t)i;
         break;
@@ -1293,11 +1301,11 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   }
 
   cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
-  for (j = 0; j < num_pred_units; ++j) {
+  for (int j = 0; j < num_pred_units; ++j) {
     CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
   }
 
-  for (j = 0; j < num_pred_units; ++j) {
+  for (int j = 0; j < num_pred_units; ++j) {
     // Signal index of the prediction mode in the prediction list.
     if (flag[j]) {
       CABAC_BIN_EP(cabac, (mpm_preds[j] == 0 ? 0 : 1), "mpm_idx");
@@ -1316,7 +1324,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       // Reduce the index of the signaled prediction mode according to the
       // prediction list, as it has been already signaled that it's not one
       // of the prediction modes.
-      for (i = 2; i >= 0; i--) {
+      for (int i = 2; i >= 0; i--) {
         tmp_pred = (tmp_pred > intra_preds[j][i] ? tmp_pred - 1 : tmp_pred);
       }
 
@@ -1334,11 +1342,11 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       // Angular 34 mode is possible only if intra pred mode is one of the
       // possible chroma pred modes, in which case it is signaled with that
       // duplicate mode.
-      for (i = 0; i < 4; ++i) {
+      for (int i = 0; i < 4; ++i) {
         if (intra_pred_mode[0] == chroma_pred_modes[i]) pred_mode = i;
       }
     } else {
-      for (i = 0; i < 4; ++i) {
+      for (int i = 0; i < 4; ++i) {
         if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
       }
     }
@@ -1584,11 +1592,13 @@ static void encode_transform_unit(encoder_state_t * const state,
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
   const videoframe_t * const frame = state->tile->frame;
-  uint8_t width = LCU_WIDTH >> depth;
-  uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
+  const uint8_t width = LCU_WIDTH >> depth;
+  const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
-  int x_cu = x_pu / 2;
-  int y_cu = y_pu / 2;
+  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x_pu << 2, y_pu << 2);
+
+  const int x_cu = x_pu / 2;
+  const int y_cu = y_pu / 2;
   const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
 
   coeff_t coeff_y[LCU_WIDTH*LCU_WIDTH+1];
@@ -1596,9 +1606,9 @@ static void encode_transform_unit(encoder_state_t * const state,
   coeff_t coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
   int32_t coeff_stride = frame->width;
 
-  int8_t scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra[PU_INDEX(x_pu, y_pu)].mode, depth);
+  int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
-  int cbf_y = cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
+  int cbf_y = cbf_is_set(cur_pu->cbf.y, depth);
 
   if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
@@ -1615,7 +1625,7 @@ static void encode_transform_unit(encoder_state_t * const state,
   // CoeffNxN
   // Residual Coding
   if (cbf_y) {
-    kvz_encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_cu->intra[PU_INDEX(x_pu, y_pu)].tr_skip);
+    kvz_encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_pu->intra.tr_skip);
   }
 
   if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
@@ -1648,7 +1658,7 @@ static void encode_transform_unit(encoder_state_t * const state,
       orig_pos_v += coeff_stride>>1;
     }
 
-    scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
+    scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
 
     if (cbf_is_set(cur_cu->cbf.u, depth)) {
       kvz_encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
@@ -1673,9 +1683,12 @@ void kvz_encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int3
                             int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v)
 {
   cabac_data_t * const cabac = &state->cabac;
-  int32_t x_cu = x_pu / 2;
-  int32_t y_cu = y_pu / 2;
   const videoframe_t * const frame = state->tile->frame;
+
+  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x_pu << 2, y_pu << 2);
+
+  const int32_t x_cu = x_pu / 2;
+  const int32_t y_cu = y_pu / 2;
   const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
@@ -1689,7 +1702,7 @@ void kvz_encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int3
 
   int8_t split = (cur_cu->tr_depth > depth);
 
-  const int cb_flag_y = cbf_is_set(cur_cu->cbf.y, depth + PU_INDEX(x_pu, y_pu));
+  const int cb_flag_y = cbf_is_set(cur_pu->cbf.y, depth);
   const int cb_flag_u = cbf_is_set(cur_cu->cbf.u, depth);
   const int cb_flag_v = cbf_is_set(cur_cu->cbf.v, depth);
 

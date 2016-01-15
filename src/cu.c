@@ -237,9 +237,6 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
       const int y_scu = (dst_y + y) >> 2;
       cu_info_t *to_cu = &dst->data[x_scu + y_scu * dst_stride];
       memcpy(to_cu,                  from_cu, sizeof(*to_cu));
-      memcpy(to_cu + 1,              from_cu, sizeof(*to_cu));
-      memcpy(to_cu + dst_stride,     from_cu, sizeof(*to_cu));
-      memcpy(to_cu + dst_stride + 1, from_cu, sizeof(*to_cu));
     }
   }
 }

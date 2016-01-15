@@ -213,7 +213,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     nosplit_cost = 0.0;
 
-    cbf_clear(&pred_cu->cbf.y, depth + PU_INDEX(x_px / 4, y_px / 4));
+    cbf_clear(&pred_cu->cbf.y, depth);
 
     kvz_intra_recon_lcu_luma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
     nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
@@ -594,11 +594,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
-    pred_cu.intra[0].mode = modes[rdo_mode];
-    pred_cu.intra[1].mode = modes[rdo_mode];
-    pred_cu.intra[2].mode = modes[rdo_mode];
-    pred_cu.intra[3].mode = modes[rdo_mode];
-    pred_cu.intra[0].mode_chroma = modes[rdo_mode];
+    pred_cu.intra.mode = modes[rdo_mode];
+    pred_cu.intra.mode_chroma = modes[rdo_mode];
     FILL(pred_cu.cbf, 0);
 
     // Reset transform split data in lcu.cu for this area.
@@ -616,11 +613,8 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
     pred_cu.depth = depth;
     pred_cu.type = CU_INTRA;
     pred_cu.part_size = ((depth == MAX_PU_DEPTH) ? SIZE_NxN : SIZE_2Nx2N);
-    pred_cu.intra[0].mode = modes[0];
-    pred_cu.intra[1].mode = modes[0];
-    pred_cu.intra[2].mode = modes[0];
-    pred_cu.intra[3].mode = modes[0];
-    pred_cu.intra[0].mode_chroma = modes[0];
+    pred_cu.intra.mode = modes[0];
+    pred_cu.intra.mode_chroma = modes[0];
     FILL(pred_cu.cbf, 0);
     search_intra_trdepth(state, x_px, y_px, depth, tr_depth, modes[0], MAX_INT, &pred_cu, lcu);
   }
@@ -714,8 +708,8 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
 
-  cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-  int8_t intra_mode = cur_cu->intra[PU_INDEX(x_px >> 2, y_px >> 2)].mode;
+  cu_info_t *cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+  int8_t intra_mode = cur_pu->intra.mode;
 
   double costs[5];
   int8_t modes[5] = { 0, 26, 10, 1, 34 };

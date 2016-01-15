@@ -35,34 +35,19 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const uint32_t x,
   const uint32_t y,
   int8_t *preds,
-  const cu_info_t *const cur_cu,
-  const cu_info_t *const left_cu,
-  const cu_info_t *const above_cu)
+  const cu_info_t *const cur_pu,
+  const cu_info_t *const left_pu,
+  const cu_info_t *const above_pu)
 {
-  int y_cu = y>>3;
-
   // The default mode if block is not coded yet is INTRA_DC.
   int8_t left_intra_dir  = 1;
-  int8_t above_intra_dir = 1;
-
-  if (x & 4) {
-    // If current CU is NxN and PU is on the right half, take mode from the
-    // left half of the same CU.
-    left_intra_dir = cur_cu->intra[PU_INDEX(0, y >> 2)].mode;
-  } else if (left_cu && left_cu->type == CU_INTRA) {
-    // Otherwise take the mode from the right side of the CU on the left.
-    left_intra_dir = left_cu->intra[PU_INDEX(1, y >> 2)].mode;
+  if (left_pu && left_pu->type == CU_INTRA) {
+    left_intra_dir = left_pu->intra.mode;
   }
 
-  if (y & 4) {
-    // If current CU is NxN and PU is on the bottom half, take mode from the
-    // top half of the same CU.
-    above_intra_dir = cur_cu->intra[PU_INDEX(x >> 2, 0)].mode;
-  } else if (above_cu && above_cu->type == CU_INTRA &&
-             (y_cu * (LCU_WIDTH>>MAX_DEPTH)) % LCU_WIDTH != 0)
-  {
-    // Otherwise take the mode from the bottom half of the CU above.
-    above_intra_dir = above_cu->intra[PU_INDEX(x >> 2, 1)].mode;
+  int8_t above_intra_dir = 1;
+  if (above_pu && above_pu->type == CU_INTRA && y % LCU_WIDTH != 0) {
+    above_intra_dir = above_pu->intra.mode;
   }
 
   // If the predictions are the same, add new predictions
@@ -503,7 +488,7 @@ void kvz_intra_recon_lcu_chroma(
     kvz_intra_recon_lcu_chroma(state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
     kvz_intra_recon_lcu_chroma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
-    if (depth < MAX_DEPTH) {
+    if (depth <= MAX_DEPTH) {
       cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
       cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
       cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
