@@ -496,10 +496,6 @@ typedef struct kvz_api {
                                   kvz_frame_info *info_out);
 } kvz_api;
 
-// Append API version to the getters name to prevent linking against incompatible versions.
-#define KVZ_API_CONCAT(func, version) func ## _apiv ## version
-#define KVZ_API_EXPAND_VERSION(func, version) KVZ_API_CONCAT(func, version)
-#define kvz_api_get KVZ_API_EXPAND_VERSION(kvz_api_get, KVZ_API_VERSION)
 
 KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
 
