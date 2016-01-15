@@ -2,7 +2,24 @@
 AC_INIT([kvazaar], m4_esyscmd([printf $(awk '/#define KVZ_VERSION/ { print $3 }' src/global.h)]))
 AC_CONFIG_SRCDIR([src/encmain.c])
 
-# Library version number
+# Library version number, modify:
+# - When modifying kvazaar.h.
+#   - Modify either major or minor.
+# - When making a new release.
+#   - If major or minor did not change since last release.
+#      - Check git history to see if someone forgot to increment major or minor.
+#      - Increment release.
+#
+# major:
+#   - Increment when ABI changes, meaning lib users need to be recompiled.
+#   - ABI changes when anything existing gets modified, including sizes of structs.
+# minor:
+#   - Increment when only API changes. Because the function pointers are in a struct, that means basically never?
+#   - If not sure, increment major instead.
+# release:
+#   - Increment when making new releases and major or minor was not changed since last release.
+#
+# Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=2
 ver_minor=4
 ver_release=0
