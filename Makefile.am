@@ -9,5 +9,4 @@ EXTRA_DIST = \
 	doc \
 	docs.doxy \
 	greatest \
-	SConstruct \
 	tools

@@ -4,7 +4,6 @@ lib_LTLIBRARIES = libkvazaar.la
 
 
 EXTRA_DIST = \
-	SConscript \
 	extras/getopt.c \
 	extras/getopt.h
 
