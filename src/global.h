@@ -173,9 +173,9 @@ typedef int16_t coeff_t;
 #define QUOTE(x) #x
 #define QUOTE_EXPAND(x) QUOTE(x)
 
-// NOTE: When making a release, remember to also bump library version in
-// Makefile, if necessary.
-#define KVZ_VERSION 0.8.1
+// NOTE: When making a release, check to see if incrementing libversion in 
+// configure.ac is necessary.
+#define KVZ_VERSION 0.8.2
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
 //#define VERBOSE 1
