@@ -258,10 +258,6 @@ out_close:
 
 static void set_hardware_flags(int32_t cpuid) {
   FILL(kvz_g_hardware_flags, 0);
-  
-  kvz_g_hardware_flags.arm = COMPILE_ARM;
-  kvz_g_hardware_flags.intel = COMPILE_INTEL;
-  kvz_g_hardware_flags.powerpc = COMPILE_POWERPC;
 
 #if COMPILE_INTEL
   if (cpuid) {

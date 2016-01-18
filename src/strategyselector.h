@@ -118,7 +118,6 @@ typedef struct {
 } strategy_to_select_t;
 
 typedef struct {
-  int intel;
   struct {
     int mmx;
     int sse;
@@ -131,12 +130,10 @@ typedef struct {
     int avx2;
   } intel_flags;
   
-  int powerpc;
   struct {
     int altivec;
   } powerpc_flags;
   
-  int arm;
   struct {
     int neon;
   } arm_flags;
