@@ -91,16 +91,12 @@ static INLINE __m128i filter_8x1_avx2(const kvz_pixel *ref_main, int16_t delta_p
   __m128i sample0 = _mm_cvtsi64_si128(*(uint64_t*)&(ref_main[x + delta_int]));
   __m128i sample1 = _mm_cvtsi64_si128(*(uint64_t*)&(ref_main[x + delta_int + 1]));
   __m128i pairs_lo = _mm_unpacklo_epi8(sample0, sample1);
-  __m128i pairs_hi = _mm_unpackhi_epi8(sample0, sample1);
 
   __m128i weight = _mm_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
   __m128i v_temp_lo = _mm_maddubs_epi16(pairs_lo, weight);
-  __m128i v_temp_hi = _mm_maddubs_epi16(pairs_hi, weight);
   v_temp_lo = _mm_add_epi16(v_temp_lo, _mm_set1_epi16(16));
-  v_temp_hi = _mm_add_epi16(v_temp_hi, _mm_set1_epi16(16));
   v_temp_lo = _mm_srli_epi16(v_temp_lo, 5);
-  v_temp_hi = _mm_srli_epi16(v_temp_hi, 5);
-  sample0 = _mm_packus_epi16(v_temp_lo, v_temp_hi);
+  sample0 = _mm_packus_epi16(v_temp_lo, v_temp_lo);
 
   return sample0;
 }
@@ -174,16 +170,12 @@ static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_
   __m256i sample1 = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&(ref_main[x + delta_int + 1])));
   sample1 = _mm256_packus_epi16(sample1, sample1);
   __m256i pairs_lo = _mm256_unpacklo_epi8(sample0, sample1);
-  __m256i pairs_hi = _mm256_unpackhi_epi8(sample0, sample1);
 
   __m256i weight = _mm256_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
   __m256i v_temp_lo = _mm256_maddubs_epi16(pairs_lo, weight);
-  __m256i v_temp_hi = _mm256_maddubs_epi16(pairs_hi, weight);
   v_temp_lo = _mm256_add_epi16(v_temp_lo, _mm256_set1_epi16(16));
-  v_temp_hi = _mm256_add_epi16(v_temp_hi, _mm256_set1_epi16(16));
   v_temp_lo = _mm256_srli_epi16(v_temp_lo, 5);
-  v_temp_hi = _mm256_srli_epi16(v_temp_hi, 5);
-  sample0 = _mm256_packus_epi16(v_temp_lo, v_temp_hi);
+  sample0 = _mm256_packus_epi16(v_temp_lo, v_temp_lo);
 
   return sample0;
 }
