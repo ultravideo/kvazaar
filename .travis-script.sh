@@ -3,7 +3,7 @@ set -ev
 
 ./autogen.sh
 ./configure
-make
+make --jobs=2
 
 if [ -n "$VALGRIND_TEST" ]; then
   libtool execute valgrind --leak-check=full --error-exitcode=1 -- \

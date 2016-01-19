@@ -5,7 +5,6 @@ env:
   - KVZ_DISABLE_AVX2=1
   - TEST_DIM=264x130
   - TEST_FRAMES=10
-  - MAKEFLAGS="--jobs=2 --environment-overrides"
 
 sudo: false
 
