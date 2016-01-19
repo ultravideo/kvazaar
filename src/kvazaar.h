@@ -29,8 +29,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kvazaar_version.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

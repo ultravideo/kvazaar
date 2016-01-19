@@ -13,8 +13,7 @@ nodist_pkgconfig_DATA = kvazaar.pc
 
 
 include_HEADERS = \
-	kvazaar.h \
-	kvazaar_version.h
+	kvazaar.h
 
 noinst_HEADERS = \
 	extras/x86inc.asm
