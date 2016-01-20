@@ -1,4 +1,3 @@
-
 bin_PROGRAMS = kvazaar
 lib_LTLIBRARIES = libkvazaar.la
 
@@ -18,6 +17,11 @@ include_HEADERS = \
 noinst_HEADERS = \
 	extras/x86inc.asm
 
+noinst_LTLIBRARIES = \
+	libaltivec.la \
+	libavx2.la \
+	libsse2.la \
+	libsse41.la
 
 kvazaar_SOURCES = \
 	encmain.c \
@@ -91,8 +95,6 @@ libkvazaar_la_SOURCES = \
 	transform.h \
 	videoframe.c \
 	videoframe.h \
-	strategies/altivec/picture-altivec.c \
-	strategies/altivec/picture-altivec.h \
 	strategies/generic/dct-generic.c \
 	strategies/generic/dct-generic.h \
 	strategies/generic/intra-generic.c \
@@ -105,10 +107,6 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/picture-generic.h \
 	strategies/generic/quant-generic.c \
 	strategies/generic/quant-generic.h \
-	strategies/sse2/picture-sse2.c \
-	strategies/sse2/picture-sse2.h \
-	strategies/sse41/picture-sse41.c \
-	strategies/sse41/picture-sse41.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -127,7 +125,20 @@ libkvazaar_la_SOURCES = \
 	strategyselector.c \
 	strategyselector.h
 
-avx2_sources = \
+libkvazaar_la_LIBADD = \
+	libaltivec.la \
+	libavx2.la \
+	libsse2.la \
+	libsse41.la
+
+libkvazaar_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-number $(KVZ_API_VERSION)
+
+
+libaltivec_la_SOURCES = \
+	strategies/altivec/picture-altivec.c \
+	strategies/altivec/picture-altivec.h
+
+libavx2_la_SOURCES = \
 	strategies/avx2/dct-avx2.c \
 	strategies/avx2/dct-avx2.h \
 	strategies/avx2/intra-avx2.c \
@@ -139,35 +150,44 @@ avx2_sources = \
 	strategies/avx2/quant-avx2.c \
 	strategies/avx2/quant-avx2.h
 
-libkvazaar_la_SOURCES += $(avx2_sources)
-libkvazaar_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-number $(KVZ_API_VERSION)
+libsse2_la_SOURCES = \
+	strategies/sse2/picture-sse2.c \
+	strategies/sse2/picture-sse2.h
 
+libsse41_la_SOURCES = \
+	strategies/sse41/picture-sse41.c \
+	strategies/sse41/picture-sse41.h
 
 if HAVE_PPC
-
-strategies/altivec/picture-altivec.lo: CFLAGS += -maltivec
-
-else #HAVE_PPC
+libaltivec_la_CFLAGS = -maltivec
+endif
 
 if HAVE_X86
-strategies/sse2/picture-sse2.lo: CFLAGS += -msse2
-strategies/sse41/picture-sse41.lo: CFLAGS += -msse4.1
-$(avx2_sources): CFLAGS += -mavx2
+
+if HAVE_AVX2
+libavx2_la_CFLAGS = -mavx2
+endif
+if HAVE_SSE4_1
+libsse41_la_CFLAGS = -msse4.1
+endif
+if HAVE_SSE2
+libsse2_la_CFLAGS = -msse2
+endif
 
 if ENABLE_ASM
-libkvazaar_la_SOURCES += \
+noinst_LTLIBRARIES += libasm.la
+libkvazaar_la_LIBADD += libasm.la
+libasm_la_SOURCES = \
 	strategies/x86_asm/picture-x86-asm-sad.asm \
 	strategies/x86_asm/picture-x86-asm-sad.h \
 	strategies/x86_asm/picture-x86-asm-satd.asm \
 	strategies/x86_asm/picture-x86-asm-satd.h
+libasm_la_CFLAGS = -DKVZ_COMPILE_ASM
 
-strategies/x86_asm/picture-x86-asm.lo: CFLAGS += -DKVZ_COMPILE_ASM
 strategies/x86_asm/picture-x86-asm-sad.lo: strategies/x86_asm/picture-x86-asm-sad.asm
 strategies/x86_asm/picture-x86-asm-satd.lo: strategies/x86_asm/picture-x86-asm-satd.asm
 endif #ENABLE_ASM
 endif #HAVE_X86
-
-endif #HAVE_PPC
 
 
 yasm_verbose = $(yasm_verbose_@AM_V@)
