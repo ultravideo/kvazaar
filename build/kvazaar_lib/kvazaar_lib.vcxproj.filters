@@ -251,9 +251,6 @@
     <ClInclude Include="..\..\src\kvazaar_internal.h">
       <Filter>Control</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\kvazaar_version.h">
-      <Filter>Control</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\videoframe.h">
       <Filter>Data structures</Filter>
     </ClInclude>
