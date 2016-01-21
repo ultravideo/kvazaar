@@ -97,6 +97,8 @@ static const struct option long_options[] = {
   { "preset",             required_argument, NULL, 0 },
   { "mv-rdo",                   no_argument, NULL, 0 },
   { "no-mv-rdo",                no_argument, NULL, 0 },
+  { "psnr",                     no_argument, NULL, 0 },
+  { "no-psnr",                  no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -337,6 +339,7 @@ void print_help(void)
     "          --preset <string>      : Use preset\n"
     "                                     ultrafast, superfast,veryfast, faster,\n"
     "                                     fast, medium, slow, slower, veryslow, placebo\n"
+    "          --no-psnr              : Don't calculate PSNR for frames\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

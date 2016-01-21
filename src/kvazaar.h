@@ -108,7 +108,9 @@ typedef struct kvz_gop_config {
 /**
  * \brief Struct which contains all configuration data
  *
- * Function config_alloc in kvz_api must be used for allocation.
+ * Functions config_alloc, config_init and config_destroy must be used to
+ * maintain ABI compatibility. Do not copy this struct, as the size might
+ * change.
  */
 typedef struct kvz_config
 {
@@ -190,6 +192,7 @@ typedef struct kvz_config
   int32_t target_bitrate;
 
   int8_t mv_rdo;            /*!< \brief MV RDO calculation in search (0: estimation, 1: RDO). */
+  int8_t calc_psnr;         /*!< \since 3.1.0 \brief Print PSNR in CLI. */
 } kvz_config;
 
 /**

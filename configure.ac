@@ -14,14 +14,16 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #   - Increment when ABI changes, meaning lib users need to be recompiled.
 #   - ABI changes when anything existing gets modified, including sizes of structs.
 # minor:
-#   - Increment when only API changes. Because the function pointers are in a struct, that means basically never?
+#   - Increment when only API changes in a backwards compatible way without breaking ABI.
+#   - We count adding parameters to bottom of kvz_config as ABI compatible, because user
+#     shouldn't copy that struct or care about it's size.
 #   - If not sure, increment major instead.
 # release:
 #   - Increment when making new releases and major or minor was not changed since last release.
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=3
-ver_minor=0
+ver_minor=1
 ver_release=0
 
 # not used, but it prevents configure from adding a lot of defines to the CFLAGS

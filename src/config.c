@@ -100,6 +100,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->pu_depth_intra.max = 4; // 0-4
 
   cfg->add_encoder_info = true;
+  cfg->calc_psnr = true;
 
   return 1;
 }
@@ -756,6 +757,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("mv-rdo")
     cfg->mv_rdo = atobool(value);
+  else if OPT("psnr")
+    cfg->calc_psnr = (bool)atobool(value);
   else
     return 0;
 #undef OPT

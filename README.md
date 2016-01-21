@@ -79,6 +79,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
               --preset <string>      : Use preset. This will override previous options.
                                          ultrafast, superfast,veryfast, faster,
                                          fast, medium, slow, slower, veryslow, placebo
+              --no-psnr              : Don't calculate PSNR for frames
 
       Video Usability Information:
               --sar <width:height>   : Specify Sample Aspect Ratio

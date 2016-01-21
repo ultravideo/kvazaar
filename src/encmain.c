@@ -298,7 +298,9 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        compute_psnr(img_src, img_rec, frame_psnr);
+        if (encoder->cfg->calc_psnr) {
+          compute_psnr(img_src, img_rec, frame_psnr);
+        }
 
         if (recout) {
           // Since chunks_out was not NULL, img_rec should have been set.
