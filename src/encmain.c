@@ -200,8 +200,6 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
     goto exit_failure;
   }
-  encoder->vui.field_seq_flag = encoder->cfg->source_scan_type != 0;
-  encoder->vui.frame_field_info_present_flag = encoder->cfg->source_scan_type != 0;
 
   //Now, do the real stuff
   {

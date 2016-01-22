@@ -149,8 +149,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   // Rate-distortion optimization level
   encoder->rdo        = 1;
   encoder->full_intra_search = 0;
-  // INTERLACING
+
+  // Interlacing
   encoder->in.source_scan_type = (int8_t)cfg->source_scan_type;
+  encoder->vui.field_seq_flag = encoder->cfg->source_scan_type != 0;
+  encoder->vui.frame_field_info_present_flag = encoder->cfg->source_scan_type != 0;
 
   // Initialize the scaling list
   kvz_scalinglist_init(&encoder->scaling_list);
