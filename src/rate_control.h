@@ -26,6 +26,8 @@
  * \brief Functions related to rate control.
  */
 
+#include "global.h"
+
 #include "encoderstate.h"
 
 double kvz_select_picture_lambda(encoder_state_t * const state);

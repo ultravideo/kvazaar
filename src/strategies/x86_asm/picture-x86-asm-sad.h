@@ -26,6 +26,8 @@
  * Optimizations for AVX, utilizing ASM implementations.
  */
 
+#include "global.h"
+
 unsigned kvz_sad_4x4_avx(const kvz_pixel*, const kvz_pixel*);
 unsigned kvz_sad_8x8_avx(const kvz_pixel*, const kvz_pixel*);
 unsigned kvz_sad_16x16_avx(const kvz_pixel*, const kvz_pixel*);

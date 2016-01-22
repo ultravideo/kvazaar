@@ -26,6 +26,8 @@
  * Sample Adaptive Offset filter.
  */
 
+#include "global.h"
+
 #include "checkpoint.h"
 #include "global.h"
 #include "videoframe.h"

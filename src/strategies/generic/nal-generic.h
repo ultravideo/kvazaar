@@ -26,7 +26,7 @@
  * Generic C implementations of optimized functions.
  */
 
-#include  "global.h"
+#include "global.h"
 
 int kvz_strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
 

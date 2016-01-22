@@ -26,6 +26,8 @@
  * Interface for subpixel interpolation functions.
  */
 
+#include "global.h"
+
 #include <stdint.h>
 
 #include "encoder.h"

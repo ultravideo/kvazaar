@@ -26,6 +26,8 @@
  * Interface for transform functions.
  */
 
+#include "global.h"
+
 #include <stdint.h>
 
 typedef unsigned (dct_func)(int8_t bitdepth, const int16_t *input, int16_t *output);

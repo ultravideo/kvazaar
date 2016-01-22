@@ -27,7 +27,9 @@
  */
 
 #include "global.h"
+
 #include "kvazaar.h"
+
 
 typedef struct {
   kvz_pixel y[LCU_LUMA_SIZE];

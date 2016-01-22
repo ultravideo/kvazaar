@@ -26,6 +26,8 @@
  * Interface for quantization functions.
  */
 
+#include "global.h"
+
 #include "encoderstate.h"
 
 // Declare function pointers.

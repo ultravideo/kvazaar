@@ -25,8 +25,9 @@
  * Command line interface
  */
 
-#include "kvazaar.h"
 #include "global.h"
+
+#include "kvazaar.h"
 #include "encoderstate.h"
 
 typedef struct cmdline_opts_t {

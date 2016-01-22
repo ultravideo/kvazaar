@@ -26,7 +26,10 @@
  * Optimizations for AVX2.
  */
 
+#include "global.h"
+
 #include <stdint.h>
+
 #include "encoderstate.h"
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth);

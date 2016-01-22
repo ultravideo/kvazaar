@@ -26,6 +26,8 @@
  * \brief Definitions for opaque structs in kvazaar.h
  */
 
+#include "global.h"
+
 #include "kvazaar.h"
 #include "input_frame_buffer.h"
 

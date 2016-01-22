@@ -26,8 +26,9 @@
  * Runtime configuration through defaults and parsing of arguments.
  */
 
-#include "kvazaar.h"
 #include "global.h"
+
+#include "kvazaar.h"
 
 /* Function definitions */
 kvz_config *kvz_config_alloc(void);

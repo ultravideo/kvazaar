@@ -31,6 +31,8 @@
 #include <fcntl.h>    /* _O_BINARY */
 #endif
 
+#include "global.h"
+
 #include "kvazaar_internal.h"
 
 #include <math.h>

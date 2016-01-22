@@ -26,7 +26,10 @@
  * Generic C implementations of optimized functions.
  */
 
+#include "global.h"
+
 #include <stdint.h>
+
 #include "encoderstate.h"
 
 int kvz_strategy_register_intra_generic(void* opaque, uint8_t bitdepth);

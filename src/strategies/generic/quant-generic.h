@@ -26,7 +26,10 @@
  * Generic C implementations of optimized functions.
  */
 
+#include "global.h"
+
 #include <stdint.h>
+
 #include "encoderstate.h"
 
 #define QUANT_SHIFT 14

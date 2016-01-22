@@ -26,8 +26,9 @@
  * Appending bits into an Annex-B coded bitstream.
  */
 
-#include "kvazaar.h"
 #include "global.h"
+
+#include "kvazaar.h"
 
 /**
  * A stream of bits.

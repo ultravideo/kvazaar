@@ -26,6 +26,8 @@
  * Generic C implementations of optimized functions.
  */
 
+#include "global.h"
+
 #include "encoder.h"
 
 int kvz_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth);

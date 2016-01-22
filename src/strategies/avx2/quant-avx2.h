@@ -26,6 +26,8 @@
  * Optimizations for AVX2.
  */
 
+#include "global.h"
+
 #include <stdint.h>
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth);

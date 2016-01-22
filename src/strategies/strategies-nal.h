@@ -26,6 +26,8 @@
  * Interface for hash functions.
  */
 
+#include "global.h"
+
 #include "../nal.h"
 
 //Function pointer to kvz_array_checksum

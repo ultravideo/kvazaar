@@ -27,6 +27,7 @@
  */
 
 #include "global.h"
+
 #include "cu.h"
 #include "image.h"
 

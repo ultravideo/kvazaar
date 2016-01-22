@@ -26,6 +26,8 @@
  *  Container for a list of reference pictures.
  */
 
+#include "global.h"
+
 #include "image.h"
 #include "cu.h"
 

@@ -26,6 +26,8 @@
  * Interface for intra prediction functions.
  */
 
+#include "global.h"
+
 #include "encoderstate.h"
 
 typedef void (angular_pred_func)(
