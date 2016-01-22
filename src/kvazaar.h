@@ -26,8 +26,6 @@
  * This file defines the public API of Kvazaar when used as a library.
  */
 
-#include "global.h"
-
 #include <stddef.h>
 #include <stdint.h>
 
