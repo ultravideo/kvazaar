@@ -344,6 +344,7 @@ int main(int argc, char *argv[])
         PTHREAD_LOCK(&main_thread_mutex);
       }      
       cur_in_img = img_in[frames_read & 1];
+      img_in[frames_read & 1] = NULL;
       frames_read++;
 
       if (in_args.retval == EXIT_FAILURE) {
