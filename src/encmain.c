@@ -164,8 +164,9 @@ static void* input_read_thread(void* in_args) {
 
       if (args->field_parity == 0) {
         if (yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
-          frames_read += 1;
           args->img_in[frames_read & 1] = frame_in;
+          frames_read ++;
+          frame_in = NULL;
         } else {
           // EOF or some error
           if (!feof(args->input)) {
@@ -177,8 +178,8 @@ static void* input_read_thread(void* in_args) {
       }
 
       if (args->encoder->cfg->source_scan_type != 0) {
-        args->img_in[(frames_read+1) & 1] = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
-        yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, args->img_in[(frames_read+1) & 1]);
+        args->img_in[frames_read & 1] = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
+        yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, args->img_in[frames_read & 1]);
         if (args->field_parity == 1) args->api->picture_free(frame_in);
         args->field_parity ^= 1; //0->1 or 1->0
       }
@@ -193,13 +194,11 @@ static void* input_read_thread(void* in_args) {
 
 exit_eof:
   args->retval = RETVAL_EOF;  
-
+  args->img_in[frames_read & 1] = NULL;
 exit_failure:
   // Do some cleaning up  
-  args->img_in[0] = NULL;
-  args->img_in[1] = NULL;
+  args->api->picture_free(frame_in);
   if (!args->retval) {
-    args->api->picture_free(frame_in);
     args->retval = RETVAL_FAILURE;
   }
   pthread_exit(NULL);
@@ -312,7 +311,7 @@ int main(int argc, char *argv[])
 
     // Lock both mutexes at startup
     PTHREAD_LOCK(&main_thread_mutex);
-    PTHREAD_LOCK(&input_mutex);    
+    PTHREAD_LOCK(&input_mutex);
 
     // Give arguments via struct to the input thread
     input_handler_args in_args;    
@@ -327,7 +326,7 @@ int main(int argc, char *argv[])
     in_args.padding_x = padding_x;
     in_args.padding_y = padding_y;
     in_args.api = api;
-    in_args.retval = 0;
+    in_args.retval = RETVAL_RUNNING;
 
     if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
       fprintf(stderr, "pthread_create failed!\n");
@@ -343,9 +342,9 @@ int main(int argc, char *argv[])
         // unlock the input thread to be able to continue to the next picture
         PTHREAD_UNLOCK(&input_mutex);
         PTHREAD_LOCK(&main_thread_mutex);
-      }
-      frames_read++;
+      }      
       cur_in_img = img_in[frames_read & 1];
+      frames_read++;
 
       if (in_args.retval == EXIT_FAILURE) {
         goto exit_failure;
@@ -449,6 +448,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
+    pthread_join(input_thread, NULL);
   }
 
   goto done;
