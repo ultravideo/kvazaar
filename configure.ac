@@ -39,6 +39,9 @@ AC_PROG_CC
 AC_PROG_CC_C99
 AM_PROG_AR
 
+# Get fread that can read more than 2GB on 32 bit systems.
+AC_SYS_LARGEFILE
+
 LT_INIT([win32-dll])
 
 AX_CHECK_COMPILE_FLAG(-mavx2,   [flag_avx2="true"])
