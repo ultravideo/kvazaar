@@ -122,6 +122,97 @@ static void compute_psnr(const kvz_picture *const src,
   }
 }
 
+typedef struct {
+  FILE* input;
+  pthread_mutex_t* input_mutex;
+  pthread_mutex_t* main_thread_mutex;
+
+  kvz_picture **img_in;
+  uint8_t field_parity;
+  cmdline_opts_t *opts;
+  encoder_control_t *encoder;
+  uint8_t padding_x;
+  uint8_t padding_y;
+  const kvz_api * api;
+  int retval;
+} input_handler_args;
+
+#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
+#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
+
+#define RETVAL_RUNNING 0
+#define RETVAL_FAILURE 1
+#define RETVAL_EOF 2
+
+/**
+* \brief Handles input reading in a thread
+*
+* \param in_args  pointer to argument struct
+*/
+static void* input_read_thread(void* in_args) {
+
+  input_handler_args* args = (input_handler_args*)in_args;
+  kvz_picture *frame_in = NULL;
+  int frames_read = 0;
+  for (;;) {
+
+    if (!feof(args->input) && (args->opts->frames == 0 || frames_read < args->opts->frames || args->field_parity == 1)) {
+      // Try to read an input frame.
+      if (args->field_parity == 0) frame_in = args->api->picture_alloc(args->opts->config->width + args->padding_x, args->opts->config->height + args->padding_y);
+      if (!frame_in) {
+        fprintf(stderr, "Failed to allocate image.\n");
+        goto exit_failure;
+      }
+
+      if (args->field_parity == 0) {
+        if (yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
+          args->img_in[frames_read & 1] = frame_in;
+        } else {
+          // EOF or some error
+          if (!feof(args->input)) {
+            fprintf(stderr, "Failed to read a frame %d\n", frames_read);
+            goto exit_failure;
+          }
+          goto exit_eof;
+        }
+      }
+
+      if (args->encoder->cfg->source_scan_type != 0) {
+        args->img_in[frames_read & 1] = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
+        yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, args->img_in[frames_read & 1]);
+        if (args->field_parity == 1) {
+          args->api->picture_free(frame_in);
+          frame_in = NULL;
+        }
+        args->field_parity ^= 1; //0->1 or 1->0
+      } else {
+        frame_in = NULL;
+      }
+      frames_read++;
+      
+    } else {
+      goto exit_eof;
+    }
+    // Wait until main thread is ready to receive input and then release main thread
+    PTHREAD_LOCK(args->input_mutex);
+    PTHREAD_UNLOCK(args->main_thread_mutex);
+    
+  }
+
+exit_eof:
+  args->retval = RETVAL_EOF;  
+  args->img_in[frames_read & 1] = NULL;
+exit_failure:
+  // Do some cleaning up  
+  args->api->picture_free(frame_in);
+  if (!args->retval) {
+    args->retval = RETVAL_FAILURE;
+  }
+  pthread_exit(NULL);
+  return 0;
+}
+
+
 /**
  * \brief Program main function.
  * \param argc Argument count from commandline
@@ -215,43 +306,54 @@ int main(int argc, char *argv[])
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     int8_t field_parity = 0;
-    kvz_picture *frame_in = NULL;
     uint8_t padding_x = get_padding(opts->config->width);
     uint8_t padding_y = get_padding(opts->config->height);
 
+    pthread_t input_thread;
+
+    pthread_mutex_t input_mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t main_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    // Lock both mutexes at startup
+    PTHREAD_LOCK(&main_thread_mutex);
+    PTHREAD_LOCK(&input_mutex);
+
+    // Give arguments via struct to the input thread
+    input_handler_args in_args;    
+    kvz_picture *img_in[2] = { NULL };
+    in_args.input = input;
+    in_args.img_in = img_in;
+    in_args.main_thread_mutex = &main_thread_mutex;
+    in_args.input_mutex = &input_mutex;
+    in_args.opts = opts;
+    in_args.field_parity = field_parity;
+    in_args.encoder = encoder;
+    in_args.padding_x = padding_x;
+    in_args.padding_y = padding_y;
+    in_args.api = api;
+    in_args.retval = RETVAL_RUNNING;
+
+    if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
+      fprintf(stderr, "pthread_create failed!\n");
+      assert(0);
+      return 0;
+    }
+    kvz_picture *cur_in_img;
     for (;;) {
 
-      kvz_picture *img_in = NULL;
+      // Skip mutex locking when thread is no longer in run state
+      if (in_args.retval == RETVAL_RUNNING) {
+        // Wait for input to be read
+        // unlock the input thread to be able to continue to the next picture
+        PTHREAD_UNLOCK(&input_mutex);
+        PTHREAD_LOCK(&main_thread_mutex);
+      }      
+      cur_in_img = img_in[frames_read & 1];
+      img_in[frames_read & 1] = NULL;
+      frames_read++;
 
-      if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames || field_parity == 1) ) {
-        // Try to read an input frame.
-        if(field_parity == 0) frame_in = api->picture_alloc(opts->config->width + padding_x, opts->config->height + padding_y);
-        if (!frame_in) {
-          fprintf(stderr, "Failed to allocate image.\n");
-          goto exit_failure;
-        }
-
-        if (field_parity == 0){
-          if (yuv_io_read(input, opts->config->width, opts->config->height, frame_in)) {
-            frames_read += 1;
-            img_in = frame_in;
-          } else {
-            // EOF or some error
-            api->picture_free(frame_in);
-            img_in = NULL;
-            if (!feof(input)) {
-              fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-              goto exit_failure;
-            }
-          }
-        }
-
-        if (encoder->cfg->source_scan_type != 0){
-          img_in = api->picture_alloc(encoder->in.width, encoder->in.height);
-          yuv_io_extract_field(frame_in, encoder->cfg->source_scan_type, field_parity, img_in);
-          if (field_parity == 1) api->picture_free(frame_in);
-          field_parity ^= 1; //0->1 or 1->0
-        }
+      if (in_args.retval == EXIT_FAILURE) {
+        goto exit_failure;
       }
 
       kvz_data_chunk* chunks_out = NULL;
@@ -260,18 +362,18 @@ int main(int argc, char *argv[])
       uint32_t len_out = 0;
       kvz_frame_info info_out;
       if (!api->encoder_encode(enc,
-                               img_in,
+                               cur_in_img,
                                &chunks_out,
                                &len_out,
                                &img_rec,
                                &img_src,
                                &info_out)) {
         fprintf(stderr, "Failed to encode image.\n");
-        api->picture_free(img_in);
+        api->picture_free(cur_in_img);
         goto exit_failure;
       }
 
-      if (chunks_out == NULL && img_in == NULL) {
+      if (chunks_out == NULL && cur_in_img == NULL) {
         // We are done since there is no more input and output left.
         break;
       }
@@ -285,7 +387,7 @@ int main(int argc, char *argv[])
           assert(written + chunk->len <= len_out);
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
-            api->picture_free(img_in);
+            api->picture_free(cur_in_img);
             api->chunk_free(chunks_out);
             goto exit_failure;
           }
@@ -321,7 +423,7 @@ int main(int argc, char *argv[])
         print_frame_info(&info_out, frame_psnr, len_out);
       }
 
-      api->picture_free(img_in);
+      api->picture_free(cur_in_img);
       api->chunk_free(chunks_out);
       api->picture_free(img_rec);
       api->picture_free(img_src);
@@ -352,6 +454,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
+    pthread_join(input_thread, NULL);
   }
 
   goto done;
