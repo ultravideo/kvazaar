@@ -100,6 +100,7 @@
     <ClCompile Include="..\..\tests\dct_tests.c" />
     <ClCompile Include="..\..\tests\test_strategies.c" />
     <ClCompile Include="..\..\tests\intra_sad_tests.c" />
+    <ClCompile Include="..\..\tests\mv_cand_tests.c" />
     <ClCompile Include="..\..\tests\sad_tests.c" />
     <ClCompile Include="..\..\tests\satd_tests.c" />
     <ClCompile Include="..\..\tests\speed_tests.c" />
