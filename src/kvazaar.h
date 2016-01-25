@@ -91,6 +91,17 @@ enum kvz_ime_algorithm {
 };
 
 /**
+ * \brief Interlacing methods.
+ * \since 3.2.0
+ */
+enum kvz_interlacing
+{
+  KVZ_INTERLACING_NONE = 0,
+  KVZ_INTERLACING_TFF = 1, // top field first
+  KVZ_INTERLACING_BFF = 2, // bottom field first
+};
+
+/**
  * \brief GoP picture configuration.
  */
 typedef struct kvz_gop_config {
@@ -218,6 +229,8 @@ typedef struct kvz_picture {
 
   int64_t pts;             //!< \brief Presentation timestamp. Should be set for input frames.
   int64_t dts;             //!< \brief Decompression timestamp.
+
+  enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
 } kvz_picture;
 
 /**

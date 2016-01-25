@@ -128,7 +128,6 @@ typedef struct {
   pthread_mutex_t* main_thread_mutex;
 
   kvz_picture **img_in;
-  uint8_t field_parity;
   cmdline_opts_t *opts;
   encoder_control_t *encoder;
   uint8_t padding_x;
@@ -161,7 +160,6 @@ static void* input_read_thread(void* in_args)
 
   input_handler_args* args = (input_handler_args*)in_args;
   kvz_picture *frame_in = NULL;
-  kvz_picture *frame_out = NULL;
   int frames_read = 0;
 
   for (;;) {
@@ -169,49 +167,35 @@ static void* input_read_thread(void* in_args)
     // args->img_in for main thread to process.
 
     bool input_empty = !(args->opts->frames == 0 // number of frames to read is unknown
-                         || frames_read < args->opts->frames // not all frames have been read
-                         || args->field_parity == 1); // the second field has not been read from the last frame
+                         || frames_read < args->opts->frames); // not all frames have been read
     if (feof(args->input) || input_empty) {
       goto exit_eof;
     }
 
-    if (args->field_parity == 0) {
-      // progressive, or first feld in interlaced
-      frame_in = args->api->picture_alloc(args->opts->config->width + args->padding_x, args->opts->config->height + args->padding_y);
+    frame_in = args->api->picture_alloc(args->opts->config->width + args->padding_x, args->opts->config->height + args->padding_y);
         
-      if (!frame_in) {
-        fprintf(stderr, "Failed to allocate image.\n");
+    if (!frame_in) {
+      fprintf(stderr, "Failed to allocate image.\n");
+      goto exit_failure;
+    }
+
+    if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
+      // reading failed
+      if (feof(args->input)) {
+        goto exit_eof;
+      } else {
+        fprintf(stderr, "Failed to read a frame %d\n", frames_read);
         goto exit_failure;
       }
-
-      if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
-        // reading failed
-        if (feof(args->input)) {
-          goto exit_eof;
-        } else {
-          fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-          goto exit_failure;
-        }
-      }
     }
 
-    if (args->encoder->cfg->source_scan_type == 0) {
-      // progressive
-      frame_out = frame_in;
-      frame_in = NULL;
-    } else {
-      // interlaced
-      frame_out = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
-      yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, frame_out);
-      if (args->field_parity == 1) {
-        // After the second field has been read, free the original input because it won't be given as output.
-        args->api->picture_free(frame_in);
-        frame_in = NULL;
-      }
-      args->field_parity ^= 1; //0->1 or 1->0
+    if (args->encoder->cfg->source_scan_type != 0) {
+      // Set source scan type for frame, so that it will be turned into fields.
+      frame_in->interlacing = args->encoder->cfg->source_scan_type;
     }
+    args->img_in[frames_read & 1] = frame_in;
+    frame_in = NULL;
 
-    args->img_in[frames_read & 1] = frame_out;
     frames_read++;
 
     // Wait until main thread is ready to receive input and then release main thread
@@ -325,7 +309,6 @@ int main(int argc, char *argv[])
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
-    int8_t field_parity = 0;
     uint8_t padding_x = get_padding(opts->config->width);
     uint8_t padding_y = get_padding(opts->config->height);
 
@@ -346,7 +329,6 @@ int main(int argc, char *argv[])
     in_args.main_thread_mutex = &main_thread_mutex;
     in_args.input_mutex = &input_mutex;
     in_args.opts = opts;
-    in_args.field_parity = field_parity;
     in_args.encoder = encoder;
     in_args.padding_x = padding_x;
     in_args.padding_y = padding_y;
@@ -420,7 +402,9 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg->calc_psnr) {
+        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+          // Do not compute PSNR for interlaced frames, because img_rec does not contain
+          // the deinterlaced frame yet.
           compute_psnr(img_src, img_rec, frame_psnr);
         }
 

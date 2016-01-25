@@ -125,6 +125,13 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     encoder->owf = select_owf_auto(cfg);
     fprintf(stderr, "--owf=auto value set to %d.\n", encoder->owf);
   }
+  if (cfg->source_scan_type != KVZ_INTERLACING_NONE) {
+    // If using interlaced coding with OWF, the OWF has to be an even number
+    // to ensure that the pair of fields will be output for the same picture.
+    if (encoder->owf % 2 == 1) {
+      encoder->owf += 1;
+    }
+  }
 
   encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
   if (!encoder->threadqueue ||
