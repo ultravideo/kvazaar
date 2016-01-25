@@ -144,7 +144,7 @@
     <ClCompile Include="..\..\src\bitstream.c">
       <Filter>CABAC</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\config.c">
+    <ClCompile Include="..\..\src\cfg.c">
       <Filter>Control</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\filter.c">
@@ -218,7 +218,7 @@
     <ClInclude Include="..\..\src\context.h">
       <Filter>CABAC</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\config.h">
+    <ClInclude Include="..\..\src\cfg.h">
       <Filter>Control</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\encoder.h">

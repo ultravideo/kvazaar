@@ -25,7 +25,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "config.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "encoder.h"

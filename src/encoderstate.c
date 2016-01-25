@@ -26,7 +26,6 @@
 #include <assert.h>
 
 #include "tables.h"
-#include "config.h"
 #include "cabac.h"
 #include "image.h"
 #include "nal.h"

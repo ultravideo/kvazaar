@@ -31,7 +31,6 @@
 #include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
-#include "config.h"
 #include "tables.h"
 #include "scalinglist.h"
 #include "threadqueue.h"

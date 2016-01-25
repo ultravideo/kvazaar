@@ -39,8 +39,8 @@ libkvazaar_la_SOURCES = \
 	cabac.h \
 	checkpoint.c \
 	checkpoint.h \
-	config.c \
-	config.h \
+	cfg.c \
+	cfg.h \
 	context.c \
 	context.h \
 	cu.c \

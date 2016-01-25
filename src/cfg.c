@@ -18,7 +18,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "config.h"
+#include "cfg.h"
 
 #include <stdio.h>
 #include <stdlib.h>

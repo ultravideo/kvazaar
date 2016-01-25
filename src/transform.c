@@ -25,7 +25,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "config.h"
 #include "nal.h"
 #include "rdo.h"
 #include "strategies/strategies-dct.h"

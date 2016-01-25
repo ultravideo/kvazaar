@@ -129,7 +129,7 @@
     <ClCompile Include="..\..\src\kvazaar.c" />
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
-    <ClCompile Include="..\..\src\config.c" />
+    <ClCompile Include="..\..\src\cfg.c" />
     <ClCompile Include="..\..\src\context.c" />
     <ClCompile Include="..\..\src\cu.c" />
     <ClCompile Include="..\..\src\encoder.c" />
@@ -224,7 +224,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h" />
     <ClInclude Include="..\..\src\cabac.h" />
-    <ClInclude Include="..\..\src\config.h" />
+    <ClInclude Include="..\..\src\cfg.h" />
     <ClInclude Include="..\..\src\context.h" />
     <ClInclude Include="..\..\src\encoder.h" />
     <ClInclude Include="..\..\src\encoderstate.h" />

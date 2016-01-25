@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
 #include "filter.h"
 #include "strategies/strategies-ipol.h"
 #include "strategies/generic/ipol-generic.h"

@@ -25,7 +25,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
 #include "bitstream.h"
 #include "videoframe.h"
 #include "cabac.h"

@@ -22,7 +22,7 @@
 
 #include <stdlib.h>
 
-#include "config.h"
+#include "cfg.h"
 #include "encoder.h"
 #include "strategyselector.h"
 #include "encoderstate.h"
