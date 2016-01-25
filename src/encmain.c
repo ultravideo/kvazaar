@@ -149,54 +149,74 @@ typedef struct {
 *
 * \param in_args  pointer to argument struct
 */
-static void* input_read_thread(void* in_args) {
+static void* input_read_thread(void* in_args)
+{
+
+  // Reading a frame works as follows:
+  // - read full frame
+  // if progressive: set read frame as output
+  // if interlaced:
+  // - allocate two fields and fill them according to field order
+  // - deallocate the initial full frame
 
   input_handler_args* args = (input_handler_args*)in_args;
   kvz_picture *frame_in = NULL;
+  kvz_picture *frame_out = NULL;
   int frames_read = 0;
-  for (;;) {
 
-    if (!feof(args->input) && (args->opts->frames == 0 || frames_read < args->opts->frames || args->field_parity == 1)) {
-      // Try to read an input frame.
-      if (args->field_parity == 0) frame_in = args->api->picture_alloc(args->opts->config->width + args->padding_x, args->opts->config->height + args->padding_y);
+  for (;;) {
+    // Each iteration of this loop puts either a single frame or a field into
+    // args->img_in for main thread to process.
+
+    bool input_empty = !(args->opts->frames == 0 // number of frames to read is unknown
+                         || frames_read < args->opts->frames // not all frames have been read
+                         || args->field_parity == 1); // the second field has not been read from the last frame
+    if (feof(args->input) || input_empty) {
+      goto exit_eof;
+    }
+
+    if (args->field_parity == 0) {
+      // progressive, or first feld in interlaced
+      frame_in = args->api->picture_alloc(args->opts->config->width + args->padding_x, args->opts->config->height + args->padding_y);
+        
       if (!frame_in) {
         fprintf(stderr, "Failed to allocate image.\n");
         goto exit_failure;
       }
 
-      if (args->field_parity == 0) {
-        if (yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
-          args->img_in[frames_read & 1] = frame_in;
-        } else {
-          // EOF or some error
-          if (!feof(args->input)) {
-            fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-            goto exit_failure;
-          }
+      if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
+        // reading failed
+        if (feof(args->input)) {
           goto exit_eof;
+        } else {
+          fprintf(stderr, "Failed to read a frame %d\n", frames_read);
+          goto exit_failure;
         }
       }
+    }
 
-      if (args->encoder->cfg->source_scan_type != 0) {
-        args->img_in[frames_read & 1] = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
-        yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, args->img_in[frames_read & 1]);
-        if (args->field_parity == 1) {
-          args->api->picture_free(frame_in);
-          frame_in = NULL;
-        }
-        args->field_parity ^= 1; //0->1 or 1->0
-      } else {
+    if (args->encoder->cfg->source_scan_type == 0) {
+      // progressive
+      frame_out = frame_in;
+      frame_in = NULL;
+    } else {
+      // interlaced
+      frame_out = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
+      yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, frame_out);
+      if (args->field_parity == 1) {
+        // After the second field has been read, free the original input because it won't be given as output.
+        args->api->picture_free(frame_in);
         frame_in = NULL;
       }
-      frames_read++;
-      
-    } else {
-      goto exit_eof;
+      args->field_parity ^= 1; //0->1 or 1->0
     }
+
+    args->img_in[frames_read & 1] = frame_out;
+    frames_read++;
+
     // Wait until main thread is ready to receive input and then release main thread
     PTHREAD_LOCK(args->input_mutex);
     PTHREAD_UNLOCK(args->main_thread_mutex);
-    
   }
 
 exit_eof:
