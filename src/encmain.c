@@ -165,8 +165,6 @@ static void* input_read_thread(void* in_args) {
       if (args->field_parity == 0) {
         if (yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
           args->img_in[frames_read & 1] = frame_in;
-          frames_read ++;
-          frame_in = NULL;
         } else {
           // EOF or some error
           if (!feof(args->input)) {
@@ -180,9 +178,16 @@ static void* input_read_thread(void* in_args) {
       if (args->encoder->cfg->source_scan_type != 0) {
         args->img_in[frames_read & 1] = args->api->picture_alloc(args->encoder->in.width, args->encoder->in.height);
         yuv_io_extract_field(frame_in, args->encoder->cfg->source_scan_type, args->field_parity, args->img_in[frames_read & 1]);
-        if (args->field_parity == 1) args->api->picture_free(frame_in);
+        if (args->field_parity == 1) {
+          args->api->picture_free(frame_in);
+          frame_in = NULL;
+        }
         args->field_parity ^= 1; //0->1 or 1->0
+      } else {
+        frame_in = NULL;
       }
+      frames_read++;
+      
     } else {
       goto exit_eof;
     }
