@@ -220,7 +220,8 @@ int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_scan_type,
   if ((field_parity != 0)     && (field_parity != 1))     return 0;
 
   unsigned offset = 0;
-  if (source_scan_type == 2) offset = frame_in->stride;
+  if (source_scan_type == 1) offset = field_parity ? frame_in->stride : 0;
+  else if (source_scan_type == 2) offset = field_parity ? 0 : frame_in->stride;  
 
   //Luma
   for (int i = 0; i < field_out->height; ++i){
