@@ -220,25 +220,25 @@ int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_scan_type,
   if ((field_parity != 0)     && (field_parity != 1))     return 0;
 
   unsigned offset = 0;
-  if (source_scan_type == 1) offset = field_parity ? frame_in->stride : 0;
-  else if (source_scan_type == 2) offset = field_parity ? 0 : frame_in->stride;  
+  if (source_scan_type == 1) offset = field_parity ? 1 : 0;
+  else if (source_scan_type == 2) offset = field_parity ? 0 : 1;  
 
   //Luma
   for (int i = 0; i < field_out->height; ++i){
-    kvz_pixel *row_in  = frame_in->y + CLIP(0, frame_in->height - 1, 2 * i) * frame_in->stride + offset;
+    kvz_pixel *row_in  = frame_in->y + MIN(frame_in->height - 1, 2 * i + offset) * frame_in->stride;
     kvz_pixel *row_out = field_out->y + i * field_out->stride;
     memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width);
   }
 
   //Chroma
   for (int i = 0; i < field_out->height / 2; ++i){
-    kvz_pixel *row_in = frame_in->u + CLIP(0, frame_in->height / 2 - 1, 2 * i) * frame_in->stride / 2 + offset / 2;
+    kvz_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
     kvz_pixel *row_out = field_out->u + i * field_out->stride / 2;
     memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
   }
 
   for (int i = 0; i < field_out->height / 2; ++i){
-    kvz_pixel *row_in = frame_in->v + CLIP(0, frame_in->height / 2 - 1, 2 * i) * frame_in->stride / 2 + offset / 2;
+    kvz_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
     kvz_pixel *row_out = field_out->v + i * field_out->stride / 2;
     memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
   }
