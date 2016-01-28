@@ -447,6 +447,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     encoder->vui.timing_info_present_flag = 1;
     encoder->vui.num_units_in_tick = cfg->framerate_denom;
     encoder->vui.time_scale = cfg->framerate_num;
+    if (cfg->source_scan_type != KVZ_INTERLACING_NONE) {
+      // when field_seq_flag=1, the time_scale and num_units_in_tick refer to
+      // field rate rather than frame rate.
+      encoder->vui.time_scale *= 2;
+    }
   }
 
   // AUD
