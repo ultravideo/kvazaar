@@ -67,6 +67,8 @@ kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
   im->pts = 0;
   im->dts = 0;
 
+  im->interlacing = KVZ_INTERLACING_NONE;
+
   return im;
 }
 

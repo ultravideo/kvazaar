@@ -570,7 +570,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
     int8_t pic_struct = 0; //0: progressive picture, 1: top field, 2: bottom field, 3...
     int8_t source_scan_type = 1; //0: interlaced, 1: progressive
 
-    switch (state->encoder_control->in.source_scan_type){
+    switch (state->tile->frame->source->interlacing){
     case 0: //Progressive frame
       pic_struct = 0;
       source_scan_type = 1;

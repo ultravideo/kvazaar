@@ -25,6 +25,9 @@ matrix:
     # These valgrind tests are slow, so they are performed with the minimum
     # number of small frames and fast settings.
     
+    # Tests for interlace
+    - env: VALGRIND_TEST="--source-scan-type=tff -p0 --preset=ultrafast --threads=2 --owf=1 --wpp"
+    
     # Tests for owf, wpp and tiles. There is lots of separate branches of
     # code related to owf=0 and owf!=0, which is why all permutations are
     # tried.
