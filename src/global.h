@@ -181,7 +181,7 @@ typedef int16_t coeff_t;
 
 // NOTE: When making a release, check to see if incrementing libversion in 
 // configure.ac is necessary.
-#define KVZ_VERSION 0.8.2
+#define KVZ_VERSION 0.8.3
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
 //#define VERBOSE 1
