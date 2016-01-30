@@ -28,7 +28,7 @@
 #include <stdlib.h>
 
 
-static unsigned reg_sad_altivec(const pixel * const data1, const pixel * const data2,
+static unsigned reg_sad_altivec(const kvz_pixel * const data1, const kvz_pixel * const data2,
                         const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   vector unsigned int vsad = {0,0,0,0}, vzero = {0,0,0,0}; 
