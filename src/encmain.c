@@ -239,13 +239,10 @@ int main(int argc, char *argv[])
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
 
-  // Stdin and stdout need to be binary for input and output to work.
+#ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
-  #ifdef _WIN32
-      _setmode( _fileno( stdin ),  _O_BINARY );
-      _setmode( _fileno( stdout ), _O_BINARY );
-      _setmode( _fileno( stderr ), _O_TEXT );
-  #endif
+  setmode( _fileno( stderr ), _O_TEXT );
+#endif
       
   CHECKPOINTS_INIT();
 
@@ -254,10 +251,17 @@ int main(int argc, char *argv[])
   opts = cmdline_opts_parse(api, argc, argv);
   // If problem with command line options, print banner and shutdown.
   if (!opts) {
-    print_version();
-    print_help();
+    print_usage();
 
     goto exit_failure;
+  }
+  if (opts->version) {
+    print_version();
+    goto done;
+  }
+  if (opts->help) {
+    print_help();
+    goto done;
   }
 
   input = open_input_file(opts->input);
@@ -271,6 +275,16 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Could not open output file, shutting down!\n");
     goto exit_failure;
   }
+
+#ifdef _WIN32
+  // Set stdin and stdout to binary for pipes.
+  if (input == stdin) {
+    _setmode(_fileno(stdin), _O_BINARY);
+  }
+  if (output == stdout) {
+    _setmode(_fileno(stdout), _O_BINARY);
+  }
+#endif
 
   if (opts->debug != NULL) {
     recout = open_output_file(opts->debug);

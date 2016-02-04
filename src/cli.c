@@ -99,6 +99,8 @@ static const struct option long_options[] = {
   { "no-mv-rdo",                no_argument, NULL, 0 },
   { "psnr",                     no_argument, NULL, 0 },
   { "no-psnr",                  no_argument, NULL, 0 },
+  { "version",                  no_argument, NULL, 0 },
+  { "help",                     no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -203,6 +205,12 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       opts->seek = atoi(optarg);
     } else if (!strcmp(name, "frames")) {
       opts->frames = atoi(optarg);
+    } else if (!strcmp(name, "version")) {
+      opts->version = true;
+      goto done;
+    } else if (!strcmp(name, "help")) {
+      opts->help = true;
+      goto done;
     } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
@@ -263,19 +271,25 @@ void cmdline_opts_free(const kvz_api *const api, cmdline_opts_t *opts)
 }
 
 
+void print_usage(void)
+{
+  fprintf(stdout,
+    "Kvazaar usage: -i and --input-res to set input, -o to set output\n"
+    "               --help for more information\n");
+}
+
+
 void print_version(void)
 {
-  fprintf(stderr,
-    "/***********************************************/\n"
-    " *   Kvazaar HEVC Encoder v. " VERSION_STRING "             *\n"
-    " *     Tampere University of Technology 2015   *\n"
-    "/***********************************************/\n\n");
+  fprintf(stdout,
+    "Kvazaar " VERSION_STRING "\n"
+    "Kvazaar license: LGPL version 2\n");
 }
 
 
 void print_help(void)
 {
-  fprintf(stderr,
+  fprintf(stdout,
     "Usage:\n"
     "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"
     "\n"
