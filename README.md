@@ -17,6 +17,8 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
     kvazaar -i <input> --input-res <width>x<height> -o <output>
 
     Optional parameters:
+          --help                     : This helpfull message
+          --version                  : Version information
           -n, --frames <integer>     : Number of frames to code [all]
           --seek <integer>           : First frame to code [0]
           --input-res <int>x<int>    : Input resolution (width x height) or

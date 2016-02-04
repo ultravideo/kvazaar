@@ -294,6 +294,8 @@ void print_help(void)
     "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"
     "\n"
     "Optional parameters:\n"
+    "      --help                     : This helpfull message\n"
+    "      --version                  : Version information\n"
     "      -n, --frames <integer>     : Number of frames to code [all]\n"
     "      --seek <integer>           : First frame to code [0]\n"
     "      --input-res <int>x<int>    : Input resolution (width x height) or\n"

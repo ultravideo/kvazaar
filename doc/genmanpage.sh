@@ -17,7 +17,7 @@ kvazaar \- open source HEVC encoder
 .SH DESCRIPTION
 EOF
 
-kvazaar 2>&1 | tail -n+10 | head -n-4 | \
+kvazaar --help 2>&1 | tail -n+5 | head -n-4 | \
   sed 's| : |\n|g; 
        s|>: $|>|g;
        s|^          --|.TP\n\\fB--|g;
