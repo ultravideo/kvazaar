@@ -85,8 +85,8 @@ static const char *progname;
 
 /* These are used to replace unistd.h include. */
 char *optarg = 0;
-int optind = 0;
-int opterr = 0;
+int optind = 1;
+int opterr = 1;
 int optopt = 0;
 int optreset = 0;
 
