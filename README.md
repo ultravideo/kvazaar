@@ -1,5 +1,5 @@
-Kvazaar {#mainpage}
-=========
+Kvazaar
+=======
 An open-source HEVC encoder licensed under LGPLv2.1
 
 Join channel #kvazaar_hevc in Freenode IRC network to contact us.
@@ -17,8 +17,8 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
     kvazaar -i <input> --input-res <width>x<height> -o <output>
 
     Optional parameters:
-          --help                     : This helpfull message
-          --version                  : Version information
+          --help                     : Print this help message and exit
+          --version                  : Print version information and exit
           -n, --frames <integer>     : Number of frames to code [all]
           --seek <integer>           : First frame to code [0]
           --input-res <int>x<int>    : Input resolution (width x height) or
@@ -156,7 +156,10 @@ The LP-GOP syntax is "lp-g(num)d(num)r(num)t(num)", where
 
 
 ##Presets
-The names of the presets are the same as with x264: ultrafast, superfast, veryfast, faster, fast, medium, slow, slower, veryslow and placebo. The effects of the presets are listed in the following table, where the names have been abreviated to fit the layout in GitHub.
+The names of the presets are the same as with x264: ultrafast,
+superfast, veryfast, faster, fast, medium, slow, slower, veryslow and
+placebo. The effects of the presets are listed in the following table,
+where the names have been abbreviated to fit the layout in GitHub.
 
                   | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p
 ----------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -----
@@ -238,7 +241,7 @@ something bigger than a bug fix but don't know what yet.
 ###Code documentation
 
 You can generate Doxygen documentation pages by running the command
-"doxygen docs.doxy". Here is a rough schetch of the module structure:
+"doxygen docs.doxy". Here is a rough sketch of the module structure:
 ![Kvazaar module hierarchy](https://github.com/ultravideo/kvazaar/blob/master/doc/kvazaar_module_hierarchy.png)
 
 ###For version control we try to follow these conventions:
@@ -253,7 +256,7 @@ You can generate Doxygen documentation pages by running the command
   nicely.
 - Every commit should at least compile. Producing a working bitstream is
   nice as well, but not always possible. Features may be temporarily
-  disabled to produce a working bitstream, but remember to re-enbable
+  disabled to produce a working bitstream, but remember to re-enable
   them before merging to master.
 
 
