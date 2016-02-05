@@ -316,6 +316,8 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
 static void encoder_state_encode_leaf(encoder_state_t * const state) {
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
+
+  const kvz_config *cfg = state->encoder_control->cfg;
   
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
@@ -349,8 +351,32 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.
 
+    // Select which frame dependancies should be set to.
+    const encoder_state_t * ref_state = NULL;
+    if (cfg->gop_lowdelay &&
+        cfg->gop_len > 0 &&
+        state->previous_encoder_state != state)
+    {
+      // For LP-gop, depend on the state of the first reference.
+      int ref_neg = cfg->gop[(state->global->poc - 1) % cfg->gop_len].ref_neg[0];
+      if (ref_neg >= state->encoder_control->owf) {
+        // If frame is not within OWF range, it's already done.
+        ref_state = NULL;
+      } else {
+        ref_state = state->previous_encoder_state;
+        while (ref_neg > 1) {
+          ref_neg -= 1;
+          ref_state = ref_state->previous_encoder_state;
+        }
+      }
+    } else {
+      // Otherwise, depend on the previous frame.
+      ref_state = state->previous_encoder_state;
+    }
+
     for (int i = 0; i < state->lcu_order_count; ++i) {
       const lcu_order_element_t * const lcu = &state->lcu_order[i];
+
 #ifdef KVZ_DEBUG
       char job_description[256];
       sprintf(job_description, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->global->frame, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
@@ -365,12 +391,16 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         // once. The added dependancy is for the first LCU of each wavefront
         // row to depend on the reconstruction status of the row below in the
         // previous frame.
-        if (state->previous_encoder_state != state && state->previous_encoder_state->tqj_recon_done && state->global->slicetype != KVZ_SLICE_I) {
+        if (ref_state != NULL &&
+            state->previous_encoder_state->tqj_recon_done &&
+            state->global->slicetype != KVZ_SLICE_I)
+        {
           if (!lcu->left) {
+            const lcu_order_element_t * const ref_lcu = &ref_state->lcu_order[i];
             if (lcu->below) {
-              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->below->encoder_state->previous_encoder_state->tqj_recon_done);
+              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], ref_lcu->below->encoder_state->tqj_recon_done);
             } else {
-              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], lcu->encoder_state->previous_encoder_state->tqj_recon_done);
+              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], ref_lcu->encoder_state->tqj_recon_done);
             }
           }
         }
