@@ -22,7 +22,7 @@ Input resolution (width x height) or
 auto          
 try to detect from file name [auto]
 .TP
-\fB\-\-input\-fps <number>      
+\fB\-\-input\-fps <num>/<denom> 
 Framerate of the input video [25.0]
 .TP
 \fB\-q\fR, \fB\-\-qp <integer>        
@@ -78,12 +78,6 @@ Enable Rate\-Distortion Optimized motion vector costs
 \fB\-\-full\-intra\-search   
 Try all intra modes.
 .TP
-\fB\-\-me <string>         
-Set integer motion estimation algorithm ["hexbs"]
-  "hexbs": Hexagon Based Search (faster)
-  "tz":    Test Zone Search (better quality)
-  "full":  Full Search (super slow)
-.TP
 \fB\-\-no\-transform\-skip   
 Disable transform skip
 .TP
@@ -98,6 +92,12 @@ Output encoders reconstruction.
 .TP
 \fB\-\-cpuid <integer>     
 Disable runtime cpu optimizations with value 0.
+.TP
+\fB\-\-me <string>         
+Set integer motion estimation algorithm ["hexbs"]
+  "hexbs": Hexagon Based Search (faster)
+  "tz":    Test Zone Search (better quality)
+  "full":  Full Search (super slow)
 .TP
 \fB\-\-subme <integer>     
 Set fractional pixel motion estimation level [1].
@@ -121,8 +121,11 @@ Range for sizes of intra prediction units to try.
 \fB\-\-no\-info             
 Don't add information about the encoder to settings.
 .TP
-\fB\-\-gop <int>          
-Length of Group of Pictures, must be 8 or 0 [0]
+\fB\-\-gop <string>        
+Definition of GOP structure [0]
+  "0":           disabled
+  "8":           B\-frame pyramid of length 8
+  "lp\-<string>": lp\-gop definition (e.g. lp\-g8d4r3t2)
 .TP
 \fB\-\-bipred              
 Enable bi\-prediction search
@@ -133,7 +136,7 @@ Target bitrate. [0]
   N: target N bits per second
 .TP
 \fB\-\-preset <string>     
-Use preset
+Use preset. This will override previous options.
   ultrafast, superfast,veryfast, faster,
   fast, medium, slow, slower, veryslow, placebo
 .TP
@@ -186,14 +189,12 @@ Disable threads if set to 0.
 .SS "Tiles:"
 .TP
 \fB\-\-tiles\-width\-split <string>|u<int>
-
 Specifies a comma separated list of pixel
 positions of tiles columns separation coordinates.
 Can also be u followed by and a single int n,
 in which case it produces columns of uniform width.
 .TP
 \fB\-\-tiles\-height\-split <string>|u<int>
-
 Specifies a comma separated list of pixel
 positions of tiles rows separation coordinates.
 Can also be u followed by and a single int n,

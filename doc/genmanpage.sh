@@ -18,8 +18,8 @@ kvazaar \- open source HEVC encoder
 EOF
 
 kvazaar --help 2>&1 | tail -n+5 | head -n-4 | \
-  sed 's| : |\n|g; 
-       s|>: $|>|g;
+  sed 's| : |\n|g;
+       s| :$||g;
        s|^          --|.TP\n\\fB--|g;
        s|^      --|.TP\n\\fB--|g;
        s|^      -|.TP\n\\fB-|g;
