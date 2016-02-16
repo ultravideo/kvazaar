@@ -44,9 +44,9 @@ AC_SYS_LARGEFILE
 
 LT_INIT([win32-dll])
 
-AX_CHECK_COMPILE_FLAG(-mavx2,   [flag_avx2="true"])
-AX_CHECK_COMPILE_FLAG(-msse4.1, [flag_sse4_1="true"])
-AX_CHECK_COMPILE_FLAG(-msse2,   [flag_sse2="true"])
+AX_CHECK_COMPILE_FLAG([-mavx2],   [flag_avx2="true"])
+AX_CHECK_COMPILE_FLAG([-msse4.1], [flag_sse4_1="true"])
+AX_CHECK_COMPILE_FLAG([-msse2],   [flag_sse2="true"])
 
 AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
