@@ -2,7 +2,7 @@
 set -ev
 
 ./autogen.sh
-./configure
+./configure $KVZ_CONFIGURE_ARGS
 make --jobs=2 V=1
 
 if [ -n "$VALGRIND_TEST" ]; then

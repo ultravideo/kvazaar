@@ -45,6 +45,11 @@ matrix:
           - libtool
           - yasm
 
+    - os: osx
+      # The version of clang in the osx image complains about -pthread being given to linker.
+      # It's a silly warning and I don't know a workaround, so let's just ignore all warnings.
+      env: KVZ_CONFIGURE_ARGS="--disable-werror"
+
     # Check for external symbols without kvz_ prefix.
     - compiler: gcc-4.8
       script:
