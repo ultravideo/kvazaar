@@ -777,6 +777,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 static void init_lcu_t(const encoder_state_t * const state, const int x, const int y, lcu_t *lcu, const yuv_t *hor_buf, const yuv_t *ver_buf)
 {
   const videoframe_t * const frame = state->tile->frame;
+
+  FILL(*lcu, 0);
   
   // Copy reference cu_info structs from neighbouring LCUs.
   {
@@ -912,16 +914,20 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
  */
 void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, const yuv_t * const hor_buf, const yuv_t * const ver_buf)
 {
+  // Initialize the same starting state to every depth. The search process
+  // will use these as temporary storage for predictions before making
+  // a decision on which to use, and they get updated during the search
+  // process.
   lcu_t work_tree[MAX_PU_DEPTH + 1];
-  int depth;
-  // Initialize work tree.
-  for (depth = 0; depth <= MAX_PU_DEPTH; ++depth) {
-    FILL(work_tree[depth], 0);
-    init_lcu_t(state, x, y, &work_tree[depth], hor_buf, ver_buf);
+  init_lcu_t(state, x, y, &work_tree[0], hor_buf, ver_buf);
+  for (int depth = 1; depth <= MAX_PU_DEPTH; ++depth) {
+    work_tree[depth] = work_tree[0];
   }
 
   // Start search from depth 0.
   search_cu(state, x, y, 0, work_tree);
 
+  // The best decisions through out the LCU got propagated back to depth 0,
+  // so copy those back to the frame.
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
 }
