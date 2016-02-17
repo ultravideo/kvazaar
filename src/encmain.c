@@ -123,16 +123,20 @@ static void compute_psnr(const kvz_picture *const src,
 }
 
 typedef struct {
-  FILE* input;
+  // Mutexes for synchronization.
   pthread_mutex_t* input_mutex;
   pthread_mutex_t* main_thread_mutex;
 
-  kvz_picture **img_in;
-  cmdline_opts_t *opts;
-  encoder_control_t *encoder;
-  uint8_t padding_x;
-  uint8_t padding_y;
-  const kvz_api * api;
+  // Parameters passed from main thread to input thread.
+  FILE* input;
+  const kvz_api *api;
+  const cmdline_opts_t *opts;
+  const encoder_control_t *encoder;
+  const uint8_t padding_x;
+  const uint8_t padding_y;
+
+  // Picture and thread status passed from input thread to main thread.
+  kvz_picture *img_in;
   int retval;
 } input_handler_args;
 
@@ -160,6 +164,7 @@ static void* input_read_thread(void* in_args)
 
   input_handler_args* args = (input_handler_args*)in_args;
   kvz_picture *frame_in = NULL;
+  int retval = RETVAL_RUNNING;
   int frames_read = 0;
 
   for (;;) {
@@ -169,49 +174,61 @@ static void* input_read_thread(void* in_args)
     bool input_empty = !(args->opts->frames == 0 // number of frames to read is unknown
                          || frames_read < args->opts->frames); // not all frames have been read
     if (feof(args->input) || input_empty) {
-      goto exit_eof;
+      retval = RETVAL_EOF;
+      goto done;
     }
 
-    frame_in = args->api->picture_alloc(args->opts->config->width + args->padding_x, args->opts->config->height + args->padding_y);
-        
+    frame_in = args->api->picture_alloc(args->opts->config->width  + args->padding_x,
+                                        args->opts->config->height + args->padding_y);
+
     if (!frame_in) {
       fprintf(stderr, "Failed to allocate image.\n");
-      goto exit_failure;
+      retval = RETVAL_FAILURE;
+      goto done;
     }
 
     if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
       // reading failed
       if (feof(args->input)) {
-        goto exit_eof;
+        retval = RETVAL_EOF;
+        goto done;
       } else {
         fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-        goto exit_failure;
+        retval = RETVAL_FAILURE;
+        goto done;
       }
     }
+
+    frames_read++;
 
     if (args->encoder->cfg->source_scan_type != 0) {
       // Set source scan type for frame, so that it will be turned into fields.
       frame_in->interlacing = args->encoder->cfg->source_scan_type;
     }
-    args->img_in[frames_read & 1] = frame_in;
-    frame_in = NULL;
 
-    frames_read++;
-
-    // Wait until main thread is ready to receive input and then release main thread
+    // Wait until main thread is ready to receive the next frame.
     PTHREAD_LOCK(args->input_mutex);
+    args->img_in = frame_in;
+    args->retval = retval;
+    // Unlock main_thread_mutex to notify main thread that the new img_in
+    // and retval have been placed to args.
     PTHREAD_UNLOCK(args->main_thread_mutex);
+
+    frame_in = NULL;
   }
 
-exit_eof:
-  args->retval = RETVAL_EOF;  
-  args->img_in[frames_read & 1] = NULL;
-exit_failure:
-  // Do some cleaning up  
+done:
+  // Wait until main thread is ready to receive the next frame.
+  PTHREAD_LOCK(args->input_mutex);
+  args->img_in = NULL;
+  args->retval = retval;
+  // Unlock main_thread_mutex to notify main thread that the new img_in
+  // and retval have been placed to args.
+  PTHREAD_UNLOCK(args->main_thread_mutex);
+
+  // Do some cleaning up.
   args->api->picture_free(frame_in);
-  if (!args->retval) {
-    args->retval = RETVAL_FAILURE;
-  }
+
   pthread_exit(NULL);
   return 0;
 }
@@ -319,7 +336,6 @@ int main(int argc, char *argv[])
     encoding_start_cpu_time = clock();
 
     uint64_t bitstream_length = 0;
-    uint32_t frames_read = 0;
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
@@ -336,18 +352,20 @@ int main(int argc, char *argv[])
     PTHREAD_LOCK(&input_mutex);
 
     // Give arguments via struct to the input thread
-    input_handler_args in_args;    
-    kvz_picture *img_in[2] = { NULL };
-    in_args.input = input;
-    in_args.img_in = img_in;
-    in_args.main_thread_mutex = &main_thread_mutex;
-    in_args.input_mutex = &input_mutex;
-    in_args.opts = opts;
-    in_args.encoder = encoder;
-    in_args.padding_x = padding_x;
-    in_args.padding_y = padding_y;
-    in_args.api = api;
-    in_args.retval = RETVAL_RUNNING;
+    input_handler_args in_args = {
+      .input_mutex = &input_mutex,
+      .main_thread_mutex = &main_thread_mutex,
+
+      .input = input,
+      .api = api,
+      .opts = opts,
+      .encoder = encoder,
+      .padding_x = padding_x,
+      .padding_y = padding_y,
+
+      .img_in = NULL,
+      .retval = RETVAL_RUNNING,
+    };
 
     if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
       fprintf(stderr, "pthread_create failed!\n");
@@ -357,16 +375,20 @@ int main(int argc, char *argv[])
     kvz_picture *cur_in_img;
     for (;;) {
 
-      // Skip mutex locking when thread is no longer in run state
+      // Skip mutex locking if the input thread does not exist.
       if (in_args.retval == RETVAL_RUNNING) {
-        // Wait for input to be read
-        // unlock the input thread to be able to continue to the next picture
+        // Unlock input_mutex so that the input thread can write the new
+        // img_in and retval to in_args.
         PTHREAD_UNLOCK(&input_mutex);
+        // Wait until the input thread has updated in_args.
         PTHREAD_LOCK(&main_thread_mutex);
-      }      
-      cur_in_img = img_in[frames_read & 1];
-      img_in[frames_read & 1] = NULL;
-      frames_read++;
+
+        cur_in_img = in_args.img_in;
+        in_args.img_in = NULL;
+
+      } else {
+        cur_in_img = NULL;
+      }
 
       if (in_args.retval == EXIT_FAILURE) {
         goto exit_failure;
