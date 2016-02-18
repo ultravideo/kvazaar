@@ -190,8 +190,21 @@ static void* input_read_thread(void* in_args)
     if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
       // reading failed
       if (feof(args->input)) {
-        retval = RETVAL_EOF;
-        goto done;
+        // When looping input, re-open the file and re-read data.
+        if (args->opts->loop_input && args->input != stdin) {
+          fclose(args->input);
+          args->input = fopen(args->opts->input, "rb");
+          if (args->input == NULL ||
+              !yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in))
+          {
+            fprintf(stderr, "Could not re-open input file, shutting down!\n");
+            retval = RETVAL_FAILURE;
+            goto done;
+          }
+        } else {
+          retval = RETVAL_EOF;
+          goto done;
+        }
       } else {
         fprintf(stderr, "Failed to read a frame %d\n", frames_read);
         retval = RETVAL_FAILURE;

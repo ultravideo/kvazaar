@@ -47,6 +47,8 @@ typedef struct cmdline_opts_t {
   bool help;
   /** \brief Encoder configuration */
   bool version;
+  /** \brief Whether to loop input */
+  bool loop_input;
 } cmdline_opts_t;
 
 cmdline_opts_t* cmdline_opts_parse(const kvz_api *api, int argc, char *argv[]);

@@ -84,6 +84,7 @@ Optional parameters:
                                      ultrafast, superfast,veryfast, faster,
                                      fast, medium, slow, slower, veryslow, placebo
           --no-psnr              : Don't calculate PSNR for frames
+          --loop-input           : Re-read input file forever
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio

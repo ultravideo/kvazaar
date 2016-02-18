@@ -101,6 +101,7 @@ static const struct option long_options[] = {
   { "no-psnr",                  no_argument, NULL, 0 },
   { "version",                  no_argument, NULL, 0 },
   { "help",                     no_argument, NULL, 0 },
+  { "loop-input",               no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -211,6 +212,8 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     } else if (!strcmp(name, "help")) {
       opts->help = true;
       goto done;
+    } else if (!strcmp(name, "loop-input")) {
+      opts->loop_input = true;
     } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
@@ -359,6 +362,7 @@ void print_help(void)
     "                                     ultrafast, superfast,veryfast, faster,\n"
     "                                     fast, medium, slow, slower, veryslow, placebo\n"
     "          --no-psnr              : Don't calculate PSNR for frames\n"
+    "          --loop-input           : Re-read input file forever\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
