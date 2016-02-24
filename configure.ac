@@ -23,7 +23,7 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=3
-ver_minor=2
+ver_minor=3
 ver_release=0
 
 # not used, but it prevents configure from adding a lot of defines to the CFLAGS
