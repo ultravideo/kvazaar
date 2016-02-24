@@ -163,6 +163,12 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\sao-avx2.c">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\quant-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\sao-generic.c" />
@@ -217,6 +223,7 @@
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h" />
+    <ClInclude Include="..\..\src\strategies\avx2\sao-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
     <ClInclude Include="..\..\src\strategies\generic\sao-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />

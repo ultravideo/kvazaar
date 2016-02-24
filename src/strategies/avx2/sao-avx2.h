@@ -1,3 +1,5 @@
+#ifndef STRATEGIES_SAO_AVX2_H_
+#define STRATEGIES_SAO_AVX2_H_
 /*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
@@ -18,28 +20,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "strategies-sao.h"
-#include "strategyselector.h"
+/**
+ * \ingroup Optimization
+ * \file
+ * AVX2 implementations of optimized functions.
+ */
 
-// Define function pointers.
-sao_edge_ddistortion_func * kvz_sao_edge_ddistortion;
-calc_sao_edge_dir_func * kvz_calc_sao_edge_dir;
-sao_reconstruct_color_func * kvz_sao_reconstruct_color;
-sao_band_ddistortion_func * kvz_sao_band_ddistortion;
+#include "global.h"
 
-// Headers for platform optimizations.
-#include "generic/sao-generic.h"
-#include "avx2/sao-avx2.h"
+int kvz_strategy_register_sao_avx2(void* opaque, uint8_t bitdepth);
 
-
-int kvz_strategy_register_sao(void* opaque, uint8_t bitdepth) {
-  bool success = true;
-
-  success &= kvz_strategy_register_sao_generic(opaque, bitdepth);
-
-  if (kvz_g_hardware_flags.intel_flags.avx2) {
-    success &= kvz_strategy_register_sao_avx2(opaque, bitdepth);
-  }
-
-  return success;
-}
+#endif //STRATEGIES_SAO_AVX2_H_
