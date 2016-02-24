@@ -102,6 +102,7 @@ static const struct option long_options[] = {
   { "version",                  no_argument, NULL, 0 },
   { "help",                     no_argument, NULL, 0 },
   { "loop-input",               no_argument, NULL, 0 },
+  { "mv-constraint",      required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -363,6 +364,9 @@ void print_help(void)
     "                                     fast, medium, slow, slower, veryslow, placebo\n"
     "          --no-psnr              : Don't calculate PSNR for frames\n"
     "          --loop-input           : Re-read input file forever\n"
+    "          --mv-constraint        : Constrain movement vectors\n"
+    "                                     \"none\": no constraint\n"
+    "                                     \"frametile\": constrain within the tile\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

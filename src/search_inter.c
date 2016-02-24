@@ -28,6 +28,37 @@
 #include "rdo.h"
 
 
+
+/**
+ * \return  True if referred block is within current tile.
+ */
+static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width)
+{
+  if (state->encoder_control->cfg->mv_constraint != KVZ_MV_CONSTRAIN_FRAME_AND_TILE) return true;
+
+  // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
+
+  vector2d_t abs_mv = { (orig->x << 2) + x, (orig->y << 2) + y };
+
+  if (abs_mv.x >= 0 && abs_mv.x + (width << 2) <= (state->tile->frame->width << 2) &&
+      abs_mv.y >= 0 && abs_mv.y + (width << 2) <= (state->tile->frame->height << 2))
+  {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+
+/**
+ * \return  True if referred block is within current tile.
+ */
+static INLINE bool intmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width)
+{
+  return fracmv_within_tile(state, orig, x << 2, y << 2, width);
+}
+
+
 static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 {
   int32_t num_bins = 0;
@@ -243,6 +274,10 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
   for (i = 0; i < n_points; i++)
   {
     vector2d_t *current = &pattern[pattern_type][i];
+    if (!intmv_within_tile(state, orig, mv->x + current->x, mv->y + current->y, width)) {
+      continue;
+    }
+
     unsigned cost;
     uint32_t bitcost;
 
@@ -307,6 +342,10 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
     for (k = -iSearchRange; k <= iSearchRange; k += iRaster)
     {
       vector2d_t current = { k, i };
+      if (!intmv_within_tile(state, orig, mv->x + current.x, mv->y + current.y, width)) {
+        continue;
+      }
+
       unsigned cost;
       uint32_t bitcost;
 
@@ -390,7 +429,7 @@ static unsigned tz_search(const encoder_state_t * const state,
   //step 1, compare (0,0) vector to predicted vectors
   
   // Check whatever input vector we got, unless its (0, 0) which will be checked later.
-  if (mv.x || mv.y) 
+  if ((mv.x || mv.y) && intmv_within_tile(state, orig, mv.x, mv.y, width))
   {
     PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
 
@@ -415,6 +454,9 @@ static unsigned tz_search(const encoder_state_t * const state,
     if (merge_cand[i].dir == 3) continue;
     mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
     mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
+    if (!intmv_within_tile(state, orig, mv.x, mv.y, width)) {
+      continue;
+    }
 
     PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
 
@@ -585,7 +627,9 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     }
   }
 
-  if (!mv_in_merge_cand) {
+  if (!mv_in_merge_cand &&
+      intmv_within_tile(state, orig, mv.x, mv.y, width))
+  {
     PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
 
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
@@ -609,6 +653,9 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     if (merge_cand[i].dir == 3) continue;
     mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
     mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
+    if (!intmv_within_tile(state, orig, mv.x, mv.y, width)) {
+      continue;
+    }
 
     PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
 
@@ -642,6 +689,10 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   best_index = 0;
   for (i = 0; i < 7; ++i) {
     const vector2d_t *pattern = &large_hexbs[i];
+    if (!intmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width)) {
+      continue;
+    }
+
     unsigned cost;
     {
       PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
@@ -685,6 +736,10 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
       const vector2d_t *offset = &large_hexbs[start + i];
+      if (!intmv_within_tile(state, orig, mv.x + offset->x, mv.y + offset->y, width)) {
+        continue;
+      }
+
       unsigned cost;
       {
         PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
@@ -717,6 +772,10 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
     const vector2d_t *offset = &small_hexbs[i];
+    if (!intmv_within_tile(state, orig, mv.x + offset->x, mv.y + offset->y, width)) {
+      continue;
+    }
+
     unsigned cost;
     {
       PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
@@ -852,7 +911,7 @@ static unsigned search_frac(const encoder_state_t * const state,
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
-  unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
+  unsigned best_index = 4;
 
   unsigned cost = 0;
 
@@ -896,6 +955,9 @@ static unsigned search_frac(const encoder_state_t * const state,
   // Search halfpel positions around best integer mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
+    if (!fracmv_within_tile(state, orig, (mv.x + pattern->x) << 1, (mv.y + pattern->y) << 1, width)) {
+      continue;
+    }
 
     int y,x;
     for(y = 0; y < height; ++y) {
@@ -911,7 +973,6 @@ static unsigned search_frac(const encoder_state_t * const state,
                              tmp_filtered, width);
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
     if (cost < best_cost) {
       best_cost    = cost;
       best_index   = i;
@@ -920,12 +981,12 @@ static unsigned search_frac(const encoder_state_t * const state,
     }
   }
 
-  //Set mv to best match
+  // Move search to best_index
   mv.x += square[best_index].x;
   mv.y += square[best_index].y;
-
   halfpel_offset.x = square[best_index].x*2;
   halfpel_offset.y = square[best_index].y*2;
+  best_index = 4;
 
   //Set mv to quarterpel precision
   mv.x <<= 1;
@@ -934,6 +995,9 @@ static unsigned search_frac(const encoder_state_t * const state,
   //Search quarterpel points around best halfpel mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
+    if (!fracmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width)) {
+      continue;
+    }
 
     int y,x;
     for(y = 0; y < height; ++y) {
@@ -1068,6 +1132,8 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
       break;
   }
 
+  assert(fracmv_within_tile(state, &orig, mv.x, mv.y, width));
+
   if (state->encoder_control->cfg->fme_level > 0) {
     temp_cost = search_frac(state,
                             width, height,
@@ -1080,8 +1146,9 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                             num_cand,
                             ref_idx,
                             &temp_bitcost);
+    assert(fracmv_within_tile(state, &orig, mv.x, mv.y, width));
   }
-
+  
   merged = 0;
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
