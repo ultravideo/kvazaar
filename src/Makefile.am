@@ -109,6 +109,8 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/picture-generic.h \
 	strategies/generic/quant-generic.c \
 	strategies/generic/quant-generic.h \
+	strategies/generic/sao-generic.c \
+	strategies/generic/sao-generic.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -122,6 +124,8 @@ libkvazaar_la_SOURCES = \
 	strategies/strategies-picture.h \
 	strategies/strategies-quant.c \
 	strategies/strategies-quant.h \
+	strategies/strategies-sao.c \
+	strategies/strategies-sao.h \
 	strategies/x86_asm/picture-x86-asm.c \
 	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \

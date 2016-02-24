@@ -50,6 +50,20 @@ typedef struct sao_info_t {
   int offsets[NUM_SAO_EDGE_CATEGORIES * 2];
 } sao_info_t;
 
+
+// Offsets of a and b in relation to c.
+// dir_offset[dir][a or b]
+// |       |   a   | a     |     a |
+// | a c b |   c   |   c   |   c   |
+// |       |   b   |     b | b     |
+static const vector2d_t g_sao_edge_offsets[SAO_NUM_EO][2] = {
+  { { -1, 0 }, { 1, 0 } },
+  { { 0, -1 }, { 0, 1 } },
+  { { -1, -1 }, { 1, 1 } },
+  { { 1, -1 }, { -1, 1 } }
+};
+
+
 #define CHECKPOINT_SAO_INFO(prefix_str, sao) CHECKPOINT(prefix_str " type=%d eo_class=%d ddistortion=%d " \
   "merge_left_flag=%d merge_up_flag=%d band_position=%d " \
   "offsets[0]=%d offsets[1]=%d offsets[2]=%d offsets[3]=%d offsets[4]=%d", \
@@ -63,5 +77,6 @@ void kvz_sao_reconstruct(const encoder_control_t * encoder, videoframe_t *frame,
                      const sao_info_t *sao, color_t color_i);
 void kvz_sao_reconstruct_frame(encoder_state_t *state);
 void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y);
+void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i);
 
 #endif

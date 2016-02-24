@@ -75,6 +75,11 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
     fprintf(stderr, "kvz_strategy_register_intra failed!\n");
     return 0;
   }
+
+  if (!kvz_strategy_register_sao(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_sao failed!\n");
+    return 0;
+  }
   
   while(cur_strategy_to_select->fptr) {
     *(cur_strategy_to_select->fptr) = strategyselector_choose_for(&strategies, cur_strategy_to_select->strategy_type);
