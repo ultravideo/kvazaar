@@ -33,15 +33,23 @@
  */
 static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int wpp_limit)
 {
-  if (state->encoder_control->cfg->mv_constraint != KVZ_MV_CONSTRAIN_FRAME_AND_TILE) {
+  if (state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_NONE) {
     return (wpp_limit == -1 || y + (width << 2) <= (wpp_limit << 2));
   };
+
+  int lt_margin = 0;
+  int rb_margin = 0;
+  if (KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
+    // Enforce a distance of 8 from any tile boundary.
+    lt_margin = 8;
+    rb_margin = 16;
+  }
 
   // TODO implement KVZ_MV_CONSTRAIN_FRAM and KVZ_MV_CONSTRAIN_TILE.
   const vector2d_t abs_mv = { (orig->x << 2) + x, (orig->y << 2) + y };
 
-  if (abs_mv.x >= 0 && abs_mv.x + (width << 2) <= (state->tile->frame->width << 2) &&
-      abs_mv.y >= 0 && abs_mv.y + (width << 2) <= (state->tile->frame->height << 2) &&
+  if (abs_mv.x >= lt_margin && abs_mv.x + (width << 2) <= (state->tile->frame->width << 2) - rb_margin &&
+      abs_mv.y >= lt_margin && abs_mv.y + (width << 2) <= (state->tile->frame->height << 2) - rb_margin &&
       (wpp_limit == -1 || y + (width << 2) <= (wpp_limit << 2)))
   {
     return true;

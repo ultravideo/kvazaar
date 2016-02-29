@@ -281,7 +281,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
                                                     "bt1361e", "iec61966-2-1", "bt2020-10", "bt2020-12", NULL };
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
-  static const char * const mv_constraint_names[] = { "none", "frame", "tile", "frametile", NULL };
+  static const char * const mv_constraint_names[] = { "none", "frame", "tile", "frametile", "frametilemargin", NULL };
 
   static const char * const preset_values[11][28] = {
       { 

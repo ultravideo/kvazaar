@@ -367,6 +367,7 @@ void print_help(void)
     "          --mv-constraint        : Constrain movement vectors\n"
     "                                     \"none\": no constraint\n"
     "                                     \"frametile\": constrain within the tile\n"
+    "                                     \"frametilemargin\": constrain even more\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

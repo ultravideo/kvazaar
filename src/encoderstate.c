@@ -577,8 +577,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 #endif
           main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_idr_frame) {
-            if (main_state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE ||
-                main_state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_TILE)
+            if (main_state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN)
             {
               // When MV's don't cross tile boundaries, add dependancy only to the same tile.
               kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);

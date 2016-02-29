@@ -111,6 +111,7 @@ enum kvz_mv_constraint
   KVZ_MV_CONSTRAIN_FRAME = 1,  // Don't refer outside the frame.
   KVZ_MV_CONSTRAIN_TILE = 2,  // Don't refer to other tiles.
   KVZ_MV_CONSTRAIN_FRAME_AND_TILE = 3,  // Don't refer outside the tile.
+  KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN = 4,  // Keep enough margin for fractional pixel margins not to refer outside the tile.
 };
 
 /**
