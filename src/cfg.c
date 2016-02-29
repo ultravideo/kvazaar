@@ -102,6 +102,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->add_encoder_info = true;
   cfg->calc_psnr = true;
 
+  cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
+
   return 1;
 }
 
@@ -279,6 +281,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
                                                     "bt1361e", "iec61966-2-1", "bt2020-10", "bt2020-12", NULL };
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
+  static const char * const mv_constraint_names[] = { "none", "frame", "tile", "frametile", "frametilemargin", NULL };
 
   static const char * const preset_values[11][28] = {
       { 
@@ -533,6 +536,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->fme_level = atoi(value);
   else if OPT("source-scan-type")
     return parse_enum(value, source_scan_type_names, &cfg->source_scan_type);
+  else if OPT("mv-constraint")
+  {
+    int8_t constraint = KVZ_MV_CONSTRAIN_NONE;
+    int result = parse_enum(value, mv_constraint_names, &constraint);
+    cfg->mv_constraint = constraint;
+    return result;
+  }
   else if OPT("sar")
     return sscanf(value, "%d:%d", &cfg->vui.sar_width, &cfg->vui.sar_height) == 2;
   else if OPT("overscan")

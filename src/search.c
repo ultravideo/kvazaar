@@ -524,7 +524,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         && WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max);
 
     if (can_use_inter) {
-      int mode_cost = kvz_search_cu_inter(state, x, y, depth, &work_tree[depth]);
+      double mode_cost = kvz_search_cu_inter(state, x, y, depth, &work_tree[depth]);
       if (mode_cost < cost) {
         cost = mode_cost;
         cur_cu->type = CU_INTER;

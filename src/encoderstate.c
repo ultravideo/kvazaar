@@ -577,10 +577,19 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 #endif
           main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].global->is_idr_frame) {
-            // Add dependancy to each child in the previous frame.
-            // TODO: Make it so that only adjacent tiles are dependet upon and search is constrained to those?
-            for (int child_id = 0; main_state->children[child_id].encoder_control; ++child_id) {
-              kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[child_id].previous_encoder_state->tqj_recon_done);
+#if 0
+            // Disabled due to non-determinism.
+            if (main_state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN)
+            {
+              // When MV's don't cross tile boundaries, add dependancy only to the same tile.
+              kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[i].previous_encoder_state->tqj_recon_done);
+            } else 
+#endif      
+            {
+              // Add dependancy to each child in the previous frame.
+              for (int child_id = 0; main_state->children[child_id].encoder_control; ++child_id) {
+                kvz_threadqueue_job_dep_add(main_state->children[i].tqj_recon_done, main_state->children[child_id].previous_encoder_state->tqj_recon_done);
+              }
             }
           }
           kvz_threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, main_state->children[i].tqj_recon_done);

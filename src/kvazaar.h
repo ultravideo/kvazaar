@@ -102,6 +102,19 @@ enum kvz_interlacing
 };
 
 /**
+* \brief Constrain movement vectors.
+* \since 3.3.0
+*/
+enum kvz_mv_constraint
+{
+  KVZ_MV_CONSTRAIN_NONE = 0,
+  KVZ_MV_CONSTRAIN_FRAME = 1,  // Don't refer outside the frame.
+  KVZ_MV_CONSTRAIN_TILE = 2,  // Don't refer to other tiles.
+  KVZ_MV_CONSTRAIN_FRAME_AND_TILE = 3,  // Don't refer outside the tile.
+  KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN = 4,  // Keep enough margin for fractional pixel margins not to refer outside the tile.
+};
+
+/**
  * \brief GoP picture configuration.
  */
 typedef struct kvz_gop_config {
@@ -204,6 +217,8 @@ typedef struct kvz_config
 
   int8_t mv_rdo;            /*!< \brief MV RDO calculation in search (0: estimation, 1: RDO). */
   int8_t calc_psnr;         /*!< \since 3.1.0 \brief Print PSNR in CLI. */
+
+  enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
 } kvz_config;
 
 /**
