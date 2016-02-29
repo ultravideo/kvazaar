@@ -1149,8 +1149,6 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
       break;
   }
 
-  assert(fracmv_within_tile(state, &orig, mv.x, mv.y, width, -1));
-  
   if (state->encoder_control->cfg->fme_level > 0) {
     temp_cost = search_frac(state,
                             width, height,
@@ -1163,7 +1161,6 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                             num_cand,
                             ref_idx,
                             &temp_bitcost);
-    assert(fracmv_within_tile(state, &orig, mv.x, mv.y, width, -1));
   }
   
   merged = 0;
@@ -1290,7 +1287,7 @@ static int search_pu_inter(const encoder_state_t * const state,
   cur_cu->inter.mv_cand[0] = 0;
   cur_cu->inter.mv_cand[1] = 0;
 
-  cur_cu->inter.cost = UINT_MAX;
+  cur_cu->inter.cost = INT_MAX;
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
@@ -1345,16 +1342,12 @@ static int search_pu_inter(const encoder_state_t * const state,
           mv[1][0] = merge_cand[j].mv[1][0];
           mv[1][1] = merge_cand[j].mv[1][1];
 
-          // Check boundaries when using owf to process multiple frames at the same time
-          if (max_px_below_lcu >= 0) {
-            // When SAO is off, row is considered reconstructed when the last LCU
-            // is done, although the bottom 2 pixels might still need deblocking.
-            // To work around this, add 2 luma pixels to the reach of the mv
-            // in order to avoid referencing those possibly non-deblocked pixels.
-            int mv_lcu_row_reach_1 = ((y+(mv[0][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
-            int mv_lcu_row_reach_2 = ((y+(mv[1][1]>>2)) + (LCU_WIDTH >> depth) - 1 + 2) / LCU_WIDTH;
-            int cur_lcu_row = y / LCU_WIDTH;
-            if (mv_lcu_row_reach_1 > cur_lcu_row + max_px_below_lcu || mv_lcu_row_reach_2 > cur_lcu_row + max_px_below_lcu) {
+          {
+            // Don't try merge candidates that don't satisfy mv constraints.
+            vector2d_t orig = { x, y };
+            if (fracmv_within_tile(state, &orig, mv[0][0], mv[0][1], width, -1) ||
+                fracmv_within_tile(state, &orig, mv[1][0], mv[1][1], width, -1))
+            {
               continue;
             }
           }
@@ -1446,6 +1439,13 @@ static int search_pu_inter(const encoder_state_t * const state,
       }
     }
     FREE_POINTER(templcu);
+  }
+
+  if (cur_cu->inter.cost < INT_MAX) {
+    const vector2d_t orig = { x, y };
+    if (cur_cu->inter.mv_dir == 1) {
+      assert(fracmv_within_tile(state, &orig, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1], width, -1));
+    }
   }
 
   return cur_cu->inter.cost;
