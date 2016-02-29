@@ -347,7 +347,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
             coord_y = (y + state->tile->lcu_offset_y * (LCU_WIDTH >> 1)) + (mv[1]>>1);
 
             overflow_neg_x = (coord_x < 0)?1:0;
-            overflow_neg_y = (y + (mv[1]>>1) < 0)?1:0;
+            overflow_neg_y = (coord_y < 0)?1:0;
 
             overflow_pos_x = (coord_x >= ref->width>>1 )?1:0;
             overflow_pos_y = (coord_y >= ref->height>>1)?1:0;
