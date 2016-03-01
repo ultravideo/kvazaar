@@ -85,6 +85,10 @@ Optional parameters:
                                      fast, medium, slow, slower, veryslow, placebo
           --no-psnr              : Don't calculate PSNR for frames
           --loop-input           : Re-read input file forever
+          --mv-constraint        : Constrain movement vectors
+                                     "none": no constraint
+                                     "frametile": constrain within the tile
+                                     "frametilemargin": constrain even more
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio

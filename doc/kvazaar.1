@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "February 2016" "kvazaar v0.8.3" "User Commands"
+.TH KVAZAAR "1" "March 2016" "kvazaar v0.8.3" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -145,6 +145,12 @@ Don't calculate PSNR for frames
 .TP
 \fB\-\-loop\-input          
 Re\-read input file forever
+.TP
+\fB\-\-mv\-constraint       
+Constrain movement vectors
+  "none": no constraint
+  "frametile": constrain within the tile
+  "frametilemargin": constrain even more
 
 .SS "Video Usability Information:"
 .TP
