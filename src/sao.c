@@ -109,7 +109,7 @@ int kvz_sao_edge_ddistortion(const kvz_pixel *orig_data, const kvz_pixel *rec_da
 }
 
 
-void kvz_init_sao_info(sao_info_t *sao) {
+static void init_sao_info(sao_info_t *sao) {
   sao->type = SAO_TYPE_NONE;
   sao->merge_left_flag = 0;
   sao->merge_up_flag = 0;
@@ -725,8 +725,8 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   sao_info_t edge_sao;
   sao_info_t band_sao;
 
-  kvz_init_sao_info(&edge_sao);
-  kvz_init_sao_info(&band_sao);
+  init_sao_info(&edge_sao);
+  init_sao_info(&band_sao);
   
   //Avoid "random" uninitialized value
   edge_sao.band_position[0] = edge_sao.band_position[1] = 0;
@@ -824,7 +824,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   return;
 }
 
-void kvz_sao_search_chroma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
+static void sao_search_chroma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -860,7 +860,7 @@ void kvz_sao_search_chroma(const encoder_state_t * const state, const videoframe
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
 }
 
-void kvz_sao_search_luma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
+static void sao_search_luma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
   kvz_pixel orig[LCU_LUMA_SIZE];
   kvz_pixel rec[LCU_LUMA_SIZE];
@@ -888,6 +888,54 @@ void kvz_sao_search_luma(const encoder_state_t * const state, const videoframe_t
   orig_list[0] = orig;
   rec_list[0] = rec;
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left, merge_cost);
+}
+
+void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y)
+{
+  videoframe_t* const frame = state->tile->frame;
+  const int stride = frame->width_in_lcu;
+  int32_t merge_cost_luma[3] = { INT32_MAX };
+  int32_t merge_cost_chroma[3] = { INT32_MAX };
+  sao_info_t *sao_luma = &frame->sao_luma[lcu_y * stride + lcu_x];
+  sao_info_t *sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
+
+  // Merge candidates
+  sao_info_t *sao_top_luma    = lcu_y != 0 ? &frame->sao_luma  [(lcu_y - 1) * stride + lcu_x] : NULL;
+  sao_info_t *sao_left_luma   = lcu_x != 0 ? &frame->sao_luma  [lcu_y       * stride + lcu_x - 1] : NULL;
+  sao_info_t *sao_top_chroma  = lcu_y != 0 ? &frame->sao_chroma[(lcu_y - 1) * stride + lcu_x] : NULL;
+  sao_info_t *sao_left_chroma = lcu_x != 0 ? &frame->sao_chroma[lcu_y       * stride + lcu_x - 1] : NULL;
+
+  sao_search_luma(state, frame, lcu_x, lcu_y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
+  sao_search_chroma(state, frame, lcu_x, lcu_y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
+
+  sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
+  // Check merge costs
+  if (sao_top_luma) {
+    // Merge up if cost is equal or smaller to the searched mode cost
+    if (merge_cost_luma[2] + merge_cost_chroma[2] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
+      *sao_luma = *sao_top_luma;
+      *sao_chroma = *sao_top_chroma;
+      sao_luma->merge_up_flag = 1;
+      sao_luma->merge_left_flag = 0;
+    }
+  }
+  if (sao_left_luma) {
+    // Merge left if cost is equal or smaller to the searched mode cost
+    // AND smaller than merge up cost, if merge up was already chosen
+    if (merge_cost_luma[1] + merge_cost_chroma[1] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
+      if (!sao_luma->merge_up_flag || merge_cost_luma[1] + merge_cost_chroma[1] < merge_cost_luma[2] + merge_cost_chroma[2]) {
+        *sao_luma = *sao_left_luma;
+        *sao_chroma = *sao_left_chroma;
+        sao_luma->merge_left_flag = 1;
+        sao_luma->merge_up_flag = 0;
+      }
+    }
+  }
+  assert(sao_luma->eo_class < SAO_NUM_EO);
+  assert(sao_chroma->eo_class < SAO_NUM_EO);
+
+  CHECKPOINT_SAO_INFO("sao_luma", *sao_luma);
+  CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
 }
 
 void kvz_sao_reconstruct_frame(encoder_state_t * const state)

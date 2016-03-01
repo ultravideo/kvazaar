@@ -58,12 +58,10 @@ typedef struct sao_info_t {
   (sao).offsets[0], (sao).offsets[1], (sao).offsets[2], (sao).offsets[3], (sao).offsets[4])
 
 
-void kvz_init_sao_info(sao_info_t *sao);
-void kvz_sao_search_chroma(const encoder_state_t * state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3]);
-void kvz_sao_search_luma(const encoder_state_t * state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3]);
 void kvz_sao_reconstruct(const encoder_control_t * encoder, videoframe_t *frame, const kvz_pixel *old_rec,
                      unsigned x_ctb, unsigned y_ctb,
                      const sao_info_t *sao, color_t color_i);
 void kvz_sao_reconstruct_frame(encoder_state_t *state);
+void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y);
 
 #endif

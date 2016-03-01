@@ -195,51 +195,9 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   }
 
   if (encoder->sao_enable) {
-    const int stride = frame->width_in_lcu;
-    int32_t merge_cost_luma[3] = { INT32_MAX };
-    int32_t merge_cost_chroma[3] = { INT32_MAX };
-    sao_info_t *sao_luma = &frame->sao_luma[lcu->position.y * stride + lcu->position.x];
-    sao_info_t *sao_chroma = &frame->sao_chroma[lcu->position.y * stride + lcu->position.x];
-
-    // Merge candidates
-    sao_info_t *sao_top_luma = lcu->position.y != 0 ? &frame->sao_luma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-    sao_info_t *sao_left_luma = lcu->position.x != 0 ? &frame->sao_luma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
-    sao_info_t *sao_top_chroma = lcu->position.y != 0 ? &frame->sao_chroma[(lcu->position.y - 1) * stride + lcu->position.x] : NULL;
-    sao_info_t *sao_left_chroma = lcu->position.x != 0 ? &frame->sao_chroma[lcu->position.y * stride + lcu->position.x - 1] : NULL;
-
-    kvz_sao_search_luma(state, frame, lcu->position.x, lcu->position.y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
-    kvz_sao_search_chroma(state, frame, lcu->position.x, lcu->position.y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
-
-    sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
-    // Check merge costs
-    if (sao_top_luma) {
-      // Merge up if cost is equal or smaller to the searched mode cost
-      if (merge_cost_luma[2] + merge_cost_chroma[2] <= merge_cost_luma[0] + merge_cost_chroma[0]) {        
-        *sao_luma = *sao_top_luma;
-        *sao_chroma = *sao_top_chroma;
-        sao_luma->merge_up_flag = 1;
-        sao_luma->merge_left_flag = 0;
-      }
-    }
-    if (sao_left_luma) {
-      // Merge left if cost is equal or smaller to the searched mode cost 
-      // AND smaller than merge up cost, if merge up was already chosen
-      if (merge_cost_luma[1] + merge_cost_chroma[1] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
-        if (!sao_luma->merge_up_flag || merge_cost_luma[1] + merge_cost_chroma[1] < merge_cost_luma[2] + merge_cost_chroma[2]) {      
-          *sao_luma = *sao_left_luma;
-          *sao_chroma = *sao_left_chroma;
-          sao_luma->merge_left_flag = 1;
-          sao_luma->merge_up_flag = 0;
-        }
-      }
-    }
-    assert(sao_luma->eo_class < SAO_NUM_EO);
-    assert(sao_chroma->eo_class < SAO_NUM_EO);
-    
-    CHECKPOINT_SAO_INFO("sao_luma", *sao_luma);
-    CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
+    kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
   }
-  
+
   // Copy LCU cu_array to main states cu_array, because that is the only one
   // which is given to the next frame through image_list_t.
   {
