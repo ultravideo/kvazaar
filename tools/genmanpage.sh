@@ -7,8 +7,9 @@ cd "$(dirname "$0")"
 
 date="$(date +"%B %Y")"
 version="$(awk '/#define KVZ_VERSION/ { print $3 }' ../src/global.h)"
+manpage_file=../doc/kvazaar.1
 
-cat <<EOF> kvazaar.1
+cat <<EOF> $manpage_file
 .TH KVAZAAR "1" "$date" "kvazaar v$version" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
@@ -27,9 +28,8 @@ EOF
        s|^                  ||g;
        s|-|\\-|g;
        s|, \\-\\-|\\fR, \\fB\\-\\-|g;' \
-  >> kvazaar.1
+  >> $manpage_file
 
 for s in Slices Wpp Tiles "Parallel processing" "Video Usability Information"; do
-  sed -i "s|^  ${s}:|.SS \"${s}:\"|g" kvazaar.1
+  sed -i "s|^  ${s}:|.SS \"${s}:\"|g" $manpage_file
 done
-
