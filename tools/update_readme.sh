@@ -1,5 +1,4 @@
-#!/bin/bash
-
+#!/bin/sh
 # This file is part of Kvazaar HEVC encoder.
 #
 # Copyright (C) 2013-2016 Tampere University of Technology and others (see
@@ -17,19 +16,22 @@
 # You should have received a copy of the GNU General Public License
 # along with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 
-if [[ $# != 1 ]]; then
-    printf "Usage: $0 README.md\n"
-    exit 1
-fi
+# This script updates parameter documentation in ../README.md file.
+
+LANG=C
+set -e
+
+cd "$(dirname "$0")"
 
 tmpfile="$(mktemp)"
+readme_file="../README.md"
 
 {
-    sed '/BEGIN KVAZAAR HELP MESSAGE/q' -- "$1";
+    sed '/BEGIN KVAZAAR HELP MESSAGE/q' -- "$readme_file";
     printf '```\n';
-    kvazaar --help;
+    ../src/kvazaar --help;
     printf '```\n';
-    sed -n '/END KVAZAAR HELP MESSAGE/{:a;p;n;ba}' -- "$1";
+    sed -n '/END KVAZAAR HELP MESSAGE/{:a;p;n;ba}' -- "$readme_file";
 } >> "$tmpfile"
 
-mv -- "$tmpfile" "$1"
+mv -- "$tmpfile" "../README.md"
