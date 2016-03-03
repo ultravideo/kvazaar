@@ -1091,9 +1091,17 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
     // TODO: Update this to work with SMP/AMP blocks.
-    int mid_x_cu = (x + (width >> 1)) / 8;
-    int mid_y_cu = (y + (height >> 1)) / 8;
-    cu_info_t *ref_cu = &state->global->ref->cu_arrays[ref_idx]->data[mid_x_cu + mid_y_cu * (frame->width_in_lcu << MAX_DEPTH)];
+    const vector2d_t frame_px = { 
+        (state->tile->lcu_offset_x << LOG2_LCU_WIDTH) + x, 
+        (state->tile->lcu_offset_y << LOG2_LCU_WIDTH) + y
+    };
+    const vector2d_t frame_cu = {
+      (frame_px.x + (width >> 1)) >> MIN_SIZE,
+      (frame_px.y + (width >> 1)) >> MIN_SIZE
+    };
+    const cu_info_t *ref_cu_array = state->global->ref->cu_arrays[ref_idx]->data;
+    const int width_in_scu = frame->width_in_lcu << MAX_DEPTH;
+    const cu_info_t *ref_cu = &ref_cu_array[frame_cu.x + frame_cu.y * width_in_scu];
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
         mv.x = ref_cu->inter.mv[0][0];
