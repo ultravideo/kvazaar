@@ -572,12 +572,13 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
-  unsigned best_index = 0; // Index of large_hexbs or finally small_hexbs.
+  // Current best index, either to merge_cands, large_hebx or small_hexbs.
+  unsigned best_index = num_cand+1;
   int wpp_limit = -1;
 
   int (*calc_mvd)(const encoder_state_t * const, int, int, int,
-    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+                  int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+                  int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -594,27 +595,45 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     }
   }
 
-  // Check mv_in, if it's not in merge candidates.
+  // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
+  if (intmv_within_tile(state, orig, 0, 0, width, wpp_limit)) {
+    best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
+                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
+                                   width, height, -1);
+    best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+    best_bitcost = bitcost;
+    best_index = num_cand + 1;
+  }
+
+  // Check if mv_in is one of the merge candidates.
   bool mv_in_merge_cand = false;
   for (int i = 0; i < num_cand; ++i) {
     if (merge_cand[i].dir == 3) continue;
-    if (merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2 == mv.x &&
-        merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2 == mv.y) {
+    const vector2d_t merge_mv = {
+      merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2,
+      merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2
+    };
+    if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
       mv_in_merge_cand = true;
       break;
     }
   }
 
+  // Check mv_in if it's not one of the merge candidates.
   if (!mv_in_merge_cand &&
-    intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit))
+      intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit))
   {
-    best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                        width, height, -1);
-    best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-    best_bitcost = bitcost;
-    best_index = num_cand; 
+    unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
+                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                   width, height, -1);
+    cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+    if (cost < best_cost) {
+      best_cost = cost;
+      best_index = num_cand;
+      best_bitcost = bitcost;
+    }
   }
 
   // Select starting point from among merge candidates. These should include
@@ -623,6 +642,10 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     if (merge_cand[i].dir == 3) continue;
     mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
     mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
+
+    // Ignore 0-vector because it has already been checked.
+    if (mv.x == 0 && mv.y == 0) continue;
+
     if (!intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit)) {
       continue;
     }
@@ -638,12 +661,16 @@ static unsigned hexagon_search(const encoder_state_t * const state,
       best_bitcost = bitcost;
     }
   }
+
   if (best_index < num_cand) {
     mv.x = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][0] >> 2;
     mv.y = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][1] >> 2;
-  } else {
+  } else if (best_index == num_cand) {
     mv.x = mv_in_out->x >> 2;
     mv.y = mv_in_out->y >> 2;
+  } else {
+    mv.x = 0;
+    mv.y = 0;
   }
   
   // Search the initial 7 points of the hexagon.
