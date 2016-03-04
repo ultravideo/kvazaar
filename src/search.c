@@ -451,8 +451,8 @@ static double calc_mode_bits(const encoder_state_t *state,
   } else {
     int8_t candidate_modes[3];
     {
-      const cu_info_t *left_cu  = ((x > 8) ? CU_GET_CU(cur_cu, -1,  0) : NULL);
-      const cu_info_t *above_cu = ((y > 8) ? CU_GET_CU(cur_cu,  0, -1) : NULL);
+      const cu_info_t *left_cu  = ((x >= 8) ? CU_GET_CU(cur_cu, -1,  0) : NULL);
+      const cu_info_t *above_cu = ((y >= 8) ? CU_GET_CU(cur_cu,  0, -1) : NULL);
       kvz_intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
     }
 
