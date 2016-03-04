@@ -291,18 +291,11 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
     uint32_t bitcost;
 
     {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
                             width, height, -1);
       cost += calc_mvd(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
-        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x + width,
-        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
-        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y + height);
     }
 
     if (cost < best_cost)
@@ -359,18 +352,11 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
       uint32_t bitcost;
 
       {
-        PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
           (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
           (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
           width, height, -1);
         cost += calc_mvd(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-        PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
-          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k + width,
-          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
-          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i + height);
       }
 
       if (cost < best_cost)
@@ -440,19 +426,11 @@ static unsigned tz_search(const encoder_state_t * const state,
   // Check whatever input vector we got, unless its (0, 0) which will be checked later.
   if ((mv.x || mv.y) && intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit))
   {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
-
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                         width, height, -1);
     best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
-
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
   }
 
   int i;
@@ -467,20 +445,12 @@ static unsigned tz_search(const encoder_state_t * const state,
       continue;
     }
 
-    PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
-
 	  uint32_t bitcost;
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                    width, height, -1);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
 
     if (cost < best_cost) {
       best_cost = cost;
@@ -638,8 +608,6 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   if (!mv_in_merge_cand &&
     intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit))
   {
-    PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
-
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                         (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                         (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
@@ -647,12 +615,6 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     best_cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     best_bitcost = bitcost;
     best_index = num_cand; 
-
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
   }
 
   // Select starting point from among merge candidates. These should include
@@ -664,20 +626,11 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     if (!intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit)) {
       continue;
     }
-
-    PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
-
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                    width, height, -1);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-    PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + width,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + height);
 
     if (cost < best_cost) {
       best_cost = cost;
@@ -703,18 +656,11 @@ static unsigned hexagon_search(const encoder_state_t * const state,
 
     unsigned cost;
     {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
                              width, height, -1);
       cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
-                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x + width,
-                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y, 
-                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y + height);
     }
 
     if (cost < best_cost) {
@@ -750,17 +696,11 @@ static unsigned hexagon_search(const encoder_state_t * const state,
 
       unsigned cost;
       {
-        PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                                (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                                width, height, -1);
         cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-        PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=large_hexbs_iterative,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
-              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + width,
-              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y, 
-              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y + height);
       }
 
       if (cost < best_cost) {
@@ -786,17 +726,11 @@ static unsigned hexagon_search(const encoder_state_t * const state,
 
     unsigned cost;
     {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHPX);
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                              (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
                              (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
                              width, height, -1);
       cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHPX, state->encoder_control->threadqueue, "type=sad,step=small_hexbs,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d,ref_px_x=%d-%d,ref_px_y=%d-%d", state->global->frame, state->tile->id, orig->x, orig->x + width, orig->y, orig->y + height,
-            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x, 
-            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x + width,
-            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y, 
-            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y + height);
     }
 
     if (cost > 0 && cost < best_cost) {

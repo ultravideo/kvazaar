@@ -132,7 +132,6 @@ int threadqueue_log(threadqueue_queue_t * threadqueue, const KVZ_CLOCK_T *start,
 #define KVZ_PERF_SAOREC   (1 << 3)
 #define KVZ_PERF_BSLEAF   (1 << 4)
 #define KVZ_PERF_SEARCHCU (1 << 5)
-#define KVZ_PERF_SEARCHPX (1 << 6)
 
 #define IMPL_PERFORMANCE_MEASURE_START(mask) KVZ_CLOCK_T start, stop; if ((KVZ_DEBUG) & mask) { KVZ_GET_TIME(&start); }
 #define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((KVZ_DEBUG) & mask) { KVZ_GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
