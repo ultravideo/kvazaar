@@ -567,6 +567,32 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     return parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
   else if OPT("tiles-height-split")
     return parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+  else if OPT("tiles")
+  {
+    // A simpler interface for setting tiles, accepting only uniform split.
+    unsigned width = 0;
+    unsigned height = 0;
+    if (2 != sscanf(value, "%ux%u", &width, &height)) {
+      fprintf(stderr, "Wrong format for tiles. Expected \"%%ux%%u\", but got \"%s\"\n", value);
+      return 0;
+    }
+
+    if (MAX_TILES_PER_DIM <= width || 0 >= width) {
+      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", width, MAX_TILES_PER_DIM);
+      return 0;
+    }
+    if (MAX_TILES_PER_DIM <= height || 0 >= height) {
+      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", height, MAX_TILES_PER_DIM);
+      return 0;
+    }
+
+    // Free split arrays incase they have already been set by another parameter.
+    FREE_POINTER(cfg->tiles_width_split);
+    FREE_POINTER(cfg->tiles_height_split);
+    cfg->tiles_width_count = width;
+    cfg->tiles_height_count = height;
+    return 1;
+  }
   else if OPT("wpp")
     cfg->wpp = atobool(value);
   else if OPT("owf") {

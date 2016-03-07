@@ -78,6 +78,7 @@ static const struct option long_options[] = {
   { "no-aud",                   no_argument, NULL, 0 },
   { "cqmfile",            required_argument, NULL, 0 },
   { "seek",               required_argument, NULL, 0 },
+  { "tiles",              required_argument, NULL, 0 },
   { "tiles-width-split",  required_argument, NULL, 0 },
   { "tiles-height-split", required_argument, NULL, 0 },
   { "wpp",                      no_argument, NULL, 0 },
@@ -395,6 +396,7 @@ void print_help(void)
     "                                   Disable threads if set to 0.\n"
     "\n"
     "  Tiles:\n"
+    "          --tiles <int>x<int>    : Split picture into wdith x height uniform tiles.\n"
     "          --tiles-width-split <string>|u<int> :\n"
     "                                   Specifies a comma separated list of pixel\n"
     "                                   positions of tiles columns separation coordinates.\n"
