@@ -76,13 +76,7 @@ static int select_owf_auto(const kvz_config *const cfg)
     // If wpp is not on, select owf such that there is enough
     // tiles for twice the number of threads.
 
-    int tiles_per_frame = 1;
-    if (cfg->tiles_width_count > 0) {
-      tiles_per_frame *= cfg->tiles_width_count + 1;
-    }
-    if (cfg->tiles_height_count > 0) {
-      tiles_per_frame *= cfg->tiles_height_count + 1;
-    }
+    int tiles_per_frame= cfg->tiles_width_count * cfg->tiles_height_count;
     int threads = (cfg->threads > 1 ? cfg->threads : 1);
     int frames = CEILDIV(threads * 4, tiles_per_frame);
 
@@ -191,8 +185,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   }
 
   //Tiles
-  encoder->tiles_enable = encoder->cfg->tiles_width_count > 0 ||
-                          encoder->cfg->tiles_height_count > 0;
+  encoder->tiles_enable = encoder->cfg->tiles_width_count > 1 ||
+                          encoder->cfg->tiles_height_count > 1;
 
   {
     int i, j; //iteration variables
@@ -202,11 +196,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     //Temporary pointers to allow encoder fields to be const
     int32_t *tiles_col_width, *tiles_row_height, *tiles_ctb_addr_rs_to_ts, *tiles_ctb_addr_ts_to_rs, *tiles_tile_id, *tiles_col_bd, *tiles_row_bd;
 
-    if (encoder->cfg->tiles_width_count >= encoder->in.width_in_lcu) {
+    if (encoder->cfg->tiles_width_count > encoder->in.width_in_lcu) {
       fprintf(stderr, "Too many tiles (width)!\n");
       goto init_failed;
 
-    } else if (encoder->cfg->tiles_height_count >= encoder->in.height_in_lcu) {
+    } else if (encoder->cfg->tiles_height_count > encoder->in.height_in_lcu) {
       fprintf(stderr, "Too many tiles (height)!\n");
       goto init_failed;
     }
@@ -215,8 +209,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     encoder->tiles_uniform_spacing_flag = 1;
 
     //tilesn[x,y] contains the number of _separation_ between tiles, whereas the encoder needs the number of tiles.
-    encoder->tiles_num_tile_columns = encoder->cfg->tiles_width_count + 1;
-    encoder->tiles_num_tile_rows = encoder->cfg->tiles_height_count + 1;
+    encoder->tiles_num_tile_columns = encoder->cfg->tiles_width_count;
+    encoder->tiles_num_tile_rows = encoder->cfg->tiles_height_count;
 
     encoder->tiles_col_width = tiles_col_width =
       MALLOC(int32_t, encoder->tiles_num_tile_columns);

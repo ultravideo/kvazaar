@@ -79,10 +79,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
 
-  cfg->tiles_width_count         = 0;
-  cfg->tiles_height_count         = 0;
-  cfg->tiles_width_split          = NULL;
-  cfg->tiles_height_split          = NULL;
+  cfg->tiles_width_count  = 1;
+  cfg->tiles_height_count = 1;
+  cfg->tiles_width_split  = NULL;
+  cfg->tiles_height_split = NULL;
   
   cfg->wpp = 0;
   cfg->owf = -1;
@@ -160,9 +160,9 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   
   //If the arg starts with u, we want an uniform split
   if (arg[0]=='u') {
-    *ntiles = atoi(arg+1)-1;
-    if (MAX_TILES_PER_DIM <= *ntiles || 0 > *ntiles) {
-      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
+    *ntiles = atoi(arg + 1);
+    if (MAX_TILES_PER_DIM <= *ntiles || 1 >= *ntiles) {
+      fprintf(stderr, "Invalid number of tiles (1 <= %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles, MAX_TILES_PER_DIM);
       return 0;
     }
     //Done with parsing
@@ -171,7 +171,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   
   //We have a comma-separated list of int for the split...
   current_arg = arg;
-  *ntiles = 0;
+  *ntiles = 1;
   do {
     int ret = sscanf(current_arg, "%d", &current_value);
     if (ret != 1) {
@@ -181,24 +181,24 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
     current_arg = strchr(current_arg, ',');
     //Skip the , if we found one
     if (current_arg) ++current_arg;
-    values[*ntiles] = current_value;
+    values[*ntiles - 1] = current_value;
     ++(*ntiles);
     if (MAX_TILES_PER_DIM <= *ntiles) break;
   } while (current_arg);
   
-  if (MAX_TILES_PER_DIM <= *ntiles || 0 >= *ntiles) {
-    fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
+  if (MAX_TILES_PER_DIM <= *ntiles || 1 >= *ntiles) {
+    fprintf(stderr, "Invalid number of tiles (1 <= %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles, MAX_TILES_PER_DIM);
     return 0;
   }
   
-  *array = MALLOC(int32_t, *ntiles);
+  *array = MALLOC(int32_t, *ntiles - 1);
   if (!*array) {
     fprintf(stderr, "Could not allocate array for tiles\n");
     return 0;
   }
   
   //TODO: memcpy?
-  for (i = 0; i < *ntiles; ++i) {
+  for (i = 0; i < *ntiles - 1; ++i) {
     (*array)[i] = values[i];
   }
   
@@ -570,18 +570,18 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("tiles")
   {
     // A simpler interface for setting tiles, accepting only uniform split.
-    unsigned width = 0;
-    unsigned height = 0;
+    unsigned width;
+    unsigned height;
     if (2 != sscanf(value, "%ux%u", &width, &height)) {
       fprintf(stderr, "Wrong format for tiles. Expected \"%%ux%%u\", but got \"%s\"\n", value);
       return 0;
     }
 
-    if (MAX_TILES_PER_DIM <= width || 0 >= width) {
+    if (MAX_TILES_PER_DIM <= width || 1 > width) {
       fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", width, MAX_TILES_PER_DIM);
       return 0;
     }
-    if (MAX_TILES_PER_DIM <= height || 0 >= height) {
+    if (MAX_TILES_PER_DIM <= height || 1 > height) {
       fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", height, MAX_TILES_PER_DIM);
       return 0;
     }
@@ -589,8 +589,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     // Free split arrays incase they have already been set by another parameter.
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
-    cfg->tiles_width_count = width - 1;
-    cfg->tiles_height_count = height - 1;
+    cfg->tiles_width_count = width;
+    cfg->tiles_height_count = height;
     return 1;
   }
   else if OPT("wpp")
@@ -928,7 +928,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->tiles_width_split) {
     int i;
     int32_t prev_tile_split = 0;
-    for (i=0; i < cfg->tiles_width_count; ++i) {
+    for (i=0; i < cfg->tiles_width_count - 1; ++i) {
       if (cfg->tiles_width_split[i] <= prev_tile_split) {
         fprintf(stderr, "Input error: tile separations in width should be strictly monotonic (%d <= %d)\n", cfg->tiles_width_split[i], prev_tile_split);
         error = 1;
@@ -941,8 +941,8 @@ int kvz_config_validate(const kvz_config *const cfg)
       }
       prev_tile_split = cfg->tiles_width_split[i];
     }
-    if (cfg->tiles_width_split[cfg->tiles_width_count-1] >= cfg->width) {
-      fprintf(stderr, "Input error: last x tile separation in width (%d) should smaller than image width (%d)\n", cfg->tiles_width_split[cfg->tiles_width_count-1], cfg->width);
+    if (cfg->tiles_width_split[cfg->tiles_width_count - 2] >= cfg->width) {
+      fprintf(stderr, "Input error: last x tile separation in width (%d) should smaller than image width (%d)\n", cfg->tiles_width_split[cfg->tiles_width_count - 2], cfg->width);
       error = 1;
     }
   }
@@ -950,7 +950,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->tiles_height_split) {
     int i;
     int32_t prev_tile_split = 0;
-    for (i=0; i < cfg->tiles_height_count; ++i) {
+    for (i=0; i < cfg->tiles_height_count - 1; ++i) {
       if (cfg->tiles_height_split[i] <= prev_tile_split) {
         fprintf(stderr, "Input error: tile separations in height should be strictly monotonic (%d <= %d)\n", cfg->tiles_height_split[i], prev_tile_split);
         error = 1;
@@ -964,8 +964,8 @@ int kvz_config_validate(const kvz_config *const cfg)
       prev_tile_split = cfg->tiles_height_split[i];
     }
 
-    if (cfg->tiles_height_split[cfg->tiles_height_count-1] >= cfg->height) {
-      fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count-1], cfg->height);
+    if (cfg->tiles_height_split[cfg->tiles_height_count - 2] >= cfg->height) {
+      fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count - 2], cfg->height);
       error = 1;
     }
   }
