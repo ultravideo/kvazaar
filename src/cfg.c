@@ -589,8 +589,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     // Free split arrays incase they have already been set by another parameter.
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
-    cfg->tiles_width_count = width;
-    cfg->tiles_height_count = height;
+    cfg->tiles_width_count = width - 1;
+    cfg->tiles_height_count = height - 1;
     return 1;
   }
   else if OPT("wpp")
