@@ -316,7 +316,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
     {
       // For LP-gop, depend on the state of the first reference.
       int ref_neg = cfg->gop[(state->global->poc - 1) % cfg->gop_len].ref_neg[0];
-      if (ref_neg >= state->encoder_control->owf) {
+      if (ref_neg > state->encoder_control->owf) {
         // If frame is not within OWF range, it's already done.
         ref_state = NULL;
       } else {
