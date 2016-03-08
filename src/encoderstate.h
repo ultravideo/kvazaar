@@ -116,8 +116,8 @@ typedef struct {
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
   yuv_t *ver_buf_search;
   
+  // The bottom post-deblocking, pre-SAO pixels of every WPP-row.
   yuv_t *hor_buf_before_sao;
-  yuv_t *ver_buf_before_sao;
   
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;

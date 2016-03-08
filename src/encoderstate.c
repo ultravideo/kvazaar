@@ -259,11 +259,18 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   }
   
   if (encoder->sao_enable && lcu->above) {
-    //If we're not the first in the row
+    // Add the post-deblocking but pre-SAO pixels of the LCU row above this
+    // row to a buffer so this row can use them on it's own SAO
+    // reconstruction.
+
+    // The pixels need to be taken to from the LCU to the top-left, because
+    // not all of the pixels could be deblocked before prediction of this
+    // LCU was reconstructed.
     if (lcu->above->left) {
       encoder_state_recdata_to_bufs(state, lcu->above->left, state->tile->hor_buf_before_sao, NULL);
     }
-    //Latest LCU in the row, copy the data from the one above also
+    // If this is the last LCU in the row, we can save the pixels from the top
+    // also, as they have been fully deblocked.
     if (!lcu->right) {
       encoder_state_recdata_to_bufs(state, lcu->above, state->tile->hor_buf_before_sao, NULL);
     }
@@ -558,13 +565,17 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
         }
       }
       
-      //If children are wavefront, we need to reconstruct SAO
-      if (main_state->encoder_control->sao_enable && main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+      // Add SAO reconstruction jobs and their dependancies when using WPP coding.
+      if (main_state->encoder_control->sao_enable && 
+          main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW)
+      {
         int y;
         videoframe_t * const frame = main_state->tile->frame;
         threadqueue_job_t *previous_job = NULL;
         
         for (y = 0; y < frame->height_in_lcu; ++y) {
+          // Queue a single job performing SAO reconstruction for the whole wavefront row.
+
           worker_sao_reconstruct_lcu_data *data = MALLOC(worker_sao_reconstruct_lcu_data, 1);
           threadqueue_job_t *job;
 #ifdef KVZ_DEBUG
@@ -578,24 +589,31 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           
           job = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_sao_reconstruct_lcu, data, 1, job_description);
           
+          // This dependancy is needed, because the pre-SAO pixels from the LCU row
+          // below this one are read straigh from the frame.
           if (previous_job) {
             kvz_threadqueue_job_dep_add(job, previous_job);
           }
           previous_job = job;
           
+          // This depepndancy ensures that the bottom edge of this LCU row
+          // has been fully deblocked.
           if (y < frame->height_in_lcu - 1) {
-            //Not last row: depend on the last LCU of the row below
+            // Not last row: depend on the last LCU of the row below.
             kvz_threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 1) * frame->width_in_lcu + frame->width_in_lcu - 1]);
           } else {
-            //Last row: depend on the last LCU of the row
+            // Last row: depend on the last LCU of the row
             kvz_threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 0) * frame->width_in_lcu + frame->width_in_lcu - 1]);
           }
           kvz_threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
           
-          //Set wfrow recon job
+          // The wavefront row is finished, when the SAO-reconstruction is
+          // finished.
           main_state->children[y].tqj_recon_done = job;
           
           if (y == frame->height_in_lcu - 1) {
+            // This tile is finished, when the reconstruction of the last
+            // WPP-row is finished.
             assert(!main_state->tqj_recon_done);
             main_state->tqj_recon_done = job;
           }
