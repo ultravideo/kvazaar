@@ -59,6 +59,21 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
 }
 
 
+static INLINE int get_wpp_limit(const encoder_state_t *state, const vector2d_t* orig)
+{
+  if (state->encoder_control->owf && state->encoder_control->wpp) {
+    // Limit motion vectors to the LCU-row below this row.
+    // To avoid fractional pixel interpolation depending on things outside
+    // this range, add a margin of 4 pixels.
+    // - fme needs 4 pixels
+    // - odd chroma interpolation needs 4 pixels
+    return 2 * LCU_WIDTH - 4 - orig->y % LCU_WIDTH;
+  } else {
+    return -1;
+  }
+}
+
+
 /**
  * \return  True if referred block is within current tile.
  */
@@ -400,25 +415,13 @@ static unsigned tz_search(const encoder_state_t * const state,
   int iDist;
   int best_dist = 0;
   unsigned best_index = num_cand + 1;
-  int wpp_limit = -1;
+  int wpp_limit = get_wpp_limit(state, orig);
 
   int(*calc_mvd)(const encoder_state_t * const, int, int, int,
     int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
     int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
-  }
-
-  if (state->encoder_control->owf) {
-    wpp_limit = 2 * LCU_WIDTH - orig->y % LCU_WIDTH;
-    if (state->encoder_control->fme_level > 0) {
-      // Fractional motion estimation can change the mv by at most 1 pixel.
-      wpp_limit -= 1;
-    }
-    if (state->encoder_control->deblock_enable) {
-      // Strong deblock filter modifies 3 pixels.
-      wpp_limit -= 3;
-    }
   }
 
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
@@ -608,25 +611,13 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   unsigned i;
   // Current best index, either to merge_cands, large_hebx or small_hexbs.
   unsigned best_index = num_cand + 1;
-  int wpp_limit = -1;
+  int wpp_limit = get_wpp_limit(state, orig);
 
   int (*calc_mvd)(const encoder_state_t * const, int, int, int,
                   int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
                   int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
-  }
-
-  if (state->encoder_control->owf) {
-    wpp_limit = 2 * LCU_WIDTH - orig->y % LCU_WIDTH;
-    if (state->encoder_control->fme_level > 0) {
-      // Fractional motion estimation can change the mv by at most 1 pixel.
-      wpp_limit -= 1;
-    }
-    if (state->encoder_control->deblock_enable) {
-      // Strong deblock filter modifies 3 pixels.
-      wpp_limit -= 3;
-    }
   }
 
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
@@ -909,14 +900,7 @@ static unsigned search_frac(const encoder_state_t * const state,
       { -1, -1 }, { 0, -1 }, { 1, -1 }
   };
 
-  int wpp_limit = -1;
-  if (state->encoder_control->owf) {
-    wpp_limit = 2 * LCU_WIDTH - orig->y % LCU_WIDTH;
-    if (state->encoder_control->deblock_enable) {
-      // Strong deblock filter modifies 3 pixels.
-      wpp_limit -= 3;
-    }
-  }
+  int wpp_limit = get_wpp_limit(state, orig);
 
   //Set mv to halfpel precision
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
