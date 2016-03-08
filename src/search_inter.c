@@ -410,7 +410,7 @@ static unsigned tz_search(const encoder_state_t * const state,
   }
 
   if (state->encoder_control->owf) {
-    wpp_limit = 2 * LCU_WIDTH - orig->x % LCU_WIDTH;
+    wpp_limit = 2 * LCU_WIDTH - orig->y % LCU_WIDTH;
     if (state->encoder_control->fme_level > 0) {
       // Fractional motion estimation can change the mv by at most 1 pixel.
       wpp_limit -= 1;
@@ -618,7 +618,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   }
 
   if (state->encoder_control->owf) {
-    wpp_limit = 2 * LCU_WIDTH - orig->x % LCU_WIDTH;
+    wpp_limit = 2 * LCU_WIDTH - orig->y % LCU_WIDTH;
     if (state->encoder_control->fme_level > 0) {
       // Fractional motion estimation can change the mv by at most 1 pixel.
       wpp_limit -= 1;
@@ -911,7 +911,7 @@ static unsigned search_frac(const encoder_state_t * const state,
 
   int wpp_limit = -1;
   if (state->encoder_control->owf) {
-    wpp_limit = 2 * LCU_WIDTH - orig->x % LCU_WIDTH;
+    wpp_limit = 2 * LCU_WIDTH - orig->y % LCU_WIDTH;
     if (state->encoder_control->deblock_enable) {
       // Strong deblock filter modifies 3 pixels.
       wpp_limit -= 3;
