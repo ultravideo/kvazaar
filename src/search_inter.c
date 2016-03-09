@@ -61,7 +61,7 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
 
 static INLINE int get_wpp_limit(const encoder_state_t *state, const vector2d_t* orig)
 {
-  encoder_control_t *ctrl = state->encoder_control;
+  const encoder_control_t *ctrl = state->encoder_control;
   if (ctrl->owf && ctrl->wpp) {
     // Limit motion vectors to the LCU-row below this row.
     // To avoid fractional pixel interpolation depending on things outside
