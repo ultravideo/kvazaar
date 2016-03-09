@@ -118,14 +118,14 @@ typedef struct
  */
 typedef struct
 {
-  int8_t type;       //!< \brief block type, CU_INTER / CU_INTRA
-  int8_t depth;      //!< \brief depth / size of this block
-  int8_t part_size;  //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
-  int8_t tr_depth;   //!< \brief transform depth
-  int8_t coded;      //!< \brief flag to indicate this block is coded and reconstructed
-  int8_t skipped;    //!< \brief flag to indicate this block is skipped
-  int8_t merged;     //!< \brief flag to indicate this block is merged
-  int8_t merge_idx;  //!< \brief merge index
+  unsigned type      : 3; //!< \brief block type, CU_INTER / CU_INTRA
+  unsigned depth     : 3; //!< \brief depth / size of this block
+  unsigned part_size : 3; //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
+  unsigned tr_depth  : 3; //!< \brief transform depth
+  unsigned coded     : 1; //!< \brief flag to indicate this block is coded and reconstructed
+  unsigned skipped   : 1; //!< \brief flag to indicate this block is skipped
+  unsigned merged    : 1; //!< \brief flag to indicate this block is merged
+  unsigned merge_idx : 3; //!< \brief merge index
 
   cu_cbf_t cbf;
   struct {
