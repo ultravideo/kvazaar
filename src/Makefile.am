@@ -70,6 +70,7 @@ libkvazaar_la_SOURCES = \
 	intra.h \
 	kvazaar.c \
 	kvazaar_internal.h \
+	kvz_math.h \
 	nal.c \
 	nal.h \
 	rate_control.c \
