@@ -31,6 +31,7 @@ kvazaar_SOURCES = \
 	yuv_io.h
 kvazaar_LDADD = libkvazaar.la $(LIBS)
 
+kvazaar_CPPFLAGS = -DKVZ_VERSION="`$(srcdir)/../tools/version.sh`"
 
 libkvazaar_la_SOURCES = \
 	bitstream.c \
