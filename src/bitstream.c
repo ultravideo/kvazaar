@@ -28,6 +28,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
+#include "kvz_math.h"
+
 const uint32_t kvz_bit_set_mask[] =
 {
 0x00000001,0x00000002,0x00000004,0x00000008,
@@ -57,19 +59,6 @@ void printf_bitstream(char *msg, ...)
 }
 #endif
 
-static int floor_log2(unsigned int n)
-{
-  assert(n != 0);
-
-  int pos = 0;
-  if (n >= 1<<16) { n >>= 16; pos += 16; }
-  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
-  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
-  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
-  if (n >= 1<< 1) {           pos +=  1; }
-  return pos;
-}
-
 /**
  * \brief Initialize the Exp Golomb code table.
  *
@@ -84,7 +73,7 @@ void kvz_init_exp_golomb()
   uint8_t M;
   uint32_t info;
   for (code_num = 0; code_num < EXP_GOLOMB_TABLE_SIZE; code_num++) {
-    M = (uint8_t)floor_log2(code_num + 1);
+    M = kvz_math_floor_log2(code_num + 1);
     info = code_num + 1 - (uint32_t)pow(2, M);
     kvz_g_exp_table[code_num].len = M * 2 + 1;
     kvz_g_exp_table[code_num].value = (1<<M) | info;

@@ -25,6 +25,7 @@
 
 #include "checkpoint.h"
 #include "encoderstate.h"
+#include "kvz_math.h"
 #include "nal.h"
 
 
@@ -630,16 +631,6 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   }
 }
 
-static int num_bitcount(unsigned int n) {
-  int pos = 0;
-  if (n >= 1<<16) { n >>= 16; pos += 16; }
-  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
-  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
-  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
-  if (n >= 1<< 1) {           pos +=  1; }
-  return ((n == 0) ? (-1) : pos);
-}
-
 void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
@@ -777,7 +768,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_UE(stream, num_entry_points - 1, "num_entry_point_offsets");
     if (num_entry_points > 0) {
       int entry_points_written = 0;
-      int offset_len = num_bitcount(max_length_seen) + 1;
+      int offset_len = kvz_math_floor_log2(max_length_seen) + 1;
       WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
       encoder_state_write_bitstream_entry_points_write(stream, state, num_entry_points, offset_len, &entry_points_written); 
     }
