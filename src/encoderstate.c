@@ -1942,66 +1942,64 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
  This method encodes the X and Y component within a block of the last significant coefficient.
 */
 void kvz_encode_last_significant_xy(encoder_state_t * const state,
-                                uint8_t lastpos_x, uint8_t lastpos_y,
-                                uint8_t width, uint8_t height,
-                                uint8_t type, uint8_t scan)
+                                    uint8_t lastpos_x, uint8_t lastpos_y,
+                                    uint8_t width, uint8_t height,
+                                    uint8_t type, uint8_t scan)
 {
   cabac_data_t * const cabac = &state->cabac;
   int index = kvz_math_floor_log2(width) - 2;
-  uint8_t offset_x  = type?0:((index*3) + ((index+1)>>2)),offset_y = offset_x;
-  uint8_t shift_x   = type?(index):((index+3)>>2), shift_y = shift_x;
+  uint8_t offset_x = type ? 0 : ((index * 3) + ((index + 1) >> 2)), offset_y = offset_x;
+  uint8_t shift_x = type ? (index) : ((index + 3) >> 2), shift_y = shift_x;
   int group_idx_x;
   int group_idx_y;
-  int last_x,last_y,i;
+  int last_x, last_y, i;
   cabac_ctx_t *base_ctx_x = (type ? cabac->ctx.cu_ctx_last_x_chroma : cabac->ctx.cu_ctx_last_x_luma);
   cabac_ctx_t *base_ctx_y = (type ? cabac->ctx.cu_ctx_last_y_chroma : cabac->ctx.cu_ctx_last_y_luma);
 
   if (scan == SCAN_VER) {
-    SWAP( lastpos_x, lastpos_y,uint8_t );
+    SWAP(lastpos_x, lastpos_y, uint8_t);
   }
 
-  group_idx_x   = g_group_idx[lastpos_x];
-  group_idx_y   = g_group_idx[lastpos_y];
+  group_idx_x = g_group_idx[lastpos_x];
+  group_idx_y = g_group_idx[lastpos_y];
 
-  // Last X binarization
-  for (last_x = 0; last_x < group_idx_x ; last_x++) {
+  // x prefix
+  for (last_x = 0; last_x < group_idx_x; last_x++) {
     cabac->cur_ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
-    CABAC_BIN(cabac,1,"last_sig_coeff_x_prefix");
+    CABAC_BIN(cabac, 1, "last_sig_coeff_x_prefix");
   }
 
   if (group_idx_x < g_group_idx[width - 1]) {
     cabac->cur_ctx = &base_ctx_x[offset_x + (last_x >> shift_x)];
-    CABAC_BIN(cabac,0,"last_sig_coeff_x_prefix");
+    CABAC_BIN(cabac, 0, "last_sig_coeff_x_prefix");
   }
 
-  // Last Y binarization
-  for (last_y = 0; last_y < group_idx_y ; last_y++) {
+  // y prefix
+  for (last_y = 0; last_y < group_idx_y; last_y++) {
     cabac->cur_ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
-    CABAC_BIN(cabac,1,"last_sig_coeff_y_prefix");
+    CABAC_BIN(cabac, 1, "last_sig_coeff_y_prefix");
   }
 
   if (group_idx_y < g_group_idx[height - 1]) {
     cabac->cur_ctx = &base_ctx_y[offset_y + (last_y >> shift_y)];
-    CABAC_BIN(cabac,0,"last_sig_coeff_y_prefix");
+    CABAC_BIN(cabac, 0, "last_sig_coeff_y_prefix");
   }
 
-  // Last X
+  // x suffix
   if (group_idx_x > 3) {
     lastpos_x -= g_min_in_group[group_idx_x];
 
     for (i = ((group_idx_x - 2) >> 1) - 1; i >= 0; i--) {
-      CABAC_BIN_EP(cabac,(lastpos_x>>i) & 1,"last_sig_coeff_x_suffix");
+      CABAC_BIN_EP(cabac, (lastpos_x >> i) & 1, "last_sig_coeff_x_suffix");
     }
   }
 
-  // Last Y
+  // y suffix
   if (group_idx_y > 3) {
     lastpos_y -= g_min_in_group[group_idx_y];
 
     for (i = ((group_idx_y - 2) >> 1) - 1; i >= 0; i--) {
-      CABAC_BIN_EP(cabac,(lastpos_y>>i) & 1,"last_sig_coeff_y_suffix");
+      CABAC_BIN_EP(cabac, (lastpos_y >> i) & 1, "last_sig_coeff_y_suffix");
     }
   }
-
-  // end LastSignificantXY
 }
