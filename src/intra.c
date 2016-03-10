@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "encoder.h"
+#include "kvz_math.h"
 #include "transform.h"
 #include "strategies/strategies-intra.h"
 #include "strategies/strategies-picture.h"
@@ -227,7 +228,7 @@ void kvz_intra_predict(
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     static const int kvz_intra_hor_ver_dist_thres[5] = { 0, 7, 1, 0, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[g_to_bits[width]];
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width) - 2];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     if (dist_from_vert_or_hor > filter_threshold) {
       used_ref = &refs->filtered_ref;

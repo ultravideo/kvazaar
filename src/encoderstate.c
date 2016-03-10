@@ -39,6 +39,7 @@
 #include "rdo.h"
 #include "rate_control.h"
 #include "strategies/strategies-picture.h"
+#include "kvz_math.h"
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -1946,8 +1947,9 @@ void kvz_encode_last_significant_xy(encoder_state_t * const state,
                                 uint8_t type, uint8_t scan)
 {
   cabac_data_t * const cabac = &state->cabac;
-  uint8_t offset_x  = type?0:((TOBITS(width)*3) + ((TOBITS(width)+1)>>2)),offset_y = offset_x;
-  uint8_t shift_x   = type?(TOBITS(width)):((TOBITS(width)+3)>>2), shift_y = shift_x;
+  int index = kvz_math_floor_log2(width) - 2;
+  uint8_t offset_x  = type?0:((index*3) + ((index+1)>>2)),offset_y = offset_x;
+  uint8_t shift_x   = type?(index):((index+3)>>2), shift_y = shift_x;
   int group_idx_x;
   int group_idx_y;
   int last_x,last_y,i;

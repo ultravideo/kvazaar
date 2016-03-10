@@ -382,6 +382,7 @@
     <ClInclude Include="..\..\src\encoder_state-bitstream.h">
       <Filter>Bitstream</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\kvz_math.h" />
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">

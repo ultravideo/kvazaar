@@ -211,6 +211,7 @@
     <ClCompile Include="..\..\src\transform.c" />
     <ClInclude Include="..\..\src\input_frame_buffer.h" />
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
+    <ClInclude Include="..\..\src\kvz_math.h" />
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h" />
