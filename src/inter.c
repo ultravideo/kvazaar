@@ -374,24 +374,18 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
         }
       }
     } else { //If no overflow, we can copy without checking boundaries
-      
-      #if LCU_WIDTH == 64
-        #define CHUNK int64_t
-      #else
-        #define CHUNK kvz_pixel
-      #endif
 
       // Copy Luma
       for (y = ypos; y < ypos + height; y++) {
         int y_in_lcu = (y & ((LCU_WIDTH)-1));
         coord_y = ((y + state->tile->lcu_offset_y * LCU_WIDTH) + mv[1]) * ref->width; // pre-calculate
-        for (x = xpos; x < xpos + width; x+=sizeof(CHUNK)/sizeof(kvz_pixel)) {
+        for (x = xpos; x < xpos + width; x+=sizeof(int32_t)/sizeof(kvz_pixel)) {
           int x_in_lcu = (x & ((LCU_WIDTH)-1));
           kvz_pixel *dst = &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]);
           kvz_pixel *src = &(ref->y[coord_y + (x + state->tile->lcu_offset_x * LCU_WIDTH) + mv[0]]);
 
           //Copy one or many pixels simultaneously
-          *(CHUNK*)dst = *(CHUNK*)src;
+          *(int32_t*)dst = *(int32_t*)src;
         }
       }
 
@@ -408,8 +402,6 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
           }
         }
       }
-
-      #undef CHUNK
     }
   }
 }

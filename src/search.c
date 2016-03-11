@@ -527,32 +527,30 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTER;
       }
 
-      if (depth < MAX_DEPTH) {
-        // Try SMP and AMP partitioning.
-        static const part_mode_t mp_modes[] = {
-          // SMP
-          SIZE_2NxN, SIZE_Nx2N,
-          // AMP
-          SIZE_2NxnU, SIZE_2NxnD,
-          SIZE_nLx2N, SIZE_nRx2N,
-        };
+      // Try SMP and AMP partitioning.
+      static const part_mode_t mp_modes[] = {
+        // SMP
+        SIZE_2NxN, SIZE_Nx2N,
+        // AMP
+        SIZE_2NxnU, SIZE_2NxnD,
+        SIZE_nLx2N, SIZE_nRx2N,
+      };
 
-        const int first_mode = ctrl->cfg->smp_enable ? 0 : 2;
-        const int last_mode  = (ctrl->cfg->amp_enable && cu_width >= 32) ? 5 : 1;
-        for (int i = first_mode; i <= last_mode; ++i) {
-          kvz_search_cu_smp(state,
-                            x, y,
-                            depth,
-                            mp_modes[i],
-                            &work_tree[depth + 1],
-                            &mode_cost, &mode_bitcost);
-          // TODO: take cost of coding part mode into account
-          if (mode_cost < cost) {
-            cost = mode_cost;
-            inter_bitcost = mode_bitcost;
-            // TODO: only copy inter prediction info, not pixels
-            work_tree_copy_up(x, y, depth, work_tree);
-          }
+      const int first_mode = ctrl->cfg->smp_enable ? 0 : 2;
+      const int last_mode  = (ctrl->cfg->amp_enable && cu_width >= 16) ? 5 : 1;
+      for (int i = first_mode; i <= last_mode; ++i) {
+        kvz_search_cu_smp(state,
+                          x, y,
+                          depth,
+                          mp_modes[i],
+                          &work_tree[depth + 1],
+                          &mode_cost, &mode_bitcost);
+        // TODO: take cost of coding part mode into account
+        if (mode_cost < cost) {
+          cost = mode_cost;
+          inter_bitcost = mode_bitcost;
+          // TODO: only copy inter prediction info, not pixels
+          work_tree_copy_up(x, y, depth, work_tree);
         }
       }
     }

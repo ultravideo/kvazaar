@@ -1421,7 +1421,11 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Search bi-pred positions
-  if (state->global->slicetype == KVZ_SLICE_B && state->encoder_control->cfg->bipred) {
+  bool can_use_bipred = state->global->slicetype == KVZ_SLICE_B
+    && state->encoder_control->cfg->bipred
+    && width + height >= 16; // 4x8 and 8x4 PBs are restricted to unipred
+
+  if (can_use_bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
     unsigned cu_width = LCU_WIDTH >> depth;
     #define NUM_PRIORITY_LIST 12;

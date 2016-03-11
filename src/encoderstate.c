@@ -1066,12 +1066,8 @@ static void encode_part_mode(encoder_state_t * const state,
       CABAC_BIN(cabac, 0, "part_mode horizontal");
     }
 
-    if (state->encoder_control->cfg->amp_enable) {
-      if (depth == MAX_DEPTH) {
-        cabac->cur_ctx = &(cabac->ctx.part_size_model[2]);
-      } else {
-        cabac->cur_ctx = &(cabac->ctx.part_size_model[3]);
-      }
+    if (state->encoder_control->cfg->amp_enable && depth < MAX_DEPTH) {
+      cabac->cur_ctx = &(cabac->ctx.part_size_model[3]);
 
       if (cur_cu->part_size == SIZE_2NxN ||
           cur_cu->part_size == SIZE_Nx2N) {
