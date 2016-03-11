@@ -32,12 +32,11 @@ MAINTAINER Marko Viitanen <fador@iki.fi>
         ./autogen.sh; \
         ./configure --disable-shared;\
         make;\
+        make install; \
     AUTOINSTALLED_PACKAGES=`apt-mark showauto`; \
     apt-get remove --purge --force-yes -y $REQUIRED_PACKAGES $AUTOINSTALLED_PACKAGES; \
         apt-get clean autoclean; \
         apt-get autoremove -y; \
         rm -rf /var/lib/{apt,dpkg,cache,log}/
-    # Because we build only the static binary, copy that to the root
-    COPY src/kvazaar /
-ENTRYPOINT ["/kvazaar"]
+ENTRYPOINT ["kvazaar"]
 CMD ["--help"]
