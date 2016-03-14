@@ -366,8 +366,8 @@ int main(int argc, char *argv[])
 
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
-      .input_mutex = &input_mutex,
-      .main_thread_mutex = &main_thread_mutex,
+      .input_mutex = NULL,
+      .main_thread_mutex = NULL,
 
       .input = input,
       .api = api,
@@ -379,6 +379,8 @@ int main(int argc, char *argv[])
       .img_in = NULL,
       .retval = RETVAL_RUNNING,
     };
+    in_args.input_mutex = &input_mutex;
+    in_args.main_thread_mutex = &main_thread_mutex;
 
     if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
       fprintf(stderr, "pthread_create failed!\n");
