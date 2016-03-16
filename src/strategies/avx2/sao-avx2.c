@@ -27,6 +27,9 @@
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+// These optimizations are based heavily on sao-generic.c.
+// Might be useful to check that if (when) this file
+// is difficult to understand.
 
 // Mapping of edge_idx values to eo-classes.
 static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
@@ -37,6 +40,27 @@ static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
   int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
 
   return sao_eo_idx_to_eo_category[eo_idx];
+}
+
+
+static __m128i sao_calc_eo_cat_avx2(__m128i* a, __m128i* b, __m128i* c)
+{
+  __m128i v_eo_idx = _mm_set1_epi16(2);
+  __m128i v_a = _mm_cvtepu8_epi16(*a);
+  __m128i v_c = _mm_cvtepu8_epi16(*c);
+  __m128i v_b = _mm_cvtepu8_epi16(*b);
+  
+  __m128i temp_a = _mm_sign_epi16(_mm_set1_epi16(1), _mm_sub_epi16(v_c, v_a));
+  __m128i temp_b = _mm_sign_epi16(_mm_set1_epi16(1), _mm_sub_epi16(v_c, v_b));
+  v_eo_idx = _mm_add_epi16(v_eo_idx, temp_a);
+  v_eo_idx = _mm_add_epi16(v_eo_idx, temp_b);
+  
+  v_eo_idx = _mm_packus_epi16(v_eo_idx, v_eo_idx);
+  __m128i v_cat_lookup = _mm_setr_epi8(1,2,0,3,4,0,0,0,0,0,0,0,0,0,0,0);
+  __m128i v_cat = _mm_shuffle_epi8(v_cat_lookup, v_eo_idx);
+
+
+  return v_cat;
 }
 
 
