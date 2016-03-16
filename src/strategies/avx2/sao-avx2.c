@@ -272,18 +272,27 @@ void kvz_sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
     // Don't sample the edge pixels because this function doesn't have access to
     // their neighbours.
     for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; ++x) {
+      for (x = 0; x < block_width; x+=8) {
         vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
         vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
         const kvz_pixel *c_data = &rec_data[y * stride + x];
         kvz_pixel *new_data = &new_rec_data[y * new_stride + x];
-        kvz_pixel a = c_data[a_ofs.y * stride + a_ofs.x];
-        kvz_pixel c = c_data[0];
-        kvz_pixel b = c_data[b_ofs.y * stride + b_ofs.x];
+        const kvz_pixel* a_ptr = &c_data[a_ofs.y * stride + a_ofs.x];
+        const kvz_pixel* c_ptr = &c_data[0];
+        const kvz_pixel* b_ptr = &c_data[b_ofs.y * stride + b_ofs.x];
 
-        int eo_cat = sao_calc_eo_cat(a, b, c);
+        __m128i v_a = _mm_loadl_epi64((__m128i*)a_ptr);
+        __m128i v_b = _mm_loadl_epi64((__m128i*)b_ptr);
+        __m128i v_c = _mm_loadl_epi64((__m128i*)c_ptr);
 
-        new_data[0] = (kvz_pixel)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
+        __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c) );
+
+        __m256i v_offset_v = load_5_offsets(sao->offsets + offset_v);
+        __m256i v_new_data = _mm256_permutevar8x32_epi32(v_offset_v, v_cat);
+        v_new_data = _mm256_add_epi32(v_new_data, _mm256_cvtepu8_epi32(v_c));
+        __m128i v_new_data_128 = _mm_packus_epi32(_mm256_castsi256_si128(v_new_data), _mm256_extracti128_si256(v_new_data, 1));
+        v_new_data_128 = _mm_packus_epi16(v_new_data_128, v_new_data_128);
+        _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
       }
     }
   }
