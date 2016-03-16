@@ -111,9 +111,6 @@ int yuv_io_read(FILE* file,
   const unsigned uv_array_width  = img_out->width  / 2;
   const unsigned uv_array_height = img_out->height  / 2;
 
-  fprintf(stderr, "NEEDMOARFILE\r\n");
-  fflush(stderr);
-
   if (input_width == img_out->width) {
     // No need to extend pixels.
     const size_t pixel_size = sizeof(unsigned char);

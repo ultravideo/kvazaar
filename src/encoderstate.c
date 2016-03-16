@@ -43,6 +43,7 @@
 #include "sao.h"
 #include "rdo.h"
 #include "rate_control.h"
+#include "visualization.h"
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -1027,7 +1028,56 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
   }
 
+#if KVZ_VISUALIZATION == 1
+  if (cur_cu->type == CU_INTER) {
+    PTHREAD_LOCK(&sdl_mutex);
 
+    const int x = x_ctb * LCU_CU_WIDTH;
+    const int y = y_ctb * LCU_CU_WIDTH;
+
+    const int cu_width = LCU_WIDTH >> depth;
+    const int pic_width = state->encoder_control->cfg->width;
+    const int index_RGB = (x + y * pic_width +
+                          state->tile->lcu_offset_x*LCU_WIDTH +
+                          state->tile->lcu_offset_y *LCU_WIDTH * pic_width) << 2;
+
+    const int cu_x_in_frame = x + state->tile->lcu_offset_x * LCU_WIDTH;
+    const int cu_y_in_frame = y + state->tile->lcu_offset_y * LCU_WIDTH;
+    const int x1 = cu_width >> 1;
+    const int y1 = cu_width >> 1;
+    const int frame_x1 = cu_x_in_frame + x1;
+    const int frame_y1 = cu_y_in_frame + y1;
+
+    if (cur_cu->inter.mv_dir & 2) {
+      // FIXME: clip the length of the vector instead of clipping X and Y separately.
+      const int frame_x2 = CLIP(0, state->tile->frame->source->width - 1, frame_x1 + (cur_cu->inter.mv[1][0] >> 2));
+      const int frame_y2 = CLIP(0, state->tile->frame->source->height - 1, frame_y1 + (cur_cu->inter.mv[1][1] >> 2));
+      const int x2 = frame_x2 - cu_x_in_frame;
+      const int y2 = frame_y2 - cu_y_in_frame;
+
+      draw_line(pic_width, index_RGB, x1, y1, x2, y2, 0, 255, 0);
+    }
+    if (cur_cu->inter.mv_dir & 1) {
+      // FIXME: clip the length of the vector instead of clipping X and Y separately.
+      const int frame_x2 = CLIP(0, state->tile->frame->source->width - 1, frame_x1 + (cur_cu->inter.mv[0][0] >> 2));
+      const int frame_y2 = CLIP(0, state->tile->frame->source->height - 1, frame_y1 + (cur_cu->inter.mv[0][1] >> 2));
+      const int x2 = frame_x2 - cu_x_in_frame;
+      const int y2 = frame_y2 - cu_y_in_frame;
+
+      const int ref_idx = MIN(2, cur_cu->inter.mv_ref[0]);
+      const int ref_poc = state->global->ref->pocs[ref_idx];
+      const int ref_framemod = ref_poc % 8;
+
+      draw_line(pic_width, index_RGB, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+    }
+    
+    SDL_Rect rect;
+    rect.w = cu_width; rect.h = cu_width; rect.x = x + state->tile->lcu_offset_x*LCU_WIDTH; rect.y = y + state->tile->lcu_offset_y*LCU_WIDTH;
+    SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB + index_RGB, pic_width * 4);
+
+    PTHREAD_UNLOCK(&sdl_mutex);
+  }
+#endif
 
     // Encode skip flag
   if (state->global->slicetype != KVZ_SLICE_I) {

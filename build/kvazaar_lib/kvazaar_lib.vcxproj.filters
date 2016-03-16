@@ -413,6 +413,9 @@
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h">
       <Filter>Header Files\strategies\avx2</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\visualization.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">

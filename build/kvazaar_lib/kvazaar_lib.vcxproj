@@ -228,6 +228,7 @@
     <ClInclude Include="..\..\src\strategies\generic\quant-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-intra.h" />
     <ClInclude Include="..\..\src\strategies\strategies-quant.h" />
+    <ClInclude Include="..\..\src\visualization.h" />
     <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <ItemGroup>
