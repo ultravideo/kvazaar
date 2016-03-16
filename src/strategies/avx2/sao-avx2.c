@@ -307,20 +307,36 @@ int kvz_sao_band_ddistortion_avx2(const encoder_state_t * const state, const kvz
   int shift = state->encoder_control->bitdepth-5;
   int sum = 0;
 
+  __m256i v_accum = { 0 };
+
   for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      int band = (rec_data[y * block_width + x] >> shift) - band_pos;
-      int offset = 0;
-      if (band >= 0 && band < 4) {
-        offset = sao_bands[band];
-      }
-      if (offset != 0) {
-        int diff = orig_data[y * block_width + x] - rec_data[y * block_width + x];
-        // Offset is applied to reconstruction, so it is subtracted from diff.
-        sum += (diff - offset) * (diff - offset) - diff * diff;
-      }
+    for (x = 0; x < block_width; x+=8) {
+      
+      __m256i v_band = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(rec_data[y * block_width + x])));
+      v_band = _mm256_srli_epi32(v_band, shift);
+      v_band = _mm256_sub_epi32(v_band, _mm256_set1_epi32(band_pos));
+
+      __m256i v_offset = { 0 };
+      __m256i v_mask = _mm256_cmpeq_epi32(_mm256_and_si256(_mm256_set1_epi32(~3), v_band), _mm256_setzero_si256());
+      v_offset = _mm256_permutevar8x32_epi32(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*)sao_bands)), v_band);
+
+      v_offset = _mm256_and_si256(v_offset, v_mask);
+      
+
+      __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
+      __m256i v_rec = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(rec_data[y * block_width + x])));
+      v_diff = _mm256_sub_epi32(v_diff, v_rec);
+      __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
+      __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
+      v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
     }
   }
+
+  //Full horizontal sum
+  v_accum = _mm256_add_epi32(v_accum, _mm256_castsi128_si256(_mm256_extracti128_si256(v_accum, 1)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, KVZ_PERMUTE(2, 3, 0, 1)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, KVZ_PERMUTE(1, 0, 1, 0)));
+  sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(v_accum));
 
   return sum;
 }
