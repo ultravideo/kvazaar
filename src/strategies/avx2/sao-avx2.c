@@ -49,18 +49,6 @@ static INLINE __m256i load_5_offsets(const int* offsets){
 }
 
 
-// Mapping of edge_idx values to eo-classes.
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
-{
-  // Mapping relationships between a, b and c to eo_idx.
-  static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-
-  int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
-
-  return sao_eo_idx_to_eo_category[eo_idx];
-}
-
-
 static __m128i sao_calc_eo_cat_avx2(__m128i* a, __m128i* b, __m128i* c)
 {
   __m128i v_eo_idx = _mm_set1_epi16(2);
