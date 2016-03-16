@@ -24,12 +24,30 @@
 #include "sao.h"
 #include "strategyselector.h"
 #include "rdo.h"
+#include "strategies/strategies-common.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
 // These optimizations are based heavily on sao-generic.c.
 // Might be useful to check that if (when) this file
 // is difficult to understand.
+
+
+static INLINE __m256i load_6_offsets(const int* offsets){
+
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*) offsets)), _mm_loadl_epi64((__m128i*)&(offsets[4])), 1);
+}
+
+static INLINE __m128i load_6_pixels(const kvz_pixel* data){
+
+  return _mm_insert_epi16(_mm_cvtsi32_si128(*(int32_t*)&(data[0])), *(int16_t*)&(data[4]), 2);
+}
+
+static INLINE __m256i load_5_offsets(const int* offsets){
+
+  return _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*) offsets)), _mm_insert_epi32(_mm_setzero_si128(), offsets[4], 0), 1);
+}
+
 
 // Mapping of edge_idx values to eo-classes.
 static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
@@ -73,22 +91,58 @@ int kvz_sao_edge_ddistortion_avx2(const kvz_pixel *orig_data, const kvz_pixel *r
   vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
   vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
 
+  __m256i v_accum = { 0 };
+
   for (y = 1; y < block_height - 1; ++y) {
-    for (x = 1; x < block_width - 1; ++x) {
+
+    for (x = 1; x < block_width - 8; x+=8) {
       const kvz_pixel *c_data = &rec_data[y * block_width + x];
-      kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
-      kvz_pixel c = c_data[0];
-      kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
 
-      int offset = offsets[sao_calc_eo_cat(a, b, c)];
+      __m128i v_c_data = _mm_loadl_epi64((__m128i*)c_data);
+      __m128i v_a = _mm_loadl_epi64((__m128i*)(&c_data[a_ofs.y * block_width + a_ofs.x]));
+      __m128i v_c = v_c_data;
+      __m128i v_b = _mm_loadl_epi64((__m128i*)(&c_data[b_ofs.y * block_width + b_ofs.x]));
 
-      if (offset != 0) {
-        int diff = orig_data[y * block_width + x] - c;
-        // Offset is applied to reconstruction, so it is subtracted from diff.
-        sum += (diff - offset) * (diff - offset) - diff * diff;
-      }
+      __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
+
+      __m256i v_offset = _mm256_loadu_si256((__m256i*) offsets);
+      v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
+   
+      __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
+      v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
+      __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
+      __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
+      v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
     }
+
+    //Handle last 6 pixels separately to prevent reading over boundary
+    const kvz_pixel *c_data = &rec_data[y * block_width + x];
+    __m128i v_c_data = load_6_pixels(c_data);
+    const kvz_pixel* a_ptr = &c_data[a_ofs.y * block_width + a_ofs.x];
+    const kvz_pixel* b_ptr = &c_data[b_ofs.y * block_width + b_ofs.x];
+    __m128i v_a = load_6_pixels(a_ptr);
+    __m128i v_c = v_c_data;
+    __m128i v_b = load_6_pixels(b_ptr);
+
+    __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
+
+    __m256i v_offset = load_6_offsets(offsets);
+    v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
+   
+    const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
+    __m256i v_diff = _mm256_cvtepu8_epi32(load_6_pixels(orig_ptr));
+    v_diff = _mm256_sub_epi32(v_diff, _mm256_cvtepu8_epi32(v_c));
+
+    __m256i v_diff_minus_offset = _mm256_sub_epi32(v_diff, v_offset);
+    __m256i v_temp_sum = _mm256_sub_epi32(_mm256_mullo_epi32(v_diff_minus_offset, v_diff_minus_offset), _mm256_mullo_epi32(v_diff, v_diff));
+    v_accum = _mm256_add_epi32(v_accum, v_temp_sum);
   }
+
+  //Full horizontal sum
+  v_accum = _mm256_add_epi32(v_accum, _mm256_castsi128_si256(_mm256_extracti128_si256(v_accum, 1)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, KVZ_PERMUTE(2, 3, 0, 1)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, KVZ_PERMUTE(1, 0, 1, 0)));
+  sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(v_accum));
 
   return sum;
 }
