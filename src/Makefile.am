@@ -109,6 +109,8 @@ libkvazaar_la_SOURCES = \
 	strategies/generic/picture-generic.h \
 	strategies/generic/quant-generic.c \
 	strategies/generic/quant-generic.h \
+	strategies/generic/sao-generic.c \
+	strategies/generic/sao-generic.h \
 	strategies/strategies-common.h \
 	strategies/strategies-dct.c \
 	strategies/strategies-dct.h \
@@ -122,6 +124,8 @@ libkvazaar_la_SOURCES = \
 	strategies/strategies-picture.h \
 	strategies/strategies-quant.c \
 	strategies/strategies-quant.h \
+	strategies/strategies-sao.c \
+	strategies/strategies-sao.h \
 	strategies/x86_asm/picture-x86-asm.c \
 	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \
@@ -150,7 +154,10 @@ libavx2_la_SOURCES = \
 	strategies/avx2/picture-avx2.c \
 	strategies/avx2/picture-avx2.h \
 	strategies/avx2/quant-avx2.c \
-	strategies/avx2/quant-avx2.h
+	strategies/avx2/quant-avx2.h \
+	strategies/avx2/sao-avx2.c \
+	strategies/avx2/sao-avx2.h
+	
 
 libsse2_la_SOURCES = \
 	strategies/sse2/picture-sse2.c \

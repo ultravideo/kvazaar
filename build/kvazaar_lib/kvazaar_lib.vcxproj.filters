@@ -207,6 +207,15 @@
     <ClCompile Include="..\..\src\encoder_state-bitstream.c">
       <Filter>Bitstream</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\strategies-sao.c">
+      <Filter>Optimization\strategies</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\generic\sao-generic.c">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\sao-avx2.c">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -383,6 +392,15 @@
       <Filter>Bitstream</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\kvz_math.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-sao.h">
+      <Filter>Optimization\strategies</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\generic\sao-generic.h">
+      <Filter>Optimization\strategies\generic</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\strategies\avx2\sao-avx2.h">
+      <Filter>Optimization\strategies\avx2</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">
