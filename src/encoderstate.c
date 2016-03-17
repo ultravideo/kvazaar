@@ -1001,15 +1001,28 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int y = y_ctb * LCU_CU_WIDTH;
     const int pic_width = screen_w;
     const int pic_height = screen_h;
-    const int index_RGB = (x + y * pic_width +
-                          state->tile->lcu_offset_x*LCU_WIDTH +
-                          state->tile->lcu_offset_y *LCU_WIDTH * pic_width) << 2;
     const int cu_width = LCU_WIDTH >> depth;
-
+    const int poc = state->global->poc;
+    
     if (x_ctb == 0 && y_ctb == 0) {
-      memset(sdl_pixels_RGB_inter, 0, (screen_w*screen_h * 4));
-      SDL_UpdateTexture(overlay_inter, NULL, sdl_pixels_RGB_inter, pic_width * 4);
+      memset(sdl_pixels_RGB_inter[poc % 2], 0, (screen_w*screen_h * 4));
+      SDL_UpdateTexture(overlay_inter[poc % 2], NULL, sdl_pixels_RGB_inter[poc % 2], pic_width * 4);
     }
+
+    const int lcu_width = (x + 64 >= screen_w ? screen_w - x : 64);
+    const int lcu_height = (y + 64 >= screen_h ? screen_h - y : 64);
+
+    kvz_pixel *buffer = sdl_pixels_RGB_inter[(poc + 1) % 2];
+    for (int lcu_y = 0; lcu_y < lcu_height; ++lcu_y) {
+      int index = (x + (y + lcu_y) * screen_w) * 4;
+      memset(&buffer[index], 0, lcu_width * 4);
+    }
+
+    SDL_Rect lcu_rect = {
+      x, y,
+      lcu_width, lcu_height
+    };
+    SDL_UpdateTexture(overlay_inter[(poc + 1) % 2], &lcu_rect, buffer + (x + y * screen_w) * 4, screen_w * 4);
 
     PTHREAD_UNLOCK(&sdl_mutex);
   }
@@ -1070,6 +1083,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int x1 = cu_x_in_frame + cu_width / 2 - 1;
     const int y1 = cu_y_in_frame + cu_width / 2 - 1;
 
+    const int poc = state->global->poc;
+
     // A shared bounding box for both L0 and L1 vectors.
     vector2d_t tl = { pic_width - 1, pic_height - 1 };
     vector2d_t br = { 0, 0 };
@@ -1082,7 +1097,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int ref_poc = state->global->ref->pocs[ref_idx];
       const int ref_framemod = ref_poc % 8;
       if (x1 != x2 && y1 != y2) {
-        draw_mv(pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+        draw_mv(sdl_pixels_RGB_inter[poc % 2], pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
       }
 
       tl.x = MIN(MIN(tl.x, x1), x2);
@@ -1098,7 +1113,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int ref_poc = state->global->ref->pocs[ref_idx];
       const int ref_framemod = ref_poc % 8;
       if (x1 != x2 && y1 != y2) {
-        draw_mv(pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+        draw_mv(sdl_pixels_RGB_inter[poc % 2], pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
       }
 
       tl.x = MIN(MIN(tl.x, x1), x2);
@@ -1127,7 +1142,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
 
     if (rect.w > 1 || rect.h > 1) {
-      SDL_UpdateTexture(overlay_inter, &rect, sdl_pixels_RGB_inter + (tl.x + tl.y * pic_width) * 4, pic_width * 4);
+      SDL_UpdateTexture(overlay_inter[poc % 2], &rect, sdl_pixels_RGB_inter[poc % 2] + (tl.x + tl.y * pic_width) * 4, pic_width * 4);
     }
     
     PTHREAD_UNLOCK(&sdl_mutex);

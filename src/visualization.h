@@ -25,15 +25,18 @@
 
 #include "threadqueue.h"
 #include <SDL.h>
+#include <SDL_ttf.h>
+#include <math.h>
+
 extern SDL_Renderer *renderer;
 extern SDL_Surface *screen, *pic;
-extern SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter;
+extern SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2];
 extern int screen_w, screen_h;
 extern int sdl_draw_blocks;
 extern pthread_mutex_t sdl_mutex;
 extern kvz_pixel *sdl_pixels_RGB;
 extern kvz_pixel *sdl_pixels_RGB_intra_dir;
-extern kvz_pixel *sdl_pixels_RGB_inter;
+extern kvz_pixel *sdl_pixels_RGB_inter[2];
 extern kvz_pixel *sdl_pixels;
 extern kvz_pixel *sdl_pixels_u;
 extern kvz_pixel *sdl_pixels_v;
@@ -86,7 +89,7 @@ static void draw_line(int pic_width, int index_RGB, int x1, int y1, int x2, int 
   }
 }
 
-static void draw_mv(int pic_width, int pic_height, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
+static void draw_mv(kvz_pixel *buffer, int pic_width, int pic_height, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
 {
   int frac_x = x1 << 4;
   int frac_y = y1 << 4;
@@ -99,11 +102,11 @@ static void draw_mv(int pic_width, int pic_height, int x1, int y1, int x2, int y
     int x = frac_x >> 4;
     int y = frac_y >> 4;
     if (x < 0 || x >= pic_width || y < 0 || y >= pic_height) break;
-    kvz_putpixel(sdl_pixels_RGB_inter, pic_width, x, y, color_r, color_g, color_b, 255);
+    kvz_putpixel(buffer, pic_width, x, y, color_r, color_g, color_b, 255);
   }
 
   // Mark the origin of the motion vector.
-  kvz_putpixel(sdl_pixels_RGB_inter, pic_width, x1, y1, 255 - color_r, 255 - color_g, 255 - color_b, 255);
+  kvz_putpixel(buffer, pic_width, x1, y1, 255 - color_r, 255 - color_g, 255 - color_b, 255);
 }
 #endif
 

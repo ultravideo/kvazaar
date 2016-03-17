@@ -48,14 +48,13 @@
 
 #if KVZ_VISUALIZATION == 1
 #include "threadqueue.h"
-#include <SDL.h>
-#include <SDL_ttf.h>
+#include "visualization.h"
 const int INFO_WIDTH = 480;
 const int INFO_HEIGHT = 240;
 SDL_Renderer *renderer, *info_renderer;
 SDL_Window *window, *info_window = NULL;
 SDL_Surface *screen, *pic;
-SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter, *overlay_hilight;
+SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2], *overlay_hilight;
 int screen_w, screen_h;
 int sdl_draw_blocks = 1;
 int sdl_draw_intra = 1;
@@ -64,7 +63,7 @@ pthread_mutex_t sdl_mutex;
 kvz_pixel *sdl_pixels_hilight;
 kvz_pixel *sdl_pixels_RGB;
 kvz_pixel *sdl_pixels_RGB_intra_dir;
-kvz_pixel *sdl_pixels_RGB_inter;
+kvz_pixel *sdl_pixels_RGB_inter[2];
 kvz_pixel *sdl_pixels;
 kvz_pixel *sdl_pixels_u;
 kvz_pixel *sdl_pixels_v;
@@ -123,7 +122,8 @@ static void sdl_force_redraw(int locked) {
       SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
     if (sdl_draw_intra) {
       SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
-      SDL_RenderCopy(renderer, overlay_inter, NULL, NULL);
+      SDL_RenderCopy(renderer, overlay_inter[0], NULL, NULL);
+      SDL_RenderCopy(renderer, overlay_inter[1], NULL, NULL);
     }
       
 
@@ -188,13 +188,15 @@ void *eventloop_main(void* temp) {
   overlay = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_IYUV, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
   overlay_blocks = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
   overlay_intra = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
-  overlay_inter = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
+  overlay_inter[0] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
+  overlay_inter[1] = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
   overlay_hilight = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, screen_w, screen_h);
 
 
   SDL_SetTextureBlendMode(overlay_hilight, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay_intra, SDL_BLENDMODE_BLEND);
-  SDL_SetTextureBlendMode(overlay_inter, SDL_BLENDMODE_BLEND);
+  SDL_SetTextureBlendMode(overlay_inter[0], SDL_BLENDMODE_BLEND);
+  SDL_SetTextureBlendMode(overlay_inter[1], SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay_blocks, SDL_BLENDMODE_BLEND);
   SDL_SetTextureBlendMode(overlay, SDL_BLENDMODE_BLEND);
   sdl_pixels_RGB = (kvz_pixel*)malloc(screen_w*screen_h * 4);
@@ -206,8 +208,10 @@ void *eventloop_main(void* temp) {
   sdl_pixels_RGB_intra_dir = (kvz_pixel*)malloc(screen_w*screen_h * 4);
   memset(sdl_pixels_RGB_intra_dir, 0, (screen_w*screen_h * 4));
 
-  sdl_pixels_RGB_inter = (kvz_pixel*)malloc(screen_w*screen_h * 4);
-  memset(sdl_pixels_RGB_inter, 0, (screen_w*screen_h * 4));
+  sdl_pixels_RGB_inter[0] = (kvz_pixel*)malloc(screen_w*screen_h * 4);
+  memset(sdl_pixels_RGB_inter[0], 0, (screen_w*screen_h * 4));
+  sdl_pixels_RGB_inter[1] = (kvz_pixel*)malloc(screen_w*screen_h * 4);
+  memset(sdl_pixels_RGB_inter[1], 0, (screen_w*screen_h * 4));
 
   sdl_pixels = (kvz_pixel*)malloc(screen_w*screen_h * 2 * sizeof(kvz_pixel));
   sdl_pixels_u = sdl_pixels + screen_w*screen_h;
@@ -426,7 +430,8 @@ void *eventloop_main(void* temp) {
           SDL_RenderCopy(renderer, overlay_blocks, NULL, NULL);
         if (sdl_draw_intra) {
           SDL_RenderCopy(renderer, overlay_intra, NULL, NULL);
-          SDL_RenderCopy(renderer, overlay_inter, NULL, NULL);
+          SDL_RenderCopy(renderer, overlay_inter[0], NULL, NULL);
+          SDL_RenderCopy(renderer, overlay_inter[1], NULL, NULL);
         }
         if (sdl_block_info) {
           SDL_RenderCopy(renderer, overlay_hilight, NULL, NULL);
