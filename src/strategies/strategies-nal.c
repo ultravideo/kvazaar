@@ -26,6 +26,10 @@ void (*kvz_array_checksum)(const kvz_pixel* data,
                        const int height, const int width,
                        const int stride,
                        unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
+void (*kvz_array_md5)(const kvz_pixel* data,
+                      const int height, const int width,
+                      const int stride,
+                      unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
 
 
 int kvz_strategy_register_nal(void* opaque, uint8_t bitdepth) {

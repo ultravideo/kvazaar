@@ -129,7 +129,9 @@ libkvazaar_la_SOURCES = \
 	strategies/x86_asm/picture-x86-asm.c \
 	strategies/x86_asm/picture-x86-asm.h \
 	strategyselector.c \
-	strategyselector.h
+	strategyselector.h \
+	extras/libmd5.c \
+	extras/libmd5.h
 
 libkvazaar_la_CFLAGS =
 
