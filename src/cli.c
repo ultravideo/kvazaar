@@ -104,6 +104,7 @@ static const struct option long_options[] = {
   { "help",                     no_argument, NULL, 0 },
   { "loop-input",               no_argument, NULL, 0 },
   { "mv-constraint",      required_argument, NULL, 0 },
+  { "hash",               required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -369,6 +370,10 @@ void print_help(void)
     "                                     \"none\": no constraint\n"
     "                                     \"frametile\": constrain within the tile\n"
     "                                     \"frametilemargin\": constrain even more\n"
+    "          --hash                 : Specify which decoded picture hash to use [checksum]\n"
+    "                                     \"none\": no constraint\n"
+    "                                     \"checksum\": constrain within the tile\n"
+    "                                     \"md5\": constrain even more\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

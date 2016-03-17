@@ -880,7 +880,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
-  {
+  if (state->encoder_control->cfg->hash != KVZ_HASH_NONE) {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);

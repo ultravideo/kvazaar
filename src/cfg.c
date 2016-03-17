@@ -78,6 +78,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_len         = 0;
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
+  cfg->hash            = KVZ_HASH_CHECKSUM;
 
   cfg->tiles_width_count  = 1;
   cfg->tiles_height_count = 1;
@@ -282,6 +283,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
   static const char * const mv_constraint_names[] = { "none", "frame", "tile", "frametile", "frametilemargin", NULL };
+  static const char * const hash_names[] = { "none", "checksum", "md5", NULL };
 
   static const char * const preset_values[11][28] = {
       { 
@@ -795,6 +797,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->mv_rdo = atobool(value);
   else if OPT("psnr")
     cfg->calc_psnr = (bool)atobool(value);
+  else if OPT("hash")
+  {
+    int8_t hash;
+    int result;
+    if ((result = parse_enum(value, hash_names, &hash))) {
+      cfg->hash = hash;
+    }
+    return result;
+  }
   else
     return 0;
 #undef OPT
