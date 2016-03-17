@@ -992,6 +992,29 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   uint8_t border_split_y = ((state->encoder_control->in.height) < ((abs_y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
 
+#if KVZ_VISUALIZATION == 1
+  if (depth == 0) {
+    PTHREAD_LOCK(&sdl_mutex);
+
+    // Clean our own 64x64 area before starting to draw.
+    const int x = x_ctb * LCU_CU_WIDTH;
+    const int y = y_ctb * LCU_CU_WIDTH;
+    const int pic_width = screen_w;
+    const int pic_height = screen_h;
+    const int index_RGB = (x + y * pic_width +
+                          state->tile->lcu_offset_x*LCU_WIDTH +
+                          state->tile->lcu_offset_y *LCU_WIDTH * pic_width) << 2;
+    const int cu_width = LCU_WIDTH >> depth;
+
+    if (x_ctb == 0 && y_ctb == 0) {
+      memset(sdl_pixels_RGB_inter, 0, (screen_w*screen_h * 4));
+      SDL_UpdateTexture(overlay_inter, NULL, sdl_pixels_RGB_inter, pic_width * 4);
+    }
+
+    PTHREAD_UNLOCK(&sdl_mutex);
+  }
+#endif
+
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
     // Implisit split flag when on border
@@ -1036,45 +1059,77 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int y = y_ctb * LCU_CU_WIDTH;
 
     const int cu_width = LCU_WIDTH >> depth;
-    const int pic_width = state->encoder_control->cfg->width;
+    const int pic_width = screen_w;
+    const int pic_height = screen_h;
     const int index_RGB = (x + y * pic_width +
                           state->tile->lcu_offset_x*LCU_WIDTH +
                           state->tile->lcu_offset_y *LCU_WIDTH * pic_width) << 2;
 
     const int cu_x_in_frame = x + state->tile->lcu_offset_x * LCU_WIDTH;
     const int cu_y_in_frame = y + state->tile->lcu_offset_y * LCU_WIDTH;
-    const int x1 = cu_width >> 1;
-    const int y1 = cu_width >> 1;
-    const int frame_x1 = cu_x_in_frame + x1;
-    const int frame_y1 = cu_y_in_frame + y1;
+    const int x1 = cu_x_in_frame + cu_width / 2 - 1;
+    const int y1 = cu_y_in_frame + cu_width / 2 - 1;
+
+    // A shared bounding box for both L0 and L1 vectors.
+    vector2d_t tl = { pic_width - 1, pic_height - 1 };
+    vector2d_t br = { 0, 0 };
 
     if (cur_cu->inter.mv_dir & 2) {
-      // FIXME: clip the length of the vector instead of clipping X and Y separately.
-      const int frame_x2 = CLIP(0, state->tile->frame->source->width - 1, frame_x1 + (cur_cu->inter.mv[1][0] >> 2));
-      const int frame_y2 = CLIP(0, state->tile->frame->source->height - 1, frame_y1 + (cur_cu->inter.mv[1][1] >> 2));
-      const int x2 = frame_x2 - cu_x_in_frame;
-      const int y2 = frame_y2 - cu_y_in_frame;
+      const int x2 = CLIP(0, state->tile->frame->source->width - 1, x1 + (cur_cu->inter.mv[1][0] >> 2));
+      const int y2 = CLIP(0, state->tile->frame->source->height - 1, y1 + (cur_cu->inter.mv[1][1] >> 2));
 
-      draw_line(pic_width, index_RGB, x1, y1, x2, y2, 0, 255, 0);
+      const int ref_idx = MIN(2, cur_cu->inter.mv_ref[1]);
+      const int ref_poc = state->global->ref->pocs[ref_idx];
+      const int ref_framemod = ref_poc % 8;
+      if (x1 != x2 && y1 != y2) {
+        draw_mv(pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+      }
+
+      tl.x = MIN(MIN(tl.x, x1), x2);
+      tl.y = MIN(MIN(tl.y, y1), y2);
+      br.x = MAX(MAX(br.x, x1), x2);
+      br.y = MAX(MAX(br.y, y1), y2);
     }
     if (cur_cu->inter.mv_dir & 1) {
-      // FIXME: clip the length of the vector instead of clipping X and Y separately.
-      const int frame_x2 = CLIP(0, state->tile->frame->source->width - 1, frame_x1 + (cur_cu->inter.mv[0][0] >> 2));
-      const int frame_y2 = CLIP(0, state->tile->frame->source->height - 1, frame_y1 + (cur_cu->inter.mv[0][1] >> 2));
-      const int x2 = frame_x2 - cu_x_in_frame;
-      const int y2 = frame_y2 - cu_y_in_frame;
+      const int x2 = x1 + (cur_cu->inter.mv[0][0] >> 2);
+      const int y2 = y1 + (cur_cu->inter.mv[0][1] >> 2);
 
       const int ref_idx = MIN(2, cur_cu->inter.mv_ref[0]);
       const int ref_poc = state->global->ref->pocs[ref_idx];
       const int ref_framemod = ref_poc % 8;
+      if (x1 != x2 && y1 != y2) {
+        draw_mv(pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+      }
 
-      draw_line(pic_width, index_RGB, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+      tl.x = MIN(MIN(tl.x, x1), x2);
+      tl.y = MIN(MIN(tl.y, y1), y2);
+      br.x = MAX(MAX(br.x, x1), x2);
+      br.y = MAX(MAX(br.y, y1), y2);
     }
     
-    SDL_Rect rect;
-    rect.w = cu_width; rect.h = cu_width; rect.x = x + state->tile->lcu_offset_x*LCU_WIDTH; rect.y = y + state->tile->lcu_offset_y*LCU_WIDTH;
-    SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB + index_RGB, pic_width * 4);
+    tl.x = CLIP(0, pic_width - 1, tl.x);
+    tl.y = CLIP(0, pic_height - 1, tl.y);
+    br.x = CLIP(0, pic_width - 2, br.x);
+    br.y = CLIP(0, pic_height - 2, br.y);
 
+    SDL_Rect rect = {
+      tl.x,
+      tl.y,
+      br.x - tl.x + 1,
+      br.y - tl.y + 1,
+    };
+
+    if ((br.x + br.y * pic_width) * 4 >= pic_width * pic_height * 4) {
+      assert(0);
+    }
+    if ((rect.x + rect.y * pic_width) * 4 + (rect.w + rect.h * pic_width) * 4 >= pic_width * pic_height * 4) {
+      assert(0);
+    }
+
+    if (rect.w > 1 || rect.h > 1) {
+      SDL_UpdateTexture(overlay_inter, &rect, sdl_pixels_RGB_inter + (tl.x + tl.y * pic_width) * 4, pic_width * 4);
+    }
+    
     PTHREAD_UNLOCK(&sdl_mutex);
   }
 #endif
