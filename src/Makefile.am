@@ -131,6 +131,8 @@ libkvazaar_la_SOURCES = \
 	strategyselector.c \
 	strategyselector.h
 
+libkvazaar_la_CFLAGS =
+
 libkvazaar_la_LIBADD = \
 	libaltivec.la \
 	libavx2.la \
@@ -191,7 +193,7 @@ libasm_la_SOURCES = \
 	strategies/x86_asm/picture-x86-asm-sad.h \
 	strategies/x86_asm/picture-x86-asm-satd.asm \
 	strategies/x86_asm/picture-x86-asm-satd.h
-libasm_la_CFLAGS = -DKVZ_COMPILE_ASM
+libkvazaar_la_CFLAGS += -DKVZ_COMPILE_ASM
 
 strategies/x86_asm/picture-x86-asm-sad.lo: strategies/x86_asm/picture-x86-asm-sad.asm
 strategies/x86_asm/picture-x86-asm-satd.lo: strategies/x86_asm/picture-x86-asm-satd.asm
