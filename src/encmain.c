@@ -599,6 +599,8 @@ int main(int argc, char *argv[])
             if (!feof(input)) {
               fprintf(stderr, "Failed to read a frame %d\n", frames_read);
               goto exit_failure;
+            } else {
+              continue;
             }
           }
         }
