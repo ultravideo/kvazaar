@@ -35,12 +35,12 @@ static void array_md5_generic(const kvz_pixel* data,
   assert(SEI_HASH_MAX_LENGTH >= 16);
 
   context_md5_t md5_ctx;
-  MD5Init(&md5_ctx);
+  kvz_md5_init(&md5_ctx);
   
   unsigned bytes = width * height * sizeof(kvz_pixel);
-  MD5Update(&md5_ctx, (const unsigned char *)data, bytes);
+  kvz_md5_update(&md5_ctx, (const unsigned char *)data, bytes);
 
-  MD5Final(checksum_out, &md5_ctx);
+  kvz_md5_final(checksum_out, &md5_ctx);
 }
 
 static void array_checksum_generic(const kvz_pixel* data,
