@@ -786,24 +786,46 @@ static void add_checksum(encoder_state_t * const state)
   bitstream_t * const stream = &state->stream;
   const videoframe_t * const frame = state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
-  uint32_t checksum_val;
-  unsigned int i;
 
   kvz_nal_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0);
 
-  kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
-
   WRITE_U(stream, 132, 8, "sei_type");
-  WRITE_U(stream, 13, 8, "size");
-  WRITE_U(stream, 2, 8, "hash_type"); // 2 = checksum
 
-  for (i = 0; i < 3; ++i) {
-    // Pack bits into a single 32 bit uint instead of pushing them one byte
-    // at a time.
-    checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) +
-                   (checksum[i][2] << 8) + (checksum[i][3]);
-    WRITE_U(stream, checksum_val, 32, "picture_checksum");
-    CHECKPOINT("checksum[%d] = %u", i, checksum_val);
+  switch (state->encoder_control->cfg->hash)
+  {
+  case KVZ_HASH_CHECKSUM:
+    kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
+
+    WRITE_U(stream, 1 + 3 * 4, 8, "size");
+    WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
+
+    for (int i = 0; i < 3; ++i) {
+      uint32_t checksum_val = (
+        (checksum[i][0] << 24) + (checksum[i][1] << 16) +
+        (checksum[i][2] << 8) + (checksum[i][3]));
+      WRITE_U(stream, checksum_val, 32, "picture_checksum");
+      CHECKPOINT("checksum[%d] = %u", i, checksum_val);
+    }
+
+    break;
+
+  case KVZ_HASH_MD5:
+    kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
+
+    WRITE_U(stream, 1 + 3 * 16, 8, "size");
+    WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
+
+    for (int i = 0; i < 3; ++i) {
+      for (int b = 0; b < 16; ++b) {
+        WRITE_U(stream, checksum[i][b], 8, "picture_md5");
+      }
+    }
+
+    break;
+
+  case KVZ_HASH_NONE:
+    // Means we shouldn't be writing this SEI.
+    assert(0);
   }
 
   kvz_bitstream_align(stream);
@@ -880,7 +902,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
-  {
+  if (state->encoder_control->cfg->hash != KVZ_HASH_NONE) {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);

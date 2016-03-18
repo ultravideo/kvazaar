@@ -115,6 +115,17 @@ enum kvz_mv_constraint
 };
 
 /**
+* \brief Constrain movement vectors.
+* \since 3.5.0
+*/
+enum kvz_hash
+{
+  KVZ_HASH_NONE = 0,
+  KVZ_HASH_CHECKSUM = 1,
+  KVZ_HASH_MD5 = 2,
+};
+
+/**
  * \brief GoP picture configuration.
  */
 typedef struct kvz_gop_config {
@@ -219,6 +230,7 @@ typedef struct kvz_config
   int8_t calc_psnr;         /*!< \since 3.1.0 \brief Print PSNR in CLI. */
 
   enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
+  enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
 } kvz_config;
 
 /**

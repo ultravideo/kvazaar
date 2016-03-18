@@ -33,7 +33,7 @@
 #include "image.h"
 #include "bitstream.h"
 
-#define SEI_HASH_MAX_LENGTH 4
+#define SEI_HASH_MAX_LENGTH 16
 
 //////////////////////////////////////////////////////////////////////////
 // FUNCTIONS
@@ -41,6 +41,9 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
                const uint8_t temporal_id, const int long_start_code);
 void kvz_image_checksum(const kvz_picture *im,
                       unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth);
+void kvz_image_md5(const kvz_picture *im,
+                   unsigned char checksum_out[][SEI_HASH_MAX_LENGTH],
+                   const uint8_t bitdepth);
 
 
 
