@@ -142,7 +142,6 @@ typedef struct
     uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
     uint8_t mv_ref_coded[2]; // \brief Coded and corrected index of ref picture
     uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
-    int8_t mode;
   } inter;
 } cu_info_t;
 
