@@ -55,7 +55,7 @@ matrix:
       script:
         - ./autogen.sh
         - ./configure && make
-        - (! nm -go --defined-only src/.libs/libkvazaar.a | grep -v ' kvz_')
+        - (! nm -go --defined-only src/.libs/libkvazaar.a | grep -v ' kvz_') || (echo 'ERROR Only symbols prefixed with kvz_ should be exported from libkvazaar.'; false)
       addons:
         apt:
           sources:
