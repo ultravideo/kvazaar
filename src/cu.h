@@ -134,7 +134,6 @@ typedef struct
     int8_t tr_skip;    //!< \brief transform skip flag
   } intra[4];
   struct {
-    double cost;
     uint32_t bitcost;
     int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
     int16_t mvd[2][2]; // \brief Motion vector differences for L0 and L1

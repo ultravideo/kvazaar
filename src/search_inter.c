@@ -1092,7 +1092,8 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                 int16_t num_cand,
                                 unsigned ref_idx,
-                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, cabac_data_t*))
+                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, cabac_data_t*),
+                                double *inter_cost)
 {
   const int x_cu = x >> 3;
   const int y_cu = y >> 3;
@@ -1248,7 +1249,9 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   mvd.x = mv.x - mv_cand[cu_mv_cand][0];
   mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
-  if(temp_cost < cur_cu->inter.cost) {
+  if (temp_cost < *inter_cost) {
+
+    *inter_cost = temp_cost;
 
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
@@ -1261,7 +1264,6 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
     cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
     cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
-    cur_cu->inter.cost    = temp_cost;
     cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
     cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
   }
@@ -1339,7 +1341,7 @@ static int search_pu_inter(encoder_state_t * const state,
   cur_cu->inter.mv_cand[0] = 0;
   cur_cu->inter.mv_cand[1] = 0;
 
-  cur_cu->inter.cost = INT_MAX;
+  double inter_cost = INT_MAX;
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
@@ -1350,7 +1352,8 @@ static int search_pu_inter(encoder_state_t * const state,
                         lcu, cur_cu,
                         mv_cand, merge_cand, num_cand,
                         ref_idx,
-                        get_mvd_cost);
+                        get_mvd_cost,
+                        &inter_cost);
   }
 
   // Search bi-pred positions
@@ -1427,7 +1430,7 @@ static int search_pu_inter(encoder_state_t * const state,
           cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
-          if (cost < cur_cu->inter.cost) {
+          if (cost < inter_cost) {
 
             cur_cu->inter.mv_dir = 3;
             cur_cu->inter.mv_ref_coded[0] = state->global->refmap[merge_cand[i].ref[0]].idx;
@@ -1484,7 +1487,7 @@ static int search_pu_inter(encoder_state_t * const state,
               cur_cu->inter.mvd[reflist][1] = cur_cu->inter.mv[reflist][1] - mv_cand[cu_mv_cand][1];
               cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
             }
-            cur_cu->inter.cost = cost;
+            inter_cost = cost;
             cur_cu->inter.bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[0] + cur_cu->inter.mv_ref_coded[1];
           }
         }
@@ -1493,14 +1496,14 @@ static int search_pu_inter(encoder_state_t * const state,
     FREE_POINTER(templcu);
   }
 
-  if (cur_cu->inter.cost < INT_MAX) {
+  if (inter_cost < INT_MAX) {
     const vector2d_t orig = { x, y };
     if (cur_cu->inter.mv_dir == 1) {
       assert(fracmv_within_tile(state, &orig, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1], width, height, -1));
     }
   }
 
-  return cur_cu->inter.cost;
+  return inter_cost;
 }
 
 
