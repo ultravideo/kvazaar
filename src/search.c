@@ -446,22 +446,17 @@ static double calc_mode_bits(const encoder_state_t *state,
                              const cu_info_t * cur_cu,
                              int x, int y)
 {
-  double mode_bits;
-  
-  if (cur_cu->type == CU_INTER) {
-    mode_bits = cur_cu->inter.bitcost;
-  } else {
-    int8_t candidate_modes[3];
-    {
-      const cu_info_t *left_cu  = ((x >= 8) ? CU_GET_CU(cur_cu, -1,  0) : NULL);
-      const cu_info_t *above_cu = ((y >= 8) ? CU_GET_CU(cur_cu,  0, -1) : NULL);
-      kvz_intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
-    }
+  assert(cur_cu->type == CU_INTRA);
+  int8_t candidate_modes[3];
+  {
+    const cu_info_t *left_cu  = ((x >= 8) ? CU_GET_CU(cur_cu, -1,  0) : NULL);
+    const cu_info_t *above_cu = ((y >= 8) ? CU_GET_CU(cur_cu,  0, -1) : NULL);
+    kvz_intra_get_dir_luma_predictor(x, y, candidate_modes, cur_cu, left_cu, above_cu);
+  }
 
-    mode_bits = kvz_luma_mode_bits(state, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, candidate_modes);
-    if (PU_INDEX(x >> 2, y >> 2) == 0) {
-      mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra[0].mode_chroma, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode);
-    }
+  double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode, candidate_modes);
+  if (PU_INDEX(x >> 2, y >> 2) == 0) {
+    mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra[0].mode_chroma, cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode);
   }
 
   return mode_bits;
@@ -492,6 +487,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   const videoframe_t * const frame = state->tile->frame;
   int cu_width = LCU_WIDTH >> depth;
   double cost = MAX_INT;
+  uint32_t inter_bitcost = MAX_INT;
   cu_info_t *cur_cu;
 
   lcu_t *const lcu = &work_tree[depth];
@@ -526,9 +522,16 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         && WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max);
 
     if (can_use_inter) {
-      double mode_cost = kvz_search_cu_inter(state, x, y, depth, &work_tree[depth]);
+      double mode_cost;
+      uint32_t mode_bitcost;
+      kvz_search_cu_inter(state,
+                          x, y,
+                          depth,
+                          &work_tree[depth],
+                          &mode_cost, &mode_bitcost);
       if (mode_cost < cost) {
         cost = mode_cost;
+        inter_bitcost = mode_bitcost;
         cur_cu->type = CU_INTER;
       }
 
@@ -545,14 +548,16 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         const int first_mode = ctrl->cfg->smp_enable ? 0 : 2;
         const int last_mode  = (ctrl->cfg->amp_enable && cu_width >= 32) ? 5 : 1;
         for (int i = first_mode; i <= last_mode; ++i) {
-          mode_cost = kvz_search_cu_smp(state,
-                                        x, y,
-                                        depth,
-                                        mp_modes[i],
-                                        &work_tree[depth + 1]);
+          kvz_search_cu_smp(state,
+                            x, y,
+                            depth,
+                            mp_modes[i],
+                            &work_tree[depth + 1],
+                            &mode_cost, &mode_bitcost);
           // TODO: take cost of coding part mode into account
           if (mode_cost < cost) {
             cost = mode_cost;
+            inter_bitcost = mode_bitcost;
             // TODO: only copy inter prediction info, not pixels
             work_tree_copy_up(x, y, depth, work_tree);
           }
@@ -655,8 +660,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->merged = 0;
         cur_cu->skipped = 1;
         // Selecting skip reduces bits needed to code the CU
-        if (cur_cu->inter.bitcost > 1) {
-          cur_cu->inter.bitcost -= 1;
+        if (inter_bitcost > 1) {
+          inter_bitcost -= 1;
         }
       }
       lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
@@ -666,7 +671,14 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
     cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
-    double mode_bits = calc_mode_bits(state, cur_cu, x, y);
+
+    double mode_bits;
+    if (cur_cu->type == CU_INTRA) {
+      mode_bits = calc_mode_bits(state, cur_cu, x, y);
+    } else {
+      mode_bits = inter_bitcost;
+    }
+
     cost += mode_bits * state->global->cur_lambda_cost;
   }
   
