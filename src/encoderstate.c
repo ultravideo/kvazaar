@@ -994,7 +994,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
 #if KVZ_VISUALIZATION == 1
   if (depth == 0) {
-    PTHREAD_LOCK(&sdl_mutex);
+    kvz_mutex_lock(&sdl_mutex);
 
     // Clean our own 64x64 area before starting to draw.
     const int x = x_ctb * LCU_CU_WIDTH;
@@ -1024,7 +1024,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     };
     SDL_UpdateTexture(overlay_inter[(poc + 1) % 2], &lcu_rect, buffer + (x + y * screen_w) * 4, screen_w * 4);
 
-    PTHREAD_UNLOCK(&sdl_mutex);
+    kvz_mutex_unlock(&sdl_mutex);
   }
 #endif
 
@@ -1066,7 +1066,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
 #if KVZ_VISUALIZATION == 1
   if (cur_cu->type == CU_INTER) {
-    PTHREAD_LOCK(&sdl_mutex);
+    kvz_mutex_lock(&sdl_mutex);
 
     const int x = x_ctb * LCU_CU_WIDTH;
     const int y = y_ctb * LCU_CU_WIDTH;
@@ -1145,7 +1145,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       SDL_UpdateTexture(overlay_inter[poc % 2], &rect, sdl_pixels_RGB_inter[poc % 2] + (tl.x + tl.y * pic_width) * 4, pic_width * 4);
     }
     
-    PTHREAD_UNLOCK(&sdl_mutex);
+    kvz_mutex_unlock(&sdl_mutex);
   }
 #endif
 

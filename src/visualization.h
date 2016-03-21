@@ -20,20 +20,31 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#include "global.h"
 
 #if KVZ_VISUALIZATION == 1
 
-#include "threadqueue.h"
 #include <SDL.h>
 #include <SDL_ttf.h>
 #include <math.h>
 
-extern SDL_Renderer *renderer;
+#include "encoderstate.h"
+#include "threadqueue.h"
+#include "cu.h"
+
+static int INFO_WIDTH = 480;
+static int INFO_HEIGHT = 240;
+
+extern SDL_Renderer *renderer, *info_renderer;
+extern SDL_Window *window, *info_window;
 extern SDL_Surface *screen, *pic;
-extern SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2];
+extern SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2], *overlay_hilight;
 extern int screen_w, screen_h;
 extern int sdl_draw_blocks;
+extern int sdl_draw_intra;
+extern int sdl_block_info;
 extern pthread_mutex_t sdl_mutex;
+extern kvz_pixel *sdl_pixels_hilight;
 extern kvz_pixel *sdl_pixels_RGB;
 extern kvz_pixel *sdl_pixels_RGB_intra_dir;
 extern kvz_pixel *sdl_pixels_RGB_inter[2];
@@ -41,10 +52,19 @@ extern kvz_pixel *sdl_pixels;
 extern kvz_pixel *sdl_pixels_u;
 extern kvz_pixel *sdl_pixels_v;
 extern int32_t sdl_delay;
-extern cu_info_t *sdl_cu_array;
+extern SDL_Surface *textSurface;
+extern SDL_Texture *text;
 
-#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
-#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
+extern cu_info_t *sdl_cu_array;
+extern TTF_Font *font;
+
+
+void *eventloop_main(void *temp);
+
+kvz_visualization_init(int width, int height);
+
+kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in);
+
 
 #define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
 #define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;

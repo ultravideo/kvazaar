@@ -74,4 +74,24 @@
 
 #endif //__GNUC__
 
+static INLINE int kvz_mutex_lock(pthread_mutex_t *mutex)
+{
+  int ret = pthread_mutex_lock(mutex);
+  if (ret) {
+    fprintf(stderr, "pthread_mutex_lock failed!\n");
+    assert(0);
+  }
+  return ret;
+}
+
+static INLINE int kvz_mutex_unlock(pthread_mutex_t *mutex)
+{
+  int ret = pthread_mutex_unlock(mutex);
+  if (ret) {
+    fprintf(stderr, "pthread_mutex_unlock failed!\n");
+    assert(0);
+  }
+  return ret;
+}
+
 #endif //THREADS_H_

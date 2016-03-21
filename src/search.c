@@ -703,7 +703,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
 #if KVZ_VISUALIZATION == 1
-  PTHREAD_LOCK(&sdl_mutex);
+  kvz_mutex_lock(&sdl_mutex);
   
   if (x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)
   {
@@ -820,7 +820,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       ++i;
     }
   }
-  PTHREAD_UNLOCK(&sdl_mutex);
+  kvz_mutex_unlock(&sdl_mutex);
 #endif
   
   PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id,
