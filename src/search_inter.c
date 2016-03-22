@@ -31,10 +31,10 @@
 /**
  * \return  True if referred block is within current tile.
  */
-static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int wpp_limit)
+static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int height, int wpp_limit)
 {
   if (state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_NONE) {
-    return (wpp_limit == -1 || y + (width << 2) <= (wpp_limit << 2));
+    return (wpp_limit == -1 || y + (height << 2) <= (wpp_limit << 2));
   };
 
   int margin = 0;
@@ -48,8 +48,8 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
 
   // Check that both margin and wpp_limit constraints are satisfied.
   if (abs_mv.x >= margin && abs_mv.x + (width << 2) <= (state->tile->frame->width << 2) - margin &&
-      abs_mv.y >= margin && abs_mv.y + (width << 2) <= (state->tile->frame->height << 2) - margin &&
-      (wpp_limit == -1 || y + (width << 2) <= (wpp_limit << 2)))
+      abs_mv.y >= margin && abs_mv.y + (height << 2) <= (state->tile->frame->height << 2) - margin &&
+      (wpp_limit == -1 || y + (height << 2) <= (wpp_limit << 2)))
   {
     return true;
   } else {
@@ -87,9 +87,9 @@ static INLINE int get_wpp_limit(const encoder_state_t *state, const vector2d_t* 
 /**
  * \return  True if referred block is within current tile.
  */
-static INLINE bool intmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int wpp_limit)
+static INLINE bool intmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int height, int wpp_limit)
 {
-  return fracmv_within_tile(state, orig, x << 2, y << 2, width, wpp_limit);
+  return fracmv_within_tile(state, orig, x << 2, y << 2, width, height, wpp_limit);
 }
 
 
@@ -308,7 +308,7 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
   for (i = 0; i < n_points; i++)
   {
     vector2d_t *current = &pattern[pattern_type][i];
-    if (!intmv_within_tile(state, orig, mv->x + current->x, mv->y + current->y, width, wpp_limit)) {
+    if (!intmv_within_tile(state, orig, mv->x + current->x, mv->y + current->y, width, height, wpp_limit)) {
       continue;
     }
 
@@ -369,7 +369,7 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
     for (k = -iSearchRange; k <= iSearchRange; k += iRaster)
     {
       vector2d_t current = { k, i };
-      if (!intmv_within_tile(state, orig, mv->x + current.x, mv->y + current.y, width, wpp_limit)) {
+      if (!intmv_within_tile(state, orig, mv->x + current.x, mv->y + current.y, width, height, wpp_limit)) {
         continue;
       }
 
@@ -435,7 +435,7 @@ static unsigned tz_search(const encoder_state_t * const state,
   }
 
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
-  if (intmv_within_tile(state, orig, 0, 0, width, wpp_limit)) {
+  if (intmv_within_tile(state, orig, 0, 0, width, height, wpp_limit)) {
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
@@ -460,7 +460,7 @@ static unsigned tz_search(const encoder_state_t * const state,
 
   // Check mv_in if it's not one of the merge candidates.
   if (!mv_in_merge_cand &&
-      intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit))
+      intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit))
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                       (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
@@ -485,7 +485,7 @@ static unsigned tz_search(const encoder_state_t * const state,
     mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
 
     if (mv.x == 0 && mv.y == 0) continue;
-    if (!intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit)) {
+    if (!intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit)) {
       continue;
     }
 
@@ -631,7 +631,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   }
 
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
-  if (intmv_within_tile(state, orig, 0, 0, width, wpp_limit)) {
+  if (intmv_within_tile(state, orig, 0, 0, width, height, wpp_limit)) {
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
@@ -657,7 +657,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
 
   // Check mv_in if it's not one of the merge candidates.
   if (!mv_in_merge_cand &&
-      intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit))
+      intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit))
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
@@ -681,7 +681,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     // Ignore 0-vector because it has already been checked.
     if (mv.x == 0 && mv.y == 0) continue;
 
-    if (!intmv_within_tile(state, orig, mv.x, mv.y, width, wpp_limit)) {
+    if (!intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit)) {
       continue;
     }
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
@@ -712,7 +712,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   best_index = 0;
   for (i = 0; i < 7; ++i) {
     const vector2d_t *pattern = &large_hexbs[i];
-    if (!intmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, wpp_limit)) {
+    if (!intmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, height, wpp_limit)) {
       continue;
     }
 
@@ -752,7 +752,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     // Iterate through the next 3 points.
     for (i = 0; i < 3; ++i) {
       const vector2d_t *offset = &large_hexbs[start + i];
-      if (!intmv_within_tile(state, orig, mv.x + offset->x, mv.y + offset->y, width, wpp_limit)) {
+      if (!intmv_within_tile(state, orig, mv.x + offset->x, mv.y + offset->y, width, height, wpp_limit)) {
         continue;
       }
 
@@ -782,7 +782,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   // Do the final step of the search with a small pattern.
   for (i = 1; i < 5; ++i) {
     const vector2d_t *offset = &small_hexbs[i];
-    if (!intmv_within_tile(state, orig, mv.x + offset->x, mv.y + offset->y, width, wpp_limit)) {
+    if (!intmv_within_tile(state, orig, mv.x + offset->x, mv.y + offset->y, width, height, wpp_limit)) {
       continue;
     }
 
@@ -961,7 +961,7 @@ static unsigned search_frac(const encoder_state_t * const state,
   // Search halfpel positions around best integer mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
-    if (!fracmv_within_tile(state, orig, (mv.x + pattern->x) << 1, (mv.y + pattern->y) << 1, width, wpp_limit)) {
+    if (!fracmv_within_tile(state, orig, (mv.x + pattern->x) << 1, (mv.y + pattern->y) << 1, width, height, wpp_limit)) {
       continue;
     }
 
@@ -1001,7 +1001,7 @@ static unsigned search_frac(const encoder_state_t * const state,
   //Search quarterpel points around best halfpel mv
   for (i = 0; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
-    if (!fracmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, wpp_limit)) {
+    if (!fracmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, height, wpp_limit)) {
       continue;
     }
 
@@ -1342,8 +1342,8 @@ static int search_pu_inter(const encoder_state_t * const state,
           {
             // Don't try merge candidates that don't satisfy mv constraints.
             vector2d_t orig = { x, y };
-            if (fracmv_within_tile(state, &orig, mv[0][0], mv[0][1], width, -1) ||
-                fracmv_within_tile(state, &orig, mv[1][0], mv[1][1], width, -1))
+            if (fracmv_within_tile(state, &orig, mv[0][0], mv[0][1], width, height, -1) ||
+                fracmv_within_tile(state, &orig, mv[1][0], mv[1][1], width, height, -1))
             {
               continue;
             }
@@ -1441,7 +1441,7 @@ static int search_pu_inter(const encoder_state_t * const state,
   if (cur_cu->inter.cost < INT_MAX) {
     const vector2d_t orig = { x, y };
     if (cur_cu->inter.mv_dir == 1) {
-      assert(fracmv_within_tile(state, &orig, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1], width, -1));
+      assert(fracmv_within_tile(state, &orig, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1], width, height, -1));
     }
   }
 
