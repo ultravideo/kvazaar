@@ -1086,7 +1086,7 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
     };
     const vector2d_t frame_cu = {
       (frame_px.x + (width >> 1)) >> MIN_SIZE,
-      (frame_px.y + (width >> 1)) >> MIN_SIZE
+      (frame_px.y + (height >> 1)) >> MIN_SIZE
     };
     const cu_info_t *ref_cu_array = state->global->ref->cu_arrays[ref_idx]->data;
     const int width_in_scu = frame->width_in_lcu << MAX_DEPTH;
