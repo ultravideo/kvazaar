@@ -64,7 +64,7 @@ void *eventloop_main(void *temp);
 kvz_visualization_init(int width, int height);
 kvz_visualization_free();
 
-kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in);
+void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in);
 
 void kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth);
 

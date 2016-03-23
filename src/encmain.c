@@ -230,11 +230,7 @@ int main(int argc, char *argv[])
       }
 
 #if KVZ_VISUALIZATION == 1
-      static bool first = true;
-      if (first) {
-        first = false;
-        kvz_visualization_frame_init(encoder, img_in);
-      }
+      kvz_visualization_frame_init(encoder, img_in);
 #endif
 
       kvz_data_chunk* chunks_out = NULL;

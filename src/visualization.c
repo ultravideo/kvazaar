@@ -81,8 +81,15 @@ kvz_visualization_free()
   SDL_Quit();
 }
 
-kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in)
+void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in)
 {
+  static bool allocated = false;
+  if (allocated) {
+    return;
+  } else {
+    allocated = true;
+  }
+
   kvz_mutex_lock(&sdl_mutex);
   // Copy original frame with darkened colors
   for (int y = 0; y < encoder->cfg->height; y++) {
