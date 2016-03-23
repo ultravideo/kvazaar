@@ -696,119 +696,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   
   if (x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)
   {
-    SDL_Rect rect;
+    kvz_visualization_draw_block(state, &work_tree[depth], cur_cu, x, y, depth);
 
-    lcu_t *lcu = &work_tree[depth];
-    kvz_picture * const pic = state->tile->frame->source;
-
-    const int pic_width = state->encoder_control->cfg->width;
-    const int pic_height = state->encoder_control->cfg->height;
-    const int x_max = MIN(x + cu_width, pic->width) - x;
-    const int y_max = MIN(y + cu_width, pic->height) - y;
-    const int index_RGB = (x + y * pic_width +
-      state->tile->lcu_offset_x*LCU_WIDTH +
-      state->tile->lcu_offset_y *LCU_WIDTH * pic_width)<<2;
-    const int luma_index = x + y * pic_width +
-      state->tile->lcu_offset_x*LCU_WIDTH +
-      state->tile->lcu_offset_y *LCU_WIDTH * pic_width;
-    const int chroma_index = (x / 2) + (y / 2) * (pic_width / 2) +
-      state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
-      state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
-
-    if ((cur_cu->depth == 0) || cur_cu->depth == depth || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
-      kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
-        x_max, y_max, LCU_WIDTH, pic_width);
-      kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
-        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-      kvz_pixels_blit(&lcu->rec.v[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_v[chroma_index],
-        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-
-      // Clear RGB buffer area
-      {
-        int temp_y;
-        for (temp_y = 0; temp_y < cu_width; temp_y++) {
-          memset(&sdl_pixels_RGB[index_RGB + (temp_y*pic_width << 2)], 0, cu_width << 2);
-          memset(&sdl_pixels_RGB_intra_dir[index_RGB + (temp_y*pic_width << 2)], 0, cu_width << 2);          
-        }
-      }
-
-
-      {
-        const int width_cu = cur_cu->part_size == SIZE_2Nx2N ? LCU_CU_WIDTH >> cur_cu->depth : 1;
-        const int x_cu = (x / (LCU_WIDTH >> MAX_DEPTH));
-        const int y_cu = (y / (LCU_WIDTH >> MAX_DEPTH));
-        int temp_x, temp_y;
-        // Set mode in every CU covered by part_mode in this depth.
-        for (temp_y = y_cu; temp_y < y_cu + width_cu; ++temp_y) {
-          for (temp_x = x_cu; temp_x < x_cu + width_cu; ++temp_x) {
-            cu_info_t *cu = &sdl_cu_array[temp_x + temp_y *  (state->tile->frame->width_in_lcu << MAX_DEPTH)];
-            memcpy(cu, cur_cu, sizeof(cu_info_t));
-          }
-        }
-      }
-
-      //if (cu_width > 4 || (!(x & 7) && !(y & 7))) 
-
-      uint8_t framemod = state->global->frame % 8;
-      
-      {
-        int temp_x;
-        // Add block borders
-        if ((y + cu_width) % 8 == 0) {
-          for (temp_x = 0; temp_x < cu_width; temp_x++) {
-            PUTPIXEL(temp_x, (cu_width - 1), frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
-          }
-        }
-        if ((x + cu_width) % 8 == 0) {
-          int y;
-          for (y = 0; y < cu_width; y++) {
-            PUTPIXEL((cu_width - 1), y, frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
-          }
-        }
-      }
-
-      // Intra directions
-      if (cur_cu->type == CU_INTRA) {
-        int i = 1;
-        int mode = cur_cu->intra[PU_INDEX(x / 4, y / 4)].mode;
-        const int x_off[] = { 8, 8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
-        const int y_off[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};        
-        if (mode == 0) { // Planar
-          int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
-          for (i = -viz_width; i < viz_width + 1; i++) {
-            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-          }
-          for (i = -viz_width; i < 0; i++) {
-            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-          }
-        } else if (mode == 1) { // DC
-          int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
-          for (i = -viz_width; i < viz_width + 1; i++) {
-            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-          }
-          for (i = -viz_width; i < viz_width + 1; i++) {
-            PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-          }
-        } else { // Angular
-          for (i = -cu_width / 4; i < cu_width / 4 + 1; i++) {
-            PUTPIXEL_intra(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
-          }
-        }
+    volatile int64_t i = 0;
+    if (sdl_delay) {
+      //SDL_Delay(sdl_delay);
+      int64_t wait_cycles = pow(2, sdl_delay) * 1000;
+      while (i < wait_cycles) {
+        ++i;
       }
     }
-    rect.w = cu_width; rect.h = cu_width; rect.x = x + state->tile->lcu_offset_x*LCU_WIDTH; rect.y = y + state->tile->lcu_offset_y*LCU_WIDTH;
-    SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels + luma_index, pic_width, sdl_pixels_u + chroma_index, pic_width >> 1, sdl_pixels_v + chroma_index, pic_width >> 1);
-    SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB+index_RGB, pic_width * 4);
-    SDL_UpdateTexture(overlay_intra, &rect, sdl_pixels_RGB_intra_dir + index_RGB, pic_width * 4);
   }
-  volatile int64_t i = 0;
-  if (sdl_delay) {
-    //SDL_Delay(sdl_delay);
-    int64_t wait_cycles = pow(2, sdl_delay) * 1000;
-    while (i < wait_cycles) {
-      ++i;
-    }
-  }
+
   kvz_mutex_unlock(&sdl_mutex);
 #endif
   
