@@ -4,12 +4,11 @@
     <ClCompile Include="..\..\src\cli.c" />
     <ClCompile Include="..\..\src\yuv_io.c" />
     <ClCompile Include="..\..\src\encmain.c" />
+    <ClCompile Include="..\..\src\visualization.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\yuv_io.h" />
     <ClInclude Include="..\..\src\cli.h" />
-    <ClCompile Include="..\..\src\visualization.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClInclude Include="..\..\src\visualization.h" />
   </ItemGroup>
 </Project>

@@ -94,6 +94,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\cli.h" />
+    <ClInclude Include="..\..\src\visualization.h" />
     <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

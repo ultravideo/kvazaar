@@ -403,9 +403,6 @@
       <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\extras\libmd5.h" />
-    <ClInclude Include="..\..\src\visualization.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">

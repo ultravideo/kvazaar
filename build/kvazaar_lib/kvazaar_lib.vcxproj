@@ -237,7 +237,6 @@
     <ClInclude Include="..\..\src\strategies\generic\quant-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-intra.h" />
     <ClInclude Include="..\..\src\strategies\strategies-quant.h" />
-    <ClInclude Include="..\..\src\visualization.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h" />
