@@ -74,10 +74,6 @@ typedef struct {
 } while (0);
 #endif //PTHREAD_DUMP
 
-
-const struct timespec kvz_time_to_wait = {1, 0};
-
-
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque)
 {
   threadqueue_worker_spec * const threadqueue_worker_spec = threadqueue_worker_spec_opaque;
@@ -466,10 +462,10 @@ int kvz_threadqueue_flush(threadqueue_queue_t * const threadqueue) {
     if (notdone > 0) {
       int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
-      PTHREAD_UNLOCK(&threadqueue->lock);
-      KVZ_SLEEP();
-      PTHREAD_LOCK(&threadqueue->lock);
-      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &kvz_time_to_wait);
+      
+      struct timespec wait_moment;
+      ms_from_now_timespec(&wait_moment, 100);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &wait_moment);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
         assert(0); 
@@ -504,10 +500,9 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue
     if (!job_done) {
       int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
-      PTHREAD_UNLOCK(&threadqueue->lock);
-      KVZ_SLEEP();
-      PTHREAD_LOCK(&threadqueue->lock);
-      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &kvz_time_to_wait);
+      struct timespec wait_moment;
+      ms_from_now_timespec(&wait_moment, 100);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &wait_moment);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
         assert(0); 
