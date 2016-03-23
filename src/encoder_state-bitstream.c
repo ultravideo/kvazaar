@@ -25,6 +25,7 @@
 
 #include "checkpoint.h"
 #include "encoderstate.h"
+#include "kvz_math.h"
 #include "nal.h"
 
 
@@ -265,11 +266,15 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   //IF default display window
   //ENDIF
 
-  WRITE_U(stream, 0, 1, "vui_timing_info_present_flag");
+  WRITE_U(stream, encoder->vui.timing_info_present_flag, 1, "vui_timing_info_present_flag");
+  if (encoder->vui.timing_info_present_flag) {
+    WRITE_U(stream, encoder->vui.num_units_in_tick, 32, "vui_num_units_in_tick");
+    WRITE_U(stream, encoder->vui.time_scale, 32, "vui_time_scale");
 
-  //IF timing info
-  //ENDIF
-
+    WRITE_U(stream, 0, 1, "vui_poc_proportional_to_timing_flag");
+    WRITE_U(stream, 0, 1, "vui_hrd_parameters_present_flag");    
+  }
+  
   WRITE_U(stream, 0, 1, "bitstream_restriction_flag");
 
   //IF bitstream restriction
@@ -329,8 +334,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  WRITE_UE(stream, encoder->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
-  WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
+  if (encoder->cfg->gop_lowdelay) {
+    WRITE_UE(stream, encoder->cfg->ref_frames, "sps_max_dec_pic_buffering");
+    WRITE_UE(stream, 0, "sps_num_reorder_pics");
+  } else {
+    WRITE_UE(stream, encoder->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
+    WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
+  }
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
 
@@ -348,7 +358,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     encoder_state_write_bitstream_scaling_list(stream, state);
   }
 
-  WRITE_U(stream, 0, 1, "amp_enabled_flag");
+  WRITE_U(stream, (encoder->cfg->amp_enable ? 1 : 0), 1, "amp_enabled_flag");
+
   WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
@@ -560,7 +571,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
     int8_t pic_struct = 0; //0: progressive picture, 1: top field, 2: bottom field, 3...
     int8_t source_scan_type = 1; //0: interlaced, 1: progressive
 
-    switch (state->encoder_control->in.source_scan_type){
+    switch (state->tile->frame->source->interlacing){
     case 0: //Progressive frame
       pic_struct = 0;
       source_scan_type = 1;
@@ -618,16 +629,6 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
       encoder_state_write_bitstream_entry_points_write(stream, &state->children[i], num_entry_points, write_length, r_count);
     }
   }
-}
-
-static int num_bitcount(unsigned int n) {
-  int pos = 0;
-  if (n >= 1<<16) { n >>= 16; pos += 16; }
-  if (n >= 1<< 8) { n >>=  8; pos +=  8; }
-  if (n >= 1<< 4) { n >>=  4; pos +=  4; }
-  if (n >= 1<< 2) { n >>=  2; pos +=  2; }
-  if (n >= 1<< 1) {           pos +=  1; }
-  return ((n == 0) ? (-1) : pos);
 }
 
 void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
@@ -767,7 +768,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_UE(stream, num_entry_points - 1, "num_entry_point_offsets");
     if (num_entry_points > 0) {
       int entry_points_written = 0;
-      int offset_len = num_bitcount(max_length_seen) + 1;
+      int offset_len = kvz_math_floor_log2(max_length_seen) + 1;
       WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
       encoder_state_write_bitstream_entry_points_write(stream, state, num_entry_points, offset_len, &entry_points_written); 
     }
@@ -785,24 +786,46 @@ static void add_checksum(encoder_state_t * const state)
   bitstream_t * const stream = &state->stream;
   const videoframe_t * const frame = state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
-  uint32_t checksum_val;
-  unsigned int i;
 
   kvz_nal_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0);
 
-  kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
-
   WRITE_U(stream, 132, 8, "sei_type");
-  WRITE_U(stream, 13, 8, "size");
-  WRITE_U(stream, 2, 8, "hash_type"); // 2 = checksum
 
-  for (i = 0; i < 3; ++i) {
-    // Pack bits into a single 32 bit uint instead of pushing them one byte
-    // at a time.
-    checksum_val = (checksum[i][0] << 24) + (checksum[i][1] << 16) +
-                   (checksum[i][2] << 8) + (checksum[i][3]);
-    WRITE_U(stream, checksum_val, 32, "picture_checksum");
-    CHECKPOINT("checksum[%d] = %u", i, checksum_val);
+  switch (state->encoder_control->cfg->hash)
+  {
+  case KVZ_HASH_CHECKSUM:
+    kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
+
+    WRITE_U(stream, 1 + 3 * 4, 8, "size");
+    WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
+
+    for (int i = 0; i < 3; ++i) {
+      uint32_t checksum_val = (
+        (checksum[i][0] << 24) + (checksum[i][1] << 16) +
+        (checksum[i][2] << 8) + (checksum[i][3]));
+      WRITE_U(stream, checksum_val, 32, "picture_checksum");
+      CHECKPOINT("checksum[%d] = %u", i, checksum_val);
+    }
+
+    break;
+
+  case KVZ_HASH_MD5:
+    kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
+
+    WRITE_U(stream, 1 + 3 * 16, 8, "size");
+    WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
+
+    for (int i = 0; i < 3; ++i) {
+      for (int b = 0; b < 16; ++b) {
+        WRITE_U(stream, checksum[i][b], 8, "picture_md5");
+      }
+    }
+
+    break;
+
+  case KVZ_HASH_NONE:
+    // Means we shouldn't be writing this SEI.
+    assert(0);
   }
 
   kvz_bitstream_align(stream);
@@ -879,7 +902,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
   }
   
-  {
+  if (state->encoder_control->cfg->hash != KVZ_HASH_NONE) {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);

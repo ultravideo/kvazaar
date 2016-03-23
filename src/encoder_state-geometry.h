@@ -20,8 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
+ * Helper functions for tiles and slices.
  */
 
 #include "global.h"

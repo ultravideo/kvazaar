@@ -18,11 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \file
- * \brief Functions for handling intra frames.
- */
-
 #include "intra.h"
 
 #include <assert.h>
@@ -30,8 +25,10 @@
 #include <stdlib.h>
 
 #include "encoder.h"
+#include "kvz_math.h"
 #include "transform.h"
 #include "strategies/strategies-intra.h"
+#include "strategies/strategies-picture.h"
 
 
 int8_t kvz_intra_get_dir_luma_predictor(
@@ -142,52 +139,6 @@ static void intra_post_process_angular(
 
 
 /**
- * \brief Generage planar prediction.
- * \param log2_width    Log2 of width, range 2..5.
- * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
- * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
- * \param dst           Buffer of size width*width.
- */
-static void intra_pred_planar(
-  const int_fast8_t log2_width,
-  const kvz_pixel *const ref_top,
-  const kvz_pixel *const ref_left,
-  kvz_pixel *const dst)
-{
-  assert(log2_width >= 2 && log2_width <= 5);
-
-  const int_fast8_t width = 1 << log2_width;
-  const kvz_pixel top_right = ref_top[width + 1];
-  const kvz_pixel bottom_left = ref_left[width + 1];
-
-#if 0
-  // Unoptimized version for reference.
-  for (int y = 0; y < width; ++y) {
-    for (int x = 0; x < width; ++x) {
-      int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
-      int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
-      dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
-    }
-  }
-#else
-  int_fast16_t top[32];
-  for (int i = 0; i < width; ++i) {
-    top[i] = ref_top[i + 1] << log2_width;
-  }
-
-  for (int y = 0; y < width; ++y) {
-    int_fast16_t hor = (ref_left[y + 1] << log2_width) + width;
-    for (int x = 0; x < width; ++x) {
-      hor += top_right - ref_left[y + 1];
-      top[x] += bottom_left - ref_top[x + 1];
-      dst[y * width + x] = (hor + top[x]) >> (log2_width + 1);
-    }
-  }
-#endif
-}
-
-
-/**
 * \brief Generage planar prediction.
 * \param log2_width    Log2 of width, range 2..5.
 * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
@@ -277,7 +228,7 @@ void kvz_intra_predict(
     // Angular modes use smoothed reference pixels, unless the mode is close
     // to being either vertical or horizontal.
     static const int kvz_intra_hor_ver_dist_thres[5] = { 0, 7, 1, 0, 0 };
-    int filter_threshold = kvz_intra_hor_ver_dist_thres[g_to_bits[width]];
+    int filter_threshold = kvz_intra_hor_ver_dist_thres[kvz_math_floor_log2(width) - 2];
     int dist_from_vert_or_hor = MIN(abs(mode - 26), abs(mode - 10));
     if (dist_from_vert_or_hor > filter_threshold) {
       used_ref = &refs->filtered_ref;
@@ -289,7 +240,7 @@ void kvz_intra_predict(
   }
 
   if (mode == 0) {
-    intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
+    kvz_intra_pred_planar(log2_width, used_ref->top, used_ref->left, dst);
   } else if (mode == 1) {
     // Do extra post filtering for edge pixels of luma DC mode.
     if (color == COLOR_Y && width < 32) {
@@ -484,9 +435,9 @@ void kvz_intra_recon_lcu_luma(
   cu_info_t *cur_cu,
   lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   if (cur_cu == NULL) {
-    cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+    cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
   const int8_t width = LCU_WIDTH >> depth;
 
@@ -499,9 +450,9 @@ void kvz_intra_recon_lcu_luma(
     kvz_intra_recon_lcu_luma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
-      cu_info_t *cu_a = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + (lcu_px.y >> 3)        *LCU_T_CU_WIDTH];
-      cu_info_t *cu_b = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
-      cu_info_t *cu_c = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
+      cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
+      cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
       if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
         cbf_set(&cur_cu->cbf.y, depth);
       }
@@ -536,12 +487,12 @@ void kvz_intra_recon_lcu_chroma(
   cu_info_t *cur_cu,
   lcu_t *lcu)
 {
-  const vector2d_t lcu_px = { x & 0x3f, y & 0x3f };
+  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   const int8_t width = LCU_WIDTH >> depth;
   const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
   if (cur_cu == NULL) {
-    cur_cu = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + (lcu_px.y >> 3)*LCU_T_CU_WIDTH];
+    cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
@@ -553,9 +504,9 @@ void kvz_intra_recon_lcu_chroma(
     kvz_intra_recon_lcu_chroma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
 
     if (depth < MAX_DEPTH) {
-      cu_info_t *cu_a = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + (lcu_px.y >> 3)        *LCU_T_CU_WIDTH];
-      cu_info_t *cu_b = &lcu->cu[LCU_CU_OFFSET + (lcu_px.x >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
-      cu_info_t *cu_c = &lcu->cu[LCU_CU_OFFSET + ((lcu_px.x + offset) >> 3) + ((lcu_px.y + offset) >> 3)*LCU_T_CU_WIDTH];
+      cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
+      cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
+      cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
       if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
         cbf_set(&cur_cu->cbf.u, depth);
       }

@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include <stdlib.h>
 
 #include "intra-avx2.h"
@@ -60,7 +56,7 @@ static INLINE __m128i filter_4x1_avx2(const kvz_pixel *ref_main, int16_t delta_p
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_4x4_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
 
   __m128i row0 = filter_4x1_avx2(ref_main, 1 * sample_disp, 0);
   __m128i row1 = filter_4x1_avx2(ref_main, 2 * sample_disp, 0);
@@ -95,16 +91,12 @@ static INLINE __m128i filter_8x1_avx2(const kvz_pixel *ref_main, int16_t delta_p
   __m128i sample0 = _mm_cvtsi64_si128(*(uint64_t*)&(ref_main[x + delta_int]));
   __m128i sample1 = _mm_cvtsi64_si128(*(uint64_t*)&(ref_main[x + delta_int + 1]));
   __m128i pairs_lo = _mm_unpacklo_epi8(sample0, sample1);
-  __m128i pairs_hi = _mm_unpackhi_epi8(sample0, sample1);
 
   __m128i weight = _mm_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
   __m128i v_temp_lo = _mm_maddubs_epi16(pairs_lo, weight);
-  __m128i v_temp_hi = _mm_maddubs_epi16(pairs_hi, weight);
   v_temp_lo = _mm_add_epi16(v_temp_lo, _mm_set1_epi16(16));
-  v_temp_hi = _mm_add_epi16(v_temp_hi, _mm_set1_epi16(16));
   v_temp_lo = _mm_srli_epi16(v_temp_lo, 5);
-  v_temp_hi = _mm_srli_epi16(v_temp_hi, 5);
-  sample0 = _mm_packus_epi16(v_temp_lo, v_temp_hi);
+  sample0 = _mm_packus_epi16(v_temp_lo, v_temp_lo);
 
   return sample0;
 }
@@ -178,16 +170,12 @@ static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_
   __m256i sample1 = _mm256_cvtepu8_epi16(_mm_loadu_si128((__m128i*)&(ref_main[x + delta_int + 1])));
   sample1 = _mm256_packus_epi16(sample1, sample1);
   __m256i pairs_lo = _mm256_unpacklo_epi8(sample0, sample1);
-  __m256i pairs_hi = _mm256_unpackhi_epi8(sample0, sample1);
 
   __m256i weight = _mm256_set1_epi16( (delta_fract << 8) | (32 - delta_fract) );
   __m256i v_temp_lo = _mm256_maddubs_epi16(pairs_lo, weight);
-  __m256i v_temp_hi = _mm256_maddubs_epi16(pairs_hi, weight);
   v_temp_lo = _mm256_add_epi16(v_temp_lo, _mm256_set1_epi16(16));
-  v_temp_hi = _mm256_add_epi16(v_temp_hi, _mm256_set1_epi16(16));
   v_temp_lo = _mm256_srli_epi16(v_temp_lo, 5);
-  v_temp_hi = _mm256_srli_epi16(v_temp_hi, 5);
-  sample0 = _mm256_packus_epi16(v_temp_lo, v_temp_hi);
+  sample0 = _mm256_packus_epi16(v_temp_lo, v_temp_lo);
 
   return sample0;
 }
@@ -199,7 +187,7 @@ static INLINE __m256i filter_16x1_avx2(const kvz_pixel *ref_main, int16_t delta_
  * \param sample_disp   Sample displacement per row
  * \param vertical_mode Mode direction, true if vertical
  */
-void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
+static void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode){
   for (int y = 0; y < 16; y += 8) {
     __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, 0);
     __m256i row1 = filter_16x1_avx2(ref_main, (y + 2) * sample_disp, 0);
@@ -291,7 +279,7 @@ void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_dis
  * \param vertical_mode Mode direction, true if vertical
  * \param width         Block width
  */
-void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode, int width){
+static void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sample_disp, bool vertical_mode, int width){
   for (int y = 0; y < width; y += 8) {
     for (int x = 0; x < width; x += 16) {
       __m256i row0 = filter_16x1_avx2(ref_main, (y + 1) * sample_disp, x);
@@ -464,6 +452,67 @@ static void kvz_angular_pred_avx2(
   }
 }
 
+
+/**
+ * \brief Generate planar prediction.
+ * \param log2_width    Log2 of width, range 2..5.
+ * \param in_ref_above  Pointer to -1 index of above reference, length=width*2+1.
+ * \param in_ref_left   Pointer to -1 index of left reference, length=width*2+1.
+ * \param dst           Buffer of size width*width.
+ */
+static void kvz_intra_pred_planar_avx2(
+  const int_fast8_t log2_width,
+  const kvz_pixel *const ref_top,
+  const kvz_pixel *const ref_left,
+  kvz_pixel *const dst)
+{
+  assert(log2_width >= 2 && log2_width <= 5);
+
+  const int_fast8_t width = 1 << log2_width;
+  const kvz_pixel top_right = ref_top[width + 1];
+  const kvz_pixel bottom_left = ref_left[width + 1];
+
+  if (log2_width > 2) {
+    
+    __m128i v_width = _mm_set1_epi16(width);
+    __m128i v_top_right = _mm_set1_epi16(top_right);
+    __m128i v_bottom_left = _mm_set1_epi16(bottom_left);
+
+    for (int y = 0; y < width; ++y) {
+
+      __m128i x_plus_1 = _mm_setr_epi16(-7, -6, -5, -4, -3, -2, -1, 0);
+      __m128i v_ref_left = _mm_set1_epi16(ref_left[y + 1]);
+      __m128i y_plus_1 = _mm_set1_epi16(y + 1);
+
+      for (int x = 0; x < width; x += 8) {
+        x_plus_1 = _mm_add_epi16(x_plus_1, _mm_set1_epi16(8));
+        __m128i v_ref_top = _mm_loadl_epi64((__m128i*)&(ref_top[x + 1]));
+        v_ref_top = _mm_cvtepu8_epi16(v_ref_top);
+
+        __m128i hor = _mm_add_epi16(_mm_mullo_epi16(_mm_sub_epi16(v_width, x_plus_1), v_ref_left), _mm_mullo_epi16(x_plus_1, v_top_right));
+        __m128i ver = _mm_add_epi16(_mm_mullo_epi16(_mm_sub_epi16(v_width, y_plus_1), v_ref_top), _mm_mullo_epi16(y_plus_1, v_bottom_left));
+
+        //dst[y * width + x] = ho
+
+        __m128i chunk = _mm_srli_epi16(_mm_add_epi16(_mm_add_epi16(ver, hor), v_width), (log2_width + 1));
+        chunk = _mm_packus_epi16(chunk, chunk);
+        _mm_storel_epi64((__m128i*)&(dst[y * width + x]), chunk);
+      }
+    }
+
+  } else {
+    // Unoptimized version for reference.
+    for (int y = 0; y < width; ++y) {
+      for (int x = 0; x < width; ++x) {
+        int_fast16_t hor = (width - 1 - x) * ref_left[y + 1] + (x + 1) * top_right;
+        int_fast16_t ver = (width - 1 - y) * ref_top[x + 1] + (y + 1) * bottom_left;
+        dst[y * width + x] = (ver + hor + width) >> (log2_width + 1);
+      }
+    }
+  }
+}
+
+
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
@@ -472,6 +521,7 @@ int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth)
 #if COMPILE_INTEL_AVX2 && defined X86_64
   if (bitdepth == 8) {
     success &= kvz_strategyselector_register(opaque, "angular_pred", "avx2", 40, &kvz_angular_pred_avx2);
+    success &= kvz_strategyselector_register(opaque, "intra_pred_planar", "avx2", 40, &kvz_intra_pred_planar_avx2);
   }
 #endif //COMPILE_INTEL_AVX2 && defined X86_64
   return success;

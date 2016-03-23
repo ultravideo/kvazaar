@@ -20,22 +20,13 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "global.h"
+/**
+ * \ingroup Reconstruction
+ * \file
+ * Various tables.
+ */
 
-//4 8 16 32 64 128
-//0 1  2  3  4   5
-static const uint8_t g_to_bits[129] =
-{
-  0,
-  0,0,0,0,
-  0,0,0,1,
-  0,0,0,0,0,0,0,2,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5
-};
-#define TOBITS(len) g_to_bits[len]
+#include "global.h"
 
 /***
   * List of indices for 4x4 coefficient groups within 8x8 transform block.

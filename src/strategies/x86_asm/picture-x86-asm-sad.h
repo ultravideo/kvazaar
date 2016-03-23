@@ -20,9 +20,13 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
- /*! \file picture-x86-asm-sad.h
-    \brief assembly functions header for sad
-*/
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for AVX, utilizing ASM implementations.
+ */
+
+#include "global.h"
 
 unsigned kvz_sad_4x4_avx(const kvz_pixel*, const kvz_pixel*);
 unsigned kvz_sad_8x8_avx(const kvz_pixel*, const kvz_pixel*);

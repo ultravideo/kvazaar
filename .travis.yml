@@ -2,25 +2,86 @@ language: c
 
 env:
   global:
-  - AS=nasm
-  - KVZ_DISABLE_AVX2=1
   - TEST_DIM=264x130
   - TEST_FRAMES=10
-  - MAKEFLAGS="--jobs=2 --environment-overrides"
 
+# Use container based infrastructure
 sudo: false
+
+# Use this the global requirements list for valgrind tests, because those are the most numerous.
+addons:
+  apt:
+    sources:
+    - ubuntu-toolchain-r-test
+    packages:
+    - autoconf
+    - libtool
+    - p7zip-full  # to uncompress our own ffmpeg binary
+    - valgrind
+    - yasm
 
 matrix:
   fast_finish: true
   
   include:
     - compiler: clang
-      env: KVZ_DISABLE_AVX2=""
-    - compiler: gcc-4.8
-      env: KVZ_DISABLE_AVX2=""
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - autoconf
+          - libtool
+          - yasm
     
+    - compiler: gcc-4.8
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - autoconf
+          - gcc-4.8
+          - libtool
+          - yasm
+
+    - os: osx
+      # The version of clang in the osx image complains about -pthread being given to linker.
+      # It's a silly warning and I don't know a workaround, so let's just ignore all warnings.
+      env: KVZ_CONFIGURE_ARGS="--disable-werror"
+
+    # Check for external symbols without kvz_ prefix.
+    - compiler: gcc-4.8
+      script:
+        - ./autogen.sh
+        - ./configure && make
+        - (! nm -go --defined-only src/.libs/libkvazaar.a | grep -v ' kvz_') || (echo 'ERROR Only symbols prefixed with kvz_ should be exported from libkvazaar.'; false)
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - autoconf
+          - gcc-4.8
+          - libtool
+          - yasm
+
+    # Tests trying to use invalid input dimensions
+    - env: EXPECTED_STATUS=1 PARAMS="-i src/kvazaar --input-res=1x65 -o /dev/null"
+      addons:
+        apt:
+          sources:
+          - ubuntu-toolchain-r-test
+          packages:
+          - autoconf
+          - libtool
+          - yasm
+
     # These valgrind tests are slow, so they are performed with the minimum
     # number of small frames and fast settings.
+    
+    # Tests for interlace
+    - env: VALGRIND_TEST="--source-scan-type=tff -p0 --preset=ultrafast --threads=2 --owf=1 --wpp"
     
     # Tests for owf, wpp and tiles. There is lots of separate branches of
     # code related to owf=0 and owf!=0, which is why all permutations are
@@ -40,7 +101,12 @@ matrix:
     # Tests for all-intra.
     - env: VALGRIND_TEST="-p1 --threads=2 --owf=1 --rd=1 --no-rdoq --no-deblock --no-sao --no-signhide"
     - env: VALGRIND_TEST="-p1 --threads=2 --owf=1 --rd=2 --no-rdoq --no-deblock --no-sao --no-signhide --no-transform-skip"
-    
+
+    # Tests for SMP and AMP blocks.
+    - env: TEST_FRAMES=4 VALGRIND_TEST="--threads=2 --owf=1 --wpp --smp"
+    - env: TEST_FRAMES=4 VALGRIND_TEST="--threads=2 --owf=1 --wpp --amp"
+    - env: TEST_FRAMES=4 VALGRIND_TEST="--threads=2 --owf=1 --wpp --smp --amp"
+
     # Tests for rate control
     - env: VALGRIND_TEST="--bitrate=500000 -p0 -r1 --owf=1 --threads=2 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
     
@@ -48,21 +114,6 @@ matrix:
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=1 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
     - env: TEST_FRAMES=10 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=4 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
-
-    # Tests trying to use invalid input dimensions
-    - env: EXPECTED_STATUS=1 PARAMS="-i kvazaar --input-res=1x65 -o /dev/null"
-
-addons:
-  apt:
-    sources:
-    - ubuntu-toolchain-r-test
-
-    packages:
-    - gcc
-    - gcc-4.8
-    - nasm
-    - p7zip-full
-    - valgrind
 
 install:
   - source .travis-install.sh

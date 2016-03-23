@@ -18,101 +18,17 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "sao.h"
 #include "rdo.h"
+#include "strategies/strategies-picture.h"
+#include "strategies/strategies-sao.h"
 
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 
-// Offsets of a and b in relation to c.
-// dir_offset[dir][a or b]
-// |       |   a   | a     |     a |
-// | a c b |   c   |   c   |   c   |
-// |       |   b   |     b | b     |
-static const vector2d_t g_sao_edge_offsets[SAO_NUM_EO][2] = {
-  { { -1, 0 }, { 1, 0 } },
-  { { 0, -1 }, { 0, 1 } },
-  { { -1, -1 }, { 1, 1 } },
-  { { 1, -1 }, { -1, 1 } }
-};
 
-// Mapping of edge_idx values to eo-classes.
-
-
-static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
-{
-  // Mapping relationships between a, b and c to eo_idx.
-  static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
-
-  int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
-
-  return sao_eo_idx_to_eo_category[eo_idx];
-}
-
-
-int kvz_sao_band_ddistortion(const encoder_state_t * const state, const kvz_pixel *orig_data, const kvz_pixel *rec_data,
-                         int block_width, int block_height,
-                         int band_pos, int sao_bands[4])
-{
-  int y, x;
-  int shift = state->encoder_control->bitdepth-5;
-  int sum = 0;
-
-  for (y = 0; y < block_height; ++y) {
-    for (x = 0; x < block_width; ++x) {
-      int band = (rec_data[y * block_width + x] >> shift) - band_pos;
-      int offset = 0;
-      if (band >= 0 && band < 4) {
-        offset = sao_bands[band];
-      }
-      if (offset != 0) {
-        int diff = orig_data[y * block_width + x] - rec_data[y * block_width + x];
-        // Offset is applied to reconstruction, so it is subtracted from diff.
-        sum += (diff - offset) * (diff - offset) - diff * diff;
-      }
-    }
-  }
-
-  return sum;
-}
-
-
-int kvz_sao_edge_ddistortion(const kvz_pixel *orig_data, const kvz_pixel *rec_data,
-                         int block_width, int block_height,
-                         int eo_class, int offsets[NUM_SAO_EDGE_CATEGORIES])
-{
-  int y, x;
-  int sum = 0;
-  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
-  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
-
-  for (y = 1; y < block_height - 1; ++y) {
-    for (x = 1; x < block_width - 1; ++x) {
-      const kvz_pixel *c_data = &rec_data[y * block_width + x];
-      kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
-      kvz_pixel c = c_data[0];
-      kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
-
-      int offset = offsets[sao_calc_eo_cat(a, b, c)];
-
-      if (offset != 0) {
-        int diff = orig_data[y * block_width + x] - c;
-        // Offset is applied to reconstruction, so it is subtracted from diff.
-        sum += (diff - offset) * (diff - offset) - diff * diff;
-      }
-    }
-  }
-
-  return sum;
-}
-
-
-void kvz_init_sao_info(sao_info_t *sao) {
+static void init_sao_info(sao_info_t *sao) {
   sao->type = SAO_TYPE_NONE;
   sao->merge_left_flag = 0;
   sao->merge_up_flag = 0;
@@ -243,7 +159,7 @@ static float sao_mode_bits_band(const encoder_state_t * const state,
 /**
  * \brief calculate an array of intensity correlations for each intensity value
  */
-static void calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
+void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i)
 {
   int val;
   int values = (1<<encoder->bitdepth);
@@ -342,78 +258,6 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
   }
 }
 
-
-/**
- * \param orig_data  Original pixel data. 64x64 for luma, 32x32 for chroma.
- * \param rec_data  Reconstructed pixel data. 64x64 for luma, 32x32 for chroma.
- * \param dir_offsets
- * \param is_chroma  0 for luma, 1 for chroma. Indicates
- */
-static void calc_sao_edge_dir(const kvz_pixel *orig_data, const kvz_pixel *rec_data,
-                              int eo_class, int block_width, int block_height,
-                              int cat_sum_cnt[2][NUM_SAO_EDGE_CATEGORIES])
-{
-  int y, x;
-  vector2d_t a_ofs = g_sao_edge_offsets[eo_class][0];
-  vector2d_t b_ofs = g_sao_edge_offsets[eo_class][1];
-  // Arrays orig_data and rec_data are quarter size for chroma.
-
-  // Don't sample the edge pixels because this function doesn't have access to
-  // their neighbours.
-  for (y = 1; y < block_height - 1; ++y) {
-    for (x = 1; x < block_width - 1; ++x) {
-      const kvz_pixel *c_data = &rec_data[y * block_width + x];
-      kvz_pixel a = c_data[a_ofs.y * block_width + a_ofs.x];
-      kvz_pixel c = c_data[0];
-      kvz_pixel b = c_data[b_ofs.y * block_width + b_ofs.x];
-
-      int eo_cat = sao_calc_eo_cat(a, b, c);
-
-      cat_sum_cnt[0][eo_cat] += orig_data[y * block_width + x] - c;
-      cat_sum_cnt[1][eo_cat] += 1;
-    }
-  }
-}
-
-static void sao_reconstruct_color(const encoder_control_t * const encoder, 
-                                  const kvz_pixel *rec_data, kvz_pixel *new_rec_data,
-                                  const sao_info_t *sao,
-                                  int stride, int new_stride,
-                                  int block_width, int block_height,
-                                  color_t color_i)
-{
-  int y, x;
-  // Arrays orig_data and rec_data are quarter size for chroma.
-  int offset_v = color_i == COLOR_V ? 5 : 0;
-
-  if(sao->type == SAO_TYPE_BAND) {
-    int offsets[1<<KVZ_BIT_DEPTH];
-    calc_sao_offset_array(encoder, sao, offsets, color_i);
-    for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; ++x) {
-        new_rec_data[y * new_stride + x] = offsets[rec_data[y * stride + x]];
-      }
-    }
-  } else {
-    // Don't sample the edge pixels because this function doesn't have access to
-    // their neighbours.
-    for (y = 0; y < block_height; ++y) {
-      for (x = 0; x < block_width; ++x) {
-        vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-        vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
-        const kvz_pixel *c_data = &rec_data[y * stride + x];
-        kvz_pixel *new_data = &new_rec_data[y * new_stride + x];
-        kvz_pixel a = c_data[a_ofs.y * stride + a_ofs.x];
-        kvz_pixel c = c_data[0];
-        kvz_pixel b = c_data[b_ofs.y * stride + b_ofs.x];
-
-        int eo_cat = sao_calc_eo_cat(a, b, c);
-
-        new_data[0] = (kvz_pixel)CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c_data[0] + sao->offsets[eo_cat + offset_v]);
-      }
-    }
-  }
-}
 
 /**
  * \brief Calculate dimensions of the buffer used by sao reconstruction.
@@ -578,7 +422,7 @@ void kvz_sao_reconstruct(const encoder_control_t * const encoder, videoframe_t *
                       tl.y + block.y + br.y,
                       pic_stride, buf_stride);
 
-  sao_reconstruct_color(encoder, &buf_rec[tl.y * buf_stride + tl.x],
+  kvz_sao_reconstruct_color(encoder, &buf_rec[tl.y * buf_stride + tl.x],
                         &new_rec[(ofs.y + tl.y) * lcu_stride + ofs.x + tl.x],
                         sao,
                         buf_stride, lcu_stride,
@@ -616,7 +460,7 @@ static void sao_search_edge_sao(const encoder_state_t * const state,
     // Call calc_sao_edge_dir once for luma and twice for chroma.
     for (i = 0; i < buf_cnt; ++i) {
       FILL(cat_sum_cnt, 0);
-      calc_sao_edge_dir(data[i], recdata[i], edge_class,
+      kvz_calc_sao_edge_dir(data[i], recdata[i], edge_class,
                         block_width, block_height, cat_sum_cnt);
     
 
@@ -728,8 +572,8 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   sao_info_t edge_sao;
   sao_info_t band_sao;
 
-  kvz_init_sao_info(&edge_sao);
-  kvz_init_sao_info(&band_sao);
+  init_sao_info(&edge_sao);
+  init_sao_info(&band_sao);
   
   //Avoid "random" uninitialized value
   edge_sao.band_position[0] = edge_sao.band_position[1] = 0;
@@ -827,7 +671,7 @@ static void sao_search_best_mode(const encoder_state_t * const state, const kvz_
   return;
 }
 
-void kvz_sao_search_chroma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
+static void sao_search_chroma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
   int block_width  = (LCU_WIDTH / 2);
   int block_height = (LCU_WIDTH / 2);
@@ -863,7 +707,7 @@ void kvz_sao_search_chroma(const encoder_state_t * const state, const videoframe
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 2, sao, sao_top, sao_left, merge_cost);
 }
 
-void kvz_sao_search_luma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
+static void sao_search_luma(const encoder_state_t * const state, const videoframe_t *frame, unsigned x_ctb, unsigned y_ctb, sao_info_t *sao, sao_info_t *sao_top, sao_info_t *sao_left, int32_t merge_cost[3])
 {
   kvz_pixel orig[LCU_LUMA_SIZE];
   kvz_pixel rec[LCU_LUMA_SIZE];
@@ -891,6 +735,54 @@ void kvz_sao_search_luma(const encoder_state_t * const state, const videoframe_t
   orig_list[0] = orig;
   rec_list[0] = rec;
   sao_search_best_mode(state, orig_list, rec_list, block_width, block_height, 1, sao, sao_top, sao_left, merge_cost);
+}
+
+void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y)
+{
+  videoframe_t* const frame = state->tile->frame;
+  const int stride = frame->width_in_lcu;
+  int32_t merge_cost_luma[3] = { INT32_MAX };
+  int32_t merge_cost_chroma[3] = { INT32_MAX };
+  sao_info_t *sao_luma = &frame->sao_luma[lcu_y * stride + lcu_x];
+  sao_info_t *sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
+
+  // Merge candidates
+  sao_info_t *sao_top_luma    = lcu_y != 0 ? &frame->sao_luma  [(lcu_y - 1) * stride + lcu_x] : NULL;
+  sao_info_t *sao_left_luma   = lcu_x != 0 ? &frame->sao_luma  [lcu_y       * stride + lcu_x - 1] : NULL;
+  sao_info_t *sao_top_chroma  = lcu_y != 0 ? &frame->sao_chroma[(lcu_y - 1) * stride + lcu_x] : NULL;
+  sao_info_t *sao_left_chroma = lcu_x != 0 ? &frame->sao_chroma[lcu_y       * stride + lcu_x - 1] : NULL;
+
+  sao_search_luma(state, frame, lcu_x, lcu_y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
+  sao_search_chroma(state, frame, lcu_x, lcu_y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
+
+  sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
+  // Check merge costs
+  if (sao_top_luma) {
+    // Merge up if cost is equal or smaller to the searched mode cost
+    if (merge_cost_luma[2] + merge_cost_chroma[2] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
+      *sao_luma = *sao_top_luma;
+      *sao_chroma = *sao_top_chroma;
+      sao_luma->merge_up_flag = 1;
+      sao_luma->merge_left_flag = 0;
+    }
+  }
+  if (sao_left_luma) {
+    // Merge left if cost is equal or smaller to the searched mode cost
+    // AND smaller than merge up cost, if merge up was already chosen
+    if (merge_cost_luma[1] + merge_cost_chroma[1] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
+      if (!sao_luma->merge_up_flag || merge_cost_luma[1] + merge_cost_chroma[1] < merge_cost_luma[2] + merge_cost_chroma[2]) {
+        *sao_luma = *sao_left_luma;
+        *sao_chroma = *sao_left_chroma;
+        sao_luma->merge_left_flag = 1;
+        sao_luma->merge_up_flag = 0;
+      }
+    }
+  }
+  assert(sao_luma->eo_class < SAO_NUM_EO);
+  assert(sao_chroma->eo_class < SAO_NUM_EO);
+
+  CHECKPOINT_SAO_INFO("sao_luma", *sao_luma);
+  CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
 }
 
 void kvz_sao_reconstruct_frame(encoder_state_t * const state)

@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "input_frame_buffer.h"
 #include "encoderstate.h"
 #include <assert.h>

@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Threading
+ * \file
+ * Container for worker tasks.
+ */
+
 #include "global.h"
 
 #include <pthread.h>
@@ -51,10 +57,10 @@ typedef struct threadqueue_job_t {
   
   int debug_worker_id;
   
-  CLOCK_T debug_clock_enqueue;
-  CLOCK_T debug_clock_start;
-  CLOCK_T debug_clock_stop;
-  CLOCK_T debug_clock_dequeue;
+  KVZ_CLOCK_T debug_clock_enqueue;
+  KVZ_CLOCK_T debug_clock_start;
+  KVZ_CLOCK_T debug_clock_stop;
+  KVZ_CLOCK_T debug_clock_dequeue;
 #endif
 } threadqueue_job_t;
 
@@ -91,8 +97,8 @@ typedef struct {
 
   FILE *debug_log;
   
-  CLOCK_T *debug_clock_thread_start;
-  CLOCK_T *debug_clock_thread_end;
+  KVZ_CLOCK_T *debug_clock_thread_start;
+  KVZ_CLOCK_T *debug_clock_thread_end;
 #endif
 } threadqueue_queue_t;
 
@@ -117,7 +123,7 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t
 int kvz_threadqueue_finalize(threadqueue_queue_t * threadqueue);
 
 #ifdef KVZ_DEBUG
-int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, const CLOCK_T *stop, const char* debug_description);
+int threadqueue_log(threadqueue_queue_t * threadqueue, const KVZ_CLOCK_T *start, const KVZ_CLOCK_T *stop, const char* debug_description);
 
 // Bitmasks for PERFORMANCE_MEASURE_START and PERFORMANCE_MEASURE_END.
 #define KVZ_PERF_FRAME    (1 << 0)
@@ -126,10 +132,9 @@ int threadqueue_log(threadqueue_queue_t * threadqueue, const CLOCK_T *start, con
 #define KVZ_PERF_SAOREC   (1 << 3)
 #define KVZ_PERF_BSLEAF   (1 << 4)
 #define KVZ_PERF_SEARCHCU (1 << 5)
-#define KVZ_PERF_SEARCHPX (1 << 6)
 
-#define IMPL_PERFORMANCE_MEASURE_START(mask) CLOCK_T start, stop; if ((KVZ_DEBUG) & mask) { GET_TIME(&start); }
-#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((KVZ_DEBUG) & mask) { GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
+#define IMPL_PERFORMANCE_MEASURE_START(mask) KVZ_CLOCK_T start, stop; if ((KVZ_DEBUG) & mask) { KVZ_GET_TIME(&start); }
+#define IMPL_PERFORMANCE_MEASURE_END(mask, threadqueue, str, ...) { if ((KVZ_DEBUG) & mask) { KVZ_GET_TIME(&stop); {char job_description[256]; sprintf(job_description, (str), __VA_ARGS__); threadqueue_log((threadqueue), &start, &stop, job_description);}} } \
 
 #ifdef _MSC_VER
 // Disable VS conditional expression warning from debug code.

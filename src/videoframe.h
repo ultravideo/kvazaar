@@ -20,12 +20,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup DataStructures
  * \file
- * \brief Video frame stuff
+ * \brief Container for the frame currently being encoded.
  */
 
 #include "global.h"
+
 #include "cu.h"
 #include "image.h"
 
@@ -62,9 +64,5 @@ void kvz_videoframe_set_poc(videoframe_t * frame, int32_t poc);
 
 const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
 cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);
-void kvz_videoframe_compute_psnr(const kvz_picture *const src,
-                                 const kvz_picture *const rec,
-                                 double psnr[NUM_COLORS]);
-
 
 #endif

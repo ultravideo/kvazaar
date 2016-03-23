@@ -22,7 +22,7 @@
 
 #include <stdlib.h>
 
-#include "config.h"
+#include "cfg.h"
 #include "encoder.h"
 #include "strategyselector.h"
 #include "encoderstate.h"
@@ -144,6 +144,49 @@ static int kvazaar_headers(kvz_encoder *enc,
 }
 
 
+/**
+* \brief Separate a single field from a frame.
+*
+* \param frame_in           input frame to extract field from
+* \param source_scan_type   scan type of input material (0: progressive, 1:top field first, 2:bottom field first)
+* \param field parity   
+* \param field_out
+*
+* \return              1 on success, 0 on failure
+*/
+static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_scan_type, unsigned field_parity, kvz_picture *field_out)
+{
+  if ((source_scan_type != 1) && (source_scan_type != 2)) return 0;
+  if ((field_parity != 0)     && (field_parity != 1))     return 0;
+
+  unsigned offset = 0;
+  if (source_scan_type == 1) offset = field_parity ? 1 : 0;
+  else if (source_scan_type == 2) offset = field_parity ? 0 : 1;  
+
+  //Luma
+  for (int i = 0; i < field_out->height; ++i){
+    kvz_pixel *row_in  = frame_in->y + MIN(frame_in->height - 1, 2 * i + offset) * frame_in->stride;
+    kvz_pixel *row_out = field_out->y + i * field_out->stride;
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width);
+  }
+
+  //Chroma
+  for (int i = 0; i < field_out->height / 2; ++i){
+    kvz_pixel *row_in = frame_in->u + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
+    kvz_pixel *row_out = field_out->u + i * field_out->stride / 2;
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
+  }
+
+  for (int i = 0; i < field_out->height / 2; ++i){
+    kvz_pixel *row_in = frame_in->v + MIN(frame_in->height / 2 - 1, 2 * i + offset) * frame_in->stride / 2;
+    kvz_pixel *row_out = field_out->v + i * field_out->stride / 2;
+    memcpy(row_out, row_in, sizeof(kvz_pixel) * frame_in->width / 2);
+  }
+
+  return 1;
+}
+
+
 static int kvazaar_encode(kvz_encoder *enc,
                           kvz_picture *pic_in,
                           kvz_data_chunk **data_out,
@@ -212,6 +255,90 @@ static int kvazaar_encode(kvz_encoder *enc,
 }
 
 
+static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
+                                          kvz_picture *pic_in,
+                                          kvz_data_chunk **data_out,
+                                          uint32_t *len_out,
+                                          kvz_picture **pic_out,
+                                          kvz_picture **src_out,
+                                          kvz_frame_info *info_out)
+{
+  if (enc->control->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+    // For progressive, simply call the normal encoding function.
+    return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+  }
+
+  // For interlaced, make two fields out of the input frame and call encode on them separately.
+  encoder_state_t *state = &enc->states[enc->cur_state_num];
+  kvz_picture *first_field = NULL, *second_field = NULL;
+  struct {
+    kvz_data_chunk* data_out;
+    uint32_t len_out;
+  } first = { 0 }, second = { 0 };
+
+  if (pic_in != NULL) {
+    first_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);
+    if (first_field == NULL) {
+      goto kvazaar_field_encoding_adapter_failure;
+    }
+    second_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);
+    if (second_field == NULL) {
+      goto kvazaar_field_encoding_adapter_failure;
+    }
+
+    yuv_io_extract_field(pic_in, pic_in->interlacing, 0, first_field);
+    yuv_io_extract_field(pic_in, pic_in->interlacing, 1, second_field);
+    
+    first_field->pts = pic_in->pts;
+    first_field->dts = pic_in->dts;
+    first_field->interlacing = pic_in->interlacing;
+
+    // Should the second field have higher pts and dts? It shouldn't affect anything.
+    second_field->pts = pic_in->pts;
+    second_field->dts = pic_in->dts;
+    second_field->interlacing = pic_in->interlacing;
+  }
+
+  if (!kvazaar_encode(enc, first_field, &first.data_out, &first.len_out, pic_out, NULL, info_out)) {
+    goto kvazaar_field_encoding_adapter_failure;
+  }
+  if (!kvazaar_encode(enc, second_field, &second.data_out, &second.len_out, NULL, NULL, NULL)) {
+    goto kvazaar_field_encoding_adapter_failure;
+  }
+
+  kvz_image_free(first_field);
+  kvz_image_free(second_field);
+
+  // Concatenate bitstreams.
+  if (len_out != NULL) {
+    *len_out = first.len_out + second.len_out;
+  }
+  if (data_out != NULL) {
+    *data_out = first.data_out;
+    if (first.data_out != NULL) {
+      kvz_data_chunk *chunk = first.data_out;
+      while (chunk->next != NULL) {
+        chunk = chunk->next;
+      }
+      chunk->next = second.data_out;
+    }
+  }
+
+  if (src_out != NULL) {
+    // TODO: deinterlace the fields to one picture.
+  }
+
+  return 1;
+
+kvazaar_field_encoding_adapter_failure:
+  kvz_image_free(first_field);
+  kvz_image_free(second_field);
+  kvz_bitstream_free_chunks(first.data_out);
+  kvz_bitstream_free_chunks(second.data_out);
+  return 0;
+}
+
+
 static const kvz_api kvz_8bit_api = {
   .config_alloc = kvz_config_alloc,
   .config_init = kvz_config_init,
@@ -226,7 +353,7 @@ static const kvz_api kvz_8bit_api = {
   .encoder_open = kvazaar_open,
   .encoder_close = kvazaar_close,
   .encoder_headers = kvazaar_headers,
-  .encoder_encode = kvazaar_encode,
+  .encoder_encode = kvazaar_field_encoding_adapter,
 };
 
 

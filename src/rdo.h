@@ -20,15 +20,17 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Compression
  * \file
- * \brief Handling Rate-Distortion Optimization related functionality
+ * Rate-Distortion Optimization related functionality.
  */
 
 #include "global.h"
 
 #include "encoder.h"
 #include "encoderstate.h"
+#include "inter.h"
 
 
 extern const uint32_t kvz_g_go_rice_range[5];
@@ -51,6 +53,11 @@ uint32_t kvz_get_coded_level(encoder_state_t * state, double* coded_cost, double
                          uint16_t abs_go_rice,
                          uint32_t c1_idx, uint32_t c2_idx,
                          int32_t q_bits,double temp, int8_t last, int8_t type);
+
+int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, int mv_shift,
+  int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+  int16_t num_cand, int32_t ref_idx, uint32_t *bitcost);
+uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac);
 
 extern const float kvz_f_entropy_bits[128];
 #define CTX_ENTROPY_FBITS(ctx,val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]

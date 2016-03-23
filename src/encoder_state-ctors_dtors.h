@@ -20,8 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
+ * Creation and destruction of encoder_state_t.
  */
 
 #include "global.h"

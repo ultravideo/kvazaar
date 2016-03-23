@@ -20,19 +20,83 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup DataStructures
  * \file
- * \brief CU and coefficients related functions
+ * Coding Unit data structure and related functions.
  */
 
 #include "global.h"
+
 #include "image.h"
+
 
 //Cu stuff
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
 typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu_type_t;
+
+typedef enum {
+  SIZE_2Nx2N = 0,
+  SIZE_2NxN  = 1,
+  SIZE_Nx2N  = 2,
+  SIZE_NxN   = 3,
+  SIZE_2NxnU = 4,
+  SIZE_2NxnD = 5,
+  SIZE_nLx2N = 6,
+  SIZE_nRx2N = 7,
+} part_mode_t;
+
+extern const uint8_t kvz_part_mode_num_parts[];
+extern const uint8_t kvz_part_mode_offsets[][4][2];
+extern const uint8_t kvz_part_mode_sizes[][4][2];
+
+/**
+ * \brief Get the x coordinate of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param cu_x        x coordinate of the containing CU
+ * \param i           number of the PU
+ * \return            location of the left edge of the PU
+ */
+#define PU_GET_X(part_mode, cu_width, cu_x, i) \
+  ((cu_x) + kvz_part_mode_offsets[(part_mode)][(i)][0] * (cu_width) / 4)
+
+/**
+ * \brief Get the y coordinate of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param cu_y        y coordinate of the containing CU
+ * \param i           number of the PU
+ * \return            location of the top edge of the PU
+ */
+#define PU_GET_Y(part_mode, cu_width, cu_y, i) \
+  ((cu_y) + kvz_part_mode_offsets[(part_mode)][(i)][1] * (cu_width) / 4)
+
+/**
+ * \brief Get the width of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param i           number of the PU
+ * \return            width of the PU
+ */
+#define PU_GET_W(part_mode, cu_width, i) \
+  (kvz_part_mode_sizes[(part_mode)][(i)][0] * (cu_width) / 4)
+
+/**
+ * \brief Get the height of a PU.
+ *
+ * \param part_mode   partition mode of the containing CU
+ * \param cu_width    width of the containing CU
+ * \param i           number of the PU
+ * \return            height of the PU
+ */
+#define PU_GET_H(part_mode, cu_width, i) \
+  (kvz_part_mode_sizes[(part_mode)][(i)][1] * (cu_width) / 4)
 
 //////////////////////////////////////////////////////////////////////////
 // TYPES
@@ -106,10 +170,15 @@ typedef struct {
 
 cu_array_t * kvz_cu_array_alloc(int width_in_scu, int height_in_scu);
 int kvz_cu_array_free(cu_array_t *cua);
-  
 
-#define SUB_SCU_BIT_MASK (64 - 1)
-#define SUB_SCU(xy) (xy & SUB_SCU_BIT_MASK)
+/**
+ * \brief Return the 7 lowest-order bits of the pixel coordinate.
+ *
+ * The 7 lower-order bits correspond to the distance from the left or top edge
+ * of the containing LCU.
+ */
+#define SUB_SCU(xy) ((xy) & (LCU_WIDTH - 1))
+
 #define LCU_CU_WIDTH 8
 #define LCU_T_CU_WIDTH 9
 #define LCU_CU_OFFSET 10
@@ -153,9 +222,65 @@ typedef struct {
    * - Left reference CUs on column 0.
    * - All of LCUs CUs on 1:9, 1:9.
    * - Top right reference CU on the last slot.
+   *
+   \verbatim
+
+      .-- left reference CUs
+      v
+       0 |  1  2  3  4  5  6  7  8 | 81 <-- top reference CUs
+     ----+-------------------------+----
+       9 | 10 11 12 13 14 15 16 17 |
+      18 | 19 20 21 22 23 24 25 26 <-- this LCU
+      27 | 28 29 30 31 32 33 34 35 |
+      36 | 37 38 39 40 41 42 43 44 |
+      45 | 46 47 48 49 50 51 52 53 |
+      54 | 55 56 57 58 59 60 61 62 |
+      63 | 64 65 66 67 68 69 70 71 |
+      72 | 73 74 75 76 77 78 79 80 |
+     ----+-------------------------+----
+
+   \endverbatim
    */
   cu_info_t cu[9*9+1];
 } lcu_t;
+
+/**
+ * \brief Return pointer to a given CU.
+ *
+ * \param lcu   pointer to the containing LCU
+ * \param x_cu  x-index of the CU
+ * \param y_cu  y-index of the CU
+ * \return      pointer to the CU
+ */
+#define LCU_GET_CU(lcu, x_cu, y_cu) \
+  (&(lcu)->cu[LCU_CU_OFFSET + (x_cu) + (y_cu) * LCU_T_CU_WIDTH])
+
+/**
+ * \brief Return pointer to the top right reference CU.
+ */
+#define LCU_GET_TOP_RIGHT_CU(lcu) \
+  (&(lcu)->cu[LCU_T_CU_WIDTH * LCU_T_CU_WIDTH])
+
+/**
+ * \brief Return pointer to the CU containing a given pixel.
+ *
+ * \param lcu   pointer to the containing LCU
+ * \param x_px  x-coordinate relative to the upper left corner of the LCU
+ * \param y_px  y-coordinate relative to the upper left corner of the LCU
+ * \return      pointer to the CU at coordinates (x_px, y_px)
+ */
+#define LCU_GET_CU_AT_PX(lcu, x_px, y_px) LCU_GET_CU(lcu, (x_px) >> 3, (y_px) >> 3)
+
+/**
+ * \brief Return pointer to a CU relative to the given CU.
+ *
+ * \param cu      pointer to a CU in the array at some location (x, y)
+ * \param x_offs  x-offset
+ * \param y_offs  y-offset
+ * \return        pointer to the CU at (x + x_offs, y + y_offs)
+ */
+#define CU_GET_CU(cu_array, x_offs, y_offs) \
+  (&cu_array[(x_offs) + (y_offs) * LCU_T_CU_WIDTH])
 
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \
   CHECKPOINT_CU(prefix_str " cu[0]", (lcu).cu[0]); \

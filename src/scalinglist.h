@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Reconstruction
  * \file
- * \brief Coding Unit (CU) and picture data related functions.
+ * Scaling list initialization.
  */
 
 #include "global.h"

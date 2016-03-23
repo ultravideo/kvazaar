@@ -31,8 +31,11 @@
 #include <fcntl.h>    /* _O_BINARY */
 #endif
 
+#include "global.h"
+
 #include "kvazaar_internal.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,9 +43,7 @@
 
 #include "checkpoint.h"
 #include "global.h"
-#include "threadqueue.h"
 #include "encoder.h"
-#include "videoframe.h"
 #include "cli.h"
 #include "yuv_io.h"
 
@@ -78,6 +79,178 @@ static FILE* open_output_file(const char* filename)
   return fopen(filename, "wb");
 }
 
+static unsigned get_padding(unsigned width_or_height){
+  if (width_or_height % CU_MIN_SIZE_PIXELS){
+    return CU_MIN_SIZE_PIXELS - (width_or_height % CU_MIN_SIZE_PIXELS);
+  }else{
+    return 0;
+  }
+}
+
+#if KVZ_BIT_DEPTH == 8
+#define PSNRMAX (255.0 * 255.0)
+#else
+  #define PSNRMAX ((double)PIXEL_MAX * (double)PIXEL_MAX)
+#endif
+
+/**
+ * \brief Calculates image PSNR value
+ *
+ * \param src   source picture
+ * \param rec   reconstructed picture
+ * \prama psnr  returns the PSNR
+ */
+static void compute_psnr(const kvz_picture *const src,
+                         const kvz_picture *const rec,
+                         double psnr[NUM_COLORS])
+{
+  assert(src->width  == rec->width);
+  assert(src->height == rec->height);
+
+  int32_t pixels = src->width * src->height;
+
+  for (int32_t c = 0; c < NUM_COLORS; ++c) {
+    int32_t num_pixels = pixels;
+    if (c != COLOR_Y) {
+      num_pixels >>= 2;
+    }
+    psnr[c] = 0;
+    for (int32_t i = 0; i < num_pixels; ++i) {
+      const int32_t error = src->data[c][i] - rec->data[c][i];
+      psnr[c] += error * error;
+    }
+
+    // Avoid division by zero
+    if (psnr[c] == 0) psnr[c] = 99.0;
+    psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;
+  }
+}
+
+typedef struct {
+  // Mutexes for synchronization.
+  pthread_mutex_t* input_mutex;
+  pthread_mutex_t* main_thread_mutex;
+
+  // Parameters passed from main thread to input thread.
+  FILE* input;
+  const kvz_api *api;
+  const cmdline_opts_t *opts;
+  const encoder_control_t *encoder;
+  const uint8_t padding_x;
+  const uint8_t padding_y;
+
+  // Picture and thread status passed from input thread to main thread.
+  kvz_picture *img_in;
+  int retval;
+} input_handler_args;
+
+#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
+#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
+
+#define RETVAL_RUNNING 0
+#define RETVAL_FAILURE 1
+#define RETVAL_EOF 2
+
+/**
+* \brief Handles input reading in a thread
+*
+* \param in_args  pointer to argument struct
+*/
+static void* input_read_thread(void* in_args)
+{
+
+  // Reading a frame works as follows:
+  // - read full frame
+  // if progressive: set read frame as output
+  // if interlaced:
+  // - allocate two fields and fill them according to field order
+  // - deallocate the initial full frame
+
+  input_handler_args* args = (input_handler_args*)in_args;
+  kvz_picture *frame_in = NULL;
+  int retval = RETVAL_RUNNING;
+  int frames_read = 0;
+
+  for (;;) {
+    // Each iteration of this loop puts either a single frame or a field into
+    // args->img_in for main thread to process.
+
+    bool input_empty = !(args->opts->frames == 0 // number of frames to read is unknown
+                         || frames_read < args->opts->frames); // not all frames have been read
+    if (feof(args->input) || input_empty) {
+      retval = RETVAL_EOF;
+      goto done;
+    }
+
+    frame_in = args->api->picture_alloc(args->opts->config->width  + args->padding_x,
+                                        args->opts->config->height + args->padding_y);
+
+    if (!frame_in) {
+      fprintf(stderr, "Failed to allocate image.\n");
+      retval = RETVAL_FAILURE;
+      goto done;
+    }
+
+    if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
+      // reading failed
+      if (feof(args->input)) {
+        // When looping input, re-open the file and re-read data.
+        if (args->opts->loop_input && args->input != stdin) {
+          fclose(args->input);
+          args->input = fopen(args->opts->input, "rb");
+          if (args->input == NULL ||
+              !yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in))
+          {
+            fprintf(stderr, "Could not re-open input file, shutting down!\n");
+            retval = RETVAL_FAILURE;
+            goto done;
+          }
+        } else {
+          retval = RETVAL_EOF;
+          goto done;
+        }
+      } else {
+        fprintf(stderr, "Failed to read a frame %d\n", frames_read);
+        retval = RETVAL_FAILURE;
+        goto done;
+      }
+    }
+
+    frames_read++;
+
+    if (args->encoder->cfg->source_scan_type != 0) {
+      // Set source scan type for frame, so that it will be turned into fields.
+      frame_in->interlacing = args->encoder->cfg->source_scan_type;
+    }
+
+    // Wait until main thread is ready to receive the next frame.
+    PTHREAD_LOCK(args->input_mutex);
+    args->img_in = frame_in;
+    args->retval = retval;
+    // Unlock main_thread_mutex to notify main thread that the new img_in
+    // and retval have been placed to args.
+    PTHREAD_UNLOCK(args->main_thread_mutex);
+
+    frame_in = NULL;
+  }
+
+done:
+  // Wait until main thread is ready to receive the next frame.
+  PTHREAD_LOCK(args->input_mutex);
+  args->img_in = NULL;
+  args->retval = retval;
+  // Unlock main_thread_mutex to notify main thread that the new img_in
+  // and retval have been placed to args.
+  PTHREAD_UNLOCK(args->main_thread_mutex);
+
+  // Do some cleaning up.
+  args->api->picture_free(frame_in);
+
+  pthread_exit(NULL);
+  return 0;
+}
+
+
 /**
  * \brief Program main function.
  * \param argc Argument count from commandline
@@ -85,7 +258,6 @@ static FILE* open_output_file(const char* filename)
  * \return Program exit state
  */
 int main(int argc, char *argv[])
-
 {
   int retval = EXIT_SUCCESS;
 
@@ -96,18 +268,15 @@ int main(int argc, char *argv[])
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
-  CLOCK_T encoding_start_real_time;
+  KVZ_CLOCK_T encoding_start_real_time;
   
   clock_t encoding_end_cpu_time;
-  CLOCK_T encoding_end_real_time;
+  KVZ_CLOCK_T encoding_end_real_time;
 
-  // Stdin and stdout need to be binary for input and output to work.
+#ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
-  #ifdef _WIN32
-      _setmode( _fileno( stdin ),  _O_BINARY );
-      _setmode( _fileno( stdout ), _O_BINARY );
-      _setmode( _fileno( stderr ), _O_TEXT );
-  #endif
+  setmode( _fileno( stderr ), _O_TEXT );
+#endif
       
   CHECKPOINTS_INIT();
 
@@ -116,10 +285,17 @@ int main(int argc, char *argv[])
   opts = cmdline_opts_parse(api, argc, argv);
   // If problem with command line options, print banner and shutdown.
   if (!opts) {
-    print_version();
-    print_help();
+    print_usage();
 
     goto exit_failure;
+  }
+  if (opts->version) {
+    print_version();
+    goto done;
+  }
+  if (opts->help) {
+    print_help();
+    goto done;
   }
 
   input = open_input_file(opts->input);
@@ -133,6 +309,16 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Could not open output file, shutting down!\n");
     goto exit_failure;
   }
+
+#ifdef _WIN32
+  // Set stdin and stdout to binary for pipes.
+  if (input == stdin) {
+    _setmode(_fileno(stdin), _O_BINARY);
+  }
+  if (output == stdout) {
+    _setmode(_fileno(stdout), _O_BINARY);
+  }
+#endif
 
   if (opts->debug != NULL) {
     recout = open_output_file(opts->debug);
@@ -159,8 +345,6 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
     goto exit_failure;
   }
-  encoder->vui.field_seq_flag = encoder->cfg->source_scan_type != 0;
-  encoder->vui.frame_field_info_present_flag = encoder->cfg->source_scan_type != 0;
 
 #if KVZ_VISUALIZATION == 1
   kvz_visualization_init(encoder->in.width, encoder->in.height);
@@ -173,64 +357,72 @@ int main(int argc, char *argv[])
   //Now, do the real stuff
   {
 
-    GET_TIME(&encoding_start_real_time);
+    KVZ_GET_TIME(&encoding_start_real_time);
     encoding_start_cpu_time = clock();
 
     uint64_t bitstream_length = 0;
-    uint32_t frames_read = 0;
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
-    int8_t field_parity = 0;
-    kvz_picture *frame_in = NULL;
-    uint8_t padding_x = kvz_get_padding(opts->config->width);
-    uint8_t padding_y = kvz_get_padding(opts->config->height);
+    uint8_t padding_x = get_padding(opts->config->width);
+    uint8_t padding_y = get_padding(opts->config->height);
 
+    pthread_t input_thread;
+
+    pthread_mutex_t input_mutex = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_t main_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    // Lock both mutexes at startup
+    PTHREAD_LOCK(&main_thread_mutex);
+    PTHREAD_LOCK(&input_mutex);
+
+    // Give arguments via struct to the input thread
+    input_handler_args in_args = {
+      .input_mutex = NULL,
+      .main_thread_mutex = NULL,
+
+      .input = input,
+      .api = api,
+      .opts = opts,
+      .encoder = encoder,
+      .padding_x = padding_x,
+      .padding_y = padding_y,
+
+      .img_in = NULL,
+      .retval = RETVAL_RUNNING,
+    };
+    in_args.input_mutex = &input_mutex;
+    in_args.main_thread_mutex = &main_thread_mutex;
+
+    if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
+      fprintf(stderr, "pthread_create failed!\n");
+      assert(0);
+      return 0;
+        }
+    kvz_picture *cur_in_img;
     for (;;) {
 
-      kvz_picture *img_in = NULL;
+      // Skip mutex locking if the input thread does not exist.
+      if (in_args.retval == RETVAL_RUNNING) {
+        // Unlock input_mutex so that the input thread can write the new
+        // img_in and retval to in_args.
+        PTHREAD_UNLOCK(&input_mutex);
+        // Wait until the input thread has updated in_args.
+        PTHREAD_LOCK(&main_thread_mutex);
 
-      if (feof(input)) {
-        // Temporary hack to loop the input forever.
-        fclose(input);
-        input = open_input_file(opts->input);
-      }
+        cur_in_img = in_args.img_in;
+        in_args.img_in = NULL;
 
-      if (!feof(input) && (opts->frames == 0 || frames_read < opts->frames || field_parity == 1) ) {
-        // Try to read an input frame.
-        if(field_parity == 0) frame_in = api->picture_alloc(opts->config->width + padding_x, opts->config->height + padding_y);
-        if (!frame_in) {
-          fprintf(stderr, "Failed to allocate image.\n");
-          goto exit_failure;
-        }
-
-        if (field_parity == 0){
-          if (yuv_io_read(input, opts->config->width, opts->config->height, frame_in)) {
-            frames_read += 1;
-            img_in = frame_in;
           } else {
-            // EOF or some error
-            api->picture_free(frame_in);
-            img_in = NULL;
-            if (!feof(input)) {
-              fprintf(stderr, "Failed to read a frame %d\n", frames_read);
-              goto exit_failure;
-            } else {
-              continue;
+        cur_in_img = NULL;
             }
-          }
-        }
 
-        if (encoder->cfg->source_scan_type != 0){
-          img_in = api->picture_alloc(encoder->in.width, encoder->in.height);
-          yuv_io_extract_field(frame_in, encoder->cfg->source_scan_type, field_parity, img_in);
-          if (field_parity == 1) api->picture_free(frame_in);
-          field_parity ^= 1; //0->1 or 1->0
+      if (in_args.retval == EXIT_FAILURE) {
+        goto exit_failure;
         }
-      }
 
 #if KVZ_VISUALIZATION == 1
-      kvz_visualization_frame_init(encoder, img_in);
+      kvz_visualization_frame_init(encoder, cur_in_img);
 #endif
 
       kvz_data_chunk* chunks_out = NULL;
@@ -239,18 +431,18 @@ int main(int argc, char *argv[])
       uint32_t len_out = 0;
       kvz_frame_info info_out;
       if (!api->encoder_encode(enc,
-                               img_in,
+                               cur_in_img,
                                &chunks_out,
                                &len_out,
                                &img_rec,
                                &img_src,
                                &info_out)) {
         fprintf(stderr, "Failed to encode image.\n");
-        api->picture_free(img_in);
+        api->picture_free(cur_in_img);
         goto exit_failure;
       }
 
-      if (chunks_out == NULL && img_in == NULL) {
+      if (chunks_out == NULL && cur_in_img == NULL) {
         // We are done since there is no more input and output left.
         break;
       }
@@ -264,7 +456,7 @@ int main(int argc, char *argv[])
           assert(written + chunk->len <= len_out);
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
-            api->picture_free(img_in);
+            api->picture_free(cur_in_img);
             api->chunk_free(chunks_out);
             goto exit_failure;
           }
@@ -277,7 +469,11 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        kvz_videoframe_compute_psnr(img_src, img_rec, frame_psnr);
+        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+          // Do not compute PSNR for interlaced frames, because img_rec does not contain
+          // the deinterlaced frame yet.
+          compute_psnr(img_src, img_rec, frame_psnr);
+        }
 
         if (recout) {
           // Since chunks_out was not NULL, img_rec should have been set.
@@ -298,16 +494,14 @@ int main(int argc, char *argv[])
         print_frame_info(&info_out, frame_psnr, len_out);
       }
 
-      api->picture_free(img_in);
+      api->picture_free(cur_in_img);
       api->chunk_free(chunks_out);
       api->picture_free(img_rec);
       api->picture_free(img_src);
     }
 
-    GET_TIME(&encoding_end_real_time);
+    KVZ_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
-
-    kvz_threadqueue_flush(encoder->threadqueue);
     // Coding finished
 
     // Print statistics of the coding
@@ -325,12 +519,13 @@ int main(int argc, char *argv[])
 
     {
       double encoding_time = ( (double)(encoding_end_cpu_time - encoding_start_cpu_time) ) / (double) CLOCKS_PER_SEC;
-      double wall_time = CLOCK_T_AS_DOUBLE(encoding_end_real_time) - CLOCK_T_AS_DOUBLE(encoding_start_real_time);
+      double wall_time = KVZ_CLOCK_T_AS_DOUBLE(encoding_end_real_time) - KVZ_CLOCK_T_AS_DOUBLE(encoding_start_real_time);
       fprintf(stderr, " Encoding time: %.3f s.\n", encoding_time);
       fprintf(stderr, " Encoding wall time: %.3f s.\n", wall_time);
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
+    pthread_join(input_thread, NULL);
   }
 
   goto done;

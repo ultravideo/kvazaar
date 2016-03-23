@@ -6,5 +6,6 @@ incdir=${prefix}/include
 Name: libkvazaar
 Description: Open-source HEVC encoder
 Version: @VERSION@
-Libs: -L${libdir} -lkvazaar -lm @LIBS@
+Libs: -L${libdir} -lkvazaar
+Libs.private: @LIBS@
 Cflags: -I${incdir}

@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "strategyselector.h"
 
 #include <assert.h>
@@ -77,6 +73,11 @@ int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth) {
 
   if (!kvz_strategy_register_intra(&strategies, bitdepth)) {
     fprintf(stderr, "kvz_strategy_register_intra failed!\n");
+    return 0;
+  }
+
+  if (!kvz_strategy_register_sao(&strategies, bitdepth)) {
+    fprintf(stderr, "kvz_strategy_register_sao failed!\n");
     return 0;
   }
   
@@ -262,10 +263,6 @@ out_close:
 
 static void set_hardware_flags(int32_t cpuid) {
   FILL(kvz_g_hardware_flags, 0);
-  
-  kvz_g_hardware_flags.arm = COMPILE_ARM;
-  kvz_g_hardware_flags.intel = COMPILE_INTEL;
-  kvz_g_hardware_flags.powerpc = COMPILE_POWERPC;
 
 #if COMPILE_INTEL
   if (cpuid) {

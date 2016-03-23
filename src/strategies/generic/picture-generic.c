@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include <stdlib.h>
 
 #include "strategyselector.h"
@@ -191,7 +187,7 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.
 */
-unsigned kvz_satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
+static unsigned satd_8x8_subblock_generic(const kvz_pixel * piOrg, const int32_t iStrideOrg,
   const kvz_pixel * piCur, const int32_t iStrideCur)
 {
   int32_t k, i, j, jj, sad = 0;
@@ -281,36 +277,55 @@ unsigned kvz_satd_8x8_general(const kvz_pixel * piOrg, const int32_t iStrideOrg,
   return sad;
 }
 
-// Function macro for defining hadamard calculating functions
-// for fixed size blocks. They calculate hadamard for integer
-// multiples of 8x8 with the 8x8 hadamard function.
-#define SATD_NXN(n, pixel_type) \
-static unsigned satd_ ## n ## x ## n ## _generic( \
-  const pixel_type * const block1, const pixel_type * const block2) \
+// These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
+SATD_NxN(generic,  8)
+SATD_NxN(generic, 16)
+SATD_NxN(generic, 32)
+SATD_NxN(generic, 64)
+SATD_ANY_SIZE(generic)
+
+
+// Declare these functions to make sure the signature of the macro matches.
+static cost_pixel_nxn_multi_func satd_4x4_dual_generic;
+static cost_pixel_nxn_multi_func satd_8x8_dual_generic;
+static cost_pixel_nxn_multi_func satd_16x16_dual_generic;
+static cost_pixel_nxn_multi_func satd_32x32_dual_generic;
+static cost_pixel_nxn_multi_func satd_64x64_dual_generic;
+
+#define SATD_DUAL_NXN(n, pixel_type) \
+static void satd_ ## n ## x ## n ## _dual_generic( \
+  const pred_buffer preds, const pixel_type * const orig, unsigned num_modes, unsigned *costs_out) \
 { \
   unsigned x, y; \
   unsigned sum = 0; \
   for (y = 0; y < (n); y += 8) { \
   unsigned row = y * (n); \
   for (x = 0; x < (n); x += 8) { \
-  sum += kvz_satd_8x8_general(&block1[row + x], (n), &block2[row + x], (n)); \
+  sum += satd_8x8_subblock_generic(&preds[0][row + x], (n), &orig[row + x], (n)); \
   } \
   } \
-  return sum>>(KVZ_BIT_DEPTH-8); \
+  costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
+  \
+  sum = 0; \
+  for (y = 0; y < (n); y += 8) { \
+  unsigned row = y * (n); \
+  for (x = 0; x < (n); x += 8) { \
+  sum += satd_8x8_subblock_generic(&preds[1][row + x], (n), &orig[row + x], (n)); \
+  } \
+  } \
+  costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
 }
 
-// Declare these functions to make sure the signature of the macro matches.
-static cost_pixel_nxn_func satd_4x4_generic;
-static cost_pixel_nxn_func satd_8x8_generic;
-static cost_pixel_nxn_func satd_16x16_generic;
-static cost_pixel_nxn_func satd_32x32_generic;
-static cost_pixel_nxn_func satd_64x64_generic;
+static void satd_4x4_dual_generic(const pred_buffer preds, const kvz_pixel * const orig, unsigned num_modes, unsigned *costs_out)
+{
+  costs_out[0] = satd_4x4_generic(orig, preds[0]);
+  costs_out[1] = satd_4x4_generic(orig, preds[1]);
+}
 
-// These macros define sadt_16bit_NxN for N = 8, 16, 32, 64
-SATD_NXN(8, kvz_pixel)
-SATD_NXN(16, kvz_pixel)
-SATD_NXN(32, kvz_pixel)
-SATD_NXN(64, kvz_pixel)
+SATD_DUAL_NXN(8, kvz_pixel)
+SATD_DUAL_NXN(16, kvz_pixel)
+SATD_DUAL_NXN(32, kvz_pixel)
+SATD_DUAL_NXN(64, kvz_pixel)
 
 // Function macro for defining SAD calculating functions
 // for fixed size blocks.
@@ -342,6 +357,88 @@ SAD_NXN(16, kvz_pixel)
 SAD_NXN(32, kvz_pixel)
 SAD_NXN(64, kvz_pixel)
 
+// Declare these functions to make sure the signature of the macro matches.
+static cost_pixel_nxn_multi_func sad_4x4_dual_generic;
+static cost_pixel_nxn_multi_func sad_8x8_dual_generic;
+static cost_pixel_nxn_multi_func sad_16x16_dual_generic;
+static cost_pixel_nxn_multi_func sad_32x32_dual_generic;
+static cost_pixel_nxn_multi_func sad_64x64_dual_generic;
+
+// Function macro for defining SAD calculating functions
+// for fixed size blocks.
+#define SAD_DUAL_NXN(n, pixel_type) \
+static void sad_ ##  n ## x ## n ## _dual_generic( \
+  const pred_buffer preds, const pixel_type * const orig, unsigned num_modes, unsigned *costs_out) \
+{ \
+  unsigned i; \
+  unsigned sum = 0; \
+  for (i = 0; i < (n)*(n); ++i) { \
+  sum += abs(preds[0][i] - orig[i]); \
+  } \
+  costs_out[0] = sum>>(KVZ_BIT_DEPTH-8); \
+  \
+  sum = 0; \
+  for (i = 0; i < (n)*(n); ++i) { \
+  sum += abs(preds[1][i] - orig[i]); \
+  } \
+  costs_out[1] = sum>>(KVZ_BIT_DEPTH-8); \
+}
+
+SAD_DUAL_NXN(4, kvz_pixel)
+SAD_DUAL_NXN(8, kvz_pixel)
+SAD_DUAL_NXN(16, kvz_pixel)
+SAD_DUAL_NXN(32, kvz_pixel)
+SAD_DUAL_NXN(64, kvz_pixel)
+
+/**
+ * \brief BLock Image Transfer from one buffer to another.
+ *
+ * It's a stupidly simple loop that copies pixels.
+ *
+ * \param orig  Start of the originating buffer.
+ * \param dst  Start of the destination buffer.
+ * \param width  Width of the copied region.
+ * \param height  Height of the copied region.
+ * \param orig_stride  Width of a row in the originating buffer.
+ * \param dst_stride  Width of a row in the destination buffer.
+ *
+ * This should be inlined, but it's defined here for now to see if Visual
+ * Studios LTCG will inline it.
+ */
+void kvz_pixels_blit_generic(const kvz_pixel * const orig, kvz_pixel * const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride)
+{
+  unsigned y;
+  //There is absolutely no reason to have a width greater than the source or the destination stride.
+  assert(width <= orig_stride);
+  assert(width <= dst_stride);
+
+#ifdef CHECKPOINTS
+  char *buffer = malloc((3 * width + 1) * sizeof(char));
+  for (y = 0; y < height; ++y) {
+    int p;
+    for (p = 0; p < width; ++p) {
+      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
+    }
+    buffer[3*width] = 0;
+    CHECKPOINT("kvz_pixels_blit: %04d: %s", y, buffer);
+  }
+  FREE_POINTER(buffer);
+#endif //CHECKPOINTS
+
+  if (orig == dst) {
+    //If we have the same array, then we should have the same stride
+    assert(orig_stride == dst_stride);
+    return;
+  }
+  assert(orig != dst || orig_stride == dst_stride);
+
+  for (y = 0; y < height; ++y) {
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
+  }
+}
+
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
@@ -360,6 +457,21 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_16x16", "generic", 0, &satd_16x16_generic);
   success &= kvz_strategyselector_register(opaque, "satd_32x32", "generic", 0, &satd_32x32_generic);
   success &= kvz_strategyselector_register(opaque, "satd_64x64", "generic", 0, &satd_64x64_generic);
+
+  success &= kvz_strategyselector_register(opaque, "sad_4x4_dual", "generic", 0, &sad_4x4_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_8x8_dual", "generic", 0, &sad_8x8_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_16x16_dual", "generic", 0, &sad_16x16_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_32x32_dual", "generic", 0, &sad_32x32_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "sad_64x64_dual", "generic", 0, &sad_64x64_dual_generic);
+
+  success &= kvz_strategyselector_register(opaque, "satd_4x4_dual", "generic", 0, &satd_4x4_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_8x8_dual", "generic", 0, &satd_8x8_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_16x16_dual", "generic", 0, &satd_16x16_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
+  success &= kvz_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
+
+  success &= kvz_strategyselector_register(opaque, "pixels_blit", "generic", 0, &kvz_pixels_blit_generic);
 
   return success;
 }

@@ -20,13 +20,14 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-/*
-* \file
-* \brief Contains code related to command line interface.
-*/
+/**
+ * \file
+ * Command line interface
+ */
+
+#include "global.h"
 
 #include "kvazaar.h"
-#include "global.h"
 #include "encoderstate.h"
 
 typedef struct cmdline_opts_t {
@@ -42,11 +43,18 @@ typedef struct cmdline_opts_t {
   int32_t frames;
   /** \brief Encoder configuration */
   kvz_config *config;
+  /** \brief Encoder configuration */
+  bool help;
+  /** \brief Encoder configuration */
+  bool version;
+  /** \brief Whether to loop input */
+  bool loop_input;
 } cmdline_opts_t;
 
 cmdline_opts_t* cmdline_opts_parse(const kvz_api *api, int argc, char *argv[]);
 void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);
 
+void print_usage(void);
 void print_version(void);
 void print_help(void);
 void print_frame_info(const kvz_frame_info *const info,

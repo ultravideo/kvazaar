@@ -20,8 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
+ * Buffering of input for reordering.
  */
 
 #include "global.h"

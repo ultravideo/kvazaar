@@ -36,6 +36,22 @@ cost_pixel_nxn_func * kvz_satd_16x16 = 0;
 cost_pixel_nxn_func * kvz_satd_32x32 = 0;
 cost_pixel_nxn_func * kvz_satd_64x64 = 0;
 
+cost_pixel_nxn_multi_func * kvz_sad_4x4_dual = 0;
+cost_pixel_nxn_multi_func * kvz_sad_8x8_dual = 0;
+cost_pixel_nxn_multi_func * kvz_sad_16x16_dual = 0;
+cost_pixel_nxn_multi_func * kvz_sad_32x32_dual = 0;
+cost_pixel_nxn_multi_func * kvz_sad_64x64_dual = 0;
+
+cost_pixel_nxn_multi_func * kvz_satd_4x4_dual = 0;
+cost_pixel_nxn_multi_func * kvz_satd_8x8_dual = 0;
+cost_pixel_nxn_multi_func * kvz_satd_16x16_dual = 0;
+cost_pixel_nxn_multi_func * kvz_satd_32x32_dual = 0;
+cost_pixel_nxn_multi_func * kvz_satd_64x64_dual = 0;
+
+cost_pixel_any_size_func * kvz_satd_any_size = 0;
+
+pixels_blit_func * kvz_pixels_blit = 0;
+
 
 // Headers for platform optimizations.
 #include "generic/picture-generic.h"
@@ -117,6 +133,57 @@ cost_pixel_nxn_func * kvz_pixels_get_sad_func(unsigned n)
     return kvz_sad_32x32;
   case 64:
     return kvz_sad_64x64;
+  default:
+    return NULL;
+  }
+}
+
+/**
+* \brief  Get a function that calculates SATDs for 2 NxN blocks.
+*
+* \param n  Width of the region for which SATD is calculated.
+*
+* \returns  Pointer to cost_pixel_nxn_multi_func.
+*/
+cost_pixel_nxn_multi_func * kvz_pixels_get_satd_dual_func(unsigned n)
+{
+  switch (n) {
+  case 4:
+    return kvz_satd_4x4_dual;
+  case 8:
+    return kvz_satd_8x8_dual;
+  case 16:
+    return kvz_satd_16x16_dual;
+  case 32:
+    return kvz_satd_32x32_dual;
+  case 64:
+    return kvz_satd_64x64_dual;
+  default:
+    return NULL;
+  }
+}
+
+
+/**
+* \brief  Get a function that calculates SADs for 2 NxN blocks.
+*
+* \param n  Width of the region for which SAD is calculated.
+*
+* \returns  Pointer to cost_pixel_nxn_multi_func.
+*/
+cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n)
+{
+  switch (n) {
+  case 4:
+    return kvz_sad_4x4_dual;
+  case 8:
+    return kvz_sad_8x8_dual;
+  case 16:
+    return kvz_sad_16x16_dual;
+  case 32:
+    return kvz_sad_32x32_dual;
+  case 64:
+    return kvz_sad_64x64_dual;
   default:
     return NULL;
   }

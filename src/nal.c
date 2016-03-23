@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "nal.h"
 #include "strategyselector.h"
 
@@ -29,7 +25,6 @@
 #include <string.h>
 #include <assert.h>
 
-#include "config.h"
 #include "bitstream.h"
 #include "cabac.h"
 #include "encoder.h"
@@ -79,4 +74,19 @@ void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_
   /* The number of chroma pixels is half that of luma. */
   kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
   kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+}
+
+/*!
+\brief Calculate md5 for all colors of the picture.
+\param im The image that md5 is calculated for.
+\param checksum_out Result of the calculation.
+\returns Void
+*/
+void kvz_image_md5(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
+{
+  kvz_array_md5(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
+
+  /* The number of chroma pixels is half that of luma. */
+  kvz_array_md5(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
+  kvz_array_md5(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
 }

@@ -20,13 +20,15 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup CABAC
  * \file
- * \brief Bitstream can be written to one or several bits at a time.
+ * Appending bits into an Annex-B coded bitstream.
  */
 
-#include "kvazaar.h"
 #include "global.h"
+
+#include "kvazaar.h"
 
 /**
  * A stream of bits.

@@ -18,11 +18,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
-#include "config.h"
+#include "cfg.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +41,9 @@ int kvz_config_init(kvz_config *cfg)
 {
   cfg->width           = 0;
   cfg->height          = 0;
-  cfg->framerate       = 25;
+  cfg->framerate       = 25; // deprecated and will be removed.
+  cfg->framerate_num   = 0;
+  cfg->framerate_denom = 1;
   cfg->qp              = 32;
   cfg->intra_period    = 0;
   cfg->vps_period      = 0;
@@ -55,7 +53,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->sao_enable      = 1;
   cfg->rdoq_enable     = 1;
   cfg->signhide_enable = true;
+  cfg->smp_enable      = false;
+  cfg->amp_enable      = false;
   cfg->rdo             = 1;
+  cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
   cfg->trskip_enable   = 1;
   cfg->tr_depth_intra  = 0;
@@ -77,11 +78,12 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_len         = 0;
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
+  cfg->hash            = KVZ_HASH_CHECKSUM;
 
-  cfg->tiles_width_count         = 0;
-  cfg->tiles_height_count         = 0;
-  cfg->tiles_width_split          = NULL;
-  cfg->tiles_height_split          = NULL;
+  cfg->tiles_width_count  = 1;
+  cfg->tiles_height_count = 1;
+  cfg->tiles_width_split  = NULL;
+  cfg->tiles_height_split = NULL;
   
   cfg->wpp = 0;
   cfg->owf = -1;
@@ -99,6 +101,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->pu_depth_intra.max = 4; // 0-4
 
   cfg->add_encoder_info = true;
+  cfg->calc_psnr = true;
+
+  cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
 
   return 1;
 }
@@ -156,9 +161,9 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   
   //If the arg starts with u, we want an uniform split
   if (arg[0]=='u') {
-    *ntiles = atoi(arg+1)-1;
-    if (MAX_TILES_PER_DIM <= *ntiles || 0 > *ntiles) {
-      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
+    *ntiles = atoi(arg + 1);
+    if (MAX_TILES_PER_DIM <= *ntiles || 1 >= *ntiles) {
+      fprintf(stderr, "Invalid number of tiles (1 <= %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles, MAX_TILES_PER_DIM);
       return 0;
     }
     //Done with parsing
@@ -167,7 +172,7 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
   
   //We have a comma-separated list of int for the split...
   current_arg = arg;
-  *ntiles = 0;
+  *ntiles = 1;
   do {
     int ret = sscanf(current_arg, "%d", &current_value);
     if (ret != 1) {
@@ -177,24 +182,24 @@ static int parse_tiles_specification(const char* const arg, int32_t * const ntil
     current_arg = strchr(current_arg, ',');
     //Skip the , if we found one
     if (current_arg) ++current_arg;
-    values[*ntiles] = current_value;
+    values[*ntiles - 1] = current_value;
     ++(*ntiles);
     if (MAX_TILES_PER_DIM <= *ntiles) break;
   } while (current_arg);
   
-  if (MAX_TILES_PER_DIM <= *ntiles || 0 >= *ntiles) {
-    fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles + 1, MAX_TILES_PER_DIM);
+  if (MAX_TILES_PER_DIM <= *ntiles || 1 >= *ntiles) {
+    fprintf(stderr, "Invalid number of tiles (1 <= %d <= %d = MAX_TILES_PER_DIM)!\n", *ntiles, MAX_TILES_PER_DIM);
     return 0;
   }
   
-  *array = MALLOC(int32_t, *ntiles);
+  *array = MALLOC(int32_t, *ntiles - 1);
   if (!*array) {
     fprintf(stderr, "Could not allocate array for tiles\n");
     return 0;
   }
   
   //TODO: memcpy?
-  for (i = 0; i < *ntiles; ++i) {
+  for (i = 0; i < *ntiles - 1; ++i) {
     (*array)[i] = values[i];
   }
   
@@ -264,7 +269,7 @@ static int parse_slice_specification(const char* const arg, int32_t * const nsli
 
 int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 {
-  static const char * const me_names[]          = { "hexbs", "tz", NULL };
+  static const char * const me_names[]          = { "hexbs", "tz", "full", NULL };
   static const char * const source_scan_type_names[] = { "progressive", "tff", "bff", NULL };
 
   static const char * const overscan_names[]    = { "undef", "show", "crop", NULL };
@@ -277,8 +282,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
                                                     "bt1361e", "iec61966-2-1", "bt2020-10", "bt2020-12", NULL };
   static const char * const colormatrix_names[] = { "GBR", "bt709", "undef", "", "fcc", "bt470bg", "smpte170m",
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
+  static const char * const mv_constraint_names[] = { "none", "frame", "tile", "frametile", "frametilemargin", NULL };
+  static const char * const hash_names[] = { "none", "checksum", "md5", NULL };
 
-  static const char * const preset_values[11][26] = {
+  static const char * const preset_values[11][28] = {
       { 
         "ultrafast", 
         "pu-depth-intra", "2-3",
@@ -293,6 +300,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0", 
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL 
       },
       { 
@@ -309,6 +317,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -325,6 +334,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -341,6 +351,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -357,6 +368,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -373,6 +385,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -389,6 +402,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "0",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -405,6 +419,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "transform-skip", "0",
         "full-intra-search", "0",
+        "mv-rdo", "0",
         NULL
       },
       {
@@ -421,6 +436,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "transform-skip", "1",
         "full-intra-search", "0",
+        "mv-rdo", "1",
         NULL
       },
       {
@@ -437,6 +453,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "transform-skip", "1",
         "full-intra-search", "1",
+        "mv-rdo", "1",
         NULL
       },
       { NULL }
@@ -465,8 +482,17 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     } else {
       return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
     }
-  else if OPT("input-fps")
-    cfg->framerate = atof(value);
+  else if OPT("input-fps") {
+    int32_t fps_num, fps_denom;
+    if (sscanf(value, "%d/%d", &fps_num, &fps_denom) == 2) {
+      cfg->framerate_num = fps_num;
+      cfg->framerate_denom = fps_denom;
+    } else {
+      // Accept decimal notation, making sure not to round 0 to 1.
+      cfg->framerate_num = (int)(atof(value) * 1000 + 0.49);
+      cfg->framerate_denom = 1000;
+    }
+  }
   else if OPT("qp")
     cfg->qp = atoi(value);
   else if OPT("period")
@@ -481,10 +507,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->deblock_enable = 1;
       cfg->deblock_beta   = beta;
       cfg->deblock_tc     = tc;
-    } else if (sscanf(value, "%d", &beta)) {
-      cfg->deblock_enable = 1;
-      cfg->deblock_beta   = beta;
-      cfg->deblock_tc     = cfg->deblock_beta;
     } else {
       cfg->deblock_enable = atobool(value);
     }
@@ -495,6 +517,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->rdoq_enable = atobool(value);
   else if OPT("signhide")
     cfg->signhide_enable = (bool)atobool(value);
+  else if OPT("smp")
+    cfg->smp_enable = (bool)atobool(value);
+  else if OPT("amp")
+    cfg->amp_enable = (bool)atobool(value);
   else if OPT("rd")
     cfg->rdo = atoi(value);
   else if OPT("full-intra-search")
@@ -512,6 +538,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->fme_level = atoi(value);
   else if OPT("source-scan-type")
     return parse_enum(value, source_scan_type_names, &cfg->source_scan_type);
+  else if OPT("mv-constraint")
+  {
+    int8_t constraint = KVZ_MV_CONSTRAIN_NONE;
+    int result = parse_enum(value, mv_constraint_names, &constraint);
+    cfg->mv_constraint = constraint;
+    return result;
+  }
   else if OPT("sar")
     return sscanf(value, "%d:%d", &cfg->vui.sar_width, &cfg->vui.sar_height) == 2;
   else if OPT("overscan")
@@ -536,6 +569,32 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     return parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
   else if OPT("tiles-height-split")
     return parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+  else if OPT("tiles")
+  {
+    // A simpler interface for setting tiles, accepting only uniform split.
+    unsigned width;
+    unsigned height;
+    if (2 != sscanf(value, "%ux%u", &width, &height)) {
+      fprintf(stderr, "Wrong format for tiles. Expected \"%%ux%%u\", but got \"%s\"\n", value);
+      return 0;
+    }
+
+    if (MAX_TILES_PER_DIM <= width || 1 > width) {
+      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", width, MAX_TILES_PER_DIM);
+      return 0;
+    }
+    if (MAX_TILES_PER_DIM <= height || 1 > height) {
+      fprintf(stderr, "Invalid number of tiles (0 < %d <= %d = MAX_TILES_PER_DIM)!\n", height, MAX_TILES_PER_DIM);
+      return 0;
+    }
+
+    // Free split arrays incase they have already been set by another parameter.
+    FREE_POINTER(cfg->tiles_width_split);
+    FREE_POINTER(cfg->tiles_height_split);
+    cfg->tiles_width_count = width;
+    cfg->tiles_height_count = height;
+    return 1;
+  }
   else if OPT("wpp")
     cfg->wpp = atobool(value);
   else if OPT("owf") {
@@ -558,8 +617,110 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("info")
     cfg->add_encoder_info = atobool(value);
   else if OPT("gop") {
-    // TODO: Defining the whole GOP structure via parameters
-    if(atoi(value) == 8) {
+    if (!strncmp(value, "lp-", 3)) {  // Handle GOPs starting with "lp-".
+      struct {
+        unsigned g;  // length
+        unsigned d;  // depth
+        unsigned r;  // references 
+        unsigned t;  // temporal
+      } gop = { 0 };
+
+      if (sscanf(value, "lp-g%ud%ur%ut%u", &gop.g, &gop.d, &gop.r, &gop.t) != 4) {
+        fprintf(stderr, "Error in GOP syntax. Example: lp-g8d4r2t2\n");
+        return 0;
+      }
+
+      if (gop.g < 1 || gop.g > 32) {
+        fprintf(stderr, "gop.g must be between 1 and 32.\n");
+      }
+      if (gop.d < 1 || gop.d > 8) {
+        fprintf(stderr, "gop.d must be between 1 and 8.\n");
+      }
+      if (gop.r < 1 || gop.r > 15) {
+        fprintf(stderr, "gop.d must be between 1 and 15.\n");
+      }
+      if (gop.t < 1 || gop.t > 15) {
+        fprintf(stderr, "gop.t must be between 1 and 32.\n");
+      }
+      
+      // Initialize modulos for testing depth.
+      // The picture belong to the lowest depth in which (poc % modulo) == 0.
+      unsigned depth_modulos[8] = { 0 };
+      for (int d = 0; d < gop.d; ++d) {
+        depth_modulos[gop.d - 1 - d] = 1 << d;
+      }
+      depth_modulos[0] = gop.g;
+
+      cfg->gop_lowdelay = 1;
+      cfg->gop_len = gop.g;
+      for (int g = 1; g <= gop.g; ++g) {
+        kvz_gop_config *gop_pic = &cfg->gop[g - 1];
+
+        // Find gop depth for picture.
+        int gop_layer = 0;
+        while (gop_layer < gop.d && (g % depth_modulos[gop_layer])) {
+          ++gop_layer;
+        }
+
+        gop_pic->poc_offset = g;
+        gop_pic->layer = gop_layer + 1;
+        gop_pic->qp_offset = gop_layer + 1;
+        gop_pic->ref_pos_count = 0;
+        gop_pic->ref_neg_count = gop.r;
+        gop_pic->is_ref = 0;
+
+        // Set first ref to point to previous frame, and the rest to previous
+        // key-frames.
+        // If gop.t > 1, have (poc % gop.t) == 0 point gop.t frames away,
+        // instead of the previous frame. Set the frames in between to
+        // point to the nearest frame with a lower gop-depth.
+        if (gop.t > 1) {
+          if (gop_pic->poc_offset % gop.t == 0) {
+            gop_pic->ref_neg[0] = gop.t;
+          } else {
+            int r = gop_pic->poc_offset - 1;
+            while (r > 0) {
+              if (cfg->gop[r].layer < gop_pic->layer) break;
+              --r;
+            }
+            // Var r is now 0 or index of the pic with layer < depth.
+            if (cfg->gop[r].layer < gop_pic->layer) {
+              gop_pic->ref_neg[0] = gop_pic->poc_offset - cfg->gop[r].poc_offset;
+              cfg->gop[r].is_ref = 1;
+            } else {
+              // No ref was found, just refer to the previous key-frame.
+              gop_pic->ref_neg[0] = gop_pic->poc_offset % gop.g;
+            }
+          }
+        } else {
+          gop_pic->ref_neg[0] = 1;
+          if (gop_pic->poc_offset >= 2) {
+            cfg->gop[gop_pic->poc_offset - 2].is_ref = 1;
+          }
+        }
+
+        int keyframe = gop_pic->poc_offset;
+        for (int i = 1; i < gop_pic->ref_neg_count; ++i) {
+          while (keyframe == gop_pic->ref_neg[i - 1]) {
+            keyframe += gop.g;
+          }
+          gop_pic->ref_neg[i] = keyframe;
+        }
+
+        gop_pic->qp_factor = 0.4624;  // from HM
+      }
+
+      for (int g = 0; g < gop.g; ++g) {
+        kvz_gop_config *gop_pic = &cfg->gop[g];
+        if (!gop_pic->is_ref) {
+          gop_pic->qp_factor = 0.68 * 1.31;  // derived from HM
+        }
+      }
+
+      // Key-frame is always a reference.
+      cfg->gop[gop.g - 1].is_ref = 1;
+      cfg->gop[gop.g - 1].qp_factor = 0.578;  // from HM
+    } else if (atoi(value) == 8) {
       cfg->gop_lowdelay = 0;
       // GOP
       cfg->gop_len = 8;
@@ -594,290 +755,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
-    } else if(!strcmp(value, "lb")) { // Low-delay B
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 4;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 1;      
-      cfg->gop[0].ref_neg_count = 4; cfg->gop[0].ref_neg[0] = 1; cfg->gop[0].ref_neg[1] = 5; cfg->gop[0].ref_neg[2] = 9; cfg->gop[0].ref_neg[3] = 13;
-      cfg->gop[0].ref_pos_count = 0;
-
-      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 4; cfg->gop[1].ref_neg[0] = 1; cfg->gop[1].ref_neg[1] = 2; cfg->gop[1].ref_neg[2] = 6; cfg->gop[1].ref_neg[3] = 10;
-      cfg->gop[1].ref_pos_count = 0;
-
-      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.4624; cfg->gop[2].is_ref = 1;
-      cfg->gop[2].ref_neg_count = 4; cfg->gop[2].ref_neg[0] = 1; cfg->gop[2].ref_neg[1] = 3; cfg->gop[2].ref_neg[2] = 7; cfg->gop[2].ref_neg[3] = 11;
-      cfg->gop[2].ref_pos_count = 0;
-
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 1; cfg->gop[3].layer = 1; cfg->gop[3].qp_factor = 0.578;   cfg->gop[3].is_ref = 1;
-      cfg->gop[3].ref_neg_count = 4; cfg->gop[3].ref_neg[0] = 1; cfg->gop[3].ref_neg[1] = 4; cfg->gop[3].ref_neg[2] = 8; cfg->gop[3].ref_neg[3] = 12;
-      cfg->gop[3].ref_pos_count = 0;
-    } else if (!strcmp(value, "g8r1t1")) { // Low-delay B with 1 ref frame
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 1;
-      cfg->gop[0].ref_pos_count = 0;
-      cfg->gop[0].ref_neg_count = 1; cfg->gop[0].ref_neg[0] = 1;
-
-      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 1; cfg->gop[1].ref_neg[0] = 1;
-      cfg->gop[1].ref_pos_count = 0;
-
-      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.4624; cfg->gop[2].is_ref = 1;
-      cfg->gop[2].ref_neg_count = 1; cfg->gop[2].ref_neg[0] = 1;
-      cfg->gop[2].ref_pos_count = 0;
-
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 2; cfg->gop[3].qp_factor = 0.4624;   cfg->gop[3].is_ref = 1;
-      cfg->gop[3].ref_neg_count = 1; cfg->gop[3].ref_neg[0] = 1;
-      cfg->gop[3].ref_pos_count = 0;
-
-      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 3; cfg->gop[4].layer = 3; cfg->gop[4].qp_factor = 0.4624;   cfg->gop[4].is_ref = 1;
-      cfg->gop[4].ref_neg_count = 1; cfg->gop[4].ref_neg[0] = 1;
-      cfg->gop[4].ref_pos_count = 0;
-
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 2; cfg->gop[5].layer = 2; cfg->gop[5].qp_factor = 0.4624; cfg->gop[5].is_ref = 1;
-      cfg->gop[5].ref_neg_count = 1; cfg->gop[5].ref_neg[0] = 1;
-      cfg->gop[5].ref_pos_count = 0;
-
-      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 3; cfg->gop[6].layer = 3; cfg->gop[6].qp_factor = 0.4624;   cfg->gop[6].is_ref = 1;
-      cfg->gop[6].ref_neg_count = 1;  cfg->gop[6].ref_neg[0] = 1;
-      cfg->gop[6].ref_pos_count = 0;
-
-      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 1; cfg->gop[7].qp_factor = 0.578;   cfg->gop[7].is_ref = 1;
-      cfg->gop[7].ref_neg_count = 1; cfg->gop[7].ref_neg[0] = 1;
-      cfg->gop[7].ref_pos_count = 0;
-    } else if (!strcmp(value, "g8r1t2")) { // Low-delay B with 1 ref frame
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 0;
-      cfg->gop[0].ref_pos_count = 0;
-      cfg->gop[0].ref_neg_count = 1; cfg->gop[0].ref_neg[0] = 1;
-
-      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 1; cfg->gop[1].ref_neg[0] = 2;
-      cfg->gop[1].ref_pos_count = 0;
-
-      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.4624; cfg->gop[2].is_ref = 0;
-      cfg->gop[2].ref_neg_count = 1; cfg->gop[2].ref_neg[0] = 1;
-      cfg->gop[2].ref_pos_count = 0;
-
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 2; cfg->gop[3].qp_factor = 0.4624;   cfg->gop[3].is_ref = 1;
-      cfg->gop[3].ref_neg_count = 1; cfg->gop[3].ref_neg[0] = 2;
-      cfg->gop[3].ref_pos_count = 0;
-
-      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 3; cfg->gop[4].layer = 3; cfg->gop[4].qp_factor = 0.4624;   cfg->gop[4].is_ref = 0;
-      cfg->gop[4].ref_neg_count = 1; cfg->gop[4].ref_neg[0] = 1;
-      cfg->gop[4].ref_pos_count = 0;
-
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 2; cfg->gop[5].layer = 2; cfg->gop[5].qp_factor = 0.4624; cfg->gop[5].is_ref = 1;
-      cfg->gop[5].ref_neg_count = 1; cfg->gop[5].ref_neg[0] = 2;
-      cfg->gop[5].ref_pos_count = 0;
-
-      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 3; cfg->gop[6].layer = 3; cfg->gop[6].qp_factor = 0.4624;   cfg->gop[6].is_ref = 0;
-      cfg->gop[6].ref_neg_count = 1;  cfg->gop[6].ref_neg[0] = 1;
-      cfg->gop[6].ref_pos_count = 0;
-
-      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 1; cfg->gop[7].qp_factor = 0.578;   cfg->gop[7].is_ref = 1;
-      cfg->gop[7].ref_neg_count = 1; cfg->gop[7].ref_neg[0] = 2;
-      cfg->gop[7].ref_pos_count = 0;
-
-    } else if (!strcmp(value, "g8r1t2b")) { // Low-delay B with 1 ref frame
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 8; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.7;  cfg->gop[0].is_ref = 0;
-      cfg->gop[0].ref_pos_count = 0;
-      cfg->gop[0].ref_neg_count = 1; cfg->gop[0].ref_neg[0] = 1;
-
-      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 3; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 1; cfg->gop[1].ref_neg[0] = 2;
-      cfg->gop[1].ref_pos_count = 0;
-
-      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 8; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.7; cfg->gop[2].is_ref = 0;
-      cfg->gop[2].ref_neg_count = 1; cfg->gop[2].ref_neg[0] = 1;
-      cfg->gop[2].ref_pos_count = 0;
-
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 2; cfg->gop[3].qp_factor = 0.4624;   cfg->gop[3].is_ref = 1;
-      cfg->gop[3].ref_neg_count = 1; cfg->gop[3].ref_neg[0] = 2;
-      cfg->gop[3].ref_pos_count = 0;
-
-      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 8; cfg->gop[4].layer = 3; cfg->gop[4].qp_factor = 0.7;   cfg->gop[4].is_ref = 0;
-      cfg->gop[4].ref_neg_count = 1; cfg->gop[4].ref_neg[0] = 1;
-      cfg->gop[4].ref_pos_count = 0;
-
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 3; cfg->gop[5].layer = 2; cfg->gop[5].qp_factor = 0.4624; cfg->gop[5].is_ref = 1;
-      cfg->gop[5].ref_neg_count = 1; cfg->gop[5].ref_neg[0] = 2;
-      cfg->gop[5].ref_pos_count = 0;
-
-      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 8; cfg->gop[6].layer = 3; cfg->gop[6].qp_factor = 0.7;   cfg->gop[6].is_ref = 0;
-      cfg->gop[6].ref_neg_count = 1;  cfg->gop[6].ref_neg[0] = 1;
-      cfg->gop[6].ref_pos_count = 0;
-
-      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 1; cfg->gop[7].qp_factor = 0.578;   cfg->gop[7].is_ref = 1;
-      cfg->gop[7].ref_neg_count = 1; cfg->gop[7].ref_neg[0] = 2;
-      cfg->gop[7].ref_pos_count = 0;
-
-    }  else if (!strcmp(value, "g8r2t1")) {
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 1;
-      cfg->gop[0].ref_neg_count = 2; cfg->gop[0].ref_neg[0] = 1; cfg->gop[0].ref_neg[1] = 9;
-      cfg->gop[0].ref_pos_count = 0;
-
-      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 2; cfg->gop[1].ref_neg[0] = 1; cfg->gop[1].ref_neg[1] = 2;
-      cfg->gop[1].ref_pos_count = 0;
-
-      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.4624; cfg->gop[2].is_ref = 1;
-      cfg->gop[2].ref_neg_count = 2; cfg->gop[2].ref_neg[0] = 1; cfg->gop[2].ref_neg[1] = 3;
-      cfg->gop[2].ref_pos_count = 0;
-
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 2; cfg->gop[3].qp_factor = 0.4624;   cfg->gop[3].is_ref = 1;
-      cfg->gop[3].ref_neg_count = 2; cfg->gop[3].ref_neg[0] = 1; cfg->gop[3].ref_neg[1] = 4;
-      cfg->gop[3].ref_pos_count = 0;
-
-      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 3; cfg->gop[4].layer = 3; cfg->gop[4].qp_factor = 0.4624;   cfg->gop[4].is_ref = 1;
-      cfg->gop[4].ref_neg_count = 2; cfg->gop[4].ref_neg[0] = 1; cfg->gop[4].ref_neg[1] = 5;
-      cfg->gop[4].ref_pos_count = 0;
-
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 2; cfg->gop[5].layer = 2; cfg->gop[5].qp_factor = 0.4624; cfg->gop[5].is_ref = 1;
-      cfg->gop[5].ref_neg_count = 2; cfg->gop[5].ref_neg[0] = 1; cfg->gop[5].ref_neg[1] = 6;
-      cfg->gop[5].ref_pos_count = 0;
-
-      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 3; cfg->gop[6].layer = 3; cfg->gop[6].qp_factor = 0.4624;   cfg->gop[6].is_ref = 1;
-      cfg->gop[6].ref_neg_count = 2; cfg->gop[6].ref_neg[0] = 1; cfg->gop[5].ref_neg[1] = 7;
-      cfg->gop[6].ref_pos_count = 0;
-
-      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 1; cfg->gop[7].qp_factor = 0.578;   cfg->gop[7].is_ref = 1;
-      cfg->gop[7].ref_neg_count = 2; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 8;
-      cfg->gop[7].ref_pos_count = 0;
-    } else if (!strcmp(value, "g8r2t2")) {
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-      cfg->gop[0].poc_offset = 1; cfg->gop[0].qp_offset = 3; cfg->gop[0].layer = 3; cfg->gop[0].qp_factor = 0.4624;  cfg->gop[0].is_ref = 0;
-      cfg->gop[0].ref_neg_count = 2; cfg->gop[0].ref_neg[0] = 1; cfg->gop[0].ref_neg[1] = 9;
-      cfg->gop[0].ref_pos_count = 0;
-
-      cfg->gop[1].poc_offset = 2; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.4624; cfg->gop[1].is_ref = 1;
-      cfg->gop[1].ref_neg_count = 2; cfg->gop[1].ref_neg[0] = 2; cfg->gop[1].ref_neg[1] = 10;
-      cfg->gop[1].ref_pos_count = 0;
-
-      cfg->gop[2].poc_offset = 3; cfg->gop[2].qp_offset = 3; cfg->gop[2].layer = 3; cfg->gop[2].qp_factor = 0.4624; cfg->gop[2].is_ref = 0;
-      cfg->gop[2].ref_neg_count = 2; cfg->gop[2].ref_neg[0] = 1; cfg->gop[2].ref_neg[1] = 3;
-      cfg->gop[2].ref_pos_count = 0;
-
-      cfg->gop[3].poc_offset = 4; cfg->gop[3].qp_offset = 2; cfg->gop[3].layer = 2; cfg->gop[3].qp_factor = 0.4624;   cfg->gop[3].is_ref = 1;
-      cfg->gop[3].ref_neg_count = 2; cfg->gop[3].ref_neg[0] = 2; cfg->gop[3].ref_neg[1] = 4;
-      cfg->gop[3].ref_pos_count = 0;
-
-      cfg->gop[4].poc_offset = 5; cfg->gop[4].qp_offset = 3; cfg->gop[4].layer = 3; cfg->gop[4].qp_factor = 0.4624;   cfg->gop[4].is_ref = 0;
-      cfg->gop[4].ref_neg_count = 2; cfg->gop[4].ref_neg[0] = 1; cfg->gop[4].ref_neg[1] = 5;
-      cfg->gop[4].ref_pos_count = 0;
-
-      cfg->gop[5].poc_offset = 6; cfg->gop[5].qp_offset = 2; cfg->gop[5].layer = 2; cfg->gop[5].qp_factor = 0.4624; cfg->gop[5].is_ref = 1;
-      cfg->gop[5].ref_neg_count = 2; cfg->gop[5].ref_neg[0] = 2; cfg->gop[5].ref_neg[1] = 6;
-      cfg->gop[5].ref_pos_count = 0;
-
-      cfg->gop[6].poc_offset = 7; cfg->gop[6].qp_offset = 3; cfg->gop[6].layer = 3; cfg->gop[6].qp_factor = 0.4624;   cfg->gop[6].is_ref = 0;
-      cfg->gop[6].ref_neg_count = 2; cfg->gop[6].ref_neg[0] = 1; cfg->gop[5].ref_neg[1] = 7;
-      cfg->gop[6].ref_pos_count = 0;
-
-      cfg->gop[7].poc_offset = 8; cfg->gop[7].qp_offset = 1; cfg->gop[7].layer = 1; cfg->gop[7].qp_factor = 0.578;   cfg->gop[7].is_ref = 1;
-      cfg->gop[7].ref_neg_count = 2; cfg->gop[7].ref_neg[0] = 2; cfg->gop[7].ref_neg[1] = 8;
-      cfg->gop[7].ref_pos_count = 0;
-    } else if (!strcmp(value, "g8r2t2b")) {
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-
-      kvz_gop_config* frame;
-
-      cfg->gop[0] = (kvz_gop_config){
-        .poc_offset = 1, .qp_offset = 3, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 2, .ref_neg = {1, 9}
-      };
-      cfg->gop[1] = (kvz_gop_config){
-        .poc_offset = 2, .qp_offset = 2, .layer = 2,
-        .qp_factor = 0.4624, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = {2, 10}
-      };
-      cfg->gop[2] = (kvz_gop_config){
-        .poc_offset = 3, .qp_offset = 3, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 2, .ref_neg = {1, 3}
-      };
-      cfg->gop[3] = (kvz_gop_config){
-        .poc_offset = 4, .qp_offset = 2, .layer = 2,
-        .qp_factor = 0.4624, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = {2, 4}
-      };
-      cfg->gop[4] = (kvz_gop_config){
-        .poc_offset = 5, .qp_offset = 3, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 2, .ref_neg = {1, 5}
-      };
-      cfg->gop[5] = (kvz_gop_config){
-        .poc_offset = 6, .qp_offset = 2, .layer = 2,
-        .qp_factor = 0.4624, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = {2, 6}
-      };
-      cfg->gop[6] = (kvz_gop_config){
-        .poc_offset = 7, .qp_offset = 3, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 2, .ref_neg = {1, 7}
-      };
-      cfg->gop[7] = (kvz_gop_config){
-        .poc_offset = 8, .qp_offset = 1, .layer = 1,
-        .qp_factor = 0.578, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = {2, 8}
-      };
-
-    } else if (!strcmp(value, "g8r2t4")) {
-      cfg->gop_lowdelay = 1;
-      cfg->gop_len = 8;
-
-      kvz_gop_config* frame;
-
-      cfg->gop[0] = (kvz_gop_config){
-        .poc_offset = 1, .qp_offset = 8, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 2, .ref_neg = { 1, 9 }
-      };
-      cfg->gop[1] = (kvz_gop_config){
-        .poc_offset = 2, .qp_offset = 4, .layer = 2,
-        .qp_factor = 0.4624, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = { 2, 10 }
-      };
-      cfg->gop[2] = (kvz_gop_config){
-        .poc_offset = 3, .qp_offset = 8, .layer = 3,
-          .qp_factor = 0.578, .is_ref = 0,
-          .ref_neg_count = 3, .ref_neg = { 1, 3, 11 }
-      };
-      cfg->gop[3] = (kvz_gop_config){
-        .poc_offset = 4, .qp_offset = 2, .layer = 1,
-        .qp_factor = 0.4, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = { 4, 12 }
-      };
-      cfg->gop[4] = (kvz_gop_config){
-        .poc_offset = 5, .qp_offset = 8, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 2, .ref_neg = { 1, 5 }
-      };
-      cfg->gop[5] = (kvz_gop_config){
-        .poc_offset = 6, .qp_offset = 4, .layer = 2,
-          .qp_factor = 0.4624, .is_ref = 1,
-          .ref_neg_count = 2, .ref_neg = { 2, 6 }
-      };
-      cfg->gop[6] = (kvz_gop_config){
-        .poc_offset = 7, .qp_offset = 8, .layer = 3,
-        .qp_factor = 0.578, .is_ref = 0,
-        .ref_neg_count = 3, .ref_neg = { 1, 3, 7 }
-      };
-      cfg->gop[7] = (kvz_gop_config){
-        .poc_offset = 8, .qp_offset = 1, .layer = 1,
-        .qp_factor = 0.578, .is_ref = 1,
-        .ref_neg_count = 2, .ref_neg = { 4, 8 }
-      };
-
     } else if (atoi(value)) {
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
@@ -916,6 +793,19 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       return 0;
     }
   }
+  else if OPT("mv-rdo")
+    cfg->mv_rdo = atobool(value);
+  else if OPT("psnr")
+    cfg->calc_psnr = (bool)atobool(value);
+  else if OPT("hash")
+  {
+    int8_t hash;
+    int result;
+    if ((result = parse_enum(value, hash_names, &hash))) {
+      cfg->hash = hash;
+    }
+    return result;
+  }
   else
     return 0;
 #undef OPT
@@ -953,8 +843,16 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->framerate <= 0.0) {
+  if (cfg->framerate < 0.0) {
     fprintf(stderr, "Input error: --input-fps must be positive\n");
+    error = 1;
+  }
+  if (cfg->framerate_num < 0) {
+    fprintf(stderr, "Input error: --input-fps must >=0\n");
+    error = 1;
+  }
+  if (cfg->framerate_denom <= 0) {
+    fprintf(stderr, "Input error: --input-fps denominator must be >0\n");
     error = 1;
   }
 
@@ -1041,7 +939,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->tiles_width_split) {
     int i;
     int32_t prev_tile_split = 0;
-    for (i=0; i < cfg->tiles_width_count; ++i) {
+    for (i=0; i < cfg->tiles_width_count - 1; ++i) {
       if (cfg->tiles_width_split[i] <= prev_tile_split) {
         fprintf(stderr, "Input error: tile separations in width should be strictly monotonic (%d <= %d)\n", cfg->tiles_width_split[i], prev_tile_split);
         error = 1;
@@ -1054,8 +952,8 @@ int kvz_config_validate(const kvz_config *const cfg)
       }
       prev_tile_split = cfg->tiles_width_split[i];
     }
-    if (cfg->tiles_width_split[cfg->tiles_width_count-1] >= cfg->width) {
-      fprintf(stderr, "Input error: last x tile separation in width (%d) should smaller than image width (%d)\n", cfg->tiles_width_split[cfg->tiles_width_count-1], cfg->width);
+    if (cfg->tiles_width_split[cfg->tiles_width_count - 2] >= cfg->width) {
+      fprintf(stderr, "Input error: last x tile separation in width (%d) should smaller than image width (%d)\n", cfg->tiles_width_split[cfg->tiles_width_count - 2], cfg->width);
       error = 1;
     }
   }
@@ -1063,7 +961,7 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->tiles_height_split) {
     int i;
     int32_t prev_tile_split = 0;
-    for (i=0; i < cfg->tiles_height_count; ++i) {
+    for (i=0; i < cfg->tiles_height_count - 1; ++i) {
       if (cfg->tiles_height_split[i] <= prev_tile_split) {
         fprintf(stderr, "Input error: tile separations in height should be strictly monotonic (%d <= %d)\n", cfg->tiles_height_split[i], prev_tile_split);
         error = 1;
@@ -1077,8 +975,8 @@ int kvz_config_validate(const kvz_config *const cfg)
       prev_tile_split = cfg->tiles_height_split[i];
     }
 
-    if (cfg->tiles_height_split[cfg->tiles_height_count-1] >= cfg->height) {
-      fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count-1], cfg->height);
+    if (cfg->tiles_height_split[cfg->tiles_height_count - 2] >= cfg->height) {
+      fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count - 2], cfg->height);
       error = 1;
     }
   }

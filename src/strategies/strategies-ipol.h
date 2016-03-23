@@ -19,7 +19,15 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
- 
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Interface for subpixel interpolation functions.
+ */
+
+#include "global.h"
+
 #include <stdint.h>
 
 #include "encoder.h"

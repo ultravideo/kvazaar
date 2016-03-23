@@ -44,17 +44,17 @@
 extern int8_t kvz_g_luma_filter[4][8];
 extern int8_t kvz_g_chroma_filter[8][4];
 
-void kvz_eight_tap_filter_x8_and_flip(__m128i data01, __m128i data23, __m128i data45, __m128i data67, __m128i* filter, __m128i* dst)
+void kvz_eight_tap_filter_x8_and_flip(__m128i *data01, __m128i *data23, __m128i *data45, __m128i *data67, __m128i *filter, __m128i *dst)
 {
   __m128i a, b, c, d;
   __m128i fir = _mm_broadcastq_epi64(_mm_loadl_epi64(filter));
 
-  a = _mm_maddubs_epi16(data01, fir);
-  b = _mm_maddubs_epi16(data23, fir);
+  a = _mm_maddubs_epi16(*data01, fir);
+  b = _mm_maddubs_epi16(*data23, fir);
   a = _mm_hadd_epi16(a, b);
 
-  c = _mm_maddubs_epi16(data45, fir);
-  d = _mm_maddubs_epi16(data67, fir);
+  c = _mm_maddubs_epi16(*data45, fir);
+  d = _mm_maddubs_epi16(*data67, fir);
   c = _mm_hadd_epi16(c, d);
 
   a = _mm_hadd_epi16(a, c);
@@ -62,17 +62,17 @@ void kvz_eight_tap_filter_x8_and_flip(__m128i data01, __m128i data23, __m128i da
   _mm_storeu_si128(dst, a);
 }
 
-__m128i kvz_eight_tap_filter_x4_and_flip_16bit(__m128i data0, __m128i data1, __m128i data2, __m128i data3, __m128i* filter)
+__m128i kvz_eight_tap_filter_x4_and_flip_16bit(__m128i *data0, __m128i *data1, __m128i *data2, __m128i *data3, __m128i *filter)
 {
   __m128i a, b, c, d;
   __m128i fir = _mm_cvtepi8_epi16(_mm_loadu_si128((__m128i*)(filter)));
 
-  a = _mm_madd_epi16(data0, fir);
-  b = _mm_madd_epi16(data1, fir);
+  a = _mm_madd_epi16(*data0, fir);
+  b = _mm_madd_epi16(*data1, fir);
   a = _mm_hadd_epi32(a, b);
 
-  c = _mm_madd_epi16(data2, fir);
-  d = _mm_madd_epi16(data3, fir);
+  c = _mm_madd_epi16(*data2, fir);
+  d = _mm_madd_epi16(*data3, fir);
   c = _mm_hadd_epi32(c, d);
 
   a = _mm_hadd_epi32(a, c);
@@ -98,10 +98,10 @@ void kvz_eight_tap_filter_and_flip_avx2(int8_t filter[4][8], kvz_pixel *src, int
 
   //Filter rows
   const int dst_stride = MAX_WIDTH;
-  kvz_eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[0]), (__m128i*)(dst + 0));
-  kvz_eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[1]), (__m128i*)(dst + 1 * dst_stride));
-  kvz_eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[2]), (__m128i*)(dst + 2 * dst_stride));
-  kvz_eight_tap_filter_x8_and_flip(rows01, rows23, rows45, rows67, (__m128i*)(&filter[3]), (__m128i*)(dst + 3 * dst_stride));
+  kvz_eight_tap_filter_x8_and_flip(&rows01, &rows23, &rows45, &rows67, (__m128i*)(&filter[0]), (__m128i*)(dst + 0));
+  kvz_eight_tap_filter_x8_and_flip(&rows01, &rows23, &rows45, &rows67, (__m128i*)(&filter[1]), (__m128i*)(dst + 1 * dst_stride));
+  kvz_eight_tap_filter_x8_and_flip(&rows01, &rows23, &rows45, &rows67, (__m128i*)(&filter[2]), (__m128i*)(dst + 2 * dst_stride));
+  kvz_eight_tap_filter_x8_and_flip(&rows01, &rows23, &rows45, &rows67, (__m128i*)(&filter[3]), (__m128i*)(dst + 3 * dst_stride));
 }
 
 static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int16_t *src, int16_t src_stride, int offset, int combined_shift, kvz_pixel* __restrict dst, int16_t dst_stride)
@@ -119,10 +119,10 @@ static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int
     int32_t array[4];
   } temp[4];
 
-  temp[0].vector = kvz_eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[0]));
-  temp[1].vector = kvz_eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[1]));
-  temp[2].vector = kvz_eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[2]));
-  temp[3].vector = kvz_eight_tap_filter_x4_and_flip_16bit(row0, row1, row2, row3, (__m128i*)(&filter[3]));
+  temp[0].vector = kvz_eight_tap_filter_x4_and_flip_16bit(&row0, &row1, &row2, &row3, (__m128i*)(&filter[0]));
+  temp[1].vector = kvz_eight_tap_filter_x4_and_flip_16bit(&row0, &row1, &row2, &row3, (__m128i*)(&filter[1]));
+  temp[2].vector = kvz_eight_tap_filter_x4_and_flip_16bit(&row0, &row1, &row2, &row3, (__m128i*)(&filter[2]));
+  temp[3].vector = kvz_eight_tap_filter_x4_and_flip_16bit(&row0, &row1, &row2, &row3, (__m128i*)(&filter[3]));
 
   __m128i packed_offset = _mm_set1_epi32(offset);
 
@@ -502,7 +502,7 @@ void kvz_get_extended_block_avx2(int xpos, int ypos, int mv_x, int mv_y, int off
   int sample_out_of_bounds = out_of_bounds_y || out_of_bounds_x;
 
   if (sample_out_of_bounds){
-    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (width + filter_size));
+    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (height + filter_size));
     if (!out->buffer){
       fprintf(stderr, "Memory allocation failed!\n");
       assert(0);
@@ -521,7 +521,7 @@ void kvz_get_extended_block_avx2(int xpos, int ypos, int mv_x, int mv_y, int off
       coord_y *= ref_width;
 
       if (!out_of_bounds_x){
-        memcpy(&out->buffer[dst_y*(width + filter_size) + 0], &ref[coord_y + min_x], (width + filter_size) * sizeof(kvz_pixel));
+        memcpy(&out->buffer[dst_y * out->stride + 0], &ref[coord_y + min_x], out->stride * sizeof(kvz_pixel));
       } else {
         for (dst_x = 0, x = (xpos)-half_filter_size; x < ((xpos + width)) + half_filter_size; dst_x++, x++) {
 
@@ -529,7 +529,7 @@ void kvz_get_extended_block_avx2(int xpos, int ypos, int mv_x, int mv_y, int off
           coord_x = CLIP(0, (ref_width)-1, coord_x);
 
           // Store source block data (with extended borders)
-          out->buffer[dst_y*(width + filter_size) + dst_x] = ref[coord_y + coord_x];
+          out->buffer[dst_y * out->stride + dst_x] = ref[coord_y + coord_x];
         }
       }
     }

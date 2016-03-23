@@ -1,0 +1,227 @@
+.TH KVAZAAR "1" "March 2016" "kvazaar v0.8.3" "User Commands"
+.SH NAME
+kvazaar \- open source HEVC encoder
+.SH SYNOPSIS
+\fBkvazaar \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
+.SH DESCRIPTION
+.TP
+\fB\-\-help                    
+Print this help message and exit
+.TP
+\fB\-\-version                 
+Print version information and exit
+.TP
+\fB\-n\fR, \fB\-\-frames <integer>    
+Number of frames to code [all]
+.TP
+\fB\-\-seek <integer>          
+First frame to code [0]
+.TP
+\fB\-\-input\-res <int>x<int>   
+Input resolution (width x height) or
+auto          
+try to detect from file name [auto]
+.TP
+\fB\-\-input\-fps <num>/<denom> 
+Framerate of the input video [25.0]
+.TP
+\fB\-q\fR, \fB\-\-qp <integer>        
+Quantization Parameter [32]
+.TP
+\fB\-p\fR, \fB\-\-period <integer>    
+Period of intra pictures [0]
+  0: only first picture is intra
+  1: all pictures are intra
+  2\-N: every Nth picture is intra
+.TP
+\fB\-\-vps\-period <integer>
+Specify how often the video parameter set is
+re\-sent. [0]
+  0: only send VPS with the first frame
+  1: send VPS with every intra frame
+  N: send VPS with every Nth intra frame
+.TP
+\fB\-r\fR, \fB\-\-ref <integer>       
+Reference frames, range 1..15 [3]
+.TP
+\fB\-\-no\-deblock          
+Disable deblocking filter
+.TP
+\fB\-\-deblock <beta:tc>   
+Deblocking filter parameters
+beta and tc range is \-6..6 [0:0]
+.TP
+\fB\-\-no\-sao              
+Disable sample adaptive offset
+.TP
+\fB\-\-no\-rdoq             
+Disable RDO quantization
+.TP
+\fB\-\-no\-signhide         
+Disable sign hiding in quantization
+.TP
+\fB\-\-smp                 
+Enable Symmetric Motion Partition
+.TP
+\fB\-\-amp                 
+Enable Asymmetric Motion Partition
+.TP
+\fB\-\-rd <integer>        
+Rate\-Distortion Optimization level [1]
+  0: no RDO
+  1: estimated RDO
+  2: full RDO
+.TP
+\fB\-\-mv\-rdo              
+Enable Rate\-Distortion Optimized motion vector costs
+.TP
+\fB\-\-full\-intra\-search   
+Try all intra modes.
+.TP
+\fB\-\-no\-transform\-skip   
+Disable transform skip
+.TP
+\fB\-\-aud                 
+Use access unit delimiters
+.TP
+\fB\-\-cqmfile <string>    
+Custom Quantization Matrices from a file
+.TP
+\fB\-\-debug <string>      
+Output encoders reconstruction.
+.TP
+\fB\-\-cpuid <integer>     
+Disable runtime cpu optimizations with value 0.
+.TP
+\fB\-\-me <string>         
+Set integer motion estimation algorithm ["hexbs"]
+  "hexbs": Hexagon Based Search (faster)
+  "tz":    Test Zone Search (better quality)
+  "full":  Full Search (super slow)
+.TP
+\fB\-\-subme <integer>     
+Set fractional pixel motion estimation level [1].
+  0: only integer motion estimation
+  1: fractional pixel motion estimation enabled
+.TP
+\fB\-\-source\-scan\-type <string>
+Set source scan type ["progressive"].
+  "progressive": progressive scan
+  "tff": top field first
+  "bff": bottom field first
+.TP
+\fB\-\-pu\-depth\-inter <int>\-<int>
+Range for sizes of inter prediction units to try.
+  0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8
+.TP
+\fB\-\-pu\-depth\-intra <int>\-<int>
+Range for sizes of intra prediction units to try.
+  0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4
+.TP
+\fB\-\-no\-info             
+Don't add information about the encoder to settings.
+.TP
+\fB\-\-gop <string>        
+Definition of GOP structure [0]
+  "0":           disabled
+  "8":           B\-frame pyramid of length 8
+  "lp\-<string>": lp\-gop definition (e.g. lp\-g8d4r3t2)
+.TP
+\fB\-\-bipred              
+Enable bi\-prediction search
+.TP
+\fB\-\-bitrate <integer>   
+Target bitrate. [0]
+  0: disable rate\-control
+  N: target N bits per second
+.TP
+\fB\-\-preset <string>     
+Use preset. This will override previous options.
+  ultrafast, superfast,veryfast, faster,
+  fast, medium, slow, slower, veryslow, placebo
+.TP
+\fB\-\-no\-psnr             
+Don't calculate PSNR for frames
+.TP
+\fB\-\-loop\-input          
+Re\-read input file forever
+.TP
+\fB\-\-mv\-constraint       
+Constrain movement vectors
+  "none": no constraint
+  "frametile": constrain within the tile
+  "frametilemargin": constrain even more
+
+.SS "Video Usability Information:"
+.TP
+\fB\-\-sar <width:height>  
+Specify Sample Aspect Ratio
+.TP
+\fB\-\-overscan <string>   
+Specify crop overscan setting ["undef"]
+  \- undef, show, crop
+.TP
+\fB\-\-videoformat <string>
+Specify video format ["undef"]
+  \- component, pal, ntsc, secam, mac, undef
+.TP
+\fB\-\-range <string>      
+Specify color range ["tv"]
+  \- tv, pc
+.TP
+\fB\-\-colorprim <string>  
+Specify color primaries ["undef"]
+  \- undef, bt709, bt470m, bt470bg,
+    smpte170m, smpte240m, film, bt2020
+.TP
+\fB\-\-transfer <string>   
+Specify transfer characteristics ["undef"]
+  \- undef, bt709, bt470m, bt470bg,
+    smpte170m, smpte240m, linear, log100,
+    log316, iec61966\-2\-4, bt1361e,
+    iec61966\-2\-1, bt2020\-10, bt2020\-12
+.TP
+\fB\-\-colormatrix <string>
+Specify color matrix setting ["undef"]
+  \- undef, bt709, fcc, bt470bg, smpte170m,
+    smpte240m, GBR, YCgCo, bt2020nc, bt2020c
+.TP
+\fB\-\-chromaloc <integer> 
+Specify chroma sample location (0 to 5) [0]
+
+.SS "Parallel processing:"
+.TP
+\fB\-\-threads <integer>   
+Maximum number of threads to use.
+Disable threads if set to 0.
+
+.SS "Tiles:"
+.TP
+\fB\-\-tiles\-width\-split <string>|u<int>
+Specifies a comma separated list of pixel
+positions of tiles columns separation coordinates.
+Can also be u followed by and a single int n,
+in which case it produces columns of uniform width.
+.TP
+\fB\-\-tiles\-height\-split <string>|u<int>
+Specifies a comma separated list of pixel
+positions of tiles rows separation coordinates.
+Can also be u followed by and a single int n,
+in which case it produces rows of uniform height.
+
+.SS "Wpp:"
+.TP
+\fB\-\-wpp                 
+Enable wavefront parallel processing
+.TP
+\fB\-\-owf <integer>|auto  
+Number of parallel frames to process. 0 to disable.
+
+.SS "Slices:"
+.TP
+\fB\-\-slice\-addresses <string>|u<int>
+Specifies a comma separated list of LCU
+positions in tile scan order of tile separations.
+Can also be u followed by and a single int n,
+in which case it produces uniform slice length.
+

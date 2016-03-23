@@ -24,6 +24,9 @@
     <ClCompile Include="..\..\tests\intra_sad_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\tests\mv_cand_tests.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\tests\satd_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>

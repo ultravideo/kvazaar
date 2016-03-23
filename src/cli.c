@@ -45,7 +45,7 @@ static const struct option long_options[] = {
   { "vps-period",         required_argument, NULL, 0 },
   { "input-res",          required_argument, NULL, 0 },
   { "input-fps",          required_argument, NULL, 0 },
-  { "deblock",                  no_argument, NULL, 0 },
+  { "deblock",            required_argument, NULL, 0 },
   { "no-deblock",               no_argument, NULL, 0 },
   { "sao",                      no_argument, NULL, 0 },
   { "no-sao",                   no_argument, NULL, 0 },
@@ -53,6 +53,10 @@ static const struct option long_options[] = {
   { "no-rdoq",                  no_argument, NULL, 0 },
   { "signhide",                 no_argument, NULL, 0 },
   { "no-signhide",              no_argument, NULL, 0 },
+  { "smp",                      no_argument, NULL, 0 },
+  { "no-smp",                   no_argument, NULL, 0 },
+  { "amp",                      no_argument, NULL, 0 },
+  { "no-amp",                   no_argument, NULL, 0 },
   { "rd",                 required_argument, NULL, 0 },
   { "full-intra-search",        no_argument, NULL, 0 },
   { "no-full-intra-search",     no_argument, NULL, 0 },
@@ -74,6 +78,7 @@ static const struct option long_options[] = {
   { "no-aud",                   no_argument, NULL, 0 },
   { "cqmfile",            required_argument, NULL, 0 },
   { "seek",               required_argument, NULL, 0 },
+  { "tiles",              required_argument, NULL, 0 },
   { "tiles-width-split",  required_argument, NULL, 0 },
   { "tiles-height-split", required_argument, NULL, 0 },
   { "wpp",                      no_argument, NULL, 0 },
@@ -91,6 +96,15 @@ static const struct option long_options[] = {
   { "no-bipred",                no_argument, NULL, 0 },
   { "bitrate",            required_argument, NULL, 0 },
   { "preset",             required_argument, NULL, 0 },
+  { "mv-rdo",                   no_argument, NULL, 0 },
+  { "no-mv-rdo",                no_argument, NULL, 0 },
+  { "psnr",                     no_argument, NULL, 0 },
+  { "no-psnr",                  no_argument, NULL, 0 },
+  { "version",                  no_argument, NULL, 0 },
+  { "help",                     no_argument, NULL, 0 },
+  { "loop-input",               no_argument, NULL, 0 },
+  { "mv-constraint",      required_argument, NULL, 0 },
+  { "hash",               required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -195,11 +209,26 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       opts->seek = atoi(optarg);
     } else if (!strcmp(name, "frames")) {
       opts->frames = atoi(optarg);
-    } else if (!kvz_config_parse(opts->config, name, optarg)) {
+    } else if (!strcmp(name, "version")) {
+      opts->version = true;
+      goto done;
+    } else if (!strcmp(name, "help")) {
+      opts->help = true;
+      goto done;
+    } else if (!strcmp(name, "loop-input")) {
+      opts->loop_input = true;
+    } else if (!api->config_parse(opts->config, name, optarg)) {
       fprintf(stderr, "invalid argument: %s=%s\n", name, optarg);
       ok = 0;
       goto done;
     }
+  }
+
+  // Check for extra arguments.
+  if (argc - optind > 0) {
+    fprintf(stderr, "Input error: Extra argument found: \"%s\"\n", argv[optind]);
+    ok = 0;
+    goto done;
   }
 
   // Check that the required files were defined
@@ -248,28 +277,36 @@ void cmdline_opts_free(const kvz_api *const api, cmdline_opts_t *opts)
 }
 
 
+void print_usage(void)
+{
+  fprintf(stdout,
+    "Kvazaar usage: -i and --input-res to set input, -o to set output\n"
+    "               --help for more information\n");
+}
+
+
 void print_version(void)
 {
-  fprintf(stderr,
-    "/***********************************************/\n"
-    " *   Kvazaar HEVC Encoder v. " VERSION_STRING "             *\n"
-    " *     Tampere University of Technology 2015   *\n"
-    "/***********************************************/\n\n");
+  fprintf(stdout,
+    "Kvazaar " VERSION_STRING "\n"
+    "Kvazaar license: LGPL version 2\n");
 }
 
 
 void print_help(void)
 {
-  fprintf(stderr,
+  fprintf(stdout,
     "Usage:\n"
     "kvazaar -i <input> --input-res <width>x<height> -o <output>\n"
     "\n"
     "Optional parameters:\n"
+    "      --help                     : Print this help message and exit\n"
+    "      --version                  : Print version information and exit\n"
     "      -n, --frames <integer>     : Number of frames to code [all]\n"
     "      --seek <integer>           : First frame to code [0]\n"
     "      --input-res <int>x<int>    : Input resolution (width x height) or\n"
     "                  auto           : try to detect from file name [auto]\n"
-    "      --input-fps <number>       : Framerate of the input video [25.0]\n"
+    "      --input-fps <num>/<denom>  : Framerate of the input video [25.0]\n"
     "      -q, --qp <integer>         : Quantization Parameter [32]\n"
     "      -p, --period <integer>     : Period of intra pictures [0]\n"
     "                                     0: only first picture is intra\n"
@@ -287,19 +324,23 @@ void print_help(void)
     "          --no-sao               : Disable sample adaptive offset\n"
     "          --no-rdoq              : Disable RDO quantization\n"
     "          --no-signhide          : Disable sign hiding in quantization\n"
+    "          --smp                  : Enable Symmetric Motion Partition\n"
+    "          --amp                  : Enable Asymmetric Motion Partition\n"
     "          --rd <integer>         : Rate-Distortion Optimization level [1]\n"
     "                                     0: no RDO\n"
     "                                     1: estimated RDO\n"
     "                                     2: full RDO\n"
+    "          --mv-rdo               : Enable Rate-Distortion Optimized motion vector costs\n"
     "          --full-intra-search    : Try all intra modes.\n"
-    "          --me <string>          : Set integer motion estimation algorithm [\"hexbs\"]\n"
-    "                                     \"hexbs\": Hexagon Based Search (faster)\n"
-    "                                     \"tz\":    Test Zone Search (better quality)\n"
     "          --no-transform-skip    : Disable transform skip\n"
     "          --aud                  : Use access unit delimiters\n"
     "          --cqmfile <string>     : Custom Quantization Matrices from a file\n"
     "          --debug <string>       : Output encoders reconstruction.\n"
     "          --cpuid <integer>      : Disable runtime cpu optimizations with value 0.\n"
+    "          --me <string>          : Set integer motion estimation algorithm [\"hexbs\"]\n"
+    "                                     \"hexbs\": Hexagon Based Search (faster)\n"
+    "                                     \"tz\":    Test Zone Search (better quality)\n"
+    "                                     \"full\":  Full Search (super slow)\n"
     "          --subme <integer>      : Set fractional pixel motion estimation level [1].\n"
     "                                     0: only integer motion estimation\n"
     "                                     1: fractional pixel motion estimation enabled\n"
@@ -312,14 +353,27 @@ void print_help(void)
     "          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.\n"
     "                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4\n"
     "          --no-info              : Don't add information about the encoder to settings.\n"
-    "          --gop <int>           : Length of Group of Pictures, must be 8 or 0 [0]\n"
+    "          --gop <string>         : Definition of GOP structure [0]\n"
+    "                                     \"0\":           disabled\n"
+    "                                     \"8\":           B-frame pyramid of length 8\n"
+    "                                     \"lp-<string>\": lp-gop definition (e.g. lp-g8d4r3t2)\n"
     "          --bipred               : Enable bi-prediction search\n"
     "          --bitrate <integer>    : Target bitrate. [0]\n"
     "                                     0: disable rate-control\n"
     "                                     N: target N bits per second\n"
-    "          --preset <string>      : Use preset\n"
+    "          --preset <string>      : Use preset. This will override previous options.\n"
     "                                     ultrafast, superfast,veryfast, faster,\n"
     "                                     fast, medium, slow, slower, veryslow, placebo\n"
+    "          --no-psnr              : Don't calculate PSNR for frames\n"
+    "          --loop-input           : Re-read input file forever\n"
+    "          --mv-constraint        : Constrain movement vectors\n"
+    "                                     \"none\": no constraint\n"
+    "                                     \"frametile\": constrain within the tile\n"
+    "                                     \"frametilemargin\": constrain even more\n"
+    "          --hash                 : Specify which decoded picture hash to use [checksum]\n"
+    "                                     \"none\": no constraint\n"
+    "                                     \"checksum\": constrain within the tile\n"
+    "                                     \"md5\": constrain even more\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
@@ -347,12 +401,13 @@ void print_help(void)
     "                                   Disable threads if set to 0.\n"
     "\n"
     "  Tiles:\n"
-    "          --tiles-width-split <string>|u<int> : \n"
+    "          --tiles <int>x<int>    : Split picture into wdith x height uniform tiles.\n"
+    "          --tiles-width-split <string>|u<int> :\n"
     "                                   Specifies a comma separated list of pixel\n"
     "                                   positions of tiles columns separation coordinates.\n"
     "                                   Can also be u followed by and a single int n,\n"
     "                                   in which case it produces columns of uniform width.\n"
-    "          --tiles-height-split <string>|u<int> : \n"
+    "          --tiles-height-split <string>|u<int> :\n"
     "                                   Specifies a comma separated list of pixel\n"
     "                                   positions of tiles rows separation coordinates.\n"
     "                                   Can also be u followed by and a single int n,\n"
@@ -363,7 +418,7 @@ void print_help(void)
     "          --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.\n"
     "\n"
     "  Slices:\n"
-    "          --slice-addresses <string>|u<int>: \n"
+    "          --slice-addresses <string>|u<int> :\n"
     "                                   Specifies a comma separated list of LCU\n"
     "                                   positions in tile scan order of tile separations.\n"
     "                                   Can also be u followed by and a single int n,\n"

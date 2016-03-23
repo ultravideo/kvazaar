@@ -19,7 +19,15 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
- 
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Interface for intra prediction functions.
+ */
+
+#include "global.h"
+
 #include "encoderstate.h"
 
 typedef void (angular_pred_func)(
@@ -29,14 +37,22 @@ typedef void (angular_pred_func)(
   const kvz_pixel *const in_ref_left,
   kvz_pixel *const dst);
 
+typedef void (intra_pred_planar_func)(
+  const int_fast8_t log2_width,
+  const kvz_pixel *const ref_top,
+  const kvz_pixel *const ref_left,
+  kvz_pixel *const dst);
+
 // Declare function pointers.
 extern angular_pred_func * kvz_angular_pred;
+extern intra_pred_planar_func * kvz_intra_pred_planar;
 
 int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth);
 
 
 #define STRATEGIES_INTRA_EXPORTS \
   {"angular_pred", (void**) &kvz_angular_pred}, \
+  {"intra_pred_planar", (void**) &kvz_intra_pred_planar}, \
 
 
 

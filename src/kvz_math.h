@@ -1,5 +1,5 @@
-#ifndef KVAZAAR_VERSION_H_
-#define KVAZAAR_VERSION_H_
+#ifndef MATH_H_
+#define MATH_H_
 /*****************************************************************************
 * This file is part of Kvazaar HEVC encoder.
 *
@@ -20,7 +20,35 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-// KVZ_API_VERSION is incremented every time the public api changes.
-#define KVZ_API_VERSION 8
+/**
+* \file
+* Generic math functions
+*/
 
-#endif // KVAZAAR_VERSION_H_
+#include "global.h"
+
+static INLINE unsigned kvz_math_floor_log2(unsigned value)
+{
+  assert(value > 0);
+
+  unsigned result = 0;
+
+  for (int i = 4; i >= 0; --i) {
+    unsigned bits = 1ull << i;
+    unsigned shift = value >= (1 << bits) ? bits : 0;
+    result += shift;
+    value >>= shift;
+  }
+
+  return result;
+}
+
+static INLINE unsigned kvz_math_ceil_log2(unsigned value)
+{
+  assert(value > 0);
+
+  // The ceil_log2 is just floor_log2 + 1, except for exact powers of 2.
+  return kvz_math_floor_log2(value) + ((value & (value - 1)) ? 1 : 0);
+}
+
+#endif //CHECKPOINT_H_

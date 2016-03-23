@@ -18,33 +18,28 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/**
- * \file
- * \brief Entry point for the Visual Studio project.
- *
- * This file is needed for Visual Studio, because it will not link the main
- * function from the .lib if the project has no .c files.
- *
- * \author Marko Viitanen ( fador@iki.fi ),
- *         Tampere University of Technology,
- *         Department of Pervasive Computing.
- * \author Ari Koivula ( ari@koivu.la ),
- *         Tampere University of Technology,
- *         Department of Pervasive Computing.
- */
+#include "strategies-sao.h"
+#include "strategyselector.h"
 
-// This is not actually needed, because the linker will use the main from the
-// .lib of the encoder, but I will leave it here in case we encounter some
-// problem with that.
-/*
-int encmain(int argc, char *argv[]);
+// Define function pointers.
+sao_edge_ddistortion_func * kvz_sao_edge_ddistortion;
+calc_sao_edge_dir_func * kvz_calc_sao_edge_dir;
+sao_reconstruct_color_func * kvz_sao_reconstruct_color;
+sao_band_ddistortion_func * kvz_sao_band_ddistortion;
 
-int main(int argc, char *argv[])
-{
-  int i = 10;
-  while (i) {
-    --i;
+// Headers for platform optimizations.
+#include "generic/sao-generic.h"
+#include "avx2/sao-avx2.h"
+
+
+int kvz_strategy_register_sao(void* opaque, uint8_t bitdepth) {
+  bool success = true;
+
+  success &= kvz_strategy_register_sao_generic(opaque, bitdepth);
+
+  if (kvz_g_hardware_flags.intel_flags.avx2) {
+    success &= kvz_strategy_register_sao_avx2(opaque, bitdepth);
   }
-  return encmain(argc, argv);
+
+  return success;
 }
-*/

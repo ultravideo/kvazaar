@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "threads.h"
 #include "image.h"
 #include "strategyselector.h"
@@ -71,6 +67,8 @@ kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
   im->pts = 0;
   im->dts = 0;
 
+  im->interlacing = KVZ_INTERLACING_NONE;
+
   return im;
 }
 
@@ -86,7 +84,7 @@ void kvz_image_free(kvz_picture *const im)
 {
   if (im == NULL) return;
 
-  int32_t new_refcount = ATOMIC_DEC(&(im->refcount));
+  int32_t new_refcount = KVZ_ATOMIC_DEC(&(im->refcount));
   if (new_refcount > 0) {
     // There are still references so we don't free the data yet.
     return;
@@ -116,7 +114,7 @@ kvz_picture *kvz_image_copy_ref(kvz_picture *im)
 {
   // The caller should have had another reference.
   assert(im->refcount > 0);
-  ATOMIC_INC(&(im->refcount));
+  KVZ_ATOMIC_INC(&(im->refcount));
 
   return im;
 }
@@ -428,20 +426,15 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 * \returns  
 */
 unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height, int max_lcu_below) {
+                        int block_width, int block_height, int max_px_below_lcu) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
   
   // Check that we are not referencing pixels that are not final.
-  if (max_lcu_below >= 0) {
-    // When SAO is off, row is considered reconstructed when the last LCU
-    // is done, although the bottom 2 pixels might still need deblocking.
-    // To work around this, add 2 luma pixels to the reach of the mv
-    // in order to avoid referencing those possibly non-deblocked pixels.
-    int mv_lcu_row_reach = (ref_y + block_height - 1 + 2) / LCU_WIDTH;
-    int cur_lcu_row = pic_y / LCU_WIDTH;
-    if (mv_lcu_row_reach > cur_lcu_row + max_lcu_below) {
-      //printf("OOB %d %d -> %d\n", ref_y + block_height, pic_y, ref_y + block_height - pic_y);
+  if (max_px_below_lcu >= 0) {
+    int next_lcu_row_px = ((pic_y >> LOG2_LCU_WIDTH) + 1) << LOG2_LCU_WIDTH;
+    int px_below_lcu = ref_y + block_height - next_lcu_row_px;
+    if (px_below_lcu > max_px_below_lcu) {
       return INT_MAX;
     }
   }
@@ -477,54 +470,3 @@ unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const 
 
   return ssd;
 }
-
-
-/**
- * \brief BLock Image Transfer from one buffer to another.
- *
- * It's a stupidly simple loop that copies pixels.
- *
- * \param orig  Start of the originating buffer.
- * \param dst  Start of the destination buffer.
- * \param width  Width of the copied region.
- * \param height  Height of the copied region.
- * \param orig_stride  Width of a row in the originating buffer.
- * \param dst_stride  Width of a row in the destination buffer.
- *
- * This should be inlined, but it's defined here for now to see if Visual
- * Studios LTCG will inline it.
- */
-void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
-                         const unsigned width, const unsigned height,
-                         const unsigned orig_stride, const unsigned dst_stride)
-{
-  unsigned y;
-  //There is absolutely no reason to have a width greater than the source or the destination stride.
-  assert(width <= orig_stride);
-  assert(width <= dst_stride);
-
-#ifdef CHECKPOINTS
-  char *buffer = malloc((3 * width + 1) * sizeof(char));
-  for (y = 0; y < height; ++y) {
-    int p;
-    for (p = 0; p < width; ++p) {
-      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
-    }
-    buffer[3*width] = 0;
-    CHECKPOINT("kvz_pixels_blit: %04d: %s", y, buffer);
-  }
-  FREE_POINTER(buffer);
-#endif //CHECKPOINTS
-
-  if (orig == dst) {
-    //If we have the same array, then we should have the same stride
-    assert(orig_stride == dst_stride);
-    return;
-  }
-  assert(orig != dst || orig_stride == dst_stride);
-
-  for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
-  }
-}
-

@@ -129,15 +129,14 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\extras\libmd5.c" />
     <ClCompile Include="..\..\src\input_frame_buffer.c" />
     <ClCompile Include="..\..\src\kvazaar.c" />
     <ClCompile Include="..\..\src\bitstream.c" />
     <ClCompile Include="..\..\src\cabac.c" />
-    <ClCompile Include="..\..\src\cli.c" />
-    <ClCompile Include="..\..\src\config.c" />
+    <ClCompile Include="..\..\src\cfg.c" />
     <ClCompile Include="..\..\src\context.c" />
     <ClCompile Include="..\..\src\cu.c" />
-    <ClCompile Include="..\..\src\encmain.c" />
     <ClCompile Include="..\..\src\encoder.c" />
     <ClCompile Include="..\..\src\encoderstate.c" />
     <ClCompile Include="..\..\src\encoder_state-bitstream.c" />
@@ -169,14 +168,20 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
+    <ClCompile Include="..\..\src\strategies\avx2\sao-avx2.c">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
+    </ClCompile>
     <ClCompile Include="..\..\src\strategies\generic\intra-generic.c" />
     <ClCompile Include="..\..\src\strategies\generic\quant-generic.c" />
+    <ClCompile Include="..\..\src\strategies\generic\sao-generic.c" />
     <ClCompile Include="..\..\src\strategies\strategies-intra.c" />
     <ClCompile Include="..\..\src\strategies\strategies-quant.c" />
-    <ClCompile Include="..\..\src\yuv_io.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
-    <ClInclude Include="..\..\src\cli.h" />
     <ClInclude Include="..\..\src\cu.h" />
+    <ClInclude Include="..\..\src\extras\libmd5.h" />
     <ClInclude Include="..\..\src\image.h" />
     <ClInclude Include="..\..\src\imagelist.h" />
     <ClCompile Include="..\..\src\strategies\altivec\picture-altivec.c" />
@@ -208,6 +213,7 @@
     <ClCompile Include="..\..\src\strategies\strategies-ipol.c" />
     <ClCompile Include="..\..\src\strategies\strategies-nal.c" />
     <ClCompile Include="..\..\src\strategies\strategies-picture.c" />
+    <ClCompile Include="..\..\src\strategies\strategies-sao.c" />
     <ClCompile Include="..\..\src\strategies\x86_asm\picture-x86-asm.c" />
     <ClCompile Include="..\..\src\videoframe.c" />
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
@@ -219,22 +225,24 @@
     <ClCompile Include="..\..\src\transform.c" />
     <ClInclude Include="..\..\src\input_frame_buffer.h" />
     <ClInclude Include="..\..\src\kvazaar_internal.h" />
+    <ClInclude Include="..\..\src\kvz_math.h" />
     <ClInclude Include="..\..\src\search_inter.h" />
     <ClInclude Include="..\..\src\search_intra.h" />
     <ClInclude Include="..\..\src\strategies\avx2\intra-avx2.h" />
+    <ClInclude Include="..\..\src\strategies\avx2\sao-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\intra-generic.h" />
+    <ClInclude Include="..\..\src\strategies\generic\sao-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-common.h" />
     <ClInclude Include="..\..\src\strategies\avx2\quant-avx2.h" />
     <ClInclude Include="..\..\src\strategies\generic\quant-generic.h" />
     <ClInclude Include="..\..\src\strategies\strategies-intra.h" />
     <ClInclude Include="..\..\src\strategies\strategies-quant.h" />
     <ClInclude Include="..\..\src\visualization.h" />
-    <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h" />
     <ClInclude Include="..\..\src\cabac.h" />
-    <ClInclude Include="..\..\src\config.h" />
+    <ClInclude Include="..\..\src\cfg.h" />
     <ClInclude Include="..\..\src\context.h" />
     <ClInclude Include="..\..\src\encoder.h" />
     <ClInclude Include="..\..\src\encoderstate.h" />
@@ -244,7 +252,6 @@
     <ClInclude Include="..\..\src\inter.h" />
     <ClInclude Include="..\..\src\intra.h" />
     <ClInclude Include="..\..\src\kvazaar.h" />
-    <ClInclude Include="..\..\src\kvazaar_version.h" />
     <ClInclude Include="..\..\src\nal.h" />
     <ClInclude Include="..\..\src\rate_control.h" />
     <ClInclude Include="..\..\src\rdo.h" />
@@ -265,6 +272,7 @@
     <ClInclude Include="..\..\src\strategies\strategies-ipol.h" />
     <ClInclude Include="..\..\src\strategies\strategies-nal.h" />
     <ClInclude Include="..\..\src\strategies\strategies-picture.h" />
+    <ClInclude Include="..\..\src\strategies\strategies-sao.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-sad.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm-satd.h" />
     <ClInclude Include="..\..\src\strategies\x86_asm\picture-x86-asm.h" />

@@ -18,17 +18,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "context.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
 #include "encoder.h"
 
 

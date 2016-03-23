@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include "encoder.h"
 
 #include <stdio.h>
@@ -30,7 +26,7 @@
 #include <assert.h>
 
 #include "tables.h"
-#include "config.h"
+#include "cfg.h"
 #include "cabac.h"
 #include "image.h"
 #include "nal.h"
@@ -80,13 +76,7 @@ static int select_owf_auto(const kvz_config *const cfg)
     // If wpp is not on, select owf such that there is enough
     // tiles for twice the number of threads.
 
-    int tiles_per_frame = 1;
-    if (cfg->tiles_width_count > 0) {
-      tiles_per_frame *= cfg->tiles_width_count + 1;
-    }
-    if (cfg->tiles_height_count > 0) {
-      tiles_per_frame *= cfg->tiles_height_count + 1;
-    }
+    int tiles_per_frame= cfg->tiles_width_count * cfg->tiles_height_count;
     int threads = (cfg->threads > 1 ? cfg->threads : 1);
     int frames = CEILDIV(threads * 4, tiles_per_frame);
 
@@ -129,6 +119,13 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     encoder->owf = select_owf_auto(cfg);
     fprintf(stderr, "--owf=auto value set to %d.\n", encoder->owf);
   }
+  if (cfg->source_scan_type != KVZ_INTERLACING_NONE) {
+    // If using interlaced coding with OWF, the OWF has to be an even number
+    // to ensure that the pair of fields will be output for the same picture.
+    if (encoder->owf % 2 == 1) {
+      encoder->owf += 1;
+    }
+  }
 
   encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
   if (!encoder->threadqueue ||
@@ -153,8 +150,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   // Rate-distortion optimization level
   encoder->rdo        = 1;
   encoder->full_intra_search = 0;
-  // INTERLACING
+
+  // Interlacing
   encoder->in.source_scan_type = (int8_t)cfg->source_scan_type;
+  encoder->vui.field_seq_flag = encoder->cfg->source_scan_type != 0;
+  encoder->vui.frame_field_info_present_flag = encoder->cfg->source_scan_type != 0;
 
   // Initialize the scaling list
   kvz_scalinglist_init(&encoder->scaling_list);
@@ -172,16 +172,21 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   
   kvz_encoder_control_input_init(encoder, cfg->width, cfg->height);
 
-  encoder->target_avg_bppic = cfg->target_bitrate / cfg->framerate;
+  if (cfg->framerate_num != 0) {
+    double framerate = cfg->framerate_num / (double)cfg->framerate_denom;
+    encoder->target_avg_bppic = cfg->target_bitrate / (framerate);
+  } else {
+    encoder->target_avg_bppic = cfg->target_bitrate / cfg->framerate;
+  }
   encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
 
   if (!encoder_control_init_gop_layer_weights(encoder)) {
     goto init_failed;
   }
-  
+
   //Tiles
-  encoder->tiles_enable = encoder->cfg->tiles_width_count > 0 ||
-                          encoder->cfg->tiles_height_count > 0;
+  encoder->tiles_enable = encoder->cfg->tiles_width_count > 1 ||
+                          encoder->cfg->tiles_height_count > 1;
 
   {
     int i, j; //iteration variables
@@ -191,11 +196,11 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     //Temporary pointers to allow encoder fields to be const
     int32_t *tiles_col_width, *tiles_row_height, *tiles_ctb_addr_rs_to_ts, *tiles_ctb_addr_ts_to_rs, *tiles_tile_id, *tiles_col_bd, *tiles_row_bd;
 
-    if (encoder->cfg->tiles_width_count >= encoder->in.width_in_lcu) {
+    if (encoder->cfg->tiles_width_count > encoder->in.width_in_lcu) {
       fprintf(stderr, "Too many tiles (width)!\n");
       goto init_failed;
 
-    } else if (encoder->cfg->tiles_height_count >= encoder->in.height_in_lcu) {
+    } else if (encoder->cfg->tiles_height_count > encoder->in.height_in_lcu) {
       fprintf(stderr, "Too many tiles (height)!\n");
       goto init_failed;
     }
@@ -204,8 +209,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
     encoder->tiles_uniform_spacing_flag = 1;
 
     //tilesn[x,y] contains the number of _separation_ between tiles, whereas the encoder needs the number of tiles.
-    encoder->tiles_num_tile_columns = encoder->cfg->tiles_width_count + 1;
-    encoder->tiles_num_tile_rows = encoder->cfg->tiles_height_count + 1;
+    encoder->tiles_num_tile_columns = encoder->cfg->tiles_width_count;
+    encoder->tiles_num_tile_rows = encoder->cfg->tiles_height_count;
 
     encoder->tiles_col_width = tiles_col_width =
       MALLOC(int32_t, encoder->tiles_num_tile_columns);
@@ -430,6 +435,19 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   encoder->vui.transfer = encoder->cfg->vui.transfer;
   encoder->vui.colormatrix = encoder->cfg->vui.colormatrix;
   encoder->vui.chroma_loc = (int8_t)encoder->cfg->vui.chroma_loc;
+
+  // If fractional framerate is set, use that instead of the floating point framerate.
+  if (cfg->framerate_num != 0) {
+    encoder->vui.timing_info_present_flag = 1;
+    encoder->vui.num_units_in_tick = cfg->framerate_denom;
+    encoder->vui.time_scale = cfg->framerate_num;
+    if (cfg->source_scan_type != KVZ_INTERLACING_NONE) {
+      // when field_seq_flag=1, the time_scale and num_units_in_tick refer to
+      // field rate rather than frame rate.
+      encoder->vui.time_scale *= 2;
+    }
+  }
+
   // AUD
   encoder->aud_enable = (int8_t)encoder->cfg->aud_enable;
 
@@ -588,12 +606,4 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
   }
 
   return 1;
-}
-
-unsigned kvz_get_padding(unsigned width_or_height){
-  if (width_or_height % CU_MIN_SIZE_PIXELS){
-    return CU_MIN_SIZE_PIXELS - (width_or_height % CU_MIN_SIZE_PIXELS);
-  }else{
-    return 0;
-  }
 }

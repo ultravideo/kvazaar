@@ -18,10 +18,6 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include <stdlib.h>
 
 #include "ipol-generic.h"
@@ -503,7 +499,7 @@ void kvz_get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int 
   int sample_out_of_bounds = out_of_bounds_y || out_of_bounds_x;
 
   if (sample_out_of_bounds){
-    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (width + filter_size));
+    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (height + filter_size));
     if (!out->buffer){
       fprintf(stderr, "Memory allocation failed!\n");
       assert(0);
@@ -522,7 +518,7 @@ void kvz_get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int 
       coord_y *= ref_width;
 
       if (!out_of_bounds_x){
-        memcpy(&out->buffer[dst_y*(width + filter_size) + 0], &ref[coord_y + min_x], (width + filter_size) * sizeof(kvz_pixel));
+        memcpy(&out->buffer[dst_y * out->stride + 0], &ref[coord_y + min_x], out->stride * sizeof(kvz_pixel));
       } else {
         for (dst_x = 0, x = (xpos)-half_filter_size; x < ((xpos + width)) + half_filter_size; dst_x++, x++) {
 
@@ -530,7 +526,7 @@ void kvz_get_extended_block_generic(int xpos, int ypos, int mv_x, int mv_y, int 
           coord_x = CLIP(0, (ref_width)-1, coord_x);
 
           // Store source block data (with extended borders)
-          out->buffer[dst_y*(width + filter_size) + dst_x] = ref[coord_y + coord_x];
+          out->buffer[dst_y * out->stride + dst_x] = ref[coord_y + coord_x];
         }
       }
     }

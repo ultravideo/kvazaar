@@ -104,11 +104,44 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
 
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
 
-  for (int32_t n = 0; n < width * height; n++) {
-    int32_t level;
-    level = coef[n];
-    level = ((int64_t)abs(level) * quant_coeff[n] + add) >> q_bits;
-    delta_u[n] = (int32_t)(((int64_t)abs(coef[n]) * quant_coeff[n] - (level << q_bits)) >> q_bits8);
+  for (int32_t n = 0; n < width * height; n += 16) {
+
+    __m256i v_level = _mm256_loadu_si256((__m256i*)&(coef[n]));
+
+    v_level = _mm256_abs_epi16(v_level);
+    __m256i low_a = _mm256_unpacklo_epi16(v_level, _mm256_set1_epi16(0));
+    __m256i high_a = _mm256_unpackhi_epi16(v_level, _mm256_set1_epi16(0));
+
+    __m256i low_b = _mm256_unpacklo_epi16(v_quant_coeff, _mm256_set1_epi16(0));
+    __m256i high_b = _mm256_unpackhi_epi16(v_quant_coeff, _mm256_set1_epi16(0));
+
+    __m256i v_level32_a = _mm256_madd_epi16(low_a, low_b);
+    __m256i v_level32_b = _mm256_madd_epi16(high_a, high_b);
+
+    v_level32_a = _mm256_add_epi32(v_level32_a, _mm256_set1_epi32(add));
+    v_level32_b = _mm256_add_epi32(v_level32_b, _mm256_set1_epi32(add));
+
+    v_level32_a = _mm256_srai_epi32(v_level32_a, q_bits);
+    v_level32_b = _mm256_srai_epi32(v_level32_b, q_bits);
+
+    v_level = _mm256_packs_epi32(v_level32_a, v_level32_b);
+
+    __m256i v_coef = _mm256_loadu_si256((__m256i*)&(coef[n]));
+    __m256i v_coef_a = _mm256_unpacklo_epi16(_mm256_abs_epi16(v_coef), _mm256_set1_epi16(0));
+    __m256i v_coef_b = _mm256_unpackhi_epi16(_mm256_abs_epi16(v_coef), _mm256_set1_epi16(0));
+    __m256i v_quant_coeff_a = _mm256_unpacklo_epi16(v_quant_coeff, _mm256_set1_epi16(0));
+    __m256i v_quant_coeff_b = _mm256_unpackhi_epi16(v_quant_coeff, _mm256_set1_epi16(0));
+    v_coef_a = _mm256_madd_epi16(v_coef_a, v_quant_coeff_a);
+    v_coef_b = _mm256_madd_epi16(v_coef_b, v_quant_coeff_b);
+    v_coef_a = _mm256_sub_epi32(v_coef_a, _mm256_slli_epi32(_mm256_unpacklo_epi16(v_level, _mm256_set1_epi16(0)), q_bits) );
+    v_coef_b = _mm256_sub_epi32(v_coef_b, _mm256_slli_epi32(_mm256_unpackhi_epi16(v_level, _mm256_set1_epi16(0)), q_bits) );
+    v_coef_a = _mm256_srai_epi32(v_coef_a, q_bits8);
+    v_coef_b = _mm256_srai_epi32(v_coef_b, q_bits8);
+    
+    _mm_storeu_si128((__m128i*)&(delta_u[n+0*4]), _mm256_castsi256_si128(v_coef_a));
+    _mm_storeu_si128((__m128i*)&(delta_u[n+2*4]), _mm256_extracti128_si256(v_coef_a, 1));
+    _mm_storeu_si128((__m128i*)&(delta_u[n+1*4]), _mm256_castsi256_si128(v_coef_b));
+    _mm_storeu_si128((__m128i*)&(delta_u[n+3*4]), _mm256_extracti128_si256(v_coef_b, 1));
   }
 
   if (ac_sum >= 2) {

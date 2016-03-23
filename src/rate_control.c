@@ -67,7 +67,7 @@ static void gop_allocate_bits(encoder_state_t * const state)
 
   // At this point, total_bits_coded of the current state contains the
   // number of bits written encoder->owf frames before the current frame.
-  int bits_coded = state->global->total_bits_coded;
+  uint64_t bits_coded = state->global->total_bits_coded;
   int pictures_coded = MAX(0, state->global->frame - encoder->owf);
 
   int gop_offset = (state->global->gop_offset - encoder->owf) % MAX(1, encoder->cfg->gop_len);

@@ -20,36 +20,43 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-/**
+/** 
+ * \ingroup Control
  * \file
- * \brief This file defines the public API of Kvazaar when used as a library.
+ * This file defines the public API of Kvazaar when used as a library.
  */
 
 #include <stddef.h>
 #include <stdint.h>
 
-#include "kvazaar_version.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#if defined(KVZ_STATIC_LIB)
-  // Using or building kvazaar as a static library.
-  #define KVZ_PUBLIC
-#elif defined(_WIN32) || defined(__CYGWIN__)
-  #ifdef KVZ_DLL_EXPORTS
-    // Building kvazaar on windows.
+#if defined(KVZ_DLL_EXPORTS)
+  #if !defined(PIC)
+    // Building static kvazaar library.
+    #define KVZ_PUBLIC
+  #elif defined(_WIN32) || defined(__CYGWIN__)
+    // Building kvazaar DLL on Windows.
     #define KVZ_PUBLIC __declspec(dllexport)
+  #elif defined(__GNUC__)
+    // Building kvazaar shared library with GCC.
+    #define KVZ_PUBLIC __attribute__ ((visibility ("default")))
   #else
-    // Using kvazaar as a DLL on windows.
-    #define KVZ_PUBLIC __declspec(dllimport)
+    #define KVZ_PUBLIC
   #endif
-#elif defined(__GNUC__)
-  // Using GCC and not on windows.
-  #define KVZ_PUBLIC __attribute__ ((visibility ("default")))
 #else
-  #define KVZ_PUBLIC
+  #if defined(KVZ_STATIC_LIB)
+    // Using static kvazaar library.
+    #define KVZ_PUBLIC
+  #elif defined(_WIN32) || defined(__CYGWIN__)
+    // Using kvazaar DLL on Windows.
+    #define KVZ_PUBLIC __declspec(dllimport)
+  #else
+    // Using kvazaar shared library and not on Windows.
+    #define KVZ_PUBLIC
+  #endif
 #endif
 
 /**
@@ -80,6 +87,42 @@ typedef struct kvz_encoder kvz_encoder;
 enum kvz_ime_algorithm {
   KVZ_IME_HEXBS = 0,
   KVZ_IME_TZ = 1,
+  KVZ_IME_FULL = 2,
+};
+
+/**
+ * \brief Interlacing methods.
+ * \since 3.2.0
+ */
+enum kvz_interlacing
+{
+  KVZ_INTERLACING_NONE = 0,
+  KVZ_INTERLACING_TFF = 1, // top field first
+  KVZ_INTERLACING_BFF = 2, // bottom field first
+};
+
+/**
+* \brief Constrain movement vectors.
+* \since 3.3.0
+*/
+enum kvz_mv_constraint
+{
+  KVZ_MV_CONSTRAIN_NONE = 0,
+  KVZ_MV_CONSTRAIN_FRAME = 1,  // Don't refer outside the frame.
+  KVZ_MV_CONSTRAIN_TILE = 2,  // Don't refer to other tiles.
+  KVZ_MV_CONSTRAIN_FRAME_AND_TILE = 3,  // Don't refer outside the tile.
+  KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN = 4,  // Keep enough margin for fractional pixel margins not to refer outside the tile.
+};
+
+/**
+* \brief Constrain movement vectors.
+* \since 3.5.0
+*/
+enum kvz_hash
+{
+  KVZ_HASH_NONE = 0,
+  KVZ_HASH_CHECKSUM = 1,
+  KVZ_HASH_MD5 = 2,
 };
 
 /**
@@ -100,7 +143,9 @@ typedef struct kvz_gop_config {
 /**
  * \brief Struct which contains all configuration data
  *
- * Function config_alloc in kvz_api must be used for allocation.
+ * Functions config_alloc, config_init and config_destroy must be used to
+ * maintain ABI compatibility. Do not copy this struct, as the size might
+ * change.
  */
 typedef struct kvz_config
 {
@@ -120,11 +165,15 @@ typedef struct kvz_config
 
   int32_t width;   /*!< \brief frame width, must be a multiple of 8 */
   int32_t height;  /*!< \brief frame height, must be a multiple of 8 */
-  double framerate; /*!< \brief Input framerate */
+  double framerate; /*!< \brief Deprecated, will be removed. */
+  int32_t framerate_num; /*!< \brief Framerate numerator */
+  int32_t framerate_denom; /*!< \brief Framerate denominator */
   int32_t deblock_enable; /*!< \brief Flag to enable deblocking filter */
   int32_t sao_enable;     /*!< \brief Flag to enable sample adaptive offset filter */
   int32_t rdoq_enable;    /*!< \brief Flag to enable RD optimized quantization. */
   int32_t signhide_enable;   /*!< \brief Flag to enable sign hiding. */
+  int32_t smp_enable;   /*!< \brief Flag to enable SMP blocks. */
+  int32_t amp_enable;   /*!< \brief Flag to enable AMP blocks. */
   int32_t rdo;            /*!< \brief RD-calculation level (0..2) */
   int32_t full_intra_search; /*!< \brief If true, don't skip modes in intra search. */
   int32_t trskip_enable;    /*!< \brief Flag to enable transform skip (for 4x4 blocks). */
@@ -176,6 +225,12 @@ typedef struct kvz_config
   kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
 
   int32_t target_bitrate;
+
+  int8_t mv_rdo;            /*!< \brief MV RDO calculation in search (0: estimation, 1: RDO). */
+  int8_t calc_psnr;         /*!< \since 3.1.0 \brief Print PSNR in CLI. */
+
+  enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
+  enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
 } kvz_config;
 
 /**
@@ -201,6 +256,8 @@ typedef struct kvz_picture {
 
   int64_t pts;             //!< \brief Presentation timestamp. Should be set for input frames.
   int64_t dts;             //!< \brief Decompression timestamp.
+
+  enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
 } kvz_picture;
 
 /**
@@ -480,10 +537,6 @@ typedef struct kvz_api {
                                   kvz_frame_info *info_out);
 } kvz_api;
 
-// Append API version to the getters name to prevent linking against incompatible versions.
-#define KVZ_API_CONCAT(func, version) func ## _apiv ## version
-#define KVZ_API_EXPAND_VERSION(func, version) KVZ_API_CONCAT(func, version)
-#define kvz_api_get KVZ_API_EXPAND_VERSION(kvz_api_get, KVZ_API_VERSION)
 
 KVZ_PUBLIC const kvz_api * kvz_api_get(int bit_depth);
 

@@ -87,8 +87,14 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\interface_main.c" />
+    <ClCompile Include="..\..\src\cli.c" />
+    <ClCompile Include="..\..\src\encmain.c" />
+    <ClCompile Include="..\..\src\yuv_io.c" />
     <ClCompile Include="..\..\src\visualization.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\cli.h" />
+    <ClInclude Include="..\..\src\yuv_io.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

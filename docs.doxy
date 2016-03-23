@@ -97,7 +97,7 @@ BRIEF_MEMBER_DESC      = YES
 # brief descriptions will be completely suppressed.
 # The default value is: YES.
 
-REPEAT_BRIEF           = YES
+REPEAT_BRIEF           = NO
 
 # This tag implements a quasi-intelligent brief description abbreviator that is
 # used to form the text in various listings. Each string in this list, if found
@@ -167,7 +167,7 @@ SHORT_NAMES            = NO
 # description.)
 # The default value is: NO.
 
-JAVADOC_AUTOBRIEF      = NO
+JAVADOC_AUTOBRIEF      = YES
 
 # If the QT_AUTOBRIEF tag is set to YES then doxygen will interpret the first
 # line (until the first dot) of a Qt-style comment as the brief description. If
@@ -734,7 +734,8 @@ WARN_LOGFILE           =
 # spaces.
 # Note: If this tag is empty the current directory is searched.
 
-INPUT                  = src
+INPUT                  = README.md src src/strategies src/strategies/altivec src/strategies/avx2 src/strategies/generic src/strategies/sse2 src/strategies/sse41 src/strategies/x86_asm tools
+USE_MDFILE_AS_MAINPAGE = README.md
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -754,7 +755,7 @@ INPUT_ENCODING         = UTF-8
 # *.md, *.mm, *.dox, *.py, *.f90, *.f, *.for, *.tcl, *.vhd, *.vhdl, *.ucf,
 # *.qsf, *.as and *.js.
 
-FILE_PATTERNS          =
+FILE_PATTERNS          = *.md *.c *.h *.asm *.py
 
 # The RECURSIVE tag can be used to specify whether or not subdirectories should
 # be searched for input files as well.
@@ -2043,7 +2044,7 @@ HAVE_DOT               = YES
 # Minimum value: 0, maximum value: 32, default value: 0.
 # This tag requires that the tag HAVE_DOT is set to YES.
 
-DOT_NUM_THREADS        = 1 # Marko usually has encoding in the background.
+DOT_NUM_THREADS        = 6
 
 # When you want a differently looking font n the dot files that doxygen
 # generates you can specify the font name using DOT_FONTNAME. You need to make

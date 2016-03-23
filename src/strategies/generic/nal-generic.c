@@ -18,16 +18,30 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include <stdlib.h>
 #include <assert.h>
+
+#include "extras/libmd5.h"
 
 #include "strategyselector.h"
 #include "nal.h"
 
+
+static void array_md5_generic(const kvz_pixel* data,
+                              const int height, const int width,
+                              const int stride,
+                              unsigned char checksum_out[SEI_HASH_MAX_LENGTH], const uint8_t bitdepth)
+{
+  assert(SEI_HASH_MAX_LENGTH >= 16);
+
+  context_md5_t md5_ctx;
+  kvz_md5_init(&md5_ctx);
+  
+  unsigned bytes = width * height * sizeof(kvz_pixel);
+  kvz_md5_update(&md5_ctx, (const unsigned char *)data, bytes);
+
+  kvz_md5_final(checksum_out, &md5_ctx);
+}
 
 static void array_checksum_generic(const kvz_pixel* data,
                                    const int height, const int width,
@@ -154,6 +168,7 @@ static void array_checksum_generic8(const kvz_pixel* data,
 int kvz_strategy_register_nal_generic(void* opaque, uint8_t bitdepth) {
   bool success = true;
 
+  success &= kvz_strategyselector_register(opaque, "array_md5", "generic", 0, &array_md5_generic);
   success &= kvz_strategyselector_register(opaque, "array_checksum", "generic", 0, &array_checksum_generic);
   success &= kvz_strategyselector_register(opaque, "array_checksum", "generic4", 1, &array_checksum_generic4);
   success &= kvz_strategyselector_register(opaque, "array_checksum", "generic8", 2, &array_checksum_generic8);

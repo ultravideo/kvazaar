@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
- * \brief
+ * Top level of the encoder implementation.
  */
 
 #include "global.h"
@@ -32,12 +33,10 @@
 #include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
-#include "config.h"
 #include "tables.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
 #include "imagelist.h"
-
 
 // Submodules
 // Functions to obtain geometry information from LCU
@@ -117,8 +116,8 @@ typedef struct {
   //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
   yuv_t *ver_buf_search;
   
+  // The bottom post-deblocking, pre-SAO pixels of every WPP-row.
   yuv_t *hor_buf_before_sao;
-  yuv_t *ver_buf_before_sao;
   
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
@@ -252,5 +251,6 @@ static const uint8_t g_min_in_group[10] = {
 #define OFFSET_HOR_BUF(position_x, position_y, cur_pic, i) ((position_x) + i + ((position_y)/LCU_WIDTH - 1) * (cur_pic)->width)
 #define OFFSET_HOR_BUF_C(position_x, position_y, cur_pic, i) ((position_x/2) + i + ((position_y)/LCU_WIDTH - 1) * (cur_pic)->width / 2)
   
+/** @} */
 
 #endif //ENCODERSTATE_H_

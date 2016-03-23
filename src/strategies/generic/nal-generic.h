@@ -19,7 +19,14 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
-#include  "global.h"
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Generic C implementations of optimized functions.
+ */
+
+#include "global.h"
 
 int kvz_strategy_register_nal_generic(void* opaque, uint8_t bitdepth);
 

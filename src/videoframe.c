@@ -18,13 +18,8 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
- * \file
- */
-
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #include "sao.h"
 #include "threads.h"
@@ -108,43 +103,4 @@ cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int 
   assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
   
   return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
-}
-
-#if KVZ_BIT_DEPTH == 8
-#define PSNRMAX (255.0 * 255.0)
-#else
-  #define PSNRMAX ((double)PIXEL_MAX * (double)PIXEL_MAX)
-#endif
-
-/**
- * \brief Calculates image PSNR value
- *
- * \param src   source picture
- * \param rec   reconstructed picture
- * \prama psnr  returns the PSNR
- */
-void kvz_videoframe_compute_psnr(const kvz_picture *const src,
-                                 const kvz_picture *const rec,
-                                 double psnr[NUM_COLORS])
-{
-  assert(src->width  == rec->width);
-  assert(src->height == rec->height);
-
-  int32_t pixels = src->width * src->height;
-
-  for (int32_t c = 0; c < NUM_COLORS; ++c) {
-    int32_t num_pixels = pixels;
-    if (c != COLOR_Y) {
-      num_pixels >>= 2;
-    }
-    psnr[c] = 0;
-    for (int32_t i = 0; i < num_pixels; ++i) {
-      const int32_t error = src->data[c][i] - rec->data[c][i];
-      psnr[c] += error * error;
-    }
-
-    // Avoid division by zero
-    if (psnr[c] == 0) psnr[c] = 99.0;
-    psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;
-  }
 }

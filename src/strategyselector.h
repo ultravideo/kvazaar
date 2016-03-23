@@ -20,6 +20,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+/**
+ * \ingroup Optimization
+ * \file
+ * Dynamic dispatch based on cpuid.
+ */
+
 #include "global.h"
 
 #if defined(KVZ_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
@@ -112,7 +118,6 @@ typedef struct {
 } strategy_to_select_t;
 
 typedef struct {
-  int intel;
   struct {
     int mmx;
     int sse;
@@ -125,12 +130,10 @@ typedef struct {
     int avx2;
   } intel_flags;
   
-  int powerpc;
   struct {
     int altivec;
   } powerpc_flags;
   
-  int arm;
   struct {
     int neon;
   } arm_flags;
@@ -150,6 +153,7 @@ int kvz_strategyselector_register(void *opaque, const char *type, const char *st
 #include "strategies/strategies-ipol.h"
 #include "strategies/strategies-quant.h"
 #include "strategies/strategies-intra.h"
+#include "strategies/strategies-sao.h"
 
 static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_NAL_EXPORTS
@@ -158,10 +162,8 @@ static const strategy_to_select_t strategies_to_select[] = {
   STRATEGIES_IPOL_EXPORTS
   STRATEGIES_QUANT_EXPORTS
   STRATEGIES_INTRA_EXPORTS
+  STRATEGIES_SAO_EXPORTS
   { NULL, NULL },
 };
-
-unsigned satd_8bit_8x8_generic(const kvz_pixel * const block1, const kvz_pixel * const block2);
-
 
 #endif //STRATEGYSELECTOR_H_

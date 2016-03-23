@@ -20,9 +20,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-/*
+/**
+ * \ingroup Control
  * \file
- * \brief The highest level of the encoder.
+ * Initialization of encoder_control_t.
  */
 
 #include "global.h"
@@ -30,7 +31,6 @@
 #include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
-#include "config.h"
 #include "tables.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
@@ -83,6 +83,10 @@ typedef struct encoder_control_t
   /* VUI */
   struct
   {
+    /* Timing info */
+    int32_t num_units_in_tick; /*!< \brief Timing scale numerator */
+    int32_t time_scale; /*!< \brief Timing scale denominator */
+
     int16_t sar_width;
     int16_t sar_height;
     int8_t overscan;
@@ -95,6 +99,8 @@ typedef struct encoder_control_t
 
     int8_t field_seq_flag;
     int8_t frame_field_info_present_flag;
+
+    int8_t timing_info_present_flag;
   } vui;
 
   int8_t aud_enable;
@@ -159,5 +165,4 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);
 void kvz_encoder_control_free(encoder_control_t *encoder);
 
 void kvz_encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);
-unsigned kvz_get_padding(unsigned width_or_height);
 #endif

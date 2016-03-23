@@ -19,6 +19,15 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+
+/**
+ * \ingroup Optimization
+ * \file
+ * Optimizations for AVX2.
+ */
+
+#include "global.h"
+
 #include <stdint.h>
 
 int kvz_strategy_register_quant_avx2(void* opaque, uint8_t bitdepth);

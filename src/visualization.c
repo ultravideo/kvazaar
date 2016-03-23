@@ -27,6 +27,7 @@
 #if KVZ_VISUALIZATION == 1
 
 #include "encoderstate.h"
+#include "strategies/strategies-picture.h"
 
 SDL_Renderer *renderer, *info_renderer;
 SDL_Window *window, *info_window = NULL;
