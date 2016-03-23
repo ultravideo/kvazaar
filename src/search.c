@@ -500,9 +500,6 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 #ifdef KVZ_DEBUG
   int debug_split = 0;
 #endif
-#if KVZ_VISUALIZATION == 1
-  int sdl_work_tree_copy = 0;
-#endif
   PERFORMANCE_MEASURE_START(KVZ_PERF_SEARCHCU);
 
   // Stop recursion if the CU is completely outside the frame.
@@ -687,18 +684,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 #if KVZ_DEBUG
       debug_split = 1;
 #endif
-#if KVZ_VISUALIZATION == 1
-      sdl_work_tree_copy = 0;
-#endif
     } else if (depth > 0) {
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
       work_tree_copy_down(x, y, depth, work_tree);
-#if KVZ_VISUALIZATION == 1
-      sdl_work_tree_copy = 1;
-    } else if (depth == 0) {
-      sdl_work_tree_copy = 1;
-#endif
     }
   }
 
@@ -726,7 +715,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       state->tile->lcu_offset_x*(LCU_WIDTH / 2) +
       state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
 
-    if ((cur_cu->depth == 0) || sdl_work_tree_copy || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
+    if ((cur_cu->depth == 0) || cur_cu->depth == depth || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
       kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
         x_max, y_max, LCU_WIDTH, pic_width);
       kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
