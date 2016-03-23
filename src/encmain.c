@@ -354,9 +354,7 @@ done:
 
   CHECKPOINTS_FINALIZE();
 #if KVZ_VISUALIZATION == 1
-  free(sdl_pixels);
-  free(sdl_pixels_RGB);
-  SDL_Quit();
+  kvz_visualization_free();
 #endif
 
   return retval;

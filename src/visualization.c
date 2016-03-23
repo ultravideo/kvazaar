@@ -74,6 +74,13 @@ kvz_visualization_init(int width, int height)
   }
 }
 
+kvz_visualization_free()
+{
+  free(sdl_pixels);
+  free(sdl_pixels_RGB);
+  SDL_Quit();
+}
+
 kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in)
 {
   kvz_mutex_lock(&sdl_mutex);

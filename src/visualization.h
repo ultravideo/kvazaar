@@ -62,6 +62,7 @@ extern TTF_Font *font;
 void *eventloop_main(void *temp);
 
 kvz_visualization_init(int width, int height);
+kvz_visualization_free();
 
 kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in);
 
