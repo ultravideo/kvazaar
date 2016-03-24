@@ -32,6 +32,7 @@
 
 #define E3 1000
 #define E9 1000000000
+#define FILETIME_TO_EPOCH 0x19DB1DED53E8000LL
 
 #if defined(__GNUC__) && !defined(__MINGW32__) 
 #include <unistd.h>
@@ -96,8 +97,10 @@ static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, i
   KVZ_GET_TIME(&now);
 
   int64_t moment_100ns = (int64_t)now.dwHighDateTime << 32 | (int64_t)now.dwLowDateTime;
+  moment_100ns -= (int64_t)FILETIME_TO_EPOCH;
+   
   int64_t secs = moment_100ns / (E9 / 100) + (wait_ms / E3);
-  int64_t nsecs = (moment_100ns % (E9 / 100)) + wait_ms % E3) * (E9 / E3));
+  int64_t nsecs = (moment_100ns % (E9 / 100))*100 + ((wait_ms % E3) * (E9 / E3));
   
   if (nsecs >= E9) {
     secs += 1;
