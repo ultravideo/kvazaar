@@ -26,7 +26,7 @@
  * Rate-Distortion Optimization related functionality.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "encoder.h"
 #include "encoderstate.h"

@@ -26,7 +26,7 @@
  * Network Abstraction Layer (NAL) messages.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include <stdio.h>
 

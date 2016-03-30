@@ -26,7 +26,7 @@
  *  Container for a list of reference pictures.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "image.h"
 #include "cu.h"

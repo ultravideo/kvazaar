@@ -26,7 +26,7 @@
  * Various tables.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 /***
   * List of indices for 4x4 coefficient groups within 8x8 transform block.

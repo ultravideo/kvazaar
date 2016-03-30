@@ -29,7 +29,7 @@
 #ifdef NDEBUG
 #error "CHECKPOINTS require assertions to be enabled!"
 #endif
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include <string.h>
 #include <stdio.h>

@@ -26,7 +26,7 @@
  * Context derivation for CABAC.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "encoder.h"
 #include "encoderstate.h"

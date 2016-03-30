@@ -26,7 +26,7 @@
  * \brief Compression of a single coding tree unit (CTU).
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "encoderstate.h"
 

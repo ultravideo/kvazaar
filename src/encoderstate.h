@@ -26,7 +26,7 @@
  * Top level of the encoder implementation.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "videoframe.h"
 #include "encoder.h"

@@ -26,7 +26,7 @@
  * Dynamic dispatch based on cpuid.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #if defined(KVZ_DEBUG) && !defined(DEBUG_STRATEGYSELECTOR)
 # define DEBUG_STRATEGYSELECTOR

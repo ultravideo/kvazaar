@@ -26,7 +26,7 @@
  * Coding Unit data structure and related functions.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "image.h"
 

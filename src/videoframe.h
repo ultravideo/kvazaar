@@ -26,7 +26,7 @@
  * \brief Container for the frame currently being encoded.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "cu.h"
 #include "image.h"

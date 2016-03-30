@@ -26,7 +26,7 @@
  * Interface for hash functions.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "../nal.h"
 

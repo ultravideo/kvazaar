@@ -26,7 +26,7 @@
  * \brief Definitions for opaque structs in kvazaar.h
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "kvazaar.h"
 #include "input_frame_buffer.h"

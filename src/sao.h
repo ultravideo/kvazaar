@@ -26,10 +26,10 @@
  * Sample Adaptive Offset filter.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "checkpoint.h"
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 #include "videoframe.h"
 #include "encoder.h"
 #include "encoderstate.h"

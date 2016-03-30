@@ -26,7 +26,7 @@
  * Initialization of encoder_control_t.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "image.h"
 #include "bitstream.h"

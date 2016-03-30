@@ -26,7 +26,7 @@
  * Container for worker tasks.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include <pthread.h>
 #include "threads.h"

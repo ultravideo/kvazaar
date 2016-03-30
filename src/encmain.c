@@ -31,7 +31,7 @@
 #include <fcntl.h>    /* _O_BINARY */
 #endif
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "kvazaar_internal.h"
 

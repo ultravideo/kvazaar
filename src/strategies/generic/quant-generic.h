@@ -26,7 +26,7 @@
  * Generic C implementations of optimized functions.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include <stdint.h>
 

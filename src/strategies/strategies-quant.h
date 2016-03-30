@@ -26,7 +26,7 @@
  * Interface for quantization functions.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "encoderstate.h"
 

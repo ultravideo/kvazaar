@@ -35,9 +35,13 @@
 #include "config.h"
 #endif
 
+// Include some basics in all files, like assert, primitives and NULL.
+// IWYU pragma: begin_exports
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
+// IWYU pragma: end_exports
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

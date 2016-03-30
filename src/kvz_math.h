@@ -25,7 +25,7 @@
 * Generic math functions
 */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 static INLINE unsigned kvz_math_floor_log2(unsigned value)
 {

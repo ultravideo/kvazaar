@@ -26,7 +26,7 @@
  * \brief Functions related to rate control.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "encoderstate.h"
 
