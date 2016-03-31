@@ -20,10 +20,10 @@
 
 #include <stdlib.h>
 
-#include "ipol-generic.h"
+#include "strategies/generic/ipol-generic.h"
 #include "strategyselector.h"
 #include "encoder.h"
-#include "picture-generic.h"
+#include "strategies/generic/picture-generic.h"
 
 extern int8_t kvz_g_luma_filter[4][8];
 extern int8_t kvz_g_chroma_filter[8][4];

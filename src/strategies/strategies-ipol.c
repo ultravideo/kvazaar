@@ -18,7 +18,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "strategies-ipol.h"
+#include "strategies/strategies-ipol.h"
 #include "strategyselector.h"
 
 // Define function pointers.
@@ -28,8 +28,8 @@ ipol_func *kvz_filter_inter_octpel_chroma;
 epol_func *kvz_get_extended_block;
 
 // Headers for platform optimizations.
-#include "generic/ipol-generic.h"
-#include "avx2/ipol-avx2.h"
+#include "strategies/generic/ipol-generic.h"
+#include "strategies/avx2/ipol-avx2.h"
 
 
 int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth) {

@@ -22,7 +22,7 @@
 * \file
 */
 
-#include "ipol-avx2.h"
+#include "strategies/avx2/ipol-avx2.h"
 #include "strategyselector.h"
 
 #if COMPILE_INTEL_AVX2

@@ -24,9 +24,9 @@
 
 #include <stdlib.h>
 
-#include "quant-avx2.h"
-#include "../generic/quant-generic.h"
-#include "../strategies-common.h"
+#include "strategies/avx2/quant-avx2.h"
+#include "strategies/generic/quant-generic.h"
+#include "strategies/strategies-common.h"
 #include "strategyselector.h"
 #include "encoder.h"
 #include "transform.h"

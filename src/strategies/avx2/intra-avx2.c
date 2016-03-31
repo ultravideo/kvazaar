@@ -20,7 +20,7 @@
 
 #include <stdlib.h>
 
-#include "intra-avx2.h"
+#include "strategies/avx2/intra-avx2.h"
 #include "strategyselector.h"
 
 #if COMPILE_INTEL_AVX2 && defined X86_64

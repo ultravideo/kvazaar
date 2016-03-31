@@ -20,7 +20,7 @@
 
 #include <stdlib.h>
 
-#include "quant-generic.h"
+#include "strategies/generic/quant-generic.h"
 #include "strategyselector.h"
 #include "encoder.h"
 #include "transform.h"

@@ -18,6 +18,8 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#include "strategies/generic/dct-generic.h"
+
 #include <stdlib.h>
 
 #include "strategyselector.h"

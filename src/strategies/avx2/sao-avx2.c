@@ -20,7 +20,7 @@
 
 #include <stdlib.h>
 
-#include "sao-avx2.h"
+#include "strategies/avx2/sao-avx2.h"
 #include "sao.h"
 #include "strategyselector.h"
 #include "rdo.h"

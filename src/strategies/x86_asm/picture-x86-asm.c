@@ -23,8 +23,8 @@
 
 #if defined(KVZ_COMPILE_ASM)
 
-#include "picture-x86-asm-sad.h"
-#include "picture-x86-asm-satd.h"
+#include "strategies/x86_asm/picture-x86-asm-sad.h"
+#include "strategies/x86_asm/picture-x86-asm-satd.h"
 
 static unsigned kvz_sad_32x32_avx(const kvz_pixel *data1, const kvz_pixel *data2)
 {

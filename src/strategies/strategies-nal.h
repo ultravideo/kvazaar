@@ -28,7 +28,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
-#include "../nal.h"
+#include "nal.h"
 
 //Function pointer to kvz_array_checksum
 /**

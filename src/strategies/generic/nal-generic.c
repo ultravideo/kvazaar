@@ -18,6 +18,8 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
+#include "strategies/generic/nal-generic.h"
+
 #include <stdlib.h>
 #include <assert.h>
 

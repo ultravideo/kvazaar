@@ -24,7 +24,7 @@
 
 #include <stdlib.h>
 
-#include "dct-avx2.h"
+#include "strategies/avx2/dct-avx2.h"
 #include "strategyselector.h"
 #include "tables.h"
 

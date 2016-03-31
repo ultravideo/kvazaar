@@ -21,7 +21,7 @@
 /*
  * \file
  */
-#include "picture-avx2.h"
+#include "strategies/avx2/picture-avx2.h"
 #include "strategyselector.h"
 
 #if COMPILE_INTEL_AVX2

@@ -18,7 +18,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "strategies-sao.h"
+#include "strategies/strategies-sao.h"
 #include "strategyselector.h"
 
 // Define function pointers.
@@ -28,8 +28,8 @@ sao_reconstruct_color_func * kvz_sao_reconstruct_color;
 sao_band_ddistortion_func * kvz_sao_band_ddistortion;
 
 // Headers for platform optimizations.
-#include "generic/sao-generic.h"
-#include "avx2/sao-avx2.h"
+#include "strategies/generic/sao-generic.h"
+#include "strategies/avx2/sao-avx2.h"
 
 
 int kvz_strategy_register_sao(void* opaque, uint8_t bitdepth) {

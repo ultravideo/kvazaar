@@ -20,7 +20,7 @@
 
 #include <stdlib.h>
 
-#include "intra-generic.h"
+#include "strategies/generic/intra-generic.h"
 #include "strategyselector.h"
 
 

@@ -18,7 +18,7 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "picture-sse2.h"
+#include "strategies/sse2/picture-sse2.h"
 #include "strategyselector.h"
 
 #if COMPILE_INTEL_SSE2

@@ -20,7 +20,7 @@
 
 #include <stdlib.h>
 
-#include "sao-generic.h"
+#include "strategies/generic/sao-generic.h"
 #include "sao.h"
 #include "strategyselector.h"
 #include "rdo.h"
