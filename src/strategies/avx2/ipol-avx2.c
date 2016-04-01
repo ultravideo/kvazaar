@@ -23,16 +23,17 @@
 */
 
 #include "strategies/avx2/ipol-avx2.h"
-#include "strategyselector.h"
 
 #if COMPILE_INTEL_AVX2
-#include <stdlib.h>
-
 #include <immintrin.h>
-
+#include <stdio.h>
+#include <string.h>
 
 #include "encoder.h"
+#include "kvazaar.h"
 #include "strategies/generic/picture-generic.h"
+#include "strategies/strategies-ipol.h"
+#include "strategyselector.h"
 
 
 #define FILTER_OFFSET 3

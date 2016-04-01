@@ -28,6 +28,7 @@
 
 #include  "global.h" // IWYU pragma: keep
 
+
 int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_IPOL_AVX2_H_

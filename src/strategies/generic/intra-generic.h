@@ -28,10 +28,6 @@
 
 #include "global.h" // IWYU pragma: keep
 
-#include <stdint.h>
-
-#include "encoderstate.h"
-
 int kvz_strategy_register_intra_generic(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_INTRA_GENERIC_H_

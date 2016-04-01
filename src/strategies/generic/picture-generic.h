@@ -27,6 +27,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth);
 

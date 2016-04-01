@@ -21,7 +21,9 @@
 #include "strategies/generic/picture-generic.h"
 
 #include <stdlib.h>
+#include <string.h>
 
+#include "strategies/strategies-picture.h"
 #include "strategyselector.h"
 
 // Function to clip int16_t to pixel. (0-255 or 0-1023)

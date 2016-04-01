@@ -27,8 +27,8 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
-#include "image.h"
 
 typedef kvz_pixel (*pred_buffer)[32 * 32];
 

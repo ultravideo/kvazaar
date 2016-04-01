@@ -19,13 +19,15 @@
  ****************************************************************************/
 
 #include "sao.h"
+
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "cabac.h"
 #include "rdo.h"
 #include "strategies/strategies-picture.h"
 #include "strategies/strategies-sao.h"
-
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
 
 
 static void init_sao_info(sao_info_t *sao) {

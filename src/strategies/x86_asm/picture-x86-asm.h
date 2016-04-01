@@ -28,6 +28,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
+
 int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth);
 
 #endif //STRATEGIES_PICTURE_X86_ASM_H_

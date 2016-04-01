@@ -28,6 +28,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
+
 // Forward declare because including the header would lead  to a cyclic
 // dependency.
 struct encoder_state_t;

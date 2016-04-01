@@ -26,10 +26,8 @@
  * Deblocking filter.
  */
 
-#include "global.h" // IWYU pragma: keep
-
-#include "encoder.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
 
 
 /**

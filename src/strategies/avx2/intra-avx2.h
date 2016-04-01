@@ -28,9 +28,6 @@
 
 #include "global.h" // IWYU pragma: keep
 
-#include <stdint.h>
-
-#include "encoderstate.h"
 
 int kvz_strategy_register_intra_avx2(void* opaque, uint8_t bitdepth);
 

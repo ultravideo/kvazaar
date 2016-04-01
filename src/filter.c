@@ -20,15 +20,14 @@
 
 #include "filter.h"
 
-#include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
-#include "bitstream.h"
-#include "videoframe.h"
-#include "cabac.h"
+#include "cu.h"
+#include "encoder.h"
+#include "kvazaar.h"
 #include "transform.h"
+#include "videoframe.h"
+
 
 //////////////////////////////////////////////////////////////////////////
 // INITIALIZATIONS
@@ -423,10 +422,6 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
       dp = dp0 + dp3;
       dq = dq0 + dq3;
       d  =  d0 + d3;
-
-      #if ENABLE_PCM
-      // TODO: add PCM deblocking
-      #endif
 
       if (d < beta) {
         int8_t filter_P = (dp < side_threshold) ? 1 : 0;

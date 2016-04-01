@@ -27,24 +27,23 @@
 /* The following two defines must be located before the inclusion of any system header files. */
 #define WINVER       0x0500
 #define _WIN32_WINNT 0x0500
-#include <io.h>       /* _setmode() */
 #include <fcntl.h>    /* _O_BINARY */
+#include <io.h>       /* _setmode() */
 #endif
 
-#include "global.h" // IWYU pragma: keep
-
-#include "kvazaar_internal.h"
-
 #include <math.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "checkpoint.h"
-#include "global.h"
-#include "encoder.h"
 #include "cli.h"
+#include "encoder.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+#include "kvazaar_internal.h"
+#include "threads.h"
 #include "yuv_io.h"
 
 /**

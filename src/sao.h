@@ -26,14 +26,14 @@
  * Sample Adaptive Offset filter.
  */
 
-#include "global.h" // IWYU pragma: keep
-
 #include "checkpoint.h"
-#include "global.h" // IWYU pragma: keep
-#include "videoframe.h"
+#include "cu.h"
 #include "encoder.h"
 #include "encoderstate.h"
-#include "math.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+#include "videoframe.h"
+
 
 typedef enum { SAO_TYPE_NONE = 0, SAO_TYPE_BAND, SAO_TYPE_EDGE } sao_type;
 typedef enum { SAO_EO0 = 0, SAO_EO1, SAO_EO2, SAO_EO3, SAO_NUM_EO } sao_eo_class;

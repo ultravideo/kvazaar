@@ -28,6 +28,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
+
 unsigned kvz_satd_4x4_avx(const kvz_pixel *org, const kvz_pixel *cur);
 unsigned kvz_satd_8x8_avx(const kvz_pixel *org, const kvz_pixel *cur);
 unsigned kvz_satd_16x16_avx(const kvz_pixel *org, const kvz_pixel *cur);

@@ -26,10 +26,12 @@
  * Interface for sao functions.
  */
 
-#include "global.h" // IWYU pragma: keep
-
+#include "encoder.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 #include "sao.h"
+
 
 // Declare function pointers.
 typedef int (sao_edge_ddistortion_func)(const kvz_pixel *orig_data, const kvz_pixel *rec_data,

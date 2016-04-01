@@ -19,16 +19,15 @@
  ****************************************************************************/
 
 #include "strategies/strategies-intra.h"
+
+#include "strategies/avx2/intra-avx2.h"
+#include "strategies/generic/intra-generic.h"
 #include "strategyselector.h"
+
 
 // Define function pointers.
 angular_pred_func *kvz_angular_pred;
 intra_pred_planar_func *kvz_intra_pred_planar;
-
-// Headers for platform optimizations.
-#include "strategies/generic/intra-generic.h"
-#include "strategies/avx2/intra-avx2.h"
-
 
 int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth) {
   bool success = true;
@@ -38,5 +37,6 @@ int kvz_strategy_register_intra(void* opaque, uint8_t bitdepth) {
   if (kvz_g_hardware_flags.intel_flags.avx2) {
     success &= kvz_strategy_register_intra_avx2(opaque, bitdepth);
   }
+
   return success;
 }

@@ -19,7 +19,11 @@
  ****************************************************************************/
 
 #include "strategies/strategies-dct.h"
+
+#include "avx2/dct-avx2.h"
+#include "generic/dct-generic.h"
 #include "strategyselector.h"
+
 
 // Define function pointers.
 dct_func * kvz_fast_forward_dst_4x4 = 0;
@@ -35,11 +39,6 @@ dct_func * kvz_idct_4x4 = 0;
 dct_func * kvz_idct_8x8= 0;
 dct_func * kvz_idct_16x16 = 0;
 dct_func * kvz_idct_32x32 = 0;
-
-
-// Headers for platform optimizations.
-#include "generic/dct-generic.h"
-#include "avx2/dct-avx2.h"
 
 
 int kvz_strategy_register_dct(void* opaque, uint8_t bitdepth) {

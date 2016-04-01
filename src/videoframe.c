@@ -18,12 +18,13 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
-#include <string.h>
-
-#include "sao.h"
-#include "threads.h"
 #include "videoframe.h"
+
+#include <stdlib.h>
+
+#include "image.h"
+#include "sao.h"
+
 
 /**
  * \brief Allocate new frame

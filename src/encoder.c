@@ -22,22 +22,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 
-#include "tables.h"
 #include "cfg.h"
-#include "cabac.h"
-#include "image.h"
-#include "nal.h"
-#include "context.h"
-#include "transform.h"
-#include "intra.h"
-#include "inter.h"
-#include "filter.h"
-#include "search.h"
-#include "sao.h"
-#include "rdo.h"
+
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
 

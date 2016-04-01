@@ -26,9 +26,12 @@
  * Interface for quantization functions.
  */
 
-#include "global.h" // IWYU pragma: keep
-
+#include "cu.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+#include "tables.h"
+
 
 // Declare function pointers.
 typedef unsigned (quant_func)(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,

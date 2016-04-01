@@ -30,6 +30,7 @@
 
 #include "kvazaar.h"
 
+
 /**
  * A stream of bits.
  */

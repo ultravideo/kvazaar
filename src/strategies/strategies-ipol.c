@@ -19,17 +19,17 @@
  ****************************************************************************/
 
 #include "strategies/strategies-ipol.h"
+
+#include "strategies/avx2/ipol-avx2.h"
+#include "strategies/generic/ipol-generic.h"
 #include "strategyselector.h"
+
 
 // Define function pointers.
 ipol_func *kvz_filter_inter_quarterpel_luma;
 ipol_func *kvz_filter_inter_halfpel_chroma;
 ipol_func *kvz_filter_inter_octpel_chroma;
 epol_func *kvz_get_extended_block;
-
-// Headers for platform optimizations.
-#include "strategies/generic/ipol-generic.h"
-#include "strategies/avx2/ipol-avx2.h"
 
 
 int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth) {

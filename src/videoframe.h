@@ -26,12 +26,10 @@
  * \brief Container for the frame currently being encoded.
  */
 
-#include "global.h" // IWYU pragma: keep
-
 #include "cu.h"
-#include "image.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
-struct sao_info_t;
 
 /**
  * \brief Struct which contains all picture data

@@ -20,15 +20,12 @@
 
 #include "bitstream.h"
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
-#include <string.h>
-#include <stdarg.h>
 #include <stdlib.h>
-#include <assert.h>
+#include <string.h>
 
 #include "kvz_math.h"
+
 
 const uint32_t kvz_bit_set_mask[] =
 {

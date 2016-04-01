@@ -26,11 +26,12 @@
  * Inter prediction.
  */
 
-#include "global.h" // IWYU pragma: keep
-
-#include "image.h"
-#include "encoder.h"
+#include "cu.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+#include "image.h"
+#include "kvazaar.h"
+
 
 typedef struct {
   uint8_t dir;

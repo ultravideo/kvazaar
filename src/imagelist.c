@@ -18,14 +18,13 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "threads.h"
 #include "imagelist.h"
-#include "strategyselector.h"
 
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
+
+#include "image.h"
+#include "threads.h"
 
 
 /**

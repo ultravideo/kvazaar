@@ -20,13 +20,10 @@
 
 #include "strategies/generic/nal-generic.h"
 
-#include <stdlib.h>
-#include <assert.h>
-
 #include "extras/libmd5.h"
-
-#include "strategyselector.h"
+#include "kvazaar.h"
 #include "nal.h"
+#include "strategyselector.h"
 
 
 static void array_md5_generic(const kvz_pixel* data,

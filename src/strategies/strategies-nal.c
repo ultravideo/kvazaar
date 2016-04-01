@@ -22,6 +22,7 @@
 
 #include "strategies/generic/nal-generic.h"
 
+
 void (*kvz_array_checksum)(const kvz_pixel* data,
                        const int height, const int width,
                        const int stride,

@@ -27,8 +27,8 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
-#include "encoderstate.h"
 
 typedef void (angular_pred_func)(
   const int_fast8_t log2_width,

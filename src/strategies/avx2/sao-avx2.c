@@ -18,16 +18,20 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
-
 #include "strategies/avx2/sao-avx2.h"
-#include "sao.h"
-#include "strategyselector.h"
-#include "rdo.h"
-#include "strategies/strategies-common.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+
+#include "cu.h"
+#include "encoder.h"
+#include "encoderstate.h"
+#include "kvazaar.h"
+#include "sao.h"
+#include "strategies/strategies-common.h"
+#include "strategyselector.h"
+
+
 // These optimizations are based heavily on sao-generic.c.
 // Might be useful to check that if (when) this file
 // is difficult to understand.

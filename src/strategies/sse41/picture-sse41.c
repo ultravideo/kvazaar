@@ -19,13 +19,13 @@
  ****************************************************************************/
 
 #include "strategies/sse41/picture-sse41.h"
-#include "strategyselector.h"
 
 #if COMPILE_INTEL_SSE41
-#  include "image.h"
-#  include <immintrin.h>
-#  include <assert.h>
-#  include <stdlib.h>
+#include <immintrin.h>
+#include <stdlib.h>
+
+#include "kvazaar.h"
+#include "strategyselector.h"
 
 
 static unsigned reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * const data2,

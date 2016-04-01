@@ -28,6 +28,7 @@
 
 #include "global.h" // IWYU pragma: keep
 
+
 /***
   * List of indices for 4x4 coefficient groups within 8x8 transform block.
   * First index: 0 = diagonal, 1 = vertical, 2 horizontal scan pattern.

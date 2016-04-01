@@ -26,10 +26,9 @@
  * Container for worker tasks.
  */
 
-#include "global.h" // IWYU pragma: keep
-
 #include <pthread.h>
-#include "threads.h"
+
+#include "global.h" // IWYU pragma: keep
 
 typedef enum {
   THREADQUEUE_JOB_STATE_QUEUED = 0,

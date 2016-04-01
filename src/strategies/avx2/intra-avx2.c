@@ -18,14 +18,16 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
-
 #include "strategies/avx2/intra-avx2.h"
-#include "strategyselector.h"
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include <immintrin.h>
+#include <stdlib.h>
+
+#include "kvazaar.h"
 #include "strategies/strategies-common.h"
+#include "strategyselector.h"
+
 
  /**
  * \brief Linear interpolation for 4 pixels. Returns 4 filtered pixels in lowest 32-bits of the register.

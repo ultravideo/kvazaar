@@ -20,10 +20,8 @@
 
 #include "strategies/generic/dct-generic.h"
 
-#include <stdlib.h>
-
 #include "strategyselector.h"
-#include "encoder.h"
+#include "tables.h"
 
 const int16_t kvz_g_dst_4[4][4] =
 {

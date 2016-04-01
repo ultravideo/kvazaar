@@ -19,16 +19,16 @@
  ****************************************************************************/
 
 #include "strategies/strategies-quant.h"
+
+#include "strategies/avx2/quant-avx2.h"
+#include "strategies/generic/quant-generic.h"
 #include "strategyselector.h"
+
 
 // Define function pointers.
 quant_func *kvz_quant;
 quant_residual_func *kvz_quantize_residual;
 dequant_func *kvz_dequant;
-
-// Headers for platform optimizations.
-#include "strategies/generic/quant-generic.h"
-#include "strategies/avx2/quant-avx2.h"
 
 
 int kvz_strategy_register_quant(void* opaque, uint8_t bitdepth) {

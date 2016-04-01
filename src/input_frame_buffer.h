@@ -27,6 +27,8 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+
 
 // Forward declaration.
 struct encoder_state_t;

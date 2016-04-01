@@ -26,9 +26,10 @@
  * Inter prediction parameter search.
  */
 
+#include "cu.h"
+#include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
 
-#include "encoderstate.h"
 
 int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu);
 

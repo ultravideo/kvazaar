@@ -27,11 +27,7 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-
-#include "image.h"
-#include "bitstream.h"
-#include "cabac.h"
-#include "tables.h"
+#include "kvazaar.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
 

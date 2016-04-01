@@ -27,8 +27,8 @@
  */
 
 #include "global.h" // IWYU pragma: keep
-
 #include "image.h"
+#include "kvazaar.h"
 
 
 //Cu stuff

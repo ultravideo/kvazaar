@@ -26,9 +26,11 @@
 * Intra prediction.
 */
 
-#include "global.h" // IWYU pragma: keep
-
+#include "cu.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+
 
 typedef struct {
   kvz_pixel left[2 * 32 + 1];

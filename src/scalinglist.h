@@ -26,7 +26,10 @@
  * Scaling list initialization.
  */
 
+#include <stdio.h>
+
 #include "global.h" // IWYU pragma: keep
+
 
 typedef struct {
         int8_t   enable;
