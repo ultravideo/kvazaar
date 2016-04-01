@@ -26,9 +26,10 @@
  * Appending bits into an Annex-B coded bitstream.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "kvazaar.h"
+
 
 /**
  * A stream of bits.

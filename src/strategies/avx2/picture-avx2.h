@@ -26,7 +26,8 @@
  * Optimizations for AVX2.
  */
 
-#include  "global.h"
+#include  "global.h" // IWYU pragma: keep
+
 
 int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth);
 

@@ -26,7 +26,9 @@
  * Buffering of input for reordering.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+
 
 // Forward declaration.
 struct encoder_state_t;

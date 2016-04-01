@@ -18,12 +18,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
+#include "strategies/generic/sao-generic.h"
 
-#include "sao-generic.h"
+#include "cu.h"
+#include "encoder.h"
+#include "encoderstate.h"
+#include "kvazaar.h"
 #include "sao.h"
 #include "strategyselector.h"
-#include "rdo.h"
 
 
 // Mapping of edge_idx values to eo-classes.

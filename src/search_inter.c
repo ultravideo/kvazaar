@@ -20,12 +20,20 @@
 
 #include "search_inter.h"
 
+#include <limits.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "cabac.h"
+#include "encoder.h"
+#include "image.h"
+#include "imagelist.h"
 #include "inter.h"
-#include "strategies/strategies-picture.h"
-#include "strategies/strategies-ipol.h"
+#include "kvazaar.h"
 #include "rdo.h"
+#include "strategies/strategies-ipol.h"
+#include "strategies/strategies-picture.h"
+#include "videoframe.h"
 
 
 /**

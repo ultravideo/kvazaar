@@ -20,13 +20,25 @@
 
 #include "encoder_state-bitstream.h"
 
-#include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "bitstream.h"
+#include "cabac.h"
 #include "checkpoint.h"
+#include "cu.h"
+#include "encoder.h"
+#include "encoder_state-geometry.h"
 #include "encoderstate.h"
+#include "imagelist.h"
+#include "kvazaar.h"
 #include "kvz_math.h"
 #include "nal.h"
+#include "scalinglist.h"
+#include "tables.h"
+#include "threadqueue.h"
+#include "videoframe.h"
 
 
 static void encoder_state_write_bitstream_aud(encoder_state_t * const state)

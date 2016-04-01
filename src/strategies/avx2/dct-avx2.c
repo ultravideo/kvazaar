@@ -22,14 +22,13 @@
 * \file
 */
 
-#include <stdlib.h>
-
-#include "dct-avx2.h"
-#include "strategyselector.h"
-#include "tables.h"
+#include "strategies/avx2/dct-avx2.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+
+#include "strategyselector.h"
+#include "tables.h"
 
 extern const int16_t kvz_g_dst_4[4][4];
 extern const int16_t kvz_g_dct_4[4][4];

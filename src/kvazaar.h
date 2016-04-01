@@ -26,8 +26,8 @@
  * This file defines the public API of Kvazaar when used as a library.
  */
 
-#include <stddef.h>
 #include <stdint.h>
+
 
 #ifdef __cplusplus
 extern "C" {

@@ -26,10 +26,10 @@
  *  Container for a list of reference pictures.
  */
 
-#include "global.h"
-
-#include "image.h"
 #include "cu.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+
 
 /**
  * \brief Struct which contains array of picture structs

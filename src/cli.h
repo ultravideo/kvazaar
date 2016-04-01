@@ -25,10 +25,8 @@
  * Command line interface
  */
 
-#include "global.h"
-
+#include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
-#include "encoderstate.h"
 
 typedef struct cmdline_opts_t {
   /** \brief Input filename */

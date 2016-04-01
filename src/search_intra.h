@@ -26,9 +26,9 @@
  * Intra prediction parameter search.
  */
 
-#include "global.h"
-
+#include "cu.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
 
 
 double kvz_luma_mode_bits(const encoder_state_t *state, 

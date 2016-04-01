@@ -18,18 +18,13 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "threads.h"
 #include "image.h"
-#include "strategyselector.h"
 
-#include <string.h>
-#include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
-#include <math.h>
-#include <assert.h>
 
-#include "checkpoint.h"
-#include "sao.h"
+#include "strategies/strategies-picture.h"
+#include "threads.h"
 
 /**
  * \brief Allocate a new image.

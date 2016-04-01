@@ -26,7 +26,7 @@
  * Abstractions for operating system specific stuff.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include <pthread.h>
 
@@ -35,15 +35,15 @@
 #define FILETIME_TO_EPOCH 0x19DB1DED53E8000LL
 
 #if defined(__GNUC__) && !defined(__MINGW32__) 
-#include <unistd.h>
-#include <time.h>
+#include <unistd.h> // IWYU pragma: export
+#include <time.h> // IWYU pragma: export
 
 #define KVZ_CLOCK_T struct timespec
 
 #ifdef __MACH__
 // Workaround Mac OS not having clock_gettime.
-#include <mach/clock.h>
-#include <mach/mach.h>
+#include <mach/clock.h> // IWYU pragma: export
+#include <mach/mach.h> // IWYU pragma: export
 #define KVZ_GET_TIME(clock_t) { \
   clock_serv_t cclock; \
   mach_timespec_t mts; \
@@ -82,7 +82,7 @@ static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, i
 
 #else //__GNUC__
 //TODO: we assume !GCC => Windows... this may be bad
-#include <windows.h>
+#include <windows.h> // IWYU pragma: export
 
 #define KVZ_CLOCK_T struct _FILETIME
 #define KVZ_GET_TIME(clock_t) { GetSystemTimeAsFileTime(clock_t); }

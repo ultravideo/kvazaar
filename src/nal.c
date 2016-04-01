@@ -19,15 +19,10 @@
  ****************************************************************************/
 
 #include "nal.h"
-#include "strategyselector.h"
-
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
 
 #include "bitstream.h"
-#include "cabac.h"
-#include "encoder.h"
+#include "strategies/strategies-nal.h"
+
 
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.

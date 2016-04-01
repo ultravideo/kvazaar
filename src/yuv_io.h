@@ -26,7 +26,10 @@
  * \brief Functions related to reading YUV input and output.
  */
 
-#include "global.h"
+#include <stdio.h>
+
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
 int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,

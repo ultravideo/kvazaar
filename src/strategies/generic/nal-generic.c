@@ -18,13 +18,12 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
-#include <assert.h>
+#include "strategies/generic/nal-generic.h"
 
 #include "extras/libmd5.h"
-
-#include "strategyselector.h"
+#include "kvazaar.h"
 #include "nal.h"
+#include "strategyselector.h"
 
 
 static void array_md5_generic(const kvz_pixel* data,

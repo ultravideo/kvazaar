@@ -26,9 +26,11 @@
  * \brief Compression of a single coding tree unit (CTU).
  */
 
-#include "global.h"
-
+#include "cu.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+#include "image.h"
+
 
 void kvz_search_lcu(encoder_state_t *state, int x, int y, const yuv_t *hor_buf, const yuv_t *ver_buf);
 

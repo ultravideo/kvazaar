@@ -19,8 +19,12 @@
  ****************************************************************************/
 
 #include "input_frame_buffer.h"
+
+#include "encoder.h"
 #include "encoderstate.h"
-#include <assert.h>
+#include "image.h"
+#include "videoframe.h"
+
 
 void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
 {

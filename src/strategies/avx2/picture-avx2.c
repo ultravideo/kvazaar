@@ -21,13 +21,16 @@
 /*
  * \file
  */
-#include "picture-avx2.h"
-#include "strategyselector.h"
+#include "strategies/avx2/picture-avx2.h"
 
 #if COMPILE_INTEL_AVX2
-#  include "image.h"
-#  include "strategies/strategies-common.h"
-#  include <immintrin.h>
+#include <immintrin.h>
+#include <string.h>
+
+#include "kvazaar.h"
+#include "strategies/strategies-picture.h"
+#include "strategyselector.h"
+#include "strategies/strategies-common.h"
 
 
 /**

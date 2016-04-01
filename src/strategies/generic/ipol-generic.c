@@ -18,12 +18,15 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
+#include "strategies/generic/ipol-generic.h"
 
-#include "ipol-generic.h"
-#include "strategyselector.h"
+#include <stdio.h>
+#include <string.h>
+
 #include "encoder.h"
-#include "picture-generic.h"
+#include "strategies/generic/picture-generic.h"
+#include "strategies/strategies-ipol.h"
+#include "strategyselector.h"
 
 extern int8_t kvz_g_luma_filter[4][8];
 extern int8_t kvz_g_chroma_filter[8][4];

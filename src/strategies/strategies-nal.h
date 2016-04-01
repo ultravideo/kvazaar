@@ -26,9 +26,10 @@
  * Interface for hash functions.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+#include "nal.h"
 
-#include "../nal.h"
 
 //Function pointer to kvz_array_checksum
 /**

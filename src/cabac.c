@@ -20,10 +20,6 @@
 
 #include "cabac.h"
 
-#include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-
 
 const uint8_t kvz_g_auc_next_state_mps[128] =
 {

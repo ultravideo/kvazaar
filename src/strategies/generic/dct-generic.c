@@ -18,10 +18,10 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
+#include "strategies/generic/dct-generic.h"
 
 #include "strategyselector.h"
-#include "encoder.h"
+#include "tables.h"
 
 const int16_t kvz_g_dst_4[4][4] =
 {

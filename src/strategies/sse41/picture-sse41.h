@@ -26,7 +26,8 @@
  * Optimizations for SSE4.1.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+
 
 int kvz_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth);
 

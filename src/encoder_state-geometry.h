@@ -26,7 +26,7 @@
  * Helper functions for tiles and slices.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 
 // Forward declare because including the header would lead  to a cyclic
