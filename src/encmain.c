@@ -36,6 +36,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h> // IWYU pragma: keep for CLOCKS_PER_SEC
 
 #include "checkpoint.h"
 #include "cli.h"
