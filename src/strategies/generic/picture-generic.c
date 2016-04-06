@@ -394,55 +394,6 @@ SAD_DUAL_NXN(16, kvz_pixel)
 SAD_DUAL_NXN(32, kvz_pixel)
 SAD_DUAL_NXN(64, kvz_pixel)
 
-/**
- * \brief BLock Image Transfer from one buffer to another.
- *
- * It's a stupidly simple loop that copies pixels.
- *
- * \param orig  Start of the originating buffer.
- * \param dst  Start of the destination buffer.
- * \param width  Width of the copied region.
- * \param height  Height of the copied region.
- * \param orig_stride  Width of a row in the originating buffer.
- * \param dst_stride  Width of a row in the destination buffer.
- *
- * This should be inlined, but it's defined here for now to see if Visual
- * Studios LTCG will inline it.
- */
-void kvz_pixels_blit_generic(const kvz_pixel * const orig, kvz_pixel * const dst,
-                         const unsigned width, const unsigned height,
-                         const unsigned orig_stride, const unsigned dst_stride)
-{
-  unsigned y;
-  //There is absolutely no reason to have a width greater than the source or the destination stride.
-  assert(width <= orig_stride);
-  assert(width <= dst_stride);
-
-#ifdef CHECKPOINTS
-  char *buffer = malloc((3 * width + 1) * sizeof(char));
-  for (y = 0; y < height; ++y) {
-    int p;
-    for (p = 0; p < width; ++p) {
-      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
-    }
-    buffer[3*width] = 0;
-    CHECKPOINT("kvz_pixels_blit: %04d: %s", y, buffer);
-  }
-  FREE_POINTER(buffer);
-#endif //CHECKPOINTS
-
-  if (orig == dst) {
-    //If we have the same array, then we should have the same stride
-    assert(orig_stride == dst_stride);
-    return;
-  }
-  assert(orig != dst || orig_stride == dst_stride);
-
-  for (y = 0; y < height; ++y) {
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
-  }
-}
-
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
@@ -474,8 +425,6 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "generic", 0, &satd_32x32_dual_generic);
   success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
   success &= kvz_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
-
-  success &= kvz_strategyselector_register(opaque, "pixels_blit", "generic", 0, &kvz_pixels_blit_generic);
 
   return success;
 }

@@ -543,87 +543,6 @@ SATD_NXN_DUAL_AVX2(16)
 SATD_NXN_DUAL_AVX2(32)
 SATD_NXN_DUAL_AVX2(64)
 
-void kvz_pixels_blit_avx2(const kvz_pixel * const orig, kvz_pixel * const dst,
-                         const unsigned width, const unsigned height,
-                         const unsigned orig_stride, const unsigned dst_stride)
-{
-  unsigned y;
-  //There is absolutely no reason to have a width greater than the source or the destination stride.
-  assert(width <= orig_stride);
-  assert(width <= dst_stride);
-
-#ifdef CHECKPOINTS
-  char *buffer = malloc((3 * width + 1) * sizeof(char));
-  for (y = 0; y < height; ++y) {
-    int p;
-    for (p = 0; p < width; ++p) {
-      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
-    }
-    buffer[3*width] = 0;
-    CHECKPOINT("kvz_pixels_blit_avx2: %04d: %s", y, buffer);
-  }
-  FREE_POINTER(buffer);
-#endif //CHECKPOINTS
-
-  if (width == orig_stride && width == dst_stride) {
-    memcpy(dst, orig, width * height * sizeof(kvz_pixel));
-    return;
-  }
-
-  int nxn_width = (width == height) ? width : 0;
-  switch (nxn_width) {
-    case 4:
-      *(int32_t*)&dst[dst_stride*0] = *(int32_t*)&orig[orig_stride*0];
-      *(int32_t*)&dst[dst_stride*1] = *(int32_t*)&orig[orig_stride*1];
-      *(int32_t*)&dst[dst_stride*2] = *(int32_t*)&orig[orig_stride*2];
-      *(int32_t*)&dst[dst_stride*3] = *(int32_t*)&orig[orig_stride*3];
-      break;
-    case 8:
-      *(int64_t*)&dst[dst_stride*0] = *(int64_t*)&orig[orig_stride*0];
-      *(int64_t*)&dst[dst_stride*1] = *(int64_t*)&orig[orig_stride*1];
-      *(int64_t*)&dst[dst_stride*2] = *(int64_t*)&orig[orig_stride*2];
-      *(int64_t*)&dst[dst_stride*3] = *(int64_t*)&orig[orig_stride*3];
-      *(int64_t*)&dst[dst_stride*4] = *(int64_t*)&orig[orig_stride*4];
-      *(int64_t*)&dst[dst_stride*5] = *(int64_t*)&orig[orig_stride*5];
-      *(int64_t*)&dst[dst_stride*6] = *(int64_t*)&orig[orig_stride*6];
-      *(int64_t*)&dst[dst_stride*7] = *(int64_t*)&orig[orig_stride*7];
-       break;
-    case 16:
-      for (int i = 0; i < 16; ++i) {
-        __m128i temp = _mm_loadu_si128((__m128i*)(orig + i * orig_stride));
-        _mm_storeu_si128((__m128i*)(dst + i * dst_stride), temp);
-      }
-      break;
-    case 32:
-      for (int i = 0; i < 32; ++i) {
-        __m256i temp = _mm256_loadu_si256((__m256i*)(orig + i * orig_stride));
-        _mm256_storeu_si256((__m256i*)(dst + i * dst_stride), temp);
-      }
-    break;
-    case 64:
-      for (int i = 0; i < 64; ++i) {
-        __m256i temp0 = _mm256_loadu_si256((__m256i*)(orig + i * orig_stride));
-        _mm256_storeu_si256((__m256i*)(dst + i * dst_stride), temp0);
-        __m256i temp1 = _mm256_loadu_si256((__m256i*)(orig + i * orig_stride + sizeof(__m256)));
-        _mm256_storeu_si256((__m256i*)(dst + i * dst_stride + sizeof(__m256)), temp1);
-      }
-    break;
-  default:
-
-    if (orig == dst) {
-      //If we have the same array, then we should have the same stride
-      assert(orig_stride == dst_stride);
-      return;
-    }
-    assert(orig != dst || orig_stride == dst_stride);
-
-    for (y = 0; y < height; ++y) {
-      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
-    }
-    break;
-  }
-}
-
 #endif //COMPILE_INTEL_AVX2
 
 
@@ -653,8 +572,6 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
-
-    success &= kvz_strategyselector_register(opaque, "pixels_blit", "avx2", 40, &kvz_pixels_blit_avx2);
   }
 #endif
   return success;
