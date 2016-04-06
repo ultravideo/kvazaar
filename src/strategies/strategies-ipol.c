@@ -30,6 +30,10 @@ ipol_func *kvz_filter_inter_quarterpel_luma;
 ipol_func *kvz_filter_inter_halfpel_chroma;
 ipol_func *kvz_filter_inter_octpel_chroma;
 epol_func *kvz_get_extended_block;
+kvz_sample_quarterpel_luma_func * kvz_sample_quarterpel_luma;
+kvz_sample_octpel_chroma_func * kvz_sample_octpel_chroma;
+kvz_sample_14bit_quarterpel_luma_func * kvz_sample_14bit_quarterpel_luma;
+kvz_sample_14bit_octpel_chroma_func * kvz_sample_14bit_octpel_chroma;
 
 
 int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth) {

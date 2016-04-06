@@ -61,7 +61,7 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
                          block_width,
                          block_height,
                          &src);
-  kvz_sample_quarterpel_luma_generic(state->encoder_control,
+  kvz_sample_quarterpel_luma(state->encoder_control,
                                      src.orig_topleft,
                                      src.stride,
                                      block_width,
@@ -106,7 +106,7 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
                          block_width,
                          block_height,
                          &src);
-  kvz_sample_14bit_quarterpel_luma_generic(state->encoder_control,
+  kvz_sample_14bit_quarterpel_luma(state->encoder_control,
                                            src.orig_topleft,
                                            src.stride,
                                            block_width,
@@ -147,13 +147,13 @@ static void inter_recon_frac_chroma(const encoder_state_t * const state,
   //Fractional chroma U
   kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->u, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_height, &src_u);
-  kvz_sample_octpel_chroma_generic(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
+  kvz_sample_octpel_chroma(state->encoder_control, src_u.orig_topleft, src_u.stride, block_width,
     block_height, lcu->rec.u + (ypos % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   //Fractional chroma V
   kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
     ref->v, ref->width >> 1, ref->height >> 1, FILTER_SIZE_C, block_width, block_height, &src_v);
-  kvz_sample_octpel_chroma_generic(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
+  kvz_sample_octpel_chroma(state->encoder_control, src_v.orig_topleft, src_v.stride, block_width,
     block_height, lcu->rec.v + (ypos  % LCU_WIDTH_C)*LCU_WIDTH_C + (xpos % LCU_WIDTH_C), LCU_WIDTH_C, mv_frac_x, mv_frac_y, mv_param);
 
   if (src_u.malloc_used) free(src_u.buffer);
@@ -198,7 +198,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                          block_width,
                          block_height,
                          &src_u);
-  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control,
+  kvz_sample_14bit_octpel_chroma(state->encoder_control,
                                          src_u.orig_topleft,
                                          src_u.stride,
                                          block_width,
@@ -223,7 +223,7 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
                          block_width,
                          block_height,
                          &src_v);
-  kvz_sample_14bit_octpel_chroma_generic(state->encoder_control,
+  kvz_sample_14bit_octpel_chroma(state->encoder_control,
                                          src_v.orig_topleft,
                                          src_v.stride,
                                          block_width,
