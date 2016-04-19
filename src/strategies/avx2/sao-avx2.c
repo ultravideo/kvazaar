@@ -288,13 +288,10 @@ void kvz_sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
         if ((block_width - x) >= 8) {
           _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
         } else {
-          union {
-            kvz_pixel arr[8];
-            int64_t val;
-          } temp;
           
-          temp.val = _mm_cvtsi128_si64(v_new_data_128);
-          for (int i = 0; i < block_width - x; ++i) new_data[i] = temp.arr[i];
+          kvz_pixel arr[8];
+          _mm_storel_epi64((__m128i*)arr, v_new_data_128);
+          for (int i = 0; i < block_width - x; ++i) new_data[i] = arr[i];
         }
       
       }
