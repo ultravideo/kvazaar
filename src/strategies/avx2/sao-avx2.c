@@ -284,7 +284,19 @@ void kvz_sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
         v_new_data = _mm256_add_epi32(v_new_data, _mm256_cvtepu8_epi32(v_c));
         __m128i v_new_data_128 = _mm_packus_epi32(_mm256_castsi256_si128(v_new_data), _mm256_extracti128_si256(v_new_data, 1));
         v_new_data_128 = _mm_packus_epi16(v_new_data_128, v_new_data_128);
-        _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
+        
+        if ((block_width - x) >= 8) {
+          _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
+        } else {
+          union {
+            kvz_pixel arr[8];
+            int64_t val;
+          } temp;
+          
+          temp.val = _mm_cvtsi128_si64(v_new_data_128);
+          for (int i = 0; i < block_width - x; ++i) new_data[i] = temp.arr[i];
+        }
+      
       }
     }
   }
