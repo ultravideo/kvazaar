@@ -267,6 +267,30 @@ void kvz_four_tap_filter_x4_hor_avx2(int8_t *filter, kvz_pixel *data, int shift,
   _mm_storel_epi64((__m128i*)dst, temp);
 }
 
+int32_t kvz_four_tap_filter_x4_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride, int offset, int shift2, int shift3)
+{
+
+  __m128i v_filter = _mm_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[0])));
+  __m128i v_data0 = _mm_loadl_epi64((__m128i*)(data + stride * 0));
+  __m128i v_data1 = _mm_loadl_epi64((__m128i*)(data + stride * 1));
+  __m128i v_data = _mm_unpacklo_epi16(v_data0, v_data1);
+  __m128i temp =  _mm_madd_epi16(v_filter, v_data);
+
+  v_filter = _mm_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[2])));
+  __m128i v_data2 = _mm_loadl_epi64((__m128i*)(data + stride * 2));
+  __m128i v_data3 = _mm_loadl_epi64((__m128i*)(data + stride * 3));
+  v_data = _mm_unpacklo_epi16(v_data2, v_data3);
+  temp = _mm_add_epi32(temp, _mm_madd_epi16(v_filter, v_data) );
+
+  temp = _mm_add_epi32(temp, _mm_set1_epi32(offset));
+  temp = _mm_srai_epi32(temp, shift2 + shift3);
+
+  temp = _mm_packus_epi32(temp, temp);
+  temp = _mm_packus_epi16(temp, temp);
+
+  return _mm_cvtsi128_si32(temp);
+}
+
 void kvz_filter_inter_quarterpel_luma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag)
 {
 
@@ -526,10 +550,10 @@ void kvz_sample_octpel_chroma_avx2(const encoder_control_t * const encoder, kvz_
 
   // Filter vertically and flip x and y
   for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
+    for (x = 0; x < width; x+=4) {
       int ypos = y;
       int xpos = x;
-      dst[y*dst_stride + x] = kvz_fast_clip_32bit_to_pixel(((kvz_four_tap_filter_ver_16bit_avx2(ver_filter, &hor_filtered[ypos][xpos], sizeof(hor_filtered[0])/sizeof(int16_t)) + offset23) >> shift2) >> shift3);
+      *(int32_t*)&(dst[y*dst_stride + x]) = kvz_four_tap_filter_x4_ver_16bit_avx2(ver_filter, &hor_filtered[ypos][xpos], sizeof(hor_filtered[0])/sizeof(int16_t), offset23, shift2, shift3);
     }
   }
 }
