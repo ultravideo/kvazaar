@@ -946,7 +946,6 @@ static unsigned search_mv_full(const encoder_state_t * const state,
           {
             already_tested = true;
             x = xx + SEARCH_RANGE;
-            y = yy + SEARCH_RANGE;
             break;
           }
         }
