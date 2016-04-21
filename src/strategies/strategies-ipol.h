@@ -39,12 +39,21 @@ typedef unsigned(ipol_func)(const encoder_control_t * encoder, kvz_pixel *src, i
 typedef unsigned(epol_func)(int xpos, int ypos, int mv_x, int mv_y, int off_x, int off_y, kvz_pixel *ref, int ref_width, int ref_height,
   int filter_size, int width, int height, kvz_extended_block *out);
 
+typedef void(kvz_sample_quarterpel_luma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
+typedef void(kvz_sample_octpel_chroma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
+
+typedef void(kvz_sample_14bit_quarterpel_luma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
+typedef void(kvz_sample_14bit_octpel_chroma_func)(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height, int16_t *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2]);
 
 // Declare function pointers.
 extern ipol_func * kvz_filter_inter_quarterpel_luma;
 extern ipol_func * kvz_filter_inter_halfpel_chroma;
 extern ipol_func * kvz_filter_inter_octpel_chroma;
 extern epol_func * kvz_get_extended_block;
+extern kvz_sample_quarterpel_luma_func * kvz_sample_quarterpel_luma;
+extern kvz_sample_octpel_chroma_func * kvz_sample_octpel_chroma;
+extern kvz_sample_14bit_quarterpel_luma_func * kvz_sample_14bit_quarterpel_luma;
+extern kvz_sample_14bit_octpel_chroma_func * kvz_sample_14bit_octpel_chroma;
 
 
 int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth);
@@ -54,6 +63,10 @@ int kvz_strategy_register_ipol(void* opaque, uint8_t bitdepth);
   {"filter_inter_quarterpel_luma", (void**) &kvz_filter_inter_quarterpel_luma}, \
   {"filter_inter_halfpel_chroma", (void**) &kvz_filter_inter_halfpel_chroma}, \
   {"filter_inter_octpel_chroma", (void**) &kvz_filter_inter_octpel_chroma}, \
+  {"sample_quarterpel_luma", (void**) &kvz_sample_quarterpel_luma}, \
+  {"sample_octpel_chroma", (void**) &kvz_sample_octpel_chroma}, \
+  {"sample_14bit_quarterpel_luma", (void**) &kvz_sample_14bit_quarterpel_luma}, \
+  {"sample_14bit_octpel_chroma", (void**) &kvz_sample_14bit_octpel_chroma}, \
   {"get_extended_block", (void**) &kvz_get_extended_block}, \
 
 

@@ -544,6 +544,10 @@ int kvz_strategy_register_ipol_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "filter_inter_quarterpel_luma", "generic", 0, &kvz_filter_inter_quarterpel_luma_generic);
   success &= kvz_strategyselector_register(opaque, "filter_inter_halfpel_chroma", "generic", 0, &kvz_filter_inter_halfpel_chroma_generic);
   success &= kvz_strategyselector_register(opaque, "filter_inter_octpel_chroma", "generic", 0, &kvz_filter_inter_octpel_chroma_generic);
+  success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "generic", 0, &kvz_sample_quarterpel_luma_generic);
+  success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "generic", 0, &kvz_sample_octpel_chroma_generic);
+  success &= kvz_strategyselector_register(opaque, "sample_14bit_quarterpel_luma", "generic", 0, &kvz_sample_14bit_quarterpel_luma_generic);
+  success &= kvz_strategyselector_register(opaque, "sample_14bit_octpel_chroma", "generic", 0, &kvz_sample_14bit_octpel_chroma_generic);
   success &= kvz_strategyselector_register(opaque, "get_extended_block", "generic", 0, &kvz_get_extended_block_generic);
 
   return success;
