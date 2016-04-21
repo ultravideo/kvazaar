@@ -88,6 +88,10 @@ enum kvz_ime_algorithm {
   KVZ_IME_HEXBS = 0,
   KVZ_IME_TZ = 1,
   KVZ_IME_FULL = 2,
+  KVZ_IME_FULL8 = 3, //! \since 3.6.0
+  KVZ_IME_FULL16 = 4, //! \since 3.6.0
+  KVZ_IME_FULL32 = 5, //! \since 3.6.0
+  KVZ_IME_FULL64 = 6, //! \since 3.6.0
 };
 
 /**
