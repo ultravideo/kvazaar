@@ -403,8 +403,8 @@ void *eventloop_main(void* temp)
             sdl_force_redraw(locked);
           }
 
-          if (event.key.keysym.sym == SDLK_KP_PLUS) sdl_delay += 1;
-          if (event.key.keysym.sym == SDLK_KP_MINUS) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
+          if (event.key.keysym.sym == SDLK_KP_PLUS || event.key.keysym.sym == SDLK_COMMA) sdl_delay += 1;
+          if (event.key.keysym.sym == SDLK_KP_MINUS || event.key.keysym.sym == SDLK_PERIOD) { sdl_delay -= 1; if (sdl_delay < 0) sdl_delay = 0; }
           if (event.key.keysym.sym == SDLK_p) {
             if (locked) {
               locked = 0;
