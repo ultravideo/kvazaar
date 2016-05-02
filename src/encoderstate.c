@@ -1153,7 +1153,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
       if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
         if (ref_list[ref_list_idx] > 1) {
           // parseRefFrmIdx
-          int32_t ref_frame = cur_cu->inter.mv_ref_coded[ref_list_idx];
+          int32_t ref_frame = state->global->refmap[cur_cu->inter.mv_ref[ref_list_idx]].idx;
 
           cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
           CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");

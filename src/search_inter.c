@@ -1253,7 +1253,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   if (temp_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
-    cur_cu->inter.mv_ref_coded[ref_list] = state->global->refmap[ref_idx].idx;
+    uint8_t mv_ref_coded = state->global->refmap[ref_idx].idx;
 
     cur_cu->merged        = merged;
     cur_cu->merge_idx     = merge_idx;
@@ -1265,7 +1265,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
 
     *inter_cost = temp_cost;
-    *inter_bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
+    *inter_bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
   }
 }
 
@@ -1438,10 +1438,10 @@ static void search_pu_inter(encoder_state_t * const state,
           if (cost < *inter_cost) {
 
             cur_cu->inter.mv_dir = 3;
-            cur_cu->inter.mv_ref_coded[0] = state->global->refmap[merge_cand[i].ref[0]].idx;
-            cur_cu->inter.mv_ref_coded[1] = state->global->refmap[merge_cand[j].ref[1]].idx;
-
-
+            uint8_t mv_ref_coded[2] = {
+              state->global->refmap[merge_cand[i].ref[0]].idx,
+              state->global->refmap[merge_cand[j].ref[1]].idx
+            };
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
@@ -1493,7 +1493,7 @@ static void search_pu_inter(encoder_state_t * const state,
               cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
             }
             *inter_cost = cost;
-            *inter_bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[0] + cur_cu->inter.mv_ref_coded[1];
+            *inter_bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + mv_ref_coded[0] + mv_ref_coded[1];
           }
         }
       }
