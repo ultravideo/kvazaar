@@ -1365,11 +1365,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int pic_width = screen_w;
     const int poc = state->global->poc;
 
-    if (x_ctb == 0 && y_ctb == 0) {
-      memset(sdl_pixels_RGB_inter[poc % 2], 0, (screen_w*screen_h * 4));
-      SDL_UpdateTexture(overlay_inter[poc % 2], NULL, sdl_pixels_RGB_inter[poc % 2], pic_width * 4);
-    }
-
     const int lcu_width = (x + 64 >= screen_w ? screen_w - x : 64);
     const int lcu_height = (y + 64 >= screen_h ? screen_h - y : 64);
 
