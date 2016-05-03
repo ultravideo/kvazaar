@@ -1360,8 +1360,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     kvz_mutex_lock(&sdl_mutex);
 
     // Clean our own 64x64 area before starting to draw.
-    const int x = x_ctb * LCU_CU_WIDTH;
-    const int y = y_ctb * LCU_CU_WIDTH;
+    const int x = abs_x_ctb * LCU_CU_WIDTH;
+    const int y = abs_y_ctb * LCU_CU_WIDTH;
     const int pic_width = screen_w;
     const int poc = state->global->poc;
 
