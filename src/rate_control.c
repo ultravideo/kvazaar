@@ -22,6 +22,10 @@
 
 #include <math.h>
 
+#include "encoder.h"
+#include "kvazaar.h"
+
+
 static const int SMOOTHING_WINDOW = 40;
 
 /**

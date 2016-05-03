@@ -18,14 +18,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "picture-altivec.h"
-#include "strategyselector.h"
-#include "image.h"
-#include <assert.h>
+#include "strategies/altivec/picture-altivec.h"
 
 #if COMPILE_POWERPC_ALTIVEC
 #include <altivec.h>
 #include <stdlib.h>
+
+#include "kvazaar.h"
+#include "strategyselector.h"
 
 
 static unsigned reg_sad_altivec(const kvz_pixel * const data1, const kvz_pixel * const data2,

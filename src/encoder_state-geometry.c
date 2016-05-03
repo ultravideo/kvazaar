@@ -20,8 +20,9 @@
 
 #include "encoder_state-geometry.h"
 
+#include "encoder.h"
 #include "encoderstate.h"
-
+#include "videoframe.h"
 
 
 int kvz_lcu_at_slice_start(const encoder_control_t * const encoder, int lcu_addr_in_ts) {

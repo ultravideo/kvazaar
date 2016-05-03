@@ -26,12 +26,10 @@
  * Network Abstraction Layer (NAL) messages.
  */
 
-#include "global.h"
-
-#include <stdio.h>
-
-#include "image.h"
 #include "bitstream.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
+
 
 #define SEI_HASH_MAX_LENGTH 16
 

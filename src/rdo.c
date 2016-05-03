@@ -18,17 +18,20 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdio.h>
+#include "rdo.h"
+
 #include <stdlib.h>
 #include <string.h>
 
-#include "rdo.h"
-#include "transform.h"
-#include "context.h"
 #include "cabac.h"
-#include "transform.h"
-#include "strategies/strategies-quant.h"
+#include "context.h"
+#include "encoder.h"
+#include "imagelist.h"
 #include "inter.h"
+#include "scalinglist.h"
+#include "strategies/strategies-quant.h"
+#include "tables.h"
+#include "transform.h"
 
 
 #define QUANT_SHIFT          14

@@ -22,25 +22,30 @@
 * \file
 */
 
-#include <stdlib.h>
-
-#include "quant-avx2.h"
-#include "../generic/quant-generic.h"
-#include "../strategies-common.h"
-#include "strategyselector.h"
-#include "encoder.h"
-#include "transform.h"
-#include "rdo.h"
+#include "strategies/avx2/quant-avx2.h"
 
 #if COMPILE_INTEL_AVX2 && defined X86_64
 #include <immintrin.h>
-#include <smmintrin.h>
+#include <stdlib.h>
+
+#include "cu.h"
+#include "encoder.h"
+#include "encoderstate.h"
+#include "kvazaar.h"
+#include "rdo.h"
+#include "scalinglist.h"
+#include "strategies/generic/quant-generic.h"
+#include "strategies/strategies-common.h"
+#include "strategies/strategies-quant.h"
+#include "strategyselector.h"
+#include "tables.h"
+#include "transform.h"
+
 
 /**
-* \brief quantize transformed coefficents
-*
-*/
-
+ * \brief quantize transformed coefficents
+ *
+ */
 void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coeff_t *q_coef, int32_t width,
   int32_t height, int8_t type, int8_t scan_idx, int8_t block_type)
 {

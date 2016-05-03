@@ -26,9 +26,9 @@
  * Interface for distortion metric functions.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
-#include "../image.h"
 
 typedef kvz_pixel (*pred_buffer)[32 * 32];
 
@@ -88,10 +88,6 @@ typedef unsigned (cost_pixel_any_size_func)(
 );
 typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const kvz_pixel *orig, unsigned num_modes, unsigned *costs_out);
 
-typedef void pixels_blit_func(const kvz_pixel* orig, kvz_pixel *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride);
-
 
 // Declare function pointers.
 extern reg_sad_func * kvz_reg_sad;
@@ -120,8 +116,6 @@ extern cost_pixel_nxn_multi_func * kvz_satd_8x8_dual;
 extern cost_pixel_nxn_multi_func * kvz_satd_16x16_dual;
 extern cost_pixel_nxn_multi_func * kvz_satd_32x32_dual;
 extern cost_pixel_nxn_multi_func * kvz_satd_64x64_dual;
-
-extern pixels_blit_func * kvz_pixels_blit;
 
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
@@ -153,7 +147,6 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_16x16_dual", (void**) &kvz_satd_16x16_dual}, \
   {"satd_32x32_dual", (void**) &kvz_satd_32x32_dual}, \
   {"satd_64x64_dual", (void**) &kvz_satd_64x64_dual}, \
-  {"pixels_blit", (void**) &kvz_pixels_blit}, \
 
 
 

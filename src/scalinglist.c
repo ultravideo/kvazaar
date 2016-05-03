@@ -22,8 +22,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tables.h"
 #include "scalinglist.h"
+#include "tables.h"
+
 
 const uint8_t kvz_g_scaling_list_num[4]    = { 6, 6, 6, 2};
 const uint16_t kvz_g_scaling_list_size[4]  = {   16,  64, 256,1024};

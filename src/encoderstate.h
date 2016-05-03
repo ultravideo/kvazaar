@@ -26,25 +26,17 @@
  * Top level of the encoder implementation.
  */
 
-#include "global.h"
-
-#include "videoframe.h"
-#include "encoder.h"
-#include "image.h"
 #include "bitstream.h"
 #include "cabac.h"
-#include "tables.h"
-#include "scalinglist.h"
-#include "threadqueue.h"
+#include "cu.h"
+#include "encoder.h"
+#include "global.h" // IWYU pragma: keep
+#include "image.h"
 #include "imagelist.h"
-
-// Submodules
-// Functions to obtain geometry information from LCU
-#include "encoder_state-geometry.h"
-// Constructors/destructors
-#include "encoder_state-ctors_dtors.h"
-// Functions writing bitstream parts
-#include "encoder_state-bitstream.h"
+#include "kvazaar.h"
+#include "tables.h"
+#include "threadqueue.h"
+#include "videoframe.h"
 
 
 typedef enum {

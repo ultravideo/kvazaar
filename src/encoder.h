@@ -26,12 +26,8 @@
  * Initialization of encoder_control_t.
  */
 
-#include "global.h"
-
-#include "image.h"
-#include "bitstream.h"
-#include "cabac.h"
-#include "tables.h"
+#include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 #include "scalinglist.h"
 #include "threadqueue.h"
 

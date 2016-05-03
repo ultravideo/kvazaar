@@ -20,11 +20,7 @@
 
 #include "context.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
-#include "encoder.h"
+#include "tables.h"
 
 
 // stuff

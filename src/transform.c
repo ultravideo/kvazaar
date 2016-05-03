@@ -20,17 +20,14 @@
 
 #include "transform.h"
 
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-
-#include "nal.h"
+#include "image.h"
+#include "kvazaar.h"
 #include "rdo.h"
 #include "strategies/strategies-dct.h"
-#include "strategies/strategies-quant.h"
-#include "strategies/generic/quant-generic.h"
 #include "strategies/strategies-picture.h"
+#include "strategies/strategies-quant.h"
+#include "tables.h"
+
 
 //////////////////////////////////////////////////////////////////////////
 // INITIALIZATIONS

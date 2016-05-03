@@ -21,26 +21,25 @@
 #include "encoderstate.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
-#include "tables.h"
 #include "cabac.h"
-#include "image.h"
-#include "nal.h"
 #include "context.h"
-#include "transform.h"
-#include "intra.h"
-#include "inter.h"
+#include "encoder_state-bitstream.h"
 #include "filter.h"
-#include "search.h"
-#include "sao.h"
-#include "rdo.h"
-#include "rate_control.h"
-#include "strategies/strategies-picture.h"
+#include "image.h"
+#include "intra.h"
 #include "kvz_math.h"
+#include "rate_control.h"
+#include "sao.h"
+#include "search.h"
+#include "strategies/strategies-picture.h"
+#include "tables.h"
+#include "threads.h"
 #include "visualization.h"
+
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -1364,8 +1363,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int x = x_ctb * LCU_CU_WIDTH;
     const int y = y_ctb * LCU_CU_WIDTH;
     const int pic_width = screen_w;
-    const int pic_height = screen_h;
-    const int cu_width = LCU_WIDTH >> depth;
     const int poc = state->global->poc;
 
     if (x_ctb == 0 && y_ctb == 0) {
@@ -1438,9 +1435,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int cu_width = LCU_WIDTH >> depth;
     const int pic_width = screen_w;
     const int pic_height = screen_h;
-    const int index_RGB = (x + y * pic_width +
-                          state->tile->lcu_offset_x*LCU_WIDTH +
-                          state->tile->lcu_offset_y *LCU_WIDTH * pic_width) << 2;
 
     const int cu_x_in_frame = x + state->tile->lcu_offset_x * LCU_WIDTH;
     const int cu_y_in_frame = y + state->tile->lcu_offset_y * LCU_WIDTH;

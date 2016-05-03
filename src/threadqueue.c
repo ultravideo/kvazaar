@@ -17,20 +17,18 @@
  * You should have received a copy of the GNU General Public License along
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
- 
-#include <assert.h>
+
+#include "threadqueue.h"
+
+#include <errno.h> // ETIMEDOUT
 #include <pthread.h>
-#include <errno.h> //ETIMEDOUT
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifdef KVZ_DEBUG
-#include <string.h>
-#endif //KVZ_DEBUG
-
 #include "global.h"
-#include "threadqueue.h"
 #include "threads.h"
+
 
 typedef struct {
   threadqueue_queue_t * threadqueue;
@@ -73,10 +71,6 @@ typedef struct {
   PERFORMANCE_MEASURE_END(NULL, "pthread_cond_wait(%s=%p, %s=%p)@%s:%d",#c, c, #l, l,__FUNCTION__, __LINE__); \
 } while (0);
 #endif //PTHREAD_DUMP
-
-
-const struct timespec kvz_time_to_wait = {1, 0};
-
 
 static void* threadqueue_worker(void* threadqueue_worker_spec_opaque)
 {
@@ -466,10 +460,10 @@ int kvz_threadqueue_flush(threadqueue_queue_t * const threadqueue) {
     if (notdone > 0) {
       int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
-      PTHREAD_UNLOCK(&threadqueue->lock);
-      KVZ_SLEEP();
-      PTHREAD_LOCK(&threadqueue->lock);
-      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &kvz_time_to_wait);
+      
+      struct timespec wait_moment;
+      ms_from_now_timespec(&wait_moment, 100);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &wait_moment);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
         assert(0); 
@@ -504,10 +498,9 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue
     if (!job_done) {
       int ret;
       PTHREAD_COND_BROADCAST(&(threadqueue->cond));
-      PTHREAD_UNLOCK(&threadqueue->lock);
-      KVZ_SLEEP();
-      PTHREAD_LOCK(&threadqueue->lock);
-      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &kvz_time_to_wait);
+      struct timespec wait_moment;
+      ms_from_now_timespec(&wait_moment, 100);
+      ret = pthread_cond_timedwait(&threadqueue->cb_cond, &threadqueue->lock, &wait_moment);
       if (ret != 0 && ret != ETIMEDOUT) {
         fprintf(stderr, "pthread_cond_timedwait failed!\n"); 
         assert(0); 

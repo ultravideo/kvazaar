@@ -20,20 +20,26 @@
 
 #include "search.h"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <limits.h>
 #include <string.h>
-#include <assert.h>
 #include <math.h>
 
-#include "intra.h"
+#include "cabac.h"
+#include "encoder.h"
+#include "imagelist.h"
 #include "inter.h"
+#include "intra.h"
+#include "kvazaar.h"
 #include "rdo.h"
-#include "transform.h"
 #include "search_inter.h"
 #include "search_intra.h"
 #include "strategies/strategies-picture.h"
+#include "threadqueue.h"
+#include "threads.h"
+#include "transform.h"
+#include "videoframe.h"
 #include "visualization.h"
+
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
   ((x) >= 0 && (y) >= 0 \

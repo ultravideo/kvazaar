@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+
 kvz_config *kvz_config_alloc(void)
 {
   kvz_config *cfg = (kvz_config *)malloc(sizeof(kvz_config));

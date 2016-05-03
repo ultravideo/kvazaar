@@ -26,10 +26,11 @@
  * Quantization and transform functions.
  */
 
-#include "global.h"
-
+#include "cu.h"
 #include "encoder.h"
 #include "encoderstate.h"
+#include "global.h" // IWYU pragma: keep
+
 
 extern const uint8_t kvz_g_chroma_scale[58];
 extern const int16_t kvz_g_inv_quant_scales[6];

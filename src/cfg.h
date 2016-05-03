@@ -26,9 +26,10 @@
  * Runtime configuration through defaults and parsing of arguments.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "kvazaar.h"
+
 
 /* Function definitions */
 kvz_config *kvz_config_alloc(void);

@@ -20,12 +20,9 @@
 
 #include "strategyselector.h"
 
-#include <assert.h>
-#include <string.h>
+#include <stdio.h>
 #include <stdlib.h>
-#if COMPILE_INTEL
-#include <immintrin.h>
-#endif
+#include <string.h>
 
 hardware_flags_t kvz_g_hardware_flags;
 
@@ -193,6 +190,7 @@ typedef struct {
 // CPUID adapters for different compilers.
 #  if defined(__GNUC__)
 #include <cpuid.h>
+
 static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info) {
   if (__get_cpuid_max(level & 0x80000000, NULL) < level) return 0;
   __cpuid_count(level, sublevel, cpu_info->eax, cpu_info->ebx, cpu_info->ecx, cpu_info->edx);
@@ -200,6 +198,7 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 }
 #  elif defined(_MSC_VER)
 #include <intrin.h>
+
 static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info) {
   int vendor_info[4] = { 0, 0, 0, 0 };
   __cpuidex(vendor_info, 0, 0);
@@ -225,8 +224,8 @@ static INLINE int get_cpuid(unsigned level, unsigned sublevel, cpuid_t *cpu_info
 #endif // COMPILE_INTEL
 
 #if COMPILE_POWERPC
-#include <unistd.h>
 #include <fcntl.h>
+#include <unistd.h>
 #include <linux/auxvec.h>
 #include <asm/cputable.h>
 

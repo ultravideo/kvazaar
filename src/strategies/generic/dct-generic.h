@@ -26,7 +26,7 @@
  * Generic C implementations of optimized functions.
  */
 
-#include  "global.h"
+#include  "global.h" // IWYU pragma: keep
 
 extern const int16_t kvz_g_dst_4[4][4];
 extern const int16_t kvz_g_dct_4[4][4];

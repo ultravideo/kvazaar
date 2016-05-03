@@ -18,16 +18,20 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
-
-#include "sao-avx2.h"
-#include "sao.h"
-#include "strategyselector.h"
-#include "rdo.h"
-#include "strategies/strategies-common.h"
+#include "strategies/avx2/sao-avx2.h"
 
 #if COMPILE_INTEL_AVX2
 #include <immintrin.h>
+
+#include "cu.h"
+#include "encoder.h"
+#include "encoderstate.h"
+#include "kvazaar.h"
+#include "sao.h"
+#include "strategies/strategies-common.h"
+#include "strategyselector.h"
+
+
 // These optimizations are based heavily on sao-generic.c.
 // Might be useful to check that if (when) this file
 // is difficult to understand.
@@ -280,7 +284,16 @@ void kvz_sao_reconstruct_color_avx2(const encoder_control_t * const encoder,
         v_new_data = _mm256_add_epi32(v_new_data, _mm256_cvtepu8_epi32(v_c));
         __m128i v_new_data_128 = _mm_packus_epi32(_mm256_castsi256_si128(v_new_data), _mm256_extracti128_si256(v_new_data, 1));
         v_new_data_128 = _mm_packus_epi16(v_new_data_128, v_new_data_128);
-        _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
+        
+        if ((block_width - x) >= 8) {
+          _mm_storel_epi64((__m128i*)new_data, v_new_data_128);
+        } else {
+          
+          kvz_pixel arr[8];
+          _mm_storel_epi64((__m128i*)arr, v_new_data_128);
+          for (int i = 0; i < block_width - x; ++i) new_data[i] = arr[i];
+        }
+      
       }
     }
   }

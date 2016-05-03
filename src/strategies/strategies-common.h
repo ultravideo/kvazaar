@@ -7,7 +7,8 @@
  * Common tools strategies.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
+
 
 //Use with shuffle and permutation intrinsics.
 //Parameters are indices to packed elements. Each must be 0, 1, 2 or 3.

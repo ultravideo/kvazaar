@@ -18,13 +18,16 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include <stdlib.h>
-#include "strategyselector.h"
+#include "strategies/x86_asm/picture-x86-asm.h"
 
 #if defined(KVZ_COMPILE_ASM)
+#include <stdlib.h>
 
-#include "picture-x86-asm-sad.h"
-#include "picture-x86-asm-satd.h"
+#include "kvazaar.h"
+#include "strategies/x86_asm/picture-x86-asm-sad.h"
+#include "strategies/x86_asm/picture-x86-asm-satd.h"
+#include "strategyselector.h"
+
 
 static unsigned kvz_sad_32x32_avx(const kvz_pixel *data1, const kvz_pixel *data2)
 {

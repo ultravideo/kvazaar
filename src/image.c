@@ -18,18 +18,13 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "threads.h"
 #include "image.h"
-#include "strategyselector.h"
 
-#include <string.h>
-#include <stdio.h>
+#include <limits.h>
 #include <stdlib.h>
-#include <math.h>
-#include <assert.h>
 
-#include "checkpoint.h"
-#include "sao.h"
+#include "strategies/strategies-picture.h"
+#include "threads.h"
 
 /**
  * \brief Allocate a new image.
@@ -469,4 +464,76 @@ unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const 
   }
 
   return ssd;
+}
+
+
+/**
+ * \brief BLock Image Transfer from one buffer to another.
+ *
+ * It's a stupidly simple loop that copies pixels.
+ *
+ * \param orig  Start of the originating buffer.
+ * \param dst  Start of the destination buffer.
+ * \param width  Width of the copied region.
+ * \param height  Height of the copied region.
+ * \param orig_stride  Width of a row in the originating buffer.
+ * \param dst_stride  Width of a row in the destination buffer.
+ *
+ * This should be inlined, but it's defined here for now to see if Visual
+ * Studios LTCG will inline it.
+ */
+#define BLIT_PIXELS_CASE(n) case n:\
+  for (y = 0; y < n; ++y) {\
+    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(kvz_pixel));\
+  }\
+  break;
+
+void kvz_pixels_blit(const kvz_pixel * const orig, kvz_pixel * const dst,
+                         const unsigned width, const unsigned height,
+                         const unsigned orig_stride, const unsigned dst_stride)
+{
+  unsigned y;
+  //There is absolutely no reason to have a width greater than the source or the destination stride.
+  assert(width <= orig_stride);
+  assert(width <= dst_stride);
+
+#ifdef CHECKPOINTS
+  char *buffer = malloc((3 * width + 1) * sizeof(char));
+  for (y = 0; y < height; ++y) {
+    int p;
+    for (p = 0; p < width; ++p) {
+      sprintf((buffer + 3*p), "%02X ", orig[y*orig_stride]);
+    }
+    buffer[3*width] = 0;
+    CHECKPOINT("kvz_pixels_blit_avx2: %04d: %s", y, buffer);
+  }
+  FREE_POINTER(buffer);
+#endif //CHECKPOINTS
+
+  if (width == orig_stride && width == dst_stride) {
+    memcpy(dst, orig, width * height * sizeof(kvz_pixel));
+    return;
+  }
+
+  int nxn_width = (width == height) ? width : 0;
+  switch (nxn_width) {
+    BLIT_PIXELS_CASE(4)
+    BLIT_PIXELS_CASE(8)
+    BLIT_PIXELS_CASE(16)
+    BLIT_PIXELS_CASE(32)
+    BLIT_PIXELS_CASE(64)
+  default:
+
+    if (orig == dst) {
+      //If we have the same array, then we should have the same stride
+      assert(orig_stride == dst_stride);
+      return;
+    }
+    assert(orig != dst || orig_stride == dst_stride);
+
+    for (y = 0; y < height; ++y) {
+      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(kvz_pixel));
+    }
+    break;
+  }
 }

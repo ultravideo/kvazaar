@@ -18,17 +18,26 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
-#include "kvazaar_internal.h"
+#include "kvazaar.h"
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "cfg.h"
-#include "encoder.h"
-#include "strategyselector.h"
-#include "encoderstate.h"
-#include "checkpoint.h"
 #include "bitstream.h"
+#include "cfg.h"
+#include "checkpoint.h"
+#include "encoder.h"
+#include "encoder_state-bitstream.h"
+#include "encoder_state-ctors_dtors.h"
+#include "encoderstate.h"
+#include "global.h"
+#include "image.h"
 #include "input_frame_buffer.h"
+#include "kvazaar_internal.h"
+#include "strategyselector.h"
+#include "threadqueue.h"
+#include "videoframe.h"
 
 
 static void kvazaar_close(kvz_encoder *encoder)

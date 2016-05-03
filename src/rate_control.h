@@ -26,9 +26,10 @@
  * \brief Functions related to rate control.
  */
 
-#include "global.h"
+#include "global.h" // IWYU pragma: keep
 
 #include "encoderstate.h"
+
 
 double kvz_select_picture_lambda(encoder_state_t * const state);
 

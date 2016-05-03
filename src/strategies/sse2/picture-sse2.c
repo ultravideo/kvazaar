@@ -18,14 +18,14 @@
  * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
 
-#include "picture-sse2.h"
-#include "strategyselector.h"
+#include "strategies/sse2/picture-sse2.h"
 
 #if COMPILE_INTEL_SSE2
-#  include "image.h"
-#  include <immintrin.h>
-#  include <assert.h>
-#  include <stdlib.h>
+#include <immintrin.h>
+#include <stdlib.h>
+
+#include "kvazaar.h"
+#include "strategyselector.h"
 
 
 static unsigned reg_sad_sse2(const kvz_pixel * const data1, const kvz_pixel * const data2,

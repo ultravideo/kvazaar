@@ -20,12 +20,18 @@
 
 #include "search_intra.h"
 
+#include <limits.h>
+
+#include "cabac.h"
+#include "encoder.h"
 #include "encoderstate.h"
-#include "videoframe.h"
-#include "strategies/strategies-picture.h"
+#include "image.h"
+#include "intra.h"
+#include "kvazaar.h"
 #include "rdo.h"
 #include "search.h"
-#include "intra.h"
+#include "strategies/strategies-picture.h"
+#include "videoframe.h"
 
 
 // Normalize SAD for comparison against SATD to estimate transform skip

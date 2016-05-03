@@ -20,9 +20,19 @@
 
 #include "encoder_state-ctors_dtors.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 
+#include "bitstream.h"
+#include "cabac.h"
+#include "cu.h"
+#include "encoder.h"
+#include "encoder_state-geometry.h"
 #include "encoderstate.h"
+#include "image.h"
+#include "imagelist.h"
+#include "threadqueue.h"
+#include "videoframe.h"
 
 
 static int encoder_state_config_global_init(encoder_state_t * const state) {

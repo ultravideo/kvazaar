@@ -28,6 +28,7 @@
 
 #include "encoderstate.h"
 #include "strategies/strategies-picture.h"
+#include "threads.h"
 
 SDL_Renderer *renderer, *info_renderer;
 SDL_Window *window, *info_window = NULL;
@@ -53,7 +54,7 @@ cu_info_t *sdl_cu_array;
 TTF_Font* font;
 
 
-kvz_visualization_init(int width, int height)
+void kvz_visualization_init(int width, int height)
 {
   screen_w = width;
   screen_h = height;
@@ -75,7 +76,7 @@ kvz_visualization_init(int width, int height)
   }
 }
 
-kvz_visualization_free()
+void kvz_visualization_free()
 {
   free(sdl_pixels);
   free(sdl_pixels_RGB);
@@ -243,7 +244,6 @@ void *eventloop_main(void* temp)
     printf("TTF_OpenFont: %s\n", TTF_GetError());
     // handle error
   }
-  SDL_Color White = { 255, 255, 255 };
 
   Uint32 rmask, gmask, bmask, amask;
 #if SDL_BYTEORDER == SDL_BIG_ENDIAN
@@ -267,7 +267,7 @@ void *eventloop_main(void* temp)
   int locked = 0;
   for (;;) {
     SDL_Event event;
-    while (1) {
+    for (;;) {
 
       while (SDL_PollEvent(&event)) {
         if (event.type == SDL_MOUSEMOTION) {
@@ -476,12 +476,11 @@ void kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   
   SDL_Rect rect;
 
-  encoder_control_t *ctrl = state->encoder_control;
+  const encoder_control_t *ctrl = state->encoder_control;
   kvz_picture * const pic = state->tile->frame->source;
 
   
   const int pic_width = state->encoder_control->cfg->width;
-  const int pic_height = state->encoder_control->cfg->height;
   const int x_max = MIN(x + cu_width, pic->width) - x;
   const int y_max = MIN(y + cu_width, pic->height) - y;
   const int index_RGB = (x + y * pic_width +

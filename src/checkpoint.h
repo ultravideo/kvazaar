@@ -29,20 +29,17 @@
 #ifdef NDEBUG
 #error "CHECKPOINTS require assertions to be enabled!"
 #endif
-#include "global.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "global.h" // IWYU pragma: keep
+
+
 extern FILE* g_ckpt_file;
 extern int g_ckpt_enabled; //Do we check?
 extern int g_ckpt_record; //Do we record?
-#endif
 
-
-
-#if defined(CHECKPOINTS)
 #define CHECKPOINTS_INIT() do { \
   if (getenv("CHECKPOINTS")) {\
     if (strcmp(getenv("CHECKPOINTS"),"record") == 0) { \
