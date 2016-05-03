@@ -1449,7 +1449,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int ref_idx = MIN(2, cur_cu->inter.mv_ref[1]);
       const int ref_poc = state->global->ref->pocs[ref_idx];
       const int ref_framemod = ref_poc % 8;
-      if (x1 != x2 && y1 != y2) {
+      if (x1 != x2 || y1 != y2) {
         draw_mv(sdl_pixels_RGB_inter[poc % 2], pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
       }
 
@@ -1465,7 +1465,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       const int ref_idx = MIN(2, cur_cu->inter.mv_ref[0]);
       const int ref_poc = state->global->ref->pocs[ref_idx];
       const int ref_framemod = ref_poc % 8;
-      if (x1 != x2 && y1 != y2) {
+      if (x1 != x2 || y1 != y2) {
         draw_mv(sdl_pixels_RGB_inter[poc % 2], pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
       }
 
