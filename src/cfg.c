@@ -812,7 +812,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     return result;
   }
   else if OPT("cu-split-termination")
-	  parse_enum(value, cu_split_termination_names, cfg->cu_split_termination);
+  {
+    int8_t mode = KVZ_CU_SPLIT_TERMINATION_ZERO;
+    int result = parse_enum(value, cu_split_termination_names, &mode);
+    cfg->cu_split_termination = mode;
+    return result;
+  }
   else
     return 0;
 #undef OPT
