@@ -81,6 +81,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->target_bitrate  = 0;
   cfg->hash            = KVZ_HASH_CHECKSUM;
 
+  cfg->cu_split_termination = KVZ_CU_SPLIT_TERMINATION_ZERO;
+
   cfg->tiles_width_count  = 1;
   cfg->tiles_height_count = 1;
   cfg->tiles_width_split  = NULL;
@@ -285,6 +287,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
                                                     "smpte240m", "YCgCo", "bt2020nc", "bt2020c", NULL };
   static const char * const mv_constraint_names[] = { "none", "frame", "tile", "frametile", "frametilemargin", NULL };
   static const char * const hash_names[] = { "none", "checksum", "md5", NULL };
+
+  static const char * const cu_split_termination_names[] = { "zero", "off", NULL };
 
   static const char * const preset_values[11][28] = {
       { 
@@ -807,6 +811,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     return result;
   }
+  else if OPT("cu-split-termination")
+	  parse_enum(value, cu_split_termination_names, cfg->cu_split_termination);
   else
     return 0;
 #undef OPT

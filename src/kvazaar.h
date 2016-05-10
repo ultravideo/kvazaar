@@ -126,6 +126,15 @@ enum kvz_hash
 };
 
 /**
+* \brief cu split termination mode
+*/
+enum kvz_cu_split_termination
+{
+	KVZ_CU_SPLIT_TERMINATION_ZERO = 0,
+	KVZ_CU_SPLIT_TERMINATION_OFF = 1
+};
+
+/**
  * \brief GoP picture configuration.
  */
 typedef struct kvz_gop_config {
@@ -231,6 +240,9 @@ typedef struct kvz_config
 
   enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
   enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
+
+  enum kvz_cu_split_termination cu_split_termination; /*!< \brief Mode of cu split termination. */
+
 } kvz_config;
 
 /**
