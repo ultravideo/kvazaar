@@ -130,8 +130,8 @@ enum kvz_hash
 */
 enum kvz_cu_split_termination
 {
-	KVZ_CU_SPLIT_TERMINATION_ZERO = 0,
-	KVZ_CU_SPLIT_TERMINATION_OFF = 1
+  KVZ_CU_SPLIT_TERMINATION_ZERO = 0,
+  KVZ_CU_SPLIT_TERMINATION_OFF = 1
 };
 
 /**
