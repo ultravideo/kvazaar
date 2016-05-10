@@ -829,10 +829,8 @@ static unsigned search_mv_full(const encoder_state_t * const state,
                                const kvz_picture *pic, const kvz_picture *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
                                int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
-                               int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
+                               int16_t num_cand, int32_t ref_idx, const int32_t search_range, uint32_t *bitcost_out)
 {
-#define SEARCH_RANGE 32
-
   vector2d_t mv = { mv_in_out->x >> 2, mv_in_out->y >> 2 };
   vector2d_t best_mv = { 0, 0 };
   unsigned best_cost = UINT32_MAX;
@@ -848,8 +846,8 @@ static unsigned search_mv_full(const encoder_state_t * const state,
 
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
   if (intmv_within_tile(state, orig, 0, 0, width, height, wpp_limit)) {
-    vector2d_t min_mv = { 0 - SEARCH_RANGE, 0 - SEARCH_RANGE };
-    vector2d_t max_mv = { 0 + SEARCH_RANGE, 0 + SEARCH_RANGE };
+    vector2d_t min_mv = { 0 - search_range, 0 - search_range };
+    vector2d_t max_mv = { 0 + search_range, 0 + search_range };
 
     for (int y = min_mv.y; y <= max_mv.y; ++y) {
       for (int x = min_mv.x; x <= max_mv.x; ++x) {
@@ -889,8 +887,8 @@ static unsigned search_mv_full(const encoder_state_t * const state,
   if (!mv_in_merge_cand &&
       intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit))
   {
-    vector2d_t min_mv = { mv.x - SEARCH_RANGE, mv.y - SEARCH_RANGE };
-    vector2d_t max_mv = { mv.x + SEARCH_RANGE, mv.y + SEARCH_RANGE };
+    vector2d_t min_mv = { mv.x - search_range, mv.y - search_range };
+    vector2d_t max_mv = { mv.x + search_range, mv.y + search_range };
 
     for (int y = min_mv.y; y <= max_mv.y; ++y) {
       for (int x = min_mv.x; x <= max_mv.x; ++x) {
@@ -922,8 +920,8 @@ static unsigned search_mv_full(const encoder_state_t * const state,
     // Ignore 0-vector because it has already been checked.
     if (mv.x == 0 && mv.y == 0) continue;
 
-    vector2d_t min_mv = { mv.x - SEARCH_RANGE, mv.y - SEARCH_RANGE };
-    vector2d_t max_mv = { mv.x + SEARCH_RANGE, mv.y + SEARCH_RANGE };
+    vector2d_t min_mv = { mv.x - search_range, mv.y - search_range };
+    vector2d_t max_mv = { mv.x + search_range, mv.y + search_range };
 
     for (int y = min_mv.y; y <= max_mv.y; ++y) {
       for (int x = min_mv.x; x <= max_mv.x; ++x) {
@@ -941,11 +939,11 @@ static unsigned search_mv_full(const encoder_state_t * const state,
             xx = merge_cand[j].mv[merge_cand[j].dir - 1][0] >> 2;
             yy = merge_cand[j].mv[merge_cand[j].dir - 1][1] >> 2;
           }
-          if (x >= xx - SEARCH_RANGE && x <= xx + SEARCH_RANGE &&
-              y >= yy - SEARCH_RANGE && y <= yy + SEARCH_RANGE)
+          if (x >= xx - search_range && x <= xx + search_range &&
+              y >= yy - search_range && y <= yy + search_range)
           {
             already_tested = true;
-            x = xx + SEARCH_RANGE;
+            x = xx + search_range;
             break;
           }
         }
@@ -972,8 +970,6 @@ static unsigned search_mv_full(const encoder_state_t * const state,
   *bitcost_out = best_bitcost;
 
   return best_cost;
-
-#undef SEARCH_RANGE
 }
 
 
@@ -1201,6 +1197,15 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
     }
   }
 
+  int search_range = 32;
+  switch (state->encoder_control->cfg->ime_algorithm) {
+    case KVZ_IME_FULL64: search_range = 64; break;
+    case KVZ_IME_FULL32: search_range = 32; break;
+    case KVZ_IME_FULL16: search_range = 16; break;
+    case KVZ_IME_FULL8: search_range = 8; break;
+    default: break;
+  }
+
   switch (state->encoder_control->cfg->ime_algorithm) {
     case KVZ_IME_TZ:
       temp_cost += tz_search(state,
@@ -1216,6 +1221,11 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                              &temp_bitcost);
       break;
 
+
+    case KVZ_IME_FULL64:
+    case KVZ_IME_FULL32:
+    case KVZ_IME_FULL16:
+    case KVZ_IME_FULL8:
     case KVZ_IME_FULL:
       temp_cost += search_mv_full(state,
                                   width, height,
@@ -1227,6 +1237,7 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                                   merge_cand,
                                   num_cand,
                                   ref_idx,
+                                  search_range,
                                   &temp_bitcost);
       break;
 
