@@ -508,28 +508,180 @@ static void inter_clear_cu_unused(cu_info_t* cu) {
 }
 
 /**
- * \brief Get merge candidates for current block
- * \param encoder encoder control struct to use
- * \param x block x position in SCU
- * \param y block y position in SCU
- * \param width current block width
- * \param height current block height
- * \param b0 candidate b0
- * \param b1 candidate b1
- * \param b2 candidate b2
- * \param a0 candidate a0
- * \param a1 candidate a1
+ * \brief Check whether a0 mv cand block is coded before the current block.
+ * \param x       x-coordinate of the current block (in pixels)
+ * \param y       y-coordinate of the current block (in pixels)
+ * \param width   width of the current block (in pixels)
+ * \param height  height of the current block (in pixels)
+ * \return        True, if the a0 mv candidate block is coded before the
+ *                current block. Otherwise false.
  */
-void kvz_inter_get_spatial_merge_candidates(int32_t x,
-                                            int32_t y,
-                                            int32_t width,
-                                            int32_t height,
-                                            cu_info_t **b0,
-                                            cu_info_t **b1,
-                                            cu_info_t **b2,
-                                            cu_info_t **a0,
-                                            cu_info_t **a1,
-                                            lcu_t *lcu)
+static bool is_a0_cand_coded(int x, int y, int width, int height)
+{
+  int size = MIN(width & ~(width - 1), height & ~(height - 1));
+
+  if (height != size) {
+    // For SMP and AMP blocks the situation is equivalent to a square block
+    // at the lower left corner of the PU.
+    y = y + height - size;
+  }
+
+  while (size < LCU_WIDTH) {
+    const int parent_size = 2 * size;
+    const int cu_index    = (x % parent_size != 0) + 2 * (y % parent_size != 0);
+    switch (cu_index) {
+      case 0:
+        // A0 is in the CU directly left of the parent CU so it has been
+        // coded already.
+        //    +---+---+
+        //    | X |   |
+        //    |---+---+
+        // A0 |   |   |
+        //    +---+---+
+        return true;
+
+      case 1:
+        // A0 is in the CU that will be coded after the current CU.
+        //    +---+---+
+        //    |   | X |
+        //    |---+---+
+        //    |A0 |   |
+        //    +---+---+
+        return false;
+
+      case 2:
+        //    +---+---+
+        //    |   |   |
+        //    |---+---+
+        //    | X |   |
+        //    +---+---+
+        // A0
+
+        // Move to the parent block.
+        y -= size;
+        size = parent_size;
+        break;
+
+      case 3:
+        // A0 is in the CU directly down of the parent CU so is has not
+        // been coded yet.
+        //    +---+---+
+        //    |   |   |
+        //    |---+---+
+        //    |   | X |
+        //    +---+---+
+        //     A0
+        return false;
+    }
+  }
+
+  // For 64x64 blocks A0 candidate is located outside the LCU.
+  return false;
+}
+
+/**
+ * \brief Check whether b0 mv cand block is coded before the current block.
+ * \param x       x-coordinate of the current block (in pixels)
+ * \param y       y-coordinate of the current block (in pixels)
+ * \param width   width of the current block (in pixels)
+ * \param height  height of the current block (in pixels)
+ * \return        True, if the b0 mv candidate block is coded before the
+ *                current block. Otherwise false.
+ */
+static bool is_b0_cand_coded(int x, int y, int width, int height)
+{
+  int size = MIN(width & ~(width - 1), height & ~(height - 1));
+
+  if (width != size) {
+    // For SMP and AMP blocks the situation is equivalent to a square block
+    // at the upper right corner of the PU.
+    x = x + width - size;
+  }
+
+  while (size < LCU_WIDTH) {
+    const int parent_size = 2 * size;
+    const int cu_index    = (x % parent_size != 0) + 2 * (y % parent_size != 0);
+    switch (cu_index) {
+      case 0:
+        // B0 is in the CU directly above the parent CU so it has been
+        // coded already.
+        //         B0
+        //    +---+---+
+        //    | X |   |
+        //    |---+---+
+        //    |   |   |
+        //    +---+---+
+        return true;
+
+      case 1:
+        //             B0
+        //    +---+---+
+        //    |   | X |
+        //    |---+---+
+        //    |   |   |
+        //    +---+---+
+
+        // Move to the parent block.
+        x -= size;
+        size = parent_size;
+        break;
+
+      case 2:
+        //    +---+---+
+        //    |   |B0 |
+        //    |---+---+
+        //    | X |   |
+        //    +---+---+
+        return true;
+
+      case 3:
+        // B0 is in the CU directly right of the parent CU so is has not
+        // been coded yet.
+        //    +---+---+
+        //    |   |   | B0
+        //    |---+---+
+        //    |   | X |
+        //    +---+---+
+        return false;
+    }
+  }
+
+  // The LCU to the right and up of the current LCU has been coded already.
+  return true;
+}
+
+/**
+ * \brief Get merge candidates for current block.
+ *
+ * The output parameters b0, b1, b2, a0, a1 are pointed to the
+ * corresponding cu_info_t struct in lcu->cu, or set to NULL, if the
+ * candidate is not available.
+ *
+ * \param x               block x position in pixels
+ * \param y               block y position in pixels
+ * \param width           block width in pixels
+ * \param height          block height in pixels
+ * \param picture_width   tile width in pixels
+ * \param picture_height  tile height in pixels
+ * \param b0              Returns the b0 candidate.
+ * \param b1              Returns the b1 candidate.
+ * \param b2              Returns the b2 candidate.
+ * \param a0              Returns the a0 candidate.
+ * \param a1              Returns the a1 candidate.
+ * \param lcu             current LCU
+ */
+static void get_spatial_merge_candidates(int32_t x,
+                                         int32_t y,
+                                         int32_t width,
+                                         int32_t height,
+                                         int32_t picture_width,
+                                         int32_t picture_height,
+                                         cu_info_t **b0,
+                                         cu_info_t **b1,
+                                         cu_info_t **b2,
+                                         cu_info_t **a0,
+                                         cu_info_t **a1,
+                                         lcu_t *lcu)
 {
   // the width and height of the current block on SCU
   uint8_t width_in_scu = width / CU_MIN_SIZE_PIXELS;
@@ -558,9 +710,9 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x,
       *a1 = NULL;
     }
 
-    if (y_cu + height_in_scu < LCU_WIDTH>>3) {
+    if (y_cu + height_in_scu < LCU_WIDTH>>3 && y + height < picture_height) {
       *a0 = LCU_GET_CU(lcu, x_cu - 1, y_cu + height_in_scu);
-      if ((*a0)->coded && (*a0)->type == CU_INTER) {
+      if ((*a0)->type == CU_INTER && is_a0_cand_coded(x, y, width, height)) {
         inter_clear_cu_unused(*a0);
       } else {
         *a0 = NULL;
@@ -570,13 +722,15 @@ void kvz_inter_get_spatial_merge_candidates(int32_t x,
 
   // B0, B1 and B2 availability testing
   if (y != 0) {
-    if (x_cu + width_in_scu < LCU_WIDTH>>3) {
-      *b0 = LCU_GET_CU(lcu, x_cu + width_in_scu, y_cu - 1);
-    } else if (y_cu == 0) {
-      // Special case, top-right CU
-      *b0 = LCU_GET_TOP_RIGHT_CU(lcu);
+    if (x + width < picture_width) {
+      if (x_cu + width_in_scu < LCU_WIDTH >> 3) {
+        *b0 = LCU_GET_CU(lcu, x_cu + width_in_scu, y_cu - 1);
+      } else if (y_cu == 0) {
+        // Special case, top-right CU
+        *b0 = LCU_GET_TOP_RIGHT_CU(lcu);
+      }
     }
-    if ((*b0) && (*b0)->coded && (*b0)->type == CU_INTER) {
+    if ((*b0) && (*b0)->type == CU_INTER && is_b0_cand_coded(x, y, width, height)) {
       inter_clear_cu_unused(*b0);
     } else {
       *b0 = NULL;
@@ -630,7 +784,9 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
 
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  kvz_inter_get_spatial_merge_candidates(x, y, width, height, &b0, &b1, &b2, &a0, &a1, lcu);
+  get_spatial_merge_candidates(x, y, width, height,
+                               state->tile->frame->width, state->tile->frame->height,
+                               &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
@@ -821,7 +977,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   cu_info_t *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
   b0 = b1 = b2 = a0 = a1 = NULL;
-  kvz_inter_get_spatial_merge_candidates(x, y, width, height, &b0, &b1, &b2, &a0, &a1, lcu);
+  get_spatial_merge_candidates(x, y, width, height,
+                               state->tile->frame->width, state->tile->frame->height,
+                               &b0, &b1, &b2, &a0, &a1, lcu);
 
   if (!use_a1) a1 = NULL;
   if (!use_b1) b1 = NULL;

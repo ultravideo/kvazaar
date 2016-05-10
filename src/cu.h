@@ -122,7 +122,6 @@ typedef struct
   unsigned depth     : 3; //!< \brief depth / size of this block
   unsigned part_size : 3; //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
   unsigned tr_depth  : 3; //!< \brief transform depth
-  unsigned coded     : 1; //!< \brief flag to indicate this block is coded and reconstructed
   unsigned skipped   : 1; //!< \brief flag to indicate this block is skipped
   unsigned merged    : 1; //!< \brief flag to indicate this block is merged
   unsigned merge_idx : 3; //!< \brief merge index

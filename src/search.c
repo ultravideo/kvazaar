@@ -210,7 +210,6 @@ static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pr
       cu->intra[3].mode = pred_mode;
       cu->intra[0].mode_chroma = chroma_mode;
       cu->part_size = part_mode;
-      cu->coded = 1;
     }
   }
 }
@@ -223,7 +222,6 @@ static void lcu_set_inter_pu(lcu_t *lcu, int x_pu, int y_pu, int width_pu, int h
     for (int x = x_pu; x < x_pu + width_pu; ++x) {
       cu_info_t *cu = LCU_GET_CU(lcu, x, y);
       //Check if this could be moved inside the if
-      cu->coded    = 1;
       if (cu != cur_pu) {
         cu->depth     = cur_pu->depth;
         cu->part_size = cur_pu->part_size;
