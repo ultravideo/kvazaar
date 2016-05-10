@@ -105,6 +105,7 @@ static const struct option long_options[] = {
   { "loop-input",               no_argument, NULL, 0 },
   { "mv-constraint",      required_argument, NULL, 0 },
   { "hash",               required_argument, NULL, 0 },
+  {"cu-split-termination",required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -374,6 +375,10 @@ void print_help(void)
     "                                     \"none\": no constraint\n"
     "                                     \"checksum\": constrain within the tile\n"
     "                                     \"md5\": constrain even more\n"
+    "          --cu-split-termination : Specify the cu split termination behaviour\n"
+    "                                     \"zero\": Terminate when splitting gives little\n"
+    "                                               improvement.\n"
+    "                                     \"off\": Don't terminate splitting early\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
