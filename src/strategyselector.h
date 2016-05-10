@@ -41,7 +41,7 @@ typedef struct {
 
 typedef struct {
   unsigned int count;
-  unsigned int allocated;
+  unsigned int allocated;//How much memory is allocated
   strategy_t* strategies;
 } strategy_list_t;
 
@@ -75,7 +75,8 @@ typedef struct {
 } hardware_flags_t;
 
 extern hardware_flags_t kvz_g_hardware_flags;
-
+extern hardware_flags_t kvz_g_strategies_in_use;
+extern hardware_flags_t kvz_g_strategies_available;
 
 int kvz_strategyselector_init(int32_t cpuid, uint8_t bitdepth);
 int kvz_strategyselector_register(void *opaque, const char *type, const char *strategy_name, int priority, void *fptr);
