@@ -89,6 +89,14 @@ Optional parameters:
                                      "none": no constraint
                                      "frametile": constrain within the tile
                                      "frametilemargin": constrain even more
+          --hash                 : Specify which decoded picture hash to use [checksum]
+                                     "none": 0 bytes
+                                     "checksum": 18 bytes
+                                     "md5": 56 bytes
+          --cu-split-termination : Specify the cu split termination behaviour
+                                     "zero": Terminate when splitting gives little
+                                               improvement.
+                                     "off": Don't terminate splitting early
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio
@@ -116,6 +124,7 @@ Optional parameters:
                                    Disable threads if set to 0.
 
   Tiles:
+          --tiles <int>x<int>    : Split picture into wdith x height uniform tiles.
           --tiles-width-split <string>|u<int> :
                                    Specifies a comma separated list of pixel
                                    positions of tiles columns separation coordinates.

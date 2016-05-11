@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "March 2016" "kvazaar v0.8.3" "User Commands"
+.TH KVAZAAR "1" "May 2016" "kvazaar v0.8.3" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -151,6 +151,18 @@ Constrain movement vectors
   "none": no constraint
   "frametile": constrain within the tile
   "frametilemargin": constrain even more
+.TP
+\fB\-\-hash                
+Specify which decoded picture hash to use [checksum]
+  "none": 0 bytes
+  "checksum": 18 bytes
+  "md5": 56 bytes
+.TP
+\fB\-\-cu\-split\-termination
+Specify the cu split termination behaviour
+  "zero": Terminate when splitting gives little
+            improvement.
+  "off": Don't terminate splitting early
 
 .SS "Video Usability Information:"
 .TP
@@ -196,6 +208,9 @@ Maximum number of threads to use.
 Disable threads if set to 0.
 
 .SS "Tiles:"
+.TP
+\fB\-\-tiles <int>x<int>   
+Split picture into wdith x height uniform tiles.
 .TP
 \fB\-\-tiles\-width\-split <string>|u<int>
 Specifies a comma separated list of pixel
