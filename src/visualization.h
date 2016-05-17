@@ -29,6 +29,7 @@
 #include <math.h>
 
 #include "encoderstate.h"
+#include "threads.h"
 #include "threadqueue.h"
 #include "cu.h"
 
@@ -66,7 +67,7 @@ void kvz_visualization_free();
 
 void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in);
 
-void kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth);
+bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth);
 
 #define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
 #define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
@@ -135,11 +136,15 @@ static void kvz_visualization_delay()
 {
   volatile int64_t i = 0;
   if (sdl_delay) {
-    //SDL_Delay(sdl_delay);
+    kvz_mutex_lock(&sdl_mutex);
+
+    // Busy loop, because normal sleep is not fine grained enough.
     int64_t wait_cycles = pow(2, sdl_delay) * 1000;
     while (i < wait_cycles) {
       ++i;
     }
+
+    kvz_mutex_unlock(&sdl_mutex);
   }
 }
 

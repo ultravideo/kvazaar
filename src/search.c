@@ -767,11 +767,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
 #if KVZ_VISUALIZATION == 1
-  if (x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height) {
-    kvz_mutex_lock(&sdl_mutex);
-    kvz_visualization_draw_block(state, &work_tree[depth], cur_cu, x, y, depth);
+  bool block_drawn = kvz_visualization_draw_block(state, &work_tree[depth], cur_cu, x, y, depth);
+  if (block_drawn) {
     kvz_visualization_delay();
-    kvz_mutex_unlock(&sdl_mutex);
   }
 #endif
   

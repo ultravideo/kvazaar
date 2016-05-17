@@ -468,11 +468,19 @@ void *eventloop_main(void* temp)
   }
 }
 
-void kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth)
+/**
+ * \brief Draw block borders.
+ * \return true if block was drawn, false otherwise
+ */
+bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth)
 {
   const int cu_width = LCU_WIDTH >> depth;
 
-  if (!(x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)) return;
+  if (!(x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)) {
+    return false;
+  }
+
+  kvz_mutex_lock(&sdl_mutex);
   
   SDL_Rect rect;
 
@@ -578,6 +586,10 @@ void kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels + luma_index, pic_width, sdl_pixels_u + chroma_index, pic_width >> 1, sdl_pixels_v + chroma_index, pic_width >> 1);
   SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB+index_RGB, pic_width * 4);
   SDL_UpdateTexture(overlay_intra, &rect, sdl_pixels_RGB_intra_dir + index_RGB, pic_width * 4);
+
+  kvz_mutex_unlock(&sdl_mutex);
+
+  return true;
 }
 
 #endif
