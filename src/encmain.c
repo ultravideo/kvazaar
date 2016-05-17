@@ -354,6 +354,14 @@ int main(int argc, char *argv[])
 
   encoder_control_t *encoder = enc->control;
   
+  //TODO: Replace with proper implementation
+  kvz_encoder *el_enc = api->encoder_open(opts->config);
+  if (!el_enc) {
+    fprintf(stderr, "Failed to open encoder.\n");
+    goto exit_failure;
+  }
+  //******************************************
+
   fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
          encoder->in.width, encoder->in.height,
@@ -472,6 +480,7 @@ int main(int argc, char *argv[])
 
         bitstream_length += len_out;
 
+
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
@@ -499,6 +508,79 @@ int main(int argc, char *argv[])
 
         print_frame_info(&info_out, frame_psnr, len_out);
       }
+
+      //DO EL coding here
+      //TODO: DO Proper implementation
+      //Use img_src as the EL picture to encode
+      api->chunk_free(chunks_out);
+      api->picture_free(cur_in_img);
+      api->picture_free(img_rec);
+
+      cur_in_img = img_src;
+      img_src = NULL;
+      img_rec = NULL;
+      chunks_out = NULL;
+
+      if (!api->encoder_encode(el_enc,
+        cur_in_img,
+        &chunks_out,
+        &len_out,
+        &img_rec,
+        &img_src,
+        &info_out)) {
+        fprintf(stderr, "Failed to encode image.\n");
+        api->picture_free(cur_in_img);
+        goto exit_failure;
+      }
+
+      //TODO: Make this a separate function to minimize copy-paste? Same for stat printing
+      if (chunks_out != NULL) {
+        uint64_t written = 0;
+        // Write data into the output file.
+        for (kvz_data_chunk *chunk = chunks_out;
+          chunk != NULL;
+          chunk = chunk->next) {
+          assert(written + chunk->len <= len_out);
+          if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
+            fprintf(stderr, "Failed to write data to file.\n");
+            api->picture_free(cur_in_img);
+            api->chunk_free(chunks_out);
+            goto exit_failure;
+          }
+          written += chunk->len;
+        }
+        fflush(output);
+
+        bitstream_length += len_out;
+
+        // Compute and print stats.
+
+        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
+        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+          // Do not compute PSNR for interlaced frames, because img_rec does not contain
+          // the deinterlaced frame yet.
+          compute_psnr(img_src, img_rec, frame_psnr);
+        }
+
+        if (recout) {
+          // Since chunks_out was not NULL, img_rec should have been set.
+          assert(img_rec);
+          if (!yuv_io_write(recout,
+            img_rec,
+            opts->config->width,
+            opts->config->height)) {
+            fprintf(stderr, "Failed to write reconstructed picture!\n");
+          }
+        }
+
+        frames_done += 1;
+        psnr_sum[0] += frame_psnr[0];
+        psnr_sum[1] += frame_psnr[1];
+        psnr_sum[2] += frame_psnr[2];
+
+        print_frame_info(&info_out, frame_psnr, len_out);
+      }
+      //********************************
 
       api->picture_free(cur_in_img);
       api->chunk_free(chunks_out);
