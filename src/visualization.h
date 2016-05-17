@@ -130,6 +130,19 @@ static void draw_mv(kvz_pixel *buffer, int pic_width, int pic_height, int x1, in
   // Mark the origin of the motion vector.
   kvz_putpixel(buffer, pic_width, x1, y1, 255 - color_r, 255 - color_g, 255 - color_b, 255);
 }
+
+static void kvz_visualization_delay()
+{
+  volatile int64_t i = 0;
+  if (sdl_delay) {
+    //SDL_Delay(sdl_delay);
+    int64_t wait_cycles = pow(2, sdl_delay) * 1000;
+    while (i < wait_cycles) {
+      ++i;
+    }
+  }
+}
+
 #endif
 
 #endif // VISUALIZAITON_H_
