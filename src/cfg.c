@@ -290,7 +290,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const cu_split_termination_names[] = { "zero", "off", NULL };
 
-  static const char * const preset_values[11][28] = {
+  static const char * const preset_values[11][32] = {
       { 
         "ultrafast", 
         "pu-depth-intra", "2-3",
@@ -306,6 +306,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0", 
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL 
       },
       { 
@@ -323,6 +325,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -340,6 +344,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -357,6 +363,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -374,6 +382,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -391,6 +401,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -408,6 +420,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -425,6 +439,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -442,6 +458,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "1",
         "full-intra-search", "0",
         "mv-rdo", "1",
+        "smp", "0",
+        "amp", "0",
         NULL
       },
       {
@@ -459,6 +477,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "transform-skip", "1",
         "full-intra-search", "1",
         "mv-rdo", "1",
+        "smp", "1",
+        "amp", "1",
         NULL
       },
       { NULL }
