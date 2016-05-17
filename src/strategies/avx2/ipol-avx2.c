@@ -35,6 +35,7 @@
 #include "strategies/strategies-ipol.h"
 #include "strategyselector.h"
 #include "strategies/strategies-common.h"
+#include "strategies/generic/ipol-generic.h"
 
 
 #define FILTER_OFFSET 3
@@ -566,6 +567,11 @@ void kvz_filter_inter_octpel_chroma_avx2(const encoder_control_t * const encoder
 
 void kvz_sample_octpel_chroma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height,kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
 {
+  //Check for amp
+  if (width != height) {
+    kvz_sample_octpel_chroma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
+    return;
+  }
   //TODO: horizontal and vertical only filtering
   int32_t x, y;
   int16_t shift1 = KVZ_BIT_DEPTH - 8;
