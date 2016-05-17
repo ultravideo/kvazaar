@@ -760,33 +760,121 @@ static void get_spatial_merge_candidates(int32_t x,
 }
 
 /**
- * \brief Get MV prediction for current block
- * \param encoder encoder control struct to use
- * \param x_cu block x position in SCU
- * \param y_cu block y position in SCU
- * \param width current block width
- * \param height current block height
- * \param mv_cand[2][2] return the motion vector candidates
+ * \brief Get merge candidates for current block.
+ *
+ * The output parameters b0, b1, b2, a0, a1 are pointed to the
+ * corresponding cu_info_t struct in lcu->cu, or set to NULL, if the
+ * candidate is not available.
+ *
+ * \param x               block x position in pixels
+ * \param y               block y position in pixels
+ * \param width           block width in pixels
+ * \param height          block height in pixels
+ * \param picture_width   tile width in pixels
+ * \param picture_height  tile height in pixels
+ * \param b0              Returns the b0 candidate.
+ * \param b1              Returns the b1 candidate.
+ * \param b2              Returns the b2 candidate.
+ * \param a0              Returns the a0 candidate.
+ * \param a1              Returns the a1 candidate.
+ * \param cu_data         array containing the cu data
+ * \param stride          vertical stride of the cu_data array
  */
-void kvz_inter_get_mv_cand(const encoder_state_t * const state,
-                           int32_t x,
-                           int32_t y,
-                           int32_t width,
-                           int32_t height,
-                           int16_t mv_cand[2][2],
-                           cu_info_t* cur_cu,
-                           lcu_t *lcu,
-                           int8_t reflist)
+static void get_spatial_merge_candidates_cua(int32_t x,
+                                             int32_t y,
+                                             int32_t width,
+                                             int32_t height,
+                                             int32_t picture_width,
+                                             int32_t picture_height,
+                                             const cu_info_t **b0,
+                                             const cu_info_t **b1,
+                                             const cu_info_t **b2,
+                                             const cu_info_t **a0,
+                                             const cu_info_t **a1,
+                                             const cu_info_t *cu_data,
+                                             int32_t stride)
+{
+  #define GET_CU(x, y) (&cu_data[(x) + (y) * stride])
+
+  // the width and height of the current block on SCU
+  uint8_t width_in_scu = width / CU_MIN_SIZE_PIXELS;
+  uint8_t height_in_scu = height / CU_MIN_SIZE_PIXELS;
+
+  /*
+  Predictor block locations
+  ____      _______
+  |B2|______|B1|B0|
+     |         |
+     |  Cur CU |
+   __|         |
+  |A1|_________|
+  |A0|
+  */
+  int32_t x_cu = SUB_SCU(x) >> MAX_DEPTH; //!< coordinates from top-left of this LCU
+  int32_t y_cu = SUB_SCU(y) >> MAX_DEPTH;
+  // A0 and A1 availability testing
+  if (x != 0) {
+    *a1 = GET_CU(x_cu - 1, y_cu + height_in_scu - 1);
+    // Do not check (*a1)->coded because the block above is always coded before
+    // the current one and the flag is not set when searching an SMP block.
+    if ((*a1)->type != CU_INTER) {
+      *a1 = NULL;
+    }
+
+    if (y_cu + height_in_scu < LCU_WIDTH>>3 && y + height < picture_height) {
+      *a0 = GET_CU(x_cu - 1, y_cu + height_in_scu);
+      if ((*a0)->type != CU_INTER || !is_a0_cand_coded(x, y, width, height)) {
+        *a0 = NULL;
+      }
+    }
+  }
+
+  // B0, B1 and B2 availability testing
+  if (y != 0) {
+    if (x + width < picture_width && (x_cu + width_in_scu < LCU_WIDTH >> 3 || y_cu == 0)) {
+      *b0 = GET_CU(x_cu + width_in_scu, y_cu - 1);
+      if ((*b0)->type != CU_INTER || !is_b0_cand_coded(x, y, width, height)) {
+        *b0 = NULL;
+      }
+    }
+
+    *b1 = GET_CU(x_cu + width_in_scu - 1, y_cu - 1);
+    // Do not check (*b1)->coded because the block to the left is always coded
+    // before the current one and the flag is not set when searching an SMP
+    // block.
+    if ((*b1)->type != CU_INTER) {
+      *b1 = NULL;
+    }
+
+    if (x != 0) {
+      *b2 = GET_CU(x_cu - 1, y_cu - 1);
+      // Do not check (*b2)->coded because the block above and to the left is
+      // always coded before the current one.
+      if ((*b2)->type != CU_INTER) {
+        *b2 = NULL;
+      }
+    }
+  }
+
+  #undef GET_CU
+}
+
+/**
+ * \brief Pick two mv candidates from the spatial candidates.
+ */
+static void get_mv_cand_from_spatial(const encoder_state_t * const state,
+                                     const cu_info_t *b0,
+                                     const cu_info_t *b1,
+                                     const cu_info_t *b2,
+                                     const cu_info_t *a0,
+                                     const cu_info_t *a1,
+                                     const cu_info_t *cur_cu,
+                                     int8_t reflist,
+                                     int16_t mv_cand[2][2])
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
   int8_t reflist2nd = !reflist;
-
-  cu_info_t *b0, *b1, *b2, *a0, *a1;
-  b0 = b1 = b2 = a0 = a1 = NULL;
-  get_spatial_merge_candidates(x, y, width, height,
-                               state->tile->frame->width, state->tile->frame->height,
-                               &b0, &b1, &b2, &a0, &a1, lcu);
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 #define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
@@ -949,6 +1037,70 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
   }
 #undef CALCULATE_SCALE
 #undef APPLY_MV_SCALING
+}
+
+/**
+ * \brief Get MV prediction for current block.
+ *
+ * \param state     encoder state
+ * \param x         block x position in pixels
+ * \param y         block y position in pixels
+ * \param width     block width in pixels
+ * \param height    block height in pixels
+ * \param mv_cand   Return the motion vector candidates.
+ * \param cur_cu    current CU
+ * \param lcu       current LCU
+ * \param reflist   reflist index (either 0 or 1)
+ */
+void kvz_inter_get_mv_cand(const encoder_state_t * const state,
+                           int32_t x,
+                           int32_t y,
+                           int32_t width,
+                           int32_t height,
+                           int16_t mv_cand[2][2],
+                           cu_info_t* cur_cu,
+                           lcu_t *lcu,
+                           int8_t reflist)
+{
+  cu_info_t *b0, *b1, *b2, *a0, *a1;
+  b0 = b1 = b2 = a0 = a1 = NULL;
+  get_spatial_merge_candidates(x, y, width, height,
+                               state->tile->frame->width, state->tile->frame->height,
+                               &b0, &b1, &b2, &a0, &a1, lcu);
+  get_mv_cand_from_spatial(state, b0, b1, b2, a0, a1, cur_cu, reflist, mv_cand);
+}
+
+/**
+ * \brief Get MV prediction for current block using state->tile->frame->cu_array.
+ *
+ * \param state     encoder state
+ * \param x         block x position in pixels
+ * \param y         block y position in pixels
+ * \param width     block width in pixels
+ * \param height    block height in pixels
+ * \param mv_cand   Return the motion vector candidates.
+ * \param cur_cu    current CU
+ * \param reflist   reflist index (either 0 or 1)
+ */
+void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
+                               int32_t x,
+                               int32_t y,
+                               int32_t width,
+                               int32_t height,
+                               int16_t mv_cand[2][2],
+                               const cu_info_t* cur_cu,
+                               int8_t reflist)
+{
+  const cu_info_t *b0, *b1, *b2, *a0, *a1;
+  b0 = b1 = b2 = a0 = a1 = NULL;
+
+  const cu_array_t *cua = state->tile->frame->cu_array;
+  const int32_t stride = state->tile->frame->width_in_lcu * 8;
+  get_spatial_merge_candidates_cua(x, y, width, height,
+                                   state->tile->frame->width, state->tile->frame->height,
+                                   &b0, &b1, &b2, &a0, &a1,
+                                   &cua->data[(x >> 6) * 8 + (y >> 6) * 8 * stride], stride);
+  get_mv_cand_from_spatial(state, b0, b1, b2, a0, a1, cur_cu, reflist, mv_cand);
 }
 
 /**

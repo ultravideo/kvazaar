@@ -84,6 +84,15 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            lcu_t *lcu,
                            int8_t reflist);
 
+void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
+                               int32_t x,
+                               int32_t y,
+                               int32_t width,
+                               int32_t height,
+                               int16_t mv_cand[2][2],
+                               const cu_info_t* cur_cu,
+                               int8_t reflist);
+
 uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t x, int32_t y,
                                  int32_t width, int32_t height,

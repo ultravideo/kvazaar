@@ -134,7 +134,6 @@ typedef struct
   } intra[4];
   struct {
     int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
-    int16_t mvd[2][2]; // \brief Motion vector differences for L0 and L1
     uint8_t mv_cand[2]; // \brief selected MV candidate
     uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
     uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)

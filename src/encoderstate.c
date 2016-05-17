@@ -31,6 +31,7 @@
 #include "filter.h"
 #include "image.h"
 #include "intra.h"
+#include "inter.h"
 #include "kvz_math.h"
 #include "rate_control.h"
 #include "sao.h"
@@ -1096,7 +1097,9 @@ static void encode_part_mode(encoder_state_t * const state,
 static void encode_inter_prediction_unit(encoder_state_t * const state,
                                          cabac_data_t * const cabac,
                                          const cu_info_t * const cur_cu,
-                                         int x_ctb, int y_ctb, int depth)
+                                         int x_ctb, int y_ctb,
+                                         int width_ctb, int height_ctb,
+                                         int depth)
 {
   // Mergeflag
   int16_t num_cand = 0;
@@ -1179,8 +1182,18 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
         }
 
         if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
-          const int32_t mvd_hor = cur_cu->inter.mvd[ref_list_idx][0];
-          const int32_t mvd_ver = cur_cu->inter.mvd[ref_list_idx][1];
+
+          int16_t mv_cand[2][2];
+          kvz_inter_get_mv_cand_cua(
+              state,
+              x_ctb << 3, y_ctb << 3,
+              width_ctb << 3, height_ctb << 3,
+              mv_cand, cur_cu, ref_list_idx);
+
+          uint8_t cu_mv_cand = cur_cu->inter.mv_cand[ref_list_idx];
+
+          const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
+          const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
           const int8_t hor_abs_gr0 = mvd_hor != 0;
           const int8_t ver_abs_gr0 = mvd_ver != 0;
           const uint32_t mvd_hor_abs = abs(mvd_hor);
@@ -1473,9 +1486,11 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     for (int i = 0; i < num_pu; ++i) {
       const int pu_x_scu = PU_GET_X(cur_cu->part_size, cu_width_scu, x_ctb, i);
       const int pu_y_scu = PU_GET_Y(cur_cu->part_size, cu_width_scu, y_ctb, i);
+      const int pu_w_scu = PU_GET_W(cur_cu->part_size, cu_width_scu, i);
+      const int pu_h_scu = PU_GET_H(cur_cu->part_size, cu_width_scu, i);
       const cu_info_t *cur_pu = kvz_videoframe_get_cu_const(frame, pu_x_scu, pu_y_scu);
 
-      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x_scu, pu_y_scu, depth);
+      encode_inter_prediction_unit(state, cabac, cur_pu, pu_x_scu, pu_y_scu, pu_w_scu, pu_h_scu, depth);
     }
 
     {

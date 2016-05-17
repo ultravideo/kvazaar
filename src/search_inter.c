@@ -1102,7 +1102,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   kvz_picture *ref_image = state->global->ref->images[ref_idx];
   uint32_t temp_bitcost = 0;
   uint32_t temp_cost = 0;
-  vector2d_t orig, mvd;
+  vector2d_t orig;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
@@ -1247,8 +1247,6 @@ static void search_pu_inter_ref(encoder_state_t * const state,
       cu_mv_cand = 1;
     }
   }
-  mvd.x = mv.x - mv_cand[cu_mv_cand][0];
-  mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
   if (temp_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
@@ -1260,8 +1258,6 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     cur_cu->inter.mv_ref[ref_list] = ref_idx;
     cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
     cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
-    cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
-    cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
     cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
 
     *inter_cost = temp_cost;
@@ -1488,8 +1484,6 @@ static void search_pu_inter(encoder_state_t * const state,
                   cu_mv_cand = 1;                  
                 }
               }
-              cur_cu->inter.mvd[reflist][0] = cur_cu->inter.mv[reflist][0] - mv_cand[cu_mv_cand][0];
-              cur_cu->inter.mvd[reflist][1] = cur_cu->inter.mv[reflist][1] - mv_cand[cu_mv_cand][1];
               cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
             }
             *inter_cost = cost;
