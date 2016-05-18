@@ -47,7 +47,7 @@
 #include "threads.h"
 #include "yuv_io.h"
 
-#if KVZ_VISUALIZATION == 1
+#if KVZ_VISUALIZATION
 #include "visualization.h"
 #endif
 
@@ -346,7 +346,7 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-#if KVZ_VISUALIZATION == 1
+#if KVZ_VISUALIZATION
   kvz_visualization_init(encoder->in.width, encoder->in.height);
 #endif
 
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
       fprintf(stderr, "pthread_create failed!\n");
       assert(0);
       return 0;
-        }
+    }
     kvz_picture *cur_in_img;
     for (;;) {
 
@@ -413,15 +413,15 @@ int main(int argc, char *argv[])
         cur_in_img = in_args.img_in;
         in_args.img_in = NULL;
 
-          } else {
+      } else {
         cur_in_img = NULL;
-            }
+      }
 
       if (in_args.retval == EXIT_FAILURE) {
         goto exit_failure;
-        }
+      }
 
-#if KVZ_VISUALIZATION == 1
+#if KVZ_VISUALIZATION
       kvz_visualization_frame_init(encoder, cur_in_img);
 #endif
 
@@ -544,7 +544,7 @@ done:
   if (recout) fclose(recout);
 
   CHECKPOINTS_FINALIZE();
-#if KVZ_VISUALIZATION == 1
+#if KVZ_VISUALIZATION
   kvz_visualization_free();
 #endif
 

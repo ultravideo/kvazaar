@@ -24,7 +24,7 @@
 
 #include "visualization.h"
 
-#if KVZ_VISUALIZATION == 1
+#if KVZ_VISUALIZATION
 
 #include "cu.h"
 #include "encoderstate.h"

@@ -22,7 +22,7 @@
 
 #include "global.h"
 
-#if KVZ_VISUALIZATION == 1
+#if KVZ_VISUALIZATION
 
 #include <SDL.h>
 #include <SDL_ttf.h>
