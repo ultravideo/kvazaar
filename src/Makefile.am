@@ -21,15 +21,18 @@ noinst_LTLIBRARIES = \
 	libaltivec.la \
 	libavx2.la \
 	libsse2.la \
-	libsse41.la
+	libsse41.la \
+	libvisualization.la
 
 kvazaar_SOURCES = \
 	encmain.c \
 	cli.h \
 	cli.c \
 	yuv_io.c \
-	yuv_io.h
-kvazaar_LDADD = libkvazaar.la $(LIBS)
+	yuv_io.h \
+	visualization.c \
+	visualization.h
+kvazaar_LDADD = libkvazaar.la libvisualization.la $(LIBS)
 
 kvazaar_CPPFLAGS = -DKVZ_VERSION="`$(srcdir)/../tools/version.sh`"
 
@@ -139,10 +142,14 @@ libkvazaar_la_LIBADD = \
 	libaltivec.la \
 	libavx2.la \
 	libsse2.la \
-	libsse41.la
+	libsse41.la \
+	libvisualization.la
 
 libkvazaar_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-number $(KVZ_API_VERSION)
 
+libvisualization_la_SOURCES = \
+	visualization.c \
+	visualization.h
 
 libaltivec_la_SOURCES = \
 	strategies/altivec/picture-altivec.c \

@@ -52,15 +52,24 @@ AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
+AC_ARG_WITH([sdl2], 
+    AS_HELP_STRING([--with-sdl2], 
+        [Build with sdl2 and sdl2_ttf. Enables visualization.]))
+AS_IF([test "x$with_sdl2" = "xyes"], [
+    PKG_CHECK_MODULES([SDL2], [sdl2 SDL2_ttf],
+        AC_DEFINE([KVZ_VISUALIZATION], [1], [With SDL2]),
+        AC_MSG_ERROR([sdl2 or SDL2 not found with pkg-config])
+    )
+])
+
 AX_PTHREAD
-CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden $PTHREAD_CFLAGS $CFLAGS"
+CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden $PTHREAD_CFLAGS $CFLAGS $SDL2_CFLAGS"
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
-LIBS="$PTHREAD_LIBS $LIBS"
-
+LIBS="$PTHREAD_LIBS $LIBS $SDL2_LIBS"
 
 # --disable-werror
 AC_ARG_ENABLE([werror], [AS_HELP_STRING([--disable-werror], [don't treat warnings as errors [no]])],
@@ -135,4 +144,3 @@ AC_CONFIG_FILES([Makefile
                  src/kvazaar.pc
                  tests/Makefile])
 AC_OUTPUT
-

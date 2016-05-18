@@ -94,8 +94,6 @@ typedef int16_t coeff_t;
 
 //#define VERBOSE 1
 
-#define KVZ_VISUALIZATION 1
-
 /* CONFIG VARIABLES */
 
 //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
