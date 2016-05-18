@@ -350,10 +350,6 @@ int main(int argc, char *argv[])
   kvz_visualization_init(encoder->in.width, encoder->in.height);
 #endif
 
-  // Wait for eventloop to handle opening the window etc
-  kvz_mutex_lock(&sdl_mutex);
-  kvz_mutex_unlock(&sdl_mutex);
-
   //Now, do the real stuff
   {
 

@@ -31,29 +31,104 @@
 #include "strategies/strategies-picture.h"
 #include "threads.h"
 
-SDL_Renderer *renderer, *info_renderer;
-SDL_Window *window, *info_window = NULL;
-SDL_Surface *screen, *pic;
-SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2], *overlay_hilight;
-int screen_w, screen_h;
-int sdl_draw_blocks = 1;
-int sdl_draw_intra = 1;
-int sdl_block_info = 0;
-pthread_mutex_t sdl_mutex;
-kvz_pixel *sdl_pixels_hilight;
-kvz_pixel *sdl_pixels_RGB;
-kvz_pixel *sdl_pixels_RGB_intra_dir;
-kvz_pixel *sdl_pixels_RGB_inter[2];
-kvz_pixel *sdl_pixels;
-kvz_pixel *sdl_pixels_u;
-kvz_pixel *sdl_pixels_v;
-int32_t sdl_delay;
-SDL_Surface* textSurface;
-SDL_Texture* text;
+static int INFO_WIDTH = 480;
+static int INFO_HEIGHT = 240;
+static SDL_Renderer *renderer, *info_renderer;
+static SDL_Window *window, *info_window = NULL;
+static SDL_Surface *screen, *pic;
+static SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2], *overlay_hilight;
+static int screen_w, screen_h;
+static int sdl_draw_blocks = 1;
+static int sdl_draw_intra = 1;
+static int sdl_block_info = 0;
+static pthread_mutex_t sdl_mutex;
+static kvz_pixel *sdl_pixels_hilight;
+static kvz_pixel *sdl_pixels_RGB;
+static kvz_pixel *sdl_pixels_RGB_intra_dir;
+static kvz_pixel *sdl_pixels_RGB_inter[2];
+static kvz_pixel *sdl_pixels;
+static kvz_pixel *sdl_pixels_u;
+static kvz_pixel *sdl_pixels_v;
+static int32_t sdl_delay;
+static SDL_Surface* textSurface;
+static SDL_Texture* text;
+static cu_info_t *sdl_cu_array;
+static TTF_Font* font;
 
-cu_info_t *sdl_cu_array;
-TTF_Font* font;
+#define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
+#define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
+#define PUTPIXEL_V(pixel_x, pixel_y, color_v) sdl_pixels_v[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_v;
+#define PUTPIXEL(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
+  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
 
+#define PUTPIXEL_intra(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
+  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
+  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
+  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
+#define PUTPIXEL_YUV(pixel_x, pixel_y, color_y, color_u, color_v) PUTPIXEL_Y(pixel_x,pixel_y, color_y); PUTPIXEL_U(pixel_x,pixel_y, color_u); PUTPIXEL_V(pixel_x,pixel_y, color_v);
+
+static INLINE void kvz_putpixel(kvz_pixel *buffer, int pic_width, int x, int y, kvz_pixel color_r, kvz_pixel color_g, kvz_pixel color_b, kvz_pixel color_a)
+{
+  int index = (x + y * pic_width) * 4;
+  buffer[index + 0] = color_b;
+  buffer[index + 1] = color_g;
+  buffer[index + 2] = color_r;
+  buffer[index + 3] = color_a;
+}
+
+static const uint32_t frame_r[8] = { 0, 128, 100, 128, 255, 128, 255, 128 };
+static const uint32_t frame_g[8] = { 255, 128, 100, 128, 255, 128, 0, 128 };
+static const uint32_t frame_b[8] = { 0, 128, 255, 128, 0, 128, 100, 128 };
+
+static void draw_line(int pic_width, int index_RGB, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
+{
+  float temp_x = x1; float temp_y = y1;
+  int len = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2));
+  if (len > 0) {
+    float x_off = ((float)(x2 - x1)) / (float)len;
+    float y_off = (y2 - y1) / (float)len;
+    for (int i = 0; i < len; i++) {
+      int xx1 = temp_x;
+      int yy1 = temp_y;
+      PUTPIXEL(xx1, yy1, color_r, color_g, color_b, 255);
+      temp_x += x_off; temp_y += y_off;
+    }
+  }
+}
+
+static void draw_mv(kvz_pixel *buffer, int pic_width, int pic_height, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
+{
+  int frac_x = x1 << 4;
+  int frac_y = y1 << 4;
+  int num_samples = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
+  num_samples = num_samples == 0 ? 1 : num_samples;
+
+  const int x_off = ((x2 - x1) << 4) / num_samples;
+  const int y_off = ((y2 - y1) << 4) / num_samples;
+  for (int i = 0; i <= num_samples; ++i, frac_x += x_off, frac_y += y_off) {
+    int x = frac_x >> 4;
+    int y = frac_y >> 4;
+    if (x < 0 || x >= pic_width || y < 0 || y >= pic_height) break;
+    kvz_putpixel(buffer, pic_width, x, y, color_r, color_g, color_b, 255);
+  }
+
+  // Mark the origin of the motion vector.
+  kvz_putpixel(buffer, pic_width, x1, y1, 255 - color_r, 255 - color_g, 255 - color_b, 255);
+}
+
+static void kvz_visualization_delay()
+{
+  volatile int64_t i = 0;
+  if (sdl_delay) {
+    // Busy loop, because normal sleep is not fine grained enough.
+    int64_t wait_cycles = pow(2, sdl_delay) * 1000;
+    while (i < wait_cycles) {
+      ++i;
+    }
+  }
+}
 
 void kvz_visualization_init(int width, int height)
 {
@@ -71,10 +146,14 @@ void kvz_visualization_init(int width, int height)
     exit(EXIT_FAILURE);
   }
 
-  if (pthread_create(&sdl_thread, NULL, eventloop_main, NULL) != 0) {
+  if (pthread_create(&sdl_thread, NULL, kvz_visualization_eventloop, NULL) != 0) {
     fprintf(stderr, "pthread_create failed!\n");
     exit(EXIT_FAILURE);
   }
+
+  // Wait for eventloop to handle opening the window etc
+  kvz_mutex_lock(&sdl_mutex);
+  kvz_mutex_unlock(&sdl_mutex);
 }
 
 void kvz_visualization_free()
@@ -150,7 +229,7 @@ static void sdl_render_multiline_text(char* text, int x, int y)
   SDL_BlitSurface(temp_surface, &src, textSurface, &dst);
 }
 
-void *eventloop_main(void* temp)
+void *kvz_visualization_eventloop(void* temp)
 {
 
   int sdl_fader = 0;
