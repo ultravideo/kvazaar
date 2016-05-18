@@ -940,8 +940,16 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
     work_tree[depth] = work_tree[0];
   }
 
+#if KVZ_VISUALIZATION == 1
+  kvz_visualization_mv_clear_lcu(state, x, y);
+#endif
+
   // Start search from depth 0.
   search_cu(state, x, y, 0, work_tree);
+
+#if KVZ_VISUALIZATION == 1
+  kvz_visualization_mv_draw_lcu(state, x, y, &work_tree[0]);
+#endif
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.

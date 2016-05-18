@@ -1355,35 +1355,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   uint8_t border_split_y = ((state->encoder_control->in.height) < ((abs_y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
   uint8_t border = border_x | border_y; /*!< are we in any border CU */
 
-#if KVZ_VISUALIZATION == 1
-  if (depth == 0) {
-    kvz_mutex_lock(&sdl_mutex);
-
-    // Clean our own 64x64 area before starting to draw.
-    const int x = abs_x_ctb * LCU_CU_WIDTH;
-    const int y = abs_y_ctb * LCU_CU_WIDTH;
-    const int pic_width = screen_w;
-    const int poc = state->global->poc;
-
-    const int lcu_width = (x + 64 >= screen_w ? screen_w - x : 64);
-    const int lcu_height = (y + 64 >= screen_h ? screen_h - y : 64);
-
-    kvz_pixel *buffer = sdl_pixels_RGB_inter[(poc + 1) % 2];
-    for (int lcu_y = 0; lcu_y < lcu_height; ++lcu_y) {
-      int index = (x + (y + lcu_y) * screen_w) * 4;
-      memset(&buffer[index], 0, lcu_width * 4);
-    }
-
-    SDL_Rect lcu_rect = {
-      x, y,
-      lcu_width, lcu_height
-    };
-    SDL_UpdateTexture(overlay_inter[(poc + 1) % 2], &lcu_rect, buffer + (x + y * screen_w) * 4, screen_w * 4);
-
-    kvz_mutex_unlock(&sdl_mutex);
-  }
-#endif
-
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
     // Implisit split flag when on border
@@ -1419,88 +1390,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       return;
     }
   }
-
-#if KVZ_VISUALIZATION == 1
-  if (cur_cu->type == CU_INTER && cur_cu->part_size == SIZE_2Nx2N) {
-    kvz_mutex_lock(&sdl_mutex);
-
-    const int x = x_ctb * LCU_CU_WIDTH;
-    const int y = y_ctb * LCU_CU_WIDTH;
-
-    const int cu_width = LCU_WIDTH >> depth;
-    const int pic_width = screen_w;
-    const int pic_height = screen_h;
-
-    const int cu_x_in_frame = x + state->tile->lcu_offset_x * LCU_WIDTH;
-    const int cu_y_in_frame = y + state->tile->lcu_offset_y * LCU_WIDTH;
-    const int x1 = cu_x_in_frame + cu_width / 2 - 1;
-    const int y1 = cu_y_in_frame + cu_width / 2 - 1;
-
-    const int poc = state->global->poc;
-
-    // A shared bounding box for both L0 and L1 vectors.
-    vector2d_t tl = { pic_width - 1, pic_height - 1 };
-    vector2d_t br = { 0, 0 };
-
-    if (cur_cu->inter.mv_dir & 2) {
-      const int x2 = CLIP(0, state->tile->frame->source->width - 1, x1 + (cur_cu->inter.mv[1][0] >> 2));
-      const int y2 = CLIP(0, state->tile->frame->source->height - 1, y1 + (cur_cu->inter.mv[1][1] >> 2));
-
-      const int ref_idx = MIN(2, cur_cu->inter.mv_ref[1]);
-      const int ref_poc = state->global->ref->pocs[ref_idx];
-      const int ref_framemod = ref_poc % 8;
-      if (x1 != x2 || y1 != y2) {
-        draw_mv(sdl_pixels_RGB_inter[poc % 2], pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
-      }
-
-      tl.x = MIN(MIN(tl.x, x1), x2);
-      tl.y = MIN(MIN(tl.y, y1), y2);
-      br.x = MAX(MAX(br.x, x1), x2);
-      br.y = MAX(MAX(br.y, y1), y2);
-    }
-    if (cur_cu->inter.mv_dir & 1) {
-      const int x2 = x1 + (cur_cu->inter.mv[0][0] >> 2);
-      const int y2 = y1 + (cur_cu->inter.mv[0][1] >> 2);
-
-      const int ref_idx = MIN(2, cur_cu->inter.mv_ref[0]);
-      const int ref_poc = state->global->ref->pocs[ref_idx];
-      const int ref_framemod = ref_poc % 8;
-      if (x1 != x2 || y1 != y2) {
-        draw_mv(sdl_pixels_RGB_inter[poc % 2], pic_width, pic_height, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
-      }
-
-      tl.x = MIN(MIN(tl.x, x1), x2);
-      tl.y = MIN(MIN(tl.y, y1), y2);
-      br.x = MAX(MAX(br.x, x1), x2);
-      br.y = MAX(MAX(br.y, y1), y2);
-    }
-    
-    tl.x = CLIP(0, pic_width - 1, tl.x);
-    tl.y = CLIP(0, pic_height - 1, tl.y);
-    br.x = CLIP(0, pic_width - 2, br.x);
-    br.y = CLIP(0, pic_height - 2, br.y);
-
-    SDL_Rect rect = {
-      tl.x,
-      tl.y,
-      br.x - tl.x + 1,
-      br.y - tl.y + 1,
-    };
-
-    if ((br.x + br.y * pic_width) * 4 >= pic_width * pic_height * 4) {
-      assert(0);
-    }
-    if ((rect.x + rect.y * pic_width) * 4 + (rect.w + rect.h * pic_width) * 4 >= pic_width * pic_height * 4) {
-      assert(0);
-    }
-
-    if (rect.w > 1 || rect.h > 1) {
-      SDL_UpdateTexture(overlay_inter[poc % 2], &rect, sdl_pixels_RGB_inter[poc % 2] + (tl.x + tl.y * pic_width) * 4, pic_width * 4);
-    }
-    
-    kvz_mutex_unlock(&sdl_mutex);
-  }
-#endif
 
     // Encode skip flag
   if (state->global->slicetype != KVZ_SLICE_I) {

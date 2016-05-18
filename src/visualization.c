@@ -26,6 +26,7 @@
 
 #if KVZ_VISUALIZATION == 1
 
+#include "cu.h"
 #include "encoderstate.h"
 #include "strategies/strategies-picture.h"
 #include "threads.h"
@@ -590,6 +591,106 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   kvz_mutex_unlock(&sdl_mutex);
 
   return true;
+}
+
+static void vis_mv(encoder_state_t * const state, int x, int y, lcu_t *lcu, int depth, int mv_dir)
+{
+  const int cu_width = LCU_WIDTH >> depth;
+  const cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x), SUB_SCU(y));
+  const int poc = state->global->poc;
+  
+  // The right and bottom borders are located within the block,
+  // so the center of the block is (width / 2 - 1).
+  const int x1 = x + cu_width / 2 - 1 + state->tile->lcu_offset_x * LCU_WIDTH;
+  const int y1 = y + cu_width / 2 - 1 + state->tile->lcu_offset_y * LCU_WIDTH;
+  const int x2 = CLIP(0, screen_w - 1, x1 + ((cur_cu->inter.mv[mv_dir][0] + 2) >> 2));
+  const int y2 = CLIP(0, screen_h - 1, y1 + ((cur_cu->inter.mv[mv_dir][1] + 2) >> 2));
+
+  const int ref_idx = MIN(2, cur_cu->inter.mv_ref[mv_dir]);
+  const int ref_poc = state->global->ref->pocs[ref_idx];
+  const int ref_framemod = ref_poc % 8;
+
+  if (x1 != x2 || y1 != y2) {
+    draw_mv(sdl_pixels_RGB_inter[poc % 2], screen_w, screen_h, x1, y1, x2, y2, frame_r[ref_framemod], frame_g[ref_framemod], frame_b[ref_framemod]);
+  }
+
+  vector2d_t tl = { screen_w - 1, screen_h - 1 };
+  vector2d_t br = { 0, 0 };
+  tl.x = MIN(MIN(tl.x, x1), x2);
+  tl.y = MIN(MIN(tl.y, y1), y2);
+  br.x = MAX(MAX(br.x, x1), x2);
+  br.y = MAX(MAX(br.y, y1), y2);
+
+  tl.x = CLIP(0, screen_w - 1, tl.x);
+  tl.y = CLIP(0, screen_h - 1, tl.y);
+  br.x = CLIP(0, screen_w - 2, br.x);
+  br.y = CLIP(0, screen_h - 2, br.y);
+
+  SDL_Rect rect = {
+    tl.x,
+    tl.y,
+    br.x - tl.x + 1,
+    br.y - tl.y + 1,
+  };
+  
+  if (rect.w > 1 || rect.h > 1) {
+    SDL_UpdateTexture(overlay_inter[poc % 2], &rect, sdl_pixels_RGB_inter[poc % 2] + (tl.x + tl.y * screen_w) * 4, screen_h * 4);
+  }
+}
+
+static void recur_vis_mv(encoder_state_t * const state, int x0, int y0, lcu_t *lcu, int depth)
+{
+  int cu_width = LCU_WIDTH >> depth;
+  cu_info_t *cur_cu = LCU_GET_CU_AT_PX(lcu, SUB_SCU(x0), SUB_SCU(y0));
+
+  if (cur_cu->type != CU_INTER) return;
+
+  const int x1 = x0 + cu_width / 2;
+  const int y1 = y0 + cu_width / 2;
+  if (cur_cu->depth > depth) {
+    recur_vis_mv(state, x0, y0, lcu, depth + 1);
+    recur_vis_mv(state, x1, y0, lcu, depth + 1);
+    recur_vis_mv(state, x0, y1, lcu, depth + 1);
+    recur_vis_mv(state, x1, y1, lcu, depth + 1);
+    return;
+  } else {
+    if (cur_cu->inter.mv_dir & 1) {
+      vis_mv(state, x0, y0, lcu, depth, 0);
+    }
+    if (cur_cu->inter.mv_dir & 2) {
+      vis_mv(state, x0, y0, lcu, depth, 1);
+    }
+  }
+}
+
+void kvz_visualization_mv_draw_lcu(encoder_state_t * const state, int x, int y, lcu_t *lcu)
+{
+  kvz_mutex_lock(&sdl_mutex);
+  recur_vis_mv(state, x, y, lcu, 0);
+  kvz_mutex_unlock(&sdl_mutex);
+}
+
+void kvz_visualization_mv_clear_lcu(encoder_state_t * const state, int x, int y)
+{
+  kvz_mutex_lock(&sdl_mutex);
+
+  const int poc = state->global->poc;
+  const int lcu_width = (x + 64 >= screen_w ? screen_w - x : 64);
+  const int lcu_height = (y + 64 >= screen_h ? screen_h - y : 64);
+
+  kvz_pixel *buffer = sdl_pixels_RGB_inter[(poc + 1) % 2];
+  for (int lcu_y = 0; lcu_y < lcu_height; ++lcu_y) {
+    int index = (x + (y + lcu_y) * screen_w) * 4;
+    memset(&buffer[index], 0, lcu_width * 4);
+  }
+
+  SDL_Rect lcu_rect = {
+    x, y,
+    lcu_width, lcu_height
+  };
+  SDL_UpdateTexture(overlay_inter[(poc + 1) % 2], &lcu_rect, buffer + (x + y * screen_w) * 4, screen_w * 4);
+
+  kvz_mutex_unlock(&sdl_mutex);
 }
 
 #endif

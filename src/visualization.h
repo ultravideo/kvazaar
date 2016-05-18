@@ -69,6 +69,9 @@ void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_i
 
 bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth);
 
+void kvz_visualization_mv_draw_lcu(encoder_state_t * const state, int x, int y, lcu_t *lcu);
+void kvz_visualization_mv_clear_lcu(encoder_state_t * const state, int x, int y);
+
 #define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
 #define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
 #define PUTPIXEL_V(pixel_x, pixel_y, color_v) sdl_pixels_v[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_v;
