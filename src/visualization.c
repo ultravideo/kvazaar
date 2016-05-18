@@ -534,10 +534,16 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   const encoder_control_t *ctrl = state->encoder_control;
   kvz_picture * const pic = state->tile->frame->source;
 
-  
+  const vector2d_t frame_px = {
+    x + state->tile->lcu_offset_x * LCU_WIDTH,
+    y + state->tile->lcu_offset_y * LCU_WIDTH
+  };
+  const vector2d_t lcu_px = { x & (LCU_WIDTH - 1), y & (LCU_WIDTH - 1) };
+  const vector2d_t lcu_px_c = { lcu_px.x / 2, lcu_px.y / 2 };
+
   const int pic_width = state->encoder_control->cfg->width;
-  const int x_max = MIN(x + cu_width, pic->width) - x;
-  const int y_max = MIN(y + cu_width, pic->height) - y;
+  const int visible_width = MIN(frame_px.x + cu_width, pic->width) - frame_px.x;
+  const int visible_height = MIN(frame_px.y + cu_width, pic->height) - frame_px.y;
   const int index_RGB = (x + y * pic_width +
     state->tile->lcu_offset_x*LCU_WIDTH +
     state->tile->lcu_offset_y *LCU_WIDTH * pic_width)<<2;
@@ -549,12 +555,21 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
     state->tile->lcu_offset_y *(LCU_WIDTH / 2) * (pic_width / 2);
 
   if ((cur_cu->depth == 0) || cur_cu->depth == depth || !(depth < ctrl->pu_depth_intra.max || depth < ctrl->pu_depth_inter.max)) {
-    kvz_pixels_blit(&lcu->rec.y[(x & 63) + (y & 63)*LCU_WIDTH], &sdl_pixels[luma_index],
-      x_max, y_max, LCU_WIDTH, pic_width);
-    kvz_pixels_blit(&lcu->rec.u[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_u[chroma_index],
-      x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-    kvz_pixels_blit(&lcu->rec.v[(x & 63) / 2 + (y & 63)*LCU_WIDTH / 4], &sdl_pixels_v[chroma_index],
-      x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    for (int row = 0; row < visible_height; ++row) {
+      memcpy(&sdl_pixels[frame_px.x + (frame_px.y + row) * pic_width],
+             &lcu->rec.y[lcu_px.x + (lcu_px.y + row) * LCU_WIDTH],
+             visible_width * sizeof(kvz_pixel));
+    }
+    for (int row = 0; row < visible_height / 2; ++row) {
+      memcpy(&sdl_pixels_u[frame_px.x / 2 + (frame_px.y / 2 + row) * pic_width / 2],
+             &lcu->rec.u[lcu_px.x / 2 + (lcu_px.y / 2 + row) * LCU_WIDTH_C],
+             visible_width / 2 * sizeof(kvz_pixel));
+    }
+    for (int row = 0; row < visible_height / 2; ++row) {
+      memcpy(&sdl_pixels_v[frame_px.x / 2 + (frame_px.y / 2 + row) * pic_width / 2],
+             &lcu->rec.v[lcu_px.x / 2 + (lcu_px.y / 2 + row) * LCU_WIDTH_C],
+             visible_width / 2 * sizeof(kvz_pixel));
+    }
 
     // Clear RGB buffer area
     {
