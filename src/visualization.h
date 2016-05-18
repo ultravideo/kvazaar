@@ -27,8 +27,6 @@
 #include "encoderstate.h"
 #include "cu.h"
 
-void *kvz_visualization_eventloop(void *temp);
-
 void kvz_visualization_init(int width, int height);
 void kvz_visualization_free();
 

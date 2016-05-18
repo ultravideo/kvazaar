@@ -105,75 +105,6 @@ static void kvz_visualization_delay()
   }
 }
 
-void kvz_visualization_init(int width, int height)
-{
-  screen_w = width;
-  screen_h = height;
-  pthread_t sdl_thread;
-
-  pthread_mutex_init(&sdl_mutex, NULL);
-
-  // Lock for eventloop thread to unlock
-  kvz_mutex_lock(&sdl_mutex);
-
-  if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-    fprintf(stderr, "Couldn't initialize SDL: %s\n", SDL_GetError());
-    exit(EXIT_FAILURE);
-  }
-
-  if (pthread_create(&sdl_thread, NULL, kvz_visualization_eventloop, NULL) != 0) {
-    fprintf(stderr, "pthread_create failed!\n");
-    exit(EXIT_FAILURE);
-  }
-
-  // Wait for eventloop to handle opening the window etc
-  kvz_mutex_lock(&sdl_mutex);
-  kvz_mutex_unlock(&sdl_mutex);
-}
-
-void kvz_visualization_free()
-{
-  free(sdl_pixels);
-  free(sdl_pixels_RGB);
-  SDL_Quit();
-}
-
-
-static void render_image(encoder_control_t *encoder, kvz_picture *image)
-{
-  kvz_mutex_lock(&sdl_mutex);
-  
-  memcpy(sdl_pixels, image->y, (encoder->cfg->width * encoder->cfg->height));
-  memcpy(sdl_pixels_u, image->u, (encoder->cfg->width * encoder->cfg->height) >> 2);
-  memcpy(sdl_pixels_v, image->v, (encoder->cfg->width * encoder->cfg->height) >> 2);
-
-  SDL_Rect rect;
-  rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
-  SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, encoder->cfg->width, sdl_pixels_u, encoder->cfg->width >> 1, sdl_pixels_v, encoder->cfg->width >> 1);
-  SDL_RenderClear(renderer);
-  SDL_RenderCopy(renderer, overlay, NULL, NULL);
-  SDL_RenderPresent(renderer);
-
-  kvz_mutex_unlock(&sdl_mutex);
-}
-
-
-void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *target_img)
-{
-  // This function is called for every frame from the main thread.
-  static bool is_first_frame = true;
-  if (is_first_frame) {
-    render_image(encoder, target_img);
-    is_first_frame = false;
-  }
-}
-
-
-#define PUTPIXEL_hilight(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2)+3] = color_alpha; \
-  sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2) +2] = color_r; \
-  sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2) +1] = color_g; \
-  sdl_pixels_hilight[(pixel_x<<2) + (pixel_y)*(screen_w<<2) +0] = color_b;
-
 static void sdl_force_redraw(int locked)
 {
   if (locked) {
@@ -204,7 +135,7 @@ static void sdl_render_multiline_text(char* text, int x, int y)
   SDL_BlitSurface(temp_surface, &src, textSurface, &dst);
 }
 
-void *kvz_visualization_eventloop(void* temp)
+static void *kvz_visualization_eventloop(void* temp)
 {
 
   int sdl_fader = 0;
@@ -346,13 +277,13 @@ void *kvz_visualization_eventloop(void* temp)
 
               for (int y = block_border_y; y < block_border_y + (LCU_WIDTH >> over_cu->depth); y++) {
                 for (int x = block_border_x; x < block_border_x + (LCU_WIDTH >> over_cu->depth); x++) {
-                  PUTPIXEL_hilight(x, y, 255, 255, 255, 128);
+                  kvz_putpixel(sdl_pixels_hilight, screen_w, x, y, 255, 255, 255, 128);
                 }
               }
               if (over_cu->depth != over_cu->tr_depth) {
                 for (int y = block_border_tr_y; y < block_border_tr_y + (LCU_WIDTH >> over_cu->tr_depth); y++) {
                   for (int x = block_border_tr_x; x < block_border_tr_x + (LCU_WIDTH >> over_cu->tr_depth); x++) {
-                    PUTPIXEL_hilight(x, y, 100, 100, 255, 128);
+                    kvz_putpixel(sdl_pixels_hilight, screen_w, x, y, 100, 100, 255, 128);
                   }
                 }
               }
@@ -514,6 +445,69 @@ void *kvz_visualization_eventloop(void* temp)
 
       SDL_Delay(10); // Limit loop CPU usage
     }
+  }
+}
+
+void kvz_visualization_init(int width, int height)
+{
+  screen_w = width;
+  screen_h = height;
+  pthread_t sdl_thread;
+
+  pthread_mutex_init(&sdl_mutex, NULL);
+
+  // Lock for eventloop thread to unlock
+  kvz_mutex_lock(&sdl_mutex);
+
+  if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
+    fprintf(stderr, "Couldn't initialize SDL: %s\n", SDL_GetError());
+    exit(EXIT_FAILURE);
+  }
+
+  if (pthread_create(&sdl_thread, NULL, kvz_visualization_eventloop, NULL) != 0) {
+    fprintf(stderr, "pthread_create failed!\n");
+    exit(EXIT_FAILURE);
+  }
+
+  // Wait for eventloop to handle opening the window etc
+  kvz_mutex_lock(&sdl_mutex);
+  kvz_mutex_unlock(&sdl_mutex);
+}
+
+void kvz_visualization_free()
+{
+  free(sdl_pixels);
+  free(sdl_pixels_RGB);
+  SDL_Quit();
+}
+
+
+static void render_image(encoder_control_t *encoder, kvz_picture *image)
+{
+  kvz_mutex_lock(&sdl_mutex);
+  
+  memcpy(sdl_pixels, image->y, (encoder->cfg->width * encoder->cfg->height));
+  memcpy(sdl_pixels_u, image->u, (encoder->cfg->width * encoder->cfg->height) >> 2);
+  memcpy(sdl_pixels_v, image->v, (encoder->cfg->width * encoder->cfg->height) >> 2);
+
+  SDL_Rect rect;
+  rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
+  SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels, encoder->cfg->width, sdl_pixels_u, encoder->cfg->width >> 1, sdl_pixels_v, encoder->cfg->width >> 1);
+  SDL_RenderClear(renderer);
+  SDL_RenderCopy(renderer, overlay, NULL, NULL);
+  SDL_RenderPresent(renderer);
+
+  kvz_mutex_unlock(&sdl_mutex);
+}
+
+
+void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *target_img)
+{
+  // This function is called for every frame from the main thread.
+  static bool is_first_frame = true;
+  if (is_first_frame) {
+    render_image(encoder, target_img);
+    is_first_frame = false;
   }
 }
 
