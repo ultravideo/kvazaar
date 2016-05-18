@@ -55,20 +55,6 @@ static SDL_Texture* text;
 static cu_info_t *sdl_cu_array;
 static TTF_Font* font;
 
-#define PUTPIXEL_Y(pixel_x, pixel_y, color_y) sdl_pixels_RGB[luma_index + (pixel_x) + (pixel_y)*pic_width] = color_y;
-#define PUTPIXEL_U(pixel_x, pixel_y, color_u) sdl_pixels_u[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_u;
-#define PUTPIXEL_V(pixel_x, pixel_y, color_v) sdl_pixels_v[chroma_index + (pixel_x>>1) + (pixel_y>>1)*(pic_width>>1)] = color_v;
-#define PUTPIXEL(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
-  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
-  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
-  sdl_pixels_RGB[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
-
-#define PUTPIXEL_intra(pixel_x, pixel_y, color_r, color_g, color_b, color_alpha) sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2)+3] = color_alpha; \
-  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +2] = color_r; \
-  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +1] = color_g; \
-  sdl_pixels_RGB_intra_dir[index_RGB + (pixel_x<<2) + (pixel_y)*(pic_width<<2) +0] = color_b;
-#define PUTPIXEL_YUV(pixel_x, pixel_y, color_y, color_u, color_v) PUTPIXEL_Y(pixel_x,pixel_y, color_y); PUTPIXEL_U(pixel_x,pixel_y, color_u); PUTPIXEL_V(pixel_x,pixel_y, color_v);
-
 static INLINE void kvz_putpixel(kvz_pixel *buffer, int pic_width, int x, int y, kvz_pixel color_r, kvz_pixel color_g, kvz_pixel color_b, kvz_pixel color_a)
 {
   int index = (x + y * pic_width) * 4;
@@ -82,21 +68,6 @@ static const uint32_t frame_r[8] = { 0, 128, 100, 128, 255, 128, 255, 128 };
 static const uint32_t frame_g[8] = { 255, 128, 100, 128, 255, 128, 0, 128 };
 static const uint32_t frame_b[8] = { 0, 128, 255, 128, 0, 128, 100, 128 };
 
-static void draw_line(int pic_width, int index_RGB, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
-{
-  float temp_x = x1; float temp_y = y1;
-  int len = sqrt((x1 - x2)*(x1 - x2) + (y1 - y2)*(y1 - y2));
-  if (len > 0) {
-    float x_off = ((float)(x2 - x1)) / (float)len;
-    float y_off = (y2 - y1) / (float)len;
-    for (int i = 0; i < len; i++) {
-      int xx1 = temp_x;
-      int yy1 = temp_y;
-      PUTPIXEL(xx1, yy1, color_r, color_g, color_b, 255);
-      temp_x += x_off; temp_y += y_off;
-    }
-  }
-}
 
 static void draw_mv(kvz_pixel *buffer, int pic_width, int pic_height, int x1, int y1, int x2, int y2, int color_r, int color_g, int color_b)
 {
@@ -608,52 +579,68 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
     //if (cu_width > 4 || (!(x & 7) && !(y & 7))) 
 
     uint8_t framemod = state->global->frame % 8;
-      
+    
     {
       int temp_x;
       // Add block borders
       if ((y + cu_width) % 8 == 0) {
         for (temp_x = 0; temp_x < cu_width; temp_x++) {
-          PUTPIXEL(temp_x, (cu_width - 1), frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
+          kvz_putpixel(sdl_pixels_RGB + index_RGB, pic_width, temp_x, cu_width - 1, frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
         }
       }
       if ((x + cu_width) % 8 == 0) {
         int y;
         for (y = 0; y < cu_width; y++) {
-          PUTPIXEL((cu_width - 1), y, frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
+          kvz_putpixel(sdl_pixels_RGB + index_RGB, pic_width, cu_width - 1, y, frame_r[framemod], frame_g[framemod], frame_b[framemod], 255);
         }
       }
     }
 
     // Intra directions
     if (cur_cu->type == CU_INTRA) {
-      int i = 1;
       int mode = cur_cu->intra[PU_INDEX(x / 4, y / 4)].mode;
-      const int x_off[] = { 8, 8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
-      const int y_off[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};        
+      // These define end points for lines originating from the center of the block.
+      const int line_from_center_8x8_x[] = { 8, 8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -7, -6, -5, -4, -3, -2, -1,  0,  1,  2,  3,  4,  5,  6,  7,  8};
+      const int line_from_center_8x8_y[] = {-8,-8,  8,  7,  6,  5,  4,  3,  2,  1,  0, -1, -2, -3, -4, -5, -6, -7, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -8};
+      int mode_line_x = line_from_center_8x8_x[mode];
+      int mode_line_y = line_from_center_8x8_y[mode];
+      int center = cu_width / 2 - 1;
+      
       if (mode == 0) { // Planar
         int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
-        for (i = -viz_width; i < viz_width + 1; i++) {
-          PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+        
+        for (int i = -viz_width; i < viz_width + 1; i++) {
+          int xx = center + i * mode_line_x / 8;
+          int yy = center + i * mode_line_y / 8;
+          kvz_putpixel(sdl_pixels_RGB + index_RGB, pic_width, xx, yy, 255, 255, 255, 255);
         }
-        for (i = -viz_width; i < 0; i++) {
-          PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+        for (int i = -viz_width; i < 0; i++) {
+          int xx = center + i * mode_line_x / 8;
+          int yy = center - i * mode_line_y / 8;
+          kvz_putpixel(sdl_pixels_RGB + index_RGB, pic_width, xx, yy, 255, 255, 255, 255);
         }
       } else if (mode == 1) { // DC
         int viz_width = cu_width == 4 ? cu_width / 4 : cu_width / 8;
-        for (i = -viz_width; i < viz_width + 1; i++) {
-          PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+        for (int i = -viz_width; i < viz_width + 1; i++) {
+          int xx = center + i * mode_line_x / 8;
+          int yy = center + i * mode_line_y / 8;
+          kvz_putpixel(sdl_pixels_RGB + index_RGB, pic_width, xx, yy, 255, 255, 255, 255);
         }
-        for (i = -viz_width; i < viz_width + 1; i++) {
-          PUTPIXEL(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((-i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+        for (int i = -viz_width; i < viz_width + 1; i++) {
+          int xx = center + i * mode_line_x / 8;
+          int yy = center - i * mode_line_y / 8;
+          kvz_putpixel(sdl_pixels_RGB + index_RGB, pic_width, xx, yy, 255, 255, 255, 255);
         }
       } else { // Angular
-        for (i = -cu_width / 4; i < cu_width / 4 + 1; i++) {
-          PUTPIXEL_intra(((cu_width >> 1) + ((i*x_off[mode]) >> 3) - 1), ((cu_width >> 1) + ((i*y_off[mode]) >> 3) - 1), 255, 255, 255, 255);
+        for (int i = -cu_width / 4; i < cu_width / 4 + 1; i++) {
+          int xx = center + i * mode_line_x / 8;
+          int yy = center + i * mode_line_y / 8;
+          kvz_putpixel(sdl_pixels_RGB_intra_dir + index_RGB, pic_width, xx, yy, 255, 255, 255, 255);
         }
       }
     }
   }
+
   rect.w = cu_width; rect.h = cu_width; rect.x = x + state->tile->lcu_offset_x*LCU_WIDTH; rect.y = y + state->tile->lcu_offset_y*LCU_WIDTH;
   SDL_UpdateYUVTexture(overlay, &rect, sdl_pixels + luma_index, pic_width, sdl_pixels_u + chroma_index, pic_width >> 1, sdl_pixels_v + chroma_index, pic_width >> 1);
   SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB+index_RGB, pic_width * 4);
