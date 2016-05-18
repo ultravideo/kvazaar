@@ -24,13 +24,7 @@
 
 #if KVZ_VISUALIZATION
 
-#include <SDL.h>
-#include <SDL_ttf.h>
-#include <math.h>
-
 #include "encoderstate.h"
-#include "threads.h"
-#include "threadqueue.h"
 #include "cu.h"
 
 void *kvz_visualization_eventloop(void *temp);

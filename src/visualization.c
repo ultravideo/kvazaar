@@ -26,16 +26,20 @@
 
 #if KVZ_VISUALIZATION
 
+#include <SDL.h>
+#include <SDL_ttf.h>
+#include <math.h>
+
 #include "cu.h"
 #include "encoderstate.h"
-#include "strategies/strategies-picture.h"
 #include "threads.h"
+#include "threadqueue.h"
+
 
 static int INFO_WIDTH = 480;
 static int INFO_HEIGHT = 240;
 static SDL_Renderer *renderer, *info_renderer;
 static SDL_Window *window, *info_window = NULL;
-static SDL_Surface *screen, *pic;
 static SDL_Texture *overlay, *overlay_blocks, *overlay_intra, *overlay_inter[2], *overlay_hilight;
 static int screen_w, screen_h;
 static int sdl_draw_blocks = 1;
