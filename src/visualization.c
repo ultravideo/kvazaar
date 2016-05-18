@@ -480,8 +480,6 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   if (!(x + cu_width <= state->tile->frame->source->width && y + cu_width <= state->tile->frame->source->height)) {
     return false;
   }
-
-  kvz_mutex_lock(&sdl_mutex);
   
   SDL_Rect rect;
 
@@ -588,10 +586,31 @@ bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_i
   SDL_UpdateTexture(overlay_blocks, &rect, sdl_pixels_RGB+index_RGB, pic_width * 4);
   SDL_UpdateTexture(overlay_intra, &rect, sdl_pixels_RGB_intra_dir + index_RGB, pic_width * 4);
 
-  kvz_mutex_unlock(&sdl_mutex);
-
   return true;
 }
+
+
+bool kvz_visualization_draw_block_with_delay(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth)
+{
+  const int cu_width = LCU_WIDTH >> depth;
+  if (!(x + cu_width <= state->tile->frame->source->width &&
+        y + cu_width <= state->tile->frame->source->height))
+  {
+    return false;
+  }
+
+  kvz_mutex_lock(&sdl_mutex);
+
+  // If drawing and delay are not within a single mutex lock, it will look choppy.
+  bool block_drawn = kvz_visualization_draw_block(state, lcu, cur_cu, x, y, depth);
+  if (block_drawn) {
+    kvz_visualization_delay();
+  }
+
+  kvz_mutex_unlock(&sdl_mutex);
+  return block_drawn;
+}
+
 
 static void vis_mv(encoder_state_t * const state, int x, int y, lcu_t *lcu, int depth, int mv_dir)
 {

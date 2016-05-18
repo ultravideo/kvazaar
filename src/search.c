@@ -767,10 +767,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
 
 #if KVZ_VISUALIZATION == 1
-  bool block_drawn = kvz_visualization_draw_block(state, &work_tree[depth], cur_cu, x, y, depth);
-  if (block_drawn) {
-    kvz_visualization_delay();
-  }
+  kvz_visualization_draw_block_with_delay(state, &work_tree[depth], cur_cu, x, y, depth);
 #endif
   
   PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id,

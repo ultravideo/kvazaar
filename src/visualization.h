@@ -68,6 +68,7 @@ void kvz_visualization_free();
 void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in);
 
 bool kvz_visualization_draw_block(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth);
+bool kvz_visualization_draw_block_with_delay(const encoder_state_t *state, lcu_t *lcu, cu_info_t *cur_cu, int x, int y, int depth);
 
 void kvz_visualization_mv_draw_lcu(encoder_state_t * const state, int x, int y, lcu_t *lcu);
 void kvz_visualization_mv_clear_lcu(encoder_state_t * const state, int x, int y);
@@ -139,15 +140,11 @@ static void kvz_visualization_delay()
 {
   volatile int64_t i = 0;
   if (sdl_delay) {
-    kvz_mutex_lock(&sdl_mutex);
-
     // Busy loop, because normal sleep is not fine grained enough.
     int64_t wait_cycles = pow(2, sdl_delay) * 1000;
     while (i < wait_cycles) {
       ++i;
     }
-
-    kvz_mutex_unlock(&sdl_mutex);
   }
 }
 
