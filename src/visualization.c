@@ -84,32 +84,14 @@ void kvz_visualization_free()
   SDL_Quit();
 }
 
-void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_in)
+
+static void render_image(encoder_control_t *encoder, kvz_picture *image)
 {
-  static bool allocated = false;
-  if (allocated) {
-    return;
-  } else {
-    allocated = true;
-  }
-
   kvz_mutex_lock(&sdl_mutex);
-  // Copy original frame with darkened colors
-  for (int y = 0; y < encoder->cfg->height; y++) {
-    for (int x = 0; x < encoder->cfg->width; x++) {
-      int16_t pix_value = img_in->y[x + y*encoder->cfg->width] - 10;
-      if (pix_value < 0) pix_value = 0;
-      sdl_pixels[x + y*encoder->cfg->width] = sdl_pixels[x + y*encoder->cfg->width] = pix_value;
-    }
-  }
-
-  // Copy chroma to both overlays
-  memcpy(sdl_pixels_u, img_in->u, (encoder->cfg->width*encoder->cfg->height) >> 2);
-  memcpy(sdl_pixels_v, img_in->v, (encoder->cfg->width*encoder->cfg->height) >> 2);
-
-  // ToDo: block overlay
-  //memcpy(overlay_blocks->pixels[1], img_in->u, (encoder->cfg->width*encoder->cfg->height) >> 2);
-  //memcpy(overlay_blocks->pixels[2], img_in->v, (encoder->cfg->width*encoder->cfg->height) >> 2);
+  
+  memcpy(sdl_pixels, image->y, (encoder->cfg->width * encoder->cfg->height));
+  memcpy(sdl_pixels_u, image->u, (encoder->cfg->width * encoder->cfg->height) >> 2);
+  memcpy(sdl_pixels_v, image->v, (encoder->cfg->width * encoder->cfg->height) >> 2);
 
   SDL_Rect rect;
   rect.w = screen_w; rect.h = screen_h; rect.x = 0; rect.y = 0;
@@ -117,7 +99,19 @@ void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *img_i
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, overlay, NULL, NULL);
   SDL_RenderPresent(renderer);
+
   kvz_mutex_unlock(&sdl_mutex);
+}
+
+
+void kvz_visualization_frame_init(encoder_control_t *encoder, kvz_picture *target_img)
+{
+  // This function is called for every frame from the main thread.
+  static bool is_first_frame = true;
+  if (is_first_frame) {
+    render_image(encoder, target_img);
+    is_first_frame = false;
+  }
 }
 
 
