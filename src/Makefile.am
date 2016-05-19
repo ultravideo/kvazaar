@@ -136,7 +136,7 @@ libkvazaar_la_SOURCES = \
 	extras/libmd5.c \
 	extras/libmd5.h
 
-libkvazaar_la_CFLAGS =
+libkvazaar_la_CFLAGS = $(AM_CFLAGS)
 
 libkvazaar_la_LIBADD = \
 	libaltivec.la \
@@ -179,19 +179,19 @@ libsse41_la_SOURCES = \
 	strategies/sse41/picture-sse41.h
 
 if HAVE_PPC
-libaltivec_la_CFLAGS = -maltivec
+libaltivec_la_CFLAGS = $(AM_CFLAGS) -maltivec
 endif
 
 if HAVE_X86
 
 if HAVE_AVX2
-libavx2_la_CFLAGS = -mavx2
+libavx2_la_CFLAGS = $(AM_CFLAGS) -mavx2
 endif
 if HAVE_SSE4_1
-libsse41_la_CFLAGS = -msse4.1
+libsse41_la_CFLAGS = $(AM_CFLAGS) -msse4.1
 endif
 if HAVE_SSE2
-libsse2_la_CFLAGS = -msse2
+libsse2_la_CFLAGS = $(AM_CFLAGS) -msse2
 endif
 
 if ENABLE_ASM
