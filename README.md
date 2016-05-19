@@ -11,7 +11,7 @@ http://ultravideo.cs.tut.fi/#encoder for more information.
 
 [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
 
-##Using Kvazaar
+## Using Kvazaar
 
 [comment]: # (BEGIN KVAZAAR HELP MESSAGE)
 ```
@@ -154,7 +154,7 @@ Optional parameters:
 ```
 [comment]: # (END KVAZAAR HELP MESSAGE)
 
-###For example:
+### For example:
 
     kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.hevc -n 600 -q 32
 
@@ -172,7 +172,7 @@ The LP-GOP syntax is "lp-g(num)d(num)r(num)t(num)", where
 
 
 
-##Presets
+## Presets
 The names of the presets are the same as with x264: ultrafast,
 superfast, veryfast, faster, fast, medium, slow, slower, veryslow and
 placebo. The effects of the presets are listed in the following table,
@@ -197,7 +197,7 @@ smp               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0   
 amp               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
 
 
-##Kvazaar library
+## Kvazaar library
 
 See [kvazaar.h](src/kvazaar.h) for the library API and its
 documentation.
@@ -207,7 +207,7 @@ must be defined. On other platforms it's not strictly required.
 
 The needed linker and compiler flags can be obtained with pkg-config.
 
-##Compiling Kvazaar
+## Compiling Kvazaar
 
 If you have trouble regarding compiling the source code, please make an
 [issue](https://github.com/ultravideo/kvazaar/issues) about in Github.
@@ -215,7 +215,7 @@ Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
 
-###Required libraries
+### Required libraries
 - For Visual Studio, the pthreads-w32 library is required. Platforms
   with native POSIX thread support don't need anything.
   - The project file expects the library to be in ../pthreads.2/
@@ -224,7 +224,7 @@ possible.
   - The executable needs pthreadVC2.dll to be present. Either install it
     somewhere or ship it with the executable.
 
-###Autotools
+### Autotools
 
 Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
 For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`.
@@ -238,11 +238,11 @@ Run the following commands to compile and install Kvazaar.
 
 See `./configure --help` for more options.
 
-###OS X
+### OS X
 - The program should compile and work on OS X but you might need a newer
   version of GCC than what comes with the platform.
 
-###Visual Studio
+### Visual Studio
 - VS2010 and older do not have support for some of the C99 features that
   we use. Please use VS2013 or newer or GCC (MinGW) to compile on
   Windows.
@@ -254,20 +254,20 @@ See `./configure --help` for more options.
 - Building the Kvazaar library is not yet supported.
 
 
-##Contributing to Kvazaar
+## Contributing to Kvazaar
 
 See http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics
 for a list of topics you might want to examine if you would like to do
 something bigger than a bug fix but don't know what yet.
 
 
-###Code documentation
+### Code documentation
 
 You can generate Doxygen documentation pages by running the command
 "doxygen docs.doxy". Here is a rough sketch of the module structure:
 ![Kvazaar module hierarchy](https://github.com/ultravideo/kvazaar/blob/master/doc/kvazaar_module_hierarchy.png)
 
-###For version control we try to follow these conventions:
+### For version control we try to follow these conventions:
 
 - Master branch always produces a working bitstream (can be decoded with
   HM).
@@ -283,7 +283,7 @@ You can generate Doxygen documentation pages by running the command
   them before merging to master.
 
 
-###Testing
+### Testing
 
 - We do not have a proper testing framework yet. We test mainly by
   decoding the bitstream with HM and checking that the result matches
@@ -296,7 +296,7 @@ You can generate Doxygen documentation pages by running the command
   bitstream is valid. As of yet there is no such suite.
 
 
-###Unit tests
+### Unit tests
 - There are some unit tests located in the tests directory. We would
   like to have more.
 - The Visual Studio project links the unit tests against the actual .lib
@@ -309,7 +309,7 @@ You can generate Doxygen documentation pages by running the command
         git submodule update
 
 
-###Code style
+### Code style
 
 We try to follow the following conventions:
 - C99 without features not supported by Visual Studio 2013 (VLAs).
@@ -325,7 +325,7 @@ We try to follow the following conventions:
   necessary.
 
 
-###Resources for HEVC bitstream features
+### Resources for HEVC bitstream features
 
 - A good first resource for HEVC bitstream is JCTVC-N1002 High
   Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder
