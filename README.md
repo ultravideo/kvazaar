@@ -225,6 +225,10 @@ possible.
     somewhere or ship it with the executable.
 
 ###Autotools
+
+Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
+For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`.
+
 Run the following commands to compile and install Kvazaar.
 
     ./autogen.sh
