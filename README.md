@@ -268,7 +268,9 @@ Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SD
 
 Directory `visualizer_extras` is expected to be found from the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
 
-`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, `zlib1.dll`, and `pthreadVC2.dll` should be placed in the working directory when running the visualizer.
+`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, `zlib1.dll`, and `pthreadVC2.dll` should be placed in the working directory (i.e. the folder the `kvazaar.exe` is in after compiling the `kvazaar_cli` project/solution) when running the visualizer. The required `.dll` can be found in the aforementioned `lib`-folder (`lib\x64`) and the dll folder inside the pthreads folder (see `Required libraries`).
+
+Note: The solution should be compiled on the x64 platform in visual studio.
 
 Optional font file `arial.ttf` is to be placed in the working directory, if block info tool is used.
 
