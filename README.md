@@ -253,6 +253,13 @@ See `./configure --help` for more options.
     user variables
 - Building the Kvazaar library is not yet supported.
 
+### Docker
+
+This project includes a [Dockerfile](./Dockerfile), which enables building for Docker. Kvazaar is also available in the Docker Hub [`ultravideo/kvazaar`](https://hub.docker.com/r/ultravideo/kvazaar/)
+Build using Docker: `docker build -t kvazaar .`
+Example usage: `docker run -i -a STDIN -a STDOUT kvazaar -i - --input-res=320x240 -o - < testfile_320x240.yuv > out.265`
+For other examples, see [Dockerfile](./Dockerfile)
+
 
 ## Contributing to Kvazaar
 
