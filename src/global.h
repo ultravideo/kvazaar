@@ -92,6 +92,8 @@
 
 typedef int16_t coeff_t;
 
+#define KVZ_VISUALIZATION 1
+
 //#define VERBOSE 1
 
 /* CONFIG VARIABLES */
