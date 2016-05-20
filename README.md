@@ -249,6 +249,17 @@ Build using Docker: `docker build -t kvazaar .`
 Example usage: `docker run -i -a STDIN -a STDOUT kvazaar -i - --input-res=320x240 -o - < testfile_320x240.yuv > out.265`
 For other examples, see [Dockerfile](./Dockerfile)
 
+### Visualization (Windows only)
+
+Branch `visualizer` has a visual studio project, which can be compiled to enable visualization feature in Kvazaar.
+
+Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SDL2-ttf`](https://www.libsdl.org/projects/SDL_ttf/).
+
+Directory `visualizer_extras` is expected to be found from the same directory level as the kvazaar project directory. Inside should be directories `include` and `lib` found from the development library zip packages.
+
+`SDL2.dll`, `SDL2_ttf.dll`, `libfreetype-6.dll`, `zlib1.dll`, and `pthreadVC2.dll` should be placed in the working directory when running the visualizer.
+
+Optional font file `arial.ttf` is to be placed in the working directory, if block info tool is used.
 
 ## Contributing to Kvazaar
 
