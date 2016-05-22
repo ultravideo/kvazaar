@@ -1258,7 +1258,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     cur_cu->inter.mv_ref[ref_list] = ref_idx;
     cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
     cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
-    cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
+    CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
 
     *inter_cost = temp_cost;
     *inter_bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
@@ -1340,8 +1340,8 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Default to candidate 0
-  cur_cu->inter.mv_cand[0] = 0;
-  cur_cu->inter.mv_cand[1] = 0;
+  CU_SET_MV_CAND(cur_cu, 0, 0);
+  CU_SET_MV_CAND(cur_cu, 1, 0);
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
@@ -1484,7 +1484,7 @@ static void search_pu_inter(encoder_state_t * const state,
                   cu_mv_cand = 1;                  
                 }
               }
-              cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
+              CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
             }
             *inter_cost = cost;
             *inter_bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + mv_ref_coded[0] + mv_ref_coded[1];

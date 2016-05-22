@@ -1190,7 +1190,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
               width_ctb << 3, height_ctb << 3,
               mv_cand, cur_cu, ref_list_idx);
 
-          uint8_t cu_mv_cand = cur_cu->inter.mv_cand[ref_list_idx];
+          uint8_t cu_mv_cand = CU_GET_MV_CAND(cur_cu, ref_list_idx);
 
           const int32_t mvd_hor = cur_cu->inter.mv[ref_list_idx][0] - mv_cand[cu_mv_cand][0];
           const int32_t mvd_ver = cur_cu->inter.mv[ref_list_idx][1] - mv_cand[cu_mv_cand][1];
@@ -1237,8 +1237,11 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
         }
 
         // Signal which candidate MV to use
-        kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.mvp_idx_model, cur_cu->inter.mv_cand[ref_list_idx], 1,
-                                    AMVP_MAX_NUM_CANDS - 1);
+        kvz_cabac_write_unary_max_symbol(cabac,
+                                         cabac->ctx.mvp_idx_model,
+                                         CU_GET_MV_CAND(cur_cu, ref_list_idx),
+                                         1,
+                                         AMVP_MAX_NUM_CANDS - 1);
       }
     } // for ref_list
   } // if !merge
