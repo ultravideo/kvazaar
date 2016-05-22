@@ -35,7 +35,12 @@
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
-typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu_type_t;
+typedef enum {
+  CU_NOTSET = 0,
+  CU_INTRA  = 1,
+  CU_INTER  = 2,
+  CU_PCM    = 3,
+} cu_type_t;
 
 typedef enum {
   SIZE_2Nx2N = 0,
@@ -118,13 +123,13 @@ typedef struct
  */
 typedef struct
 {
-  unsigned type      : 3; //!< \brief block type, CU_INTER / CU_INTRA
-  unsigned depth     : 3; //!< \brief depth / size of this block
-  unsigned part_size : 3; //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
-  unsigned tr_depth  : 3; //!< \brief transform depth
-  unsigned skipped   : 1; //!< \brief flag to indicate this block is skipped
-  unsigned merged    : 1; //!< \brief flag to indicate this block is merged
-  unsigned merge_idx : 3; //!< \brief merge index
+  uint8_t type      : 2; //!< \brief block type, CU_INTER / CU_INTRA
+  uint8_t depth     : 3; //!< \brief depth / size of this block
+  uint8_t part_size : 3; //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
+  uint8_t tr_depth  : 3; //!< \brief transform depth
+  uint8_t skipped   : 1; //!< \brief flag to indicate this block is skipped
+  uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
+  uint8_t merge_idx : 3; //!< \brief merge index
 
   cu_cbf_t cbf;
   union {
