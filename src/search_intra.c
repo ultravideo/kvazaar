@@ -202,7 +202,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     kvz_pixel u[TR_MAX_WIDTH*TR_MAX_WIDTH];
     kvz_pixel v[TR_MAX_WIDTH*TR_MAX_WIDTH];
   } nosplit_pixels;
-  cu_cbf_t nosplit_cbf = { .y = 0, .u = 0, .v = 0 };
+  uint16_t nosplit_cbf = 0;
 
   double split_cost = INT32_MAX;
   double nosplit_cost = INT32_MAX;
@@ -213,14 +213,14 @@ static double search_intra_trdepth(encoder_state_t * const state,
 
     nosplit_cost = 0.0;
 
-    cbf_clear(&pred_cu->cbf.y, depth);
+    cbf_clear(&pred_cu->cbf, depth, COLOR_Y);
 
     kvz_intra_recon_lcu_luma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
     nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
 
     if (reconstruct_chroma) {
-      cbf_clear(&pred_cu->cbf.u, depth);
-      cbf_clear(&pred_cu->cbf.v, depth);
+      cbf_clear(&pred_cu->cbf, depth, COLOR_U);
+      cbf_clear(&pred_cu->cbf, depth, COLOR_V);
 
       kvz_intra_recon_lcu_chroma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
       nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
@@ -281,11 +281,11 @@ static double search_intra_trdepth(encoder_state_t * const state,
       const uint8_t tr_depth = depth - pred_cu->depth;
 
       const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
-      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
+      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
       }
-      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
-        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
+      if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+        cbf_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
       }
     }
 

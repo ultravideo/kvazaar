@@ -232,12 +232,12 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth <= MAX_DEPTH) {
-      cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
-      cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
-      cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
-      if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
-        cbf_set(&cur_pu->cbf.y, depth);
-      }
+      uint16_t child_cbfs[3] = {
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+      };
+      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_Y);
     }
 
     return;
@@ -262,7 +262,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
     // Clear coded block flag structures for depths lower than current depth.
     // This should ensure that the CBF data doesn't get corrupted if this function
     // is called more than once.
-    cbf_clear(&cur_pu->cbf.y, depth);
+    cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
 
     if (width == 4 && 
         state->encoder_control->trskip_enable)
@@ -275,7 +275,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
           base_y, recbase_y, recbase_y, orig_coeff_y
       );
       if (has_coeffs) {
-        cbf_set(&cur_pu->cbf.y, depth);
+        cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
     } else {
       int has_coeffs = kvz_quantize_residual(
@@ -285,7 +285,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
           base_y, recbase_y, recbase_y, orig_coeff_y
       );
       if (has_coeffs) {
-        cbf_set(&cur_pu->cbf.y, depth);
+        cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
     }
   }
@@ -315,15 +315,13 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth < MAX_DEPTH) {
-      cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
-      cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
-      cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
-      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
-        cbf_set(&cur_cu->cbf.u, depth);
-      }
-      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
-        cbf_set(&cur_cu->cbf.v, depth);
-      }
+      uint16_t child_cbfs[3] = {
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+      };
+      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
+      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
     }
 
     return;
@@ -332,8 +330,8 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
   if (depth <= MAX_DEPTH || (lcu_px.x % 8 == 0 && lcu_px.y % 8 == 0)) {
-    cbf_clear(&cur_cu->cbf.u, depth);
-    cbf_clear(&cur_cu->cbf.v, depth);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
 
     const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH_C;
     kvz_pixel *recbase_u = &lcu->rec.u[chroma_offset];
@@ -349,10 +347,10 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
 
     scan_idx_chroma = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
     if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
-      cbf_set(&cur_cu->cbf.u, depth);
+      cbf_set(&cur_cu->cbf, depth, COLOR_U);
     }
     if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
-      cbf_set(&cur_cu->cbf.v, depth);
+      cbf_set(&cur_cu->cbf, depth, COLOR_V);
     }
   }
 }

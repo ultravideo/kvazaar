@@ -111,13 +111,6 @@ typedef struct {
   int y;
 } vector2d_t;
 
-typedef struct
-{
-  uint8_t y;
-  uint8_t u;
-  uint8_t v;
-} cu_cbf_t;
-
 /**
  * \brief Struct for CU info
  */
@@ -131,7 +124,8 @@ typedef struct
   uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
   uint8_t merge_idx : 3; //!< \brief merge index
 
-  cu_cbf_t cbf;
+  uint16_t cbf;
+
   union {
     struct {
       int8_t mode;
@@ -379,37 +373,65 @@ void kvz_coefficients_blit(const coeff_t *orig, coeff_t *dst,
 unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
                         const int width);
 
-
+#define NUM_CBF_DEPTHS 5
+static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };
 
 /**
  * Check if CBF in a given level >= depth is true.
  */
-static INLINE int cbf_is_set(uint8_t cbf_flags, int depth)
+static INLINE int cbf_is_set(uint16_t cbf, int depth, color_t plane)
 {
-  // Transform data for 4x4 blocks is stored at depths 4-8 for luma, so masks
-  // for those levels don't include the other ones.
-  static const uint8_t masks[8] = { 0xff, 0x7f, 0x3f, 0x1f, 0x8, 0x4, 0x2, 0x1 };
+  return (cbf & (cbf_masks[depth] << (NUM_CBF_DEPTHS * plane))) != 0;
+}
 
-  return (cbf_flags & masks[depth]) != 0;
+/**
+ * Check if CBF in a given level >= depth is true.
+ */
+static INLINE int cbf_is_set_any(uint16_t cbf, int depth)
+{
+  return cbf_is_set(cbf, depth, COLOR_Y) ||
+         cbf_is_set(cbf, depth, COLOR_U) ||
+         cbf_is_set(cbf, depth, COLOR_V);
 }
 
 /**
  * Set CBF in a level to true.
  */
-static INLINE void cbf_set(uint8_t *cbf_flags, int depth)
+static INLINE void cbf_set(uint16_t *cbf, int depth, color_t plane)
 {
   // Return value of the bit corresponding to the level.
-  *cbf_flags |= 1 << (7 - depth);
+  *cbf |= (0x10 >> depth) << (NUM_CBF_DEPTHS * plane);
+}
+
+/**
+ * Set CBF in a level to true if it is set at a lower level in any of
+ * the child_cbfs.
+ */
+static INLINE void cbf_set_conditionally(uint16_t *cbf, uint16_t child_cbfs[3], int depth, color_t plane)
+{
+  bool child_cbf_set = cbf_is_set(child_cbfs[0], depth + 1, plane) ||
+                       cbf_is_set(child_cbfs[1], depth + 1, plane) ||
+                       cbf_is_set(child_cbfs[2], depth + 1, plane);
+  if (child_cbf_set) {
+    cbf_set(cbf, depth, plane);
+  }
 }
 
 /**
  * Set CBF in a levels <= depth to false.
  */
-static INLINE void cbf_clear(uint8_t *cbf_flags, int depth)
+static INLINE void cbf_clear(uint16_t *cbf, int depth, color_t plane)
 {
-  static const uint8_t masks[8] = { 0xff, 0x7f, 0x3f, 0x1f, 0x8, 0x4, 0x2, 0x1 };
+  *cbf &= ~(cbf_masks[depth] << (NUM_CBF_DEPTHS * plane));
+}
 
-  *cbf_flags &= ~masks[depth];
+/**
+ * Copy cbf flags.
+ */
+static INLINE void cbf_copy(uint16_t *cbf, uint16_t src, color_t plane)
+{
+  cbf_clear(cbf, 0, plane);
+  *cbf |= src & (cbf_masks[0] << (NUM_CBF_DEPTHS * plane));
 }
 
 #define GET_SPLITDATA(CU,curDepth) ((CU)->depth > curDepth)

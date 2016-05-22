@@ -326,8 +326,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           cu_q = kvz_cu_array_at(frame->cu_array, x_coord, y    );
         }
 
-        bool nonzero_coeffs = cbf_is_set(cu_q->cbf.y, cu_q->tr_depth)
-                           || cbf_is_set(cu_p->cbf.y, cu_p->tr_depth);
+        bool nonzero_coeffs = cbf_is_set(cu_q->cbf, cu_q->tr_depth, COLOR_Y)
+                           || cbf_is_set(cu_p->cbf, cu_p->tr_depth, COLOR_Y);
 
         // Filter strength
         strength = 0;

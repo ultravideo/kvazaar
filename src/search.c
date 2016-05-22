@@ -261,7 +261,7 @@ static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *
       cu_info_t *cu_from = LCU_GET_CU_AT_PX(lcu, x & mask, y & mask);
       if (cu != cu_from) {
         // Chroma coeff data is not used, luma is needed for deblocking
-        cu->cbf.y = cu_from->cbf.y;
+        cbf_copy(&cu->cbf, cu_from->cbf, COLOR_Y);
       }
     }
   }
@@ -321,11 +321,11 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   // Add transform_tree cbf_luma bit cost.
   if (pred_cu->type == CU_INTRA ||
       tr_depth > 0 ||
-      cbf_is_set(tr_cu->cbf.u, depth) ||
-      cbf_is_set(tr_cu->cbf.v, depth))
+      cbf_is_set(tr_cu->cbf, depth, COLOR_U) ||
+      cbf_is_set(tr_cu->cbf, depth, COLOR_V))
   {
     const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_luma[!tr_depth]);
-    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.y, depth));
+    tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_Y));
   }
 
   unsigned ssd = 0;
@@ -375,11 +375,11 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   if (depth < MAX_PU_DEPTH) {
     const int tr_depth = depth - pred_cu->depth;
     const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.u, depth - 1)) {
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.u, depth));
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_U)) {
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_U));
     }
-    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf.v, depth - 1)) {
-      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf.v, depth));
+    if (tr_depth == 0 || cbf_is_set(pred_cu->cbf, depth - 1, COLOR_V)) {
+      tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_V));
     }
   }
 
@@ -648,7 +648,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       kvz_quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
       kvz_quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
 
-      int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
+      int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
       if(cur_cu->merged && !cbf && cur_cu->part_size == SIZE_2Nx2N) {
         cur_cu->merged = 0;
@@ -680,8 +680,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->global->slicetype != KVZ_SLICE_I)) {
     int half_cu = cu_width / 2;
     double split_cost = 0.0;
-    int cbf = cbf_is_set(cur_cu->cbf.y, depth) || cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth);
-        
+    int cbf = cbf_is_set_any(cur_cu->cbf, depth);
+
     if (depth < MAX_DEPTH) {
       // Add cost of cu_split_flag.
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);

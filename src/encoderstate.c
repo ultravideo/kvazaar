@@ -1495,10 +1495,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
 
     {
-      int cbf = (cbf_is_set(cur_cu->cbf.y, depth) ||
-                 cbf_is_set(cur_cu->cbf.u, depth) ||
-                 cbf_is_set(cur_cu->cbf.v, depth));
-
+      int cbf = cbf_is_set_any(cur_cu->cbf, depth);
       // Only need to signal coded block flag if not skipped or merged
       // skip = no coded residual, merge = coded residual
       if (cur_cu->part_size != SIZE_2Nx2N || !cur_cu->merged) {
@@ -1604,7 +1601,7 @@ static void encode_transform_unit(encoder_state_t * const state,
 
   int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
-  int cbf_y = cbf_is_set(cur_pu->cbf.y, depth);
+  int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
 
   if (cbf_y) {
     int x = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH);
@@ -1631,7 +1628,9 @@ static void encode_transform_unit(encoder_state_t * const state,
     return;
   }
 
-  if (cbf_is_set(cur_cu->cbf.u, depth) || cbf_is_set(cur_cu->cbf.v, depth)) {
+  bool chroma_cbf_set = cbf_is_set(cur_cu->cbf, depth, COLOR_U) ||
+                        cbf_is_set(cur_cu->cbf, depth, COLOR_V);
+  if (chroma_cbf_set) {
     int x, y;
     coeff_t *orig_pos_u, *orig_pos_v;
 
@@ -1656,11 +1655,11 @@ static void encode_transform_unit(encoder_state_t * const state,
 
     scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
 
-    if (cbf_is_set(cur_cu->cbf.u, depth)) {
+    if (cbf_is_set(cur_cu->cbf, depth, COLOR_U)) {
       kvz_encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
     }
 
-    if (cbf_is_set(cur_cu->cbf.v, depth)) {
+    if (cbf_is_set(cur_cu->cbf, depth, COLOR_V)) {
       kvz_encode_coeff_nxn(state, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
@@ -1698,9 +1697,9 @@ void kvz_encode_transform_coeff(encoder_state_t * const state, int32_t x_pu,int3
 
   int8_t split = (cur_cu->tr_depth > depth);
 
-  const int cb_flag_y = cbf_is_set(cur_pu->cbf.y, depth);
-  const int cb_flag_u = cbf_is_set(cur_cu->cbf.u, depth);
-  const int cb_flag_v = cbf_is_set(cur_cu->cbf.v, depth);
+  const int cb_flag_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
+  const int cb_flag_u = cbf_is_set(cur_cu->cbf, depth, COLOR_U);
+  const int cb_flag_v = cbf_is_set(cur_cu->cbf, depth, COLOR_V);
 
   // The split_transform_flag is not signaled when:
   // - transform size is greater than 32 (depth == 0)
