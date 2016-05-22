@@ -569,14 +569,18 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     bool skip_intra = state->encoder_control->rdo == 0
                       && cur_cu->type != CU_NOTSET
                       && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
-    if (!skip_intra 
+    if (!skip_intra
         && WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max))
     {
-      double mode_cost = kvz_search_cu_intra(state, x, y, depth, &work_tree[depth]);
-      if (mode_cost < cost) {
-        cost = mode_cost;
+      int8_t intra_mode;
+      double intra_cost;
+      kvz_search_cu_intra(state, x, y, depth, &work_tree[depth],
+                          &intra_mode, &intra_cost);
+      if (intra_cost < cost) {
+        cost = intra_cost;
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
+        cur_cu->intra[PU_INDEX(x >> 2, y >> 2)].mode = intra_mode;
       }
     }
 

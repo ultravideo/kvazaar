@@ -127,17 +127,19 @@ typedef struct
   unsigned merge_idx : 3; //!< \brief merge index
 
   cu_cbf_t cbf;
-  struct {
-    int8_t mode;
-    int8_t mode_chroma;
-    int8_t tr_skip;    //!< \brief transform skip flag
-  } intra[4];
-  struct {
-    int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
-    uint8_t mv_cand[2]; // \brief selected MV candidate
-    uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
-    uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
-  } inter;
+  union {
+    struct {
+      int8_t mode;
+      int8_t mode_chroma;
+      int8_t tr_skip;    //!< \brief transform skip flag
+    } intra[4];
+    struct {
+      int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
+      uint8_t mv_cand[2]; // \brief selected MV candidate
+      uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
+      uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
+    } inter;
+  };
 } cu_info_t;
 
 #define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \

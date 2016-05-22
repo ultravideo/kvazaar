@@ -772,9 +772,10 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
  * Update lcu to have best modes at this depth.
  * \return Cost of best mode.
  */
-double kvz_search_cu_intra(encoder_state_t * const state,
-                           const int x_px, const int y_px,
-                           const int depth, lcu_t *lcu)
+void kvz_search_cu_intra(encoder_state_t * const state,
+                         const int x_px, const int y_px,
+                         const int depth, lcu_t *lcu,
+                         int8_t *mode_out, double *cost_out)
 {
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   const vector2d_t lcu_cu = { lcu_px.x >> 3, lcu_px.y >> 3 };
@@ -811,7 +812,6 @@ double kvz_search_cu_intra(encoder_state_t * const state,
 
   // Find best intra mode for 2Nx2N.
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
-  unsigned pu_index = PU_INDEX(x_px >> 2, y_px >> 2);
 
   int8_t number_of_modes;
   bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
@@ -855,7 +855,7 @@ double kvz_search_cu_intra(encoder_state_t * const state,
   }
 
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
-  cur_cu->intra[pu_index].mode = modes[best_mode_i];
 
-  return costs[best_mode_i];
+  *mode_out = modes[best_mode_i];
+  *cost_out = costs[best_mode_i];
 }
