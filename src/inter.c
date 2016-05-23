@@ -240,15 +240,16 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
 
 /**
  * \brief Reconstruct inter block
- * \param ref picture to copy the data from
- * \param xpos block x position
- * \param ypos block y position
- * \param width block width
- * \param height block height
- * \param mv[2] motion vector
- * \param lcu destination lcu
- * \param hi_prec destination of high precision output (null if not needed)
- * \returns Void
+ *
+ * \param state         encoder state
+ * \param ref           picture to copy the data from
+ * \param xpos          block x position
+ * \param ypos          block y position
+ * \param width         block width
+ * \param height        block height
+ * \param mv_param      motion vector
+ * \param lcu           destination lcu
+ * \param hi_prec_out   destination of high precision output (null if not needed)
 */
 void kvz_inter_recon_lcu(const encoder_state_t * const state,
                          const kvz_picture * const ref,
@@ -407,18 +408,18 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
 }
 
 /**
-* \brief Reconstruct bi-pred inter block
-* \param ref1 reference picture to copy the data from
-* \param ref2 other reference picture to copy the data from
-* \param xpos block x position
-* \param ypos block y position
-* \param width block width
-* \param height block height
-* \param mv[2][2] motion vectors
-* \param lcu destination lcu
-* \returns Void
-*/
-
+ * \brief Reconstruct bi-pred inter block
+ *
+ * \param state     encoder state
+ * \param ref1      reference picture to copy the data from
+ * \param ref2      other reference picture to copy the data from
+ * \param xpos      block x position
+ * \param ypos      block y position
+ * \param width     block width
+ * \param height    block height
+ * \param mv_param  motion vectors
+ * \param lcu       destination lcu
+ */
 void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
                                 const kvz_picture * ref1,
                                 const kvz_picture * ref2,
@@ -486,10 +487,11 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
 }
 
 /**
- * \brief Set unused L0/L1 motion vectors and reference
+ * \brief Clear unused L0/L1 motion vectors and reference
  * \param cu coding unit to clear
  */
-static void inter_clear_cu_unused(cu_info_t* cu) {
+static void inter_clear_cu_unused(cu_info_t* cu)
+{
   for (unsigned i = 0; i < 2; ++i) {
     if (cu->inter.mv_dir & (1 << i)) continue;
 

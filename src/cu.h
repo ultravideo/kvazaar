@@ -116,9 +116,9 @@ typedef struct {
  */
 typedef struct
 {
-  uint8_t type      : 2; //!< \brief block type, CU_INTER / CU_INTRA
+  uint8_t type      : 2; //!< \brief block type, one of cu_type_t values
   uint8_t depth     : 3; //!< \brief depth / size of this block
-  uint8_t part_size : 3; //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
+  uint8_t part_size : 3; //!< \brief partition mode, one of part_mode_t values
   uint8_t tr_depth  : 3; //!< \brief transform depth
   uint8_t skipped   : 1; //!< \brief flag to indicate this block is skipped
   uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
