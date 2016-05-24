@@ -302,7 +302,7 @@ static void* strategyselector_choose_for(const strategy_list_t * const strategie
 
   //Check what strategy we are going to use
   if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx") == 0) kvz_g_strategies_in_use.intel_flags.avx++;
-  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "x86_asm_avx") == 0) kvz_g_strategies_available.intel_flags.avx++;
+  if (strcmp(strategies->strategies[max_priority_i].strategy_name, "x86_asm_avx") == 0) kvz_g_strategies_in_use.intel_flags.avx++;
   if (strcmp(strategies->strategies[max_priority_i].strategy_name, "avx2") == 0) kvz_g_strategies_in_use.intel_flags.avx2++;
   if (strcmp(strategies->strategies[max_priority_i].strategy_name, "mmx") == 0) kvz_g_strategies_in_use.intel_flags.mmx++;
   if (strcmp(strategies->strategies[max_priority_i].strategy_name, "sse") == 0) kvz_g_strategies_in_use.intel_flags.sse++;
