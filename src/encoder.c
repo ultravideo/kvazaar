@@ -550,31 +550,61 @@ static int encoder_control_init_gop_layer_weights(encoder_control_t * const enco
 
   switch (num_layers) {
     case 0:
+    case 1:
       break;
 
+    // Use the first layers of the 4-layer weights.
+    case 2:
     case 3:
+
     case 4:
-      // These weights were copied from http://doi.org/10.1109/TIP.2014.2336550
-      if (encoder->target_avg_bpp <= 0.05) {
-        encoder->gop_layer_weights[0] = 30;
-        encoder->gop_layer_weights[1] = 8;
-        encoder->gop_layer_weights[2] = 4;
-        encoder->gop_layer_weights[3] = 1;
-      } else if (encoder->target_avg_bpp <= 0.1) {
-        encoder->gop_layer_weights[0] = 25;
-        encoder->gop_layer_weights[1] = 7;
-        encoder->gop_layer_weights[2] = 4;
-        encoder->gop_layer_weights[3] = 1;
-      } else if (encoder->target_avg_bpp <= 0.2) {
-        encoder->gop_layer_weights[0] = 20;
-        encoder->gop_layer_weights[1] = 6;
-        encoder->gop_layer_weights[2] = 4;
-        encoder->gop_layer_weights[3] = 1;
+      if (encoder->cfg->gop_lowdelay) {
+        // These weights are based on http://doi.org/10.1109/TIP.2014.2336550
+        // They are meant for lp-g4d3r4t1 gop, but work ok for others.
+        if (encoder->target_avg_bpp <= 0.05) {
+          encoder->gop_layer_weights[0] = 14;
+          encoder->gop_layer_weights[1] = 3;
+          encoder->gop_layer_weights[2] = 2;
+          encoder->gop_layer_weights[3] = 1;
+        } else if (encoder->target_avg_bpp <= 0.1) {
+          encoder->gop_layer_weights[0] = 12;
+          encoder->gop_layer_weights[1] = 3;
+          encoder->gop_layer_weights[2] = 2;
+          encoder->gop_layer_weights[3] = 1;
+        } else if (encoder->target_avg_bpp <= 0.2) {
+          encoder->gop_layer_weights[0] = 10;
+          encoder->gop_layer_weights[1] = 3;
+          encoder->gop_layer_weights[2] = 2;
+          encoder->gop_layer_weights[3] = 1;
+        } else {
+          encoder->gop_layer_weights[0] = 6;
+          encoder->gop_layer_weights[1] = 3;
+          encoder->gop_layer_weights[2] = 2;
+          encoder->gop_layer_weights[3] = 1;
+        }
       } else {
-        encoder->gop_layer_weights[0] = 15;
-        encoder->gop_layer_weights[1] = 5;
-        encoder->gop_layer_weights[2] = 4;
-        encoder->gop_layer_weights[3] = 1;
+        // These weights are from http://doi.org/10.1109/TIP.2014.2336550
+        if (encoder->target_avg_bpp <= 0.05) {
+          encoder->gop_layer_weights[0] = 30;
+          encoder->gop_layer_weights[1] = 8;
+          encoder->gop_layer_weights[2] = 4;
+          encoder->gop_layer_weights[3] = 1;
+        } else if (encoder->target_avg_bpp <= 0.1) {
+          encoder->gop_layer_weights[0] = 25;
+          encoder->gop_layer_weights[1] = 7;
+          encoder->gop_layer_weights[2] = 4;
+          encoder->gop_layer_weights[3] = 1;
+        } else if (encoder->target_avg_bpp <= 0.2) {
+          encoder->gop_layer_weights[0] = 20;
+          encoder->gop_layer_weights[1] = 6;
+          encoder->gop_layer_weights[2] = 4;
+          encoder->gop_layer_weights[3] = 1;
+        } else {
+          encoder->gop_layer_weights[0] = 15;
+          encoder->gop_layer_weights[1] = 5;
+          encoder->gop_layer_weights[2] = 4;
+          encoder->gop_layer_weights[3] = 1;
+        }
       }
       break;
 
