@@ -104,6 +104,7 @@ Optional parameters:
                                      "off": Early termination is off
                                      "on": Early termination is on
                                      "sensitive": Sensitive early termination is on
+          --lossless             : Use lossless coding
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio

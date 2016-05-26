@@ -108,6 +108,8 @@ static const struct option long_options[] = {
   {"cu-split-termination",required_argument, NULL, 0 },
   { "crypto",             required_argument, NULL, 0 },
   { "me-early-termination",required_argument, NULL, 0 },
+  { "lossless",                 no_argument, NULL, 0 },
+  { "no-lossless",              no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -388,6 +390,7 @@ void print_help(void)
     "                                     \"off\": Early termination is off\n"
     "                                     \"on\": Early termination is on\n"
     "                                     \"sensitive\": Sensitive early termination is on\n"
+    "          --lossless             : Use lossless coding\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
