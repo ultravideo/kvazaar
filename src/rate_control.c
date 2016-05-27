@@ -127,7 +127,10 @@ double kvz_select_picture_lambda(encoder_state_t * const state)
     update_rc_parameters(state);
   }
 
-  if (encoder->cfg->gop_len == 0 || state->global->gop_offset == 0) {
+  if (encoder->cfg->gop_len == 0 ||
+      state->global->gop_offset == 0 ||
+      state->global->frame == 0)
+  {
     // A new GOP begins at this frame.
     gop_allocate_bits(state);
   } else {

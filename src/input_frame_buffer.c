@@ -65,7 +65,7 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   assert(frame->rec    != NULL);
 
   if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
-    // GOP disabled, just return the input frame.
+    // No reordering of output pictures necessary.
 
     if (img_in == NULL) return 0;
 
@@ -73,7 +73,14 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     frame->source   = kvz_image_copy_ref(img_in);
     frame->rec->pts = img_in->pts;
     frame->rec->dts = img_in->dts;
-    state->global->gop_offset = cfg->gop_lowdelay ? (state->global->frame-1) % cfg->gop_len : 0;
+    state->global->gop_offset = 0;
+    if (cfg->gop_lowdelay) {
+      state->global->gop_offset = (state->global->frame - 1) % cfg->gop_len;
+      if (state->global->gop_offset < 0) {
+        // Set gop_offset of IDR as the highest quality picture.
+        state->global->gop_offset += cfg->gop_len;
+      }
+    }
     return 1;
   }
 
@@ -132,7 +139,7 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     // Output the first frame.
     idx_out = -1;
     dts_out = buf->pts_buffer[gop_buf_size - 1] + buf->delay;
-    gop_offset = 0;
+    gop_offset = 0; // highest quality picture
 
   } else {
     gop_offset = (buf->num_out - 1) % cfg->gop_len;
