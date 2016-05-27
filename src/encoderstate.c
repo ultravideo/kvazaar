@@ -715,44 +715,65 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
   }
 }
 
+/**
+ * \brief Remove any references that should no longer be used.
+ */
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
-  int8_t refnumber = encoder->cfg->ref_frames;
-  int8_t check_refs = 0;
+  
+  int neg_refs = encoder->cfg->gop[state->global->gop_offset].ref_neg_count;
+  int pos_refs = encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
+
+  unsigned target_ref_num;
   if (encoder->cfg->gop_len) {
-    refnumber = encoder->cfg->gop[state->global->gop_offset].ref_neg_count + encoder->cfg->gop[state->global->gop_offset].ref_pos_count;
-    check_refs = 1;
-  } else if (state->global->slicetype == KVZ_SLICE_I) {
-    refnumber = 0;
-  }
-  // Remove the ref pic (if present)
-  while (check_refs || state->global->ref->used_size > (uint32_t)refnumber) {
-    int8_t ref_to_remove = state->global->ref->used_size - 1;
-    if (encoder->cfg->gop_len) {
-      for (int ref = 0; ref < state->global->ref->used_size; ref++) {
-        uint8_t found = 0;
-        for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_neg_count; i++) {
-          if (state->global->ref->pocs[ref] == state->global->poc - encoder->cfg->gop[state->global->gop_offset].ref_neg[i]) {
-            found = 1;
-            break;
-          }
-        }
-        if (found) continue;
-        for (int i = 0; i < encoder->cfg->gop[state->global->gop_offset].ref_pos_count; i++) {
-          if (state->global->ref->pocs[ref] == state->global->poc + encoder->cfg->gop[state->global->gop_offset].ref_pos[i]) {
-            found = 1;
-            break;
-          }
-        }
-        if (!found) {
-          kvz_image_list_rem(state->global->ref, ref);
-          ref--;
-        }
-      }
-      check_refs = 0;
-    } else kvz_image_list_rem(state->global->ref, ref_to_remove);
+    target_ref_num = neg_refs + pos_refs;
+  } else {
+    target_ref_num = encoder->cfg->ref_frames;
+    if (state->global->slicetype == KVZ_SLICE_I) {
+      target_ref_num = 0; // TODO: do the same with GOP
+    }
   }
 
+  if (encoder->cfg->gop_len) {
+    // With GOP in use, go through all the existing reference pictures and
+    // remove any picture that is not referenced by the current picture.
+
+    for (int ref = state->global->ref->used_size - 1; ref >= 0; --ref) {
+      bool is_referenced = false;
+
+      int ref_poc = state->global->ref->pocs[ref];
+      
+      for (int i = 0; i < neg_refs; i++) {
+        int ref_relative_poc = -encoder->cfg->gop[state->global->gop_offset].ref_neg[i];
+        if (ref_poc == state->global->poc + ref_relative_poc) {
+          is_referenced = true;
+          break;
+        }
+      }
+
+      
+      for (int i = 0; i < pos_refs; i++) {
+        int ref_relative_poc = encoder->cfg->gop[state->global->gop_offset].ref_pos[i];
+        if (ref_poc == state->global->poc + ref_relative_poc) {
+          is_referenced = true;
+          break;
+        }
+      }
+
+      if (!is_referenced) {
+        // This reference is not referred to by this frame, it must be removed.
+        kvz_image_list_rem(state->global->ref, ref);
+      }
+    }
+  } else {
+    // Without GOP, remove the oldest picture.
+    while (state->global->ref->used_size > target_ref_num) {
+      int8_t oldest_ref = state->global->ref->used_size - 1;
+      kvz_image_list_rem(state->global->ref, oldest_ref);
+    }
+  }
+
+  assert(state->global->ref->used_size <= target_ref_num);
 }
 
 static void encoder_state_reset_poc(encoder_state_t *state) {
