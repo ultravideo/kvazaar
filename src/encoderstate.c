@@ -729,12 +729,12 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
     target_ref_num = neg_refs + pos_refs;
   } else {
     target_ref_num = encoder->cfg->ref_frames;
-    if (state->global->slicetype == KVZ_SLICE_I) {
-      target_ref_num = 0; // TODO: do the same with GOP
-    }
+  }
+  if (state->global->slicetype == KVZ_SLICE_I) {
+    target_ref_num = 0;
   }
 
-  if (encoder->cfg->gop_len) {
+  if (encoder->cfg->gop_len && target_ref_num > 0) {
     // With GOP in use, go through all the existing reference pictures and
     // remove any picture that is not referenced by the current picture.
 
