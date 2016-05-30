@@ -437,7 +437,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "weighted_bipred_idc");
 
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
-  WRITE_U(stream, 0, 1, "transquant_bypass_enable_flag");
+  WRITE_U(stream, encoder->cfg->lossless, 1, "transquant_bypass_enable_flag");
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
   //wavefronts
   WRITE_U(stream, encoder->wpp, 1, "entropy_coding_sync_enabled_flag");

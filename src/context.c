@@ -62,6 +62,12 @@ static const uint8_t INIT_MERGE_IDX_EXT[3][1] = {
   { CNU, },
 };
 
+static const uint8_t INIT_CU_TRANSQUANT_BYPASS[3][1] = {
+  { 154, },
+  { 154, },
+  { 154, },
+};
+
 static const uint8_t INIT_SKIP_FLAG[3][3] =  {
   { 197,  185,  201, },
   { 197,  185,  201, },
@@ -209,6 +215,7 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_merge_flag_ext_model, QP, INIT_MERGE_FLAG_EXT[slice][0]);
   kvz_ctx_init(&cabac->ctx.cu_merge_idx_ext_model, QP, INIT_MERGE_IDX_EXT[slice][0]);
   kvz_ctx_init(&cabac->ctx.cu_pred_mode_model, QP, INIT_PRED_MODE[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_transquant_bypass, QP, INIT_CU_TRANSQUANT_BYPASS[slice][0]);
 
   kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[0], QP, INIT_SKIP_FLAG[slice][0]);
   kvz_ctx_init(&cabac->ctx.cu_skip_flag_model[1], QP, INIT_SKIP_FLAG[slice][1]);
