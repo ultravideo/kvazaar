@@ -1906,8 +1906,8 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
     }
 
     if (num_non_zero > 0) {
-      int8_t sign_hidden = (last_nz_pos_in_cg - first_nz_pos_in_cg >=
-                            4 /*SBH_THRESHOLD*/) ? 1 : 0;
+      bool sign_hidden = last_nz_pos_in_cg - first_nz_pos_in_cg >= 4 /* SBH_THRESHOLD */
+                         && !encoder->cfg->lossless;
       uint32_t ctx_set  = (i > 0 && type == 0) ? 2 : 0;
       cabac_ctx_t *base_ctx_mod;
       int32_t num_c1_flag, first_c2_flag_idx, idx, first_coeff2;

@@ -397,18 +397,22 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   encoder->in.video_format    = FORMAT_420;
 
   // deblocking filter
-  encoder->deblock_enable     = (int8_t)  encoder->cfg->deblock_enable;
+  encoder->deblock_enable     = (int8_t)  (encoder->cfg->deblock_enable &&
+                                           !encoder->cfg->lossless);
   encoder->beta_offset_div2   = (int8_t)  encoder->cfg->deblock_beta;
   encoder->tc_offset_div2     = (int8_t)  encoder->cfg->deblock_tc;
   // SAO
-  encoder->sao_enable         = (int8_t)  encoder->cfg->sao_enable;
+  encoder->sao_enable         = (int8_t)  (encoder->cfg->sao_enable &&
+                                           !encoder->cfg->lossless);
   // RDO
   encoder->rdoq_enable        = (int8_t)  encoder->cfg->rdoq_enable;
   encoder->rdo                = (int8_t)  encoder->cfg->rdo;
-  encoder->sign_hiding        =           encoder->cfg->signhide_enable;
+  encoder->sign_hiding        =           (encoder->cfg->signhide_enable &&
+                                           !encoder->cfg->lossless);
   encoder->full_intra_search  = (int8_t)  encoder->cfg->full_intra_search;
   // TR SKIP
-  encoder->trskip_enable      = (int8_t)  encoder->cfg->trskip_enable;
+  encoder->trskip_enable      = (int8_t)  (encoder->cfg->trskip_enable &&
+                                           !encoder->cfg->lossless);
   encoder->tr_depth_intra     = (int8_t)  encoder->cfg->tr_depth_intra;
   // MOTION ESTIMATION
   encoder->fme_level          = (int8_t)  encoder->cfg->fme_level;

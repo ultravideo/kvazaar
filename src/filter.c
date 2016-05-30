@@ -684,6 +684,8 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  */
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
+  assert(!state->encoder_control->cfg->lossless);
+
   filter_deblock_lcu_inside(state, x_px, y_px, EDGE_VER);
   if (x_px > 0) {
     filter_deblock_lcu_rightmost(state, x_px, y_px);
