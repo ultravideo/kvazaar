@@ -1431,9 +1431,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
   if (state->encoder_control->cfg->lossless) {
-    // TODO: bypass transform and quantization
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
-    CABAC_BIN(cabac, 0, "cu_transquant_bypass_flag");
+    CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
   }
 
     // Encode skip flag
