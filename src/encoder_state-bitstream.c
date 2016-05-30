@@ -93,6 +93,139 @@ static void encoder_state_write_bitstream_PTL(bitstream_t *stream,
   // end PTL
 }
 
+//*******************************************
+//For scalability extension. TODO: merge with encoder_state_write_bitstream_PTL? Add asserts
+//Handle case when profilePresentFlag is not set
+static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
+  encoder_state_t * const state)
+{
+  // PTL
+  // Level 6.2 (general_level_idc is 30 * 6.2)
+  WRITE_U(stream, 186, 8, "general_level_idc");
+
+  WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
+  WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
+
+  for (int i = 1; i < 8; i++) {
+    WRITE_U(stream, 0, 2, "reserved_zero_2bits");
+  }
+
+  // end PTL
+}
+
+//Write exstension data
+static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
+                                                       encoder_state_t * const state)
+{
+  encoder_state_write_bitstream_PTL_no_profile(stream, state);
+  
+  uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
+  WRITE_U(stream, splitting_flag, 1, "splitting_flag");
+  
+  uint16_t  num_scalability_types = 0;
+
+  for (int i = 0; i < 16; i++){
+    //TODO: Implement scalability mask flags in configuration?
+    WRITE_U(stream, 0, 1, "scalability_mask_flag[i]");
+    num_scalability_types += 0;
+  }
+
+  //Currently unecessary
+  /*for (int j = 0; j < (num_scalability_types - splitting_flag); j++){
+    WRITE_U(stream, 0, 3, "dimension_id_len_minus1[j]");
+  }*/
+
+  uint8_t vps_nuh_layer_id_present_flag = 0;
+  WRITE_U(stream, 0, 1, "vps_nuh_layer_id_present_flag");
+
+  //Currently unecessary
+  //TODO: implement settings?
+  /*for (int i = 0; i <= state->layer->max_layers - 1; i++){
+    if (vps_nuh_layer_id_present_flag){
+      WRITE_U(stream, i, 6, "layer_id_in_nuh[i]");
+    }
+    if (!splitting_flag){
+      for (int j = 0; j < num_scalability_types; j++){
+        WRITE_U(stream, 0, 0, "dimension_id[i][j]");
+      }
+    }
+  }*/
+
+  uint8_t view_id_len = 0;
+  WRITE_U(stream, view_id_len, 4, "view_id_len");
+  //Not used. TODO: implement?
+  //if (view_id_len > 0){
+  //  //write "view_id_val[i]"
+  //}
+
+  //Generate a default layer reference structure where a layer only depends on the layer directly "below".
+  //TODO: implement dependecy specification in config?
+  for (int layer = 1; layer < state->layer->max_layers; layer++){
+    for (int ref_layer = 0; ref_layer < layer; ref_layer++){
+      uint8_t dep_flag = 0;
+      if (ref_layer == layer - 1){
+        dep_flag = 1;
+      }
+      WRITE_U(stream, dep_flag, 1, "direct_dependency_flag[i][j]");
+    }
+  }
+  //TODO: implement num independent layers?
+  //if numIndependentLayers > 1 write "num_add_layer_sets"
+
+  uint8_t vps_sub_layers_max_minus1_present_flag = 1;
+  WRITE_U(stream, vps_sub_layers_max_minus1_present_flag, 1, "vps_sub_layers_max_minus1_present_flag");
+  //if vps_sub_layers_max_minus1_present_flag write sub_layers_max_minus1[i]=0
+  if (vps_sub_layers_max_minus1_present_flag) {
+    for (int i = 0; i < state->layer->max_layers; i++) {
+      WRITE_U(stream, 0, 3, "sub_layers_vps_max_minus1[i]");
+    }
+  }
+
+  WRITE_U(stream, 0, 1, "max_tid_ref_present_flag");
+  //if max_tid_ref_present_flag write "max_tid_il_ref_pics_plus1[i][j]"
+
+  WRITE_U(stream, 1, 1, "default_ref_layers_active_flag");
+
+  //TODO: Add ptl for scalable main etc.
+  WRITE_UE(stream, 1, "vps_num_profile_tier_level_minus1");
+  //Write extra PTL here
+  //if NumLayerSets > 1 write stuff here
+  //+ Other stuff
+
+  WRITE_UE(stream, 0, "vps_num_rep_formats_minus1");
+  //Write other rep formats here
+  //Write rep_format_idx_present_flag here
+  //Write rep_format_idx[i] here
+
+  //Only allow one interlayer ref. TODO: allow multible?
+  WRITE_U(stream, 1, 1, "max_one_active_ref_layer_flag");
+
+  WRITE_U(stream, 0, 1, "vps_poc_lsb_aligned_flag");
+  
+  //TODO: implement numDirectRefLayer and layer_id_in_nuh
+  //for (int i = 1; i < state->layer->max_layers; i++){
+  //  if (NumDirectRefLayers[layer_id_in_nuh[i]] == 0){
+  //    Starts from the first EL
+  //    WRITE_U(stream, 0, 1, "poc_lsb_not_present_flag[0]"); 
+  //  }
+  //}
+
+  //dpb_size() can be skipped if numOutpuLayers is less than 2
+  uint8_t direct_dep_type_len_minus2 = 0;
+  WRITE_UE(stream, direct_dep_type_len_minus2, "direct_dep_type_len_minus2");
+  WRITE_U(stream, 1, 1, "direct_dependency_all_layers_flag");
+  //if "direct_dependency_all_layers_flag"
+  WRITE_U(stream, 0, direct_dep_type_len_minus2+2, "direct_dependency_all_layers_type");
+  //Else write separately for each layer
+
+  WRITE_UE(stream, 0, "vps_non_vui_extension_length");
+  //Write non vui extension data here
+
+  WRITE_U(stream, 0, 1, "vps_vui_present_flag");
+  //write vui stuff here
+}
+//*********************************************************
+
 static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -101,8 +234,13 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 #endif
 
   WRITE_U(stream, 0, 4, "vps_video_parameter_set_id");
-  WRITE_U(stream, 3, 2, "vps_reserved_three_2bits" );
-  WRITE_U(stream, 0, 6, "vps_reserved_zero_6bits" );
+  WRITE_U(stream, 3, 2, "vps_reserved_three_2bits" ); //Vps_base_layer_internal_flag and vps_base_layer_available_flag
+
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+   WRITE_U(stream, state->layer->max_layers-1, 6, "vps_max_layers_minus1" );
+  //*********************************************
+
   WRITE_U(stream, 1, 3, "vps_max_sub_layers_minus1");
   WRITE_U(stream, 0, 1, "vps_temporal_id_nesting_flag");
   WRITE_U(stream, 0xffff, 16, "vps_reserved_ffff_16bits");
@@ -118,14 +256,31 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "vps_max_latency_increase");
   }
 
-  WRITE_U(stream, 0, 6, "vps_max_nuh_reserved_zero_layer_id");
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  WRITE_U(stream, state->layer->max_layers - 1, 6, "vps_max_layer_id");
+  //*********************************************
+  
   WRITE_UE(stream, 0, "vps_max_op_sets_minus1");
   WRITE_U(stream, 0, 1, "vps_timing_info_present_flag");
 
   //IF timing info
   //END IF
 
-  WRITE_U(stream, 0, 1, "vps_extension_flag");
+  //WRITE_U(stream, 0, 1, "vps_extension_flag");
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else? Set based on extencion used
+  WRITE_U(stream, (state->layer->max_layers - 1) > 0 ? 1 : 0 , 1, "vps_extension_flag");
+
+  //Align with ones
+  if (state->layer->max_layers > 0){
+    kvz_bitstream_align(stream); // while(!aligned) "vbs_extension_alignment_bit_equal_to_one"
+    //Write vps_extension()
+    encoder_state_write_bitsream_vps_extension(stream, state);
+
+    WRITE_U(stream, 0, 1, "vps_extension2_flag");
+  }
+  //*********************************************
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
@@ -321,7 +476,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 }
 
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
-                                                            encoder_state_t * const state)
+  encoder_state_t * const state)
 {
   const encoder_control_t * encoder = state->encoder_control;
 
@@ -331,56 +486,84 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   // TODO: profile IDC and level IDC should be defined later on
   WRITE_U(stream, 0, 4, "sps_video_parameter_set_id");
-  WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
-  WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
 
-  encoder_state_write_bitstream_PTL(stream, state);
+  //*******************************************
+  //For scalability extension. TODO: add asserts.
+  //TODO: set sps_max_sub_layers in cfg?
+  if (state->layer->layer_id == 0) {
+    WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
+  }
+  else {
+    WRITE_U(stream, 7, 3, "sps_ext_or_max_sub_layers_minus1")
+  }
+  //TODO: Add sps_ext_of_max_sub_layers_minus1 to cfg?
+  uint8_t multi_layer_ext_sps_flag = (state->layer->layer_id != 0); // && sps_ext_or_max_sub_layers_minus1 == 7);
+
+  if (!multi_layer_ext_sps_flag) {
+    WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
+    encoder_state_write_bitstream_PTL(stream, state);
+  }
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
 
+  if (multi_layer_ext_sps_flag) {
+    WRITE_U(stream, 0, 1, "update_rep_format_flag");
+  }
+  else {
+    WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
+  
   if (encoder->chroma_format == KVZ_CSP_444) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
-  WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
-  WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
 
-  if (encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height) {
-    // The standard does not seem to allow setting conf_win values such that
-    // the number of luma samples is not a multiple of 2. Options are to either
-    // hide one line or show an extra line of non-video. Neither seems like a
-    // very good option, so let's not even try.
-    assert(!(encoder->in.width % 2));
-    WRITE_U(stream, 1, 1, "conformance_window_flag");
-    WRITE_UE(stream, 0, "conf_win_left_offset");
-    WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
-             "conf_win_right_offset");
-    WRITE_UE(stream, 0, "conf_win_top_offset");
-    WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
-             "conf_win_bottom_offset");
-  } else {
-    WRITE_U(stream, 0, 1, "conformance_window_flag");
+
+    WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
+    WRITE_UE(stream, encoder->in.height, "pic_height_in_luma_samples");
+
+    if (encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height) {
+      // The standard does not seem to allow setting conf_win values such that
+      // the number of luma samples is not a multiple of 2. Options are to either
+      // hide one line or show an extra line of non-video. Neither seems like a
+      // very good option, so let's not even try.
+      assert(!(encoder->in.width % 2));
+      WRITE_U(stream, 1, 1, "conformance_window_flag");
+      WRITE_UE(stream, 0, "conf_win_left_offset");
+      WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1,
+        "conf_win_right_offset");
+      WRITE_UE(stream, 0, "conf_win_top_offset");
+      WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
+        "conf_win_bottom_offset");
+    }
+    else {
+      WRITE_U(stream, 0, 1, "conformance_window_flag");
+    }
+
+    //IF window flag
+    //END IF
+
+    WRITE_UE(stream, encoder->bitdepth - 8, "bit_depth_luma_minus8");
+    WRITE_UE(stream, encoder->bitdepth - 8, "bit_depth_chroma_minus8");
+
   }
-
-  //IF window flag
-  //END IF
-
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_luma_minus8");
-  WRITE_UE(stream, encoder->bitdepth-8, "bit_depth_chroma_minus8");
+  
+  
   WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
-  WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
+  if (!multi_layer_ext_sps_flag) {
+    WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
-  //for each layer
-  if (encoder->cfg->gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg->ref_frames, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, 0, "sps_num_reorder_pics");
-  } else {
-    WRITE_UE(stream, encoder->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
+    //for each layer
+    if (encoder->cfg->gop_lowdelay) {
+      WRITE_UE(stream, encoder->cfg->ref_frames, "sps_max_dec_pic_buffering");
+      WRITE_UE(stream, 0, "sps_num_reorder_pics");
+    }
+    else {
+      WRITE_UE(stream, encoder->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
+      WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
+    }
+    WRITE_UE(stream, 0, "sps_max_latency_increase");
+    //end for
   }
-  WRITE_UE(stream, 0, "sps_max_latency_increase");
-  //end for
 
   WRITE_UE(stream, MIN_SIZE-3, "log2_min_coding_block_size_minus3");
   WRITE_UE(stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
@@ -392,10 +575,21 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
   if (encoder->scaling_list.enable) {
-    WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
-    encoder_state_write_bitstream_scaling_list(stream, state);
-  }
+    //TODO: Infer scaling list from previous layer?
+    uint8_t sps_infer_scaling_list_flag = 0;
 
+    if (multi_layer_ext_sps_flag) {
+      WRITE_U(stream, sps_infer_scaling_list_flag, 1, "sps_infer_scaling_list_flag");
+    }
+    if (sps_infer_scaling_list_flag) {
+      WRITE_U(stream, state->layer->layer_id - 1, 6, "sps_scaling_list_ref_layer_id");
+    }
+    else {
+      WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
+      encoder_state_write_bitstream_scaling_list(stream, state);
+    }
+  }
+//*******************************************  
   WRITE_U(stream, (encoder->cfg->amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
   WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
@@ -509,7 +703,43 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
-  WRITE_U(stream, 0, 1, "pps_extension_flag");
+  
+  //*******************************************
+  //For scalability extension. TODO: add asserts.
+  //TODO: set in cfg
+  uint8_t pps_extension_flag = 0; // state->layer->max_layers > 1 ? 1 : 0;
+  uint8_t pps_multilayer_extension_flag = 0; //pps_extension_flag;
+  WRITE_U(stream, pps_extension_flag, 1, "pps_extension_flag");
+
+  //Write all possible extension flags here if pps_extension_flag defined
+  //TODO: Is multilayer_extension necessary?
+  if (pps_extension_flag) {
+    WRITE_U(stream, 0, 1, "pps_range_extension_flag");
+    WRITE_U(stream, pps_multilayer_extension_flag, 1, "pps_multilayer_extension_flag");
+    WRITE_U(stream, 0, 1, "pps_3d_extension_flag");
+    WRITE_U(stream, 0, 5, "pps_extension_5bits");
+  }
+
+  if (pps_multilayer_extension_flag) {
+    //pps_multilayer_extension()
+    WRITE_U(stream, 0, 1, "poc_reset_info_present_flag");
+
+    uint8_t pps_infer_scaling_list_flag = 0; //TODO: Infer list
+    WRITE_U(stream, 0, 2, "pps_infer_scaling_list_flag");
+    if (pps_infer_scaling_list_flag) {
+      WRITE_U(stream, state->layer->layer_id - 1, 6, "pps_scaling_list_ref_layer_id");
+    }
+
+    WRITE_UE(stream, 0, "num_ref_loc_offsets");
+    //for num_ref_loc_offsets
+    //  do stuff
+    //end for
+
+    WRITE_U(stream, 0, 1, "colour_mapping_enabled_flag");
+    //if colour_mapping_enabled_flag write colormapping 
+  }
+
+  //*******************************************
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
@@ -1050,15 +1280,23 @@ void kvz_encoder_state_worker_write_bitstream(void * opaque)
 void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
                                             encoder_state_t * const state)
 {
+  // ***********************************************
+  // Modified for SHVC
+  // SPS and PPS need layer id in nalu header. TODO: Write VPS and SPS only when first in sequence?
+
   // Video Parameter Set (VPS)
-  kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
-  encoder_state_write_bitstream_vid_parameter_set(stream, state);
+  if (state->layer->layer_id == 0) //only call for base layer
+  {
+    kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
+    encoder_state_write_bitstream_vid_parameter_set(stream, state);
+  }
 
   // Sequence Parameter Set (SPS)
-  kvz_nal_write(stream, KVZ_NAL_SPS_NUT, 0, 1);
+  kvz_nal_ext_write(stream, KVZ_NAL_SPS_NUT, 0, 1, state->layer->layer_id);
   encoder_state_write_bitstream_seq_parameter_set(stream, state);
 
   // Picture Parameter Set (PPS)
-  kvz_nal_write(stream, KVZ_NAL_PPS_NUT, 0, 1);
+  kvz_nal_ext_write(stream, KVZ_NAL_PPS_NUT, 0, 1, state->layer->layer_id);
   encoder_state_write_bitstream_pic_parameter_set(stream, state);
+  //***********************************************
 }

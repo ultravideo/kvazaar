@@ -332,12 +332,26 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
       return 0;
     }
+    //*********************************************
+    //For scalable extension. TODO: Move somewhere else?
+    child_state->layer = MALLOC(encoder_state_config_layer_t, 1);
+    if (!child_state->layer ) {
+      fprintf(stderr, "Could not initialize encoder_state->layer!\n");
+      return 0;
+    }
+    child_state->layer->layer_id = encoder->cfg->layer;
+    child_state->layer->max_layers = encoder->cfg->max_layers;
+    //*********************************************
   } else {
     child_state->encoder_control = parent_state->encoder_control;
     if (!child_state->frame) child_state->frame = parent_state->frame;
     if (!child_state->tile) child_state->tile = parent_state->tile;
     if (!child_state->slice) child_state->slice = parent_state->slice;
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
+    //*********************************************
+    //For scalable extension. TODO: Move somewhere else?
+    if (!child_state->layer) child_state->layer = parent_state->layer;
+    //*********************************************
   }
   
   kvz_bitstream_init(&child_state->stream);
@@ -431,6 +445,10 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           fprintf(stderr, "Could not initialize encoder_state->slice!\n");
           return 0;
         }
+        //*********************************************
+        //For scalable extension. TODO: Move somewhere else?
+        new_child->layer = child_state->layer;
+        //*********************************************
       }
       
       if ((!slice_allowed || (range_end_slice < range_end_tile)) && !new_child && tile_allowed) {
@@ -461,6 +479,11 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           fprintf(stderr, "Could not initialize encoder_state->tile!\n");
           return 0;
         }
+
+        //*********************************************
+        //For scalable extension. TODO: Move somewhere else?
+        new_child->layer = child_state->layer;
+        //*********************************************
       }
       
       if (new_child) {
@@ -545,6 +568,11 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
           fprintf(stderr, "Could not initialize encoder_state->wfrow!\n");
           return 0;
         }
+
+        //*********************************************
+        //For scalable extension. TODO: Move somewhere else?
+        new_child->layer = child_state->layer;
+        //*********************************************
         
         if (!kvz_encoder_state_init(new_child, child_state)) {
           fprintf(stderr, "Unable to init child...\n");
@@ -697,5 +725,12 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     FREE_POINTER(state->frame);
   }
   
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  if (!state->parent || (state->parent->layer != state->layer)) {
+    FREE_POINTER(state->layer);
+  }
+  //*********************************************
+
   kvz_bitstream_finalize(&state->stream);
 }

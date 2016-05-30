@@ -23,6 +23,40 @@
 #include "bitstream.h"
 #include "strategies/strategies-nal.h"
 
+//****************************************
+//Modifyed to fit SHVC code. TODO: Merge with kvz_nal_write?
+void kvz_nal_ext_write(bitstream_t * const bitstream, const uint8_t nal_type,
+  const uint8_t temporal_id, const int long_start_code, const uint8_t layer_id)
+{
+  uint8_t byte;
+
+  // Some useful constants
+  const uint8_t start_code_prefix_one_3bytes = 0x01;
+  const uint8_t zero = 0x00;
+
+  // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
+  // and PPS, or the first NALU of an access unit
+  if (long_start_code)
+    kvz_bitstream_writebyte(bitstream, zero);
+
+  // start_code_prefix_one_3bytes
+  kvz_bitstream_writebyte(bitstream, zero);
+  kvz_bitstream_writebyte(bitstream, zero);
+  kvz_bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
+
+  // Handle header bits with full bytes instead of using bitstream
+  // forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of layer_id
+  byte = nal_type << 1;
+  byte |= (layer_id >> 5) & 1; //select first bit of layer id (the 6th bit in the 8bit variable)
+  kvz_bitstream_writebyte(bitstream, byte);
+  
+  // 5bits of layer_id + nuh_temporal_id_plus1(3)
+  byte = layer_id << 3; //select 5 bits from the end
+  byte |= (temporal_id + 1) & 7;
+  kvz_bitstream_writebyte(bitstream, byte);
+}
+//****************************************
+
 
 /**
  * \brief Write a Network Abstraction Layer (NAL) packet to the output.
@@ -55,6 +89,8 @@ void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   byte = (temporal_id + 1) & 7;
   kvz_bitstream_writebyte(bitstream, byte);
 }
+
+
 
 /*!
  \brief Calculate checksums for all colors of the picture.

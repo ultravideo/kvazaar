@@ -161,6 +161,15 @@ typedef struct lcu_order_element {
   struct lcu_order_element *right;
 } lcu_order_element_t;
 
+//*********************************************
+//For scalable extension. TODO: Move somewhere else?
+//Hold current layer info
+typedef struct{
+  uint8_t layer_id; //id of the current layer
+  uint8_t max_layers; //Total number of layers
+} encoder_state_config_layer_t;
+//*********************************************
+
 typedef struct encoder_state_t {
   const encoder_control_t *encoder_control;
   encoder_state_type type;
@@ -177,7 +186,12 @@ typedef struct encoder_state_t {
   encoder_state_config_tile_t   *tile;
   encoder_state_config_slice_t  *slice;
   encoder_state_config_wfrow_t  *wfrow;
-  
+
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  encoder_state_config_layer_t *layer;
+  //*********************************************
+
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
   lcu_order_element_t *lcu_order;
   uint32_t lcu_order_count;

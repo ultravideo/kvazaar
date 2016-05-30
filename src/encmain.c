@@ -346,6 +346,18 @@ int main(int argc, char *argv[])
     }
   }
 
+  //******************************************
+  //TODO: Replace with proper implementation. Move to encoder?
+  opts->config->layer = 1;
+  opts->config->max_layers = 2;
+  kvz_encoder *el_enc = api->encoder_open(opts->config);
+  if (!el_enc) {
+    fprintf(stderr, "Failed to open encoder.\n");
+    goto exit_failure;
+  }
+  opts->config->layer = 0;
+  //******************************************
+
   enc = api->encoder_open(opts->config);
   if (!enc) {
     fprintf(stderr, "Failed to open encoder.\n");
@@ -353,14 +365,6 @@ int main(int argc, char *argv[])
   }
 
   encoder_control_t *encoder = enc->control;
-  
-  //TODO: Replace with proper implementation
-  kvz_encoder *el_enc = api->encoder_open(opts->config);
-  if (!el_enc) {
-    fprintf(stderr, "Failed to open encoder.\n");
-    goto exit_failure;
-  }
-  //******************************************
 
   fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
@@ -509,8 +513,9 @@ int main(int argc, char *argv[])
         print_frame_info(&info_out, frame_psnr, len_out);
       }
 
+      //******************************************
       //DO EL coding here
-      //TODO: DO Proper implementation
+      //TODO: DO Proper implementation. Move to encoder?
       //Use img_src as the EL picture to encode
       api->chunk_free(chunks_out);
       api->picture_free(cur_in_img);

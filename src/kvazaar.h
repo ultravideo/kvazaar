@@ -319,6 +319,13 @@ typedef struct kvz_config
   } gop_lp_definition;
 
   int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
+
+//*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  uint8_t layer;
+  uint8_t max_layers;
+  //*********************************************
+
 } kvz_config;
 
 /**
