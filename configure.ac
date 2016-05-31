@@ -26,7 +26,7 @@ ver_major=3
 ver_minor=6
 ver_release=0
 
-# not used, but it prevents configure from adding a lot of defines to the CFLAGS
+# Prevents configure from adding a lot of defines to the CFLAGS
 AC_CONFIG_HEADERS([config.h])
 
 AC_CONFIG_MACRO_DIR([m4])
@@ -52,15 +52,19 @@ AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
-AX_PTHREAD
-CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden $PTHREAD_CFLAGS $CFLAGS"
+KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden"
+CFLAGS="$KVZ_CFLAGS $CFLAGS"
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
-LIBS="$PTHREAD_LIBS $LIBS"
 
+# This does workarounds for pthreads on various compilers.
+AX_PTHREAD
+CFLAGS="$PTHREAD_CFLAGS $CFLAGS"
+LIBS="$PTHREAD_LIBS $LIBS"
+CC="$PTHREAD_CC"
 
 # --disable-werror
 AC_ARG_ENABLE([werror], [AS_HELP_STRING([--disable-werror], [don't treat warnings as errors [no]])],
