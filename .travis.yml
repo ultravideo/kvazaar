@@ -45,10 +45,9 @@ matrix:
           - libtool
           - yasm
 
+    # We have some Mac specific code and Mac sometimes has odd build issues.
     - os: osx
-      # The version of clang in the osx image complains about -pthread being given to linker.
-      # It's a silly warning and I don't know a workaround, so let's just ignore all warnings.
-      env: KVZ_CONFIGURE_ARGS="--disable-werror"
+      compiler: clang  # gcc is actually clang on Travis OS X
 
     # Check for external symbols without kvz_ prefix.
     - compiler: gcc-4.8
