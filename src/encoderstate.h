@@ -167,6 +167,8 @@ typedef struct lcu_order_element {
 typedef struct{
   uint8_t layer_id; //id of the current layer
   uint8_t max_layers; //Total number of layers
+  uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
+  uint16_t num_output_layer_sets;
 } encoder_state_config_layer_t;
 //*********************************************
 

@@ -136,7 +136,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   }*/
 
   uint8_t vps_nuh_layer_id_present_flag = 0;
-  WRITE_U(stream, 0, 1, "vps_nuh_layer_id_present_flag");
+  WRITE_U(stream, vps_nuh_layer_id_present_flag, 1, "vps_nuh_layer_id_present_flag");
 
   //Currently unecessary
   //TODO: implement settings?
@@ -172,6 +172,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //TODO: implement num independent layers?
   //if numIndependentLayers > 1 write "num_add_layer_sets"
 
+  //TODO: Not really necessary. Can be infered from maxTLayers
   uint8_t vps_sub_layers_max_minus1_present_flag = 1;
   WRITE_U(stream, vps_sub_layers_max_minus1_present_flag, 1, "vps_sub_layers_max_minus1_present_flag");
   //if vps_sub_layers_max_minus1_present_flag write sub_layers_max_minus1[i]=0
@@ -181,16 +182,43 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
     }
   }
 
+  //Control max number of temporal references
   WRITE_U(stream, 0, 1, "max_tid_ref_present_flag");
   //if max_tid_ref_present_flag write "max_tid_il_ref_pics_plus1[i][j]"
 
-  WRITE_U(stream, 1, 1, "default_ref_layers_active_flag");
+  WRITE_U(stream, 0, 1, "default_ref_layers_active_flag");
 
   //TODO: Add ptl for scalable main etc.
-  WRITE_UE(stream, 1, "vps_num_profile_tier_level_minus1");
+  uint8_t vps_num_profile_tier_level_minus1 = 1;
+  WRITE_UE(stream, vps_num_profile_tier_level_minus1, "vps_num_profile_tier_level_minus1");
   //Write extra PTL here
-  //if NumLayerSets > 1 write stuff here
-  //+ Other stuff
+  
+  //TODO: Find out proper values? Set in config
+  if (state->layer->num_layer_sets > 1) {
+    WRITE_UE(stream, state->layer->num_output_layer_sets - state->layer->num_layer_sets, "num_add_olss");
+    WRITE_U(stream, 1, 2, "default_output_layer_idc"); //value 1 says the layer with the largest nuh_layer_id is the output layer
+  }
+
+  //TODO: Add proper conditions
+  for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
+    //If numLayerSets > 2 && i >= numLayerSets write "layer_set_idx_for_ols_minus1[i]"
+    //If i > vps_num_layer_sets_minus1 || defaultOutputLayerIdc == 2 write "output_layer_flag[i][j]
+    
+    //For j=0;j<NumLayersInIDList[OlsIdxToLsIdx[i]];j++ 
+    //OlsIdxToLsIdx[1] == 1; NumLayersInIDList[1] == 2
+    for (int j = 0; j < 2; j++) {
+      //If NecessaryLayerFlag[i][j] && vps_num_prifile_tier_level_minus1 > 0
+      //NecessaryLayerFlag[1][0] == true; NecessaryLayerFlag[1][1] == true
+      if (vps_num_profile_tier_level_minus1 > 0) {
+        WRITE_U(stream, , kvz_math_ceil_log2(vps_num_profile_tier_level_minus1+1), "profile_tier_level_idx[i][j]");
+      }
+    }
+
+    //If numOutputLayersInOutputLayerSet[i] == 1 && NumDirectRefLayers[OlsHigestOutputLyerId[i]] > 0
+    // numOutputLayersInOutputLayerSet[1] == 1; OlsHighestOutputLayerId[1] == 1; NumDirectRefLayers[1] == 1;
+    WRITE_U(stream, , 1, "alt_output_layer_flag[i]");
+
+  }
 
   WRITE_UE(stream, 0, "vps_num_rep_formats_minus1");
   //Write other rep formats here
@@ -211,11 +239,12 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //}
 
   //dpb_size() can be skipped if numOutpuLayers is less than 2
+
   uint8_t direct_dep_type_len_minus2 = 0;
   WRITE_UE(stream, direct_dep_type_len_minus2, "direct_dep_type_len_minus2");
   WRITE_U(stream, 1, 1, "direct_dependency_all_layers_flag");
   //if "direct_dependency_all_layers_flag"
-  WRITE_U(stream, 0, direct_dep_type_len_minus2+2, "direct_dependency_all_layers_type");
+  WRITE_U(stream, 2, direct_dep_type_len_minus2+2, "direct_dependency_all_layers_type"); //Value 2 used in SHM. TODO: find out why
   //Else write separately for each layer
 
   WRITE_UE(stream, 0, "vps_non_vui_extension_length");
@@ -259,9 +288,16 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   WRITE_U(stream, state->layer->max_layers - 1, 6, "vps_max_layer_id");
-  //*********************************************
   
-  WRITE_UE(stream, 0, "vps_max_op_sets_minus1");
+  //TODO: Find out what it does
+  WRITE_UE(stream, state->layer->num_layer_sets - 1, "vps_num_layer_sets_minus1");
+  for (int i = 1; i < state->layer->num_layer_sets; i++) {
+    for (int j = 0; j < state->layer->max_layers; j++) {
+      WRITE_U(stream, 1, 1, "layer_id_included_flag[i][j]"); //By default include all.
+    }
+  }
+  //*********************************************
+
   WRITE_U(stream, 0, 1, "vps_timing_info_present_flag");
 
   //IF timing info
