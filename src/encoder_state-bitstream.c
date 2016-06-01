@@ -199,6 +199,10 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
     WRITE_U(stream, 1, 2, "default_output_layer_idc"); //value 1 says the layer with the largest nuh_layer_id is the output layer
   }
 
+  //TODO: Move to a better place
+  //ptl_idx for layer sets
+  uint16_t ptl_idx[2][2] = { 0, 0, 0, 1 };
+
   //TODO: Add proper conditions
   for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
     //If numLayerSets > 2 && i >= numLayerSets write "layer_set_idx_for_ols_minus1[i]"
@@ -210,13 +214,13 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
       //If NecessaryLayerFlag[i][j] && vps_num_prifile_tier_level_minus1 > 0
       //NecessaryLayerFlag[1][0] == true; NecessaryLayerFlag[1][1] == true
       if (vps_num_profile_tier_level_minus1 > 0) {
-        WRITE_U(stream, , kvz_math_ceil_log2(vps_num_profile_tier_level_minus1+1), "profile_tier_level_idx[i][j]");
+        WRITE_U(stream, ptl_idx[i][j], kvz_math_ceil_log2(vps_num_profile_tier_level_minus1+1), "profile_tier_level_idx[i][j]");
       }
     }
 
     //If numOutputLayersInOutputLayerSet[i] == 1 && NumDirectRefLayers[OlsHigestOutputLyerId[i]] > 0
     // numOutputLayersInOutputLayerSet[1] == 1; OlsHighestOutputLayerId[1] == 1; NumDirectRefLayers[1] == 1;
-    WRITE_U(stream, , 1, "alt_output_layer_flag[i]");
+    WRITE_U(stream, 0, 1, "alt_output_layer_flag[i]");
 
   }
 
