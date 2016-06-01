@@ -224,10 +224,18 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   }
 
-  WRITE_UE(stream, 0, "vps_num_rep_formats_minus1");
-  //Write other rep formats here
-  //Write rep_format_idx_present_flag here
-  //Write rep_format_idx[i] here
+  uint8_t vps_num_rep_formats_minus1 = 0;
+  WRITE_UE(stream, vps_num_rep_formats_minus1, "vps_num_rep_formats_minus1");
+  
+  //Write rep formats here
+  for (int i = 0; i <= vps_num_rep_formats_minus1; i++) {
+    //rep_format(){
+    WRITE_U(stream, , ,)
+    //}
+  }
+
+  //if vps_num_rep_formats_minus1 > 0 Write rep_format_idx_present_flag here
+  //if rep_format_idx_present_flag Write rep_format_idx[i] here
 
   //Only allow one interlayer ref. TODO: allow multible?
   WRITE_U(stream, 1, 1, "max_one_active_ref_layer_flag");
