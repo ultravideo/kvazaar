@@ -313,8 +313,16 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   WRITE_U(stream, (state->layer->max_layers - 1) > 0 ? 1 : 0 , 1, "vps_extension_flag");
 
   //Align with ones
+  //TODO: a better way?
   if (state->layer->max_layers > 0){
-    kvz_bitstream_align(stream); // while(!aligned) "vbs_extension_alignment_bit_equal_to_one"
+    //while (stream->cur_bit != 0) {
+    if (stream->cur_bit != 0){
+      //kvz_bitstream_align(stream);
+      // while(!aligned) "vbs_extension_alignment_bit_equal_to_one"
+      //WRITE_U(stream, 1, 1, "vps_extension_alignment_bit_equal_to_one");
+      WRITE_U(stream, 0xffff, 8-(stream->cur_bit & 7), "vps_extension_alignment_bit_equal_to_one");
+    }
+
     //Write vps_extension()
     encoder_state_write_bitsream_vps_extension(stream, state);
 
