@@ -228,9 +228,33 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   WRITE_UE(stream, vps_num_rep_formats_minus1, "vps_num_rep_formats_minus1");
   
   //Write rep formats here
+  //TODO: Implement own settings for alternate rep formats.
   for (int i = 0; i <= vps_num_rep_formats_minus1; i++) {
     //rep_format(){
-    WRITE_U(stream, , ,)
+    encoder_control_t* encoder = state->encoder_control;
+    WRITE_U(stream, encoder->in.width, 16, "pic_width_vps_in_luma_samples");
+    WRITE_U(stream, encoder->in.height, 16, "pic_height_vps_in_luma_samples");
+    
+    uint8_t chroma_and_bit_depth_vps_present_flag = 1; //Has to be one in the first rep format
+    WRITE_U(stream, chroma_and_bit_depth_vps_present_flag, 1, "chroma_and_bit_depth_vps_present_flag");
+
+    if (chroma_and_bit_depth_vps_present_flag) {
+      WRITE_U(stream, encoder->in.video_format, 2, "chroma_format_vps_idc");
+      if (encoder->in.video_format == 3) {
+        WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
+      }
+      WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_luma_minus8");
+      WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_chroma_minus8");
+    }
+    uint8_t conformance_window_flag = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+    WRITE_U(stream, conformance_window_flag, 1, "conformance_window_pvs_flag");
+
+    if (conformance_window_flag) {
+      WRITE_UE(stream, 0, "conf_win_vps_left_offset");
+      WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1, "conf_win_vps_right_offset");
+      WRITE_UE(stream, 0, "conf_win_vps_top_offset");
+      WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1, "conf_win_vps_bottom_offset");
+    }
     //}
   }
 
@@ -250,7 +274,26 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //  }
   //}
 
-  //dpb_size() can be skipped if numOutpuLayers is less than 2
+
+  //dpb_size(){
+  //for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
+  //  state->layer->num_output_layer_sets == 2
+  WRITE_U(stream, , 1, "sub_layer_flag_info_present_flag[i]");
+  //  for (int j=0; j <= MaxSubLayersInLayerSetMinus1[OlsIdxToLsIdx[i]]; j++){
+  //    OlsIdxToLsIdx[1]==1; MaxSubLayerInLayersSetMinus1[1] == 0
+  //    if( j>0 && sub_layer_flag_info_present_flag[i] ) write "sub_layer_dpb_info_present_flag[i][j]
+  //    if(sub_layer_dpb_info_present_flag[i][j]){
+  //      for(int k=0; k < NumLayrsInIdList[OlsIdxToLsIdx[i]]; k++){
+  //        //if (NecessaryLayerFlag[i][k] && (vps_base_layer_internal_flag||(LayerSetLayerIdList[OlsIdxToLsIdx[i]][k] != 0 ) ) ) {
+  //          write "max_vps_dec_pic_buffering_minus1[i][k][j]
+  //        }
+  //      }
+  //      Write "max_vps_num_reorder_pics[i][j]"
+  //      Write "max_vps_latency_increase_plus1[i][j]"
+  //    }
+  //  }
+  //}
+  //}
 
   uint8_t direct_dep_type_len_minus2 = 0;
   WRITE_UE(stream, direct_dep_type_len_minus2, "direct_dep_type_len_minus2");
