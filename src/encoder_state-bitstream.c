@@ -204,13 +204,14 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint16_t ptl_idx[2][2] = { 0, 0, 0, 1 };
 
   //TODO: Add proper conditions
+  uint8_t num_layers_in_id_list = 2;
   for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
     //If numLayerSets > 2 && i >= numLayerSets write "layer_set_idx_for_ols_minus1[i]"
     //If i > vps_num_layer_sets_minus1 || defaultOutputLayerIdc == 2 write "output_layer_flag[i][j]
     
     //For j=0;j<NumLayersInIDList[OlsIdxToLsIdx[i]];j++ 
     //OlsIdxToLsIdx[1] == 1; NumLayersInIDList[1] == 2
-    for (int j = 0; j < 2; j++) {
+    for (int j = 0; j < num_layers_in_id_list; j++) {
       //If NecessaryLayerFlag[i][j] && vps_num_prifile_tier_level_minus1 > 0
       //NecessaryLayerFlag[1][0] == true; NecessaryLayerFlag[1][1] == true
       if (vps_num_profile_tier_level_minus1 > 0) {
@@ -276,20 +277,24 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
 
   //dpb_size(){
+  //TODO: Implement properly.
+  uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = { 0, 0, 4, 4 };
   //for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
   //  state->layer->num_output_layer_sets == 2
-  WRITE_U(stream, , 1, "sub_layer_flag_info_present_flag[i]");
+  WRITE_U(stream, 0, 1, "sub_layer_flag_info_present_flag[i]");
   //  for (int j=0; j <= MaxSubLayersInLayerSetMinus1[OlsIdxToLsIdx[i]]; j++){
   //    OlsIdxToLsIdx[1]==1; MaxSubLayerInLayersSetMinus1[1] == 0
   //    if( j>0 && sub_layer_flag_info_present_flag[i] ) write "sub_layer_dpb_info_present_flag[i][j]
+  //    //Always signal for j==0 => sub_layer_dpb_info_present_flag[1][0] == true
   //    if(sub_layer_dpb_info_present_flag[i][j]){
-  //      for(int k=0; k < NumLayrsInIdList[OlsIdxToLsIdx[i]]; k++){
-  //        //if (NecessaryLayerFlag[i][k] && (vps_base_layer_internal_flag||(LayerSetLayerIdList[OlsIdxToLsIdx[i]][k] != 0 ) ) ) {
-  //          write "max_vps_dec_pic_buffering_minus1[i][k][j]
+  for(int k=0; k < num_layers_in_id_list; k++){
+  //        if (NecessaryLayerFlag[i][k] && (vps_base_layer_internal_flag||(LayerSetLayerIdList[OlsIdxToLsIdx[i]][k] != 0 ) ) ) {
+  //        NecessaryLayerFlag[i][k] == true; vps_base_layer_internal_flag == true
+    WRITE_UE(stream, max_vps_dec_pic_buffering_minus1[1][k][0], "max_vps_dec_pic_buffering_minus1[i][k][j]"); //Max pics in DPF
   //        }
-  //      }
-  //      Write "max_vps_num_reorder_pics[i][j]"
-  //      Write "max_vps_latency_increase_plus1[i][j]"
+  }
+  WRITE_UE(stream, 3, "max_vps_num_reorder_pics[i][j]"); //value from SHM
+  WRITE_UE(stream, 0, "max_vps_latency_increase_plus1[i][j]"); //value from SHM
   //    }
   //  }
   //}
