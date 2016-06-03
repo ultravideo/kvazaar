@@ -44,7 +44,10 @@
 static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
 {
   bitstream_t * const stream = &state->stream;
-  kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
+  // ***********************************************
+  // Modified for SHVC. TODO: only in base layer?
+  kvz_nal_ext_write(stream, KVZ_NAL_AUD_NUT, 0, 1, state->layer->layer_id);
+  // ***********************************************
 
   uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
                    : state->frame->slicetype == KVZ_SLICE_P ? 1
@@ -1173,7 +1176,10 @@ static void add_checksum(encoder_state_t * const state)
   const videoframe_t * const frame = state->tile->frame;
   unsigned char checksum[3][SEI_HASH_MAX_LENGTH];
 
-  kvz_nal_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0);
+  // ***********************************************
+  // Modified for SHVC
+  kvz_nal_ext_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0, state->layer->layer_id);
+  // ***********************************************
 
   WRITE_U(stream, 132, 8, "sei_type");
 
@@ -1254,15 +1260,18 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     first_nal_in_au = false;
     kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
-
+  
+  // ***********************************************
+  // Modified for SHVC. TODO: only in base layer?
   // Send Kvazaar version information only in the first frame.
-  if (state->frame->num == 0 && encoder->cfg->add_encoder_info) {
+  if (state->frame->num == 0 && encoder->cfg->add_encoder_info && state->layer->layer_id == 0) {
     kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
+ 
 
   //SEI messages for interlacing
   if (encoder->vui.frame_field_info_present_flag){
@@ -1281,9 +1290,9 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   {
     uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-    kvz_nal_write(stream, nal_type, 0, first_nal_in_au);
+    kvz_nal_ext_write(stream, nal_type, 0, first_nal_in_au, state->layer->layer_id);
   }
-
+ // ***********************************************
   {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_write_bitstream_children(state);
