@@ -1186,6 +1186,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
           const uint32_t mvd_hor_abs = abs(mvd_hor);
           const uint32_t mvd_ver_abs = abs(mvd_ver);
 
+
           cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
           CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
           CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
@@ -1204,16 +1205,21 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
             if (mvd_hor_abs > 1) {
               kvz_cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
             }
-
-            CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
+            uint8_t mvd_hor_sign = (mvd_hor>0)?0:1;
+#if KVC_SEL_ENCRYPTION
+            mvd_hor_sign = mvd_hor^ff_get_key(&state->tile->dbs_g, 1);
+#endif
+            CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
           }
-
           if (ver_abs_gr0) {
             if (mvd_ver_abs > 1) {
               kvz_cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
             }
-
-            CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
+            uint8_t mvd_ver_sign = (mvd_ver>0)?0:1;
+#if KVC_SEL_ENCRYPTION
+            mvd_ver_sign = mvd_ver^ff_get_key(&state->tile->dbs_g, 1);
+#endif
+            CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
           }
         }
 

@@ -37,6 +37,7 @@
 #include "tables.h"
 #include "threadqueue.h"
 #include "videoframe.h"
+#include "extras/crypto.h"
 
 
 typedef enum {
@@ -113,6 +114,10 @@ typedef struct {
   
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
+
+  // Instance of encryption generator by tile
+  Crypto_Handle       dbs_g;
+
 } encoder_state_config_tile_t;
 
 typedef struct {
