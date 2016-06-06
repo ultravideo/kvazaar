@@ -257,6 +257,61 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 }
 
 
+static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, const encoder_state_t *const state,
+  const vector2d_t *orig, unsigned width, unsigned height, int wpp_limit, const kvz_picture *pic, const kvz_picture *ref,
+  int16_t mv_cand[2][2], int32_t ref_idx, unsigned *best_cost, uint32_t *bitcost_out, uint32_t *best_bitcost,
+  int(*calc_mvd)(const encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+  int16_t, int32_t, uint32_t *))
+{
+  static const vector2d_t small_hexbs[5] = {
+      { 0, 0 },
+      { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 },
+  };
+  double multiplier = 1;
+  // If early termination is set to fast set multiplier to 0.9
+  if (state->encoder_control->cfg->me_early_termination == KVZ_ME_EARLY_TERMINATION_SENSITIVE){
+    multiplier = 0.95;
+  }
+  const vector2d_t *offset;
+  for (int k = 0; k < 2; ++k){
+    unsigned best_index = 0;
+    for (int i = 1; i < 5; ++i) {
+      offset = &small_hexbs[i];
+      if (!intmv_within_tile(state, orig, mv->x + offset->x, mv->y + offset->y, width, height, wpp_limit)) {
+        continue;
+      }
+
+      unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + offset->x,
+        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + offset->y,
+        width, height, -1);
+      unsigned bitcost;
+      cost += calc_mvd(state, mv->x + offset->x, mv->y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+      if (cost < multiplier * *best_cost ) {
+        *best_cost = cost;
+        best_index = i;
+        *best_bitcost = bitcost;
+      }
+    }
+    // Adjust the movement vector
+    mv->x += small_hexbs[best_index].x;
+    mv->y += small_hexbs[best_index].y;
+
+    // if best match is at center we stop the search
+    if (best_index == 0){
+      // Return final movement vector in quarter-pixel precision.
+      mv_in_out->x = mv->x << 2;
+      mv_in_out->y = mv->y << 2;
+
+      *bitcost_out = *best_bitcost;
+      return true;
+    }
+  }
+  return false;
+}
+
+
 unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref, unsigned pattern_type,
                            const vector2d_t *orig, const int iDist, vector2d_t *mv, unsigned best_cost, int *best_dist,
                            int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
@@ -536,6 +591,11 @@ static unsigned tz_search(const encoder_state_t * const state,
   best_cost = select_starting_point(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
                                 pic, ref, mv_cand, ref_idx, best_cost, &best_index, &best_bitcost, calc_mvd);
 
+  // Check if we should stop search
+  if (state->encoder_control->cfg->me_early_termination){
+    if (early_terminate(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
+      pic, ref, mv_cand, ref_idx, &best_cost, bitcost_out, &best_bitcost, calc_mvd)) return best_cost;
+  }
   //step 2, grid search
   for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
   {
@@ -684,6 +744,12 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   // both mv_cand vectors and (0, 0).
   best_cost = select_starting_point(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
                                 pic, ref, mv_cand, ref_idx, best_cost, &best_index, &best_bitcost, calc_mvd);
+
+  // Check if we should stop search
+  if (state->encoder_control->cfg->me_early_termination){
+    if (early_terminate(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
+      pic, ref, mv_cand, ref_idx, &best_cost, bitcost_out, &best_bitcost, calc_mvd)) return best_cost;
+  }
 
   // Search the initial 7 points of the hexagon.
   best_index = 0;

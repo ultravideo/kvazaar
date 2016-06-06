@@ -108,6 +108,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
 
+  cfg->me_early_termination = 0;
+
   return 1;
 }
 
@@ -289,6 +291,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const hash_names[] = { "none", "checksum", "md5", NULL };
 
   static const char * const cu_split_termination_names[] = { "zero", "off", NULL };
+
+  static const char * const me_early_termination_names[] = { "off", "on", "sensitive", NULL };
 
   static const char * const preset_values[11][32] = {
       { 
@@ -836,6 +840,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int8_t mode = KVZ_CU_SPLIT_TERMINATION_ZERO;
     int result = parse_enum(value, cu_split_termination_names, &mode);
     cfg->cu_split_termination = mode;
+    return result;
+  }
+  else if OPT("me-early-termination"){
+    int8_t mode = 0;
+    int result = parse_enum(value, me_early_termination_names, &mode);
+    cfg->me_early_termination = mode;
     return result;
   }
   else

@@ -138,6 +138,13 @@ enum kvz_cu_split_termination
   KVZ_CU_SPLIT_TERMINATION_OFF = 1
 };
 
+enum kvz_me_early_termination
+{
+  KVZ_ME_EARLY_TERMINATION_OFF = 0,
+  KVZ_ME_EARLY_TERMINATION_ON = 1,
+  KVZ_ME_EARLY_TERMINATION_SENSITIVE = 2
+};
+
 /**
  * \brief GoP picture configuration.
  */
@@ -246,6 +253,8 @@ typedef struct kvz_config
   enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
 
   enum kvz_cu_split_termination cu_split_termination; /*!< \brief Mode of cu split termination. */
+
+  enum kvz_me_early_termination me_early_termination;
 
 } kvz_config;
 
