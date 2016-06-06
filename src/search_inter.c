@@ -115,6 +115,68 @@ static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol, uint32_t count)
 }
 
 
+/**Checks if mv is one of the merge candidates
+* \return true if found else return false
+*/
+static bool mv_in_merge(const inter_merge_cand_t* merge_cand, int16_t num_cand, const vector2d_t* mv)
+{
+  for (int i = 0; i < num_cand; ++i) {
+    if (merge_cand[i].dir == 3) continue;
+    const vector2d_t merge_mv = {
+      merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2,
+      merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2
+    };
+    if (merge_mv.x == mv->x && merge_mv.y == mv->y) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
+static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, const encoder_state_t *const state,
+                                      const vector2d_t *orig, unsigned width, unsigned height, int wpp_limit, const kvz_picture *pic, const kvz_picture *ref,
+                                      int16_t mv_cand[2][2], int32_t ref_idx, unsigned best_cost, unsigned *best_index, uint32_t *best_bitcost,
+                                      int(*calc_mvd)(const encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+                                      int16_t, int32_t, uint32_t *)){
+  // Go through candidates
+  for (unsigned i = 0; i < num_cand; ++i) {
+    if (merge_cand[i].dir == 3) continue;
+    mv->x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
+    mv->y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
+
+    if (mv->x == 0 && mv->y == 0) continue;
+    if (!intmv_within_tile(state, orig, mv->x, mv->y, width, height, wpp_limit)) {
+      continue;
+    }
+
+    uint32_t bitcost = 0;
+    unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+      (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x,
+      (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y,
+      width, height, -1);
+    cost += calc_mvd(state, mv->x, mv->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+    if (cost < best_cost) {
+      best_cost = cost;
+      *best_index = i;
+      *best_bitcost = bitcost;
+    }
+  }  
+  if (*best_index < num_cand) {
+    mv->x = merge_cand[*best_index].mv[merge_cand[*best_index].dir - 1][0] >> 2;
+    mv->y = merge_cand[*best_index].mv[merge_cand[*best_index].dir - 1][1] >> 2;
+  } else if (*best_index == num_cand) {
+    mv->x = mv_in_out->x >> 2;
+    mv->y = mv_in_out->y >> 2;
+  } else {
+    mv->x = 0;
+    mv->y = 0;
+  }
+  return best_cost;
+}
+
+
 static uint32_t get_mvd_coding_cost(vector2d_t *mvd, cabac_data_t* cabac)
 {
   uint32_t bitcost = 0;
@@ -452,22 +514,8 @@ static unsigned tz_search(const encoder_state_t * const state,
     best_index = num_cand + 1;
   }
 
-  // Check if mv_in is one of the merge candidates.
-  bool mv_in_merge_cand = false;
-  for (int i = 0; i < num_cand; ++i) {
-    if (merge_cand[i].dir == 3) continue;
-    const vector2d_t merge_mv = {
-      merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2,
-      merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2
-    };
-    if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
-      mv_in_merge_cand = true;
-      break;
-    }
-  }
-
   // Check mv_in if it's not one of the merge candidates.
-  if (!mv_in_merge_cand &&
+  if (!mv_in_merge(merge_cand, num_cand, &mv) &&
       intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit))
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
@@ -483,44 +531,10 @@ static unsigned tz_search(const encoder_state_t * const state,
     }
   }
 
-  int i;
   // Select starting point from among merge candidates. These should include
   // both mv_cand vectors and (0, 0).
-  for (i = 0; i < num_cand; ++i) 
-  {
-    if (merge_cand[i].dir == 3) continue;
-    mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
-    mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
-
-    if (mv.x == 0 && mv.y == 0) continue;
-    if (!intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit)) {
-      continue;
-    }
-
-    uint32_t bitcost;
-    unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                   width, height, -1);
-    cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-    if (cost < best_cost) {
-      best_cost = cost;
-      best_index = i;
-      best_bitcost = bitcost;
-    }
-  }
-  
-  if (best_index < num_cand) {
-    mv.x = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][0] >> 2;
-    mv.y = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][1] >> 2;
-  } else if (best_index == num_cand) {
-    mv.x = mv_in_out->x >> 2;
-    mv.y = mv_in_out->y >> 2;
-  } else {
-    mv.x = 0;
-    mv.y = 0;
-  }
+  best_cost = select_starting_point(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
+                                pic, ref, mv_cand, ref_idx, best_cost, &best_index, &best_bitcost, calc_mvd);
 
   //step 2, grid search
   for (iDist = 1; iDist <= iSearchRange; iDist *= 2)
@@ -609,7 +623,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   // 5   0  2,8
   //  \     /
   //   4---3
-  static const vector2d_t large_hexbs[10] = {
+  static const vector2d_t large_hexbs[9] = {
       { 0, 0 },
       { 1, -2 }, { 2, 0 }, { 1, 2 }, { -1, 2 }, { -2, 0 }, { -1, -2 },
       { 1, -2 }, { 2, 0 }
@@ -649,73 +663,28 @@ static unsigned hexagon_search(const encoder_state_t * const state,
     best_index = num_cand + 1;
   }
 
-  // Check if mv_in is one of the merge candidates.
-  bool mv_in_merge_cand = false;
-  for (int i = 0; i < num_cand; ++i) {
-    if (merge_cand[i].dir == 3) continue;
-    const vector2d_t merge_mv = {
-      merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2,
-      merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2
-    };
-    if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
-      mv_in_merge_cand = true;
-      break;
-    }
-  }
-
   // Check mv_in if it's not one of the merge candidates.
-  if (!mv_in_merge_cand &&
-      intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit))
+  if (!mv_in_merge(merge_cand, num_cand, &mv) &&
+      intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit)) 
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
                                    (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
                                    (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
                                    width, height, -1);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
     if (cost < best_cost) {
-      best_cost = cost;
-      best_index = num_cand;
+      best_cost    = cost;
+      best_index   = num_cand;
       best_bitcost = bitcost;
     }
   }
 
   // Select starting point from among merge candidates. These should include
   // both mv_cand vectors and (0, 0).
-  for (i = 0; i < num_cand; ++i) {
-    if (merge_cand[i].dir == 3) continue;
-    mv.x = merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2;
-    mv.y = merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2;
+  best_cost = select_starting_point(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
+                                pic, ref, mv_cand, ref_idx, best_cost, &best_index, &best_bitcost, calc_mvd);
 
-    // Ignore 0-vector because it has already been checked.
-    if (mv.x == 0 && mv.y == 0) continue;
-
-    if (!intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit)) {
-      continue;
-    }
-    unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
-                                   width, height, -1);
-    cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-    if (cost < best_cost) {
-      best_cost = cost;
-      best_index = i;
-      best_bitcost = bitcost;
-    }
-  }
-
-  if (best_index < num_cand) {
-    mv.x = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][0] >> 2;
-    mv.y = merge_cand[best_index].mv[merge_cand[best_index].dir - 1][1] >> 2;
-  } else if (best_index == num_cand) {
-    mv.x = mv_in_out->x >> 2;
-    mv.y = mv_in_out->y >> 2;
-  } else {
-    mv.x = 0;
-    mv.y = 0;
-  }
-  
   // Search the initial 7 points of the hexagon.
   best_index = 0;
   for (i = 0; i < 7; ++i) {
@@ -724,14 +693,11 @@ static unsigned hexagon_search(const encoder_state_t * const state,
       continue;
     }
 
-    unsigned cost;
-    {
-      cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x, 
-                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
-                             width, height, -1);
-      cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-    }
+    unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x,
+                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
+                                   width, height, -1);
+    cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost < best_cost) {
       best_cost    = cost;
@@ -764,21 +730,17 @@ static unsigned hexagon_search(const encoder_state_t * const state,
         continue;
       }
 
-      unsigned cost;
-      {
-        cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                               (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                               (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                               width, height, -1);
-        cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-      }
+      unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+                                     (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
+                                     (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
+                                     width, height, -1);
+      cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
       if (cost < best_cost) {
         best_cost    = cost;
         best_index   = start + i;
         best_bitcost = bitcost;
       }
-      ++offset;
     }
   }
 
@@ -794,14 +756,11 @@ static unsigned hexagon_search(const encoder_state_t * const state,
       continue;
     }
 
-    unsigned cost;
-    {
-      cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                             (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                             (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
-                             width, height, -1);
-      cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-    }
+    unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
+                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
+                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
+                                   width, height, -1);
+    cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
     if (cost > 0 && cost < best_cost) {
       best_cost    = cost;
@@ -869,22 +828,8 @@ static unsigned search_mv_full(const encoder_state_t * const state,
     }
   }
 
-  // Check if mv_in is one of the merge candidates.
-  bool mv_in_merge_cand = false;
-  for (int i = 0; i < num_cand; ++i) {
-    if (merge_cand[i].dir == 3) continue;
-    const vector2d_t merge_mv = {
-      merge_cand[i].mv[merge_cand[i].dir - 1][0] >> 2,
-      merge_cand[i].mv[merge_cand[i].dir - 1][1] >> 2
-    };
-    if (merge_mv.x == mv.x && merge_mv.y == mv.y) {
-      mv_in_merge_cand = true;
-      break;
-    }
-  }
-
   // Check mv_in if it's not one of the merge candidates.
-  if (!mv_in_merge_cand &&
+  if (!mv_in_merge(merge_cand, num_cand, &mv) &&
       intmv_within_tile(state, orig, mv.x, mv.y, width, height, wpp_limit))
   {
     vector2d_t min_mv = { mv.x - search_range, mv.y - search_range };
