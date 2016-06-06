@@ -208,5 +208,5 @@ yasm_verbose_ = $(yasm_verbose_@AM_DEFAULT_V@)
 yasm_verbose_0 = @echo "  YASM    " $@;
 
 .asm.lo:
-	$(yasm_verbose)$(LIBTOOL) --mode=compile $(YASM) -I$(srcdir)/extras $(ASFLAGS) $< -o $@ -prefer-non-pic 1>/dev/null
+	$(yasm_verbose)$(LIBTOOL) --mode=compile --tag=CC $(YASM) -I$(srcdir)/extras $(ASFLAGS) $< -o $@ -prefer-non-pic 1>/dev/null
 
