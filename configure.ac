@@ -61,7 +61,7 @@ AC_ARG_WITH([libcryptopp],
         [Build with libcryptopp Enables selective encryption.]))
 AS_IF([test "x$with_libcryptopp" = "xyes"], [
     PKG_CHECK_MODULES([libcryptopp], [cryptopp],
-        AC_DEFINE([KVC_SEL_ENCRYPTION], [1], [With libcryptopp]),
+        AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With libcryptopp]),
         AC_MSG_ERROR([libcryptopp not found with pkg-config])
     )
 ])
