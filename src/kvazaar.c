@@ -283,7 +283,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   struct {
     kvz_data_chunk* data_out;
     uint32_t len_out;
-  } first = { 0 }, second = { 0 };
+  } first = { 0, 0 }, second = { 0, 0 };
 
   if (pic_in != NULL) {
     first_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);

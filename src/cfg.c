@@ -661,7 +661,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         unsigned d;  // depth
         unsigned r;  // references 
         unsigned t;  // temporal
-      } gop = { 0 };
+      } gop = { 0, 0, 0, 0 };
 
       if (sscanf(value, "lp-g%ud%ur%ut%u", &gop.g, &gop.d, &gop.r, &gop.t) != 4) {
         fprintf(stderr, "Error in GOP syntax. Example: lp-g8d4r2t2\n");

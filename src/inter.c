@@ -45,7 +45,7 @@ static void inter_recon_frac_luma(const encoder_state_t * const state,
  #define FILTER_SIZE_Y 8 //Luma filter size
 
   // Fractional luma 1/4-pel
-  kvz_extended_block src = {0, 0, 0};
+  kvz_extended_block src = {0, 0, 0, 0};
 
   // Fractional luma
   kvz_get_extended_block(xpos,
@@ -90,7 +90,7 @@ static void inter_recon_14bit_frac_luma(const encoder_state_t * const state,
 #define FILTER_SIZE_Y 8 //Luma filter size
 
   // Fractional luma 1/4-pel
-  kvz_extended_block src = { 0, 0, 0 };
+  kvz_extended_block src = { 0, 0, 0, 0 };
 
   // Fractional luma
   kvz_get_extended_block(xpos,
@@ -141,8 +141,8 @@ static void inter_recon_frac_chroma(const encoder_state_t * const state,
 #define FILTER_SIZE_C 4 //Chroma filter size
 
   // Fractional chroma 1/8-pel
-  kvz_extended_block src_u = { 0, 0, 0 };
-  kvz_extended_block src_v = { 0, 0, 0 };
+  kvz_extended_block src_u = { 0, 0, 0, 0 };
+  kvz_extended_block src_v = { 0, 0, 0, 0 };
 
   //Fractional chroma U
   kvz_get_extended_block(xpos, ypos, (mv_param[0] >> 2) >> 1, (mv_param[1] >> 2) >> 1, state->tile->lcu_offset_x * LCU_WIDTH_C, state->tile->lcu_offset_y * LCU_WIDTH_C,
@@ -181,8 +181,8 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
 #define FILTER_SIZE_C 4 //Chroma filter size
 
   // Fractional chroma 1/8-pel
-  kvz_extended_block src_u = { 0, 0, 0 };
-  kvz_extended_block src_v = { 0, 0, 0 };
+  kvz_extended_block src_u = { 0, 0, 0, 0 };
+  kvz_extended_block src_v = { 0, 0, 0, 0 };
 
   //Fractional chroma U
   kvz_get_extended_block(xpos,
