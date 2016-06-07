@@ -66,6 +66,7 @@ AS_IF([test "x$with_cryptopp" = "xyes"], [
     )
 ])
 
+AM_CONDITIONAL([USE_CRYPTOPP], [test "x$with_cryptopp" = "xyes"])
 CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
 LIBS="$LIBS $cryptopp_LIBS"
 

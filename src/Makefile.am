@@ -132,7 +132,6 @@ libkvazaar_la_SOURCES = \
 	strategyselector.h \
 	extras/libmd5.c \
 	extras/libmd5.h \
-	extras/crypto.cpp \
 	extras/crypto.h
 
 libkvazaar_la_CFLAGS =
@@ -142,6 +141,17 @@ libkvazaar_la_LIBADD = \
 	libavx2.la \
 	libsse2.la \
 	libsse41.la
+
+if USE_CRYPTOPP
+# The crypto.cpp has to be in it's own library, because otherwise
+# autoconf wants to use CXXLD for linking, even if the cpp file
+# is not included.
+noinst_LTLIBRARIES += libcrypto.la
+libkvazaar_la_LIBADD += libcrypto.la
+libcrypto_la_SOURCES = \
+	extras/crypto.h \
+	extras/crypto.cpp
+endif
 
 libkvazaar_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-number $(KVZ_API_VERSION)
 
