@@ -861,28 +861,38 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       if (toggle == 1) {
         cfg->crypto_features = KVZ_CRYPTO_ON;
       }
-      return 1;
+    } else {
+      // Try and parse "feature1+feature2" type list.
+      for (;;) {
+        if (*cur == '+' || *cur == '\0') {
+          int8_t feature = 0;
+          int num_chars = cur - token_begin;
+          if (parse_enum_n(token_begin, num_chars, crypto_feature_names, &feature)) {
+            cfg->crypto_features |= (1 << feature);
+          } else {
+            cfg->crypto_features = KVZ_CRYPTO_OFF;
+            return 0;
+          }
+          token_begin = cur + 1;
+        }
+
+        if (*cur == '\0') {
+          break;
+        } else {
+          ++cur;
+        }
+      }
     }
 
-    // Try and parse "feature1+feature2" type list.
-    for (;;) {
-      if (*cur == '+' || *cur == '\0') {
-        int8_t feature = 0;
-        int num_chars = cur - token_begin;
-        if (parse_enum_n(token_begin, num_chars, crypto_feature_names, &feature)) {
-          cfg->crypto_features |= (1 << feature);
-        } else {
-          cfg->crypto_features = KVZ_CRYPTO_OFF;
-          return 0;
-        }
-        token_begin = cur + 1;
-      }
-
-      if (*cur == '\0') {
-        break;
-      } else {
-        ++cur;
-      }
+    // Disallow turning on the encryption when it's not compiled in.
+    bool encryption_compiled_in = false;
+#ifdef KVZ_SEL_ENCRYPTION
+    encryption_compiled_in = true;
+#endif
+    if (!encryption_compiled_in && cfg->crypto_features) {
+      fprintf(stderr, "--crypto cannot be enabled because it's not compiled in.\n");
+      cfg->crypto_features = KVZ_CRYPTO_OFF;
+      return 0;
     }
 
     return 1;
