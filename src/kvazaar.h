@@ -139,6 +139,19 @@ enum kvz_cu_split_termination
 };
 
 /**
+* \brief Enable and disable crypto features.
+* \since 3.7.0
+*/
+enum kvz_crypto_features {
+  KVZ_CRYPTO_OFF = 0,
+  KVZ_CRYPTO_FEATURE1 = (1 << 0),
+  KVZ_CRYPTO_FEATURE2 = (1 << 1),
+  KVZ_CRYPTO_FEATURE3 = (1 << 2),
+  KVZ_CRYPTO_FEATURE4 = (1 << 3),
+  KVZ_CRYPTO_ON = (1 << 4) - 1,
+};
+
+/**
  * \brief GoP picture configuration.
  */
 typedef struct kvz_gop_config {
@@ -247,6 +260,7 @@ typedef struct kvz_config
 
   enum kvz_cu_split_termination cu_split_termination; /*!< \brief Mode of cu split termination. */
 
+  enum kvz_crypto_features crypto_features; /*!< \since 3.7.0 */
 } kvz_config;
 
 /**
