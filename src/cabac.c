@@ -19,7 +19,7 @@
  ****************************************************************************/
 
 #include "cabac.h"
-
+#include "encoderstate.h"
 
 const uint8_t kvz_g_auc_next_state_mps[128] =
 {
@@ -346,7 +346,7 @@ void kvz_cabac_write_unary_max_symbol_ep(cabac_data_t * const data, unsigned int
 /**
  * \brief
  */
-void kvz_cabac_write_ep_ex_golomb(cabac_data_t * const data, uint32_t symbol, uint32_t count)
+void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_data_t * const data, uint32_t symbol, uint32_t count)
 {
   uint32_t bins = 0;
   int32_t num_bins = 0;
@@ -360,8 +360,16 @@ void kvz_cabac_write_ep_ex_golomb(cabac_data_t * const data, uint32_t symbol, ui
   bins = 2 * bins;
   ++num_bins;
 
-  bins = (bins << count) | symbol;
+  bins      = (bins << count) | symbol;
   num_bins += count;
-
+#if  !EncryptMVDiff
+  if(!state->cabac.only_count) {
+    uint32_t key, mask;
+    key                      = ff_get_key(&state->tile->dbs_g, num_bins>>1);
+    mask                     = ( (1<<(num_bins >>1) ) -1 );
+    state->tile->m_prev_pos  = ( bins + ( state->tile->m_prev_pos^key ) ) & mask;
+    bins                     = ( (bins >> (num_bins >>1) ) << (num_bins >>1) ) | state->tile->m_prev_pos;
+  }
+#endif
   kvz_cabac_encode_bins_ep(data, bins, num_bins);
 }

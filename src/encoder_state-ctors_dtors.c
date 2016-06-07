@@ -107,7 +107,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   state->tile->id = encoder->tiles_tile_id[state->tile->lcu_offset_in_ts];
   
   state->tile->dbs_g = InitC();
-
+  state->tile->m_prev_pos = 0;
   return 1;
 }
 
@@ -119,7 +119,7 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
-  
+  DeleteCryptoC(state->tile->dbs_g);
   FREE_POINTER(state->tile->wf_jobs);
 }
 

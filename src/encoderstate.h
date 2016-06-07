@@ -117,6 +117,7 @@ typedef struct {
 
   // Instance of encryption generator by tile
   Crypto_Handle       dbs_g;
+  uint32_t m_prev_pos;
 
 } encoder_state_config_tile_t;
 
