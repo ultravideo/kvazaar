@@ -1766,6 +1766,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
 
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
+
   unsigned sig_cg_cnt = 0;
   for (int cg_y = 0; cg_y < width / 4; ++cg_y) {
     for (int cg_x = 0; cg_x < width / 4; ++cg_x) {
@@ -1864,6 +1865,10 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
           ctx_sig  = kvz_context_get_sig_ctx_inc(pattern_sig_ctx, scan_mode, pos_x, pos_y,
                                              log2_block_size, type);
           cabac->cur_ctx = &baseCtx[ctx_sig];
+          if(!state->cabac.only_count)
+            if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
+            	sig = sig ^ ff_get_key(&state->tile->dbs_g, 1);
+
           CABAC_BIN(cabac, sig, "sig_coeff_flag");
         }
 
@@ -1927,7 +1932,9 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
           CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
         }
       }
-
+      if(!state->cabac.only_count)
+        if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
+          coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero);
       if (be_valid && sign_hidden) {
         CABAC_BINS_EP(cabac, (coeff_signs >> 1), (num_non_zero - 1), "coeff_sign_flag");
       } else {
