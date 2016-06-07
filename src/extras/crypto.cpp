@@ -1,4 +1,9 @@
 #include <extras/crypto.h>
+
+#ifndef KVZ_SEL_ENCRYPTION
+extern int kvz_make_vs_ignore_crypto_not_having_symbols;
+int kvz_make_vs_ignore_crypto_not_having_symbols = 0;
+#else
 #include <cryptopp/aes.h>
 #include <cryptopp/modes.h>
 #include <cryptopp/osrng.h>
@@ -117,3 +122,5 @@ void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream, int size_bits, 
 void DeleteCryptoC(Crypto_Handle hdl) {
     DeleteCryptoC(hdl);
 }
+
+#endif // KVZ_SEL_ENCRYPTION

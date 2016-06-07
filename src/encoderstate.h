@@ -116,7 +116,7 @@ typedef struct {
   threadqueue_job_t **wf_jobs;
 
   // Instance of encryption generator by tile
-  Crypto_Handle       dbs_g;
+  Crypto_Handle dbs_g;
   uint32_t m_prev_pos;
 
 } encoder_state_config_tile_t;

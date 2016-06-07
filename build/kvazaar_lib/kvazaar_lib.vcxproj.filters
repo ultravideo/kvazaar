@@ -217,6 +217,7 @@
       <Filter>Optimization\strategies\avx2</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\extras\libmd5.c" />
+    <ClCompile Include="..\..\src\extras\crypto.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\bitstream.h">
@@ -403,6 +404,7 @@
       <Filter>Optimization\strategies\avx2</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\extras\libmd5.h" />
+    <ClInclude Include="..\..\src\extras\crypto.h" />
   </ItemGroup>
   <ItemGroup>
     <YASM Include="..\..\src\extras\x86inc.asm">
