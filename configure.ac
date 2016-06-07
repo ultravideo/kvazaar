@@ -56,18 +56,18 @@ AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
 
-AC_ARG_WITH([libcryptopp],
+AC_ARG_WITH([cryptopp],
     AS_HELP_STRING([--with-cryptopp],
-        [Build with libcryptopp Enables selective encryption.]))
-AS_IF([test "x$with_libcryptopp" = "xyes"], [
-    PKG_CHECK_MODULES([libcryptopp], [cryptopp],
-        AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With libcryptopp]),
-        AC_MSG_ERROR([libcryptopp not found with pkg-config])
+        [Build with cryptopp Enables selective encryption.]))
+AS_IF([test "x$with_cryptopp" = "xyes"], [
+    PKG_CHECK_MODULES([cryptopp], [cryptopp],
+        AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp]),
+        AC_MSG_ERROR([cryptopp not found with pkg-config])
     )
 ])
 
-CPPFLAGS="$CPPFLAGS $libcryptopp_CFLAGS"
-LIBS="$LIBS $libcryptopp_LIBS"
+CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
+LIBS="$LIBS $cryptopp_LIBS"
 
 
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
