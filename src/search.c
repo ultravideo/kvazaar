@@ -329,10 +329,13 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   // SSD between reconstruction and original
-  int index = y_px * LCU_WIDTH + x_px;
-  int ssd   = kvz_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
-                                  LCU_WIDTH,          LCU_WIDTH,
-                                  width);
+  int ssd = 0;
+  if (!state->encoder_control->cfg->lossless) {
+    int index = y_px * LCU_WIDTH + x_px;
+    ssd = kvz_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
+                                        LCU_WIDTH,          LCU_WIDTH,
+                                        width);
+  }
 
   {
     coeff_t coeff_temp[32 * 32];
@@ -393,14 +396,17 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   // Chroma SSD
-  int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
-  int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
-                                  LCU_WIDTH_C,         LCU_WIDTH_C,
-                                  width);
-  int ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
-                                  LCU_WIDTH_C,        LCU_WIDTH_C,
-                                  width);
-  int ssd   = ssd_u + ssd_v;
+  int ssd = 0;
+  if (!state->encoder_control->cfg->lossless) {
+    int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+    int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
+                                    LCU_WIDTH_C,         LCU_WIDTH_C,
+                                    width);
+    int ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
+                                    LCU_WIDTH_C,        LCU_WIDTH_C,
+                                    width);
+    ssd = ssd_u + ssd_v;
+  }
 
   {
     coeff_t coeff_temp[16 * 16];
