@@ -144,10 +144,10 @@ enum kvz_cu_split_termination
 */
 enum kvz_crypto_features {
   KVZ_CRYPTO_OFF = 0,
-  KVZ_CRYPTO_FEATURE1 = (1 << 0),
-  KVZ_CRYPTO_FEATURE2 = (1 << 1),
-  KVZ_CRYPTO_FEATURE3 = (1 << 2),
-  KVZ_CRYPTO_FEATURE4 = (1 << 3),
+  KVZ_CRYPTO_MVs = (1 << 0),
+  KVZ_CRYPTO_MV_SIGNS = (1 << 1),
+  KVZ_CRYPTO_TRANSF_COEFFS = (1 << 2),
+  KVZ_CRYPTO_TRANSF_COEFF_SIGNS = (1 << 3),
   KVZ_CRYPTO_ON = (1 << 4) - 1,
 };
 

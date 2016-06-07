@@ -296,7 +296,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const cu_split_termination_names[] = { "zero", "off", NULL };
   static const char * const crypto_toggle_names[] = { "off", "on", NULL };
-  static const char * const crypto_feature_names[] = { "feature1", "feature2", "feature3", "feature4", NULL };
+  static const char * const crypto_feature_names[] = { "mvs", "mv_signs", "trans_coeffs", "trans_coeff_signs", NULL };
 
   static const char * const preset_values[11][32] = {
       { 
