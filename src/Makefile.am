@@ -143,12 +143,7 @@ libkvazaar_la_LIBADD = \
 	libsse41.la
 
 if USE_CRYPTOPP
-# The crypto.cpp has to be in it's own library, because otherwise
-# autoconf wants to use CXXLD for linking, even if the cpp file
-# is not included.
-noinst_LTLIBRARIES += libcrypto.la
-libkvazaar_la_LIBADD += libcrypto.la
-libcrypto_la_SOURCES = \
+libkvazaar_la_SOURCES += \
 	extras/crypto.h \
 	extras/crypto.cpp
 endif
