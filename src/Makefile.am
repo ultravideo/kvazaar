@@ -131,7 +131,8 @@ libkvazaar_la_SOURCES = \
 	strategyselector.c \
 	strategyselector.h \
 	extras/libmd5.c \
-	extras/libmd5.h
+	extras/libmd5.h \
+	extras/crypto.h
 
 libkvazaar_la_CFLAGS =
 
@@ -140,6 +141,12 @@ libkvazaar_la_LIBADD = \
 	libavx2.la \
 	libsse2.la \
 	libsse41.la
+
+if USE_CRYPTOPP
+libkvazaar_la_SOURCES += \
+	extras/crypto.h \
+	extras/crypto.cpp
+endif
 
 libkvazaar_la_LDFLAGS = $(AM_LDFLAGS) -no-undefined -version-number $(KVZ_API_VERSION)
 

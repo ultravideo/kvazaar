@@ -895,7 +895,7 @@ void  kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff
 * \returns int
 * Calculates cost of actual motion vectors using CABAC coding
 */
-uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
+uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, cabac_data_t* cabac) {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
   const int32_t mvd_ver = mvd->y;
@@ -920,13 +920,13 @@ uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
   }
   if (hor_abs_gr0) {
     if (mvd_hor_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(cabac, mvd_hor_abs - 2, 1);
+      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
     }
     CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
   }
   if (ver_abs_gr0) {
     if (mvd_ver_abs > 1) {
-      kvz_cabac_write_ep_ex_golomb(cabac, mvd_ver_abs - 2, 1);
+      kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
     }
     CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
   }
@@ -941,7 +941,7 @@ uint32_t kvz_get_mvd_coding_cost_cabac(vector2d_t *mvd, cabac_data_t* cabac) {
 * \returns int
 * Calculates Motion Vector cost and related costs using CABAC coding
 */
-int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, int mv_shift,
+int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_shift,
   int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
   int16_t num_cand, int32_t ref_idx, uint32_t *bitcost) {
 
@@ -980,11 +980,11 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
   if (!merged) {
     mvd_temp1.x = x - mv_cand[0][0];
     mvd_temp1.y = y - mv_cand[0][1];
-    cand1_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp1, cabac);
+    cand1_cost = kvz_get_mvd_coding_cost_cabac(state, &mvd_temp1, cabac);
 
     mvd_temp2.x = x - mv_cand[1][0];
     mvd_temp2.y = y - mv_cand[1][1];
-    cand2_cost = kvz_get_mvd_coding_cost_cabac(&mvd_temp2, cabac);
+    cand2_cost = kvz_get_mvd_coding_cost_cabac(state, &mvd_temp2, cabac);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -1080,7 +1080,7 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
 
           if (hor_abs_gr0) {
             if (mvd_hor_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(cabac, mvd_hor_abs - 2, 1);
+              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs - 2, 1);
             }
 
             CABAC_BIN_EP(cabac, (mvd_hor > 0) ? 0 : 1, "mvd_sign_flag_hor");
@@ -1088,7 +1088,7 @@ int kvz_calc_mvd_cost_cabac(const encoder_state_t * const state, int x, int y, i
 
           if (ver_abs_gr0) {
             if (mvd_ver_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(cabac, mvd_ver_abs - 2, 1);
+              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs - 2, 1);
             }
 
             CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");

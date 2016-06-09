@@ -134,10 +134,10 @@ static bool mv_in_merge(const inter_merge_cand_t* merge_cand, int16_t num_cand, 
 }
 
 
-static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, const encoder_state_t *const state,
+static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, encoder_state_t *const state,
                                       const vector2d_t *orig, unsigned width, unsigned height, int wpp_limit, const kvz_picture *pic, const kvz_picture *ref,
                                       int16_t mv_cand[2][2], int32_t ref_idx, unsigned best_cost, unsigned *best_index, uint32_t *best_bitcost,
-                                      int(*calc_mvd)(const encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+                                      int(*calc_mvd)(encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
                                       int16_t, int32_t, uint32_t *)){
   // Go through candidates
   for (unsigned i = 0; i < num_cand; ++i) {
@@ -177,7 +177,7 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
 }
 
 
-static uint32_t get_mvd_coding_cost(vector2d_t *mvd, cabac_data_t* cabac)
+static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *mvd, cabac_data_t* cabac)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -210,7 +210,7 @@ static uint32_t get_mvd_coding_cost(vector2d_t *mvd, cabac_data_t* cabac)
 }
 
 
-static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int mv_shift,
+static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shift,
                          int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                          int16_t num_cand,int32_t ref_idx, uint32_t *bitcost)
 {
@@ -240,11 +240,11 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
   if(!merged) {
     mvd_temp1.x = x - mv_cand[0][0];
     mvd_temp1.y = y - mv_cand[0][1];
-    cand1_cost = get_mvd_coding_cost(&mvd_temp1, NULL);
+    cand1_cost = get_mvd_coding_cost(state, &mvd_temp1, NULL);
 
     mvd_temp2.x = x - mv_cand[1][0];
     mvd_temp2.y = y - mv_cand[1][1];
-    cand2_cost = get_mvd_coding_cost(&mvd_temp2, NULL);
+    cand2_cost = get_mvd_coding_cost(state, &mvd_temp2, NULL);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -257,7 +257,7 @@ static int calc_mvd_cost(const encoder_state_t * const state, int x, int y, int 
 }
 
 
-unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref, unsigned pattern_type,
+unsigned kvz_tz_pattern_search(encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref, unsigned pattern_type,
                            const vector2d_t *orig, const int iDist, vector2d_t *mv, unsigned best_cost, int *best_dist,
                            int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                            int width, int height, int wpp_limit)
@@ -269,7 +269,7 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
   vector2d_t mv_best = { 0, 0 };
 
 
-  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+  int(*calc_mvd)(encoder_state_t * const, int, int, int,
     int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
     int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -416,7 +416,7 @@ unsigned kvz_tz_pattern_search(const encoder_state_t * const state, const kvz_pi
 }
 
 
-unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref,
+unsigned kvz_tz_raster_search(encoder_state_t * const state, const kvz_picture *pic, const kvz_picture *ref,
                           const vector2d_t *orig, vector2d_t *mv, unsigned best_cost,
                           int16_t mv_cand[2][2], inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS], int16_t num_cand, int32_t ref_idx, uint32_t *best_bitcost,
                           int width, int height, int iSearchRange, int iRaster, int wpp_limit)
@@ -426,7 +426,7 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
 
   vector2d_t mv_best = { 0, 0 };
 
-  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+  int(*calc_mvd)(encoder_state_t * const, int, int, int,
     int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
     int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -472,7 +472,7 @@ unsigned kvz_tz_raster_search(const encoder_state_t * const state, const kvz_pic
 }
 
 
-static unsigned tz_search(const encoder_state_t * const state,
+static unsigned tz_search(encoder_state_t * const state,
                           unsigned width, unsigned height,
                           const kvz_picture *pic, const kvz_picture *ref,
                           const vector2d_t *orig, vector2d_t *mv_in_out,
@@ -497,7 +497,7 @@ static unsigned tz_search(const encoder_state_t * const state,
   unsigned best_index = num_cand + 1;
   int wpp_limit = get_wpp_limit(state, orig);
 
-  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+  int(*calc_mvd)(encoder_state_t * const, int, int, int,
     int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
     int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -608,7 +608,7 @@ static unsigned tz_search(const encoder_state_t * const state,
  * the predicted motion vector is way off. In the future even more additional
  * points like 0,0 might be used, such as vectors from top or left.
  */
-static unsigned hexagon_search(const encoder_state_t * const state,
+static unsigned hexagon_search(encoder_state_t * const state,
                                unsigned width, unsigned height,
                                const kvz_picture *pic, const kvz_picture *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
@@ -645,7 +645,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
   unsigned best_index = num_cand + 1;
   int wpp_limit = get_wpp_limit(state, orig);
 
-  int (*calc_mvd)(const encoder_state_t * const, int, int, int,
+  int (*calc_mvd)(encoder_state_t * const, int, int, int,
                   int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
                   int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -783,7 +783,7 @@ static unsigned hexagon_search(const encoder_state_t * const state,
 }
 
 
-static unsigned search_mv_full(const encoder_state_t * const state,
+static unsigned search_mv_full(encoder_state_t * const state,
                                unsigned width, unsigned height,
                                const kvz_picture *pic, const kvz_picture *ref,
                                const vector2d_t *orig, vector2d_t *mv_in_out,
@@ -796,7 +796,7 @@ static unsigned search_mv_full(const encoder_state_t * const state,
   uint32_t best_bitcost = 0, bitcost;
   int wpp_limit = get_wpp_limit(state, orig);
 
-  int (*calc_mvd)(const encoder_state_t * const, int, int, int,
+  int (*calc_mvd)(encoder_state_t * const, int, int, int,
                   int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
                   int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -933,7 +933,7 @@ static unsigned search_mv_full(const encoder_state_t * const state,
  * Algoritm first searches 1/2-pel positions around integer mv and after best match is found,
  * refines the search by searching best 1/4-pel postion around best 1/2-pel position.
  */
-static unsigned search_frac(const encoder_state_t * const state,
+static unsigned search_frac(encoder_state_t * const state,
                             unsigned width, unsigned height,
                             const kvz_picture *pic, const kvz_picture *ref,
                             const vector2d_t *orig, vector2d_t *mv_in_out,
@@ -973,7 +973,7 @@ static unsigned search_frac(const encoder_state_t * const state,
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
-  int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+  int(*calc_mvd)(encoder_state_t * const, int, int, int,
     int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
     int16_t, int32_t, uint32_t *) = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
@@ -1083,7 +1083,7 @@ static unsigned search_frac(const encoder_state_t * const state,
 /**
  * \brief Perform inter search for a single reference frame.
  */
-static void search_pu_inter_ref(const encoder_state_t * const state,
+static void search_pu_inter_ref(encoder_state_t * const state,
                                 int x, int y,
                                 int width, int height,
                                 int depth,
@@ -1092,7 +1092,7 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                 int16_t num_cand,
                                 unsigned ref_idx,
-                                uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*))
+                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, cabac_data_t*))
 {
   const int x_cu = x >> 3;
   const int y_cu = y >> 3;
@@ -1234,11 +1234,11 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
 
     mvd_temp1.x = mv.x - mv_cand[0][0];
     mvd_temp1.y = mv.y - mv_cand[0][1];
-    cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
+    cand1_cost = get_mvd_cost(state, &mvd_temp1, (cabac_data_t*)&state->cabac);
 
     mvd_temp2.x = mv.x - mv_cand[1][0];
     mvd_temp2.y = mv.y - mv_cand[1][1];
-    cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
+    cand2_cost = get_mvd_cost(state, &mvd_temp2, (cabac_data_t*)&state->cabac);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -1281,7 +1281,7 @@ static void search_pu_inter_ref(const encoder_state_t * const state,
  *
  * \return            cost of the best mode
  */
-static int search_pu_inter(const encoder_state_t * const state,
+static int search_pu_inter(encoder_state_t * const state,
                            int x_cu, int y_cu,
                            int depth,
                            part_mode_t part_mode,
@@ -1317,7 +1317,7 @@ static int search_pu_inter(const encoder_state_t * const state,
                                               merge_cand,
                                               lcu);
 
-  uint32_t(*get_mvd_cost)(vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
+  uint32_t(*get_mvd_cost)(encoder_state_t * const state, vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     get_mvd_cost = kvz_get_mvd_coding_cost_cabac;
   }
@@ -1363,7 +1363,7 @@ static int search_pu_inter(const encoder_state_t * const state,
     uint8_t cutoff = num_cand;
 
 
-    int(*calc_mvd)(const encoder_state_t * const, int, int, int,
+    int(*calc_mvd)(encoder_state_t * const, int, int, int,
       int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
       int16_t, int32_t, uint32_t *) = calc_mvd_cost;
     if (state->encoder_control->cfg->mv_rdo) {
@@ -1469,11 +1469,11 @@ static int search_pu_inter(const encoder_state_t * const state,
 
                 mvd_temp1.x = cur_cu->inter.mv[reflist][0] - mv_cand[0][0];
                 mvd_temp1.y = cur_cu->inter.mv[reflist][1] - mv_cand[0][1];
-                cand1_cost = get_mvd_cost(&mvd_temp1, (cabac_data_t*)&state->cabac);
+                cand1_cost = get_mvd_cost(state, &mvd_temp1, (cabac_data_t*)&state->cabac);
 
                 mvd_temp2.x = cur_cu->inter.mv[reflist][0] - mv_cand[1][0];
                 mvd_temp2.y = cur_cu->inter.mv[reflist][1] - mv_cand[1][1];
-                cand2_cost = get_mvd_cost(&mvd_temp2, (cabac_data_t*)&state->cabac);
+                cand2_cost = get_mvd_cost(state, &mvd_temp2, (cabac_data_t*)&state->cabac);
 
                 // Select candidate 1 if it has lower cost
                 if (cand2_cost < cand1_cost) {
@@ -1517,7 +1517,7 @@ static int search_pu_inter(const encoder_state_t * const state,
  *
  * \return            cost of the best mode
  */
-int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
+int kvz_search_cu_inter(encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
 {
   return search_pu_inter(state, x, y, depth, SIZE_2Nx2N, 0, lcu);
 }
@@ -1537,7 +1537,7 @@ int kvz_search_cu_inter(const encoder_state_t * const state, int x, int y, int d
  *
  * \return            cost of the best mode
  */
-int kvz_search_cu_smp(const encoder_state_t * const state,
+int kvz_search_cu_smp(encoder_state_t * const state,
                       int x, int y,
                       int depth,
                       part_mode_t part_mode,

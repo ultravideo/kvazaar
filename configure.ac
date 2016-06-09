@@ -23,7 +23,7 @@ AC_CONFIG_SRCDIR([src/encmain.c])
 #
 # Here is a somewhat sane guide to lib versioning: http://apr.apache.org/versioning.html
 ver_major=3
-ver_minor=6
+ver_minor=7
 ver_release=0
 
 # Prevents configure from adding a lot of defines to the CFLAGS
@@ -38,6 +38,7 @@ AM_SILENT_RULES([yes])
 AC_PROG_CC
 AC_PROG_CC_C99
 AM_PROG_AR
+AC_PROG_CXX
 
 # Get fread that can read more than 2GB on 32 bit systems.
 AC_SYS_LARGEFILE
@@ -52,13 +53,31 @@ AM_CONDITIONAL([HAVE_AVX2], [test x"$flag_avx2" = x"true"])
 AM_CONDITIONAL([HAVE_SSE4_1], [test x"$flag_sse4_1" = x"true"])
 AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 
-KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -ftree-vectorize -fvisibility=hidden"
+KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
+
+AC_ARG_WITH([cryptopp],
+    AS_HELP_STRING([--with-cryptopp],
+        [Build with cryptopp Enables selective encryption.]))
+AS_IF([test "x$with_cryptopp" = "xyes"], [
+    PKG_CHECK_MODULES([cryptopp], [cryptopp],
+        AC_DEFINE([KVZ_SEL_ENCRYPTION], [1], [With cryptopp]),
+        AC_MSG_ERROR([cryptopp not found with pkg-config])
+    )
+])
+
+AM_CONDITIONAL([USE_CRYPTOPP], [test "x$with_cryptopp" = "xyes"])
+CPPFLAGS="$CPPFLAGS $cryptopp_CFLAGS"
+LIBS="$LIBS $cryptopp_LIBS"
+
+
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
 
 AC_SEARCH_LIBS([log], [m c], [], [exit 1])
 AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
 AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
+
+
 
 # This does workarounds for pthreads on various compilers.
 AX_PTHREAD
@@ -70,10 +89,6 @@ CC="$PTHREAD_CC"
 AC_ARG_ENABLE([werror], [AS_HELP_STRING([--disable-werror], [don't treat warnings as errors [no]])],
               [], [CFLAGS="-Werror $CFLAGS"]
 )
-
-
-# check for getopt
-AC_CHECK_HEADER([getopt.h], [], [CFLAGS="$CFLAGS -I$srcdir/src/extras"])
 
 
 # host and cpu specific settings
@@ -133,10 +148,8 @@ AC_SUBST([ASFLAGS])
 KVZ_API_VERSION="$ver_major:$ver_minor:$ver_release"
 AC_SUBST([KVZ_API_VERSION])
 
-
 AC_CONFIG_FILES([Makefile
                  src/Makefile
                  src/kvazaar.pc
                  tests/Makefile])
 AC_OUTPUT
-

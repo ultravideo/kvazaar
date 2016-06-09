@@ -125,6 +125,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\extras\crypto.cpp" />
     <ClCompile Include="..\..\src\extras\libmd5.c" />
     <ClCompile Include="..\..\src\input_frame_buffer.c" />
     <ClCompile Include="..\..\src\kvazaar.c" />
@@ -177,6 +178,7 @@
     <ClCompile Include="..\..\src\strategies\strategies-quant.c" />
     <ClInclude Include="..\..\src\checkpoint.h" />
     <ClInclude Include="..\..\src\cu.h" />
+    <ClInclude Include="..\..\src\extras\crypto.h" />
     <ClInclude Include="..\..\src\extras\libmd5.h" />
     <ClInclude Include="..\..\src\image.h" />
     <ClInclude Include="..\..\src\imagelist.h" />

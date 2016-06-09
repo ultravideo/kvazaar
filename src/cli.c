@@ -106,6 +106,7 @@ static const struct option long_options[] = {
   { "mv-constraint",      required_argument, NULL, 0 },
   { "hash",               required_argument, NULL, 0 },
   {"cu-split-termination",required_argument, NULL, 0 },
+  { "crypto",             required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 

@@ -107,6 +107,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->calc_psnr = true;
 
   cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
+  cfg->crypto_features = KVZ_CRYPTO_OFF;
 
   return 1;
 }
@@ -137,17 +138,22 @@ static int atobool(const char *str)
   return 0;
 }
 
-static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
+static int parse_enum_n(const char *arg, unsigned num_chars, const char * const *names, int8_t *dst)
 {
   int8_t i;
   for (i = 0; names[i]; i++) {
-    if (!strcmp(arg, names[i])) {
+    if (!strncmp(arg, names[i], num_chars)) {
       *dst = i;
       return 1;
     }
   }
 
   return 0;
+}
+
+static int parse_enum(const char *arg, const char * const *names, int8_t *dst)
+{
+  return parse_enum_n(arg, 255, names, dst);
 }
 
 static int parse_tiles_specification(const char* const arg, int32_t * const ntiles, int32_t** const array) {
@@ -289,6 +295,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   static const char * const hash_names[] = { "none", "checksum", "md5", NULL };
 
   static const char * const cu_split_termination_names[] = { "zero", "off", NULL };
+  static const char * const crypto_toggle_names[] = { "off", "on", NULL };
+  static const char * const crypto_feature_names[] = { "mvs", "mv_signs", "trans_coeffs", "trans_coeff_signs", NULL };
 
   static const char * const preset_values[11][32] = {
       { 
@@ -837,6 +845,57 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int result = parse_enum(value, cu_split_termination_names, &mode);
     cfg->cu_split_termination = mode;
     return result;
+  }
+  else if OPT("crypto")
+  {
+    // on, off, feature1+feature2
+
+    const char *token_begin = value;
+    const char *cur = token_begin;
+
+    cfg->crypto_features = KVZ_CRYPTO_OFF;
+
+    // If value is on or off, set all features to on or off.
+    int8_t toggle = 0;
+    if (parse_enum(token_begin, crypto_toggle_names, &toggle)) {
+      if (toggle == 1) {
+        cfg->crypto_features = KVZ_CRYPTO_ON;
+      }
+    } else {
+      // Try and parse "feature1+feature2" type list.
+      for (;;) {
+        if (*cur == '+' || *cur == '\0') {
+          int8_t feature = 0;
+          int num_chars = cur - token_begin;
+          if (parse_enum_n(token_begin, num_chars, crypto_feature_names, &feature)) {
+            cfg->crypto_features |= (1 << feature);
+          } else {
+            cfg->crypto_features = KVZ_CRYPTO_OFF;
+            return 0;
+          }
+          token_begin = cur + 1;
+        }
+
+        if (*cur == '\0') {
+          break;
+        } else {
+          ++cur;
+        }
+      }
+    }
+
+    // Disallow turning on the encryption when it's not compiled in.
+    bool encryption_compiled_in = false;
+#ifdef KVZ_SEL_ENCRYPTION
+    encryption_compiled_in = true;
+#endif
+    if (!encryption_compiled_in && cfg->crypto_features) {
+      fprintf(stderr, "--crypto cannot be enabled because it's not compiled in.\n");
+      cfg->crypto_features = KVZ_CRYPTO_OFF;
+      return 0;
+    }
+
+    return 1;
   }
   else
     return 0;

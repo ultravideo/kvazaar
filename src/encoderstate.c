@@ -1186,6 +1186,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
           const uint32_t mvd_hor_abs = abs(mvd_hor);
           const uint32_t mvd_ver_abs = abs(mvd_ver);
 
+
           cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
           CABAC_BIN(cabac, (mvd_hor != 0), "abs_mvd_greater0_flag_hor");
           CABAC_BIN(cabac, (mvd_ver != 0), "abs_mvd_greater0_flag_ver");
@@ -1202,18 +1203,23 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 
           if (hor_abs_gr0) {
             if (mvd_hor_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(cabac,mvd_hor_abs-2, 1);
+              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_hor_abs-2, 1);
             }
-
-            CABAC_BIN_EP(cabac, (mvd_hor>0)?0:1, "mvd_sign_flag_hor");
+            uint32_t mvd_hor_sign = (mvd_hor>0)?0:1;
+            if(!state->cabac.only_count)
+              if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_MV_SIGNS)
+                mvd_hor_sign = mvd_hor_sign^ff_get_key(&state->tile->dbs_g, 1);
+            CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
           }
-
           if (ver_abs_gr0) {
             if (mvd_ver_abs > 1) {
-              kvz_cabac_write_ep_ex_golomb(cabac,mvd_ver_abs-2, 1);
+              kvz_cabac_write_ep_ex_golomb(state, cabac, mvd_ver_abs-2, 1);
             }
-
-            CABAC_BIN_EP(cabac, (mvd_ver>0)?0:1, "mvd_sign_flag_ver");
+            uint32_t mvd_ver_sign = (mvd_ver>0)?0:1;
+            if(!state->cabac.only_count)
+              if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_MV_SIGNS)
+                mvd_ver_sign = mvd_ver_sign^ff_get_key(&state->tile->dbs_g, 1);
+            CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
           }
         }
 
@@ -1758,6 +1764,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
 
   // Scan all coeff groups to find out which of them have coeffs.
   // Populate sig_coeffgroup_flag with that info.
+
   unsigned sig_cg_cnt = 0;
   for (int cg_y = 0; cg_y < width / 4; ++cg_y) {
     for (int cg_x = 0; cg_x < width / 4; ++cg_x) {
@@ -1919,10 +1926,17 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
           CABAC_BIN(cabac, symbol, "coeff_abs_level_greater2_flag");
         }
       }
-
       if (be_valid && sign_hidden) {
-        CABAC_BINS_EP(cabac, (coeff_signs >> 1), (num_non_zero - 1), "coeff_sign_flag");
+    	coeff_signs = coeff_signs >> 1;
+    	if(!state->cabac.only_count)
+    	  if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
+    	    coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero-1);
+    	  }
+        CABAC_BINS_EP(cabac, coeff_signs , (num_non_zero - 1), "coeff_sign_flag");
       } else {
+        if(!state->cabac.only_count)
+    	  if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
+    	    coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero);
         CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "coeff_sign_flag");
       }
 
@@ -1933,7 +1947,13 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state, coeff_t *coeff, uint8_t
           int32_t base_level  = (idx < C1FLAG_NUMBER) ? (2 + first_coeff2) : 1;
 
           if (abs_coeff[idx] >= base_level) {
-            kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
+        	if(!state->cabac.only_count) {
+        	  if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)
+                kvz_cabac_write_coeff_remain_encry(state, cabac, abs_coeff[idx] - base_level, go_rice_param, base_level);
+        	  else
+        		kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
+        	} else
+              kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
 
             if (abs_coeff[idx] > 3 * (1 << go_rice_param)) {
               go_rice_param = MIN(go_rice_param + 1, 4);
