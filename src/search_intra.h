@@ -40,10 +40,10 @@ double kvz_chroma_mode_bits(const encoder_state_t *state,
 int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
                               const int x_px, const int y_px,
                               const int depth, lcu_t *lcu);
-                                  
-double kvz_search_cu_intra(encoder_state_t * const state,
-                       const int x_px, const int y_px,
-                       const int depth, lcu_t *lcu);
 
+void kvz_search_cu_intra(encoder_state_t * const state,
+                         const int x_px, const int y_px,
+                         const int depth, lcu_t *lcu,
+                         int8_t *mode_out, double *cost_out);
 
 #endif // SEARCH_INTRA_H_

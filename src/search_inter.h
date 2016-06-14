@@ -31,12 +31,18 @@
 #include "global.h" // IWYU pragma: keep
 
 
-int kvz_search_cu_inter(encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu);
+void kvz_search_cu_inter(encoder_state_t * const state,
+                         int x, int y, int depth,
+                         lcu_t *lcu,
+                         double *inter_cost,
+                         uint32_t *inter_bitcost);
 
-int kvz_search_cu_smp(encoder_state_t * const state,
-                      int x, int y,
-                      int depth,
-                      part_mode_t part_mode,
-                      lcu_t *lcu);
+void kvz_search_cu_smp(encoder_state_t * const state,
+                       int x, int y,
+                       int depth,
+                       part_mode_t part_mode,
+                       lcu_t *lcu,
+                       double *inter_cost,
+                       uint32_t *inter_bitcost);
 
 #endif // SEARCH_INTER_H_

@@ -35,7 +35,12 @@
 //////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 
-typedef enum { CU_NOTSET = 0, CU_PCM, CU_SKIP, CU_SPLIT, CU_INTRA, CU_INTER } cu_type_t;
+typedef enum {
+  CU_NOTSET = 0,
+  CU_INTRA  = 1,
+  CU_INTER  = 2,
+  CU_PCM    = 3,
+} cu_type_t;
 
 typedef enum {
   SIZE_2Nx2N = 0,
@@ -118,33 +123,42 @@ typedef struct
  */
 typedef struct
 {
-  int8_t type;       //!< \brief block type, CU_INTER / CU_INTRA
-  int8_t depth;      //!< \brief depth / size of this block
-  int8_t part_size;  //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
-  int8_t tr_depth;   //!< \brief transform depth
-  int8_t coded;      //!< \brief flag to indicate this block is coded and reconstructed
-  int8_t skipped;    //!< \brief flag to indicate this block is skipped
-  int8_t merged;     //!< \brief flag to indicate this block is merged
-  int8_t merge_idx;  //!< \brief merge index
+  uint8_t type      : 2; //!< \brief block type, CU_INTER / CU_INTRA
+  uint8_t depth     : 3; //!< \brief depth / size of this block
+  uint8_t part_size : 3; //!< \brief Currently only 2Nx2N, TODO: AMP/SMP/NxN parts
+  uint8_t tr_depth  : 3; //!< \brief transform depth
+  uint8_t skipped   : 1; //!< \brief flag to indicate this block is skipped
+  uint8_t merged    : 1; //!< \brief flag to indicate this block is merged
+  uint8_t merge_idx : 3; //!< \brief merge index
 
   cu_cbf_t cbf;
-  struct {
-    int8_t mode;
-    int8_t mode_chroma;
-    int8_t tr_skip;    //!< \brief transform skip flag
-  } intra[4];
-  struct {
-    double cost;
-    uint32_t bitcost;
-    int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
-    int16_t mvd[2][2]; // \brief Motion vector differences for L0 and L1
-    uint8_t mv_cand[2]; // \brief selected MV candidate
-    uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
-    uint8_t mv_ref_coded[2]; // \brief Coded and corrected index of ref picture
-    uint8_t mv_dir; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
-    int8_t mode;
-  } inter;
+  union {
+    struct {
+      int8_t mode;
+      int8_t mode_chroma;
+      int8_t tr_skip;    //!< \brief transform skip flag
+    } intra[4];
+    struct {
+      int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
+      uint8_t mv_ref[2]; // \brief Index of the encoder_control.ref array.
+      uint8_t mv_cand0 : 3; // \brief selected MV candidate
+      uint8_t mv_cand1 : 3; // \brief selected MV candidate
+      uint8_t mv_dir   : 2; // \brief Probably describes if mv_ref is L0, L1 or both (bi-pred)
+    } inter;
+  };
 } cu_info_t;
+
+#define CU_GET_MV_CAND(cu_info_ptr, reflist) \
+  (((reflist) == 0) ? (cu_info_ptr)->inter.mv_cand0 : (cu_info_ptr)->inter.mv_cand1)
+
+#define CU_SET_MV_CAND(cu_info_ptr, reflist, value) \
+  do { \
+    if ((reflist) == 0) { \
+      (cu_info_ptr)->inter.mv_cand0 = (value); \
+    } else { \
+      (cu_info_ptr)->inter.mv_cand1 = (value); \
+    } \
+  } while (0)
 
 #define CHECKPOINT_CU(prefix_str, cu) CHECKPOINT(prefix_str " type=%d depth=%d part_size=%d tr_depth=%d coded=%d " \
   "skipped=%d merged=%d merge_idx=%d cbf.y=%d cbf.u=%d cbf.v=%d " \

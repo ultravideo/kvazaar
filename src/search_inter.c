@@ -1092,7 +1092,9 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                 int16_t num_cand,
                                 unsigned ref_idx,
-                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, cabac_data_t*))
+                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, cabac_data_t*),
+                                double *inter_cost,
+                                uint32_t *inter_bitcost)
 {
   const int x_cu = x >> 3;
   const int y_cu = y >> 3;
@@ -1100,7 +1102,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   kvz_picture *ref_image = state->global->ref->images[ref_idx];
   uint32_t temp_bitcost = 0;
   uint32_t temp_cost = 0;
-  vector2d_t orig, mvd;
+  vector2d_t orig;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
@@ -1245,25 +1247,21 @@ static void search_pu_inter_ref(encoder_state_t * const state,
       cu_mv_cand = 1;
     }
   }
-  mvd.x = mv.x - mv_cand[cu_mv_cand][0];
-  mvd.y = mv.y - mv_cand[cu_mv_cand][1];
 
-  if(temp_cost < cur_cu->inter.cost) {
-
+  if (temp_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
-    cur_cu->inter.mv_ref_coded[ref_list] = state->global->refmap[ref_idx].idx;
+    uint8_t mv_ref_coded = state->global->refmap[ref_idx].idx;
 
     cur_cu->merged        = merged;
     cur_cu->merge_idx     = merge_idx;
     cur_cu->inter.mv_ref[ref_list] = ref_idx;
     cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
     cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
-    cur_cu->inter.mvd[ref_list][0] = (int16_t)mvd.x;
-    cur_cu->inter.mvd[ref_list][1] = (int16_t)mvd.y;
-    cur_cu->inter.cost    = temp_cost;
-    cur_cu->inter.bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[ref_list];
-    cur_cu->inter.mv_cand[ref_list] = cu_mv_cand;
+    CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
+
+    *inter_cost = temp_cost;
+    *inter_bitcost = temp_bitcost + cur_cu->inter.mv_dir - 1 + mv_ref_coded;
   }
 }
 
@@ -1279,15 +1277,21 @@ static void search_pu_inter_ref(encoder_state_t * const state,
  * \param i_pu        index of the PU in the CU
  * \param lcu         containing LCU
  *
- * \return            cost of the best mode
+ * \param inter_cost    Return inter cost of the best mode
+ * \param inter_bitcost Return inter bitcost of the best mode
  */
-static int search_pu_inter(encoder_state_t * const state,
-                           int x_cu, int y_cu,
-                           int depth,
-                           part_mode_t part_mode,
-                           int i_pu,
-                           lcu_t *lcu)
+static void search_pu_inter(encoder_state_t * const state,
+                            int x_cu, int y_cu,
+                            int depth,
+                            part_mode_t part_mode,
+                            int i_pu,
+                            lcu_t *lcu,
+                            double *inter_cost,
+                            uint32_t *inter_bitcost)
 {
+  *inter_cost = MAX_INT;
+  *inter_bitcost = MAX_INT;
+
   const videoframe_t * const frame = state->tile->frame;
   const int width_cu  = LCU_WIDTH >> depth;
   const int x         = PU_GET_X(part_mode, width_cu, x_cu, i_pu);
@@ -1336,10 +1340,8 @@ static int search_pu_inter(encoder_state_t * const state,
   }
 
   // Default to candidate 0
-  cur_cu->inter.mv_cand[0] = 0;
-  cur_cu->inter.mv_cand[1] = 0;
-
-  cur_cu->inter.cost = INT_MAX;
+  CU_SET_MV_CAND(cur_cu, 0, 0);
+  CU_SET_MV_CAND(cur_cu, 1, 0);
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
@@ -1350,7 +1352,9 @@ static int search_pu_inter(encoder_state_t * const state,
                         lcu, cur_cu,
                         mv_cand, merge_cand, num_cand,
                         ref_idx,
-                        get_mvd_cost);
+                        get_mvd_cost,
+                        inter_cost,
+                        inter_bitcost);
   }
 
   // Search bi-pred positions
@@ -1427,13 +1431,13 @@ static int search_pu_inter(encoder_state_t * const state,
           cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
-          if (cost < cur_cu->inter.cost) {
+          if (cost < *inter_cost) {
 
             cur_cu->inter.mv_dir = 3;
-            cur_cu->inter.mv_ref_coded[0] = state->global->refmap[merge_cand[i].ref[0]].idx;
-            cur_cu->inter.mv_ref_coded[1] = state->global->refmap[merge_cand[j].ref[1]].idx;
-
-
+            uint8_t mv_ref_coded[2] = {
+              state->global->refmap[merge_cand[i].ref[0]].idx,
+              state->global->refmap[merge_cand[j].ref[1]].idx
+            };
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
@@ -1480,12 +1484,10 @@ static int search_pu_inter(encoder_state_t * const state,
                   cu_mv_cand = 1;                  
                 }
               }
-              cur_cu->inter.mvd[reflist][0] = cur_cu->inter.mv[reflist][0] - mv_cand[cu_mv_cand][0];
-              cur_cu->inter.mvd[reflist][1] = cur_cu->inter.mv[reflist][1] - mv_cand[cu_mv_cand][1];
-              cur_cu->inter.mv_cand[reflist] = cu_mv_cand;
+              CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
             }
-            cur_cu->inter.cost = cost;
-            cur_cu->inter.bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + cur_cu->inter.mv_ref_coded[0] + cur_cu->inter.mv_ref_coded[1];
+            *inter_cost = cost;
+            *inter_bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + mv_ref_coded[0] + mv_ref_coded[1];
           }
         }
       }
@@ -1493,14 +1495,12 @@ static int search_pu_inter(encoder_state_t * const state,
     FREE_POINTER(templcu);
   }
 
-  if (cur_cu->inter.cost < INT_MAX) {
+  if (*inter_cost < INT_MAX) {
     const vector2d_t orig = { x, y };
     if (cur_cu->inter.mv_dir == 1) {
       assert(fracmv_within_tile(state, &orig, cur_cu->inter.mv[0][0], cur_cu->inter.mv[0][1], width, height, -1));
     }
   }
-
-  return cur_cu->inter.cost;
 }
 
 
@@ -1515,11 +1515,21 @@ static int search_pu_inter(encoder_state_t * const state,
  * \param depth       depth of the CU in the quadtree
  * \param lcu         containing LCU
  *
- * \return            cost of the best mode
+ * \param inter_cost    Return inter cost
+ * \param inter_bitcost Return inter bitcost
  */
-int kvz_search_cu_inter(encoder_state_t * const state, int x, int y, int depth, lcu_t *lcu)
+void kvz_search_cu_inter(encoder_state_t * const state,
+                         int x, int y, int depth,
+                         lcu_t *lcu,
+                         double   *inter_cost,
+                         uint32_t *inter_bitcost)
 {
-  return search_pu_inter(state, x, y, depth, SIZE_2Nx2N, 0, lcu);
+  search_pu_inter(state,
+                  x, y, depth,
+                  SIZE_2Nx2N, 0,
+                  lcu,
+                  inter_cost,
+                  inter_bitcost);
 }
 
 
@@ -1535,20 +1545,25 @@ int kvz_search_cu_inter(encoder_state_t * const state, int x, int y, int depth, 
  * \param part_mode   partition mode to search
  * \param lcu         containing LCU
  *
- * \return            cost of the best mode
+ * \param inter_cost    Return inter cost
+ * \param inter_bitcost Return inter bitcost
  */
-int kvz_search_cu_smp(encoder_state_t * const state,
-                      int x, int y,
-                      int depth,
-                      part_mode_t part_mode,
-                      lcu_t *lcu)
+void kvz_search_cu_smp(encoder_state_t * const state,
+                       int x, int y,
+                       int depth,
+                       part_mode_t part_mode,
+                       lcu_t *lcu,
+                       double *inter_cost,
+                       uint32_t *inter_bitcost)
 {
   const int num_pu    = kvz_part_mode_num_parts[part_mode];
   const int width_scu = (LCU_WIDTH >> depth) >> MAX_DEPTH;
   const int y_scu     = SUB_SCU(y) >> MAX_DEPTH;
   const int x_scu     = SUB_SCU(x) >> MAX_DEPTH;
 
-  int cost = 0;
+  *inter_cost    = 0;
+  *inter_bitcost = 0;
+
   for (int i = 0; i < num_pu; ++i) {
     const int x_pu      = PU_GET_X(part_mode, width_scu, x_scu, i);
     const int y_pu      = PU_GET_Y(part_mode, width_scu, y_scu, i);
@@ -1556,11 +1571,17 @@ int kvz_search_cu_smp(encoder_state_t * const state,
     const int height_pu = PU_GET_H(part_mode, width_scu, i);
     cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
 
-    cur_pu->type = CU_INTER;
+    cur_pu->type      = CU_INTER;
     cur_pu->part_size = part_mode;
-    cur_pu->depth = depth;
+    cur_pu->depth     = depth;
 
-    cost += search_pu_inter(state, x, y, depth, part_mode, i, lcu);
+    double cost      = MAX_INT;
+    uint32_t bitcost = MAX_INT;
+
+    search_pu_inter(state, x, y, depth, part_mode, i, lcu, &cost, &bitcost);
+
+    *inter_cost    += cost;
+    *inter_bitcost += bitcost;
 
     for (int y = y_pu; y < y_pu + height_pu; ++y) {
       for (int x = x_pu; x < x_pu + width_pu; ++x) {
@@ -1570,6 +1591,4 @@ int kvz_search_cu_smp(encoder_state_t * const state,
       }
     }
   }
-
-  return cost;
 }
