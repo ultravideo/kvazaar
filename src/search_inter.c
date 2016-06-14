@@ -1654,7 +1654,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
       for (int x = x_pu; x < x_pu + width_pu; ++x) {
         cu_info_t *scu = LCU_GET_CU(lcu, x, y);
         scu->type = CU_INTER;
-        memcpy(&scu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+        scu->inter = cur_pu->inter;
       }
     }
   }
