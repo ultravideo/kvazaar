@@ -107,6 +107,7 @@ static const struct option long_options[] = {
   { "hash",               required_argument, NULL, 0 },
   {"cu-split-termination",required_argument, NULL, 0 },
   { "crypto",             required_argument, NULL, 0 },
+  { "me-early-termination",required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -380,6 +381,10 @@ void print_help(void)
     "                                     \"zero\": Terminate when splitting gives little\n"
     "                                               improvement.\n"
     "                                     \"off\": Don't terminate splitting early\n"
+    "          --me-early-termitanion : Specify the me early termination behaviour\n"
+    "                                     \"off\": Early termination is off\n"
+    "                                     \"on\": Early termination is on\n"
+    "                                     \"sensitive\": Sensitive early termination is on\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
