@@ -644,6 +644,95 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
   return true;
 }
 
+
+/**
+* \brief Get merge candidates for current block
+* \param encoder encoder control struct to use
+* \param x block x position in SCU
+* \param y block y position in SCU
+* \param width current block width
+* \param height current block height
+* \param H candidate H
+* \param C1 candidate C1
+*/
+void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state,
+                                             int32_t x,
+                                             int32_t y,
+                                             int32_t width,
+                                             int32_t height,
+                                             cu_info_t **C3,
+                                             cu_info_t **H,
+                                             lcu_t *lcu) {
+  /*
+  Predictor block locations
+  _________
+  |CurrentPU|
+  | |C0|__  |
+  |    |C3| |
+  |_________|_
+  |H|
+  */
+
+  // Find temporal reference, closest POC
+  if (state->global->ref->used_size) {
+    uint32_t poc_diff = UINT_MAX;
+    int32_t closest_ref = 0;
+
+    for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
+      int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+
+      td = td < 0 ? -td : td;
+      if (td < poc_diff) {
+        closest_ref = temporal_cand;
+        poc_diff = td;
+      }
+    }
+
+    cu_array_t *ref_cu_array = state->global->ref->cu_arrays[closest_ref];
+
+    int32_t x_lcu = x / LCU_WIDTH;
+    int32_t y_lcu = y / LCU_WIDTH;
+
+    int cu_per_width = state->encoder_control->in.width_in_lcu* LCU_WIDTH / LCU_CU_WIDTH;
+
+    uint32_t xColBr = x + width;
+    uint32_t yColBr = y + height;
+
+    // H must be available
+    if (xColBr + LCU_CU_WIDTH < state->encoder_control->in.width &&
+      yColBr + LCU_CU_WIDTH < state->encoder_control->in.height) {
+      int32_t H_offset = -1;
+
+      // Completely inside the current CTU / LCU
+      if (xColBr % LCU_WIDTH != 0 &&
+        yColBr % LCU_WIDTH != 0) {
+        H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
+          (((yColBr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
+      } else if (yColBr % LCU_WIDTH != 0) {
+        H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
+          (((y >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
+      }
+
+      if (H_offset >= 0) {
+        // Only use when it's inter block
+        if (ref_cu_array->data[H_offset].type == CU_INTER) {
+          *H = &ref_cu_array->data[H_offset];
+        }
+      }
+    }
+    uint32_t xColCtr = x + (width / 2);
+    uint32_t yColCtr = y + (height / 2);
+
+    // C3 must be inside the LCU, in the center position of current CU
+    if (xColCtr + LCU_CU_WIDTH < state->encoder_control->in.width && yColCtr + LCU_CU_WIDTH < state->encoder_control->in.height) {
+      uint32_t C3_offset = ((xColCtr >> 4) << 4) / LCU_CU_WIDTH + ((((yColCtr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width);
+      if (ref_cu_array->data[C3_offset].type == CU_INTER) {
+        *C3 = &ref_cu_array->data[C3_offset];
+      }
+    }
+  }
+}
+
 /**
  * \brief Get merge candidates for current block.
  *
