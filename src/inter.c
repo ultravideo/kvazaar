@@ -1353,8 +1353,38 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   }
 
 #if ENABLE_TEMPORAL_MVP
-  if(candidates < AMVP_MAX_NUM_CANDS) {
-    //TODO: add temporal mv predictor
+  if (candidates < MRG_MAX_NUM_CANDS && state->global->ref->used_size) {
+
+    uint32_t poc_diff = UINT_MAX;
+    int32_t closest_ref = 0;
+
+    for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
+      int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+      td = td < 0 ? -td : td;
+      if (td < poc_diff) {
+        closest_ref = temporal_cand;
+        poc_diff = td;
+      }
+    }
+
+    cu_info_t *C3 = NULL;
+    cu_info_t *H = NULL;
+    cu_info_t *selected_CU = NULL;
+
+    kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &C3, &H, lcu);
+
+    if (H != NULL) {
+      selected_CU = H;
+    } else if (C3 != NULL) {
+      selected_CU = C3;
+    }
+
+    if (selected_CU) {
+      mv_cand[candidates].mv[0][0] = selected_CU->inter.mv[0][0];
+      mv_cand[candidates].mv[0][1] = selected_CU->inter.mv[0][1];
+      mv_cand[candidates].dir = 1;
+      candidates++;
+    }
   }
 #endif
 
