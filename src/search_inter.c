@@ -257,10 +257,10 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
 }
 
 
-static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, const encoder_state_t *const state,
+static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, encoder_state_t *const state,
   const vector2d_t *orig, unsigned width, unsigned height, int wpp_limit, const kvz_picture *pic, const kvz_picture *ref,
   int16_t mv_cand[2][2], int32_t ref_idx, unsigned *best_cost, uint32_t *bitcost_out, uint32_t *best_bitcost,
-  int(*calc_mvd)(const encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
+  int(*calc_mvd)(encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
   int16_t, int32_t, uint32_t *))
 {
   static const vector2d_t small_hexbs[5] = {
