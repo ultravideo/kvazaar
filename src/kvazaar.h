@@ -131,6 +131,7 @@ enum kvz_hash
 
 /**
 * \brief cu split termination mode
+* \since since 3.8.0
 */
 enum kvz_cu_split_termination
 {
@@ -138,6 +139,10 @@ enum kvz_cu_split_termination
   KVZ_CU_SPLIT_TERMINATION_OFF = 1
 };
 
+/**
+* \brief me early termination mode
+* \since since 3.8.0
+*/
 enum kvz_me_early_termination
 {
   KVZ_ME_EARLY_TERMINATION_OFF = 0,
@@ -252,9 +257,9 @@ typedef struct kvz_config
   enum kvz_mv_constraint mv_constraint;  /*!< \since 3.3.0 \brief Constrain movement vectors. */
   enum kvz_hash hash;  /*!< \since 3.5.0 \brief What hash algorithm to use. */
 
-  enum kvz_cu_split_termination cu_split_termination; /*!< \brief Mode of cu split termination. */
+  enum kvz_cu_split_termination cu_split_termination; /*!< \since 3.8.0 \brief Mode of cu split termination. */
 
-  enum kvz_me_early_termination me_early_termination;
+  enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
 
 } kvz_config;
 
