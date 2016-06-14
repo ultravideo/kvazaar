@@ -751,6 +751,13 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 
     //end if
   //end if
+
+#if ENABLE_TEMPORAL_MVP
+  if (state->global->slicetype != KVZ_SLICE_I) {
+    WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
+  }
+#endif
+
   if (encoder->sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
     WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");

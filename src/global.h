@@ -125,7 +125,7 @@ typedef int16_t coeff_t;
 #define ENABLE_PCM 0
 
 //! Enable usage of temporal Motion Vector Prediction
-#define ENABLE_TEMPORAL_MVP 0
+#define ENABLE_TEMPORAL_MVP 1
 
 //! skip residual coding when it's under _some_ threshold
 #define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0
