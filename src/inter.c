@@ -1090,8 +1090,75 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
   }
 
 #if ENABLE_TEMPORAL_MVP
-  if(candidates < AMVP_MAX_NUM_CANDS) {
-    //TODO: add temporal mv predictor
+  /*
+  Predictor block locations
+  _________
+  |CurrentPU|
+  | |C0|__  |
+  |    |C3| |
+  |_________|_
+  |H|
+  */
+
+  // Find temporal reference, closest POC
+  if (state->global->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
+    uint32_t poc_diff = UINT_MAX;
+    int32_t closest_ref = 0;
+
+    for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
+      int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+      td = td < 0 ? -td : td;
+      if (td < poc_diff) {
+        closest_ref = temporal_cand;
+        poc_diff = td;
+      }
+    }
+
+    cu_array_t *ref_cu_array = state->global->ref->cu_arrays[closest_ref];
+    cu_info_t *C3 = NULL;
+    cu_info_t *H = NULL;
+    cu_info_t *selected_CU = NULL;
+
+    kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &C3, &H, lcu);
+
+    if (H != NULL) {
+      selected_CU = H;
+    } else if (C3 != NULL) {
+      selected_CU = C3;
+    }
+
+
+    uint32_t xColBr = x + width;
+    uint32_t yColBr = y + height;
+
+    int cu_per_width = state->encoder_control->in.width_in_lcu* LCU_WIDTH / LCU_CU_WIDTH;
+
+    // H must be available
+    if (xColBr + LCU_CU_WIDTH < state->encoder_control->in.width &&
+      yColBr + LCU_CU_WIDTH < state->encoder_control->in.height) {
+      int32_t H_offset = -1;
+
+      // Completely inside the current CTU / LCU
+      if (xColBr % LCU_WIDTH != 0 &&
+        yColBr % LCU_WIDTH != 0) {
+        H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
+          (((yColBr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
+      } else if (yColBr % LCU_WIDTH != 0) {
+        H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
+          (((y >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
+      }
+    }
+
+    if (selected_CU) {
+      int td = state->global->poc - state->global->ref->pocs[closest_ref];
+      int tb = state->global->poc - state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]];
+
+      int scale = 256;// CALCULATE_SCALE(NULL, tb, td);
+      mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+      mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+
+      candidates++;
+    }
   }
 #endif
 
