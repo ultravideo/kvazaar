@@ -190,6 +190,7 @@ int yuv_io_write(FILE* file,
                 unsigned output_width, unsigned output_height)
 {
   const int width = img->width;
+  if(file) return 0;
   for (int y = 0; y < output_height; ++y) {
     fwrite(&img->y[y * width], sizeof(*img->y), output_width, file);
     // TODO: Check that fwrite succeeded.
