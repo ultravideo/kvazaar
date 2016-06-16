@@ -281,7 +281,9 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   //dpb_size(){
   //TODO: Implement properly.
-  uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = { 0, 0, 4, 4 };
+  uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg->ref_frames + state->encoder_control->cfg->gop_len;
+  uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = { 0, 0, max_dec_pic_buffering_minus1,
+                                                         max_dec_pic_buffering_minus1 }; //needs to be in line (<=) sps values
   //for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
   //  state->layer->num_output_layer_sets == 2
   WRITE_U(stream, 0, 1, "sub_layer_flag_info_present_flag[i]");
@@ -343,9 +345,13 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //for each layer
   for (int i = 0; i < 1; i++) {
-  WRITE_UE(stream, 1, "vps_max_dec_pic_buffering");
-  WRITE_UE(stream, 0, "vps_num_reorder_pics");
-  WRITE_UE(stream, 0, "vps_max_latency_increase");
+    //*********************************************
+    //For scalable extension. TODO: Why was it previously 1?
+    WRITE_UE(stream, state->encoder_control->cfg->ref_frames
+              + state->encoder_control->cfg->gop_len, "vps_max_dec_pic_buffering_minus1[i]");
+    //*********************************************
+    WRITE_UE(stream, 0, "vps_num_reorder_pics");
+    WRITE_UE(stream, 0, "vps_max_latency_increase");
   }
 
   //*********************************************
@@ -1048,12 +1054,22 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       //WRITE_U(stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
+
+  // ***********************************************
+  // Modified for SHVC
+  // TODO: Get proper values.
+  uint8_t poc_lsb_not_present_flag = 0; //Infered to be 0 if not present
+  if ((state->layer->layer_id > 0 && !poc_lsb_not_present_flag) || (state->frame->pictype != KVZ_NAL_IDR_W_RADL
+      && state->frame->pictype != KVZ_NAL_IDR_N_LP)) {  
+    WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
+  }
   if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
       && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
     int last_poc = 0;
     int poc_shift = 0;
 
-      WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
+    //WRITE_U(stream, state->frame->poc & 0x1f, 5, "pic_order_cnt_lsb");
+//***********************************************
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
@@ -1119,6 +1135,15 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     //end if
   //end if
 
+  // ***********************************************
+  // Modified for SHVC
+  // TODO: Get proper values.
+  if (state->layer->layer_id > 0) {  //&& !default_ref_layers_active_flag && NumDirectRefLayers[nuh_layer_id] > 0 ){
+    //default_ref_layers_active_flag == 0; NumDirectRefLayers[1] == 1
+    WRITE_U(stream, 0, 1, "inter_layer_pred_enabled_flag");
+    //TODO: if inter_layer_pred_enabled_flag == 1 Write other stuff 
+  }
+  //***********************************************
 
   if (encoder->sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
