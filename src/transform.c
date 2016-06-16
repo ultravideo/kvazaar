@@ -209,13 +209,12 @@ int kvz_quantize_residual_trskip(
  * - lcu->cbf  coded block flags for the area
  * - lcu->cu.intra[].tr_skip  for the area
  */
-void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, int32_t y, const uint8_t depth, cu_info_t *cur_cu, lcu_t* lcu)
+void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, int32_t y, const uint8_t depth, cu_info_t *cur_pu, lcu_t* lcu)
 {
   // we have 64>>depth transform size
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
-  const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
-  if (cur_cu == NULL) {
-    cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
+  if (cur_pu == NULL) {
+    cur_pu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
   const int8_t width = LCU_WIDTH>>depth;
   
@@ -224,7 +223,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
   assert(width == 4 || width == 8 || width == 16 || width == 32 || width == 64);
 
   // Split transform and increase depth
-  if (depth == 0 || cur_cu->tr_depth > depth) {
+  if (depth == 0 || cur_pu->tr_depth > depth) {
     int offset = width / 2;
     kvz_quantize_lcu_luma_residual(state, x,          y,          depth+1, NULL, lcu);
     kvz_quantize_lcu_luma_residual(state, x + offset, y,          depth+1, NULL, lcu);
@@ -232,13 +231,13 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
     kvz_quantize_lcu_luma_residual(state, x + offset, y + offset, depth+1, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
-    if (depth < MAX_DEPTH) {
-      cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
-      cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
-      cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
-      if (cbf_is_set(cu_a->cbf.y, depth+1) || cbf_is_set(cu_b->cbf.y, depth+1) || cbf_is_set(cu_c->cbf.y, depth+1)) {
-        cbf_set(&cur_cu->cbf.y, depth);
-      }
+    if (depth <= MAX_DEPTH) {
+      uint16_t child_cbfs[3] = {
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+      };
+      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_Y);
     }
 
     return;
@@ -254,7 +253,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
     // Pointers to current location in arrays with kvantized coefficients.
     coeff_t *orig_coeff_y = &lcu->coeff.y[luma_offset];
 
-    coeff_scan_order_t scan_idx_luma = kvz_get_scan_order(cur_cu->type, cur_cu->intra[pu_index].mode, depth);
+    coeff_scan_order_t scan_idx_luma = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
     #if OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD
     uint32_t residual_sum = 0;
@@ -263,30 +262,30 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
     // Clear coded block flag structures for depths lower than current depth.
     // This should ensure that the CBF data doesn't get corrupted if this function
     // is called more than once.
-    cbf_clear(&cur_cu->cbf.y, depth + pu_index);
+    cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
 
     if (width == 4 && 
         state->encoder_control->trskip_enable)
     {
       // Try quantization with trskip and use it if it's better.
       int has_coeffs = kvz_quantize_residual_trskip(
-          state, cur_cu, width, COLOR_Y, scan_idx_luma,
-          &cur_cu->intra[pu_index].tr_skip,
+          state, cur_pu, width, COLOR_Y, scan_idx_luma,
+          &cur_pu->intra.tr_skip,
           LCU_WIDTH, LCU_WIDTH,
           base_y, recbase_y, recbase_y, orig_coeff_y
       );
       if (has_coeffs) {
-        cbf_set(&cur_cu->cbf.y, depth + pu_index);
+        cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
     } else {
       int has_coeffs = kvz_quantize_residual(
-          state, cur_cu, width, COLOR_Y, scan_idx_luma,
+          state, cur_pu, width, COLOR_Y, scan_idx_luma,
           0,
           LCU_WIDTH, LCU_WIDTH,
           base_y, recbase_y, recbase_y, orig_coeff_y
       );
       if (has_coeffs) {
-        cbf_set(&cur_cu->cbf.y, depth + pu_index);
+        cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
     }
   }
@@ -297,7 +296,6 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
 {
   // we have 64>>depth transform size
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
-  const int pu_index = PU_INDEX(lcu_px.x / 4, lcu_px.y / 4);
   const int8_t width = LCU_WIDTH>>depth;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
@@ -317,15 +315,13 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
 
     // Propagate coded block flags from child CUs to parent CU.
     if (depth < MAX_DEPTH) {
-      cu_info_t *cu_a = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y);
-      cu_info_t *cu_b = LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset);
-      cu_info_t *cu_c = LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset);
-      if (cbf_is_set(cu_a->cbf.u, depth+1) || cbf_is_set(cu_b->cbf.u, depth+1) || cbf_is_set(cu_c->cbf.u, depth+1)) {
-        cbf_set(&cur_cu->cbf.u, depth);
-      }
-      if (cbf_is_set(cu_a->cbf.v, depth+1) || cbf_is_set(cu_b->cbf.v, depth+1) || cbf_is_set(cu_c->cbf.v, depth+1)) {
-        cbf_set(&cur_cu->cbf.v, depth);
-      }
+      uint16_t child_cbfs[3] = {
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
+        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+      };
+      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
+      cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
     }
 
     return;
@@ -333,9 +329,9 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
 
   // If luma is 4x4, do chroma for the 8x8 luma area when handling the top
   // left PU because the coordinates are correct.
-  if (depth <= MAX_DEPTH || pu_index == 0) {
-    cbf_clear(&cur_cu->cbf.u, depth);
-    cbf_clear(&cur_cu->cbf.v, depth);
+  if (depth <= MAX_DEPTH || (lcu_px.x % 8 == 0 && lcu_px.y % 8 == 0)) {
+    cbf_clear(&cur_cu->cbf, depth, COLOR_U);
+    cbf_clear(&cur_cu->cbf, depth, COLOR_V);
 
     const int chroma_offset = lcu_px.x / 2 + lcu_px.y / 2 * LCU_WIDTH_C;
     kvz_pixel *recbase_u = &lcu->rec.u[chroma_offset];
@@ -349,12 +345,12 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
     int chroma_depth = (depth == MAX_PU_DEPTH ? depth - 1 : depth);
     int chroma_width = LCU_WIDTH_C >> chroma_depth;
 
-    scan_idx_chroma = kvz_get_scan_order(cur_cu->type, cur_cu->intra[0].mode_chroma, depth);
+    scan_idx_chroma = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
     if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
-      cbf_set(&cur_cu->cbf.u, depth);
+      cbf_set(&cur_cu->cbf, depth, COLOR_U);
     }
     if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
-      cbf_set(&cur_cu->cbf.v, depth);
+      cbf_set(&cur_cu->cbf, depth, COLOR_V);
     }
   }
 }

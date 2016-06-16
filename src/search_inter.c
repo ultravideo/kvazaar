@@ -1188,18 +1188,14 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     // Take starting point for MV search from previous frame.
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
-    // TODO: Update this to work with SMP/AMP blocks.
-    const vector2d_t frame_px = { 
-        (state->tile->lcu_offset_x << LOG2_LCU_WIDTH) + x, 
-        (state->tile->lcu_offset_y << LOG2_LCU_WIDTH) + y
+    const vector2d_t tile_top_left_corner = {
+        (state->tile->lcu_offset_x << LOG2_LCU_WIDTH),
+        (state->tile->lcu_offset_y << LOG2_LCU_WIDTH)
     };
-    const vector2d_t frame_cu = {
-      (frame_px.x + (width >> 1)) >> MIN_SIZE,
-      (frame_px.y + (height >> 1)) >> MIN_SIZE
-    };
-    const cu_info_t *ref_cu_array = state->global->ref->cu_arrays[ref_idx]->data;
-    const int width_in_scu = frame->width_in_lcu << MAX_DEPTH;
-    const cu_info_t *ref_cu = &ref_cu_array[frame_cu.x + frame_cu.y * width_in_scu];
+    const int mid_x = tile_top_left_corner.x + x + (width >> 1);
+    const int mid_y = tile_top_left_corner.y + y + (height >> 1);
+    const cu_array_t* ref_array = state->global->ref->cu_arrays[ref_idx];
+    const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
         mv.x = ref_cu->inter.mv[0][0];
@@ -1425,7 +1421,11 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Search bi-pred positions
-  if (state->global->slicetype == KVZ_SLICE_B && state->encoder_control->cfg->bipred) {
+  bool can_use_bipred = state->global->slicetype == KVZ_SLICE_B
+    && state->encoder_control->cfg->bipred
+    && width + height >= 16; // 4x8 and 8x4 PBs are restricted to unipred
+
+  if (can_use_bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
     unsigned cu_width = LCU_WIDTH >> depth;
     #define NUM_PRIORITY_LIST 12;
@@ -1623,20 +1623,20 @@ void kvz_search_cu_smp(encoder_state_t * const state,
                        double *inter_cost,
                        uint32_t *inter_bitcost)
 {
-  const int num_pu    = kvz_part_mode_num_parts[part_mode];
-  const int width_scu = (LCU_WIDTH >> depth) >> MAX_DEPTH;
-  const int y_scu     = SUB_SCU(y) >> MAX_DEPTH;
-  const int x_scu     = SUB_SCU(x) >> MAX_DEPTH;
+  const int num_pu  = kvz_part_mode_num_parts[part_mode];
+  const int width   = LCU_WIDTH >> depth;
+  const int y_local = SUB_SCU(y);
+  const int x_local = SUB_SCU(x);
 
   *inter_cost    = 0;
   *inter_bitcost = 0;
 
   for (int i = 0; i < num_pu; ++i) {
-    const int x_pu      = PU_GET_X(part_mode, width_scu, x_scu, i);
-    const int y_pu      = PU_GET_Y(part_mode, width_scu, y_scu, i);
-    const int width_pu  = PU_GET_W(part_mode, width_scu, i);
-    const int height_pu = PU_GET_H(part_mode, width_scu, i);
-    cu_info_t *cur_pu   = LCU_GET_CU(lcu, x_pu, y_pu);
+    const int x_pu      = PU_GET_X(part_mode, width, x_local, i);
+    const int y_pu      = PU_GET_Y(part_mode, width, y_local, i);
+    const int width_pu  = PU_GET_W(part_mode, width, i);
+    const int height_pu = PU_GET_H(part_mode, width, i);
+    cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
 
     cur_pu->type      = CU_INTER;
     cur_pu->part_size = part_mode;
@@ -1650,11 +1650,11 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     *inter_cost    += cost;
     *inter_bitcost += bitcost;
 
-    for (int y = y_pu; y < y_pu + height_pu; ++y) {
-      for (int x = x_pu; x < x_pu + width_pu; ++x) {
-        cu_info_t *scu = LCU_GET_CU(lcu, x, y);
+    for (int y = y_pu; y < y_pu + height_pu; y += SCU_WIDTH) {
+      for (int x = x_pu; x < x_pu + width_pu; x += SCU_WIDTH) {
+        cu_info_t *scu = LCU_GET_CU_AT_PX(lcu, x, y);
         scu->type = CU_INTER;
-        memcpy(&scu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+        scu->inter = cur_pu->inter;
       }
     }
   }

@@ -31,6 +31,7 @@
 #include "strategies/strategies-picture.h"
 #include "strategyselector.h"
 #include "strategies/strategies-common.h"
+#include "strategies/generic/picture-generic.h"
 
 
 /**
@@ -452,6 +453,19 @@ INLINE static void hor_transform_block_dual_avx2(__m256i (*row_diff)[8])
   hor_transform_row_dual_avx2((*row_diff) + 5);
   hor_transform_row_dual_avx2((*row_diff) + 6);
   hor_transform_row_dual_avx2((*row_diff) + 7);
+}
+
+
+/**
+* \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
+*/
+static unsigned kvz_satd_4x4_subblock_8bit_avx2(const kvz_pixel * buf1,
+                                                const int32_t     stride1,
+                                                const kvz_pixel * buf2,
+                                                const int32_t     stride2)
+{
+  // TODO: AVX2 implementation
+  return kvz_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
 }
 
 static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)

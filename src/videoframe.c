@@ -46,10 +46,9 @@ videoframe_t *kvz_videoframe_alloc(const int32_t width, const int32_t height, co
   if (frame->height_in_lcu * LCU_WIDTH < frame->height) frame->height_in_lcu++;
 
   {
-    // Allocate height_in_scu x width_in_scu x sizeof(CU_info)
-    unsigned height_in_scu = frame->height_in_lcu << MAX_DEPTH;
-    unsigned width_in_scu = frame->width_in_lcu << MAX_DEPTH;
-    frame->cu_array = kvz_cu_array_alloc(width_in_scu, height_in_scu);
+    unsigned cu_array_width  = frame->width_in_lcu  * LCU_WIDTH;
+    unsigned cu_array_height = frame->height_in_lcu * LCU_WIDTH;
+    frame->cu_array = kvz_cu_array_alloc(cu_array_width, cu_array_height);
   }
 
   frame->coeff_y = NULL; frame->coeff_u = NULL; frame->coeff_v = NULL;
@@ -90,18 +89,16 @@ void kvz_videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
   frame->poc = poc;
 }
 
-const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu)
+const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame,
+                                             unsigned int x_in_scu,
+                                             unsigned int y_in_scu)
 {
-  assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
-  assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
-  
-  return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
+  return kvz_cu_array_at_const(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
 }
 
-cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu)
+cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame,
+                                 const unsigned int x_in_scu,
+                                 const unsigned int y_in_scu)
 {
-  assert(x_in_scu < (frame->width_in_lcu << MAX_DEPTH));
-  assert(y_in_scu < (frame->height_in_lcu << MAX_DEPTH));
-  
-  return &frame->cu_array->data[x_in_scu + y_in_scu * (frame->width_in_lcu << MAX_DEPTH)];
+  return kvz_cu_array_at(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
 }

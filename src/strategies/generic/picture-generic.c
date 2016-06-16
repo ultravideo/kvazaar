@@ -99,19 +99,13 @@ static unsigned reg_sad_generic(const kvz_pixel * const data1, const kvz_pixel *
   return sad;
 }
 
-
 /**
- * \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
+ * \brief  Transform differences between two 4x4 blocks.
  * From HM 13.0
  */
-static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
+static int32_t hadamard_4x4_generic(int32_t diff[4*4])
 {
-  int32_t k, satd = 0, diff[16], m[16], d[16];
-  for (k = 0; k < 16; ++k) {
-    diff[k] = piOrg[k] - piCur[k];
-  }
-
-  /*===== hadamard transform =====*/
+  int32_t m[4 * 4];
   m[0] = diff[0] + diff[12];
   m[1] = diff[1] + diff[13];
   m[2] = diff[2] + diff[14];
@@ -129,6 +123,7 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
   m[14] = diff[2] - diff[14];
   m[15] = diff[3] - diff[15];
 
+  int32_t d[4 * 4];
   d[0] = m[0] + m[4];
   d[1] = m[1] + m[5];
   d[2] = m[2] + m[6];
@@ -180,13 +175,44 @@ static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
   d[14] = m[14] + m[15];
   d[15] = m[15] - m[14];
 
-  for (k = 0; k<16; ++k) {
-    satd += abs(d[k]);
+  int32_t satd = 0;
+  for (int i = 0; i < 16; i++) {
+    satd += abs(d[i]);
   }
   satd = ((satd + 1) >> 1);
 
   return satd;
 }
+
+/**
+ * \brief  Calculate SATD between two 4x4 blocks.
+ */
+static unsigned satd_4x4_generic(const kvz_pixel *piOrg, const kvz_pixel *piCur)
+{
+  int32_t diff[4 * 4];
+  for (int i = 0; i < 4 * 4; i++) {
+    diff[i] = piOrg[i] - piCur[i];
+  }
+  return hadamard_4x4_generic(diff);
+}
+
+/**
+* \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
+*/
+unsigned kvz_satd_4x4_subblock_generic(const kvz_pixel * buf1,
+                                       const int32_t     stride1,
+                                       const kvz_pixel * buf2,
+                                       const int32_t     stride2)
+{
+  int32_t diff[4 * 4];
+  for (int y = 0; y < 4; y++) {
+    for (int x = 0; x < 4; x++) {
+      diff[x + y * 4] = buf1[x + y * stride1] - buf2[x + y * stride2];
+    }
+  }
+  return hadamard_4x4_generic(diff);
+}
+
 
 /**
 * \brief  Calculate SATD between two 8x8 blocks inside bigger arrays.

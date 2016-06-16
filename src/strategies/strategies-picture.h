@@ -66,11 +66,33 @@ static unsigned satd_ ## n ## x ## n ## _ ## suffix ( \
       const kvz_pixel *block2, int stride2) \
   { \
     unsigned sum = 0; \
+    if (width % 8 != 0) { \
+      /* Process the first column using 4x4 blocks. */ \
+      for (int y = 0; y < height; y += 4) { \
+        sum += kvz_satd_4x4_subblock_ ## suffix(&block1[y * stride1], stride1, \
+                                                &block2[y * stride2], stride2); \
+      } \
+      block1 += 4; \
+      block2 += 4; \
+      width -= 4; \
+    } \
+    if (height % 8 != 0) { \
+      /* Process the first row using 4x4 blocks. */ \
+      for (int x = 0; x < width; x += 4) { \
+        sum += kvz_satd_4x4_subblock_ ## suffix(&block1[x], stride1, \
+                                                &block2[x], stride2); \
+      } \
+      block1 += 4 * stride1; \
+      block2 += 4 * stride2; \
+      height -= 4; \
+    } \
+    /* The rest can now be processed with 8x8 blocks. */ \
     for (int y = 0; y < height; y += 8) { \
       const kvz_pixel *row1 = &block1[y * stride1]; \
       const kvz_pixel *row2 = &block2[y * stride2]; \
       for (int x = 0; x < width; x += 8) { \
-        sum += satd_8x8_subblock_ ## suffix(&row1[x], stride1, &row2[x], stride2); \
+        sum += satd_8x8_subblock_ ## suffix(&row1[x], stride1, \
+                                            &row2[x], stride2); \
       } \
     } \
     return sum >> (KVZ_BIT_DEPTH - 8); \

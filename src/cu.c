@@ -120,28 +120,123 @@ unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_strid
   return sum;
 }
 
-cu_array_t * kvz_cu_array_alloc(const int width_in_scu, const int height_in_scu) {
-  unsigned cu_array_size = height_in_scu * width_in_scu;
-  cu_array_t *cua;
-  cua = MALLOC(cu_array_t, 1);
-  cua->data = (cu_info_t*)malloc(sizeof(cu_info_t) * cu_array_size);
+
+cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
+{
+  return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);
+}
+
+
+const cu_info_t* kvz_cu_array_at_const(const cu_array_t *cua, unsigned x_px, unsigned y_px)
+{
+  assert(x_px < cua->width);
+  assert(y_px < cua->height);
+  return &(cua)->data[(x_px >> 2) + (y_px >> 2) * ((cua)->width >> 2)];
+}
+
+
+/**
+ * \brief Allocate a CU array.
+ *
+ * \param width   width of the array in luma pixels
+ * \param height  height of the array in luma pixels
+ */
+cu_array_t * kvz_cu_array_alloc(const int width, const int height) {
+  cu_array_t *cua = MALLOC(cu_array_t, 1);
+
+  // Round up to a multiple of cell width and divide by cell width.
+  const int width_scu  = (width  + 15) >> 2;
+  const int height_scu = (height + 15) >> 2;
+  assert(width_scu  * 16 >= width);
+  assert(height_scu * 16 >= height);
+  const unsigned cu_array_size = width_scu * height_scu;
+  cua->data = calloc(cu_array_size, sizeof(cu_info_t));
+  cua->width  = width_scu  << 2;
+  cua->height = height_scu << 2;
   cua->refcount = 1;
-  FILL_ARRAY(cua->data, 0, cu_array_size);
+
   return cua;
 }
+
 
 int kvz_cu_array_free(cu_array_t * const cua)
 {
   int32_t new_refcount;
   if (!cua) return 1;
-  
+
   new_refcount = KVZ_ATOMIC_DEC(&(cua->refcount));
   //Still we have some references, do nothing
   if (new_refcount > 0) return 1;
-  
+
   FREE_POINTER(cua->data);
   free(cua);
 
   return 1;
 }
 
+
+/**
+ * \brief Copy part of a cu array to another cu array.
+ *
+ * All values are in luma pixels.
+ *
+ * \param dst     destination array
+ * \param dst_x   x-coordinate of the left edge of the copied area in dst
+ * \param dst_y   y-coordinate of the top edge of the copied area in dst
+ * \param src     source array
+ * \param src_x   x-coordinate of the left edge of the copied area in src
+ * \param src_y   y-coordinate of the top edge of the copied area in src
+ * \param width   width of the area to copy
+ * \param height  height of the area to copy
+ */
+void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
+                       const cu_array_t* src, int src_x, int src_y,
+                       int width, int height)
+{
+  // Convert values from pixel coordinates to array indices.
+  int src_stride = src->width >> 2;
+  int dst_stride = dst->width >> 2;
+  const cu_info_t* src_ptr = &src->data[(src_x >> 2) + (src_y >> 2) * src_stride];
+  cu_info_t* dst_ptr       = &dst->data[(dst_x >> 2) + (dst_y >> 2) * dst_stride];
+
+  // Number of bytes to copy per row.
+  const size_t row_size = sizeof(cu_info_t) * (width >> 2);
+
+  width = MIN(width,   MIN(src->width  - src_x, dst->width  - dst_x));
+  height = MIN(height, MIN(src->height - src_y, dst->height - dst_y));
+
+  assert(src_x + width  <= src->width);
+  assert(src_y + height <= src->height);
+  assert(dst_x + width  <= dst->width);
+  assert(dst_y + height <= dst->height);
+
+  for (int i = 0; i < (height >> 2); ++i) {
+    memcpy(dst_ptr, src_ptr, row_size);
+    src_ptr += src_stride;
+    dst_ptr += dst_stride;
+  }
+}
+
+/**
+ * \brief Copy an lcu to a cu array.
+ *
+ * All values are in luma pixels.
+ *
+ * \param dst     destination array
+ * \param dst_x   x-coordinate of the left edge of the copied area in dst
+ * \param dst_y   y-coordinate of the top edge of the copied area in dst
+ * \param src     source lcu
+ */
+void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu_t *src)
+{
+  const int dst_stride = dst->width >> 2;
+  for (int y = 0; y < LCU_WIDTH; y += SCU_WIDTH) {
+    for (int x = 0; x < LCU_WIDTH; x += SCU_WIDTH) {
+      const cu_info_t *from_cu = LCU_GET_CU_AT_PX(src, x, y);
+      const int x_scu = (dst_x + x) >> 2;
+      const int y_scu = (dst_y + y) >> 2;
+      cu_info_t *to_cu = &dst->data[x_scu + y_scu * dst_stride];
+      memcpy(to_cu,                  from_cu, sizeof(*to_cu));
+    }
+  }
+}

@@ -42,11 +42,11 @@ TEST test_get_spatial_merge_cand(void)
                                &mv_cand[4], // a1
                                &lcu);
 
-  ASSERT_EQ(mv_cand[0], &lcu.cu[81]); // b0
-  ASSERT_EQ(mv_cand[1], &lcu.cu[ 8]); // b1
-  ASSERT_EQ(mv_cand[2], &lcu.cu[ 4]); // b2
-  ASSERT_EQ(mv_cand[3], &lcu.cu[40]); // a0
-  ASSERT_EQ(mv_cand[4], &lcu.cu[31]); // a1
+  ASSERT_EQ(mv_cand[0], &lcu.cu[289]); // b0
+  ASSERT_EQ(mv_cand[1], &lcu.cu[ 16]); // b1
+  ASSERT_EQ(mv_cand[2], &lcu.cu[  8]); // b2
+  ASSERT_EQ(mv_cand[3], &lcu.cu[127]); // a0
+  ASSERT_EQ(mv_cand[4], &lcu.cu[110]); // a1
 
   PASS();
 }
