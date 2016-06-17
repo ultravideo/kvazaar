@@ -705,14 +705,10 @@ void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state
         yColBr < state->encoder_control->in.height) {
       int32_t H_offset = -1;
 
-      // Completely inside the current CTU / LCU
-      if (xColBr % LCU_WIDTH != 0 &&
-        yColBr % LCU_WIDTH != 0) {
+      // Y inside the current CTU / LCU
+      if (yColBr % LCU_WIDTH != 0) {
         H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
-          (((yColBr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
-      } else if (yColBr % LCU_WIDTH != 0) {
-        H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
-          (((y >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
+                  (((yColBr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
       }
 
       if (H_offset >= 0) {
@@ -1136,7 +1132,7 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
       int td = state->global->poc - state->global->ref->pocs[closest_ref];
       int tb = state->global->poc - state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]];
 
-      int scale = CALCULATE_SCALE(NULL, tb, td);
+      int scale = 256;// CALCULATE_SCALE(NULL, tb, td);
       mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
       mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
 
