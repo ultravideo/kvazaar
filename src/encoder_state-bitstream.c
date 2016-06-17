@@ -116,6 +116,63 @@ static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
   // end PTL
 }
 
+//TODO: Merger with other ptl
+static void encoder_state_write_bitstream_PTL_scalable(bitstream_t *stream,
+  encoder_state_t * const state)
+{
+  // PTL
+  // Profile Tier
+  WRITE_U(stream, 0, 2, "general_profile_space");
+  WRITE_U(stream, 0, 1, "general_tier_flag");
+
+  // Main Profile == 1,  Main 10 profile == 2, Scalable Main (10) Profile == 7,
+  // Use scalable profile here
+  //uint8_t general_profile_idc = (state->encoder_control->bitdepth == 8) ? 7 : 8;
+
+  WRITE_U(stream, 7, 5, "general_profile_idc"); //Should be 7 for 8 and 10 bit version
+
+  /* Compatibility flags should be set at general_profile_idc
+  *  (so with general_profile_idc = 1, compatibility_flag[1] should be 1)
+  * According to specification, when compatibility_flag[1] is set,
+  *  compatibility_flag[2] should be set too.
+  */
+  WRITE_U(stream, 3 << 29, 32, "general_profile_compatibility_flag[]");
+
+  WRITE_U(stream, 1, 1, "general_progressive_source_flag");
+  WRITE_U(stream, state->encoder_control->in.source_scan_type != 0, 1, "general_interlaced_source_flag");
+  WRITE_U(stream, 0, 1, "general_non_packed_constraint_flag");
+  WRITE_U(stream, 0, 1, "general_frame_only_constraint_flag");
+
+  //Write settings specifyed in the specification
+  WRITE_U(stream, 1, 1, "general_max_12bit_constraint_flag");
+  WRITE_U(stream, 1, 1, "general_max_10bit_constraint_flag");
+  WRITE_U(stream, (state->encoder_control->bitdepth == 8) ? 1 : 0, 1, "general_max_8bit_constraint_flag");
+  WRITE_U(stream, 1, 1, "general_max_422chroma_constraint_flag");
+  WRITE_U(stream, 1, 1, "general_max_420chroma_constraint_flag");
+  WRITE_U(stream, 0, 1, "general_max_monochrome_constraint_flag");
+  WRITE_U(stream, 0, 1, "general_intra_constraint_flag");
+  WRITE_U(stream, 0, 1, "general_one_picture_only_constraint_flag");
+  WRITE_U(stream, 1, 1, "general_lower_bit_rate_constraint_flag");
+
+  WRITE_U(stream, 0, 32, "XXX_reserved_zero_34bits[0..31]");
+  WRITE_U(stream, 0, 2, "XXX_reserved_zero_34bits[32..34]");
+
+  WRITE_U(stream, 0, 1, "inbld_flag");
+  // end Profile Tier
+
+  // Level 6.2 (general_level_idc is 30 * 6.2)
+  WRITE_U(stream, 186, 8, "general_level_idc");
+
+  WRITE_U(stream, 0, 1, "sub_layer_profile_present_flag");
+  WRITE_U(stream, 0, 1, "sub_layer_level_present_flag");
+
+  for (int i = 1; i < 8; i++) {
+    WRITE_U(stream, 0, 2, "reserved_zero_2bits");
+  }
+
+  // end PTL
+}
+
 //Write exstension data
 static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
                                                        encoder_state_t * const state)
@@ -125,13 +182,16 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
   
-  uint16_t  num_scalability_types = 0;
+  //uint16_t  num_scalability_types = 0;
 
-  for (int i = 0; i < 16; i++){
+  //for (int i = 0; i < 16; i++){
     //TODO: Implement scalability mask flags in configuration?
-    WRITE_U(stream, 0, 1, "scalability_mask_flag[i]");
-    num_scalability_types += 0;
-  }
+    //WRITE_U(stream, 0, 1, "scalability_mask_flag[i]");
+    //num_scalability_types += 0;
+  //}
+  //Write in one operation
+  //TODO: implement scalability mask proberly
+  WRITE_U(stream, 0x2000, 16, "scalability_mask_flag[i]"); // 0x2000 = 0010000000000000
 
   //Currently unecessary
   /*for (int j = 0; j < (num_scalability_types - splitting_flag); j++){
@@ -192,9 +252,14 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "default_ref_layers_active_flag");
 
   //TODO: Add ptl for scalable main etc.
-  uint8_t vps_num_profile_tier_level_minus1 = 1;
+  uint8_t vps_num_profile_tier_level_minus1 = 2;
   WRITE_UE(stream, vps_num_profile_tier_level_minus1, "vps_num_profile_tier_level_minus1");
-  //Write extra PTL here
+  
+  // int i = vps_base_layer_internal_flag ? 2 : 1
+  for (int i = 2; i <= vps_num_profile_tier_level_minus1; i++) {
+    WRITE_U(stream, 1, 1, "vps_profile_present_flag[i]");
+    encoder_state_write_bitstream_PTL_scalable(stream, state);
+  }
   
   //TODO: Find out proper values? Set in config
   if (state->layer->num_layer_sets > 1) {
