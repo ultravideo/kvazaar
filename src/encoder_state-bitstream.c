@@ -182,7 +182,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
   
-  //uint16_t  num_scalability_types = 0;
+  uint16_t  num_scalability_types = 1; //TODO: calculate from actual mask
 
   //for (int i = 0; i < 16; i++){
     //TODO: Implement scalability mask flags in configuration?
@@ -193,26 +193,28 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //TODO: implement scalability mask proberly
   WRITE_U(stream, 0x2000, 16, "scalability_mask_flag[i]"); // 0x2000 = 0010000000000000
 
-  //Currently unecessary
-  /*for (int j = 0; j < (num_scalability_types - splitting_flag); j++){
-    WRITE_U(stream, 0, 3, "dimension_id_len_minus1[j]");
-  }*/
+  //Value from SHM
+  uint8_t dimension_id_len[1] = { 1 };
+  for (int j = 0; j < (num_scalability_types - splitting_flag); j++){
+    WRITE_U(stream, dimension_id_len[j]-1, 3, "dimension_id_len_minus1[j]");
+  }
 
   uint8_t vps_nuh_layer_id_present_flag = 0;
   WRITE_U(stream, vps_nuh_layer_id_present_flag, 1, "vps_nuh_layer_id_present_flag");
 
-  //Currently unecessary
+  uint16_t dimension_id[2][1] = { 0, 1 }; //Values from SHM
+  
   //TODO: implement settings?
-  /*for (int i = 0; i <= state->layer->max_layers - 1; i++){
+  for (int i = 1; i < state->layer->max_layers; i++) {
     if (vps_nuh_layer_id_present_flag){
-      WRITE_U(stream, i, 6, "layer_id_in_nuh[i]");
+      WRITE_U(stream, i, 6, "layer_id_in_nuh[i]"); //Sets alternate ids for layers. Defaults to i
     }
     if (!splitting_flag){
       for (int j = 0; j < num_scalability_types; j++){
-        WRITE_U(stream, 0, 0, "dimension_id[i][j]");
+        WRITE_U(stream, dimension_id[i][j], dimension_id_len[j], "dimension_id[i][j]");
       }
     }
-  }*/
+  }
 
   uint8_t view_id_len = 0;
   WRITE_U(stream, view_id_len, 4, "view_id_len");
@@ -266,10 +268,10 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
     WRITE_UE(stream, state->layer->num_output_layer_sets - state->layer->num_layer_sets, "num_add_olss");
     WRITE_U(stream, 1, 2, "default_output_layer_idc"); //value 1 says the layer with the largest nuh_layer_id is the output layer
   }
-
+  
   //TODO: Move to a better place
   //ptl_idx for layer sets
-  uint16_t ptl_idx[2][2] = { 0, 0, 0, 1 };
+  uint16_t ptl_idx[2][2] = { 0, 0, 1, 2 };
 
   //TODO: Add proper conditions
   uint8_t num_layers_in_id_list = 2;
