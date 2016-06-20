@@ -39,19 +39,20 @@ void kvz_init_input_frame_buffer(input_frame_buffer_t *input_buffer)
 /**
  * \brief Pass an input frame to the encoder state.
  *
- * Sets the source image of the encoder state if there is a suitable image
- * available.
+ * Returns the image that should be encoded next if there is a suitable
+ * image available.
  *
  * The caller must not modify img_in after calling this function.
  *
  * \param buf     an input frame buffer
  * \param state   a main encoder state
  * \param img_in  input frame or NULL
- * \return        1 if the source image was set, 0 if not
+ * \return        pointer to the next picture, or NULL if no picture is
+ *                available
  */
-int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
-                           encoder_state_t *const state,
-                           kvz_picture *const img_in)
+kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
+                                    encoder_state_t *const state,
+                                    kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
   const kvz_config* const cfg = encoder->cfg;
@@ -60,19 +61,12 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
   assert(state->global->frame >= 0);
 
-  videoframe_t *frame = state->tile->frame;
-  assert(frame->source == NULL);
-  assert(frame->rec    != NULL);
-
   if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
     // No reordering of output pictures necessary.
 
-    if (img_in == NULL) return 0;
+    if (img_in == NULL) return NULL;
 
     img_in->dts = img_in->pts;
-    frame->source   = kvz_image_copy_ref(img_in);
-    frame->rec->pts = img_in->pts;
-    frame->rec->dts = img_in->dts;
     state->global->gop_offset = 0;
     if (cfg->gop_lowdelay) {
       state->global->gop_offset = (state->global->frame - 1) % cfg->gop_len;
@@ -81,7 +75,7 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
         state->global->gop_offset += cfg->gop_len;
       }
     }
-    return 1;
+    return kvz_image_copy_ref(img_in);
   }
 
   if (img_in != NULL) {
@@ -112,7 +106,7 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
   if (buf->num_out == buf->num_in) {
     // All frames returned.
-    return 0;
+    return NULL;
   }
 
   if (img_in == NULL && buf->num_in < cfg->gop_len) {
@@ -175,14 +169,12 @@ int kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   // Index in buf->pic_buffer and buf->pts_buffer.
   int buf_idx = (idx_out + gop_buf_size) % gop_buf_size;
 
-  assert(buf->pic_buffer[buf_idx] != NULL);
-  frame->source      = buf->pic_buffer[buf_idx];
-  frame->rec->pts    = frame->source->pts;
-  frame->source->dts = dts_out;
-  frame->rec->dts    = dts_out;
+  kvz_picture* next_pic = buf->pic_buffer[buf_idx];
+  assert(next_pic != NULL);
+  next_pic->dts = dts_out;
   buf->pic_buffer[buf_idx] = NULL;
   state->global->gop_offset = gop_offset;
 
   buf->num_out++;
-  return 1;
+  return next_pic;
 }

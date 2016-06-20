@@ -212,7 +212,7 @@ static int kvazaar_encode(kvz_encoder *enc,
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
   if (!state->prepared) {
-    kvz_encoder_next_frame(state);
+    kvz_encoder_prepare(state);
   }
 
   if (pic_in != NULL) {
@@ -220,10 +220,11 @@ static int kvazaar_encode(kvz_encoder *enc,
     CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
   }
 
-  if (kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in)) {
+  kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
+  if (frame) {
     assert(state->global->frame == enc->frames_started);
     // Start encoding.
-    kvz_encode_one_frame(state);
+    kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;
   }
 
