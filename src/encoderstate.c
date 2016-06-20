@@ -790,7 +790,12 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   assert(!state->tile->frame->rec);
 
   state->tile->frame->source = frame;
-  state->tile->frame->rec = kvz_image_alloc(frame->width, frame->height);
+  if (state->encoder_control->cfg->lossless) {
+    // In lossless mode, the reconstruction is equal to the source frame.
+    state->tile->frame->rec = kvz_image_copy_ref(frame);
+  } else {
+    state->tile->frame->rec = kvz_image_alloc(frame->width, frame->height);
+  }
 
   kvz_videoframe_set_poc(state->tile->frame, state->global->poc);
 }
