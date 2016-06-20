@@ -137,8 +137,7 @@ static bool mv_in_merge(const inter_merge_cand_t* merge_cand, int16_t num_cand, 
 static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, encoder_state_t *const state,
                                       const vector2d_t *orig, unsigned width, unsigned height, int wpp_limit, const kvz_picture *pic, const kvz_picture *ref,
                                       int16_t mv_cand[2][2], int32_t ref_idx, unsigned best_cost, unsigned *best_index, uint32_t *best_bitcost,
-                                      int(*calc_mvd)(encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-                                      int16_t, int32_t, uint32_t *)){
+                                      kvz_mvd_cost_func *calc_mvd){
   // Go through candidates
   for (unsigned i = 0; i < num_cand; ++i) {
     if (merge_cand[i].dir == 3) continue;
@@ -260,8 +259,7 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
 static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, vector2d_t *mv_in_out, vector2d_t *mv, encoder_state_t *const state,
   const vector2d_t *orig, unsigned width, unsigned height, int wpp_limit, const kvz_picture *pic, const kvz_picture *ref,
   int16_t mv_cand[2][2], int32_t ref_idx, unsigned *best_cost, uint32_t *bitcost_out, uint32_t *best_bitcost,
-  int(*calc_mvd)(encoder_state_t * const, int, int, int, int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-  int16_t, int32_t, uint32_t *))
+  kvz_mvd_cost_func *calc_mvd)
 {
   static const vector2d_t small_hexbs[5] = {
       { 0, 0 },
@@ -324,9 +322,7 @@ unsigned kvz_tz_pattern_search(encoder_state_t * const state, const kvz_picture 
   vector2d_t mv_best = { 0, 0 };
 
 
-  int(*calc_mvd)(encoder_state_t * const, int, int, int,
-    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -481,9 +477,7 @@ unsigned kvz_tz_raster_search(encoder_state_t * const state, const kvz_picture *
 
   vector2d_t mv_best = { 0, 0 };
 
-  int(*calc_mvd)(encoder_state_t * const, int, int, int,
-    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -552,9 +546,7 @@ static unsigned tz_search(encoder_state_t * const state,
   unsigned best_index = num_cand + 1;
   int wpp_limit = get_wpp_limit(state, orig);
 
-  int(*calc_mvd)(encoder_state_t * const, int, int, int,
-    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -706,9 +698,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
   unsigned best_index = num_cand + 1;
   int wpp_limit = get_wpp_limit(state, orig);
 
-  int (*calc_mvd)(encoder_state_t * const, int, int, int,
-                  int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-                  int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -863,9 +853,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
   uint32_t best_bitcost = 0, bitcost;
   int wpp_limit = get_wpp_limit(state, orig);
 
-  int (*calc_mvd)(encoder_state_t * const, int, int, int,
-                  int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-                  int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -1040,9 +1028,7 @@ static unsigned search_frac(encoder_state_t * const state,
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
-  int(*calc_mvd)(encoder_state_t * const, int, int, int,
-    int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-    int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+  kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
@@ -1434,9 +1420,7 @@ static void search_pu_inter(encoder_state_t * const state,
     uint8_t cutoff = num_cand;
 
 
-    int(*calc_mvd)(encoder_state_t * const, int, int, int,
-      int16_t[2][2], inter_merge_cand_t[MRG_MAX_NUM_CANDS],
-      int16_t, int32_t, uint32_t *) = calc_mvd_cost;
+    kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
     if (state->encoder_control->cfg->mv_rdo) {
       calc_mvd = kvz_calc_mvd_cost_cabac;
     }

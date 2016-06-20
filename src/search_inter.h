@@ -29,7 +29,16 @@
 #include "cu.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
+#include "inter.h"
 
+typedef int kvz_mvd_cost_func(encoder_state_t * const state,
+                              int x, int y,
+                              int mv_shift,
+                              int16_t mv_cand[2][2],
+                              inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
+                              int16_t num_cand,
+                              int32_t ref_idx,
+                              uint32_t *bitcost);
 
 void kvz_search_cu_inter(encoder_state_t * const state,
                          int x, int y, int depth,
