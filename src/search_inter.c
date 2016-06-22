@@ -1375,19 +1375,6 @@ static void search_pu_inter(encoder_state_t * const state,
     get_mvd_cost = kvz_get_mvd_coding_cost_cabac;
   }
 
-  int max_px_below_lcu = -1;
-  if (state->encoder_control->owf) {
-    max_px_below_lcu = LCU_WIDTH;
-    if (state->encoder_control->fme_level > 0) {
-      // Fractional motion estimation can change the mv by at most 1 pixel.
-      max_px_below_lcu -= 1;
-    }
-    if (state->encoder_control->deblock_enable) {
-      // Strong deblock filter modifies 3 pixels.
-      max_px_below_lcu -= 3;
-    }
-  }
-
   // Default to candidate 0
   CU_SET_MV_CAND(cur_cu, 0, 0);
   CU_SET_MV_CAND(cur_cu, 1, 0);
