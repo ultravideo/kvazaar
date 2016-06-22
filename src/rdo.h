@@ -38,12 +38,8 @@
 extern const uint32_t kvz_g_go_rice_range[5];
 extern const uint32_t kvz_g_go_rice_prefix_len[5];
 
-int kvz_intra_rdo_cost_compare(uint32_t *rdo_costs,int8_t rdo_modes_to_check, uint32_t cost);
-
 void  kvz_rdoq(encoder_state_t *state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
            int32_t height, int8_t type, int8_t scan_mode, int8_t block_type, int8_t tr_depth);
-
-uint32_t kvz_rdo_cost_intra(encoder_state_t *state, kvz_pixel* pred, kvz_pixel* orig_block, int width, int8_t mode, int tr_depth);
 
 int32_t kvz_get_coeff_cost(const encoder_state_t *state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode);
 

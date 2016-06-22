@@ -370,9 +370,6 @@ void kvz_coefficients_blit(const coeff_t *orig, coeff_t *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
-unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
-                        const int width);
-
 #define NUM_CBF_DEPTHS 5
 static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };
 
