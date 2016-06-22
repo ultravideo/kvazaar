@@ -35,13 +35,10 @@
 image_list_t * kvz_image_list_alloc(int size)
 {
   image_list_t *list = (image_list_t *)malloc(sizeof(image_list_t));
-  list->size = size;
-  if (size > 0) {
-    list->images = (kvz_picture**)malloc(sizeof(kvz_picture*) * size);
-    list->cu_arrays = (cu_array_t**)malloc(sizeof(cu_array_t*) * size);
-    list->pocs = malloc(sizeof(int32_t) * size);
-  }
-
+  list->size      = size;
+  list->images    = malloc(sizeof(kvz_picture*) * size);
+  list->cu_arrays = malloc(sizeof(cu_array_t*)  * size);
+  list->pocs      = malloc(sizeof(int32_t)      * size);
   list->used_size = 0;
 
   return list;
@@ -114,7 +111,8 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
   }
 
   if (list->size == list->used_size) {
-    if (!kvz_image_list_resize(list, list->size*2)) return 0;
+    unsigned new_size = MAX(list->size + 1, list->size * 2);
+    if (!kvz_image_list_resize(list, new_size)) return 0;
   }
 
   for (i = list->used_size; i > 0; i--) {
