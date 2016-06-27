@@ -691,11 +691,7 @@ void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state
     }
 
     cu_array_t *ref_cu_array = state->global->ref->cu_arrays[closest_ref];
-
-    int32_t x_lcu = x / LCU_WIDTH;
-    int32_t y_lcu = y / LCU_WIDTH;
-
-    int cu_per_width = state->encoder_control->in.width_in_lcu* LCU_WIDTH / LCU_CU_WIDTH;
+    int cu_per_width = ref_cu_array->width / SCU_WIDTH;
 
     uint32_t xColBr = x + width;
     uint32_t yColBr = y + height;
@@ -707,8 +703,8 @@ void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state
 
       // Y inside the current CTU / LCU
       if (yColBr % LCU_WIDTH != 0) {
-        H_offset = ((xColBr >> 4) << 4) / LCU_CU_WIDTH +
-                  (((yColBr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width;
+        H_offset = ((xColBr >> 4) << 4) / SCU_WIDTH +
+                  (((yColBr >> 4) << 4) / SCU_WIDTH) * cu_per_width;
       }
 
       if (H_offset >= 0) {
@@ -723,7 +719,7 @@ void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state
 
     // C3 must be inside the LCU, in the center position of current CU
     if (xColCtr < state->encoder_control->in.width && yColCtr < state->encoder_control->in.height) {
-      uint32_t C3_offset = ((xColCtr >> 4) << 4) / LCU_CU_WIDTH + ((((yColCtr >> 4) << 4) / LCU_CU_WIDTH) * cu_per_width);
+      uint32_t C3_offset = ((xColCtr >> 4) << 4) / SCU_WIDTH + ((((yColCtr >> 4) << 4) / SCU_WIDTH) * cu_per_width);
       if (ref_cu_array->data[C3_offset].type == CU_INTER) {
         *C3 = &ref_cu_array->data[C3_offset];
       }
@@ -1118,9 +1114,7 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
       }
     }
 
-    cu_array_t *ref_cu_array = state->global->ref->cu_arrays[closest_ref];
     cu_info_t *selected_CU = NULL;
-
 
     if (h != NULL) {
       selected_CU = h;
@@ -1175,7 +1169,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int8_t reflist)
 {
   cu_info_t *b0, *b1, *b2, *a0, *a1, *c3, *h;
-  b0 = b1 = b2 = a0 = a1 = NULL;
+  b0 = b1 = b2 = a0 = a1 = c3 = h = NULL;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width, state->tile->frame->height,
                                &b0, &b1, &b2, &a0, &a1, lcu);
@@ -1205,7 +1199,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                int8_t reflist)
 {
   const cu_info_t *b0, *b1, *b2, *a0, *a1, *c3, *h;
-  b0 = b1 = b2 = a0 = a1 = NULL;
+  b0 = b1 = b2 = a0 = a1 = c3 = h = NULL;
   
   const cu_array_t *cua = state->tile->frame->cu_array;
   get_spatial_merge_candidates_cua(cua,
