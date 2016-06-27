@@ -249,7 +249,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   }
 
   // Set resolution automatically if necessary
-  if (opts->config->width == 0 && opts->config->width == 0){
+  if (opts->config->width == 0 && opts->config->height == 0) {
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
     goto done;
   }

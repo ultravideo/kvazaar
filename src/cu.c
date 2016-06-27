@@ -105,22 +105,6 @@ void kvz_coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
   }
 }
 
-unsigned kvz_coefficients_calc_abs(const coeff_t *const buf, const int buf_stride,
-                        const int width)
-{
-  int sum = 0;
-  int y, x;
-
-  for (y = 0; y < width; ++y) {
-    for (x = 0; x < width; ++x) {
-      sum += abs(buf[x + y * buf_stride]);
-    }
-  }
-
-  return sum;
-}
-
-
 cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
   return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);
