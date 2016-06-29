@@ -162,19 +162,17 @@ static INLINE void eight_tap_filter_and_flip_16bit_avx2(int8_t filter[4][8], int
 
 int16_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
 {
-  union {
-    __m128i vector;
-    int16_t array[8];
-  } sample;
 
-  __m128i packed_data = _mm_loadu_si128((__m128i*)data);
-  __m128i packed_filter = _mm_loadu_si128((__m128i*)filter);
+  __m128i sample;
 
-  sample.vector = _mm_maddubs_epi16(packed_data, packed_filter);
-  sample.vector = _mm_hadd_epi16(sample.vector, sample.vector);
-  sample.vector = _mm_hadd_epi16(sample.vector, sample.vector);
+  __m128i packed_data = _mm_loadl_epi64((__m128i*)data);
+  __m128i packed_filter = _mm_loadl_epi64((__m128i*)filter);
 
-  return sample.array[0];
+  sample = _mm_maddubs_epi16(packed_data, packed_filter);
+  sample = _mm_add_epi16(sample, _mm_shuffle_epi32(sample, KVZ_PERMUTE(1, 0, 1, 0)));
+  sample = _mm_add_epi16(sample, _mm_shufflelo_epi16(sample, KVZ_PERMUTE(1, 0, 1, 0)));
+
+  return _mm_extract_epi16(sample, 0);
 }
 
 int32_t kvz_eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
