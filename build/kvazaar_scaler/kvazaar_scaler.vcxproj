@@ -11,10 +11,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="scaler.h" />
+    <ClInclude Include="..\..\src\scaler\scaler.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="scaler.c" />
+    <ClCompile Include="..\..\src\scaler\scaler.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{42F395F1-58A3-4A03-A425-7F7440EC6A6D}</ProjectGuid>

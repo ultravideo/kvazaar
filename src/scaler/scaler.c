@@ -20,6 +20,12 @@
 
 #include "scaler.h"
 
+#include <stdlib.h>
+#include <memory.h>
+
+#define MIN(x,y) (x < y ? x : y)
+#define MAX(x,y) (x > y ? x : y)
+
 //Define filters for scaling operations
 //Values from SHM
 static const int filter16[8][16][12] = {
@@ -177,15 +183,35 @@ static const int filter16[8][16][12] = {
     }
 };
 
- pic_buffer_t* newPictureBuffer(int width, int height)
- {
-   pic_buffer_t* buffer = (pic_buffer_t*)malloc(sizeof(pic_buffer_t));
-   //Allocate enough memory to fit a width-by-height picture
-   pic_data_t* data = (pic_data_t*)malloc(sizeof(pic_data_t)*width*height);
+//Used for clipping values
+int clip(int val, int min, int max)
+{
+  if (val <= min)
+    return min;
+  if (val >= max)
+    return max;
 
-   buffer->data = data;
+  return val;
+}
+
+ pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row)
+ {
+   //TODO: Add error checking
+   pic_buffer_t* buffer = (pic_buffer_t*)malloc(sizeof(pic_buffer_t));
+   
+   //Allocate enough memory to fit a width-by-height picture
+   buffer->data = (pic_data_t*)malloc(sizeof(pic_data_t)*width*height);
+
    buffer->width = width;
    buffer->height = height;
+
+   //Initialize tmp_row or set as NULL
+   if (has_tmp_row) {
+     buffer->tmp_row = (pic_data_t*)malloc(sizeof(pic_data_t)*width);
+   }
+   else {
+     buffer->tmp_row = NULL;
+   }
 
    return buffer;
  }
@@ -193,5 +219,139 @@ static const int filter16[8][16][12] = {
  void deallocatePictureBuffer(pic_buffer_t* buffer)
  {
    free(buffer->data);
+   free(buffer->tmp_row);
    free(buffer);
+ }
+
+ void copyPictureBuffer(pic_buffer_t* src, pic_buffer_t* dst, int fill)
+ {
+   //TODO: add checks
+   //max_dim_* is chosen so that no over indexing happenes (src/dst)
+   //min_dim_* is chosen so that no over indexing happenes (src), but all inds in dst get a value
+   int max_dim_x = fill ? dst->width : MIN(src->width,dst->width);
+   int max_dim_y = fill ? dst->height : MIN(src->height,dst->height);
+   int min_dim_x = fill ? src->width : max_dim_x;
+   int min_dim_y = fill ? src->height : max_dim_y;
+
+   int cur_ind = 0;
+
+   //Copy loop
+   for (int i = 0; i < max_dim_y ; i++) {
+     if (i < min_dim_y) {
+       for (int j = 0; j < max_dim_x; j++) {
+         //If outside min x, copy adjacent value.
+         dst->data[cur_ind] = (j < min_dim_x) ? src->data[cur_ind] : dst->data[cur_ind - 1];
+         cur_ind++;
+       }
+     }
+     //Handle extra rows if needed
+     else {
+       for (int j = 0; j < max_dim_x; j++) {
+         dst->data[cur_ind] = dst->data[cur_ind - max_dim_x];
+         cur_ind++;
+       }
+     }
+   }
+
+ }
+
+ //Actual downscaling is done here
+ void downsample(pic_buffer_t* buffer, scaling_parameter_t* param)
+ {
+   //TODO: Add cropping etc.
+   
+   //Choose best filter to use
+   //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+   int ver_filter = 0;
+   int hor_filter = 0;
+
+   int src_height = param->src_height;
+   int src_width = param->src_width;
+   int trgt_height = param->rnd_trgt_height;
+   int trgt_width = param->rnd_trgt_width;
+   
+   int crop_width = src_width - param->right_offset; //- param->left_offset;
+   int crop_height = src_height - param->bottom_offset; //- param->top_offset;
+
+   if (4 * crop_height > 15 * trgt_height)
+     ver_filter = 7;
+   else if (7 * crop_height > 20 * trgt_height)
+     ver_filter = 6;
+   else if ( 2 * crop_height > 5 * trgt_height)
+     ver_filter = 5;
+   else if ( 1 * crop_height > 2 * trgt_height)
+     ver_filter = 4;
+   else if ( 3 * crop_height > 5 * trgt_height)
+     ver_filter = 3;
+   else if ( 4 * crop_height > 5 * trgt_height)
+     ver_filter = 2;
+   else if ( 19 * crop_height > 20 * trgt_height)
+     ver_filter = 1;
+
+   if (4 * crop_width > 15 * trgt_width)
+     ver_filter = 7;
+   else if (7 * crop_width > 20 * trgt_width)
+     ver_filter = 6;
+   else if (2 * crop_width > 5 * trgt_width)
+     ver_filter = 5;
+   else if (1 * crop_width > 2 * trgt_width)
+     ver_filter = 4;
+   else if (3 * crop_width > 5 * trgt_width)
+     ver_filter = 3;
+   else if (4 * crop_width > 5 * trgt_width)
+     ver_filter = 2;
+   else if (19 * crop_width > 20 * trgt_width)
+     ver_filter = 1;
+
+   int shift_x = param->shift_x - 4;
+   int shift_y = param->shift_y - 4;
+
+   pic_data_t* tmp_row = buffer->tmp_row;
+
+   // Horizontal downsampling
+   for (int i = 0; i < src_height; i++) {
+     pic_data_t* src_row = buffer->data[i*buffer->width];
+
+     for (int j = 0; j < trgt_width; j++) {
+       //Calculate reference position in src pic
+       int ref_pos_16 = (int)((unsigned int)(j*param->scale_x + param->add_x) >> shift_x);
+       int phase = ref_pos_16 & 15;
+       int ref_pos = ref_pos_16 >> 4;
+
+       //Apply filter
+       tmp_row[j] = 0;
+       for (int k = 0; k < 12; k++) {
+         int m = clip(ref_pos + k - 5, 0, src_width - 1);
+         tmp_row[j] = filter16[hor_filter][phase][k] * src_row[m];
+       }
+     }
+     //Copy tmp row to data
+     memcpy(src_row, tmp_row, sizeof(pic_data_t)*trgt_width);
+   }
+
+   // Vertical downsampling
+   for (int i = 0; i < trgt_width; i++) {
+     pic_data_t* src_col = buffer->data[i];
+     for (int j = 0; j < trgt_height; j++) {
+       //Calculate ref pos
+       int ref_pos_16 = (int)((unsigned int)(j*param->scale_y + param->add_y) >> shift_y);
+       int phase = ref_pos_16 & 15;
+       int ref_pos = ref_pos_16 >> 4;
+
+       //Apply filter
+       tmp_row[j] = 0;
+       for (int k = 0; k < 12; k++) {
+         int m = clip(ref_pos + k - 5, 0, src_height - 1);
+         tmp_row[j] = filter16[ver_filter][phase][k] * src_col[m*buffer->width];
+       }
+       //TODO: Why?
+       //Scale values back down
+       tmp_row[j] = (tmp_row[j] + 8192) >> 14;
+     }
+
+     //Clip and move to buffer data
+     for (int n = 0; n < trgt_height; n++) {
+       buffer->data[n*buffer->width] = clip(tmp_row[n], 0, 255);
+     }
+   }
  }

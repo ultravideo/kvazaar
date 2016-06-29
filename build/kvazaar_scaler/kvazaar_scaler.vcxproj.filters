@@ -15,12 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="scaler.h">
+    <ClInclude Include="..\..\src\scaler\scaler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="scaler.c">
+    <ClCompile Include="..\..\src\scaler\scaler.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
