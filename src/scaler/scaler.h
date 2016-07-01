@@ -35,9 +35,33 @@ typedef struct{
 } pic_buffer_t;
 
 /**
- * \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
+* \brief Picture buffer type for yuv frames.
+*/
+typedef struct{
+  pic_buffer_t* y;
+  pic_buffer_t* u;
+  pic_buffer_t* v;
+} yuv_buffer_t;
+
+/**
+ * \brief Create a Picture buffer. The caller is responsible for deallocation
  */
 pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
+
+/**
+* \brief Create/Initialize a Picture buffer. Widht/height should be the width/height of the data. The caller is responsible for deallocation.
+*/
+pic_buffer_t* newPictureBuffer_double(double* data, int width, int height, int has_tmp_row);
+
+/**
+* \brief Create/Initialize a yuv buffer. Widht/height should be the width/height of the data. The caller is responsible for deallocation
+*/
+yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, int is_420);
+
+/**
+* \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
+*/
+void deallocateYuvBuffer(yuv_buffer_t* yuv);
 
 /**
  * \brief Deallocate a picture buffer.
@@ -53,6 +77,8 @@ void deallocatePictureBuffer(pic_buffer_t* buffer);
  */
 void copyPictureBuffer(pic_buffer_t* src, pic_buffer_t* dst, int fill);
 
+//TODO: Move to .c?
+//TODO: Add offsets/cropping
 typedef struct{
   //Original parameters
   int src_width;
@@ -65,6 +91,10 @@ typedef struct{
   int rnd_trgt_width;
   int rnd_trgt_height;
 
+  int rnd_src_width;
+  int rnd_src_height;
+
+  //Sample positional parameters
   int right_offset;
   int bottom_offset;
 
@@ -78,5 +108,19 @@ typedef struct{
   int add_y;
 
 } scaling_parameter_t;
+
+
+/**
+* \brief Function for getting initial scaling parameters given src and trgt size parameters.
+*/
+scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height);
+
+
+//TODO: Return/recycle the same buffer for the scaled yuv
+/**
+* \brief Function for scaling a yuv picture.
+*/
+yuv_buffer_t* yuvDownscaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
+
 
 #endif
