@@ -218,17 +218,32 @@ int clip(int val, int min, int max)
    return buffer;
  }
 
+ // ======================= newPictureBuffer_ ==================================
+ //TODO: DO something about the lack of overloading?
  pic_buffer_t* newPictureBuffer_double(double* data, int width, int height, int has_tmp_row)
  {
    pic_buffer_t* buffer = newPictureBuffer(width, height, has_tmp_row);
 
    //Initialize buffer
-   for (int i = width*height; i > 0; i++) {
+   for (int i = width*height-1; i >= 0; i--) {
      buffer->data[i] = (int)data[i];
    }
 
    return buffer;
  }
+
+ pic_buffer_t* newPictureBuffer_uint8(uint8_t* data, int width, int height, int has_tmp_row)
+ {
+   pic_buffer_t* buffer = newPictureBuffer(width, height, has_tmp_row);
+
+   //Initialize buffer
+   for (int i = width*height-1; i >= 0; i--) {
+     buffer->data[i] = (int)data[i];
+   }
+
+   return buffer;
+ }
+ // ==============================================================================
 
  void deallocatePictureBuffer(pic_buffer_t* buffer)
  {
@@ -239,7 +254,7 @@ int clip(int val, int min, int max)
 
  void copyPictureBuffer(pic_buffer_t* src, pic_buffer_t* dst, int fill)
  {
-   //TODO: add checks
+   //TODO: add checks. Check if fill is necessary
    //max_dim_* is chosen so that no over indexing happenes (src/dst)
    //min_dim_* is chosen so that no over indexing happenes (src), but all inds in dst get a value
    int max_dim_x = fill ? dst->width : MIN(src->width,dst->width);
@@ -247,28 +262,30 @@ int clip(int val, int min, int max)
    int min_dim_x = fill ? src->width : max_dim_x;
    int min_dim_y = fill ? src->height : max_dim_y;
 
-   int cur_ind = 0;
+   int dst_row = 0;
+   int src_row = 0;
 
    //Copy loop
    for (int i = 0; i < max_dim_y ; i++) {
      if (i < min_dim_y) {
        for (int j = 0; j < max_dim_x; j++) {
          //If outside min x, copy adjacent value.
-         dst->data[cur_ind] = (j < min_dim_x) ? src->data[cur_ind] : dst->data[cur_ind - 1];
-         cur_ind++;
+         dst->data[dst_row + j] = (j < min_dim_x) ? src->data[src_row + j] : dst->data[dst_row + j - 1];
        }
      }
      //Handle extra rows if needed
      else {
        for (int j = 0; j < max_dim_x; j++) {
-         dst->data[cur_ind] = dst->data[cur_ind - max_dim_x];
-         cur_ind++;
+         dst->data[dst_row + j] = dst->data[dst_row + j - dst->width];
        }
      }
+     dst_row += dst->width; //switch to the next row
+     src_row += src->width; //switch to the next row
    }
 
  }
 
+ // ======================= newYuvBuffer_ ==================================
  yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, int is_420)
  {
    yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
@@ -285,6 +302,24 @@ int clip(int val, int min, int max)
 
    return yuv;
  }
+
+ yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, int is_420)
+ {
+   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+
+   //Allocate y pic_buffer
+   yuv->y = newPictureBuffer_uint8(y_data, width, height, 0);
+
+   //Allocate u and v buffers
+   is_420 = is_420 ? 1 : 0;
+   width >>= is_420;
+   height >>= is_420;
+   yuv->u = newPictureBuffer_uint8(u_data, width, height, 0);
+   yuv->v = newPictureBuffer_uint8(v_data, width, height, 0);
+
+   return yuv;
+ }
+ // ==============================================================================
 
  void deallocateYuvBuffer(yuv_buffer_t* yuv)
  {
@@ -329,19 +364,19 @@ int clip(int val, int min, int max)
      ver_filter = 1;
 
    if (4 * crop_width > 15 * trgt_width)
-     ver_filter = 7;
+     hor_filter = 7;
    else if (7 * crop_width > 20 * trgt_width)
-     ver_filter = 6;
+     hor_filter = 6;
    else if (2 * crop_width > 5 * trgt_width)
-     ver_filter = 5;
+     hor_filter = 5;
    else if (1 * crop_width > 2 * trgt_width)
-     ver_filter = 4;
+     hor_filter = 4;
    else if (3 * crop_width > 5 * trgt_width)
-     ver_filter = 3;
+     hor_filter = 3;
    else if (4 * crop_width > 5 * trgt_width)
-     ver_filter = 2;
+     hor_filter = 2;
    else if (19 * crop_width > 20 * trgt_width)
-     ver_filter = 1;
+     hor_filter = 1;
 
    int shift_x = param->shift_x - 4;
    int shift_y = param->shift_y - 4;
@@ -350,7 +385,7 @@ int clip(int val, int min, int max)
 
    // Horizontal downsampling
    for (int i = 0; i < src_height; i++) {
-     pic_data_t* src_row = buffer->data[i*buffer->width];
+     pic_data_t* src_row = &buffer->data[i*buffer->width];
 
      for (int j = 0; j < trgt_width; j++) {
        //Calculate reference position in src pic
@@ -362,7 +397,7 @@ int clip(int val, int min, int max)
        tmp_row[j] = 0;
        for (int k = 0; k < 12; k++) {
          int m = clip(ref_pos + k - 5, 0, src_width - 1);
-         tmp_row[j] = filter16[hor_filter][phase][k] * src_row[m];
+         tmp_row[j] += filter16[hor_filter][phase][k] * src_row[m];
        }
      }
      //Copy tmp row to data
@@ -371,7 +406,7 @@ int clip(int val, int min, int max)
 
    // Vertical downsampling
    for (int i = 0; i < trgt_width; i++) {
-     pic_data_t* src_col = buffer->data[i];
+     pic_data_t* src_col = &buffer->data[i];
      for (int j = 0; j < trgt_height; j++) {
        //Calculate ref pos
        int ref_pos_16 = (int)((unsigned int)(j*param->scale_y + param->add_y) >> shift_y);
@@ -382,7 +417,7 @@ int clip(int val, int min, int max)
        tmp_row[j] = 0;
        for (int k = 0; k < 12; k++) {
          int m = clip(ref_pos + k - 5, 0, src_height - 1);
-         tmp_row[j] = filter16[ver_filter][phase][k] * src_col[m*buffer->width];
+         tmp_row[j] += filter16[ver_filter][phase][k] * src_col[m*buffer->width];
        }
        //TODO: Why?
        //Scale values back down
@@ -391,11 +426,43 @@ int clip(int val, int min, int max)
 
      //Clip and move to buffer data
      for (int n = 0; n < trgt_height; n++) {
-       buffer->data[n*buffer->width] = clip(tmp_row[n], 0, 255);
+       src_col[n*buffer->width] = clip(tmp_row[n], 0, 255);
      }
    }
  }
 
+
+//Calculate scaling parameters and update param. Factor determines if certain values are 
+// divided eg. with chroma. 0 for no factor and -1 for halving stuff and 1 for doubling etc.
+//Calculations from SHM
+void calculateParameters(scaling_parameter_t* param, const int w_factor, const int h_factor)
+{
+  //First shift widths/height by an appropriate factor
+  param->src_width = SHIFT(param->src_width, w_factor);
+  param->src_height = SHIFT(param->src_height, h_factor);
+  param->trgt_width = SHIFT(param->trgt_width, w_factor);
+  param->trgt_height = SHIFT(param->trgt_height, h_factor);
+  param->rnd_src_width = SHIFT(param->rnd_src_width, w_factor);
+  param->rnd_src_height = SHIFT(param->rnd_src_height, h_factor);
+  param->rnd_trgt_width = SHIFT(param->rnd_trgt_width, w_factor);
+  param->rnd_trgt_height = SHIFT(param->rnd_trgt_height, h_factor);
+
+  //Calculate sample positional parameters
+  param->right_offset = param->src_width - param->rnd_src_width; //- left_offset
+  param->bottom_offset = param->src_height - param->rnd_src_height; //- top_offset
+
+  //TODO: Make dependant on width/heiht?
+  param->shift_x = 16;
+  param->shift_y = 16;
+
+  param->scale_x = (((unsigned int)param->rnd_src_width << param->shift_x) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width;
+  param->scale_y = (((unsigned int)param->rnd_src_height << param->shift_y) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height;
+
+  //TODO: Add dependace to phase?
+  param->add_x = (param->rnd_trgt_width >> 1) / param->rnd_trgt_width + (1 << (param->shift_x - 5));
+  param->add_y = (param->rnd_trgt_height >> 1) / param->rnd_trgt_height + (1 << (param->shift_y - 5));
+
+}
 
 scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height)
 {
@@ -419,42 +486,11 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
   param.rnd_src_width = ((param.src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
 
   //Pre-Calculate other parameters
-  calculateParamaeters(&param, 0, 0);
+  calculateParameters(&param, 0, 0);
 
   return param;
 }
 
-
- //Calculate scaling parameters and update param. Factor determines if certain values are 
-// divided eg. with chroma. 0 for no factor and -1 for halving stuff and 1 for doubling etc.
-//Calculations from SHM
-void calculateParamaeters(scaling_parameter_t* param, const int w_factor, const int h_factor){
-  //First shift widths/height by an appropriate factor
-  param->src_width = SHIFT(param->src_width, w_factor);
-  param->src_height = SHIFT(param->src_height, h_factor);
-  param->trgt_width = SHIFT(param->trgt_width, w_factor);
-  param->trgt_height = SHIFT(param->trgt_height, h_factor);
-  param->rnd_src_width = SHIFT(param->rnd_src_width, w_factor);
-  param->rnd_src_height = SHIFT(param->rnd_src_height, h_factor);
-  param->rnd_trgt_width = SHIFT(param->rnd_trgt_width, w_factor);
-  param->rnd_trgt_height = SHIFT(param->rnd_trgt_height, h_factor);
-
-  //Calculate sample positional parameters
-  param->right_offset = param->src_width - param->rnd_src_width; //- left_offset
-  param->bottom_offset = param->src_height - param->rnd_src_height; //- top_offset
-
-  //TODO: Make dependant on width/heiht?
-  param->shift_x = 16;
-  param->shift_y = 16; 
-
-  param->scale_x = (((unsigned int)param->rnd_src_width << param->shift_x) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width;
-  param->scale_y = (((unsigned int)param->rnd_src_height << param->shift_y) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height;
-
-  //TODO: Add dependace to phase?
-  param->add_x = (param->rnd_trgt_width >> 1) / param->rnd_trgt_width + (1 << (param->shift_x - 5));
-  param->add_y = (param->rnd_trgt_height >> 1) / param->rnd_trgt_height + (1 << (param->shift_y - 5));
-
-}
  
  yuv_buffer_t* yuvDownscaling( const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420)
  {
@@ -470,7 +506,7 @@ void calculateParamaeters(scaling_parameter_t* param, const int w_factor, const 
    if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
      param.src_width = yuv->y->width;
      param.src_height = yuv->y->height;
-     calculateParamaeters(&param, w_factor, h_factor);
+     calculateParameters(&param, w_factor, h_factor);
    }
 
    //is_420 = is_420 ? 1 : 0;
@@ -509,7 +545,7 @@ void calculateParamaeters(scaling_parameter_t* param, const int w_factor, const 
    }
    if (recalc) {
      //Re-calculate parameters
-     calculateParamaeters(&param, w_factor, h_factor);
+     calculateParameters(&param, w_factor, h_factor);
    }
 
    pic_buffer_t* u = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
@@ -532,7 +568,7 @@ void calculateParamaeters(scaling_parameter_t* param, const int w_factor, const 
    }
    if (recalc) {
      //Re-calculate parameters
-     calculateParamaeters(&param, w_factor, h_factor);
+     calculateParameters(&param, w_factor, h_factor);
    }
 
    pic_buffer_t* v = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
@@ -545,6 +581,9 @@ void calculateParamaeters(scaling_parameter_t* param, const int w_factor, const 
    new_yuv->y = y;
    new_yuv->u = u;
    new_yuv->v = v;
+
+   //Deallocate buffer. TODO: Reuse buffer?
+   deallocatePictureBuffer(buffer);
    
    return new_yuv;
  }

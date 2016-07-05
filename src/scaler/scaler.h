@@ -20,6 +20,8 @@
 * with Kvazaar.  If not, see <http://www.gnu.org/licenses/>.
 ****************************************************************************/
 
+#include <stdint.h>
+
 typedef int pic_data_t; //Use some other type?
 
 /**
@@ -52,11 +54,13 @@ pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
 * \brief Create/Initialize a Picture buffer. Widht/height should be the width/height of the data. The caller is responsible for deallocation.
 */
 pic_buffer_t* newPictureBuffer_double(double* data, int width, int height, int has_tmp_row);
+pic_buffer_t* newPictureBuffer_uint8(uint8_t* data, int width, int height, int has_tmp_row);
 
 /**
 * \brief Create/Initialize a yuv buffer. Widht/height should be the width/height of the data. The caller is responsible for deallocation
 */
 yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, int is_420);
+yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, int is_420);
 
 /**
 * \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
