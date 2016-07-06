@@ -539,7 +539,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      w_factor = yuv->y->width < yuv->u->width ? 1 : -1;
      recalc = 1;
    }
-   if (yuv->y->height != yuv->u->width) {
+   if (yuv->y->height != yuv->u->height) {
      h_factor = yuv->y->height < yuv->u->height ? 1 : -1;
      recalc = 1;
    }
@@ -562,7 +562,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      w_factor = yuv->v->width > yuv->u->width ? 1 : -1;
      recalc = 1;
    }
-   if (yuv->v->height != yuv->u->width) {
+   if (yuv->v->height != yuv->u->height) {
      h_factor = yuv->v->height > yuv->u->width ? 1 : -1;
      recalc = 1;
    }
