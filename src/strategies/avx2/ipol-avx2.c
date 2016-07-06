@@ -397,7 +397,7 @@ int16_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
   sample = _mm_add_epi16(sample, _mm_shuffle_epi32(sample, KVZ_PERMUTE(1, 0, 1, 0)));
   sample = _mm_add_epi16(sample, _mm_shufflelo_epi16(sample, KVZ_PERMUTE(1, 0, 1, 0)));
 
-  return _mm_extract_epi16(sample, 0);
+  return (int16_t)_mm_cvtsi128_si32(sample);
 }
 
 
@@ -481,6 +481,22 @@ int32_t kvz_four_tap_filter_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_
   return temp;
 }
 
+void kvz_eight_tap_filter_x4_hor_avx2(int8_t *filter, kvz_pixel *data, int shift, int16_t* dst)
+{
+  __m256i packed_data = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadl_epi64((__m128i*)data)), _mm_loadl_epi64((__m128i*)(data + 2)), 1);
+  __m256i packed_filter = _mm256_broadcastq_epi64(_mm_loadl_epi64((__m128i*)filter));
+  __m256i idx_lookup = _mm256_broadcastsi128_si256(_mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 1, 2, 3, 4, 5, 6, 7, 8));
+
+  __m256i temp = _mm256_shuffle_epi8(packed_data, idx_lookup);
+
+  temp = _mm256_maddubs_epi16(temp, packed_filter);
+  __m128i temp_128 = _mm_hadd_epi16(_mm256_extracti128_si256(temp, 0), _mm256_extracti128_si256(temp, 1));
+  temp_128 = _mm_hadd_epi16(temp_128, temp_128);
+  temp_128 = _mm_srai_epi16(temp_128, shift);
+
+  _mm_storel_epi64((__m128i*)dst, temp_128);
+}
+
 void kvz_four_tap_filter_x4_hor_avx2(int8_t *filter, kvz_pixel *data, int shift, int16_t* dst)
 {
   __m128i packed_data = _mm_loadl_epi64((__m128i*)data);
@@ -494,6 +510,28 @@ void kvz_four_tap_filter_x4_hor_avx2(int8_t *filter, kvz_pixel *data, int shift,
   temp = _mm_srai_epi16(temp, shift);
 
   _mm_storel_epi64((__m128i*)dst, temp);
+}
+
+void kvz_eight_tap_filter_x8_hor_avx2(int8_t *filter, kvz_pixel *data, int shift, int16_t* dst)
+{
+  __m256i packed_data = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*)data)), _mm_loadu_si128((__m128i*)(data + 4)), 1);
+  __m256i packed_filter = _mm256_broadcastq_epi64(_mm_loadl_epi64((__m128i*)filter));
+  __m256i idx_lookup0 = _mm256_broadcastsi128_si256(_mm_setr_epi8(0, 1, 2, 3, 4, 5, 6, 7, 1, 2, 3, 4, 5, 6, 7, 8));
+  __m256i idx_lookup1 = _mm256_broadcastsi128_si256(_mm_setr_epi8(2, 3, 4, 5, 6, 7, 8, 9, 3, 4, 5, 6, 7, 8, 9, 10));
+
+  __m256i temp0 = _mm256_shuffle_epi8(packed_data, idx_lookup0);
+  __m256i temp1 = _mm256_shuffle_epi8(packed_data, idx_lookup1);
+
+  temp0 = _mm256_maddubs_epi16(temp0, packed_filter);
+  temp1 = _mm256_maddubs_epi16(temp1, packed_filter);
+  temp0 = _mm256_hadd_epi16(temp0, temp1);
+  temp0 = _mm256_hadd_epi16(temp0, temp0);
+
+  temp0 = _mm256_srai_epi16(temp0, shift);
+
+  temp0 = _mm256_permute4x64_epi64(temp0, KVZ_PERMUTE(0, 2, 1, 3));
+
+  _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(temp0));
 }
 
 void kvz_four_tap_filter_x8_hor_avx2(int8_t *filter, kvz_pixel *data, int shift, int16_t* dst)
@@ -510,6 +548,30 @@ void kvz_four_tap_filter_x8_hor_avx2(int8_t *filter, kvz_pixel *data, int shift,
 
   _mm_storel_epi64((__m128i*)dst, _mm256_castsi256_si128(temp));
   _mm_storel_epi64((__m128i*)(dst + 4), _mm256_extracti128_si256(temp, 1));
+}
+
+int32_t kvz_eight_tap_filter_x4_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride, int offset, int shift2, int shift3)
+{
+
+  __m128i v_filter = _mm_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[0])));
+  __m128i v_data0 = _mm_loadl_epi64((__m128i*)(data + stride * 0));
+  __m128i v_data1 = _mm_loadl_epi64((__m128i*)(data + stride * 1));
+  __m128i v_data = _mm_unpacklo_epi16(v_data0, v_data1);
+  __m128i temp =  _mm_madd_epi16(v_filter, v_data);
+
+  v_filter = _mm_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[2])));
+  __m128i v_data2 = _mm_loadl_epi64((__m128i*)(data + stride * 2));
+  __m128i v_data3 = _mm_loadl_epi64((__m128i*)(data + stride * 3));
+  v_data = _mm_unpacklo_epi16(v_data2, v_data3);
+  temp = _mm_add_epi32(temp, _mm_madd_epi16(v_filter, v_data) );
+
+  temp = _mm_add_epi32(temp, _mm_set1_epi32(offset));
+  temp = _mm_srai_epi32(temp, shift2 + shift3);
+
+  temp = _mm_packus_epi32(temp, temp);
+  temp = _mm_packus_epi16(temp, temp);
+
+  return _mm_cvtsi128_si32(temp);
 }
 
 int32_t kvz_four_tap_filter_x4_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride, int offset, int shift2, int shift3)
@@ -534,6 +596,43 @@ int32_t kvz_four_tap_filter_x4_ver_16bit_avx2(int8_t *filter, int16_t *data, int
   temp = _mm_packus_epi16(temp, temp);
 
   return _mm_cvtsi128_si32(temp);
+}
+
+void kvz_eight_tap_filter_x8_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride, int offset, int shift2, int shift3, kvz_pixel* dst)
+{
+
+  __m256i v_filter = _mm256_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[0])));
+  __m256i v_data0 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 0)));
+  __m256i v_data1 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 1)));
+  __m256i v_data = _mm256_or_si256(v_data0, _mm256_slli_epi32(v_data1, 16));
+  __m256i temp =  _mm256_madd_epi16(v_filter, v_data);
+
+  v_filter = _mm256_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[2])));
+  __m256i v_data2 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 2)));
+  __m256i v_data3 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 3)));
+  v_data = _mm256_or_si256(v_data2, _mm256_slli_epi32(v_data3, 16));
+  temp = _mm256_add_epi32(temp, _mm256_madd_epi16(v_filter, v_data) );
+
+  v_filter = _mm256_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[4])));
+  __m256i v_data4 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 4)));
+  __m256i v_data5 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 5)));
+  v_data = _mm256_or_si256(v_data4, _mm256_slli_epi32(v_data5, 16));
+  temp = _mm256_add_epi32(temp, _mm256_madd_epi16(v_filter, v_data) );
+
+  v_filter = _mm256_cvtepi8_epi16(_mm_set1_epi16(*(int16_t*)&(filter[6])));
+  __m256i v_data6 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 6)));
+  __m256i v_data7 = _mm256_cvtepu16_epi32(_mm_loadu_si128((__m128i*)(data + stride * 7)));
+  v_data = _mm256_or_si256(v_data6, _mm256_slli_epi32(v_data7, 16));
+  temp = _mm256_add_epi32(temp, _mm256_madd_epi16(v_filter, v_data) );
+
+  temp = _mm256_add_epi32(temp, _mm256_set1_epi32(offset));
+  temp = _mm256_srai_epi32(temp, shift2 + shift3);
+
+  temp = _mm256_packus_epi32(temp, temp);
+  temp = _mm256_packus_epi16(temp, temp);
+
+  *(int32_t*)dst = _mm_cvtsi128_si32(_mm256_castsi256_si128(temp));
+  *(int32_t*)(dst + 4) = _mm_cvtsi128_si32(_mm256_extracti128_si256(temp, 1));
 }
 
 void kvz_four_tap_filter_x8_ver_16bit_avx2(int8_t *filter, int16_t *data, int16_t stride, int offset, int shift2, int shift3, kvz_pixel* dst)
@@ -1134,6 +1233,68 @@ void kvz_filter_frac_blocks_luma_avx2(const encoder_control_t * const encoder, k
   }
 }
 
+void kvz_sample_quarterpel_luma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height,kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
+{
+  //Check for amp
+  if (width != height) {
+    kvz_sample_quarterpel_luma_generic(encoder, src, src_stride, width, height, dst, dst_stride, hor_flag, ver_flag, mv);
+    return;
+  }
+  //TODO: horizontal and vertical only filtering
+  int32_t x, y;
+  int16_t shift1 = KVZ_BIT_DEPTH - 8;
+  int32_t shift2 = 6;
+  int32_t shift3 = 14 - KVZ_BIT_DEPTH;
+  int32_t offset23 = 1 << (shift2 + shift3 - 1);
+
+  int8_t *hor_filter = kvz_g_luma_filter[mv[0] & 3];
+  int8_t *ver_filter = kvz_g_luma_filter[mv[1] & 3];
+
+  int16_t hor_filtered[(LCU_WIDTH + 1) + FILTER_SIZE][(LCU_WIDTH + 1) + FILTER_SIZE];
+
+  if (width == 4) {
+    // Filter horizontally and flip x and y
+    for (y = 0; y < height + FILTER_SIZE - 1; ++y) {
+      for (x = 0; x < width; x += 4) {
+        int ypos = y - FILTER_OFFSET;
+        int xpos = x - FILTER_OFFSET;
+        int16_t *out = &(hor_filtered[y][x]);
+        kvz_eight_tap_filter_x4_hor_avx2(hor_filter, &src[src_stride*ypos + xpos], shift1, out);
+      }
+    }
+
+    // Filter vertically and flip x and y
+    for (y = 0; y < height; ++y) {
+      for (x = 0; x < width; x+=4) {
+        int ypos = y;
+        int xpos = x;
+        *(int32_t*)&(dst[y*dst_stride + x]) = kvz_eight_tap_filter_x4_ver_16bit_avx2(ver_filter, &hor_filtered[ypos][xpos], sizeof(hor_filtered[0])/sizeof(int16_t), offset23, shift2, shift3);
+      }
+    }
+
+  } else {
+    // Filter horizontally and flip x and y
+    for (y = 0; y < height + FILTER_SIZE - 1; ++y) {
+      for (x = 0; x < width; x+=8) {
+        int ypos = y - FILTER_OFFSET;
+        int xpos = x - FILTER_OFFSET;
+        int16_t *dst = &(hor_filtered[y][x]);
+        kvz_eight_tap_filter_x8_hor_avx2(hor_filter, &src[src_stride*ypos + xpos], shift1, dst);
+      }
+    }
+
+    // Filter vertically and flip x and y
+    for (y = 0; y < height; ++y) {
+      for (x = 0; x < width; x+=8) {
+        int ypos = y;
+        int xpos = x;
+        kvz_pixel *out = &(dst[y*dst_stride + x]);
+        kvz_eight_tap_filter_x8_ver_16bit_avx2(ver_filter, &hor_filtered[ypos][xpos], sizeof(hor_filtered[0])/sizeof(int16_t), offset23, shift2, shift3, out);
+      }
+    }
+  }
+}
+
 void kvz_sample_octpel_chroma_avx2(const encoder_control_t * const encoder, kvz_pixel *src, int16_t src_stride, int width, int height,kvz_pixel *dst, int16_t dst_stride, int8_t hor_flag, int8_t ver_flag, const int16_t mv[2])
 {
   //Check for amp
@@ -1265,6 +1426,7 @@ int kvz_strategy_register_ipol_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "filter_inter_halfpel_chroma", "avx2", 40, &kvz_filter_inter_halfpel_chroma_avx2);
     success &= kvz_strategyselector_register(opaque, "filter_inter_octpel_chroma", "avx2", 40, &kvz_filter_inter_octpel_chroma_avx2);
     success &= kvz_strategyselector_register(opaque, "filter_frac_blocks_luma", "avx2", 40, &kvz_filter_frac_blocks_luma_avx2);
+    success &= kvz_strategyselector_register(opaque, "sample_quarterpel_luma", "avx2", 40, &kvz_sample_quarterpel_luma_avx2);
     success &= kvz_strategyselector_register(opaque, "sample_octpel_chroma", "avx2", 40, &kvz_sample_octpel_chroma_avx2);
   }
   success &= kvz_strategyselector_register(opaque, "get_extended_block", "avx2", 40, &kvz_get_extended_block_avx2);
