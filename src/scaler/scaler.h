@@ -95,8 +95,8 @@ typedef struct{
   int rnd_trgt_width;
   int rnd_trgt_height;
 
-  int rnd_src_width;
-  int rnd_src_height;
+  int scaled_src_width;
+  int scaled_src_height;
 
   //Sample positional parameters
   int right_offset;

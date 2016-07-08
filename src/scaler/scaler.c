@@ -209,7 +209,9 @@ int clip(int val, int min, int max)
 
    //Initialize tmp_row or set as NULL
    if (has_tmp_row) {
-     buffer->tmp_row = (pic_data_t*)malloc(sizeof(pic_data_t)*width);
+     //Use max dim for size
+     int max_dim = MAX(width, height);
+     buffer->tmp_row = (pic_data_t*)malloc(sizeof(pic_data_t)*max_dim);
    }
    else {
      buffer->tmp_row = NULL;
@@ -442,21 +444,21 @@ void calculateParameters(scaling_parameter_t* param, const int w_factor, const i
   param->src_height = SHIFT(param->src_height, h_factor);
   param->trgt_width = SHIFT(param->trgt_width, w_factor);
   param->trgt_height = SHIFT(param->trgt_height, h_factor);
-  param->rnd_src_width = SHIFT(param->rnd_src_width, w_factor);
-  param->rnd_src_height = SHIFT(param->rnd_src_height, h_factor);
+  param->scaled_src_width = SHIFT(param->scaled_src_width, w_factor);
+  param->scaled_src_height = SHIFT(param->scaled_src_height, h_factor);
   param->rnd_trgt_width = SHIFT(param->rnd_trgt_width, w_factor);
   param->rnd_trgt_height = SHIFT(param->rnd_trgt_height, h_factor);
 
   //Calculate sample positional parameters
-  param->right_offset = param->src_width - param->rnd_src_width; //- left_offset
-  param->bottom_offset = param->src_height - param->rnd_src_height; //- top_offset
+  param->right_offset = param->src_width - param->scaled_src_width; //- left_offset
+  param->bottom_offset = param->src_height - param->scaled_src_height; //- top_offset
 
-  //TODO: Make dependant on width/heiht?
+  //TODO: Make dependant on width/height?
   param->shift_x = 16;
   param->shift_y = 16;
 
-  param->scale_x = (((unsigned int)param->rnd_src_width << param->shift_x) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width;
-  param->scale_y = (((unsigned int)param->rnd_src_height << param->shift_y) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height;
+  param->scale_x = (((unsigned int)param->scaled_src_width << param->shift_x) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width;
+  param->scale_y = (((unsigned int)param->scaled_src_height << param->shift_y) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height;
 
   //TODO: Add dependace to phase?
   param->add_x = (param->rnd_trgt_width >> 1) / param->rnd_trgt_width + (1 << (param->shift_x - 5));
@@ -475,15 +477,17 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
 
   //Calculate Resampling parameters
   //Calculations from SHM
-  int hor_div = param.trgt_width;
-  int ver_div = param.trgt_height;
+  int hor_div = param.trgt_width << 1;
+  int ver_div = param.trgt_height << 1;
 
-  param.rnd_trgt_height = ((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
   param.rnd_trgt_width = ((param.trgt_width + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
+  param.rnd_trgt_height = ((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
 
   //Round to multiple of 2
-  param.rnd_src_height = ((param.src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
-  param.rnd_src_width = ((param.src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
+  int scaled_src_width = MAX(param.src_width, param.trgt_width); //Min/max of source/target values
+  int scaled_src_height = MAX(param.src_height, param.trgt_height); //Min/max of source/target values
+  param.scaled_src_width = ((scaled_src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
+  param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
   //Pre-Calculate other parameters
   calculateParameters(&param, 0, 0);
@@ -514,9 +518,9 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
    //Allocate a pic_buffer to hold the component data while the downscaling is done
    //Size calculation from SHM. TODO: Figure out why
    int max_width = MAX(param.src_width, param.trgt_width);
-   int max_height = MAX(param.trgt_height, param.src_height);
+   int max_height = MAX(param.src_height, param.trgt_height);
    int min_width = MIN(param.src_width, param.trgt_width);
-   int min_height = MIN(param.trgt_height, param.src_height);
+   int min_height = MIN(param.src_height, param.trgt_height);
    int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
    int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
    int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
