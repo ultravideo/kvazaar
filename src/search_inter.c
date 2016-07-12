@@ -1016,17 +1016,7 @@ static unsigned search_frac(encoder_state_t * const state,
 
   unsigned cost = 0;
 
-  vector2d_t halfpel_offset;
-
-  #define FILTER_SIZE 8
-  #define HALF_FILTER (FILTER_SIZE>>1)
-
   kvz_extended_block src = { 0, 0, 0 };
-
-  //destination buffer for interpolation
-  int dst_stride = (width + 1) * 4;
-  kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
-  kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
   // Buffers for interpolated fractional pixels one 
   // for each position excluding the integer position.
@@ -1063,8 +1053,8 @@ static unsigned search_frac(encoder_state_t * const state,
                 state->tile->lcu_offset_y * LCU_WIDTH,
                 ref->y, ref->width, ref->height, FILTER_SIZE, width+1, height+1, &src);
 
-  kvz_filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, width+1,
-      height+1, dst, dst_stride, 1, 1);
+  kvz_filter_frac_blocks_luma(state->encoder_control, src.orig_topleft, src.stride, width,
+    height, fracpel_blocks, fme_level);
 
   kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
   kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, width, height, pic->stride, width);
@@ -1084,8 +1074,6 @@ static unsigned search_frac(encoder_state_t * const state,
   mv.x <<= 1;
   mv.y <<= 1;
 
-  kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
-
   // Search halfpel positions around best integer mv
   for (i = 1; i <= last_hpel_index; ++i) {
     const vector2d_t *pattern = &square[i];
@@ -1093,18 +1081,9 @@ static unsigned search_frac(encoder_state_t * const state,
       continue;
     }
 
-    int y,x;
-    for(y = 0; y < height; ++y) {
-      int dst_y = y*4+pattern->y*2;
-      for(x = 0; x < width; ++x) {
-        int dst_x = x*4+pattern->x*2;
-        tmp_filtered[y*width+x] = dst_off[dst_y*dst_stride+dst_x];
-      }
-    }
-
     cost = kvz_satd_any_size(width, height,
                              tmp_pic, width,
-                             tmp_filtered, width);
+                             hpel_pos[i - 1], (LCU_WIDTH + 1));
 
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 1, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     if (cost < best_cost) {
@@ -1115,11 +1094,11 @@ static unsigned search_frac(encoder_state_t * const state,
     }
   }
 
+  unsigned int best_hpel_index = best_index;
+
   // Move search to best_index
   mv.x += square[best_index].x;
   mv.y += square[best_index].y;
-  halfpel_offset.x = square[best_index].x*2;
-  halfpel_offset.y = square[best_index].y*2;
 
   //Set mv to quarterpel precision
   mv.x <<= 1;
@@ -1138,18 +1117,36 @@ static unsigned search_frac(encoder_state_t * const state,
         continue;
       }
 
-      int y, x;
-      for (y = 0; y < height; ++y) {
-        int dst_y = y * 4 + halfpel_offset.y + pattern->y;
-        for (x = 0; x < width; ++x) {
-          int dst_x = x * 4 + halfpel_offset.x + pattern->x;
-          tmp_filtered[y*width + x] = dst_off[dst_y*dst_stride + dst_x];
-        }
-      }
+      
+      int hpel_offset_x = square[best_hpel_index].x;
+      int hpel_offset_y = square[best_hpel_index].y;
+
+      int qpel_offset_x = 2 * hpel_offset_x + pattern->x;
+      int qpel_offset_y = 2 * hpel_offset_y + pattern->y;
+
+      unsigned qpel_filter_x = (qpel_offset_x + 4) % 4;
+      unsigned qpel_filter_y = (qpel_offset_y + 4) % 4;
+
+      // The first value (-1) is for the integer position and
+      // it will not be used
+      int filters_to_block_idx[4][4] = {
+          { -1,  3,  0,  4 },
+          {  7, 11,  8, 12 },
+          {  1,  5,  2,  6 },
+          {  9, 13, 10, 14 }
+      };
+      
+      int qpel_idx = filters_to_block_idx[qpel_filter_y][qpel_filter_x];
+
+      // Select values filtered from correct integer samples
+      int int_offset_x = qpel_offset_x >= 0;
+      int int_offset_y = qpel_offset_y >= 0;
+
+      kvz_pixel *qpel_pos = fracpel_blocks[qpel_idx] + int_offset_y * (LCU_WIDTH + 1) + int_offset_x;
 
       cost = kvz_satd_any_size(width, height,
         tmp_pic, width,
-        tmp_filtered, width);
+        qpel_pos, (LCU_WIDTH + 1));
 
       cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
