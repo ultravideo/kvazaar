@@ -1041,18 +1041,26 @@ static unsigned search_frac(encoder_state_t * const state,
   kvz_filter_inter_quarterpel_luma(state->encoder_control, src.orig_topleft, src.stride, width+1,
       height+1, dst, dst_stride, 1, 1);
 
-  if (src.malloc_used) free(src.buffer);
+  kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
+  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, width, height, pic->stride, width);
+
+  // Search integer position
+  cost = kvz_satd_any_size(width, height,
+                            tmp_pic, width,
+                            src.orig_topleft + src.stride + 1, src.stride);
+
+  cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+  best_cost = cost;
+  best_bitcost = bitcost;
 
   //Set mv to half-pixel precision
   mv.x <<= 1;
   mv.y <<= 1;
 
   kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
-  kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
-  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, width, height, pic->stride, width);
 
   // Search halfpel positions around best integer mv
-  for (i = 0; i < 9; ++i) {
+  for (i = 1; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
     if (!fracmv_within_tile(state, orig, (mv.x + pattern->x) << 1, (mv.y + pattern->y) << 1, width, height, wpp_limit)) {
       continue;
@@ -1092,7 +1100,7 @@ static unsigned search_frac(encoder_state_t * const state,
   mv.y <<= 1;
 
   //Search quarterpel points around best halfpel mv
-  for (i = 0; i < 9; ++i) {
+  for (i = 1; i < 9; ++i) {
     const vector2d_t *pattern = &square[i];
     if (!fracmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, height, wpp_limit)) {
       continue;
@@ -1128,6 +1136,8 @@ static unsigned search_frac(encoder_state_t * const state,
   mv_in_out->y = mv.y;
 
   *bitcost_out = best_bitcost;
+
+  if (src.malloc_used) free(src.buffer);
 
   return best_cost;
 }
