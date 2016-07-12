@@ -996,13 +996,13 @@ static unsigned search_frac(encoder_state_t * const state,
                             int16_t num_cand, int32_t ref_idx, uint32_t *bitcost_out)
 {
   // Map indexes to relative coordinates in the following way:
-  // 6 7 8
-  // 3 4 5
-  // 0 1 2
+  // 5 3 6
+  // 1 0 2
+  // 7 4 8
   static const vector2d_t square[9] = {
-      { -1, 1 },  { 0, 1 },  { 1, 1 },
-      { -1, 0 },  { 0, 0 },  { 1, 0 },
-      { -1, -1 }, { 0, -1 }, { 1, -1 }
+      {  0,  0 },  { -1,  0 },  {  1,  0 },
+      {  0, -1 },  {  0,  1 },  { -1, -1 },
+      {  1, -1 },  { -1,  1 },  {  1,  1 }
   };
 
   int wpp_limit = get_wpp_limit(state, orig);
@@ -1012,7 +1012,7 @@ static unsigned search_frac(encoder_state_t * const state,
   unsigned best_cost = UINT32_MAX;
   uint32_t best_bitcost = 0, bitcost;
   unsigned i;
-  unsigned best_index = 4;
+  unsigned best_index = 0;
 
   unsigned cost = 0;
 
@@ -1085,7 +1085,7 @@ static unsigned search_frac(encoder_state_t * const state,
   mv.y += square[best_index].y;
   halfpel_offset.x = square[best_index].x*2;
   halfpel_offset.y = square[best_index].y*2;
-  best_index = 4;
+  best_index = 0;
 
   //Set mv to quarterpel precision
   mv.x <<= 1;
