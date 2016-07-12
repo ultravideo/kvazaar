@@ -1028,6 +1028,8 @@ static unsigned search_frac(encoder_state_t * const state,
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
+  int fme_level = state->encoder_control->fme_level;
+
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
@@ -1053,6 +1055,8 @@ static unsigned search_frac(encoder_state_t * const state,
   best_cost = cost;
   best_bitcost = bitcost;
 
+  int last_hpel_index = (fme_level == 1) ? 4 : 8;
+
   //Set mv to half-pixel precision
   mv.x <<= 1;
   mv.y <<= 1;
@@ -1060,7 +1064,7 @@ static unsigned search_frac(encoder_state_t * const state,
   kvz_pixel tmp_filtered[LCU_WIDTH*LCU_WIDTH];
 
   // Search halfpel positions around best integer mv
-  for (i = 1; i < 9; ++i) {
+  for (i = 1; i <= last_hpel_index; ++i) {
     const vector2d_t *pattern = &square[i];
     if (!fracmv_within_tile(state, orig, (mv.x + pattern->x) << 1, (mv.y + pattern->y) << 1, width, height, wpp_limit)) {
       continue;
@@ -1093,44 +1097,50 @@ static unsigned search_frac(encoder_state_t * const state,
   mv.y += square[best_index].y;
   halfpel_offset.x = square[best_index].x*2;
   halfpel_offset.y = square[best_index].y*2;
-  best_index = 0;
 
   //Set mv to quarterpel precision
   mv.x <<= 1;
   mv.y <<= 1;
 
-  //Search quarterpel points around best halfpel mv
-  for (i = 1; i < 9; ++i) {
-    const vector2d_t *pattern = &square[i];
-    if (!fracmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, height, wpp_limit)) {
-      continue;
-    }
+  if (fme_level >= 3) {
 
-    int y,x;
-    for(y = 0; y < height; ++y) {
-      int dst_y = y*4+halfpel_offset.y+pattern->y;
-      for(x = 0; x < width; ++x) {
-        int dst_x = x*4+halfpel_offset.x+pattern->x;
-        tmp_filtered[y*width+x] = dst_off[dst_y*dst_stride+dst_x];
+    best_index = 0;
+
+    int last_qpel_index = (fme_level == 3) ? 4 : 8;
+
+    //Search quarterpel points around best halfpel mv
+    for (i = 1; i <= last_qpel_index; ++i) {
+      const vector2d_t *pattern = &square[i];
+      if (!fracmv_within_tile(state, orig, mv.x + pattern->x, mv.y + pattern->y, width, height, wpp_limit)) {
+        continue;
+      }
+
+      int y, x;
+      for (y = 0; y < height; ++y) {
+        int dst_y = y * 4 + halfpel_offset.y + pattern->y;
+        for (x = 0; x < width; ++x) {
+          int dst_x = x * 4 + halfpel_offset.x + pattern->x;
+          tmp_filtered[y*width + x] = dst_off[dst_y*dst_stride + dst_x];
+        }
+      }
+
+      cost = kvz_satd_any_size(width, height,
+        tmp_pic, width,
+        tmp_filtered, width);
+
+      cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
+
+      if (cost < best_cost) {
+        best_cost = cost;
+        best_index = i;
+        best_bitcost = bitcost;
       }
     }
 
-    cost = kvz_satd_any_size(width, height,
-                             tmp_pic, width,
-                             tmp_filtered, width);
-
-    cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 0, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
-
-    if (cost < best_cost) {
-      best_cost    = cost;
-      best_index   = i;
-      best_bitcost = bitcost;
-    }
+    //Set mv to best final best match
+    mv.x += square[best_index].x;
+    mv.y += square[best_index].y;
   }
-
-  //Set mv to best final best match
-  mv.x += square[best_index].x;
-  mv.y += square[best_index].y;
 
   mv_in_out->x = mv.x;
   mv_in_out->y = mv.y;
