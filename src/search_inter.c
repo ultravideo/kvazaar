@@ -1028,6 +1028,29 @@ static unsigned search_frac(encoder_state_t * const state,
   kvz_pixel dst[(LCU_WIDTH+1) * (LCU_WIDTH+1) * 16];
   kvz_pixel* dst_off = &dst[dst_stride*4+4];
 
+  // Buffers for interpolated fractional pixels one 
+  // for each position excluding the integer position.
+  // Has one extra column on left and row on top because
+  // samples are used also from those integer pixels when
+  // searching positions to the left and up.
+  frac_search_block fracpel_blocks[15];
+  
+  kvz_pixel *hpel_pos[8];
+  
+  // Horizontal hpel positions
+  hpel_pos[0] = fracpel_blocks[HPEL_POS_HOR] + (LCU_WIDTH + 1);
+  hpel_pos[1] = fracpel_blocks[HPEL_POS_HOR] + (LCU_WIDTH + 1) + 1;
+  
+  // Vertical hpel positions
+  hpel_pos[2] = fracpel_blocks[HPEL_POS_VER] + 1;
+  hpel_pos[3] = fracpel_blocks[HPEL_POS_VER] + (LCU_WIDTH + 1) + 1;
+  
+  // Diagonal hpel positions
+  hpel_pos[4] = fracpel_blocks[HPEL_POS_DIA];
+  hpel_pos[5] = fracpel_blocks[HPEL_POS_DIA] + 1;
+  hpel_pos[6] = fracpel_blocks[HPEL_POS_DIA] + (LCU_WIDTH + 1);
+  hpel_pos[7] = fracpel_blocks[HPEL_POS_DIA] + (LCU_WIDTH + 1) + 1;
+
   int fme_level = state->encoder_control->fme_level;
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;

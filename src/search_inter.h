@@ -31,6 +31,24 @@
 #include "global.h" // IWYU pragma: keep
 #include "inter.h"
 
+#define FILTER_SIZE 8
+#define HALF_FILTER (FILTER_SIZE>>1)
+
+// Maximum extra width a block needs to filter 
+// a fractional pixel with positive fractional mv.x and mv.y
+#define KVZ_EXT_PADDING (FILTER_SIZE - 1)
+
+// Maximum block width for extended block
+#define KVZ_EXT_BLOCK_W (LCU_WIDTH + KVZ_EXT_PADDING)
+
+typedef kvz_pixel frac_search_block[(LCU_WIDTH + 1) * (LCU_WIDTH + 1)];
+
+enum hpel_position {
+  HPEL_POS_HOR = 0,
+  HPEL_POS_VER = 1,
+  HPEL_POS_DIA = 2
+};
+
 typedef int kvz_mvd_cost_func(encoder_state_t * const state,
                               int x, int y,
                               int mv_shift,
