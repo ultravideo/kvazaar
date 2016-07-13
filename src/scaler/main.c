@@ -83,6 +83,12 @@ void copyBack(pic_data_t* dst, uint8_t* src, int size)
     dst[i] = (pic_data_t)src[i];
   }
 }
+void copyFrom(uint8_t* dst, pic_data_t* src, int size)
+{
+  for (int i = 0; i < size; i++) {
+    dst[i] = (uint8_t)src[i];
+  }
+}
 
 /**
 * \brief Read a single frame from a file.
@@ -107,14 +113,11 @@ int yuv_io_read(FILE* file,
   const unsigned uv_input_height = input_height / 2;
   const unsigned uv_size = uv_input_width * uv_input_height;
 
-  const unsigned uv_array_width = img_out->y->width / 2;
-  const unsigned uv_array_height = img_out->y->height / 2;
-
   if (input_width == img_out->y->width) {
     // No need to extend pixels.
     const size_t pixel_size = sizeof(unsigned char);
-    unsigned char* buffer = malloc(sizeof(unsigned char)*y_size + pixel_size);
-    int read = fread(buffer, pixel_size, y_size, file);
+    unsigned char* buffer = malloc(sizeof(unsigned char)*y_size);
+    
     if (fread(buffer, pixel_size, y_size, file) != y_size) {
       free(buffer); return 0;
     }
@@ -148,15 +151,25 @@ int yuv_io_write(FILE* file,
   unsigned output_width, unsigned output_height)
 {
   const int width = img->y->width;
+  const unsigned y_size = output_width * output_height;
+  const unsigned uv_input_width = output_width / 2;
+  const unsigned uv_input_height = output_height / 2;
+  const unsigned uv_size = uv_input_width * uv_input_height;
+
+  unsigned char* buffer = malloc(sizeof(unsigned char)*y_size);
+  copyFrom(buffer, img->y->data, y_size);
+
   for (int y = 0; y < output_height; ++y) {
-    fwrite(&img->y[y * width], sizeof(*img->y), output_width, file);
+    fwrite(&buffer[y * width], sizeof(unsigned char), output_width, file);
     // TODO: Check that fwrite succeeded.
   }
+  copyFrom(buffer, img->u->data, uv_size);
   for (int y = 0; y < output_height / 2; ++y) {
-    fwrite(&img->u[y * width / 2], sizeof(*img->u), output_width / 2, file);
+    fwrite(&buffer[y * width / 2], sizeof(unsigned char), output_width / 2, file);
   }
+  copyFrom(buffer, img->v->data, uv_size);
   for (int y = 0; y < output_height / 2; ++y) {
-    fwrite(&img->v[y * width / 2], sizeof(*img->v), output_width / 2, file);
+    fwrite(&buffer[y * width / 2], sizeof(unsigned char), output_width / 2, file);
   }
 
   return 1;
@@ -201,24 +214,26 @@ void test2()
   int32_t in_width = 600;
   int32_t in_height = 600;
 
-  FILE* file = fopen("Kimono1_600x600_24.yuv","r");
+  FILE* file = fopen("Kimono1_600x600_24.yuv","rb");
   if (file == NULL) {
     perror("FIle open failed");
   }
   
   yuv_buffer_t* data = newYuvBuffer_uint8(NULL, NULL, NULL, in_width, in_height, 1);
-  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, in_width / 2 + 1, in_height / 2, 1);
+  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, in_width / 2, in_height / 2, 1);
 
   if (yuv_io_read(file, in_width, in_height, data)) {
     
     kvzDownscaling(data, out);
     
-    FILE* out_file = fopen("Kimono_301x300.yuv", "w");
+    FILE* out_file = fopen("Kimono_300x300.yuv", "wb");
     yuv_io_write(out_file, out, out->y->width, out->y->height);
     fclose(out_file);
   }
   else {
     perror("Read fail");
+    if (feof(file)) perror("End of file");
+    if (ferror(file)) perror("File error");
   }
 
   deallocateYuvBuffer(data);
