@@ -79,7 +79,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   yuv_buffer_t* pic = newYuvBuffer_uint8(y_data, cb_data, cr_data, in_y_width, in_y_height, is_420);
   scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height);
 
-  yuv_buffer_t* scaled = yuvDownscaling(pic, &param, is_420);
+  yuv_buffer_t* scaled = scale(pic, &param, is_420);
   
   //ERROR(debug, "got past downscaling");
 

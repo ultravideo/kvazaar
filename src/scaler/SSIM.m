@@ -15,18 +15,18 @@ X = double(X);
 Y = double(Y);
 
 window = fspecial('gaussian',11,1.5);
-window = window./sum(window(:));
+window = window/sum(window(:));
 
 AVGx = filter2(window,X,'valid');
 AVGx_sqr = AVGx.*AVGx;
 AVGy = filter2(window,Y,'valid');
-AVGy_sqr = AVGy./AVGy;
+AVGy_sqr = AVGy.*AVGy;
 AVGxy = AVGx.*AVGy;
 VARx_sqr = filter2(window, X.*X, 'valid')-AVGx_sqr;
 VARy_sqr = filter2(window, Y.*Y, 'valid')-AVGy_sqr;
 COVAR = filter2(window, X.*Y, 'valid')-AVGxy;
 
-SSIM_MAP = ((2*AVGxy + c1)*(2*COVAR + c2))/((AVGx_sqr+AVGy_sqr+c1)*(VARx_sqr+VARy_sqr+c2));
+SSIM_MAP = ((2*AVGxy + c1).*(2*COVAR + c2))./((AVGx_sqr+AVGy_sqr+c1).*(VARx_sqr+VARy_sqr+c2));
 MSSIM = mean(SSIM_MAP(:));
 
 end

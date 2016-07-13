@@ -51,16 +51,26 @@ typedef struct{
 pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
 
 /**
-* \brief Create/Initialize a Picture buffer. Widht/height should be the width/height of the data. The caller is responsible for deallocation.
+* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
 */
 pic_buffer_t* newPictureBuffer_double(double* data, int width, int height, int has_tmp_row);
 pic_buffer_t* newPictureBuffer_uint8(uint8_t* data, int width, int height, int has_tmp_row);
 
 /**
-* \brief Create/Initialize a yuv buffer. Widht/height should be the width/height of the data. The caller is responsible for deallocation
+* \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
 */
 yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, int is_420);
 yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, int is_420);
+
+/**
+* \brief Clone the given pic buffer
+*/
+pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic);
+
+/**
+* \brief Clone the given yuv buffer
+*/
+yuv_buffer_t* cloneYuvBuffer(const yuv_buffer_t* const yuv);
 
 /**
 * \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
@@ -126,5 +136,15 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
 */
 yuv_buffer_t* yuvDownscaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
 
+//TODO: Return/recycle the same buffer for the scaled yuv
+/**
+* \brief Function for scaling a yuv picture.
+*/
+yuv_buffer_t* yuvUpscaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
+
+/**
+* \brief Function for calling the correct function (upsample or downsample).
+*/
+yuv_buffer_t* scale(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
 
 #endif
