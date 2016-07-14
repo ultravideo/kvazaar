@@ -98,7 +98,6 @@ static unsigned satd_ ## n ## x ## n ## _ ## suffix ( \
     return sum >> (KVZ_BIT_DEPTH - 8); \
   }
 
-
 typedef unsigned(reg_sad_func)(const kvz_pixel *const data1, const kvz_pixel *const data2,
   const int width, const int height,
   const unsigned stride1, const unsigned stride2);
@@ -109,6 +108,7 @@ typedef unsigned (cost_pixel_any_size_func)(
     const kvz_pixel *block2, int stride2
 );
 typedef void (cost_pixel_nxn_multi_func)(const pred_buffer preds, const kvz_pixel *orig, unsigned num_modes, unsigned *costs_out);
+typedef void (cost_pixel_any_size_multi_func)(int width, int height, const kvz_pixel **preds, const int *strides, const kvz_pixel *orig, const int orig_stride, unsigned num_modes, unsigned *costs_out, int8_t *valid);
 
 
 // Declare function pointers.
@@ -139,6 +139,7 @@ extern cost_pixel_nxn_multi_func * kvz_satd_16x16_dual;
 extern cost_pixel_nxn_multi_func * kvz_satd_32x32_dual;
 extern cost_pixel_nxn_multi_func * kvz_satd_64x64_dual;
 
+extern cost_pixel_any_size_multi_func *kvz_satd_any_size_quad;
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth);
 cost_pixel_nxn_func * kvz_pixels_get_satd_func(unsigned n);
@@ -169,6 +170,7 @@ cost_pixel_nxn_multi_func * kvz_pixels_get_sad_dual_func(unsigned n);
   {"satd_16x16_dual", (void**) &kvz_satd_16x16_dual}, \
   {"satd_32x32_dual", (void**) &kvz_satd_32x32_dual}, \
   {"satd_64x64_dual", (void**) &kvz_satd_64x64_dual}, \
+  {"satd_any_size_quad", (void**) &kvz_satd_any_size_quad}, \
 
 
 

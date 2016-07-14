@@ -62,7 +62,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->trskip_enable   = 1;
   cfg->tr_depth_intra  = 0;
   cfg->ime_algorithm   = 0; /* hexbs */
-  cfg->fme_level       = 1;
+  cfg->fme_level       = 4;
   cfg->source_scan_type = 0; /* progressive */
   cfg->vui.sar_width   = 0;
   cfg->vui.sar_height  = 0;
@@ -388,7 +388,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "ref", "2",
         "deblock", "1",
         "signhide", "1",
-        "subme", "1",
+        "subme", "4",
         "sao", "0",
         "rdoq", "0",
         "transform-skip", "0",
@@ -407,7 +407,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "ref", "3",
         "deblock", "1",
         "signhide", "1",
-        "subme", "1",
+        "subme", "4",
         "sao", "0",
         "rdoq", "0",
         "transform-skip", "0",
@@ -426,7 +426,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "ref", "3",
         "deblock", "1",
         "signhide", "1",
-        "subme", "1",
+        "subme", "4",
         "sao", "1",
         "rdoq", "0",
         "transform-skip", "0",
@@ -445,7 +445,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "ref", "4",
         "deblock", "1",
         "signhide", "1",
-        "subme", "1",
+        "subme", "4",
         "sao", "1",
         "rdoq", "1",
         "transform-skip", "0",
@@ -464,7 +464,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "ref", "4",
         "deblock", "1",
         "signhide", "1",
-        "subme", "1",
+        "subme", "4",
         "sao", "1",
         "rdoq", "1",
         "transform-skip", "1",
@@ -483,7 +483,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "ref", "6",
         "deblock", "1",
         "signhide", "1",
-        "subme", "1",
+        "subme", "4",
         "sao", "1",
         "rdoq", "1",
         "transform-skip", "1",
@@ -992,8 +992,8 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->fme_level != 0 && cfg->fme_level != 1) {
-    fprintf(stderr, "Input error: invalid --subme parameter (must be 0 or 1)\n");
+  if (cfg->fme_level != 0 && cfg->fme_level > 4) {
+    fprintf(stderr, "Input error: invalid --subme parameter (must be in range 0-4)\n");
     error = 1;
   }
 

@@ -60,9 +60,12 @@ Optional parameters:
                                      "hexbs": Hexagon Based Search (faster)
                                      "tz":    Test Zone Search (better quality)
                                      "full":  Full Search (super slow)
-          --subme <integer>      : Set fractional pixel motion estimation level [1].
+          --subme <integer>      : Set fractional pixel motion estimation level [4].
                                      0: only integer motion estimation
-                                     1: fractional pixel motion estimation enabled
+                                     1: + 1/2-pixel horizontal and vertical
+                                     2: + 1/2-pixel diagonal
+                                     3: + 1/4-pixel horizontal and vertical
+                                     4: + 1/4-pixel diagonal
           --source-scan-type <string> : Set source scan type ["progressive"].
                                      "progressive": progressive scan
                                      "tff": top field first
@@ -187,7 +190,7 @@ me                | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz  
 ref               | 1     | 1     | 2     | 2     | 2     | 3     | 3     | 4     | 4     | 6
 deblock           | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1
 signhide          | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1
-subme             | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1
+subme             | 0     | 0     | 0     | 0     | 4     | 4     | 4     | 4     | 4     | 4
 sao               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1
 rdoq              | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1
 transform-skip    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1

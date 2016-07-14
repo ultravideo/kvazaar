@@ -455,42 +455,6 @@ INLINE static void hor_transform_block_dual_avx2(__m256i (*row_diff)[8])
   hor_transform_row_dual_avx2((*row_diff) + 7);
 }
 
-
-/**
-* \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
-*/
-static unsigned kvz_satd_4x4_subblock_8bit_avx2(const kvz_pixel * buf1,
-                                                const int32_t     stride1,
-                                                const kvz_pixel * buf2,
-                                                const int32_t     stride2)
-{
-  // TODO: AVX2 implementation
-  return kvz_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
-}
-
-static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
-{
-  __m128i temp[8];
-
-  diff_blocks_avx2(&temp, buf1, stride1, buf2, stride2);
-  hor_transform_block_avx2(&temp);
-  ver_transform_block_avx2(&temp);
-  
-  unsigned sad = sum_block_avx2(temp);
-
-  unsigned result = (sad + 2) >> 2;
-  return result;
-}
-
-
-SATD_NxN(8bit_avx2,  8)
-SATD_NxN(8bit_avx2, 16)
-SATD_NxN(8bit_avx2, 32)
-SATD_NxN(8bit_avx2, 64)
-SATD_ANY_SIZE(8bit_avx2)
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned stride1,
                                                 const kvz_pixel * buf2, unsigned stride2,
                                                 const kvz_pixel * orig, unsigned stride_orig,
@@ -507,6 +471,58 @@ static void kvz_satd_8bit_8x8_general_dual_avx2(const kvz_pixel * buf1, unsigned
   *sum0 = (*sum0 + 2) >> 2;
   *sum1 = (*sum1 + 2) >> 2;
 }
+
+/**
+* \brief  Calculate SATD between two 4x4 blocks inside bigger arrays.
+*/
+static unsigned kvz_satd_4x4_subblock_8bit_avx2(const kvz_pixel * buf1,
+                                                const int32_t     stride1,
+                                                const kvz_pixel * buf2,
+                                                const int32_t     stride2)
+{
+  // TODO: AVX2 implementation
+  return kvz_satd_4x4_subblock_generic(buf1, stride1, buf2, stride2);
+}
+
+static void kvz_satd_4x4_subblock_quad_avx2(const kvz_pixel *preds[4],
+                                       const int strides[4],
+                                       const kvz_pixel *orig,
+                                       const int orig_stride,
+                                       unsigned costs[4])
+{
+  // TODO: AVX2 implementation
+  kvz_satd_4x4_subblock_quad_generic(preds, strides, orig, orig_stride, costs);
+}
+
+static unsigned satd_8x8_subblock_8bit_avx2(const kvz_pixel * buf1, unsigned stride1, const kvz_pixel * buf2, unsigned stride2)
+{
+  __m128i temp[8];
+
+  diff_blocks_avx2(&temp, buf1, stride1, buf2, stride2);
+  hor_transform_block_avx2(&temp);
+  ver_transform_block_avx2(&temp);
+  
+  unsigned sad = sum_block_avx2(temp);
+
+  unsigned result = (sad + 2) >> 2;
+  return result;
+}
+
+static void satd_8x8_subblock_quad_avx2(const kvz_pixel **preds,
+  const int *strides,
+  const kvz_pixel *orig,
+  const int orig_stride,
+  unsigned *costs)
+{
+  kvz_satd_8bit_8x8_general_dual_avx2(preds[0], strides[0], preds[1], strides[1], orig, orig_stride, &costs[0], &costs[1]);
+  kvz_satd_8bit_8x8_general_dual_avx2(preds[2], strides[2], preds[3], strides[3], orig, orig_stride, &costs[2], &costs[3]);
+}
+
+SATD_NxN(8bit_avx2,  8)
+SATD_NxN(8bit_avx2, 16)
+SATD_NxN(8bit_avx2, 32)
+SATD_NxN(8bit_avx2, 64)
+SATD_ANY_SIZE(8bit_avx2)
 
 // Function macro for defining hadamard calculating functions
 // for fixed size blocks. They calculate hadamard for integer
@@ -557,6 +573,72 @@ SATD_NXN_DUAL_AVX2(16)
 SATD_NXN_DUAL_AVX2(32)
 SATD_NXN_DUAL_AVX2(64)
 
+#define SATD_ANY_SIZE_MULTI_AVX2(suffix, num_parallel_blocks) \
+  static cost_pixel_any_size_multi_func satd_any_size_## suffix; \
+  static void satd_any_size_ ## suffix ( \
+      int width, int height, \
+      const kvz_pixel **preds, \
+      const int *strides, \
+      const kvz_pixel *orig, \
+      const int orig_stride, \
+      unsigned num_modes, \
+      unsigned *costs_out, \
+      int8_t *valid) \
+  { \
+    unsigned sums[num_parallel_blocks] = { 0 }; \
+    const kvz_pixel *pred_ptrs[4] = { preds[0], preds[1], preds[2], preds[3] };\
+    const kvz_pixel *orig_ptr = orig; \
+    costs_out[0] = 0; costs_out[1] = 0; costs_out[2] = 0; costs_out[3] = 0; \
+    if (width % 8 != 0) { \
+      /* Process the first column using 4x4 blocks. */ \
+      for (int y = 0; y < height; y += 4) { \
+        kvz_satd_4x4_subblock_ ## suffix(preds, strides, orig, orig_stride, sums); \
+            } \
+      orig_ptr += 4; \
+      for(int blk = 0; blk < num_parallel_blocks; ++blk){\
+        pred_ptrs[blk] += 4; \
+            }\
+      width -= 4; \
+            } \
+    if (height % 8 != 0) { \
+      /* Process the first row using 4x4 blocks. */ \
+      for (int x = 0; x < width; x += 4 ) { \
+        kvz_satd_4x4_subblock_ ## suffix(pred_ptrs, strides, orig_ptr, orig_stride, sums); \
+            } \
+      orig_ptr += 4 * orig_stride; \
+      for(int blk = 0; blk < num_parallel_blocks; ++blk){\
+        pred_ptrs[blk] += 4 * strides[blk]; \
+            }\
+      height -= 4; \
+        } \
+    /* The rest can now be processed with 8x8 blocks. */ \
+    for (int y = 0; y < height; y += 8) { \
+      orig_ptr = &orig[y * orig_stride]; \
+      pred_ptrs[0] = &preds[0][y * strides[0]]; \
+      pred_ptrs[1] = &preds[1][y * strides[1]]; \
+      pred_ptrs[2] = &preds[2][y * strides[2]]; \
+      pred_ptrs[3] = &preds[3][y * strides[3]]; \
+      for (int x = 0; x < width; x += 8) { \
+        satd_8x8_subblock_ ## suffix(pred_ptrs, strides, orig_ptr, orig_stride, sums); \
+        orig_ptr += 8; \
+        pred_ptrs[0] += 8; \
+        pred_ptrs[1] += 8; \
+        pred_ptrs[2] += 8; \
+        pred_ptrs[3] += 8; \
+        costs_out[0] += sums[0]; \
+        costs_out[1] += sums[1]; \
+        costs_out[2] += sums[2]; \
+        costs_out[3] += sums[3]; \
+      } \
+    } \
+    for(int i = 0; i < num_parallel_blocks; ++i){\
+      costs_out[i] = costs_out[i] >> (KVZ_BIT_DEPTH - 8);\
+    } \
+    return; \
+  }
+
+SATD_ANY_SIZE_MULTI_AVX2(quad_avx2, 4)
+
 #endif //COMPILE_INTEL_AVX2
 
 
@@ -586,6 +668,7 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_32x32_dual", "avx2", 40, &satd_8bit_32x32_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
+    success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "generic", 40, &satd_any_size_quad_avx2);
   }
 #endif
   return success;

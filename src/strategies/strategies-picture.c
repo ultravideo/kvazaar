@@ -57,6 +57,7 @@ cost_pixel_nxn_multi_func * kvz_satd_32x32_dual = 0;
 cost_pixel_nxn_multi_func * kvz_satd_64x64_dual = 0;
 
 cost_pixel_any_size_func * kvz_satd_any_size = 0;
+cost_pixel_any_size_multi_func * kvz_satd_any_size_quad = 0;
 
 
 int kvz_strategy_register_picture(void* opaque, uint8_t bitdepth) {
