@@ -171,6 +171,7 @@ static __m256i kvz_eight_tap_filter_flip_x8_16bit_dual_avx2(__m256i *row, int8_t
   return temp[0];
 }
 
+/*
 static __m128i kvz_eight_tap_filter_flip_x8_avx2(__m128i *row, int8_t *filter,  int32_t shift1)
 {
   __m128i temp[4];
@@ -198,6 +199,7 @@ static __m128i kvz_eight_tap_filter_flip_x8_avx2(__m128i *row, int8_t *filter,  
 
   return temp[0];
 }
+*/
 
 static __m256i kvz_eight_tap_filter_flip_x8_dual_avx2(__m256i *row, int8_t *filter[2],  int32_t shift1)
 {
@@ -228,6 +230,7 @@ static __m256i kvz_eight_tap_filter_flip_x8_dual_avx2(__m256i *row, int8_t *filt
   return temp[0];
 }
 
+/*
 static INLINE void kvz_filter_flip_shift_x8_avx2(kvz_pixel *src, int16_t src_stride, int8_t *filter, int32_t shift1, int16_t *dst){
 
   __m128i rows[8];
@@ -242,6 +245,7 @@ static INLINE void kvz_filter_flip_shift_x8_avx2(kvz_pixel *src, int16_t src_str
   __m128i out = kvz_eight_tap_filter_flip_x8_avx2(rows, filter, shift1);
   _mm_storeu_si128((__m128i*)dst,  out);
 }
+*/
 
 static INLINE void kvz_filter_flip_shift_x8_dual_avx2(kvz_pixel *src, int16_t src_stride, int8_t *firs[2], int32_t shift1, int16_t *dst[2]){
 
