@@ -27,6 +27,33 @@ void copyBack(uint8_t* dst, int* src, int size)
   }
 }
 
+//Transform a matlab 2d array form to "normal" C form.
+//Matlab has colums first in memory. Rows expected.
+uint8_t* col2rowMO(uint8_t* input, int width, int height)
+{
+  uint8_t* output = malloc(sizeof(uint8_t)*width*height);
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      output[width*i + j] = input[height*j + i];
+    }
+  }
+
+  return output;
+}
+
+//Switch from row major order to col major order
+int* row2colMO(int* input, int width, int height)
+{
+  int* output = malloc(sizeof(int)*width*height);
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      output[height*i + j] = input[width*j + i];
+    }
+  }
+
+  return output;
+}
+
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
   //Check correct input and output parameter number
@@ -69,6 +96,11 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   uint8_t* cb_data = (uint8_t*)mxGetData(prhs[2]);
   uint8_t* cr_data = (uint8_t*)mxGetData(prhs[4]);
 
+  //Swithch major order
+  y_data = col2rowMO(y_data, in_y_width, in_y_height);
+  cb_data = col2rowMO(cb_data, in_cb_width, in_cb_height);
+  cr_data = col2rowMO(cr_data, in_cr_width, in_cr_height);
+
   //Define output
   plhs[0] = mxCreateNumericMatrix(out_y_height, out_y_width, mxUINT8_CLASS, mxREAL);
   plhs[1] = mxCreateNumericMatrix(out_cb_height, out_cb_width, mxUINT8_CLASS, mxREAL);
@@ -82,15 +114,26 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   yuv_buffer_t* scaled = scale(pic, &param, is_420);
   
   //ERROR(debug, "got past downscaling");
+  free(y_data);
+  free(cb_data);
+  free(cr_data);
+
+  //Go back to col major order
+  y_data = row2colMO(scaled->y->data, out_y_width, out_y_height);
+  cb_data = row2colMO(scaled->u->data, out_cb_width, out_cb_height);
+  cr_data = row2colMO(scaled->v->data, out_cr_width, out_cr_height);
 
   //Copy results to output
-  copyBack((uint8_t*)mxGetData(plhs[0]), scaled->y->data, out_y_height*out_y_width);
-  copyBack((uint8_t*)mxGetData(plhs[1]), scaled->u->data, out_cb_height*out_cb_width);
-  copyBack((uint8_t*)mxGetData(plhs[2]), scaled->v->data, out_cr_height*out_cr_width);
+  copyBack((uint8_t*)mxGetData(plhs[0]), y_data, out_y_height*out_y_width);
+  copyBack((uint8_t*)mxGetData(plhs[1]), cb_data, out_cb_height*out_cb_width);
+  copyBack((uint8_t*)mxGetData(plhs[2]), cr_data, out_cr_height*out_cr_width);
 
   //ERROR(debug, "Got to the end");
 
   //Free memory appears problematic. Need to use matlabs memory deallocation?
+  free(y_data);
+  free(cb_data);
+  free(cr_data);
   deallocateYuvBuffer(pic);
   deallocateYuvBuffer(scaled);
 }

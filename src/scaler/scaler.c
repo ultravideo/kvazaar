@@ -375,7 +375,7 @@ int clip(int val, int min, int max)
 
    *ret = *pic;
    ret->data = malloc(sizeof(pic_data_t)*size);
-   memcpy(ret->data, pic->data, size);
+   memcpy(ret->data, pic->data, size*sizeof(pic_data_t));
 
    if (pic->tmp_row) {
      int tmp_size = MAX(pic->width, pic->height);

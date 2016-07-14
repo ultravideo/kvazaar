@@ -13,6 +13,14 @@
 #define OUT_Y_W 4
 #define OUT_Y_H 2
 
+#define BUFF_SIZE 256
+
+#ifdef _MSC_VER
+#if _MSC_VER <= 1800
+#define snprintf(...) _snprintf_s(__VA_ARGS__)
+#endif
+#endif
+
 void printPicBuffer(pic_buffer_t* buffer)
 {
   for (int i = 0; i < buffer->height; i++) {
@@ -213,20 +221,32 @@ void test2()
 {
   int32_t in_width = 600;
   int32_t in_height = 600;
+  int32_t out_width = 600;
+  int32_t out_height = 600;
+  int framerate = 24;
+  
+  const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+  
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+  
+  char out_file_name[BUFF_SIZE];
+  sprintf(out_file_name, "Kimono1_%ix%i_%i_s.yuv", out_width, out_height, framerate);
 
-  FILE* file = fopen("Kimono1_600x600_24.yuv","rb");
+  FILE* file = fopen(in_file_name,"rb");
   if (file == NULL) {
     perror("FIle open failed");
+    printf("File name: %s", in_file_name);
   }
   
   yuv_buffer_t* data = newYuvBuffer_uint8(NULL, NULL, NULL, in_width, in_height, 1);
-  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, in_width / 2, in_height / 2, 1);
+  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, out_width, out_height, 1);
 
   if (yuv_io_read(file, in_width, in_height, data)) {
     
     kvzDownscaling(data, out);
     
-    FILE* out_file = fopen("Kimono_300x300.yuv", "wb");
+    FILE* out_file = fopen(out_file_name, "wb");
     yuv_io_write(out_file, out, out->y->width, out->y->height);
     fclose(out_file);
   }
