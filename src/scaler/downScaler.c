@@ -109,7 +109,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   //Do actual scaling stuff
   int is_420 = in_y_width != in_cb_width ? 1 : 0;
   yuv_buffer_t* pic = newYuvBuffer_uint8(y_data, cb_data, cr_data, in_y_width, in_y_height, is_420);
-  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height);
+  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, in_y_width != in_cb_width ? CHROMA_420 : CHROMA_444);
 
   yuv_buffer_t* scaled = scale(pic, &param, is_420);
   

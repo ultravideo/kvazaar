@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <memory.h>
+#include <assert.h>
 
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
 #define MAX(x,y) (((x) > (y)) ? (x) : (y))
@@ -293,8 +294,10 @@ int clip(int val, int min, int max)
 
  void deallocatePictureBuffer(pic_buffer_t* buffer)
  {
-   free(buffer->data);
-   free(buffer->tmp_row);
+   if (buffer != NULL) {
+     free(buffer->data);
+     free(buffer->tmp_row);
+   }
    free(buffer);
  }
 
@@ -405,6 +408,26 @@ int clip(int val, int min, int max)
    deallocatePictureBuffer(yuv->v);
 
    free(yuv);
+ }
+
+ //Helper function for choosing the correct filter
+ //Returns the size of the filter and the filter param is set to the correct filter
+ int getFilter(const int* filter, int is_upsampling, int is_luma, int phase, int filter_ind)
+ {
+   if (is_upsampling) {
+     //Upsampling so use 8- or 4-tap filters
+     if (is_luma) {
+       filter = lumaUpFilter[phase];
+       return sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]);
+     }
+
+     filter = chromaUpFilter[phase];
+     return sizeof(chromaUpFilter[0]) / sizeof(chromaUpFilter[0][0]);
+   }
+
+   //Downsampling so use 12-tap filter
+   filter = filter16[filter_ind][phase];
+   return (sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]));
  }
 
  //Actual downscaling is done here
@@ -598,6 +621,120 @@ int clip(int val, int min, int max)
    }
  }
 
+ void resample(pic_buffer_t* buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+ {
+   //TODO: Add cropping etc.
+
+   //Choose best filter to use when downsampling
+   //Need to use rounded values (to the closest multiple of 2,4,16 etc.)?
+   int ver_filter = 0;
+   int hor_filter = 0;
+
+   int src_height = param->src_height;
+   int src_width = param->src_width;
+   int trgt_height = param->rnd_trgt_height;
+   int trgt_width = param->rnd_trgt_width;
+
+   if (!is_upscaling) {
+     int crop_width = src_width - param->right_offset; //- param->left_offset;
+     int crop_height = src_height - param->bottom_offset; //- param->top_offset;
+
+     if (4 * crop_height > 15 * trgt_height)
+       ver_filter = 7;
+     else if (7 * crop_height > 20 * trgt_height)
+       ver_filter = 6;
+     else if (2 * crop_height > 5 * trgt_height)
+       ver_filter = 5;
+     else if (1 * crop_height > 2 * trgt_height)
+       ver_filter = 4;
+     else if (3 * crop_height > 5 * trgt_height)
+       ver_filter = 3;
+     else if (4 * crop_height > 5 * trgt_height)
+       ver_filter = 2;
+     else if (19 * crop_height > 20 * trgt_height)
+       ver_filter = 1;
+
+     if (4 * crop_width > 15 * trgt_width)
+       hor_filter = 7;
+     else if (7 * crop_width > 20 * trgt_width)
+       hor_filter = 6;
+     else if (2 * crop_width > 5 * trgt_width)
+       hor_filter = 5;
+     else if (1 * crop_width > 2 * trgt_width)
+       hor_filter = 4;
+     else if (3 * crop_width > 5 * trgt_width)
+       hor_filter = 3;
+     else if (4 * crop_width > 5 * trgt_width)
+       hor_filter = 2;
+     else if (19 * crop_width > 20 * trgt_width)
+       hor_filter = 1;
+   }
+
+   int shift_x = param->shift_x - 4;
+   int shift_y = param->shift_y - 4;
+
+   pic_data_t* tmp_row = buffer->tmp_row;
+
+   // Horizontal downsampling
+   for (int i = 0; i < src_height; i++) {
+     pic_data_t* src_row = &buffer->data[i*buffer->width];
+
+     for (int j = 0; j < trgt_width; j++) {
+       //Calculate reference position in src pic
+       int ref_pos_16 = (int)((unsigned int)(j*param->scale_x + param->add_x) >> shift_x);
+       int phase = ref_pos_16 & 15;
+       int ref_pos = ref_pos_16 >> 4;
+
+       //Choose filter
+       const int* filter;
+       int size = getFilter(filter, is_upscaling, is_luma, phase, hor_filter);
+
+       //Apply filter
+       tmp_row[j] = 0;
+       for (int k = 0; k < size; k++) {
+         int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_width - 1);
+         tmp_row[j] += filter[k] * src_row[m];
+       }
+     }
+     //Copy tmp row to data
+     memcpy(src_row, tmp_row, sizeof(pic_data_t)*trgt_width);
+   }
+
+   pic_data_t* tmp_col = tmp_row; //rename for clarity
+
+   // Vertical downsampling
+   for (int i = 0; i < trgt_width; i++) {
+     pic_data_t* src_col = &buffer->data[i];
+     for (int j = 0; j < trgt_height; j++) {
+       //Calculate ref pos
+       int ref_pos_16 = (int)((unsigned int)(j*param->scale_y + param->add_y) >> shift_y);
+       int phase = ref_pos_16 & 15;
+       int ref_pos = ref_pos_16 >> 4;
+
+       //Choose filter
+       const int* filter;
+       int size = getFilter(filter, is_upscaling, is_luma, phase, ver_filter);
+
+       //Apply filter
+       tmp_col[j] = 0;
+       for (int k = 0; k < size; k++) {
+         int m = clip(ref_pos + k - (size >> 1) + 1, 0, src_height - 1);
+         tmp_col[j] += filter[k] * src_col[m*buffer->width];
+       }
+       //TODO: Why? Filter coefs summ up to 128 applied 2x 128*128= 2^14
+       //TODO: Why?  Filter coefs summ up to 64 applied 2x 64*64= 2^12
+       //Scale values back down
+       tmp_col[j] = is_upscaling ? (tmp_col[j] + 2048) >> 12 : (tmp_col[j] + 8192) >> 14;
+     }
+
+     //Clip and move to buffer data
+     for (int n = 0; n < trgt_height; n++) {
+       src_col[n*buffer->width] = clip(tmp_col[n], 0, 255);
+     }
+   }
+ }
+
+
 //Calculate scaling parameters and update param. Factor determines if certain values are 
 // divided eg. with chroma. 0 for no factor and -1 for halving stuff and 1 for doubling etc.
 //Calculations from SHM
@@ -630,13 +767,31 @@ void calculateParameters(scaling_parameter_t* param, const int w_factor, const i
 
 }
 
-scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height)
+chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height)
+{
+  if (chroma_width == 0 && chroma_height == 0) {
+    return CHROMA_400;
+  }
+  if (chroma_width == luma_width && chroma_height == luma_height) {
+    return CHROMA_444;
+  }
+  if (chroma_width == (luma_width >> 1) && chroma_height == (luma_height)) {
+    return CHROMA_422;
+  }
+  //If not CHROMA_420, not a supported format
+  assert(chroma_width != (luma_width >> 1) && chroma_height != (luma_height >> 1));
+
+  return CHROMA_420;
+}
+
+scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
 {
   scaling_parameter_t param = {
     .src_width = src_width,
     .src_height = src_height,
     .trgt_width = trgt_width,
-    .trgt_height = trgt_height
+    .trgt_height = trgt_height,
+    .chroma = chroma
   };
 
   //Calculate Resampling parameters
@@ -732,7 +887,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      recalc = 1;
    }
    if (yuv->v->height != yuv->u->height) {
-     h_factor = yuv->v->height > yuv->u->width ? 1 : -1;
+     h_factor = yuv->v->height > yuv->u->height ? 1 : -1;
      recalc = 1;
    }
    if (recalc) {
@@ -829,7 +984,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      recalc = 1;
    }
    if (yuv->v->height != yuv->u->height) {
-     h_factor = yuv->v->height > yuv->u->width ? 1 : -1;
+     h_factor = yuv->v->height > yuv->u->height ? 1 : -1;
      recalc = 1;
    }
    if (recalc) {
@@ -852,6 +1007,130 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
    deallocatePictureBuffer(buffer);
 
    return new_yuv;
+ }
+
+
+ //Returns result in yuv buffer. If dst is null, allocate new buffer, else use and return dst.
+ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
+   yuv_buffer_t* dst)
+ {
+   //Initialize basic parameters
+   scaling_parameter_t param = *base_param;
+
+   //Calculate if we are upscaling or downscaling
+   int is_downscaled_width = base_param->src_width > base_param->trgt_width;
+   int is_downscaled_height = base_param->src_height > base_param->trgt_height;
+   int is_equal_width = base_param->src_width == base_param->trgt_width;
+   int is_equal_height = base_param->src_height == base_param->trgt_height;
+
+   int is_upscaling = 1;
+
+   //both dimensions need to be either up- or downscaled
+   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
+     is_downscaled_height && !is_downscaled_width && !is_equal_width) {
+     return NULL;
+   }
+   else if (is_equal_height && is_equal_width) {
+     //If equal just return source
+     return cloneYuvBuffer(yuv);
+   }
+   else if (is_downscaled_width || is_downscaled_height) {
+     //Atleast one dimension is downscaled
+     is_upscaling = 0;
+   }
+
+   //How much to scale the luma sizes to get the chroma sizes
+   int w_factor = 0;
+   int h_factor = 0;
+   switch (param.chroma) {
+   case CHROMA_400:{
+     //No chroma
+     assert(yuv->u->height == 0 && yuv->u->width == 0 && yuv->v->height == 0 && yuv->v->width == 0);
+     break;
+   }
+   case CHROMA_420:{
+     assert(yuv->u->height == (yuv->y->height >> 1) && yuv->u->width == (yuv->y->width >> 1)
+       && yuv->v->height == (yuv->y->height >> 1) && yuv->v->width == (yuv->y->width >> 1));
+     w_factor = -1;
+     h_factor = -1;
+     break;
+   }
+   case CHROMA_422:{
+     assert(yuv->u->height == (yuv->y->height) && yuv->u->width == (yuv->y->width >> 1)
+       && yuv->v->height == (yuv->y->height) && yuv->v->width == (yuv->y->width >> 1));
+     w_factor = -1;
+     break;
+   }
+   case CHROMA_444:{
+     assert(yuv->u->height == (yuv->y->height) && yuv->u->width == (yuv->y->width)
+       && yuv->v->height == (yuv->y->height) && yuv->v->width == (yuv->y->width));
+     break;
+   }
+   default:
+     assert(0);
+   }
+
+   //Check if base param and yuv buffer are the same size, if yes we can asume parameters are initialized
+   if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
+     param.src_width = yuv->y->width;
+     param.src_height = yuv->y->height;
+     calculateParameters(&param, w_factor, h_factor);
+   }
+
+   //Allocate a pic_buffer to hold the component data while the downscaling is done
+   //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
+   int max_width = MAX(param.src_width, param.trgt_width);
+   int max_height = MAX(param.src_height, param.trgt_height);
+   int min_width = MIN(param.src_width, param.trgt_width);
+   int min_height = MIN(param.src_height, param.trgt_height);
+   int min_width_rnd16 = ((min_width + 15) >> 4) << 4;
+   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
+   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
+   int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
+   pic_buffer_t* buffer = newPictureBuffer(buffer_width, buffer_height, 1);
+
+   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
+   //Make sure the sizes match
+   if (dst == NULL || dst->y->width == param.trgt_width || dst->y->height == param.trgt_height
+     || dst->u->width == SHIFT(param.trgt_width, w_factor) || dst->u->height == SHIFT(param.trgt_height, h_factor)
+     || dst->v->width == SHIFT(param.trgt_width, w_factor) || dst->v->height == SHIFT(param.trgt_height, h_factor)) {
+
+     deallocateYuvBuffer(dst); //Free old buffer if it exists
+
+     dst = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+     dst->y = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
+     dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), dst->u->height == SHIFT(param.trgt_height, h_factor), 0);
+     dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), dst->u->height == SHIFT(param.trgt_height, h_factor), 0);
+   }
+
+   /*==========Start Resampling=============*/
+   //Resample y
+   copyPictureBuffer(yuv->y, buffer, 1);
+   resample(buffer, &param, is_upscaling, 1);
+   copyPictureBuffer(buffer, dst->y, 0);
+   
+   //Skip chroma if CHROMA_400
+   if (param.chroma != CHROMA_400) {
+     //If chroma size differs from luma size, we need to recalculate the parameters
+     if (h_factor != 0 || w_factor != 0) {
+       calculateParameters(&param, w_factor, h_factor);
+     }
+
+     //Resample u
+     copyPictureBuffer(yuv->u, buffer, 1);
+     resample(buffer, &param, is_upscaling, 0);
+     copyPictureBuffer(buffer, dst->u, 0);
+
+     //Resample v
+     copyPictureBuffer(yuv->u, buffer, 1);
+     resample(buffer, &param, is_upscaling, 0);
+     copyPictureBuffer(buffer, dst->v, 0);
+   }
+
+   //Deallocate buffer
+   deallocatePictureBuffer(buffer);
+
+   return dst;
  }
 
  yuv_buffer_t* scale(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420)

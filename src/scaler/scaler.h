@@ -91,6 +91,9 @@ void deallocatePictureBuffer(pic_buffer_t* buffer);
  */
 void copyPictureBuffer(pic_buffer_t* src, pic_buffer_t* dst, int fill);
 
+//Format for specifying the ratio between chroma and luma
+typedef enum { CHROMA_400, CHROMA_420, CHROMA_422, CHROMA_444 } chroma_format_t;
+
 //TODO: Move to .c?
 //TODO: Add offsets/cropping
 typedef struct{
@@ -100,6 +103,8 @@ typedef struct{
 
   int trgt_width;
   int trgt_height;
+
+  chroma_format_t chroma;
 
   //Resampling parameters
   int rnd_trgt_width;
@@ -125,9 +130,14 @@ typedef struct{
 
 
 /**
+* \brief Returns the appropriate chroma format for the given parameters
+*/
+chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height);
+
+/**
 * \brief Function for getting initial scaling parameters given src and trgt size parameters.
 */
-scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height);
+scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
 
 
 //TODO: Return/recycle the same buffer for the scaled yuv
