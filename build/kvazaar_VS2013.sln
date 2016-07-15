@@ -20,7 +20,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kvazaar_cli", "kvazaar_cli\
 		{EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF} = {EEA3BDD1-8A08-41C1-BA57-E05D5C2CD8FF}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "kvazaar_scaler", "kvazaar_scaler\kvazaar_scaler.vcxproj", "{42F395F1-58A3-4A03-A425-7F7440EC6A6D}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scaler_lib", "kvazaar_scaler\kvazaar_scaler.vcxproj", "{42F395F1-58A3-4A03-A425-7F7440EC6A6D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scaler_tests", "scaler_tests\scaler_tests.vcxproj", "{97F19A1C-2095-4F3C-8182-2678C58CD755}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -68,12 +70,24 @@ Global
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Debug|Mixed Platforms.Build.0 = Debug|Win32
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Debug|Win32.ActiveCfg = Debug|Win32
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Debug|Win32.Build.0 = Debug|Win32
-		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Debug|x64.ActiveCfg = Debug|Win32
+		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Debug|x64.ActiveCfg = Debug|x64
+		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Debug|x64.Build.0 = Debug|x64
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Release|Mixed Platforms.ActiveCfg = Release|Win32
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Release|Mixed Platforms.Build.0 = Release|Win32
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Release|Win32.ActiveCfg = Release|Win32
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Release|Win32.Build.0 = Release|Win32
 		{42F395F1-58A3-4A03-A425-7F7440EC6A6D}.Release|x64.ActiveCfg = Release|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Debug|Win32.ActiveCfg = Debug|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Debug|Win32.Build.0 = Debug|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Debug|x64.ActiveCfg = Debug|x64
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Debug|x64.Build.0 = Debug|x64
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Release|Win32.ActiveCfg = Release|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Release|Win32.Build.0 = Release|Win32
+		{97F19A1C-2095-4F3C-8182-2678C58CD755}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
