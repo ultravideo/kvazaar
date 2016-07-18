@@ -18,6 +18,7 @@ s = uint32(s);
 A = uint32(A);
 
 SI = zeros(3,size(A,2));
+FSI = SI;
 PI = SI;
 ind = 1;
 for r = A
@@ -26,12 +27,15 @@ for r = A
     [y, u, v] = downScaler( y, s, u, s, v, s );
     
     % Calculate PSNR/SSIM
-    PI(1,ind) = psnr(y,yuv(:,:,1));
+    PI(1,ind) = ssim(y,yuv(:,:,1));
     [SI(1,ind), ~] = SSIM(y, yuv(:,:,1));
-    PI(2,ind) = psnr(u,yuv(:,:,2));
+    [FSI(1,ind), ~] = FastSSIM(y, yuv(:,:,1));
+    PI(2,ind) = ssim(u,yuv(:,:,2));
     [SI(2,ind), ~] = SSIM(u, yuv(:,:,2));
-    PI(3,ind) = psnr(v,yuv(:,:,3));
+    [FSI(2,ind), ~] = FastSSIM(u, yuv(:,:,2));
+    PI(3,ind) = ssim(v,yuv(:,:,3));
     [SI(3,ind), ~] = SSIM(v, yuv(:,:,3));
+    [FSI(3,ind), ~] = FastSSIM(v, yuv(:,:,3));
     ind = ind+1;
 end
 
@@ -52,4 +56,13 @@ hold all;
 plot(ratio,SI(2,:));
 plot(ratio,SI(3,:));
 title('MSSIM');
+legend('Y','U','V');
+
+figure;
+
+plot(ratio,FSI(1,:));
+hold all;
+plot(ratio,FSI(2,:));
+plot(ratio,FSI(3,:));
+title('Fast-MSSIM');
 legend('Y','U','V');
