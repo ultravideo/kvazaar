@@ -403,6 +403,8 @@ int clip(int val, int min, int max)
 
  void deallocateYuvBuffer(yuv_buffer_t* yuv)
  {
+   if (yuv == NULL) return;
+
    deallocatePictureBuffer(yuv->y);
    deallocatePictureBuffer(yuv->u);
    deallocatePictureBuffer(yuv->v);
@@ -412,21 +414,21 @@ int clip(int val, int min, int max)
 
  //Helper function for choosing the correct filter
  //Returns the size of the filter and the filter param is set to the correct filter
- int getFilter(const int* filter, int is_upsampling, int is_luma, int phase, int filter_ind)
+ int getFilter( const int** filter, int is_upsampling, int is_luma, int phase, int filter_ind)
  {
    if (is_upsampling) {
      //Upsampling so use 8- or 4-tap filters
      if (is_luma) {
-       filter = lumaUpFilter[phase];
+       *filter = lumaUpFilter[phase];
        return sizeof(lumaUpFilter[0]) / sizeof(lumaUpFilter[0][0]);
      }
 
-     filter = chromaUpFilter[phase];
+     *filter = chromaUpFilter[phase];
      return sizeof(chromaUpFilter[0]) / sizeof(chromaUpFilter[0][0]);
    }
 
    //Downsampling so use 12-tap filter
-   filter = filter16[filter_ind][phase];
+   *filter = filter16[filter_ind][phase];
    return (sizeof(filter16[0][0]) / sizeof(filter16[0][0][0]));
  }
 
@@ -687,7 +689,7 @@ int clip(int val, int min, int max)
 
        //Choose filter
        const int* filter;
-       int size = getFilter(filter, is_upscaling, is_luma, phase, hor_filter);
+       int size = getFilter(&filter, is_upscaling, is_luma, phase, hor_filter);
 
        //Apply filter
        tmp_row[j] = 0;
@@ -713,7 +715,7 @@ int clip(int val, int min, int max)
 
        //Choose filter
        const int* filter;
-       int size = getFilter(filter, is_upscaling, is_luma, phase, ver_filter);
+       int size = getFilter(&filter, is_upscaling, is_luma, phase, ver_filter);
 
        //Apply filter
        tmp_col[j] = 0;
@@ -1091,16 +1093,16 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
 
    //Check if we need to allocate a yuv buffer for the new image or re-use dst.
    //Make sure the sizes match
-   if (dst == NULL || dst->y->width == param.trgt_width || dst->y->height == param.trgt_height
-     || dst->u->width == SHIFT(param.trgt_width, w_factor) || dst->u->height == SHIFT(param.trgt_height, h_factor)
-     || dst->v->width == SHIFT(param.trgt_width, w_factor) || dst->v->height == SHIFT(param.trgt_height, h_factor)) {
+   if (dst == NULL || dst->y->width != param.trgt_width || dst->y->height != param.trgt_height
+     || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
+     || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
 
      deallocateYuvBuffer(dst); //Free old buffer if it exists
 
      dst = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
      dst->y = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
-     dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), dst->u->height == SHIFT(param.trgt_height, h_factor), 0);
-     dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), dst->u->height == SHIFT(param.trgt_height, h_factor), 0);
+     dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
+     dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
    }
 
    /*==========Start Resampling=============*/
@@ -1122,7 +1124,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      copyPictureBuffer(buffer, dst->u, 0);
 
      //Resample v
-     copyPictureBuffer(yuv->u, buffer, 1);
+     copyPictureBuffer(yuv->v, buffer, 1);
      resample(buffer, &param, is_upscaling, 0);
      copyPictureBuffer(buffer, dst->v, 0);
    }

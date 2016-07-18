@@ -157,4 +157,9 @@ yuv_buffer_t* yuvUpscaling(const yuv_buffer_t* const yuv, const scaling_paramete
 */
 yuv_buffer_t* scale(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
 
+/**
+* \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
+*/
+yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+
 #endif

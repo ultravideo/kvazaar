@@ -217,6 +217,69 @@ void kvzDownscaling(yuv_buffer_t* in, yuv_buffer_t* out)
   deallocateYuvBuffer(scaled);
 }
 
+/**
+* \brief Use sizes in kvz_picture for scaling. Can handle up and downscaling
+*/
+void kvzScaling(yuv_buffer_t* in, yuv_buffer_t* out)
+{
+  //Create picture buffers based on given kvz_pictures
+  int32_t in_y_width = in->y->width;
+  int32_t in_y_height = in->y->height;
+  int32_t out_y_width = out->y->width;
+  int32_t out_y_height = out->y->height;
+
+  //assumes 420
+  int is_420 = in->y->width != in->u->width ? 1 : 0;
+  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+
+  yuv_buffer_t* scaled = yuvScaling(in, &param, out);
+
+}
+
+void test3()
+{
+  int32_t in_width = 700;
+  int32_t in_height = 700;
+  int32_t out_width = 700;
+  int32_t out_height = 700;
+  int framerate = 24;
+
+  const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+
+  char out_file_name[BUFF_SIZE];
+  sprintf(out_file_name, "Kimono1_%ix%i_%i_s.yuv", out_width, out_height, framerate);
+
+  FILE* file = fopen(in_file_name, "rb");
+  if (file == NULL) {
+    perror("FIle open failed");
+    printf("File name: %s", in_file_name);
+  }
+
+  yuv_buffer_t* data = newYuvBuffer_uint8(NULL, NULL, NULL, in_width, in_height, 1);
+  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, out_width, out_height, 1);
+
+  if (yuv_io_read(file, in_width, in_height, data)) {
+
+    kvzScaling(data, out);
+
+    FILE* out_file = fopen(out_file_name, "wb");
+    yuv_io_write(out_file, out, out->y->width, out->y->height);
+    fclose(out_file);
+  }
+  else {
+    perror("Read fail");
+    if (feof(file)) perror("End of file");
+    if (ferror(file)) perror("File error");
+  }
+
+  deallocateYuvBuffer(data);
+  deallocateYuvBuffer(out);
+  fclose(file);
+}
+
 void test2()
 {
   int32_t in_width = 600;
@@ -263,7 +326,7 @@ void test2()
 
 int main()
 {
-  test2();
+  test3();
 
   system("Pause");
   return EXIT_SUCCESS;
