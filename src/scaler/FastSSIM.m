@@ -54,15 +54,18 @@ end
 function M = integralMean(X)
 I = integralImage(X);
 winsz = 8;
-s = size(X)-winsz;
+w_end = size(I,2);
+h_end = size(I,1);
 wincnt = winsz*winsz;
-M = zeros(s);
-for m = 1:s(1)
-    for n = 1:s(2)
-       M(m,n) = I(m,n) + I(m+winsz,n+winsz) - I(m+winsz,n) - I(m,n+winsz);
-    end
-end
+
+%V1 = I(1:(h_end-winsz),1:(w_end-winsz));
+%V2 = I(1:(h_end-winsz),(winsz+1):w_end);
+%V3 = I((winsz+1):h_end,1:(w_end-winsz));
+%V4 = I((winsz+1):h_end,(winsz+1):w_end);
+
+M = I((winsz+1):h_end,(winsz+1):w_end)+I(1:(h_end-winsz),1:(w_end-winsz))-(I(1:(h_end-winsz),(winsz+1):w_end)+I((winsz+1):h_end,1:(w_end-winsz)));
 M = M./wincnt;
+
 end
 
 %Generate a integral image
