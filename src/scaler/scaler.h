@@ -157,23 +157,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
 /*=============================================================================================*/
 
 /*================Main scaling functions========================*/
-//TODO: Return/recycle the same buffer for the scaled yuv
-/**
-* \brief Function for scaling a yuv picture.
-*/
-yuv_buffer_t* yuvDownscaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
-
-//TODO: Return/recycle the same buffer for the scaled yuv
-/**
-* \brief Function for scaling a yuv picture.
-*/
-yuv_buffer_t* yuvUpscaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
-
-/**
-* \brief Function for calling the correct function (upsample or downsample).
-*/
-yuv_buffer_t* scale(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, int is_420);
-
+//TODO: Return/recycle the same buffer for the scaled yuv. Use yuv it self and not a separate buffer?
 /**
 * \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst

@@ -42,32 +42,32 @@ void printout( yuv_buffer_t* buffer )
   printPicBuffer(buffer->v);
 }
 
-void test1()
+/*void test1()
 {
   //Create a simple "picture" to debug scaler
 
   uint8_t y_data[IN_Y_W*IN_Y_H] = {
     25, 64, 240, 40, 16, 250, 0, 42,
     125, 164, 240, 140, 16, 250, 3, 12,
-    /*25, 164, 20, 40 , 16, 250, 0, 4,
-    25, 14, 140, 50 , 16, 205, 234, 44,
-    57, 82, 34, 90, 65, 90, 44, 22,
-    89, 92, 0, 71, 61, 78, 109, 100,*/
+    //25, 164, 20, 40 , 16, 250, 0, 4,
+    //25, 14, 140, 50 , 16, 205, 234, 44,
+    //57, 82, 34, 90, 65, 90, 44, 22,
+    //89, 92, 0, 71, 61, 78, 109, 100,
     0, 124, 78, 56, 29, 0, 4, 8,
     4, 7, 56, 12, 49, 7, 2, 0
   };
 
   uint8_t cb_data[in_cb_width*in_cb_height] = {
     240, 40, 16, 7,
-    /*164, 240, 16, 7,
-    16, 16, 16, 7,*/
+    //164, 240, 16, 7,
+    //16, 16, 16, 7,
     7, 35, 79, 5
   };
 
   uint8_t cr_data[in_cb_width*in_cb_height] = {
     40, 140, 16, 7,
-    /*135, 40 , 16, 6,
-    16, 16, 16, 5,*/
+    //135, 40 , 16, 6,
+    //16, 16, 16, 5,
     8, 54, 21, 4
   };
 
@@ -82,7 +82,7 @@ void test1()
   //Free memory
   deallocateYuvBuffer(pic);
   deallocateYuvBuffer(scaled);
-}
+}*/
 
 
 //Copy data to a output array
@@ -187,7 +187,7 @@ int yuv_io_write(FILE* file,
 /**
 * \brief Downscale given kvz_picture. Use sizes in kvz_picture for scaling
 */
-void kvzDownscaling(yuv_buffer_t* in, yuv_buffer_t* out)
+/*void kvzDownscaling(yuv_buffer_t* in, yuv_buffer_t* out)
 {
   //Create picture buffers based on given kvz_pictures
   int32_t in_y_width = in->y->width;
@@ -216,7 +216,7 @@ void kvzDownscaling(yuv_buffer_t* in, yuv_buffer_t* out)
 
   //Free memory
   deallocateYuvBuffer(scaled);
-}
+}*/
 
 /**
 * \brief Use sizes in kvz_picture for scaling. Can handle up and downscaling
@@ -281,7 +281,7 @@ void test3()
   fclose(file);
 }
 
-void test2()
+/*void test2()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
@@ -323,7 +323,7 @@ void test2()
   deallocateYuvBuffer(data);
   deallocateYuvBuffer(out);
   fclose(file);
-}
+}*/
 
 int main()
 {
