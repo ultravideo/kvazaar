@@ -812,6 +812,7 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
  }
 
  //Use yuv and dst as the buffer instead of allocating a new buffer. Also use unrounded sizes
+ //yuv is not quaranteet to contain the original data.
  yuv_buffer_t* __yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
    yuv_buffer_t* dst)
  {
@@ -907,8 +908,8 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
    int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
    pic_buffer_t* buffer = newPictureBuffer(buffer_width, buffer_height, 1);*/
    //TODO: Clean up this part and implement properly
-   param.rnd_trgt_height = param.trgt_height;
-   param.rnd_trgt_width = param.trgt_width;
+   //param.rnd_trgt_height = param.trgt_height;
+   //param.rnd_trgt_width = param.trgt_width;
    pic_buffer_t* buffer = is_upscaling ? dst->y : yuv->y;//malloc(sizeof(pic_buffer_t)); //Choose bigger buffer
    free(buffer->tmp_row);
    buffer->tmp_row = malloc(sizeof(pic_data_t)*(is_upscaling ? MAX(param.trgt_width, param.trgt_height) : MAX(param.src_width, param.src_height)));

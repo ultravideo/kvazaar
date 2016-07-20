@@ -233,16 +233,16 @@ void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   int is_420 = in->y->width != in->u->width ? 1 : 0;
   scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
-  *out = yuvScaling(in, &param, *out);
+  *out = __yuvScaling(in, &param, *out);
 
 }
 
 void test3()
 {
-  int32_t in_width = 500;
-  int32_t in_height = 580;
-  int32_t out_width = 1000;
-  int32_t out_height = 1082;
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = 510;
+  int32_t out_height = 500;
   int framerate = 24;
 
   const char* file_name_format = "Kimono1_%ix%i_%i.yuv";

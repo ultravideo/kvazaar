@@ -163,5 +163,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
 */
 yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+yuv_buffer_t* __yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+
 /*=============================================================*/
 #endif
