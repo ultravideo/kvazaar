@@ -22,6 +22,7 @@
 
 #include <stdint.h>
 
+/*===============Buffer datastructure definitions=============*/
 typedef int pic_data_t; //Use some other type?
 
 /**
@@ -44,7 +45,9 @@ typedef struct{
   pic_buffer_t* u;
   pic_buffer_t* v;
 } yuv_buffer_t;
-
+/*==========================================================*/
+typedef chroma_format_t;
+/*==================Buffer utility functions===============*/
 /**
  * \brief Create a Picture buffer. The caller is responsible for deallocation
  */
@@ -59,8 +62,8 @@ pic_buffer_t* newPictureBuffer_uint8(uint8_t* data, int width, int height, int h
 /**
 * \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
 */
-yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, int is_420);
-yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, int is_420);
+yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, chroma_format_t format);
+yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, chroma_format_t format);
 
 /**
 * \brief Clone the given pic buffer
@@ -91,6 +94,18 @@ void deallocatePictureBuffer(pic_buffer_t* buffer);
  */
 void copyPictureBuffer(pic_buffer_t* src, pic_buffer_t* dst, int fill);
 
+/**
+* \brief Copies data from one buffer to the other.
+* \param src is the source buffer
+* \param dst is the destination buffer
+* \param fill signals if the inds in dst not overlapped by src should be filled
+*    with values adjacent to the said index.
+*/
+void copyYuvBuffer(yuv_buffer_t* src, yuv_buffer_t* dst, int fill);
+
+/*=======================================================*/
+
+/*=====================Scaling parameter definition=====================*/
 //Format for specifying the ratio between chroma and luma
 typedef enum { CHROMA_400, CHROMA_420, CHROMA_422, CHROMA_444 } chroma_format_t;
 
@@ -127,8 +142,9 @@ typedef struct{
   int add_y;
 
 } scaling_parameter_t;
+/*==========================================================================*/
 
-
+/*===========================Scaling parameter utility functions=================================*/
 /**
 * \brief Returns the appropriate chroma format for the given parameters
 */
@@ -138,8 +154,9 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
 * \brief Function for getting initial scaling parameters given src and trgt size parameters.
 */
 scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+/*=============================================================================================*/
 
-
+/*================Main scaling functions========================*/
 //TODO: Return/recycle the same buffer for the scaled yuv
 /**
 * \brief Function for scaling a yuv picture.
@@ -159,7 +176,8 @@ yuv_buffer_t* scale(const yuv_buffer_t* const yuv, const scaling_parameter_t* co
 
 /**
 * \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
+*        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
 */
 yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
-
+/*=============================================================*/
 #endif

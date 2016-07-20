@@ -107,12 +107,14 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   plhs[2] = mxCreateNumericMatrix(out_cr_height, out_cr_width, mxUINT8_CLASS, mxREAL);
 
   //Do actual scaling stuff
-  int is_420 = in_y_width != in_cb_width ? 1 : 0;
+  chroma_format_t is_420 = in_y_width != in_cb_width ? CHROMA_420 : CHROMA_444;
   yuv_buffer_t* pic = newYuvBuffer_uint8(y_data, cb_data, cr_data, in_y_width, in_y_height, is_420);
   scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, in_y_width != in_cb_width ? CHROMA_420 : CHROMA_444);
 
-  yuv_buffer_t* scaled = scale(pic, &param, is_420);
-  
+  yuv_buffer_t* scaled = yuvScaling(pic, &param, NULL);//scale(pic, &param, is_420);
+  if (scaled == NULL) {
+    ERROR(scalingError, "Scaling failed. Tried to up- and downscale at the same time or unable to allocate memory");
+  }
   //ERROR(debug, "got past downscaling");
   free(y_data);
   free(cb_data);

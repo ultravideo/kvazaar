@@ -21,7 +21,7 @@
 #include "scaler.h"
 
 #include <stdlib.h>
-#include <memory.h>
+#include <string.h>
 #include <assert.h>
 
 #define MIN(x,y) (((x) < (y)) ? (x) : (y))
@@ -334,25 +334,56 @@ int clip(int val, int min, int max)
 
  }
 
+ void copyYuvBuffer(yuv_buffer_t* src, yuv_buffer_t* dst, int fill)
+ {
+   copyPictureBuffer(src->y, dst->y, fill);
+   copyPictureBuffer(src->u, dst->u, fill);
+   copyPictureBuffer(src->v, dst->v, fill);
+ }
+
  // ======================= newYuvBuffer_ ==================================
- yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, int is_420)
+ yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, chroma_format_t format)
  {
    yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
 
    //Allocate y pic_buffer
    yuv->y = newPictureBuffer_double(y_data, width, height, 0);
-   
+
    //Allocate u and v buffers
-   is_420 = is_420 ? 1 : 0;
-   width >>= is_420;
-   height >>= is_420;
+   int w_factor = 0;
+   int h_factor = 0;
+
+   switch (format) {
+   case CHROMA_400:{
+     //No chroma
+     width = height = 0;
+     break;
+   }
+   case CHROMA_420:{
+     w_factor = 1;
+     h_factor = 1;
+     break;
+   }
+   case CHROMA_422:{
+     w_factor = 1;
+     break;
+   }
+   case CHROMA_444:{
+     break;
+   }
+   default:
+     assert(0);//Unsupported format
+   }
+
+   width = width >> w_factor;
+   height = height >> h_factor;
    yuv->u = newPictureBuffer_double(u_data, width, height, 0);
    yuv->v = newPictureBuffer_double(v_data, width, height, 0);
 
    return yuv;
  }
 
- yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, int is_420)
+ yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, chroma_format_t format)
  {
    yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
 
@@ -360,9 +391,33 @@ int clip(int val, int min, int max)
    yuv->y = newPictureBuffer_uint8(y_data, width, height, 0);
 
    //Allocate u and v buffers
-   is_420 = is_420 ? 1 : 0;
-   width >>= is_420;
-   height >>= is_420;
+   int w_factor = 0;
+   int h_factor = 0;
+
+   switch (format) {
+   case CHROMA_400:{
+     //No chroma
+     width = height = 0;
+     break;
+   }
+   case CHROMA_420:{
+     w_factor = 1;
+     h_factor = 1;
+     break;
+   }
+   case CHROMA_422:{
+     w_factor = 1;
+     break;
+   }
+   case CHROMA_444:{
+     break;
+   }
+   default:
+     assert(0);//Unsupported format
+   }
+
+   width = width >> w_factor;
+   height = height >> h_factor;
    yuv->u = newPictureBuffer_uint8(u_data, width, height, 0);
    yuv->v = newPictureBuffer_uint8(v_data, width, height, 0);
 
@@ -1012,34 +1067,13 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
  }
 
 
- //Returns result in yuv buffer. If dst is null, allocate new buffer, else use and return dst.
+ 
  yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
    yuv_buffer_t* dst)
  {
+   /*========== Basic Initialization ==============*/
    //Initialize basic parameters
    scaling_parameter_t param = *base_param;
-
-   //Calculate if we are upscaling or downscaling
-   int is_downscaled_width = base_param->src_width > base_param->trgt_width;
-   int is_downscaled_height = base_param->src_height > base_param->trgt_height;
-   int is_equal_width = base_param->src_width == base_param->trgt_width;
-   int is_equal_height = base_param->src_height == base_param->trgt_height;
-
-   int is_upscaling = 1;
-
-   //both dimensions need to be either up- or downscaled
-   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
-     is_downscaled_height && !is_downscaled_width && !is_equal_width) {
-     return NULL;
-   }
-   else if (is_equal_height && is_equal_width) {
-     //If equal just return source
-     return cloneYuvBuffer(yuv);
-   }
-   else if (is_downscaled_width || is_downscaled_height) {
-     //Atleast one dimension is downscaled
-     is_upscaling = 0;
-   }
 
    //How much to scale the luma sizes to get the chroma sizes
    int w_factor = 0;
@@ -1069,7 +1103,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      break;
    }
    default:
-     assert(0);
+     assert(0); //Unsupported chroma type
    }
 
    //Check if base param and yuv buffer are the same size, if yes we can asume parameters are initialized
@@ -1078,6 +1112,44 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
      param.src_height = yuv->y->height;
      calculateParameters(&param, w_factor, h_factor);
    }
+
+    //Check if we need to allocate a yuv buffer for the new image or re-use dst.
+   //Make sure the sizes match
+   if (dst == NULL || dst->y->width != param.trgt_width || dst->y->height != param.trgt_height
+     || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
+     || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
+
+     deallocateYuvBuffer(dst); //Free old buffer if it exists
+
+     dst = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+     dst->y = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
+     dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
+     dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
+   }
+
+   //Calculate if we are upscaling or downscaling
+   int is_downscaled_width = base_param->src_width > base_param->trgt_width;
+   int is_downscaled_height = base_param->src_height > base_param->trgt_height;
+   int is_equal_width = base_param->src_width == base_param->trgt_width;
+   int is_equal_height = base_param->src_height == base_param->trgt_height;
+
+   int is_upscaling = 1;
+
+   //both dimensions need to be either up- or downscaled
+   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
+     is_downscaled_height && !is_downscaled_width && !is_equal_width) {
+     return NULL;
+   }
+   else if (is_equal_height && is_equal_width) {
+     //If equal just return source
+     copyYuvBuffer(yuv, dst, 0);
+     return dst;
+   }
+   else if (is_downscaled_width || is_downscaled_height) {
+     //Atleast one dimension is downscaled
+     is_upscaling = 0;
+   }
+   /*=================================*/
 
    //Allocate a pic_buffer to hold the component data while the downscaling is done
    //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
@@ -1091,19 +1163,6 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
    int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
    pic_buffer_t* buffer = newPictureBuffer(buffer_width, buffer_height, 1);
 
-   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
-   //Make sure the sizes match
-   if (dst == NULL || dst->y->width != param.trgt_width || dst->y->height != param.trgt_height
-     || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
-     || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
-
-     deallocateYuvBuffer(dst); //Free old buffer if it exists
-
-     dst = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
-     dst->y = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
-     dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
-     dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
-   }
 
    /*==========Start Resampling=============*/
    //Resample y

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <malloc.h> //For _msize()
 
 #include "scaler.h"
 
@@ -163,7 +164,7 @@ int yuv_io_write(FILE* file,
   const unsigned uv_input_width = output_width / 2;
   const unsigned uv_input_height = output_height / 2;
   const unsigned uv_size = uv_input_width * uv_input_height;
-
+  //printf("chroma size: %i", _msize(img->u->data)/sizeof(pic_data_t));
   unsigned char* buffer = malloc(sizeof(unsigned char)*y_size);
   copyFrom(buffer, img->y->data, y_size);
 
@@ -173,11 +174,11 @@ int yuv_io_write(FILE* file,
   }
   copyFrom(buffer, img->u->data, uv_size);
   for (int y = 0; y < output_height / 2; ++y) {
-    fwrite(&buffer[y * width / 2], sizeof(unsigned char), output_width / 2, file);
+    fwrite(&buffer[y * (width / 2)], sizeof(unsigned char), output_width / 2, file);
   }
   copyFrom(buffer, img->v->data, uv_size);
   for (int y = 0; y < output_height / 2; ++y) {
-    fwrite(&buffer[y * width / 2], sizeof(unsigned char), output_width / 2, file);
+    fwrite(&buffer[y * (width / 2)], sizeof(unsigned char), output_width / 2, file);
   }
 
   return 1;
@@ -220,28 +221,28 @@ void kvzDownscaling(yuv_buffer_t* in, yuv_buffer_t* out)
 /**
 * \brief Use sizes in kvz_picture for scaling. Can handle up and downscaling
 */
-void kvzScaling(yuv_buffer_t* in, yuv_buffer_t* out)
+void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 {
   //Create picture buffers based on given kvz_pictures
   int32_t in_y_width = in->y->width;
   int32_t in_y_height = in->y->height;
-  int32_t out_y_width = out->y->width;
-  int32_t out_y_height = out->y->height;
+  int32_t out_y_width = (*out)->y->width;
+  int32_t out_y_height = (*out)->y->height;
 
   //assumes 420
   int is_420 = in->y->width != in->u->width ? 1 : 0;
   scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
-  yuv_buffer_t* scaled = yuvScaling(in, &param, out);
+  *out = yuvScaling(in, &param, *out);
 
 }
 
 void test3()
 {
-  int32_t in_width = 700;
-  int32_t in_height = 700;
-  int32_t out_width = 700;
-  int32_t out_height = 700;
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = 500;
+  int32_t out_height = 500;
   int framerate = 24;
 
   const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
@@ -258,12 +259,12 @@ void test3()
     printf("File name: %s", in_file_name);
   }
 
-  yuv_buffer_t* data = newYuvBuffer_uint8(NULL, NULL, NULL, in_width, in_height, 1);
-  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, out_width, out_height, 1);
+  yuv_buffer_t* data = newYuvBuffer_uint8(NULL, NULL, NULL, in_width, in_height, CHROMA_420);
+  yuv_buffer_t* out = newYuvBuffer_uint8(NULL, NULL, NULL, out_width, out_height, CHROMA_420);
 
   if (yuv_io_read(file, in_width, in_height, data)) {
 
-    kvzScaling(data, out);
+    kvzScaling(data, &out);
 
     FILE* out_file = fopen(out_file_name, "wb");
     yuv_io_write(out_file, out, out->y->width, out->y->height);
@@ -282,10 +283,10 @@ void test3()
 
 void test2()
 {
-  int32_t in_width = 600;
-  int32_t in_height = 600;
-  int32_t out_width = 600;
-  int32_t out_height = 600;
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = 601;
+  int32_t out_height = 602;
   int framerate = 24;
   
   const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
