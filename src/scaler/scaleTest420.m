@@ -1,4 +1,4 @@
-%% Run test on downScaler (420 chroma format)
+%% Run test on downScaler (4:2:0 chroma format + others)
 % init mex
 mex -g downScaler.c %-v COMPFLAGS='$COMPFLAGS /E' downScaler.c
 
@@ -22,3 +22,23 @@ subplot(1,3,2);
 imshow(u);
 subplot(1,3,3);
 imshow(v);
+
+%% Test 4:2:2
+d = uint32([1 2]);
+[y,u,v] = downScaler( yuv(:,:,1), s, yuv(:,chroma_inds_w,2), idivide(s,d,'floor'), yuv(:,chroma_inds_w,3), idivide(s,d,'floor'));
+
+%% Display images
+figure;
+subplot(1,3,1);
+imshow(y);
+subplot(1,3,2);
+imshow(u);
+subplot(1,3,3);
+imshow(v);
+
+%% Test 4:0:0
+[y,u,v] = downScaler( yuv(:,:,1), s, uint8([]), [0 0], uint8([]), [0 0]);
+
+%%
+figure;
+imshow(y);

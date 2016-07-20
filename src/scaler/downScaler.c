@@ -92,6 +92,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   int out_cr_width = ((uint32_t*)mxGetData(prhs[5]))[1];
   int out_cr_height = ((uint32_t*)mxGetData(prhs[5]))[0];
 
+  //Check correct chroma sizes
+  if (in_cb_width != in_cr_width || in_cr_height != in_cr_height ||
+    out_cb_width != out_cr_width || out_cr_height != out_cr_height) {
+    ERROR(differingChromaSizes, "The chroma sizes must match");
+  }
+
   uint8_t* y_data = (uint8_t*)mxGetData(prhs[0]);
   uint8_t* cb_data = (uint8_t*)mxGetData(prhs[2]);
   uint8_t* cr_data = (uint8_t*)mxGetData(prhs[4]);
@@ -107,9 +113,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
   plhs[2] = mxCreateNumericMatrix(out_cr_height, out_cr_width, mxUINT8_CLASS, mxREAL);
 
   //Do actual scaling stuff
-  chroma_format_t is_420 = in_y_width != in_cb_width ? CHROMA_420 : CHROMA_444;
-  yuv_buffer_t* pic = newYuvBuffer_uint8(y_data, cb_data, cr_data, in_y_width, in_y_height, is_420);
-  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, in_y_width != in_cb_width ? CHROMA_420 : CHROMA_444);
+  
+  //Select correct format
+  chroma_format_t format = getChromaFormat(in_y_width, in_y_height, in_cb_width, in_cb_height);
+
+  yuv_buffer_t* pic = newYuvBuffer_uint8(y_data, cb_data, cr_data, in_y_width, in_y_height, format);
+  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, format);
 
   yuv_buffer_t* scaled = yuvScaling(pic, &param, NULL);//scale(pic, &param, is_420);
   if (scaled == NULL) {
