@@ -680,7 +680,7 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
     return CHROMA_422;
   }
   //If not CHROMA_420, not a supported format
-  assert(chroma_width != (luma_width >> 1) && chroma_height != (luma_height >> 1));
+  assert(chroma_width == (luma_width >> 1) && chroma_height == (luma_height >> 1));
 
   return CHROMA_420;
 }
