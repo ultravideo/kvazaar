@@ -12,7 +12,7 @@
 #include "mex.h"
 #include "scaler.h"
 #include "scaler.c"
-#include "stdlib.h"
+#include <stdlib.h>
 #include "matrix.h"
 
 #define STR(s) #s

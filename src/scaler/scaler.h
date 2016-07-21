@@ -28,90 +28,41 @@ typedef int pic_data_t; //Use some other type?
 /**
  * \brief Picture buffer type for operating on image data.
  */
-typedef struct{
+typedef struct
+{
   pic_data_t* data; //Contain main data
   pic_data_t* tmp_row; //A temporary buffer row that may be used to hold data when operating on buffer
 
   int width;
   int height;
-
 } pic_buffer_t;
 
 /**
 * \brief Picture buffer type for yuv frames.
 */
-typedef struct{
+typedef struct
+{
   pic_buffer_t* y;
   pic_buffer_t* u;
   pic_buffer_t* v;
 } yuv_buffer_t;
+
 /*==========================================================*/
-typedef chroma_format_t;
-/*==================Buffer utility functions===============*/
-/**
- * \brief Create a Picture buffer. The caller is responsible for deallocation
- */
-pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
-
-/**
-* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
-*/
-pic_buffer_t* newPictureBuffer_double(double* data, int width, int height, int has_tmp_row);
-pic_buffer_t* newPictureBuffer_uint8(uint8_t* data, int width, int height, int has_tmp_row);
-
-/**
-* \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
-*/
-yuv_buffer_t* newYuvBuffer_double(double* y_data, double* u_data, double* v_data, int width, int height, chroma_format_t format);
-yuv_buffer_t* newYuvBuffer_uint8(uint8_t* y_data, uint8_t* u_data, uint8_t* v_data, int width, int height, chroma_format_t format);
-
-/**
-* \brief Clone the given pic buffer
-*/
-pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic);
-
-/**
-* \brief Clone the given yuv buffer
-*/
-yuv_buffer_t* cloneYuvBuffer(const yuv_buffer_t* const yuv);
-
-/**
-* \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
-*/
-void deallocateYuvBuffer(yuv_buffer_t* yuv);
-
-/**
- * \brief Deallocate a picture buffer.
- */
-void deallocatePictureBuffer(pic_buffer_t* buffer);
-
-/**
- * \brief Copies data from one buffer to the other.
- * \param src is the source buffer
- * \param dst is the destination buffer
- * \param fill signals if the inds in dst not overlapped by src should be filled
-*    with values adjacent to the said index.
- */
-void copyPictureBuffer(pic_buffer_t* src, pic_buffer_t* dst, int fill);
-
-/**
-* \brief Copies data from one buffer to the other.
-* \param src is the source buffer
-* \param dst is the destination buffer
-* \param fill signals if the inds in dst not overlapped by src should be filled
-*    with values adjacent to the said index.
-*/
-void copyYuvBuffer(yuv_buffer_t* src, yuv_buffer_t* dst, int fill);
-
-/*=======================================================*/
 
 /*=====================Scaling parameter definition=====================*/
 //Format for specifying the ratio between chroma and luma
-typedef enum { CHROMA_400, CHROMA_420, CHROMA_422, CHROMA_444 } chroma_format_t;
+typedef enum
+{
+  CHROMA_400,
+  CHROMA_420,
+  CHROMA_422,
+  CHROMA_444
+} chroma_format_t;
 
 //TODO: Move to .c?
 //TODO: Add offsets/cropping
-typedef struct{
+typedef struct
+{
   //Original parameters
   int src_width;
   int src_height;
@@ -140,9 +91,67 @@ typedef struct{
 
   int add_x;
   int add_y;
-
 } scaling_parameter_t;
+
 /*==========================================================================*/
+
+/*==================Buffer utility functions===============*/
+/**
+ * \brief Create a Picture buffer. The caller is responsible for deallocation
+ */
+pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
+
+/**
+* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
+*/
+pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row);
+pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row);
+
+/**
+* \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
+*/
+yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format);
+yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format);
+
+/**
+* \brief Clone the given pic buffer
+*/
+pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic);
+
+/**
+* \brief Clone the given yuv buffer
+*/
+yuv_buffer_t* cloneYuvBuffer(const yuv_buffer_t* const yuv);
+
+/**
+* \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
+*/
+void deallocateYuvBuffer(yuv_buffer_t* yuv);
+
+/**
+ * \brief Deallocate a picture buffer.
+ */
+void deallocatePictureBuffer(pic_buffer_t* buffer);
+
+/**
+ * \brief Copies data from one buffer to the other.
+ * \param src is the source buffer
+ * \param dst is the destination buffer
+ * \param fill signals if the inds in dst not overlapped by src should be filled
+*    with values adjacent to the said index.
+ */
+void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t* const dst, int fill);
+
+/**
+* \brief Copies data from one buffer to the other.
+* \param src is the source buffer
+* \param dst is the destination buffer
+* \param fill signals if the inds in dst not overlapped by src should be filled
+*    with values adjacent to the said index.
+*/
+void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, int fill);
+
+/*=======================================================*/
 
 /*===========================Scaling parameter utility functions=================================*/
 /**
@@ -154,7 +163,7 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
 * \brief Function for getting initial scaling parameters given src and trgt size parameters.
 */
 scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
-scaling_parameter_t __newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
 /*=============================================================================================*/
 
 /*================Main scaling functions========================*/
@@ -166,7 +175,7 @@ scaling_parameter_t __newScalingParameters(int src_width, int src_height, int tr
 * \post the larger of yuv and dst will have valid tmp rows in it's pic buffers. 
 */
 yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
-yuv_buffer_t* __yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
 
 /*=============================================================*/
 #endif

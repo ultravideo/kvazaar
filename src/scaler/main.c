@@ -2,7 +2,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <malloc.h> //For _msize()
 
 #include "scaler.h"
 
@@ -26,13 +25,13 @@ void printPicBuffer(pic_buffer_t* buffer)
 {
   for (int i = 0; i < buffer->height; i++) {
     for (int j = 0; j < buffer->width; j++) {
-      printf("%i ", buffer->data[buffer->width*i + j]);
+      printf("%i ", buffer->data[buffer->width * i + j]);
     }
     printf("\n");
   }
 }
 
-void printout( yuv_buffer_t* buffer )
+void printout(yuv_buffer_t* buffer)
 {
   printf("Y:\n");
   printPicBuffer(buffer->y);
@@ -92,6 +91,7 @@ void copyBack(pic_data_t* dst, uint8_t* src, int size)
     dst[i] = (pic_data_t)src[i];
   }
 }
+
 void copyFrom(uint8_t* dst, pic_data_t* src, int size)
 {
   for (int i = 0; i < size; i++) {
@@ -113,10 +113,9 @@ void copyFrom(uint8_t* dst, pic_data_t* src, int size)
 * \return              1 on success, 0 on failure
 */
 int yuv_io_read(FILE* file,
-  unsigned input_width, unsigned input_height,
-  yuv_buffer_t *img_out)
+                unsigned input_width, unsigned input_height,
+                yuv_buffer_t* img_out)
 {
-  
   const unsigned y_size = input_width * input_height;
   const unsigned uv_input_width = input_width / 2;
   const unsigned uv_input_height = input_height / 2;
@@ -125,18 +124,21 @@ int yuv_io_read(FILE* file,
   if (input_width == img_out->y->width) {
     // No need to extend pixels.
     const size_t pixel_size = sizeof(unsigned char);
-    unsigned char* buffer = malloc(sizeof(unsigned char)*y_size);
-    
+    unsigned char* buffer = malloc(sizeof(unsigned char) * y_size);
+
     if (fread(buffer, pixel_size, y_size, file) != y_size) {
-      free(buffer); return 0;
+      free(buffer);
+      return 0;
     }
     copyBack(img_out->y->data, buffer, y_size);
     if (fread(buffer, pixel_size, uv_size, file) != uv_size) {
-      free(buffer);  return 0;
+      free(buffer);
+      return 0;
     }
     copyBack(img_out->u->data, buffer, uv_size);
     if (fread(buffer, pixel_size, uv_size, file) != uv_size) {
-      free(buffer);  return 0;
+      free(buffer);
+      return 0;
     }
     copyBack(img_out->v->data, buffer, uv_size);
   }
@@ -156,8 +158,8 @@ int yuv_io_read(FILE* file,
 * \return              1 on success, 0 on failure
 */
 int yuv_io_write(FILE* file,
-  const yuv_buffer_t *img,
-  unsigned output_width, unsigned output_height)
+                 const yuv_buffer_t* img,
+                 unsigned output_width, unsigned output_height)
 {
   const int width = img->y->width;
   const unsigned y_size = output_width * output_height;
@@ -165,19 +167,19 @@ int yuv_io_write(FILE* file,
   const unsigned uv_input_height = output_height / 2;
   const unsigned uv_size = uv_input_width * uv_input_height;
   //printf("chroma size: %i", _msize(img->u->data)/sizeof(pic_data_t));
-  unsigned char* buffer = malloc(sizeof(unsigned char)*y_size);
+  unsigned char* buffer = malloc(sizeof(unsigned char) * y_size);
   copyFrom(buffer, img->y->data, y_size);
 
-  for (int y = 0; y < output_height; ++y) {
+  for (unsigned int y = 0; y < output_height; ++y) {
     fwrite(&buffer[y * width], sizeof(unsigned char), output_width, file);
     // TODO: Check that fwrite succeeded.
   }
   copyFrom(buffer, img->u->data, uv_size);
-  for (int y = 0; y < output_height / 2; ++y) {
+  for (unsigned int y = 0; y < output_height / 2; ++y) {
     fwrite(&buffer[y * (width / 2)], sizeof(unsigned char), output_width / 2, file);
   }
   copyFrom(buffer, img->v->data, uv_size);
-  for (int y = 0; y < output_height / 2; ++y) {
+  for (unsigned int y = 0; y < output_height / 2; ++y) {
     fwrite(&buffer[y * (width / 2)], sizeof(unsigned char), output_width / 2, file);
   }
 
@@ -230,22 +232,21 @@ void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   int32_t out_y_height = (*out)->y->height;
 
   //assumes 420
-  int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  //int is_420 = in->y->width != in->u->width ? 1 : 0;
+  scaling_parameter_t param = _newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
-  *out = yuvScaling(in, &param, *out);
-
+  *out = _yuvScaling(in, &param, *out);
 }
 
 void test3()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = 2000;
-  int32_t out_height = 2050;
+  int32_t out_width = 1060;
+  int32_t out_height = 644;
   int framerate = 24;
 
-  const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+  //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
 
   char in_file_name[BUFF_SIZE];
   sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
