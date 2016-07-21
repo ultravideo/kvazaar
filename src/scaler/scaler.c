@@ -633,8 +633,6 @@ void calculateParameters(scaling_parameter_t* param, const int w_factor, const i
 
 }
 
-
-
 scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
 {
   scaling_parameter_t param = {
@@ -652,6 +650,36 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
 
   param.rnd_trgt_width = ((param.trgt_width + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
   param.rnd_trgt_height = ((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
+
+  //Round to multiple of 2
+  //TODO: Why MAX? Try using src
+  int scaled_src_width = param.src_width;//MAX(param.src_width, param.trgt_width); //Min/max of source/target values
+  int scaled_src_height = param.src_height;//MAX(param.src_height, param.trgt_height); //Min/max of source/target values
+  param.scaled_src_width = ((scaled_src_width * param.rnd_trgt_width + (hor_div >> 1)) / hor_div) << 1;
+  param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
+
+  //Pre-Calculate other parameters
+  calculateParameters(&param, 0, 0);
+
+  return param;
+}
+scaling_parameter_t __newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
+{
+  scaling_parameter_t param = {
+    .src_width = src_width,
+    .src_height = src_height,
+    .trgt_width = trgt_width,
+    .trgt_height = trgt_height,
+    .chroma = chroma
+  };
+
+  //Calculate Resampling parameters
+  //Calculations from SHM
+  int hor_div = param.trgt_width << 1;
+  int ver_div = param.trgt_height << 1;
+
+  param.rnd_trgt_width = param.trgt_width;//((param.trgt_width + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
+  param.rnd_trgt_height = param.trgt_height;//((param.trgt_height + (1 << 4) - 1) >> 4) << 4; //Round to multiple of 16
 
   //Round to multiple of 2
   //TODO: Why MAX? Try using src
@@ -910,15 +938,22 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
    //TODO: Clean up this part and implement properly
    //param.rnd_trgt_height = param.trgt_height;
    //param.rnd_trgt_width = param.trgt_width;
-   pic_buffer_t* buffer = is_upscaling ? dst->y : yuv->y;//malloc(sizeof(pic_buffer_t)); //Choose bigger buffer
-   free(buffer->tmp_row);
-   buffer->tmp_row = malloc(sizeof(pic_data_t)*(is_upscaling ? MAX(param.trgt_width, param.trgt_height) : MAX(param.src_width, param.src_height)));
+   yuv_buffer_t* buffer = is_upscaling ? dst : yuv;//malloc(sizeof(pic_buffer_t)); //Choose bigger buffer
+   if (buffer->y->tmp_row == NULL) {
+     buffer->y->tmp_row = malloc(sizeof(pic_data_t)*(MAX(buffer->y->width, buffer->y->height)));
+   }
+   if (buffer->u->tmp_row == NULL) {
+     buffer->u->tmp_row = malloc(sizeof(pic_data_t)*(MAX(buffer->u->width, buffer->u->height)));
+   }
+   if (buffer->v->tmp_row == NULL) {
+     buffer->v->tmp_row = malloc(sizeof(pic_data_t)*(MAX(buffer->v->width, buffer->v->height)));
+   }
 
    /*==========Start Resampling=============*/
    //Resample y
-   if(is_upscaling) copyPictureBuffer(yuv->y, buffer, 1);
-   resample(buffer, &param, is_upscaling, 1);
-   if(!is_upscaling) copyPictureBuffer(buffer, dst->y, 0);
+   if(is_upscaling) copyPictureBuffer(yuv->y, buffer->y, 1);
+   resample(buffer->y, &param, is_upscaling, 1);
+   if(!is_upscaling) copyPictureBuffer(buffer->y, dst->y, 0);
 
    //Skip chroma if CHROMA_400
    if (param.chroma != CHROMA_400) {
@@ -928,14 +963,14 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
      }
 
      //Resample u
-     copyPictureBuffer(yuv->u, buffer, 1);
-     resample(buffer, &param, is_upscaling, 0);
-     copyPictureBuffer(buffer, dst->u, 0);
+     if (is_upscaling) copyPictureBuffer(yuv->u, buffer->u, 1);
+     resample(buffer->u, &param, is_upscaling, 0);
+     if (!is_upscaling) copyPictureBuffer(buffer->u, dst->u, 0);
 
      //Resample v
-     copyPictureBuffer(yuv->v, buffer, 1);
-     resample(buffer, &param, is_upscaling, 0);
-     copyPictureBuffer(buffer, dst->v, 0);
+     if (is_upscaling) copyPictureBuffer(yuv->v, buffer->v, 1);
+     resample(buffer->v, &param, is_upscaling, 0);
+     if (!is_upscaling) copyPictureBuffer(buffer->v, dst->v, 0);
    }
 
    //Deallocate buffer
