@@ -175,10 +175,14 @@ void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst,
 /**
 * \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
+*/
+yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+/**
+* \brief Experimental. Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
+*        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
 * \pre yuv and dst must have tmp rows that are either NULL or valid and guaranteed to be atleast MAX(width,height) of the respective pic buffer.
 * \post the larger of yuv and dst will have valid tmp rows in it's pic buffers. 
 */
-yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
 yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
 
 /*=============================================================*/
