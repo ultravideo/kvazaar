@@ -259,6 +259,50 @@ pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row)
   return buffer;
 }
 
+yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row)
+{
+  yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+  yuv->format =format;
+  yuv->y = newPictureBuffer(width, height, has_tmp_row);
+
+  int w_factor = 0;
+  int h_factor = 0;
+
+  switch (format) {
+    case CHROMA_400:
+      {
+        //No chroma
+        width = height = 0;
+        break;
+      }
+    case CHROMA_420:
+      {
+        w_factor = 1;
+        h_factor = 1;
+        break;
+      }
+    case CHROMA_422:
+      {
+        w_factor = 1;
+        break;
+      }
+    case CHROMA_444:
+      {
+        break;
+      }
+    default:
+      assert(0);//Unsupported format
+  }
+
+  width = width >> w_factor;
+  height = height >> h_factor;
+
+  yuv->u = newPictureBuffer( width, height, has_tmp_row);
+  yuv->v = newPictureBuffer( width, height, has_tmp_row);
+
+  return yuv;
+}
+
 // ======================= newPictureBuffer_ ==================================
 //TODO: DO something about the lack of overloading?
 pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row)
@@ -342,12 +386,13 @@ void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst,
 }
 
 // ======================= newYuvBuffer_ ==================================
-yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format)
+yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+  yuv->format = format;
 
   //Allocate y pic_buffer
-  yuv->y = newPictureBuffer_double(y_data, width, height, 0);
+  yuv->y = newPictureBuffer_double(y_data, width, height, has_tmp_row);
 
   //Allocate u and v buffers
   int w_factor = 0;
@@ -381,18 +426,18 @@ yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* cons
 
   width = width >> w_factor;
   height = height >> h_factor;
-  yuv->u = newPictureBuffer_double(u_data, width, height, 0);
-  yuv->v = newPictureBuffer_double(v_data, width, height, 0);
+  yuv->u = newPictureBuffer_double(u_data, width, height, has_tmp_row);
+  yuv->v = newPictureBuffer_double(v_data, width, height, has_tmp_row);
 
   return yuv;
 }
 
-yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format)
+yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
 
   //Allocate y pic_buffer
-  yuv->y = newPictureBuffer_uint8(y_data, width, height, 0);
+  yuv->y = newPictureBuffer_uint8(y_data, width, height, has_tmp_row);
 
   //Allocate u and v buffers
   int w_factor = 0;
@@ -422,8 +467,8 @@ yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* con
 
   width = width >> w_factor;
   height = height >> h_factor;
-  yuv->u = newPictureBuffer_uint8(u_data, width, height, 0);
-  yuv->v = newPictureBuffer_uint8(v_data, width, height, 0);
+  yuv->u = newPictureBuffer_uint8(u_data, width, height, has_tmp_row);
+  yuv->v = newPictureBuffer_uint8(v_data, width, height, has_tmp_row);
 
   return yuv;
 }
@@ -771,10 +816,7 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
 
     deallocateYuvBuffer(dst); //Free old buffer if it exists
 
-    dst = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
-    dst->y = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
-    dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
-    dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
+    dst = newYuvBuffer(param.trgt_width, param.trgt_height, param.chroma, 0);
   }
 
   //Calculate if we are upscaling or downscaling
@@ -899,10 +941,7 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
 
     deallocateYuvBuffer(dst); //Free old buffer if it exists
 
-    dst = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
-    dst->y = newPictureBuffer(param.trgt_width, param.trgt_height, 0);
-    dst->u = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
-    dst->v = newPictureBuffer(SHIFT(param.trgt_width, w_factor), SHIFT(param.trgt_height, h_factor), 0);
+    dst = newYuvBuffer(param.trgt_width, param.trgt_height, param.chroma, 0);
   }
 
   //Calculate if we are upscaling or downscaling

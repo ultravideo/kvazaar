@@ -22,32 +22,6 @@
 
 #include <stdint.h>
 
-/*===============Buffer datastructure definitions=============*/
-typedef int pic_data_t; //Use some other type?
-
-/**
- * \brief Picture buffer type for operating on image data.
- */
-typedef struct
-{
-  pic_data_t* data; //Contain main data
-  pic_data_t* tmp_row; //A temporary buffer row that may be used to hold data when operating on buffer
-
-  int width;
-  int height;
-} pic_buffer_t;
-
-/**
-* \brief Picture buffer type for yuv frames.
-*/
-typedef struct
-{
-  pic_buffer_t* y;
-  pic_buffer_t* u;
-  pic_buffer_t* v;
-} yuv_buffer_t;
-
-/*==========================================================*/
 
 /*=====================Scaling parameter definition=====================*/
 //Format for specifying the ratio between chroma and luma
@@ -94,12 +68,54 @@ typedef struct
 } scaling_parameter_t;
 
 /*==========================================================================*/
+/*===========================Scaling parameter utility functions=================================*/
+/**
+* \brief Returns the appropriate chroma format for the given parameters
+*/
+chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height);
 
+/**
+* \brief Function for getting initial scaling parameters given src and trgt size parameters.
+*/
+scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+/*=============================================================================================*/
+
+
+/*===============Buffer datastructure definitions=============*/
+typedef int pic_data_t; //Use some other type?
+
+/**
+ * \brief Picture buffer type for operating on image data.
+ */
+typedef struct
+{
+  pic_data_t* data; //Contain main data
+  pic_data_t* tmp_row; //A temporary buffer row that may be used to hold data when operating on buffer
+
+  int width;
+  int height;
+} pic_buffer_t;
+
+/**
+* \brief Picture buffer type for yuv frames.
+*/
+typedef struct
+{
+  pic_buffer_t* y;
+  pic_buffer_t* u;
+  pic_buffer_t* v;
+
+  chroma_format_t format;
+} yuv_buffer_t;
+
+/*==========================================================*/
 /*==================Buffer utility functions===============*/
 /**
  * \brief Create a Picture buffer. The caller is responsible for deallocation
  */
 pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
+yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row);
 
 /**
 * \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
@@ -110,8 +126,8 @@ pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int h
 /**
 * \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
 */
-yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format);
-yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format);
+yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
+yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
 
 /**
 * \brief Clone the given pic buffer
@@ -153,18 +169,6 @@ void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst,
 
 /*=======================================================*/
 
-/*===========================Scaling parameter utility functions=================================*/
-/**
-* \brief Returns the appropriate chroma format for the given parameters
-*/
-chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height);
-
-/**
-* \brief Function for getting initial scaling parameters given src and trgt size parameters.
-*/
-scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
-scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
-/*=============================================================================================*/
 
 /*================Main scaling functions========================*/
 //TODO: Return/recycle the same buffer for the scaled yuv. Use yuv it self and not a separate buffer?
