@@ -206,7 +206,7 @@ void _kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = _newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
   *out = _yuvScaling(in, &param, *out);
 }
@@ -244,7 +244,7 @@ static void compute_psnr(const yuv_buffer_t *const src,
   }
 }
 
-pic_buffer_t* compareComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
+pic_buffer_t* diffComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
 {
   int width = pic1->width;
   int height = pic1->height;
@@ -261,13 +261,13 @@ pic_buffer_t* compareComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
   return res;
 }
 
-yuv_buffer_t* compare(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2)
+yuv_buffer_t* yuvDiff(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2)
 {
   yuv_buffer_t* res = newYuvBuffer(yuv1->y->width, yuv1->y->height, yuv1->format, 0);
 
-  res->y = compareComponent(yuv1->y, yuv2->y);
-  res->u = compareComponent(yuv1->u, yuv2->u);
-  res->v = compareComponent(yuv1->v, yuv2->v);
+  res->y = diffComponent(yuv1->y, yuv2->y);
+  res->u = diffComponent(yuv1->u, yuv2->u);
+  res->v = diffComponent(yuv1->v, yuv2->v);
 
   return res;
 }
@@ -290,7 +290,32 @@ void printMeanColor(yuv_buffer_t* yuv)
   printf("V avg color: %f\n",meanColorComponent(yuv->v));
 }
 
+double sumComponent(pic_buffer_t* pic)
+{
+  int size = pic->width*pic->height;
+  long int sum = 0;
 
+  for(int i = 0; i < size; i++) {
+    sum += abs(pic->data[i]);
+  }
+  return (double)sum;
+}
+
+int isZero(yuv_buffer_t* yuv)
+{
+  return sumComponent(yuv->y) != 0 ? 0 : (sumComponent(yuv->u) != 0 ? 0 : (sumComponent(yuv->v) != 0 ? 0 : 1));
+}
+
+int isSame(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2 )
+{
+  yuv_buffer_t* result = yuvDiff(yuv1, yuv2);
+  
+  int res = isZero(result);
+
+  deallocateYuvBuffer(result);
+
+  return res;
+}
 
 /*void test1()
 {
@@ -382,8 +407,8 @@ void test3()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = 192;
-  int32_t out_height = 108;
+  int32_t out_width = 100;
+  int32_t out_height = 290;
   int framerate = 24;
 
   //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
@@ -405,7 +430,7 @@ void test3()
 
   if (yuv_io_read(file, in_width, in_height, data)) {
 
-    kvzScaling(data, &out);
+    _kvzScaling(data, &out);
 
     FILE* out_file = fopen(out_file_name, "wb");
     yuv_io_write(out_file, out, out->y->width, out->y->height);
@@ -427,18 +452,15 @@ void test4()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = 50;
-  int32_t out_height = 50;
+  int32_t out_width = 500;
+  int32_t out_height = 550;
   int framerate = 24;
 
   //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
 
   char in_file_name[BUFF_SIZE];
   sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
-
-  char out_file_name[BUFF_SIZE];
-  sprintf(out_file_name, "Kimono1_%ix%i_%i_s.yuv", out_width, out_height, framerate);
-
+  
   FILE* file = fopen(in_file_name, "rb");
   if (file == NULL) {
     perror("FIle open failed");
@@ -457,7 +479,7 @@ void test4()
     kvzScaling(data1, &out1);
     _kvzScaling(data2, &out2);
 
-    yuv_buffer_t* result = compare(out1, out2);
+    yuv_buffer_t* result = yuvDiff(out1, out2);
     printout(result);
     printMeanColor(result);
 
@@ -482,6 +504,77 @@ void test4()
   deallocateYuvBuffer(out1);
   deallocateYuvBuffer(data2);
   deallocateYuvBuffer(out2);
+  fclose(file);
+}
+
+//Check different widths and heights to make sure the tested methods produce the same result
+void test5()
+{
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width_beg = 100;
+  int32_t out_height_beg = 100;
+  int32_t max_width = 3000;
+  int32_t max_height = 3000;
+
+  const int w_step = 10;
+  const int h_step = 10;
+  int framerate = 24;
+
+  //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+
+  FILE* file = fopen(in_file_name, "rb");
+  if (file == NULL) {
+    perror("FIle open failed");
+    printf("File name: %s", in_file_name);
+  }
+
+  yuv_buffer_t* data = newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* data1 = NULL;
+  yuv_buffer_t* data2 = NULL;
+
+  int all_same = 1;
+
+  if (yuv_io_read(file, in_width, in_height, data)) {
+    //Iterate over different widths and heights
+    for (int w = out_width_beg; w < max_width; w += w_step) {
+      for (int h = out_height_beg; h < max_height; h += h_step) {
+        data1 = cloneYuvBuffer(data);
+        data2 = cloneYuvBuffer(data);
+
+        yuv_buffer_t* out1 = newYuvBuffer(w, h, CHROMA_420, 0);
+        yuv_buffer_t* out2 = newYuvBuffer(w, h, CHROMA_420, 0);
+
+        kvzScaling(data1, &out1);
+        _kvzScaling(data2, &out2);
+
+        if (isSame(out1,out2)) {
+          fprintf(stderr, "\rCur size: %dx%d\n", w, h);
+        }
+        else {
+          printf("Not same at %ix%i size.\n", w, h);
+          all_same = 0;
+        }
+        deallocateYuvBuffer(data1);
+        deallocateYuvBuffer(data2);
+        deallocateYuvBuffer(out1);
+        deallocateYuvBuffer(out2);
+      }
+    }
+  }
+  else {
+    perror("Read fail");
+    if (feof(file)) perror("End of file");
+    if (ferror(file)) perror("File error");
+  }
+
+  if(all_same) printf("All were same.\n");
+
+  deallocateYuvBuffer(data);
+  
   fclose(file);
 }
 
