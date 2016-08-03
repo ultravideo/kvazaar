@@ -108,6 +108,8 @@ static const struct option long_options[] = {
   {"cu-split-termination",required_argument, NULL, 0 },
   { "crypto",             required_argument, NULL, 0 },
   { "me-early-termination",required_argument, NULL, 0 },
+  { "lossless",                 no_argument, NULL, 0 },
+  { "no-lossless",              no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -368,7 +370,7 @@ void print_help(void)
     "                                     0: disable rate-control\n"
     "                                     N: target N bits per second\n"
     "          --preset <string>      : Use preset. This will override previous options.\n"
-    "                                     ultrafast, superfast,veryfast, faster,\n"
+    "                                     ultrafast, superfast, veryfast, faster,\n"
     "                                     fast, medium, slow, slower, veryslow, placebo\n"
     "          --no-psnr              : Don't calculate PSNR for frames\n"
     "          --loop-input           : Re-read input file forever\n"
@@ -384,10 +386,11 @@ void print_help(void)
     "                                     \"zero\": Terminate when splitting gives little\n"
     "                                               improvement.\n"
     "                                     \"off\": Don't terminate splitting early\n"
-    "          --me-early-termitanion : Specify the me early termination behaviour\n"
+    "          --me-early-termination : Specify the me early termination behaviour\n"
     "                                     \"off\": Early termination is off\n"
     "                                     \"on\": Early termination is on\n"
     "                                     \"sensitive\": Sensitive early termination is on\n"
+    "          --lossless             : Use lossless coding\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
@@ -415,7 +418,7 @@ void print_help(void)
     "                                   Disable threads if set to 0.\n"
     "\n"
     "  Tiles:\n"
-    "          --tiles <int>x<int>    : Split picture into wdith x height uniform tiles.\n"
+    "          --tiles <int>x<int>    : Split picture into width x height uniform tiles.\n"
     "          --tiles-width-split <string>|u<int> :\n"
     "                                   Specifies a comma separated list of pixel\n"
     "                                   positions of tiles columns separation coordinates.\n"

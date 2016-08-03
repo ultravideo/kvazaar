@@ -276,6 +276,8 @@ typedef struct kvz_config
 
   enum kvz_me_early_termination me_early_termination; /*!< \since 3.8.0 \brief Mode of me early termination. */
 
+  int32_t lossless; /*!< \brief Use lossless coding. */
+
 } kvz_config;
 
 /**

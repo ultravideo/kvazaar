@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "May 2016" "kvazaar v0.8.3" "User Commands"
+.TH KVAZAAR "1" "August 2016" "kvazaar v0.8.3" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -100,9 +100,12 @@ Set integer motion estimation algorithm ["hexbs"]
   "full":  Full Search (super slow)
 .TP
 \fB\-\-subme <integer>     
-Set fractional pixel motion estimation level [1].
+Set fractional pixel motion estimation level [4].
   0: only integer motion estimation
-  1: fractional pixel motion estimation enabled
+  1: + 1/2\-pixel horizontal and vertical
+  2: + 1/2\-pixel diagonal
+  3: + 1/4\-pixel horizontal and vertical
+  4: + 1/4\-pixel diagonal
 .TP
 \fB\-\-source\-scan\-type <string>
 Set source scan type ["progressive"].
@@ -137,7 +140,7 @@ Target bitrate. [0]
 .TP
 \fB\-\-preset <string>     
 Use preset. This will override previous options.
-  ultrafast, superfast,veryfast, faster,
+  ultrafast, superfast, veryfast, faster,
   fast, medium, slow, slower, veryslow, placebo
 .TP
 \fB\-\-no\-psnr             
@@ -163,6 +166,15 @@ Specify the cu split termination behaviour
   "zero": Terminate when splitting gives little
             improvement.
   "off": Don't terminate splitting early
+.TP
+\fB\-\-me\-early\-termination
+Specify the me early termination behaviour
+  "off": Early termination is off
+  "on": Early termination is on
+  "sensitive": Sensitive early termination is on
+.TP
+\fB\-\-lossless            
+Use lossless coding
 
 .SS "Video Usability Information:"
 .TP
@@ -210,7 +222,7 @@ Disable threads if set to 0.
 .SS "Tiles:"
 .TP
 \fB\-\-tiles <int>x<int>   
-Split picture into wdith x height uniform tiles.
+Split picture into width x height uniform tiles.
 .TP
 \fB\-\-tiles\-width\-split <string>|u<int>
 Specifies a comma separated list of pixel

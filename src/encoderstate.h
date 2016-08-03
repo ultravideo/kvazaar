@@ -183,7 +183,7 @@ typedef struct encoder_state_t {
 
   /**
    * \brief Indicates that this encoder state is ready for encoding the
-   * next frame i.e. kvz_encoder_next_frame has been called.
+   * next frame i.e. kvz_encoder_prepare has been called.
    */
   int prepared;
 
@@ -201,9 +201,9 @@ typedef struct encoder_state_t {
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
 } encoder_state_t;
 
-void kvz_encode_one_frame(encoder_state_t *state);
+void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
 
-void kvz_encoder_next_frame(encoder_state_t *state);
+void kvz_encoder_prepare(encoder_state_t *state);
 
 
 void kvz_encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,

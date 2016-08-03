@@ -741,6 +741,8 @@ static void sao_search_luma(const encoder_state_t * const state, const videofram
 
 void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y)
 {
+  assert(!state->encoder_control->cfg->lossless);
+
   videoframe_t* const frame = state->tile->frame;
   const int stride = frame->width_in_lcu;
   int32_t merge_cost_luma[3] = { INT32_MAX };

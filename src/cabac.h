@@ -76,6 +76,7 @@ typedef struct
     cabac_ctx_t cu_skip_flag_model[3];
     cabac_ctx_t cu_merge_idx_ext_model;
     cabac_ctx_t cu_merge_flag_ext_model;
+    cabac_ctx_t cu_transquant_bypass;
     cabac_ctx_t cu_mvd_model[2];
     cabac_ctx_t cu_ref_pic_model[2];
     cabac_ctx_t mvp_idx_model[2];

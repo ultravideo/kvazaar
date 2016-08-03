@@ -84,7 +84,7 @@ Optional parameters:
                                      0: disable rate-control
                                      N: target N bits per second
           --preset <string>      : Use preset. This will override previous options.
-                                     ultrafast, superfast,veryfast, faster,
+                                     ultrafast, superfast, veryfast, faster,
                                      fast, medium, slow, slower, veryslow, placebo
           --no-psnr              : Don't calculate PSNR for frames
           --loop-input           : Re-read input file forever
@@ -100,6 +100,11 @@ Optional parameters:
                                      "zero": Terminate when splitting gives little
                                                improvement.
                                      "off": Don't terminate splitting early
+          --me-early-termination : Specify the me early termination behaviour
+                                     "off": Early termination is off
+                                     "on": Early termination is on
+                                     "sensitive": Sensitive early termination is on
+          --lossless             : Use lossless coding
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio
@@ -127,7 +132,7 @@ Optional parameters:
                                    Disable threads if set to 0.
 
   Tiles:
-          --tiles <int>x<int>    : Split picture into wdith x height uniform tiles.
+          --tiles <int>x<int>    : Split picture into width x height uniform tiles.
           --tiles-width-split <string>|u<int> :
                                    Specifies a comma separated list of pixel
                                    positions of tiles columns separation coordinates.

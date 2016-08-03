@@ -328,13 +328,13 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     tr_tree_bits += CTX_ENTROPY_FBITS(ctx, cbf_is_set(pred_cu->cbf, depth, COLOR_Y));
   }
 
-  unsigned ssd = 0;
   // SSD between reconstruction and original
-  for (int y = y_px; y < y_px + width; ++y) {
-    for (int x = x_px; x < x_px + width; ++x) {
-      int diff = (int)lcu->rec.y[y * LCU_WIDTH + x] - (int)lcu->ref.y[y * LCU_WIDTH + x];
-      ssd += diff*diff;
-    }
+  int ssd = 0;
+  if (!state->encoder_control->cfg->lossless) {
+    int index = y_px * LCU_WIDTH + x_px;
+    ssd = kvz_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
+                                        LCU_WIDTH,          LCU_WIDTH,
+                                        width);
   }
 
   {
@@ -397,17 +397,15 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   // Chroma SSD
   int ssd = 0;
-  for (int y = lcu_px.y; y < lcu_px.y + width; ++y) {
-    for (int x = lcu_px.x; x < lcu_px.x + width; ++x) {
-      int diff = (int)lcu->rec.u[y * LCU_WIDTH_C + x] - (int)lcu->ref.u[y * LCU_WIDTH_C + x];
-      ssd += diff * diff;
-    }
-  }
-  for (int y = lcu_px.y; y < lcu_px.y + width; ++y) {
-    for (int x = lcu_px.x; x < lcu_px.x + width; ++x) {
-      int diff = (int)lcu->rec.v[y * LCU_WIDTH_C + x] - (int)lcu->ref.v[y * LCU_WIDTH_C + x];
-      ssd += diff * diff;
-    }
+  if (!state->encoder_control->cfg->lossless) {
+    int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
+    int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
+                                    LCU_WIDTH_C,         LCU_WIDTH_C,
+                                    width);
+    int ssd_v = kvz_pixels_calc_ssd(&lcu->ref.v[index], &lcu->rec.v[index],
+                                    LCU_WIDTH_C,        LCU_WIDTH_C,
+                                    width);
+    ssd = ssd_u + ssd_v;
   }
 
   {

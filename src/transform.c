@@ -47,6 +47,51 @@ const uint8_t kvz_g_chroma_scale[58]=
 //
 
 /**
+ * \brief Bypass transform and quantization.
+ *
+ * Copies the reference pixels directly to reconstruction and the residual
+ * directly to coefficients. Used when cu_transquant_bypass_flag is set.
+ * Parameters pred_in and rec_out may be aliased.
+ *
+ * \param width       Transform width.
+ * \param in_stride   Stride for ref_in and pred_in
+ * \param out_stride  Stride for rec_out and coeff_out.
+ * \param ref_in      Reference pixels.
+ * \param pred_in     Predicted pixels.
+ * \param rec_out     Returns the reconstructed pixels.
+ * \param coeff_out   Returns the coefficients used for reconstruction of rec_out.
+ *
+ * \returns  Whether coeff_out contains any non-zero coefficients.
+ */
+static bool bypass_transquant(const int width,
+                              const int in_stride,
+                              const int out_stride,
+                              const kvz_pixel *const ref_in,
+                              const kvz_pixel *const pred_in,
+                              kvz_pixel *rec_out,
+                              coeff_t *coeff_out)
+{
+  bool nonzero_coeffs = false;
+
+  for (int y = 0; y < width; ++y) {
+    for (int x = 0; x < width; ++x) {
+      int32_t in_idx  = x + y * in_stride;
+      int32_t out_idx = x + y * out_stride;
+
+      // The residual must be computed before writing to rec_out because
+      // pred_in and rec_out may point to the same array.
+      coeff_t coeff      = (coeff_t)(ref_in[in_idx] - pred_in[in_idx]);
+      coeff_out[out_idx] = coeff;
+      rec_out[out_idx]   = ref_in[in_idx];
+
+      nonzero_coeffs |= (coeff != 0);
+    }
+  }
+
+  return nonzero_coeffs;
+}
+
+/**
  * \brief Get scaled QP used in quantization
  *
  */
@@ -264,9 +309,15 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
     // is called more than once.
     cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
 
-    if (width == 4 && 
-        state->encoder_control->trskip_enable)
-    {
+
+    if (state->encoder_control->cfg->lossless) {
+      if (bypass_transquant(width,
+                            LCU_WIDTH, LCU_WIDTH,
+                            base_y, recbase_y,
+                            recbase_y, orig_coeff_y)) {
+        cbf_set(&cur_pu->cbf, depth, COLOR_Y);
+      }
+    } else if (width == 4 && state->encoder_control->trskip_enable) {
       // Try quantization with trskip and use it if it's better.
       int has_coeffs = kvz_quantize_residual_trskip(
           state, cur_pu, width, COLOR_Y, scan_idx_luma,
@@ -346,11 +397,27 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
     int chroma_width = LCU_WIDTH_C >> chroma_depth;
 
     scan_idx_chroma = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
-    if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
-      cbf_set(&cur_cu->cbf, depth, COLOR_U);
-    }
-    if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
-      cbf_set(&cur_cu->cbf, depth, COLOR_V);
+
+    if (state->encoder_control->cfg->lossless) {
+      if (bypass_transquant(chroma_width,
+                            LCU_WIDTH_C, LCU_WIDTH_C,
+                            base_u, recbase_u,
+                            recbase_u, orig_coeff_u)) {
+        cbf_set(&cur_cu->cbf, depth, COLOR_U);
+      }
+      if (bypass_transquant(chroma_width,
+                            LCU_WIDTH_C, LCU_WIDTH_C,
+                            base_v, recbase_v,
+                            recbase_v, orig_coeff_v)) {
+        cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      }
+    } else {
+      if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {
+        cbf_set(&cur_cu->cbf, depth, COLOR_U);
+      }
+      if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_V, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_v, recbase_v, recbase_v, orig_coeff_v)) {
+        cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      }
     }
   }
 }

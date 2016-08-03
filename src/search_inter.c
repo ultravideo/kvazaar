@@ -1017,7 +1017,7 @@ static unsigned search_frac(encoder_state_t * const state,
 
   unsigned costs[4] = { 0 };
 
-  kvz_extended_block src = { 0, 0, 0 };
+  kvz_extended_block src = { 0, 0, 0, 0 };
 
   // Buffers for interpolated fractional pixels one 
   // for each position excluding the integer position.
