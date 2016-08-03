@@ -105,6 +105,8 @@ Optional parameters:
                                      "on": Early termination is on
                                      "sensitive": Sensitive early termination is on
           --lossless             : Use lossless coding
+          --implicit-rdpcm       : Enable implicit residual DPCM. Currently only supported
+                                   with lossless coding.
           --no-tmvp              : Disable Temporal Motion Vector Prediction
           --rdoq-skip            : Skips RDOQ for 4x4 blocks
           --input-format         : P420 or P400

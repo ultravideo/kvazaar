@@ -84,6 +84,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->hash            = KVZ_HASH_CHECKSUM;
   cfg->lossless        = false;
   cfg->tmvp_enable     = true;
+  cfg->implicit_rdpcm  = false;
 
   cfg->cu_split_termination = KVZ_CU_SPLIT_TERMINATION_ZERO;
 
@@ -944,6 +945,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       return 0;
     }
   }
+  else if OPT("implicit-rdpcm")
+    cfg->implicit_rdpcm = (bool)atobool(value);
   else
     return 0;
 #undef OPT
@@ -1208,6 +1211,11 @@ int kvz_config_validate(const kvz_config *const cfg)
       fprintf(stderr, "Input error: last tile separation in height (%d) should smaller than image height (%d)\n", cfg->tiles_height_split[cfg->tiles_height_count - 2], cfg->height);
       error = 1;
     }
+  }
+
+  if (cfg->implicit_rdpcm && !cfg->lossless) {
+    fprintf(stderr, "Input error: --implicit-rdpcm is not suppoted without --lossless\n");
+    error = 1;
   }
 
   return !error;

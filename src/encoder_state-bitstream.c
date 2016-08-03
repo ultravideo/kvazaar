@@ -293,6 +293,33 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   //ENDIF
 }
 
+
+static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
+                                                        encoder_state_t * const state)
+{
+  if (state->encoder_control->cfg->implicit_rdpcm &&
+      state->encoder_control->cfg->lossless) {
+    WRITE_U(stream, 1, 1, "sps_extension_present_flag");
+
+    WRITE_U(stream, 1, 1, "sps_range_extension_flag");
+    WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
+    WRITE_U(stream, 0, 1, "sps_3d_extension_flag");
+    WRITE_U(stream, 0, 5, "sps_extension_5bits");
+
+    WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
+    WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
+    WRITE_U(stream, 1, 1, "implicit_rdpcm_enabled_flag");
+    WRITE_U(stream, 0, 1, "explicit_rdpcm_enabled_flag");
+    WRITE_U(stream, 0, 1, "extended_precision_processing_flag");
+    WRITE_U(stream, 0, 1, "intra_smoothing_disabled_flag");
+    WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
+    WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
+    WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
+  } else {
+    WRITE_U(stream, 0, 1, "sps_extension_present_flag");
+  }
+}
+
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -399,27 +426,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   encoder_state_write_bitstream_VUI(stream, state);
 
-  if (encoder->cfg->lossless) {
-    // Use range extensions for RDPCM in lossless mode.
-    WRITE_U(stream, 1, 1, "sps_extension_present_flag");
-
-    WRITE_U(stream, 1, 1, "sps_range_extension_flag");
-    WRITE_U(stream, 0, 1, "sps_multilayer_extension_flag");
-    WRITE_U(stream, 0, 1, "sps_3d_extension_flag");
-    WRITE_U(stream, 0, 5, "sps_extension_5bits");
-
-    WRITE_U(stream, 0, 1, "transform_skip_rotation_enabled_flag");
-    WRITE_U(stream, 0, 1, "transform_skip_context_enabled_flag");
-    WRITE_U(stream, 1, 1, "implicit_rdpcm_enabled_flag");
-    WRITE_U(stream, 0, 1, "explicit_rdpcm_enabled_flag");
-    WRITE_U(stream, 0, 1, "extended_precision_processing_flag");
-    WRITE_U(stream, 0, 1, "intra_smoothing_disabled_flag");
-    WRITE_U(stream, 0, 1, "high_precision_offsets_enabled_flag");
-    WRITE_U(stream, 0, 1, "persistent_rice_adaptation_enabled_flag");
-    WRITE_U(stream, 0, 1, "cabac_bypass_alignment_enabled_flag");
-  } else {
-    WRITE_U(stream, 0, 1, "sps_extension_present_flag");
-  }
+  encoder_state_write_bitstream_SPS_extension(stream, state);
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }

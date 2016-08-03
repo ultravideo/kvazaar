@@ -348,7 +348,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
                             recbase_y, orig_coeff_y)) {
         cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
-      if (cur_pu->type == CU_INTRA) {
+      if (state->encoder_control->cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
         // implicit rdpcm for horizontal and vertical intra modes
         if (cur_pu->intra.mode == 10) {
           rdpcm(width, LCU_WIDTH, RDPCM_HOR, orig_coeff_y);
@@ -451,7 +451,7 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
                             recbase_v, orig_coeff_v)) {
         cbf_set(&cur_cu->cbf, depth, COLOR_V);
       }
-      if (cur_cu->type == CU_INTRA) {
+      if (state->encoder_control->cfg->implicit_rdpcm && cur_cu->type == CU_INTRA) {
         // implicit rdpcm for horizontal and vertical intra modes
         if (cur_cu->intra.mode_chroma == 10) {
           rdpcm(chroma_width, LCU_WIDTH_C, RDPCM_HOR, orig_coeff_u);

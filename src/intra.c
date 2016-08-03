@@ -454,8 +454,9 @@ void kvz_intra_recon_lcu_luma(
   kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
 
   kvz_pixel pred[32 * 32];
-  kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred,
-                    !state->encoder_control->cfg->lossless);
+  const kvz_config *cfg = state->encoder_control->cfg;
+  bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
+  kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred, filter_boundary);
   
   kvz_pixel *block_in_lcu = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
   kvz_pixels_blit(pred, block_in_lcu, width, width, width, LCU_WIDTH);
