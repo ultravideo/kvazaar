@@ -341,7 +341,7 @@ static void set_el_frame_info(kvz_frame_info *const info, const encoder_state_t 
 
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //Create a new kvz picture based on pic_in with size given by width and height
-kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int height, int width)
+kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int width, int height)
 {
   //Create the buffers that are passed to the scaling function
   //TODO: Consider the case when kvz_pixel is not uint8
@@ -361,7 +361,7 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int height, int wi
   int chroma_size = luma_size/4;
   int full_size = luma_size + chroma_size*2;
   for(int i = 0; i < full_size; i++) {
-    pic_out->fulldata[i] = i < luma_size ? trgt_pic->y->data[i] : (i < luma_size+chroma_size ? trgt_pic->u->data[i] : trgt_pic->v->data[i]);
+    pic_out->fulldata[i] = i < luma_size ? trgt_pic->y->data[i] : (i < luma_size+chroma_size ? trgt_pic->u->data[i-luma_size] : trgt_pic->v->data[i-luma_size-chroma_size]);
   }
 
   //Do deallocation
