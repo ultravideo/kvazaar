@@ -302,7 +302,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //TODO: Implement own settings for alternate rep formats.
   for (int i = 0; i <= vps_num_rep_formats_minus1; i++) {
     //rep_format(){
-    encoder_control_t* encoder = state->encoder_control;
+    const encoder_control_t* encoder = state->encoder_control;
     WRITE_U(stream, encoder->in.width, 16, "pic_width_vps_in_luma_samples");
     WRITE_U(stream, encoder->in.height, 16, "pic_height_vps_in_luma_samples");
     

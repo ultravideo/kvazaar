@@ -61,6 +61,20 @@ struct kvz_encoder {
 
   unsigned frames_started;
   unsigned frames_done;
+
+  // ***********************************************
+  // Modified for SHVC
+  //TODO: Allow more than two layers
+  //Dublicate encoder states for enhancement layers
+  struct encoder_control_t* el_control;
+  struct encoder_state_t* el_states;
+  unsigned cur_el_state_num;
+  unsigned out_el_state_num;
+  struct input_frame_buffer_t el_input_buffer;
+  unsigned el_frames_started;
+  unsigned el_frames_done;
+  // ***********************************************
+  
 };
 
 #endif // KVAZAAR_INTERNAL_H_

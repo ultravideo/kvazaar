@@ -516,3 +516,34 @@ void print_frame_info(const kvz_frame_info *const info,
 
   fprintf(stderr, "\n");
 }
+
+// ***********************************************
+        // Modified for SHVC
+//TODO: Merge with print_frame_info?
+void print_el_frame_info(const kvz_frame_info * const info,
+                         const double frame_psnr[3],
+                         const uint32_t bytes)
+{
+  fprintf(stderr, "POC %4d is_el QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
+          info->poc,
+          info->el_qp,
+          "BPI"[info->el_slice_type % 3],
+          bytes << 3,
+          frame_psnr[0], frame_psnr[1], frame_psnr[2]);
+
+  if (info->slice_type != KVZ_SLICE_I) {
+    // Print reference picture lists
+    fprintf(stderr, " [L0 ");
+    for (int j = info->el_ref_list_len[0] - 1; j >= 0; j--) {
+      fprintf(stderr, "%d ", info->el_ref_list[0][j]);
+    }
+    fprintf(stderr, "] [L1 ");
+    for (int j = 0; j < info->el_ref_list_len[1]; j++) {
+      fprintf(stderr, "%d ", info->el_ref_list[1][j]);
+    }
+    fprintf(stderr, "]");
+  }
+
+  fprintf(stderr, "\n");
+}
+// ***********************************************

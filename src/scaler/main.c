@@ -580,7 +580,7 @@ void test5()
 
 int main()
 {
-  test3();
+  test5();
 
   system("Pause");
   return EXIT_SUCCESS;

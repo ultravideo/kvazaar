@@ -59,4 +59,12 @@ void print_frame_info(const kvz_frame_info *const info,
                       const double frame_psnr[3],
                       const uint32_t bytes);
 
+// ***********************************************
+        // Modified for SHVC
+//TODO: Merge with print_frame_info?
+void print_el_frame_info(const kvz_frame_info * const info,
+                         const double frame_psnr[3],
+                         const uint32_t bytes);
+// ***********************************************
+       
 #endif

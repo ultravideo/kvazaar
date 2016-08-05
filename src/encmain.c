@@ -348,15 +348,15 @@ int main(int argc, char *argv[])
 
   //******************************************
   //TODO: Replace with proper implementation. Move to encoder?
-  opts->config->layer = 1;
+  opts->config->layer = 0;
   opts->config->max_layers = 2;
-  kvz_encoder *el_enc = api->encoder_open(opts->config);
+  /*kvz_encoder *el_enc = api->encoder_open(opts->config);
   if (!el_enc) {
     fprintf(stderr, "Failed to open encoder.\n");
     goto exit_failure;
   }
   opts->config->layer = 0;
-  //******************************************
+  *///******************************************
 
   enc = api->encoder_open(opts->config);
   if (!enc) {
@@ -511,9 +511,47 @@ int main(int argc, char *argv[])
         psnr_sum[2] += frame_psnr[2];
 
         print_frame_info(&info_out, frame_psnr, len_out);
+
+        // ***********************************************
+        // Modified for SHVC
+        //TODO: Figure out a better way?
+        //We use the subimage to pass bl and el images from the encoder at several at the time.
+        //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
+        kvz_picture* el_img_src = img_src->base_image;
+        kvz_picture* el_img_rec = img_rec->base_image;
+        img_src->base_image = img_src; //Need to set correct base image for deallocation
+        img_rec->base_image = img_rec;
+
+        //Calculate info
+        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+          // Do not compute PSNR for interlaced frames, because img_rec does not contain
+          // the deinterlaced frame yet.
+          compute_psnr(el_img_src, el_img_rec, frame_psnr);
+        }
+
+        if (recout) {
+          // Since chunks_out was not NULL, img_rec should have been set.
+          assert(el_img_rec);
+          if (!yuv_io_write(recout,
+                            el_img_rec,
+                            opts->config->width,
+                            opts->config->height)) {
+            fprintf(stderr, "Failed to write reconstructed picture!\n");
+          }
+        }
+
+        //TODO: Print el info correctly. Do calculate psnr_sum for el
+        print_el_frame_info(&info_out, frame_psnr, len_out);
+
+        //Deallocate el_img_*
+        //TODO: Need to deallocate even if no data is output?
+        api->picture_free(el_img_rec);
+        api->picture_free(el_img_src);
       }
 
-      //******************************************
+      
+// ***********************************************
+      /******************************************
       //DO EL coding here
       //TODO: DO Proper implementation. Move to encoder?
       //Use img_src as the EL picture to encode
@@ -585,7 +623,7 @@ int main(int argc, char *argv[])
 
         print_frame_info(&info_out, frame_psnr, len_out);
       }
-      //********************************
+      *///********************************
 
       api->picture_free(cur_in_img);
       api->chunk_free(chunks_out);
