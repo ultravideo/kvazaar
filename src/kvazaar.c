@@ -116,6 +116,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   //TODO: Make a better implementaino. el_cfg is needed to pass the layer id, figure out a better way
   kvz_config* el_cfg = kvz_config_alloc();
   *el_cfg = *cfg;
+  el_cfg->qp = 1;
   encoder->el_control = kvz_encoder_control_init(el_cfg);
 
   encoder->cur_el_state_num = 0;
@@ -373,7 +374,7 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int height, int wi
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   //DO scaling here
-  kvz_picture* bl_pic_in = kvazaar_scaling(pic_in, pic_in->width/2, pic_in->height/2); //TODO: Get bl w/h from cfg etc.
+  kvz_picture* bl_pic_in = kvazaar_scaling(pic_in, pic_in->width, pic_in->height);//pic_in->width/2, pic_in->height/2); //TODO: Get bl w/h from cfg etc.
 
   //Encode Bl first
   if (!kvazaar_encode(enc, bl_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
@@ -397,6 +398,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   if (!state->prepared) {
     kvz_encoder_next_frame(state);
     //Also add base layer to the reference list
+    //TODO: Add upscaling
     kvz_image_list_add( state->global->ref, bl_state->tile->frame->rec, bl_state->tile->frame->cu_array, bl_state->global->poc );
   }
 
