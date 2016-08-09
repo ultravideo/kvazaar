@@ -25,7 +25,6 @@
 #include "image.h"
 #include "kvz_math.h"
 #include "strategies/strategies-intra.h"
-#include "strategies/strategies-picture.h"
 #include "tables.h"
 #include "transform.h"
 #include "videoframe.h"

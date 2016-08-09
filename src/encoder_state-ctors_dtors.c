@@ -29,8 +29,10 @@
 #include "encoder.h"
 #include "encoder_state-geometry.h"
 #include "encoderstate.h"
+#include "extras/crypto.h"
 #include "image.h"
 #include "imagelist.h"
+#include "kvazaar.h"
 #include "threadqueue.h"
 #include "videoframe.h"
 

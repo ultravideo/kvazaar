@@ -25,8 +25,8 @@
 #include <string.h>
 
 #include "cabac.h"
+#include "image.h"
 #include "rdo.h"
-#include "strategies/strategies-picture.h"
 #include "strategies/strategies-sao.h"
 
 

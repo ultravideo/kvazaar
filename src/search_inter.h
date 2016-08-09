@@ -30,6 +30,7 @@
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
 #include "inter.h"
+#include "kvazaar.h"
 
 #define FILTER_SIZE 8
 #define HALF_FILTER (FILTER_SIZE>>1)

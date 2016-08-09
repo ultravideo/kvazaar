@@ -32,7 +32,6 @@
 #include "rdo.h"
 #include "search_inter.h"
 #include "search_intra.h"
-#include "strategies/strategies-picture.h"
 #include "threadqueue.h"
 #include "transform.h"
 #include "videoframe.h"

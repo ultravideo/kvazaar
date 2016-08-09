@@ -21,7 +21,6 @@
 #include "strategies/generic/picture-generic.h"
 
 #include <stdlib.h>
-#include <string.h>
 
 #include "strategies/strategies-picture.h"
 #include "strategyselector.h"

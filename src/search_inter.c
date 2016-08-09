@@ -22,7 +22,6 @@
 
 #include <limits.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "cabac.h"
 #include "encoder.h"

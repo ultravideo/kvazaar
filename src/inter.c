@@ -25,9 +25,9 @@
 
 #include "encoder.h"
 #include "imagelist.h"
-#include "strategies/generic/ipol-generic.h"
 #include "strategies/generic/picture-generic.h"
 #include "strategies/strategies-ipol.h"
+#include "videoframe.h"
 
 
 static void inter_recon_frac_luma(const encoder_state_t * const state,

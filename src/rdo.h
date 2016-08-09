@@ -30,9 +30,7 @@
 #include "cu.h"
 #include "encoderstate.h"
 #include "global.h" // IWYU pragma: keep
-#include "inter.h"
 #include "search_inter.h"
-#include "kvazaar.h"
 
 
 extern const uint32_t kvz_g_go_rice_range[5];
