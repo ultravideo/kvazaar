@@ -206,20 +206,6 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
 void kvz_encoder_prepare(encoder_state_t *state);
 
 
-void kvz_encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,
-                        uint16_t y_ctb, uint8_t depth);
-
-void kvz_encode_last_significant_xy(encoder_state_t *state,
-                                uint8_t lastpos_x, uint8_t lastpos_y,
-                                uint8_t width, uint8_t height,
-                                uint8_t type, uint8_t scan);
-void kvz_encode_coeff_nxn(encoder_state_t *state, coeff_t *coeff, uint8_t width,
-                      uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void kvz_encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
-                            int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
-void encode_block_residual(const encoder_control_t * const encoder,
-                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
-
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);

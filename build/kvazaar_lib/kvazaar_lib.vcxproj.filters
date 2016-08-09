@@ -207,6 +207,9 @@
     <ClCompile Include="..\..\src\encoder_state-bitstream.c">
       <Filter>Bitstream</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\encode_coding_tree.c">
+      <Filter>Bitstream</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\strategies\strategies-sao.c">
       <Filter>Optimization\strategies</Filter>
     </ClCompile>
@@ -391,6 +394,9 @@
       <Filter>Optimization\strategies\altivec</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\encoder_state-bitstream.h">
+      <Filter>Bitstream</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\encode_coding_tree.h">
       <Filter>Bitstream</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\kvz_math.h" />

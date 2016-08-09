@@ -25,6 +25,7 @@
 
 #include "cabac.h"
 #include "context.h"
+#include "encode_coding_tree.h"
 #include "encoder.h"
 #include "imagelist.h"
 #include "inter.h"

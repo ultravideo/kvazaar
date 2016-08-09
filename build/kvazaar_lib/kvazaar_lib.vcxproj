@@ -139,6 +139,7 @@
     <ClCompile Include="..\..\src\encoder_state-bitstream.c" />
     <ClCompile Include="..\..\src\encoder_state-ctors_dtors.c" />
     <ClCompile Include="..\..\src\encoder_state-geometry.c" />
+    <ClCompile Include="..\..\src\encode_coding_tree.c" />
     <ClCompile Include="..\..\src\extras\getopt.c" />
     <ClCompile Include="..\..\src\filter.c" />
     <ClCompile Include="..\..\src\image.c" />
@@ -217,6 +218,7 @@
     <ClInclude Include="..\..\src\encoder_state-bitstream.h" />
     <ClInclude Include="..\..\src\encoder_state-ctors_dtors.h" />
     <ClInclude Include="..\..\src\encoder_state-geometry.h" />
+    <ClInclude Include="..\..\src\encode_coding_tree.h" />
     <ClCompile Include="..\..\src\strategyselector.c" />
     <ClCompile Include="..\..\src\tables.c" />
     <ClCompile Include="..\..\src\threadqueue.c" />
