@@ -105,6 +105,7 @@ Optional parameters:
                                      "on": Early termination is on
                                      "sensitive": Sensitive early termination is on
           --lossless             : Use lossless coding
+          --no-tmvp              : Disable Temporal Motion Vector Prediction
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio

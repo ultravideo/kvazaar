@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "encoder.h"
 #include "imagelist.h"
@@ -644,6 +645,89 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
   return true;
 }
 
+
+/**
+* \brief Get merge candidates for current block
+* \param encoder encoder control struct to use
+* \param x block x position in SCU
+* \param y block y position in SCU
+* \param width current block width
+* \param height current block height
+* \param H candidate H
+* \param C1 candidate C1
+*/
+static void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state,
+                                             int32_t x,
+                                             int32_t y,
+                                             int32_t width,
+                                             int32_t height,
+                                             cu_info_t **C3,
+                                             cu_info_t **H) {
+  /*
+  Predictor block locations
+  _________
+  |CurrentPU|
+  | |C0|__  |
+  |    |C3| |
+  |_________|_
+            |H|
+  */
+
+  *C3 = NULL;
+  *H  = NULL;
+
+  // Find temporal reference, closest POC
+  if (state->frame->ref->used_size) {
+    uint32_t poc_diff = UINT_MAX;
+    int32_t closest_ref = 0;
+
+    for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+      int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
+
+      td = td < 0 ? -td : td;
+      if (td < poc_diff) {
+        closest_ref = temporal_cand;
+        poc_diff = td;
+      }
+    }
+
+    cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[closest_ref];
+    int cu_per_width = ref_cu_array->width / SCU_WIDTH;
+
+    uint32_t xColBr = x + width;
+    uint32_t yColBr = y + height;
+
+    // H must be available
+    if (xColBr < state->encoder_control->in.width &&
+        yColBr < state->encoder_control->in.height) {
+      int32_t H_offset = -1;
+
+      // Y inside the current CTU / LCU
+      if (yColBr % LCU_WIDTH != 0) {
+        H_offset = ((xColBr >> 4) << 4) / SCU_WIDTH +
+                  (((yColBr >> 4) << 4) / SCU_WIDTH) * cu_per_width;
+      }
+
+      if (H_offset >= 0) {
+        // Only use when it's inter block
+        if (ref_cu_array->data[H_offset].type == CU_INTER) {
+          *H = &ref_cu_array->data[H_offset];
+        }
+      }
+    }
+    uint32_t xColCtr = x + (width / 2);
+    uint32_t yColCtr = y + (height / 2);
+
+    // C3 must be inside the LCU, in the center position of current CU
+    if (xColCtr < state->encoder_control->in.width && yColCtr < state->encoder_control->in.height) {
+      uint32_t C3_offset = ((xColCtr >> 4) << 4) / SCU_WIDTH + ((((yColCtr >> 4) << 4) / SCU_WIDTH) * cu_per_width);
+      if (ref_cu_array->data[C3_offset].type == CU_INTER) {
+        *C3 = &ref_cu_array->data[C3_offset];
+      }
+    }
+  }
+}
+
 /**
  * \brief Get merge candidates for current block.
  *
@@ -840,11 +924,17 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
  * \brief Pick two mv candidates from the spatial candidates.
  */
 static void get_mv_cand_from_spatial(const encoder_state_t * const state,
+                                     int32_t x,
+                                     int32_t y,
+                                     int32_t width,
+                                     int32_t height,
                                      const cu_info_t *b0,
                                      const cu_info_t *b1,
                                      const cu_info_t *b2,
                                      const cu_info_t *a0,
                                      const cu_info_t *a1,
+                                     const cu_info_t *c3,
+                                     const cu_info_t *h,
                                      const cu_info_t *cur_cu,
                                      int8_t reflist,
                                      int16_t mv_cand[2][2])
@@ -1000,11 +1090,44 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
     candidates = 1;
   }
 
-#if ENABLE_TEMPORAL_MVP
-  if(candidates < AMVP_MAX_NUM_CANDS) {
-    //TODO: add temporal mv predictor
+  if (state->encoder_control->cfg->tmvp_enable) {
+    /*
+    Predictor block locations
+    _________
+    |CurrentPU|
+    | |C0|__  |
+    |    |C3| |
+    |_________|_
+    |H|
+    */
+
+    // Find temporal reference, closest POC
+    if (state->frame->poc > 1 && state->frame->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
+      uint32_t poc_diff = UINT_MAX;
+
+      for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+        int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
+        td = td < 0 ? -td : td;
+        if (td < poc_diff) {
+          poc_diff = td;
+        }
+      }
+
+      const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
+
+      if (selected_CU) {
+        int td = selected_CU->inter.mv_ref[reflist] + 1;
+        int tb = cur_cu->inter.mv_ref[reflist] + 1;
+
+        int scale = CALCULATE_SCALE(NULL, tb, td);
+        mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+        mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+
+        candidates++;
+      }
+#undef CALCULATE_SCALE
+    }
   }
-#endif
 
   // Fill with (0,0)
   while (candidates < AMVP_MAX_NUM_CANDS) {
@@ -1039,12 +1162,13 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            lcu_t *lcu,
                            int8_t reflist)
 {
-  cu_info_t *b0, *b1, *b2, *a0, *a1;
-  b0 = b1 = b2 = a0 = a1 = NULL;
+  cu_info_t *b0, *b1, *b2, *a0, *a1, *c3, *h;
+  b0 = b1 = b2 = a0 = a1 = c3 = h = NULL;
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width, state->tile->frame->height,
                                &b0, &b1, &b2, &a0, &a1, lcu);
-  get_mv_cand_from_spatial(state, b0, b1, b2, a0, a1, cur_cu, reflist, mv_cand);
+  kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
+  get_mv_cand_from_spatial(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
 /**
@@ -1069,14 +1193,16 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                int8_t reflist)
 {
   const cu_info_t *b0, *b1, *b2, *a0, *a1;
-  b0 = b1 = b2 = a0 = a1 = NULL;
-
+  cu_info_t *c3, *h;
+  b0 = b1 = b2 = a0 = a1 = c3 = h = NULL;
+  
   const cu_array_t *cua = state->tile->frame->cu_array;
   get_spatial_merge_candidates_cua(cua,
                                    x, y, width, height,
                                    state->tile->frame->width, state->tile->frame->height,
                                    &b0, &b1, &b2, &a0, &a1);
-  get_mv_cand_from_spatial(state, b0, b1, b2, a0, a1, cur_cu, reflist, mv_cand);
+  kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
+  get_mv_cand_from_spatial(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
 /**
@@ -1195,12 +1321,39 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       }
     }
   }
+  
+  if (state->encoder_control->cfg->tmvp_enable) {
+#define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
-#if ENABLE_TEMPORAL_MVP
-  if(candidates < AMVP_MAX_NUM_CANDS) {
-    //TODO: add temporal mv predictor
+    if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {
+
+      cu_info_t *c3 = NULL;
+      cu_info_t *h = NULL;
+
+      kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
+
+      const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
+
+      if (selected_CU) {
+        int td = selected_CU->inter.mv_ref[0] + 1;
+        int tb = 1;
+
+        int scale = CALCULATE_SCALE(NULL, tb, td);
+        mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+        mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+
+        /*
+        ToDo: temporal prediction in B-pictures
+        mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[1][0];
+        mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[1][1];
+        */
+        mv_cand[candidates].dir = selected_CU->inter.mv_dir;
+        mv_cand[candidates].ref[0] = 0;
+        candidates++;
+      }
+    }
+#undef CALCULATE_SCALE
   }
-#endif
 
   if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
     #define NUM_PRIORITY_LIST 12;

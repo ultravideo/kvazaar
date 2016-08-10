@@ -982,6 +982,10 @@ void kvz_encoder_prepare(encoder_state_t *state)
                    prev_state->tile->frame->rec,
                    prev_state->tile->frame->cu_array,
                    prev_state->frame->poc);
+    kvz_cu_array_free(state->tile->frame->cu_array);
+    unsigned height = state->tile->frame->height_in_lcu * LCU_WIDTH;
+    unsigned width  = state->tile->frame->width_in_lcu  * LCU_WIDTH;
+    state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
   // Remove source and reconstructed picture.

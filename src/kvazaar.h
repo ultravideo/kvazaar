@@ -278,6 +278,8 @@ typedef struct kvz_config
 
   int32_t lossless; /*!< \brief Use lossless coding. */
 
+  int32_t tmvp_enable; /*!> \brief Use Temporal Motion Vector Predictors. */
+
 } kvz_config;
 
 /**

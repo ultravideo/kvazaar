@@ -393,7 +393,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //IF long_term_ref_pics_present
   //ENDIF
 
-  WRITE_U(stream, ENABLE_TEMPORAL_MVP, 1,
+  WRITE_U(stream, state->encoder_control->cfg->tmvp_enable, 1,
           "sps_temporal_mvp_enable_flag");
   WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
@@ -747,10 +747,16 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
+    
+    if (state->encoder_control->cfg->tmvp_enable) {
+      WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
+    }
   }
 
     //end if
   //end if
+
+
   if (encoder->sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
     WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
@@ -763,6 +769,12 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }
+
+      // ToDo: handle B-frames with TMVP
+      if (state->encoder_control->cfg->tmvp_enable && ref_negative > 1) {
+        WRITE_UE(stream, 0, "collocated_ref_idx");
+      }
+
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 

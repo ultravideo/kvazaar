@@ -61,19 +61,6 @@ void kvz_inter_recon_lcu_bipred(const encoder_state_t * const state,
                                 int16_t mv_param[2][2],
                                 lcu_t* lcu);
 
-void kvz_inter_get_spatial_merge_candidates(int32_t x,
-                                            int32_t y,
-                                            int32_t width,
-                                            int32_t height,
-                                            int32_t picture_width,
-                                            int32_t picture_height,
-                                            cu_info_t **b0,
-                                            cu_info_t **b1,
-                                            cu_info_t **b2,
-                                            cu_info_t **a0,
-                                            cu_info_t **a1,
-                                            lcu_t *lcu);
-
 void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                            int32_t x,
                            int32_t y,
