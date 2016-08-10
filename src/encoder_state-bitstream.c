@@ -747,14 +747,15 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
+    
+    if (state->encoder_control->cfg->tmvp_enable) {
+      WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
+    }
   }
 
     //end if
   //end if
 
-  if (state->encoder_control->cfg->tmvp_enable && state->frame->slicetype != KVZ_SLICE_I) {
-    WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
-  }
 
   if (encoder->sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");

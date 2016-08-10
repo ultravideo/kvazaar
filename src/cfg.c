@@ -604,10 +604,22 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->aud_enable = atobool(value);
   else if OPT("cqmfile")
     cfg->cqmfile = strdup(value);
-  else if OPT("tiles-width-split")
-    return parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
-  else if OPT("tiles-height-split")
-    return parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+  else if OPT("tiles-width-split") {
+    int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
+    if (cfg->tiles_width_count > 1 && cfg->tmvp_enable) {
+      cfg->tmvp_enable = false;
+      fprintf(stderr, "Disabling TMVP because tiles are used.\n");
+    }
+    return retval;
+  }
+  else if OPT("tiles-height-split") {
+    int retval = parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+    if (cfg->tiles_height_count > 1 && cfg->tmvp_enable) {
+      cfg->tmvp_enable = false;
+      fprintf(stderr, "Disabling TMVP because tiles are used.\n");
+    }
+    return retval;
+  }
   else if OPT("tiles")
   {
     // A simpler interface for setting tiles, accepting only uniform split.
@@ -632,6 +644,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     FREE_POINTER(cfg->tiles_height_split);
     cfg->tiles_width_count = width;
     cfg->tiles_height_count = height;
+
+    if (cfg->tmvp_enable) {
+      cfg->tmvp_enable = false;
+      fprintf(stderr, "Disabling TMVP because tiles are used.\n");
+    }
+
     return 1;
   }
   else if OPT("wpp")
@@ -919,6 +937,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->tmvp_enable = atobool(value);
     if (cfg->gop_len && cfg->tmvp_enable) {
       fprintf(stderr, "Cannot enable TMVP because GOP is used.\n");
+      cfg->tmvp_enable = false;
+    }
+    if (cfg->tiles_width_count > 1 || cfg->tiles_height_count > 1) {
+      fprintf(stderr, "Cannot enable TMVP because tiles are used.\n");
       cfg->tmvp_enable = false;
     }
   }
