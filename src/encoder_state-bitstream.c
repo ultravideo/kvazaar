@@ -770,6 +770,12 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }
+
+#if ENABLE_TEMPORAL_MVP
+        if (ref_negative > 1) {
+          WRITE_UE(stream, 0, "collocated_ref_idx");
+        }
+#endif
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
 
