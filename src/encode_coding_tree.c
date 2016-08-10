@@ -550,8 +550,8 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
     uint32_t ref_list_idx;
     uint32_t j;
     int ref_list[2] = { 0, 0 };
-    for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->pocs[j] < state->global->poc) {
+    for (j = 0; j < state->frame->ref->used_size; j++) {
+      if (state->frame->ref->pocs[j] < state->frame->poc) {
         ref_list[0]++;
       } else {
         ref_list[1]++;
@@ -559,7 +559,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
     }
 
     // Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
-    if (state->global->slicetype == KVZ_SLICE_B)
+    if (state->frame->slicetype == KVZ_SLICE_B)
     {
       // Code Inter Dir
       uint8_t inter_dir = cur_cu->inter.mv_dir-1;
@@ -582,7 +582,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
       if (cur_cu->inter.mv_dir & (1 << ref_list_idx)) {
         if (ref_list[ref_list_idx] > 1) {
           // parseRefFrmIdx
-          int32_t ref_frame = state->global->refmap[cur_cu->inter.mv_ref[ref_list_idx]].idx;
+          int32_t ref_frame = state->frame->refmap[cur_cu->inter.mv_ref[ref_list_idx]].idx;
 
           cabac->cur_ctx = &(cabac->ctx.cu_ref_pic_model[0]);
           CABAC_BIN(cabac, (ref_frame != 0), "ref_idx_lX");
@@ -607,7 +607,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
           }
         }
 
-        if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->global->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
+        if (!(/*pcCU->getSlice()->getMvdL1ZeroFlag() &&*/ state->frame->ref_list == REF_PIC_LIST_1 && cur_cu->inter.mv_dir == 3)) {
 
           int16_t mv_cand[2][2];
           kvz_inter_get_mv_cand_cua(
@@ -954,7 +954,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   }
 
     // Encode skip flag
-  if (state->global->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != KVZ_SLICE_I) {
     int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
     int ui;
     int16_t num_cand = MRG_MAX_NUM_CANDS;
@@ -993,7 +993,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   // ENDIF SKIP
 
   // Prediction mode
-  if (state->global->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != KVZ_SLICE_I) {
     cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model);
     CABAC_BIN(cabac, (cur_cu->type == CU_INTRA), "PredMode");
   }

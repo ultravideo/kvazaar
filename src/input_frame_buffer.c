@@ -58,7 +58,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
   const int gop_buf_size = 3 * cfg->gop_len;
 
-  assert(state->global->frame >= 0);
+  assert(state->frame->num >= 0);
 
   if (cfg->gop_len == 0 || cfg->gop_lowdelay) {
     // No reordering of output pictures necessary.
@@ -66,12 +66,12 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     if (img_in == NULL) return NULL;
 
     img_in->dts = img_in->pts;
-    state->global->gop_offset = 0;
+    state->frame->gop_offset = 0;
     if (cfg->gop_lowdelay) {
-      state->global->gop_offset = (state->global->frame - 1) % cfg->gop_len;
-      if (state->global->gop_offset < 0) {
+      state->frame->gop_offset = (state->frame->num - 1) % cfg->gop_len;
+      if (state->frame->gop_offset < 0) {
         // Set gop_offset of IDR as the highest quality picture.
-        state->global->gop_offset += cfg->gop_len;
+        state->frame->gop_offset += cfg->gop_len;
       }
     }
     return kvz_image_copy_ref(img_in);
@@ -172,7 +172,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
   assert(next_pic != NULL);
   next_pic->dts = dts_out;
   buf->pic_buffer[buf_idx] = NULL;
-  state->global->gop_offset = gop_offset;
+  state->frame->gop_offset = gop_offset;
 
   buf->num_out++;
   return next_pic;

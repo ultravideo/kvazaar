@@ -100,7 +100,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
       goto kvazaar_open_failure;
     }
 
-    encoder->states[i].global->QP = (int8_t)cfg->qp;
+    encoder->states[i].frame->QP = (int8_t)cfg->qp;
   }
 
   for (int i = 0; i < encoder->num_encoder_states; ++i) {
@@ -112,7 +112,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     kvz_encoder_state_match_children_of_previous_frame(&encoder->states[i]);
   }
 
-  encoder->states[encoder->cur_state_num].global->frame = -1;
+  encoder->states[encoder->cur_state_num].frame->num = -1;
 
   return encoder;
 
@@ -124,10 +124,10 @@ kvazaar_open_failure:
 
 static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *const state)
 {
-  info->poc = state->global->poc,
-  info->qp = state->global->QP;
-  info->nal_unit_type = state->global->pictype;
-  info->slice_type = state->global->slicetype;
+  info->poc = state->frame->poc,
+  info->qp = state->frame->QP;
+  info->nal_unit_type = state->frame->pictype;
+  info->slice_type = state->frame->slicetype;
   kvz_encoder_get_ref_lists(state, info->ref_list_len, info->ref_list);
 }
 
@@ -217,12 +217,12 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   if (pic_in != NULL) {
     // FIXME: The frame number printed here is wrong when GOP is enabled.
-    CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->control->cfg->seek);
+    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg->seek);
   }
 
   kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
   if (frame) {
-    assert(state->global->frame == enc->frames_started);
+    assert(state->frame->num == enc->frames_started);
     // Start encoding.
     kvz_encode_one_frame(state, frame);
     enc->frames_started += 1;

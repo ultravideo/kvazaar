@@ -37,24 +37,24 @@
 #include "videoframe.h"
 
 
-static int encoder_state_config_global_init(encoder_state_t * const state) {
-  state->global->ref = kvz_image_list_alloc(MAX_REF_PIC_COUNT);
-  if(!state->global->ref) {
+static int encoder_state_config_frame_init(encoder_state_t * const state) {
+  state->frame->ref = kvz_image_list_alloc(MAX_REF_PIC_COUNT);
+  if(!state->frame->ref) {
     fprintf(stderr, "Failed to allocate the picture list!\n");
     return 0;
   }
-  state->global->ref_list = REF_PIC_LIST_0;
-  state->global->frame = 0;
-  state->global->poc = 0;
-  state->global->total_bits_coded = 0;
-  state->global->cur_gop_bits_coded = 0;
-  state->global->rc_alpha = 3.2003;
-  state->global->rc_beta = -1.367;
+  state->frame->ref_list = REF_PIC_LIST_0;
+  state->frame->num = 0;
+  state->frame->poc = 0;
+  state->frame->total_bits_coded = 0;
+  state->frame->cur_gop_bits_coded = 0;
+  state->frame->rc_alpha = 3.2003;
+  state->frame->rc_beta = -1.367;
   return 1;
 }
 
-static void encoder_state_config_global_finalize(encoder_state_t * const state) {
-  kvz_image_list_destroy(state->global->ref);
+static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
+  kvz_image_list_destroy(state->frame->ref);
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 
@@ -247,7 +247,7 @@ static void encoder_state_dump_graphviz(const encoder_state_t * const state) {
   printf(" \"%p\" [\n", state);
   printf("  label = \"{encoder_state|");
   printf("+ type=%c\\l", state->type);
-  if (!state->parent || state->global != state->parent->global) {
+  if (!state->parent || state->frame != state->parent->global) {
     printf("|+ global\\l");
   }
   if (!state->parent || state->tile != state->parent->tile) {
@@ -294,7 +294,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   //
   //If parent_state is not NULL, the following variable should either be set to NULL,
   //in order to inherit from parent, or should point to a valid structure:
-  //child_state->global
+  //child_state->frame
   //child_state->tile
   //child_state->slice
   //child_state->wfrow
@@ -311,9 +311,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     const encoder_control_t * const encoder = child_state->encoder_control;
     child_state->type = ENCODER_STATE_TYPE_MAIN;
     assert(child_state->encoder_control);
-    child_state->global = MALLOC(encoder_state_config_global_t, 1);
-    if (!child_state->global || !encoder_state_config_global_init(child_state)) {
-      fprintf(stderr, "Could not initialize encoder_state->global!\n");
+    child_state->frame = MALLOC(encoder_state_config_frame_t, 1);
+    if (!child_state->frame || !encoder_state_config_frame_init(child_state)) {
+      fprintf(stderr, "Could not initialize encoder_state->frame!\n");
       return 0;
     }
     child_state->tile = MALLOC(encoder_state_config_tile_t, 1);
@@ -333,7 +333,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     }
   } else {
     child_state->encoder_control = parent_state->encoder_control;
-    if (!child_state->global) child_state->global = parent_state->global;
+    if (!child_state->frame) child_state->frame = parent_state->frame;
     if (!child_state->tile) child_state->tile = parent_state->tile;
     if (!child_state->slice) child_state->slice = parent_state->slice;
     if (!child_state->wfrow) child_state->wfrow = parent_state->wfrow;
@@ -421,9 +421,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         //Create a slice
         new_child = &child_state->children[child_count];
         new_child->encoder_control = encoder;
-        new_child->type = ENCODER_STATE_TYPE_SLICE;
-        new_child->global = child_state->global;
-        new_child->tile = child_state->tile;
+        new_child->type  = ENCODER_STATE_TYPE_SLICE;
+        new_child->frame = child_state->frame;
+        new_child->tile  = child_state->tile;
         new_child->wfrow = child_state->wfrow;
         new_child->slice = MALLOC(encoder_state_config_slice_t, 1);
         if (!new_child->slice || !encoder_state_config_slice_init(new_child, range_start, range_end_slice)) {
@@ -447,9 +447,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         
         new_child = &child_state->children[child_count];
         new_child->encoder_control = encoder;
-        new_child->type = ENCODER_STATE_TYPE_TILE;
-        new_child->global = child_state->global;
-        new_child->tile = MALLOC(encoder_state_config_tile_t, 1);
+        new_child->type  = ENCODER_STATE_TYPE_TILE;
+        new_child->frame = child_state->frame;
+        new_child->tile  = MALLOC(encoder_state_config_tile_t, 1);
         new_child->slice = child_state->slice;
         new_child->wfrow = child_state->wfrow;
         
@@ -531,9 +531,9 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         encoder_state_t *new_child = &child_state->children[i];
         
         new_child->encoder_control = encoder;
-        new_child->type = ENCODER_STATE_TYPE_WAVEFRONT_ROW;
-        new_child->global = child_state->global;
-        new_child->tile = child_state->tile;
+        new_child->type  = ENCODER_STATE_TYPE_WAVEFRONT_ROW;
+        new_child->frame = child_state->frame;
+        new_child->tile  = child_state->tile;
         new_child->slice = child_state->slice;
         new_child->wfrow = MALLOC(encoder_state_config_wfrow_t, 1);
         
@@ -688,9 +688,9 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
     FREE_POINTER(state->tile);
   }
   
-  if (!state->parent || (state->parent->global != state->global)) {
-    encoder_state_config_global_finalize(state);
-    FREE_POINTER(state->global);
+  if (!state->parent || (state->parent->frame != state->frame)) {
+    encoder_state_config_frame_finalize(state);
+    FREE_POINTER(state->frame);
   }
   
   kvz_bitstream_finalize(&state->stream);

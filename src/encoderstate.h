@@ -50,13 +50,13 @@ typedef enum {
 
 
 
-typedef struct {
+typedef struct encoder_state_config_frame_t {
   double cur_lambda_cost; //!< \brief Lambda for SSE
   double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
   
-  int32_t frame;
-  int32_t poc; /*!< \brief picture order count */
-  int8_t gop_offset; /*!< \brief offset in the gop structure */
+  int32_t num;       /*!< \brief Frame number */
+  int32_t poc;       /*!< \brief Picture order count */
+  int8_t gop_offset; /*!< \brief Offset in the gop structure */
   
   int8_t QP;   //!< \brief Quantization parameter
   double QP_factor; //!< \brief Quantization factor
@@ -88,9 +88,9 @@ typedef struct {
   double rc_alpha;
   double rc_beta;
 
-} encoder_state_config_global_t;
+} encoder_state_config_frame_t;
 
-typedef struct {
+typedef struct encoder_state_config_tile_t {
   //Current sub-frame
   videoframe_t *frame;
   
@@ -121,7 +121,7 @@ typedef struct {
 
 } encoder_state_config_tile_t;
 
-typedef struct {
+typedef struct encoder_state_config_slice_t {
   int32_t id;
   
   //Global coordinates
@@ -133,7 +133,7 @@ typedef struct {
   int32_t end_in_rs;
 } encoder_state_config_slice_t;
 
-typedef struct {
+typedef struct encoder_state_config_wfrow_t {
   //Row in tile coordinates of the wavefront
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow_t;
@@ -169,7 +169,7 @@ typedef struct encoder_state_t {
   //Pointer to the encoder_state of the previous frame
   struct encoder_state_t *previous_encoder_state;
   
-  encoder_state_config_global_t *global;
+  encoder_state_config_frame_t  *frame;
   encoder_state_config_tile_t   *tile;
   encoder_state_config_slice_t  *slice;
   encoder_state_config_wfrow_t  *wfrow;

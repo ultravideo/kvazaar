@@ -314,7 +314,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + tr_tree_bits * state->global->cur_lambda_cost;
+    return sum + tr_tree_bits * state->frame->cur_lambda_cost;
   }
 
   // Add transform_tree cbf_luma bit cost.
@@ -346,7 +346,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * LUMA_MULT + bits * state->global->cur_lambda_cost;
+  return (double)ssd * LUMA_MULT + bits * state->frame->cur_lambda_cost;
 }
 
 
@@ -391,7 +391,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + tr_tree_bits * state->global->cur_lambda_cost;
+    return sum + tr_tree_bits * state->frame->cur_lambda_cost;
   }
 
   // Chroma SSD
@@ -421,7 +421,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CHROMA_MULT + bits * state->global->cur_lambda_cost;
+  return (double)ssd * CHROMA_MULT + bits * state->frame->cur_lambda_cost;
 }
 
 
@@ -507,7 +507,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   {
 
     bool can_use_inter =
-        state->global->slicetype != KVZ_SLICE_I
+        state->frame->slicetype != KVZ_SLICE_I
         && WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max);
 
     if (can_use_inter) {
@@ -619,8 +619,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         if (cur_pu->inter.mv_dir == 3) {
           const kvz_picture *const refs[2] = {
-            state->global->ref->images[cur_pu->inter.mv_ref[0]],
-            state->global->ref->images[cur_pu->inter.mv_ref[1]],
+            state->frame->ref->images[cur_pu->inter.mv_ref[0]],
+            state->frame->ref->images[cur_pu->inter.mv_ref[1]],
           };
           kvz_inter_recon_lcu_bipred(state,
                                      refs[0], refs[1],
@@ -631,7 +631,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         } else {
           const int mv_idx = cur_pu->inter.mv_dir - 1;
           const kvz_picture *const ref =
-              state->global->ref->images[cur_pu->inter.mv_ref[mv_idx]];
+              state->frame->ref->images[cur_pu->inter.mv_ref[mv_idx]];
           kvz_inter_recon_lcu(state,
                               ref,
                               pu_x, pu_y,
@@ -670,11 +670,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       mode_bits = inter_bitcost;
     }
 
-    cost += mode_bits * state->global->cur_lambda_cost;
+    cost += mode_bits * state->frame->cur_lambda_cost;
   }
   
   // Recursively split all the way to max search depth.
-  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->global->slicetype != KVZ_SLICE_I)) {
+  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->frame->slicetype != KVZ_SLICE_I)) {
     int half_cu = cu_width / 2;
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf, depth);
@@ -683,15 +683,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Add cost of cu_split_flag.
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
       const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->global->cur_lambda_cost;
-      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->global->cur_lambda_cost;
+      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;
+      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->frame->cur_lambda_cost;
     }
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
       // Add cost of intra part_size.
       const cabac_ctx_t *ctx = &(state->cabac.ctx.part_size_model[0]);
-      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->global->cur_lambda_cost;  // 2Nx2N
-      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->global->cur_lambda_cost;  // NxN
+      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->frame->cur_lambda_cost;  // 2Nx2N
+      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;  // NxN
     }
 
     // If skip mode was selected for the block, skip further search.
@@ -735,11 +735,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // Add the cost of coding no-split.
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
         const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->global->cur_lambda_cost;
+        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;
 
         // Add the cost of coding intra mode only once.
         double mode_bits = calc_mode_bits(state, &work_tree[depth], cur_cu, x, y);
-        cost += mode_bits * state->global->cur_lambda_cost;
+        cost += mode_bits * state->frame->cur_lambda_cost;
       }
     }
 
@@ -761,7 +761,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     work_tree_copy_down(x, y, depth, work_tree);
   }
 
-  PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->global->frame, state->tile->id, state->slice->id,
+  PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->frame->num, state->tile->id, state->slice->id,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x,
                           (state->tile->lcu_offset_x * LCU_WIDTH) + x + (LCU_WIDTH >> depth), 
                           (state->tile->lcu_offset_y * LCU_WIDTH) + y,

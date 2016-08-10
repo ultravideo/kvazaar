@@ -291,7 +291,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
     kvz_pixel *src = orig_src;
 
     int8_t strength = 0;
-    int32_t qp              = state->global->QP;
+    int32_t qp              = state->frame->QP;
     int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
     int32_t beta            = kvz_g_beta_table_8x8[b_index] * bitdepth_scale;
@@ -345,7 +345,7 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         }
         
         // B-slice related checks
-        if(!strength && state->global->slicetype == KVZ_SLICE_B) {
+        if(!strength && state->frame->slicetype == KVZ_SLICE_B) {
 
           // Zero all undefined motion vectors for easier usage
           if(!(cu_q->inter.mv_dir & 1)) {
@@ -490,7 +490,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     };
     int8_t strength = 2;
 
-    int32_t QP             = kvz_g_chroma_scale[state->global->QP];
+    int32_t QP             = kvz_g_chroma_scale[state->frame->QP];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = kvz_g_tc_table_8x8[TC_index]*bitdepth_scale;

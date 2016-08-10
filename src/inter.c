@@ -854,8 +854,8 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
   int8_t reflist2nd = !reflist;
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand, list) {int td = state->global->poc - state->global->ref->pocs[(cu)->inter.mv_ref[list]];\
-                                   int tb = state->global->poc - state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]];\
+#define APPLY_MV_SCALING(cu, cand, list) {int td = state->frame->poc - state->frame->ref->pocs[(cu)->inter.mv_ref[list]];\
+                                   int tb = state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]];\
                                    if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 ); \
@@ -1202,7 +1202,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   }
 #endif
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == KVZ_SLICE_B) {
+  if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
     #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
@@ -1235,14 +1235,14 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
 
-  int num_ref = state->global->ref->used_size;
+  int num_ref = state->frame->ref->used_size;
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->global->slicetype == KVZ_SLICE_B) {
+  if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
     int j;
     int ref_negative = 0;
     int ref_positive = 0;
-    for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->pocs[j] < state->global->poc) {
+    for (j = 0; j < state->frame->ref->used_size; j++) {
+      if (state->frame->ref->pocs[j] < state->frame->poc) {
         ref_negative++;
       } else {
         ref_positive++;
@@ -1258,7 +1258,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     mv_cand[candidates].ref[0] = (zero_idx>=num_ref-1)?0:zero_idx;
     mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
     mv_cand[candidates].dir = 1;
-    if (state->global->slicetype == KVZ_SLICE_B) {
+    if (state->frame->slicetype == KVZ_SLICE_B) {
       mv_cand[candidates].mv[1][0] = 0;
       mv_cand[candidates].mv[1][1] = 0;
       mv_cand[candidates].dir = 3;

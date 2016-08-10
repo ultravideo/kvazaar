@@ -199,7 +199,7 @@ int kvz_quantize_residual_trskip(
     int has_coeffs;
   } skip, noskip, *best;
 
-  const int bit_cost = (int)(state->global->cur_lambda_cost+0.5);
+  const int bit_cost = (int)(state->frame->cur_lambda_cost+0.5);
   
   noskip.has_coeffs = kvz_quantize_residual(
       state, cur_cu, width, color, scan_order,
