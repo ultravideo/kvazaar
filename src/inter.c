@@ -1123,15 +1123,16 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
     }
 
     if (selected_CU) {
-      int td = state->global->poc - state->global->ref->pocs[closest_ref];
-      int tb = state->global->poc - state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]];
+      int td = selected_CU->inter.mv_ref[reflist]+1;
+      int tb = cur_cu->inter.mv_ref[reflist]+1;
 
-      int scale = 256;// CALCULATE_SCALE(NULL, tb, td);
+      int scale = CALCULATE_SCALE(NULL, tb, td);
       mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
       mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
 
       candidates++;
     }
+    #undef CALCULATE_SCALE
   }
 #endif
 
@@ -1326,10 +1327,12 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       }
     }
   }
-
+  
 #if ENABLE_TEMPORAL_MVP
-  if (candidates < MRG_MAX_NUM_CANDS && state->global->ref->used_size) {
+  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
+  if (candidates < MRG_MAX_NUM_CANDS && state->global->ref->used_size) {
+    
     uint32_t poc_diff = UINT_MAX;
     int32_t closest_ref = 0;
 
@@ -1355,13 +1358,24 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
 
     if (selected_CU) {
-      mv_cand[candidates].mv[0][0] = selected_CU->inter.mv[0][0];
-      mv_cand[candidates].mv[0][1] = selected_CU->inter.mv[0][1];
-      mv_cand[candidates].dir = 1;
-      mv_cand[candidates].ref[0] = 0;      
+      int td = selected_CU->inter.mv_ref[0] + 1;
+      int tb = 1;
+
+      int scale = CALCULATE_SCALE(NULL, tb, td);
+      mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+      mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+
+      /*
+      ToDo: temporal prediction in B-pictures
+      mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[1][0];
+      mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[1][1];
+      */
+      mv_cand[candidates].dir = selected_CU->inter.mv_dir;
+      mv_cand[candidates].ref[0] = 0;
       candidates++;
     }
   }
+  #undef CALCULATE_SCALE
 #endif
 
   if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
