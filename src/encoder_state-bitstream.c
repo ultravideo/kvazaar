@@ -46,8 +46,8 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
   bitstream_t * const stream = &state->stream;
   kvz_nal_write(stream, KVZ_NAL_AUD_NUT, 0, 1);
 
-  uint8_t pic_type = state->global->slicetype == KVZ_SLICE_I ? 0
-                   : state->global->slicetype == KVZ_SLICE_P ? 1
+  uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
+                   : state->frame->slicetype == KVZ_SLICE_P ? 1
                    :                                       2;
   WRITE_U(stream, pic_type, 3, "pic_type");
 
@@ -579,7 +579,7 @@ static void encoder_state_write_picture_timing_sei_message(encoder_state_t * con
 
   if (state->encoder_control->vui.frame_field_info_present_flag){
 
-    int8_t odd_picture = state->global->frame % 2;
+    int8_t odd_picture = state->frame->num % 2;
     int8_t pic_struct = 0; //0: progressive picture, 1: top field, 2: bottom field, 3...
     int8_t source_scan_type = 1; //0: interlaced, 1: progressive
 
@@ -651,22 +651,22 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   int ref_negative = 0;
   int ref_positive = 0;
   if (encoder->cfg->gop_len) {
-    for (j = 0; j < state->global->ref->used_size; j++) {
-      if (state->global->ref->pocs[j] < state->global->poc) {
+    for (j = 0; j < state->frame->ref->used_size; j++) {
+      if (state->frame->ref->pocs[j] < state->frame->poc) {
         ref_negative++;
       } else {
         ref_positive++;
       }
     }
-  } else ref_negative = state->global->ref->used_size;
+  } else ref_negative = state->frame->ref->used_size;
 
 #ifdef KVZ_DEBUG
   printf("=========== Slice ===========\n");
 #endif
   WRITE_U(stream, (state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
 
-  if (state->global->pictype >= KVZ_NAL_BLA_W_LP
-      && state->global->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
+  if (state->frame->pictype >= KVZ_NAL_BLA_W_LP
+      && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
     WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
   }
 
@@ -677,7 +677,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_UE(stream, state->slice->start_in_rs, "slice_segment_address");
   }
 
-  WRITE_UE(stream, state->global->slicetype, "slice_type");
+  WRITE_UE(stream, state->frame->slicetype, "slice_type");
 
   // if !entropy_slice_flag
 
@@ -685,12 +685,12 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       //WRITE_U(stream, 1, 1, "pic_output_flag");
     //end if
     //if( IdrPicFlag ) <- nal_unit_type == 5
-  if (state->global->pictype != KVZ_NAL_IDR_W_RADL
-      && state->global->pictype != KVZ_NAL_IDR_N_LP) {
+  if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
+      && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
     int last_poc = 0;
     int poc_shift = 0;
 
-      WRITE_U(stream, state->global->poc&0x1f, 5, "pic_order_cnt_lsb");
+      WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
       WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
@@ -700,9 +700,9 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
-          for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
+          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+          for (int i = 0; i < state->frame->ref->used_size; i++) {
+            if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
               found = 1;
               break;
             }
@@ -727,9 +727,9 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
-          for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
+          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+          for (int i = 0; i < state->frame->ref->used_size; i++) {
+            if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
               found = 1;
               break;
             }
@@ -756,10 +756,10 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
   }
 
-  if (state->global->slicetype != KVZ_SLICE_I) {
+  if (state->frame->slicetype != KVZ_SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
       WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
-        if (state->global->slicetype == KVZ_SLICE_B) {
+        if (state->frame->slicetype == KVZ_SLICE_B) {
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
           WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
         }
@@ -767,7 +767,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   }
 
   {
-    int slice_qp_delta = state->global->QP - encoder->cfg->qp;
+    int slice_qp_delta = state->frame->QP - encoder->cfg->qp;
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
    
@@ -872,15 +872,15 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     encoder_state_write_bitstream_aud(state);
   }
   
-  if ((encoder->vps_period > 0 && state->global->frame % encoder->vps_period == 0)
-      || (state->global->frame == 0 && encoder->vps_period >= 0))
+  if ((encoder->vps_period > 0 && state->frame->num % encoder->vps_period == 0)
+      || (state->frame->num == 0 && encoder->vps_period >= 0))
   {
     first_nal_in_au = false;
     kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
 
   // Send Kvazaar version information only in the first frame.
-  if (state->global->frame == 0 && encoder->cfg->add_encoder_info) {
+  if (state->frame->num == 0 && encoder->cfg->add_encoder_info) {
     kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
 
@@ -904,38 +904,38 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   {
-    uint8_t nal_type = (state->global->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
+    uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
     kvz_nal_write(stream, nal_type, 0, first_nal_in_au);
   }
 
   {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_write_bitstream_children(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->global->frame, state->type);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->frame->num, state->type);
   }
   
   if (state->encoder_control->cfg->hash != KVZ_HASH_NONE) {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);
-    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->global->frame, state->type);
+    PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_checksum,frame=%d,encoder_type=%c", state->frame->num, state->type);
   }
   
   //Get bitstream length for stats
   uint64_t newpos = kvz_bitstream_tell(stream);
   state->stats_bitstream_length = (newpos >> 3) - (curpos >> 3);
 
-  if (state->global->frame > 0) {
-    state->global->total_bits_coded = state->previous_encoder_state->global->total_bits_coded;
+  if (state->frame->num > 0) {
+    state->frame->total_bits_coded = state->previous_encoder_state->frame->total_bits_coded;
   }
-  state->global->total_bits_coded += newpos - curpos;
+  state->frame->total_bits_coded += newpos - curpos;
 
-  if (encoder->cfg->gop_len > 0 && state->global->gop_offset > 0) {
-    state->global->cur_gop_bits_coded = state->previous_encoder_state->global->cur_gop_bits_coded;
+  if (encoder->cfg->gop_len > 0 && state->frame->gop_offset > 0) {
+    state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   } else {
-    state->global->cur_gop_bits_coded = 0;
+    state->frame->cur_gop_bits_coded = 0;
   }
-  state->global->cur_gop_bits_coded += newpos - curpos;
+  state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 
 void kvz_encoder_state_write_bitstream_leaf(encoder_state_t * const state)

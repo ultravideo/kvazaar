@@ -50,13 +50,13 @@ typedef enum {
 
 
 
-typedef struct {
+typedef struct encoder_state_config_frame_t {
   double cur_lambda_cost; //!< \brief Lambda for SSE
   double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
   
-  int32_t frame;
-  int32_t poc; /*!< \brief picture order count */
-  int8_t gop_offset; /*!< \brief offset in the gop structure */
+  int32_t num;       /*!< \brief Frame number */
+  int32_t poc;       /*!< \brief Picture order count */
+  int8_t gop_offset; /*!< \brief Offset in the gop structure */
   
   int8_t QP;   //!< \brief Quantization parameter
   double QP_factor; //!< \brief Quantization factor
@@ -88,9 +88,9 @@ typedef struct {
   double rc_alpha;
   double rc_beta;
 
-} encoder_state_config_global_t;
+} encoder_state_config_frame_t;
 
-typedef struct {
+typedef struct encoder_state_config_tile_t {
   //Current sub-frame
   videoframe_t *frame;
   
@@ -121,7 +121,7 @@ typedef struct {
 
 } encoder_state_config_tile_t;
 
-typedef struct {
+typedef struct encoder_state_config_slice_t {
   int32_t id;
   
   //Global coordinates
@@ -133,7 +133,7 @@ typedef struct {
   int32_t end_in_rs;
 } encoder_state_config_slice_t;
 
-typedef struct {
+typedef struct encoder_state_config_wfrow_t {
   //Row in tile coordinates of the wavefront
   int32_t lcu_offset_y;
 } encoder_state_config_wfrow_t;
@@ -169,7 +169,7 @@ typedef struct encoder_state_t {
   //Pointer to the encoder_state of the previous frame
   struct encoder_state_t *previous_encoder_state;
   
-  encoder_state_config_global_t *global;
+  encoder_state_config_frame_t  *frame;
   encoder_state_config_tile_t   *tile;
   encoder_state_config_slice_t  *slice;
   encoder_state_config_wfrow_t  *wfrow;
@@ -205,20 +205,6 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
 
 void kvz_encoder_prepare(encoder_state_t *state);
 
-
-void kvz_encode_coding_tree(encoder_state_t *state, uint16_t x_ctb,
-                        uint16_t y_ctb, uint8_t depth);
-
-void kvz_encode_last_significant_xy(encoder_state_t *state,
-                                uint8_t lastpos_x, uint8_t lastpos_y,
-                                uint8_t width, uint8_t height,
-                                uint8_t type, uint8_t scan);
-void kvz_encode_coeff_nxn(encoder_state_t *state, coeff_t *coeff, uint8_t width,
-                      uint8_t type, int8_t scan_mode, int8_t tr_skip);
-void kvz_encode_transform_coeff(encoder_state_t *state, int32_t x_cu, int32_t y_cu,
-                            int8_t depth, int8_t tr_depth, uint8_t parent_coeff_u, uint8_t parent_coeff_v);
-void encode_block_residual(const encoder_control_t * const encoder,
-                           uint16_t x_ctb, uint16_t y_ctb, uint8_t depth);
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
 

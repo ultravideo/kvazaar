@@ -56,6 +56,8 @@ libkvazaar_la_SOURCES = \
 	encoder_state-ctors_dtors.h \
 	encoder_state-geometry.c \
 	encoder_state-geometry.h \
+	encode_coding_tree.c \
+	encode_coding_tree.h \
 	filter.c \
 	filter.h \
 	global.h \

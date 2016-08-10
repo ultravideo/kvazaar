@@ -22,7 +22,6 @@
 
 #include <limits.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "cabac.h"
 #include "encoder.h"
@@ -252,7 +251,7 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(state->global->cur_lambda_cost_sqrt+0.5);
+  return temp_bitcost*(int32_t)(state->frame->cur_lambda_cost_sqrt+0.5);
 }
 
 
@@ -1231,14 +1230,14 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   const int x_cu = x >> 3;
   const int y_cu = y >> 3;
   const videoframe_t * const frame = state->tile->frame;
-  kvz_picture *ref_image = state->global->ref->images[ref_idx];
+  kvz_picture *ref_image = state->frame->ref->images[ref_idx];
   uint32_t temp_bitcost = 0;
   uint32_t temp_cost = 0;
   vector2d_t orig;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
-  int8_t ref_list = state->global->refmap[ref_idx].list-1;
+  int8_t ref_list = state->frame->refmap[ref_idx].list-1;
   int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
   orig.x = x_cu * CU_MIN_SIZE_PIXELS;
   orig.y = y_cu * CU_MIN_SIZE_PIXELS;
@@ -1259,7 +1258,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     };
     const int mid_x = tile_top_left_corner.x + x + (width >> 1);
     const int mid_y = tile_top_left_corner.y + y + (height >> 1);
-    const cu_array_t* ref_array = state->global->ref->cu_arrays[ref_idx];
+    const cu_array_t* ref_array = state->frame->ref->cu_arrays[ref_idx];
     const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
     if (ref_cu->type == CU_INTER) {
       if (ref_cu->inter.mv_dir & 1) {
@@ -1379,7 +1378,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   if (temp_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
-    uint8_t mv_ref_coded = state->global->refmap[ref_idx].idx;
+    uint8_t mv_ref_coded = state->frame->refmap[ref_idx].idx;
 
     cur_cu->merged        = merged;
     cur_cu->merge_idx     = merge_idx;
@@ -1459,7 +1458,7 @@ static void search_pu_inter(encoder_state_t * const state,
   CU_SET_MV_CAND(cur_cu, 1, 0);
 
   uint32_t ref_idx;
-  for (ref_idx = 0; ref_idx < state->global->ref->used_size; ref_idx++) {
+  for (ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
     search_pu_inter_ref(state,
                         x, y,
                         width, height,
@@ -1473,7 +1472,7 @@ static void search_pu_inter(encoder_state_t * const state,
   }
 
   // Search bi-pred positions
-  bool can_use_bipred = state->global->slicetype == KVZ_SLICE_B
+  bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
     && state->encoder_control->cfg->bipred
     && width + height >= 16; // 4x8 and 8x4 PBs are restricted to unipred
 
@@ -1508,7 +1507,7 @@ static void search_pu_inter(encoder_state_t * const state,
           kvz_pixel tmp_block[64 * 64];
           kvz_pixel tmp_pic[64 * 64];
           // Force L0 and L1 references
-          if (state->global->refmap[merge_cand[i].ref[0]].list == 2 || state->global->refmap[merge_cand[j].ref[1]].list == 1) continue;
+          if (state->frame->refmap[merge_cand[i].ref[0]].list == 2 || state->frame->refmap[merge_cand[j].ref[1]].list == 1) continue;
 
           mv[0][0] = merge_cand[i].mv[0][0];
           mv[0][1] = merge_cand[i].mv[0][1];
@@ -1526,8 +1525,8 @@ static void search_pu_inter(encoder_state_t * const state,
           }
 
           kvz_inter_recon_lcu_bipred(state,
-                                     state->global->ref->images[merge_cand[i].ref[0]],
-                                     state->global->ref->images[merge_cand[j].ref[1]],
+                                     state->frame->ref->images[merge_cand[i].ref[0]],
+                                     state->frame->ref->images[merge_cand[j].ref[1]],
                                      x, y,
                                      width,
                                      height,
@@ -1552,8 +1551,8 @@ static void search_pu_inter(encoder_state_t * const state,
 
             cur_cu->inter.mv_dir = 3;
             uint8_t mv_ref_coded[2] = {
-              state->global->refmap[merge_cand[i].ref[0]].idx,
-              state->global->refmap[merge_cand[j].ref[1]].idx
+              state->frame->refmap[merge_cand[i].ref[0]].idx,
+              state->frame->refmap[merge_cand[j].ref[1]].idx
             };
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];

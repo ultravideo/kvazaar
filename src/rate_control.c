@@ -42,19 +42,19 @@ static void update_rc_parameters(encoder_state_t * state)
   const double bpp = state->stats_bitstream_length * 8 / pixels_per_picture;
   const double log_bpp = log(bpp);
 
-  const double alpha_old = state->global->rc_alpha;
-  const double beta_old = state->global->rc_beta;
+  const double alpha_old = state->frame->rc_alpha;
+  const double beta_old = state->frame->rc_beta;
   // lambda computed from real bpp
   const double lambda_comp = CLIP(0.1, 10000, alpha_old * pow(bpp, beta_old));
   // lambda used in encoding
-  const double lambda_real = state->global->cur_lambda_cost;
+  const double lambda_real = state->frame->cur_lambda_cost;
   const double lambda_log_ratio = log(lambda_real) - log(lambda_comp);
 
   const double alpha = alpha_old + 0.1 * lambda_log_ratio * alpha_old;
-  state->global->rc_alpha = CLIP(0.05, 20, alpha);
+  state->frame->rc_alpha = CLIP(0.05, 20, alpha);
 
   const double beta = beta_old + 0.05 * lambda_log_ratio * CLIP(-5, 1, log_bpp);
-  state->global->rc_beta = CLIP(-3, -0.1, beta);
+  state->frame->rc_beta = CLIP(-3, -0.1, beta);
 }
 
 /**
@@ -71,14 +71,14 @@ static void gop_allocate_bits(encoder_state_t * const state)
 
   // At this point, total_bits_coded of the current state contains the
   // number of bits written encoder->owf frames before the current frame.
-  uint64_t bits_coded = state->global->total_bits_coded;
-  int pictures_coded = MAX(0, state->global->frame - encoder->owf);
+  uint64_t bits_coded = state->frame->total_bits_coded;
+  int pictures_coded = MAX(0, state->frame->num - encoder->owf);
 
-  int gop_offset = (state->global->gop_offset - encoder->owf) % MAX(1, encoder->cfg->gop_len);
+  int gop_offset = (state->frame->gop_offset - encoder->owf) % MAX(1, encoder->cfg->gop_len);
   // Only take fully coded GOPs into account.
   if (encoder->cfg->gop_len > 0 && gop_offset != encoder->cfg->gop_len - 1) {
     // Subtract number of bits in the partially coded GOP.
-    bits_coded -= state->global->cur_gop_bits_coded;
+    bits_coded -= state->frame->cur_gop_bits_coded;
     // Subtract number of pictures in the partially coded GOP.
     pictures_coded -= gop_offset + 1;
   }
@@ -86,7 +86,7 @@ static void gop_allocate_bits(encoder_state_t * const state)
   double gop_target_bits =
     (encoder->target_avg_bppic * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
     * MAX(1, encoder->cfg->gop_len) / SMOOTHING_WINDOW;
-  state->global->cur_gop_target_bits = MAX(200, gop_target_bits);
+  state->frame->cur_gop_target_bits = MAX(200, gop_target_bits);
 }
 
 /**
@@ -99,12 +99,12 @@ static double pic_allocate_bits(const encoder_state_t * const state)
   const encoder_control_t * const encoder = state->encoder_control;
 
   if (encoder->cfg->gop_len <= 0) {
-    return state->global->cur_gop_target_bits;
+    return state->frame->cur_gop_target_bits;
   }
 
   const double pic_weight = encoder->gop_layer_weights[
-    encoder->cfg->gop[state->global->gop_offset].layer - 1];
-  double pic_target_bits = state->global->cur_gop_target_bits * pic_weight;
+    encoder->cfg->gop[state->frame->gop_offset].layer - 1];
+  double pic_target_bits = state->frame->cur_gop_target_bits * pic_weight;
   return MAX(100, pic_target_bits);
 }
 
@@ -122,20 +122,20 @@ double kvz_select_picture_lambda(encoder_state_t * const state)
 
   assert(encoder->cfg->target_bitrate > 0);
 
-  if (state->global->frame > encoder->owf) {
+  if (state->frame->num > encoder->owf) {
     // At least one frame has been written.
     update_rc_parameters(state);
   }
 
   if (encoder->cfg->gop_len == 0 ||
-      state->global->gop_offset == 0 ||
-      state->global->frame == 0)
+      state->frame->gop_offset == 0 ||
+      state->frame->num == 0)
   {
     // A new GOP begins at this frame.
     gop_allocate_bits(state);
   } else {
-    state->global->cur_gop_target_bits =
-      state->previous_encoder_state->global->cur_gop_target_bits;
+    state->frame->cur_gop_target_bits =
+      state->previous_encoder_state->frame->cur_gop_target_bits;
   }
 
   // TODO: take the picture headers into account
@@ -143,7 +143,7 @@ double kvz_select_picture_lambda(encoder_state_t * const state)
   const double target_bits_per_pixel =
     target_bits_current_picture / encoder->in.pixels_per_pic;
   const double lambda =
-    state->global->rc_alpha * pow(target_bits_per_pixel, state->global->rc_beta);
+    state->frame->rc_alpha * pow(target_bits_per_pixel, state->frame->rc_beta);
   return CLIP(0.1, 10000, lambda);
 }
 
@@ -167,9 +167,9 @@ double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state)
   const int intra_period = state->encoder_control->cfg->intra_period;
   const int keyframe_period = gop_len > 0 ? gop_len : intra_period;
   
-  double lambda = pow(2.0, (state->global->QP - 12) / 3.0);
+  double lambda = pow(2.0, (state->frame->QP - 12) / 3.0);
 
-  if (state->global->slicetype == KVZ_SLICE_I) {
+  if (state->frame->slicetype == KVZ_SLICE_I) {
     lambda *= 0.57;
     
     // Reduce lambda for I-frames according to the number of references.
@@ -179,14 +179,14 @@ double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state)
       lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (keyframe_period - 1));
     }
   } else if (gop_len > 0) {
-    lambda *= state->global->QP_factor;
+    lambda *= state->frame->QP_factor;
   } else {
     lambda *= 0.4624;
   }
 
   // Increase lambda if not key-frame.
-  if (keyframe_period > 0 && state->global->poc % keyframe_period != 0) {
-    lambda *= CLIP(2.0, 4.0, (state->global->QP - 12) / 6.0);
+  if (keyframe_period > 0 && state->frame->poc % keyframe_period != 0) {
+    lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
   }
   
   return lambda;
