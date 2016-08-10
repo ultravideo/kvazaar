@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include "encoder.h"
 #include "imagelist.h"
@@ -655,7 +656,7 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
 * \param H candidate H
 * \param C1 candidate C1
 */
-void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state,
+static void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state,
                                              int32_t x,
                                              int32_t y,
                                              int32_t width,
@@ -676,12 +677,12 @@ void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state
   *H  = NULL;
 
   // Find temporal reference, closest POC
-  if (state->global->ref->used_size) {
+  if (state->frame->ref->used_size) {
     uint32_t poc_diff = UINT_MAX;
     int32_t closest_ref = 0;
 
-    for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
-      int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+    for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+      int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
 
       td = td < 0 ? -td : td;
       if (td < poc_diff) {
@@ -690,7 +691,7 @@ void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * const state
       }
     }
 
-    cu_array_t *ref_cu_array = state->global->ref->cu_arrays[closest_ref];
+    cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[closest_ref];
     int cu_per_width = ref_cu_array->width / SCU_WIDTH;
 
     uint32_t xColBr = x + width;
@@ -1101,26 +1102,18 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
     */
 
     // Find temporal reference, closest POC
-    if (state->global->poc > 1 && state->global->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
+    if (state->frame->poc > 1 && state->frame->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
       uint32_t poc_diff = UINT_MAX;
-      int32_t closest_ref = 0;
 
-      for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
-        int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+      for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+        int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
         td = td < 0 ? -td : td;
         if (td < poc_diff) {
-          closest_ref = temporal_cand;
           poc_diff = td;
         }
       }
 
-      cu_info_t *selected_CU = NULL;
-
-      if (h != NULL) {
-        selected_CU = h;
-      } else if (c3 != NULL) {
-        selected_CU = c3;
-      }
+      const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
 
       if (selected_CU) {
         int td = selected_CU->inter.mv_ref[reflist] + 1;
@@ -1199,7 +1192,8 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                const cu_info_t* cur_cu,
                                int8_t reflist)
 {
-  const cu_info_t *b0, *b1, *b2, *a0, *a1, *c3, *h;
+  const cu_info_t *b0, *b1, *b2, *a0, *a1;
+  cu_info_t *c3, *h;
   b0 = b1 = b2 = a0 = a1 = c3 = h = NULL;
   
   const cu_array_t *cua = state->tile->frame->cu_array;
@@ -1331,31 +1325,14 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   if (state->encoder_control->cfg->tmvp_enable) {
 #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
-    if (candidates < MRG_MAX_NUM_CANDS && state->global->ref->used_size) {
+    if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {
 
-      uint32_t poc_diff = UINT_MAX;
-      int32_t closest_ref = 0;
+      cu_info_t *c3 = NULL;
+      cu_info_t *h = NULL;
 
-      for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
-        int td = state->global->poc - state->global->ref->pocs[temporal_cand];
-        td = td < 0 ? -td : td;
-        if (td < poc_diff) {
-          closest_ref = temporal_cand;
-          poc_diff = td;
-        }
-      }
+      kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
 
-      cu_info_t *C3 = NULL;
-      cu_info_t *H = NULL;
-      cu_info_t *selected_CU = NULL;
-
-      kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &C3, &H);
-
-      if (H != NULL) {
-        selected_CU = H;
-      } else if (C3 != NULL) {
-        selected_CU = C3;
-      }
+      const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
 
       if (selected_CU) {
         int td = selected_CU->inter.mv_ref[0] + 1;
