@@ -110,6 +110,8 @@ static const struct option long_options[] = {
   { "me-early-termination",required_argument, NULL, 0 },
   { "lossless",                 no_argument, NULL, 0 },
   { "no-lossless",              no_argument, NULL, 0 },
+  { "tmvp",                     no_argument, NULL, 0 },
+  { "no-tmvp",                  no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -391,6 +393,7 @@ void print_help(void)
     "                                     \"on\": Early termination is on\n"
     "                                     \"sensitive\": Sensitive early termination is on\n"
     "          --lossless             : Use lossless coding\n"
+    "          --no-tmvp              : Disable Temporal Motion Vector Prediction\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

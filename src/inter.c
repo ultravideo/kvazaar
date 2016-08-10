@@ -1089,52 +1089,52 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
     candidates = 1;
   }
 
-#if ENABLE_TEMPORAL_MVP
-  /*
-  Predictor block locations
-  _________
-  |CurrentPU|
-  | |C0|__  |
-  |    |C3| |
-  |_________|_
-            |H|
-  */
+  if (state->encoder_control->cfg->tmvp_enable) {
+    /*
+    Predictor block locations
+    _________
+    |CurrentPU|
+    | |C0|__  |
+    |    |C3| |
+    |_________|_
+    |H|
+    */
 
-  // Find temporal reference, closest POC
-  if (state->global->poc > 1 && state->global->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
-    uint32_t poc_diff = UINT_MAX;
-    int32_t closest_ref = 0;
+    // Find temporal reference, closest POC
+    if (state->global->poc > 1 && state->global->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
+      uint32_t poc_diff = UINT_MAX;
+      int32_t closest_ref = 0;
 
-    for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
-      int td = state->global->poc - state->global->ref->pocs[temporal_cand];
-      td = td < 0 ? -td : td;
-      if (td < poc_diff) {
-        closest_ref = temporal_cand;
-        poc_diff = td;
+      for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
+        int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+        td = td < 0 ? -td : td;
+        if (td < poc_diff) {
+          closest_ref = temporal_cand;
+          poc_diff = td;
+        }
       }
+
+      cu_info_t *selected_CU = NULL;
+
+      if (h != NULL) {
+        selected_CU = h;
+      } else if (c3 != NULL) {
+        selected_CU = c3;
+      }
+
+      if (selected_CU) {
+        int td = selected_CU->inter.mv_ref[reflist] + 1;
+        int tb = cur_cu->inter.mv_ref[reflist] + 1;
+
+        int scale = CALCULATE_SCALE(NULL, tb, td);
+        mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+        mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+
+        candidates++;
+      }
+#undef CALCULATE_SCALE
     }
-
-    cu_info_t *selected_CU = NULL;
-
-    if (h != NULL) {
-      selected_CU = h;
-    } else if (c3 != NULL) {
-      selected_CU = c3;
-    }
-
-    if (selected_CU) {
-      int td = selected_CU->inter.mv_ref[reflist]+1;
-      int tb = cur_cu->inter.mv_ref[reflist]+1;
-
-      int scale = CALCULATE_SCALE(NULL, tb, td);
-      mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-      mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
-
-      candidates++;
-    }
-    #undef CALCULATE_SCALE
   }
-#endif
 
   // Fill with (0,0)
   while (candidates < AMVP_MAX_NUM_CANDS) {
@@ -1328,55 +1328,55 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
   
-#if ENABLE_TEMPORAL_MVP
-  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
+  if (state->encoder_control->cfg->tmvp_enable) {
+#define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
-  if (candidates < MRG_MAX_NUM_CANDS && state->global->ref->used_size) {
-    
-    uint32_t poc_diff = UINT_MAX;
-    int32_t closest_ref = 0;
+    if (candidates < MRG_MAX_NUM_CANDS && state->global->ref->used_size) {
 
-    for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
-      int td = state->global->poc - state->global->ref->pocs[temporal_cand];
-      td = td < 0 ? -td : td;
-      if (td < poc_diff) {
-        closest_ref = temporal_cand;
-        poc_diff = td;
+      uint32_t poc_diff = UINT_MAX;
+      int32_t closest_ref = 0;
+
+      for (int temporal_cand = 0; temporal_cand < state->global->ref->used_size; temporal_cand++) {
+        int td = state->global->poc - state->global->ref->pocs[temporal_cand];
+        td = td < 0 ? -td : td;
+        if (td < poc_diff) {
+          closest_ref = temporal_cand;
+          poc_diff = td;
+        }
+      }
+
+      cu_info_t *C3 = NULL;
+      cu_info_t *H = NULL;
+      cu_info_t *selected_CU = NULL;
+
+      kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &C3, &H);
+
+      if (H != NULL) {
+        selected_CU = H;
+      } else if (C3 != NULL) {
+        selected_CU = C3;
+      }
+
+      if (selected_CU) {
+        int td = selected_CU->inter.mv_ref[0] + 1;
+        int tb = 1;
+
+        int scale = CALCULATE_SCALE(NULL, tb, td);
+        mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+        mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+
+        /*
+        ToDo: temporal prediction in B-pictures
+        mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[1][0];
+        mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[1][1];
+        */
+        mv_cand[candidates].dir = selected_CU->inter.mv_dir;
+        mv_cand[candidates].ref[0] = 0;
+        candidates++;
       }
     }
-
-    cu_info_t *C3 = NULL;
-    cu_info_t *H = NULL;
-    cu_info_t *selected_CU = NULL;
-
-    kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &C3, &H);
-
-    if (H != NULL) {
-      selected_CU = H;
-    } else if (C3 != NULL) {
-      selected_CU = C3;
-    }
-
-    if (selected_CU) {
-      int td = selected_CU->inter.mv_ref[0] + 1;
-      int tb = 1;
-
-      int scale = CALCULATE_SCALE(NULL, tb, td);
-      mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-      mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
-
-      /*
-      ToDo: temporal prediction in B-pictures
-      mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[1][0];
-      mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[1][1];
-      */
-      mv_cand[candidates].dir = selected_CU->inter.mv_dir;
-      mv_cand[candidates].ref[0] = 0;
-      candidates++;
-    }
+#undef CALCULATE_SCALE
   }
-  #undef CALCULATE_SCALE
-#endif
 
   if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
     #define NUM_PRIORITY_LIST 12;

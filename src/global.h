@@ -124,9 +124,6 @@ typedef int16_t coeff_t;
 //! spec: pcm_enabled_flag, Setting to 1 will enable using PCM blocks (current intra-search does not consider PCM)
 #define ENABLE_PCM 0
 
-//! Enable usage of temporal Motion Vector Prediction
-#define ENABLE_TEMPORAL_MVP 1
-
 //! skip residual coding when it's under _some_ threshold
 #define OPTIMIZATION_SKIP_RESIDUAL_ON_THRESHOLD 0
 

@@ -81,6 +81,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->target_bitrate  = 0;
   cfg->hash            = KVZ_HASH_CHECKSUM;
   cfg->lossless        = false;
+  cfg->tmvp_enable     = true;
 
   cfg->cu_split_termination = KVZ_CU_SPLIT_TERMINATION_ZERO;
 
@@ -797,6 +798,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
     }
+    if (cfg->gop_len && cfg->tmvp_enable) {
+      cfg->tmvp_enable = false;
+      fprintf(stderr, "Disabling TMVP because GOP is used.\n");
+    }
   }
   else if OPT("bipred")
     cfg->bipred = atobool(value);
@@ -910,6 +915,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("lossless")
     cfg->lossless = (bool)atobool(value);
+  else if OPT("tmvp") {
+    cfg->tmvp_enable = atobool(value);
+    if (cfg->gop_len && cfg->tmvp_enable) {
+      fprintf(stderr, "Cannot enable TMVP because GOP is used.\n");
+      cfg->tmvp_enable = false;
+    }
+  }
   else
     return 0;
 #undef OPT
