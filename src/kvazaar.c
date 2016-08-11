@@ -117,6 +117,8 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   kvz_config* el_cfg = kvz_config_alloc();
   *el_cfg = *cfg;
   el_cfg->qp = 1;
+  el_cfg->width = el_cfg->el_width;
+  el_cfg->height = el_cfg->el_height;
   encoder->el_control = kvz_encoder_control_init(el_cfg);
 
   encoder->cur_el_state_num = 0;
@@ -151,6 +153,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   encoder->el_states[encoder->cur_el_state_num].global->frame = -1;
   // ***********************************************
   
+
 
   kvz_init_input_frame_buffer(&encoder->input_buffer);
 
@@ -374,7 +377,7 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int width, int hei
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   //DO scaling here
-  kvz_picture* bl_pic_in = kvazaar_scaling(pic_in, pic_in->width, pic_in->height);//pic_in->width/2, pic_in->height/2); //TODO: Get bl w/h from cfg etc.
+  kvz_picture* bl_pic_in = kvazaar_scaling(pic_in, enc->control->in.width, enc->control->in.height);//pic_in->width/2, pic_in->height/2); 
 
   //Encode Bl first
   if (!kvazaar_encode(enc, bl_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
@@ -392,14 +395,16 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   //Calculate data for El
 
   encoder_state_t *state = &enc->el_states[enc->cur_el_state_num];
-  encoder_state_t *bl_state = &enc->states[enc->cur_el_state_num]; //Should return the bl state with the same poc as state
-  assert( state->global->poc == bl_state->global->poc );
+  
 
   if (!state->prepared) {
     kvz_encoder_next_frame(state);
+
     //Also add base layer to the reference list
-    //TODO: Add upscaling
-    kvz_image_list_add( state->global->ref, bl_state->tile->frame->rec, bl_state->tile->frame->cu_array, bl_state->global->poc );
+    encoder_state_t *bl_state = &enc->states[enc->cur_el_state_num]; //Should return the bl state with the same poc as state.
+    assert( state->global->poc == bl_state->global->poc );
+    //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
+    kvz_image_list_add( state->global->ref, kvazaar_scaling(bl_state->tile->frame->rec,pic_in->width,pic_in->height), kvz_cu_array_alloc(pic_in->width,pic_in->height), bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );
   }
 
   if (pic_in != NULL) {

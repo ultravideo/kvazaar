@@ -324,6 +324,11 @@ typedef struct kvz_config
   //For scalable extension. TODO: Move somewhere else?
   uint8_t layer;
   uint8_t max_layers;
+  int32_t el_width;
+  int32_t el_height;
+  int32_t in_width;
+  int32_t in_height;
+
   //*********************************************
 
 } kvz_config;
