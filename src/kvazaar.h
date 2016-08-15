@@ -472,11 +472,11 @@ typedef struct kvz_frame_info {
   // ***********************************************
         // Modified for SHVC
   //TODO: add support for multiple layers
-  int32_t el_qp;
-  enum kvz_nal_unit_type el_nal_unit_type;
-  enum kvz_slice_type el_slice_type;
-  int el_ref_list[2][16];
-  int el_ref_list_len[2];
+  //int32_t* el_qp;
+  //enum kvz_nal_unit_type* el_nal_unit_type;
+  //enum kvz_slice_type* el_slice_type;
+  //int* el_ref_list[2][16];
+  //int* el_ref_list_len[2];
   // ***********************************************
 
 

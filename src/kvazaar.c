@@ -60,17 +60,28 @@ static void kvazaar_close(kvz_encoder *encoder)
 
     // ***********************************************
     // Modified for SHVC
-    if (encoder->el_states) {
-      for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-        kvz_encoder_state_finalize(&encoder->el_states[i]);
+    for (int layer_id_minus1 = 0; layer_id_minus1 < encoder->control->cfg->max_layers-1; layer_id_minus1++) {
+      if (encoder->el_states[layer_id_minus1]) {
+        for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
+          kvz_encoder_state_finalize(&encoder->el_states[layer_id_minus1][i]);
+        }
       }
-    }
-    FREE_POINTER(encoder->el_states);
+      FREE_POINTER(encoder->el_states[layer_id_minus1]);
 
-    const kvz_config* el_cfg = encoder->el_control->cfg;
-    kvz_encoder_control_free(encoder->el_control);
-    encoder->el_control = NULL;
-    kvz_config_destroy((kvz_config*)el_cfg); //TODO: Figure out a better way
+      const kvz_config* el_cfg = encoder->el_control[layer_id_minus1]->cfg;
+      kvz_encoder_control_free(encoder->el_control[layer_id_minus1]);
+      encoder->el_control = NULL;
+      kvz_config_destroy((kvz_config*)el_cfg); //TODO: Figure out a better way 
+    }
+    FREE_POINTER(encoder->el_control);
+    FREE_POINTER(encoder->el_states);
+    FREE_POINTER(encoder->cur_el_state_num);
+    FREE_POINTER(encoder->out_el_state_num);
+    FREE_POINTER(encoder->el_input_buffer);
+    FREE_POINTER(encoder->el_frames_started);
+    FREE_POINTER(encoder->el_frames_done);
+    FREE_POINTER(encoder->downscaling);
+    FREE_POINTER(encoder->upscaling);
   // ***********************************************
   }
   FREE_POINTER(encoder);
@@ -78,6 +89,12 @@ static void kvazaar_close(kvz_encoder *encoder)
   
 
 }
+
+
+// ***********************************************
+// Modified for SHVC
+
+// ***********************************************
 
 
 static kvz_encoder * kvazaar_open(const kvz_config *cfg)
@@ -114,43 +131,88 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   // ***********************************************
   // Modified for SHVC
   //TODO: Make a better implementaino. el_cfg is needed to pass the layer id, figure out a better way
-  kvz_config* el_cfg = kvz_config_alloc();
-  *el_cfg = *cfg;
-  el_cfg->qp = 1;
-  el_cfg->width = el_cfg->el_width;
-  el_cfg->height = el_cfg->el_height;
-  encoder->el_control = kvz_encoder_control_init(el_cfg);
+  //TODO: Add error checking
+  //Allocate the needed arrays etc.
+  int el_layers = cfg->max_layers-1;
 
-  encoder->cur_el_state_num = 0;
-  encoder->out_el_state_num = 0;
-  encoder->el_frames_started = 0;
-  encoder->el_frames_done = 0;
+  if( el_layers > 0 ) {  
+    encoder->el_control = MALLOC(encoder_control_t*, el_layers);
+    encoder->el_states = MALLOC(encoder_state_t*, el_layers);
+    encoder->cur_el_state_num = MALLOC(unsigned, el_layers);
+    encoder->out_el_state_num = MALLOC(unsigned, el_layers);
+    encoder->el_input_buffer = MALLOC(input_frame_buffer_t, el_layers);
+    encoder->el_frames_started = MALLOC(unsigned, el_layers);
+    encoder->el_frames_done = MALLOC(unsigned, el_layers);
+    encoder->downscaling = calloc(el_layers+1,sizeof(scaling_parameter_t*));
+    encoder->upscaling = calloc(el_layers+1,sizeof(scaling_parameter_t*));
 
-  kvz_init_input_frame_buffer(&encoder->el_input_buffer);
-
-  encoder->el_states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
-  if (!encoder->el_states) {
-    goto kvazaar_open_failure;
-  }
-
-  for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-    encoder->el_states[i].encoder_control = encoder->el_control;
-
-    if (!kvz_encoder_state_init(&encoder->el_states[i], NULL)) {
+    if (!encoder->el_control || !encoder->el_states || !encoder->cur_el_state_num ||
+      !encoder->out_el_state_num || !encoder->el_input_buffer || !encoder->el_frames_started ||
+      !encoder->el_frames_done || !encoder->downscaling || !encoder->upscaling ) {
       goto kvazaar_open_failure;
     }
 
-    encoder->el_states[i].global->QP = (int8_t)el_cfg->qp;
+    //Set scaling param for base layer
+    encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,cfg->width,cfg->height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
+    encoder->upscaling[0] = newScalingParameters(cfg->width,cfg->height,cfg->width,cfg->height,CHROMA_420);
+  }
+  else {
+    encoder->el_control = NULL;
+    encoder->el_states = NULL;
+    encoder->cur_el_state_num = NULL;
+    encoder->out_el_state_num = NULL;
+    encoder->el_input_buffer = NULL;
+    encoder->el_frames_started = NULL;
+    encoder->el_frames_done = NULL;
+    encoder->downscaling = NULL;
+    encoder->upscaling = NULL;
   }
 
-  for (int i = 0; i < encoder->num_encoder_states; ++i) {
-    
-    encoder->el_states[i].previous_encoder_state = &encoder->el_states[abs((i - 1) % encoder->num_encoder_states)];
-    
-    kvz_encoder_state_match_children_of_previous_frame(&encoder->el_states[i]);
-  }
+  for (int layer_id_minus1 = 0; layer_id_minus1 < el_layers; layer_id_minus1++) {
+    //TODO: Set correct size based on cfg
+    kvz_config* el_cfg = kvz_config_alloc();
+    *el_cfg = *cfg;
+    el_cfg->qp = 1;
+    el_cfg->width = el_cfg->el_width;
+    el_cfg->height = el_cfg->el_height;
+    el_cfg->layer = layer_id_minus1;
+    encoder->el_control[layer_id_minus1] = kvz_encoder_control_init(el_cfg);
 
-  encoder->el_states[encoder->cur_el_state_num].global->frame = -1;
+    encoder->cur_el_state_num[layer_id_minus1] = 0;
+    encoder->out_el_state_num[layer_id_minus1] = 0;
+    encoder->el_frames_started[layer_id_minus1] = 0;
+    encoder->el_frames_done[layer_id_minus1] = 0;
+
+    kvz_init_input_frame_buffer(&encoder->el_input_buffer[layer_id_minus1]);
+
+    encoder->el_states[layer_id_minus1] = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
+    if (!encoder->el_states[layer_id_minus1]) {
+      goto kvazaar_open_failure;
+    }
+
+    for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
+      encoder->el_states[layer_id_minus1][i].encoder_control = encoder->el_control[layer_id_minus1];
+
+      if (!kvz_encoder_state_init(&encoder->el_states[layer_id_minus1][i], NULL)) {
+        goto kvazaar_open_failure;
+      }
+
+      encoder->el_states[layer_id_minus1][i].global->QP = (int8_t)el_cfg->qp;
+    }
+
+    for (int i = 0; i < encoder->num_encoder_states; ++i) {
+
+      encoder->el_states[layer_id_minus1][i].previous_encoder_state = &encoder->el_states[layer_id_minus1][abs((i - 1) % encoder->num_encoder_states)];
+
+      kvz_encoder_state_match_children_of_previous_frame(&encoder->el_states[layer_id_minus1][i]);
+    }
+
+    encoder->el_states[layer_id_minus1][encoder->cur_el_state_num[layer_id_minus1]].global->frame = -1;
+
+    //Prepare scaling parameters so that up/downscaling[layer_id] gives the correct parameters for up/downscaling from orig/prev_layer to layer_id
+    encoder->downscaling[layer_id_minus1+1] = newScalingParameters(cfg->in_width,cfg->in_height,cfg->el_width,cfg->el_height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
+    encoder->upscaling[layer_id_minus1+1] = newScalingParameters(encoder->upscaling[layer_id_minus1].trgt_width,encoder->upscaling[layer_id_minus1].trgt_height,cfg->el_width,cfg->el_height,CHROMA_420); //TODO: Account for irrecular reference structures?
+  }
   // ***********************************************
   
 
@@ -334,34 +396,37 @@ static int kvazaar_encode(kvz_encoder *enc,
 }
 // ***********************************************
   // Modified for SHVC
-static void set_el_frame_info(kvz_frame_info *const info, const encoder_state_t *const state)
-{
-  info->el_qp = state->global->QP;
-  info->el_nal_unit_type = state->global->pictype;
-  info->el_slice_type = state->global->slicetype;
-  kvz_encoder_get_ref_lists(state, info->el_ref_list_len, info->el_ref_list);
-}
+//static void set_el_frame_info(kvz_frame_info *const info, const encoder_state_t *const state, int layer_id_minus1)
+//{
+//
+//
+//  info->el_qp[layer_id_minus1] = state->global->QP;
+//  info->el_nal_unit_type[layer_id_minus1] = state->global->pictype;
+//  info->el_slice_type[layer_id_minus1] = state->global->slicetype;
+//  kvz_encoder_get_ref_lists(state, info->el_ref_list_len[layer_id_minus1], info->el_ref_list[layer_id_minus1]);
+//}
 
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //Create a new kvz picture based on pic_in with size given by width and height
-kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int width, int height)
+kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_t* param)
 {
   //Create the buffers that are passed to the scaling function
   //TODO: Consider the case when kvz_pixel is not uint8
   assert(pic_in->width==pic_in->stride); //Should be equal or the data transfer may fail.
+  assert(pic_in->width==param->src_width); //in pic size should match the param size
+  assert(pic_in->height==param->src_height);
   
-  yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, CHROMA_420, 0); //TODO: Get chroma format from cfg?
-  scaling_parameter_t param = newScalingParameters(pic_in->width, pic_in->height, width, height, CHROMA_420);
-  yuv_buffer_t* trgt_pic = yuvScaling(src_pic, &param, NULL );
+  yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, param->chroma, 0);
+  yuv_buffer_t* trgt_pic = yuvScaling(src_pic, param, NULL );
   
   //Create a new kvz picture from the buffer
-  kvz_picture* pic_out = kvz_image_alloc(width, height);
+  kvz_picture* pic_out = kvz_image_alloc(param->trgt_width, param->trgt_height);
   pic_out->dts = pic_in->dts;
   pic_out->pts = pic_in->pts;
 
   //Copy data to kvz picture
-  int luma_size = width*height;
-  int chroma_size = luma_size/4;
+  int luma_size = param->trgt_width*param->trgt_height;
+  int chroma_size = luma_size/(param->chroma == CHROMA_420 ? 4 : param->chroma == CHROMA_444 ? 1 : 0);
   int full_size = luma_size + chroma_size*2;
   for(int i = 0; i < full_size; i++) {
     pic_out->fulldata[i] = i < luma_size ? trgt_pic->y->data[i] : (i < luma_size+chroma_size ? trgt_pic->u->data[i-luma_size] : trgt_pic->v->data[i-luma_size-chroma_size]);
@@ -374,15 +439,19 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, int width, int hei
   return pic_out;
 }
 
+//TODO: make a note of this: Asume that info_out is an array with an element for each layer
+//TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   //DO scaling here
-  kvz_picture* bl_pic_in = kvazaar_scaling(pic_in, enc->control->in.width, enc->control->in.height);//pic_in->width/2, pic_in->height/2); 
+  kvz_picture* l_pic_in = kvazaar_scaling(pic_in, &enc->downscaling[0]);//pic_in->width/2, pic_in->height/2); 
 
   //Encode Bl first
-  if (!kvazaar_encode(enc, bl_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
+  if (!kvazaar_encode(enc, l_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
     return 0;
   }
+
+  kvz_image_free(l_pic_in);
 
   //TODO: checks ?
 
@@ -392,82 +461,95 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   //if (pic_out) *pic_out = NULL;
   //if (src_out) *src_out = NULL;
 
-  //Calculate data for El
+  //Store the pic and data pointers to the most resently encoded el layer to allow chaining them
+  kvz_data_chunk* last_l_chunk = *data_out;
+  kvz_picture* last_l_pic_out = *pic_out;
+  kvz_picture* last_l_src_out = *src_out;
 
-  encoder_state_t *state = &enc->el_states[enc->cur_el_state_num];
-  
+  //Calculate data for Els
+  for (int layer_id_minus1 = 0; layer_id_minus1 < enc->control->cfg->max_layers-1; layer_id_minus1++) {
 
-  if (!state->prepared) {
-    kvz_encoder_next_frame(state);
+    unsigned* cur_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
+    unsigned* out_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
+    unsigned* el_frames_started = &enc->el_frames_started[layer_id_minus1];
+    unsigned* el_frames_done = &enc->el_frames_done[layer_id_minus1];
+    encoder_state_t *state = &enc->el_states[layer_id_minus1][*cur_el_state_num];
+    l_pic_in = kvazaar_scaling(pic_in, &enc->downscaling[layer_id_minus1+1]);
 
-    //Also add base layer to the reference list
-    encoder_state_t *bl_state = &enc->states[enc->cur_el_state_num]; //Should return the bl state with the same poc as state.
-    assert( state->global->poc == bl_state->global->poc );
-    //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
-    kvz_image_list_add( state->global->ref, kvazaar_scaling(bl_state->tile->frame->rec,pic_in->width,pic_in->height), kvz_cu_array_alloc(pic_in->width,pic_in->height), bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );
-  }
+    if (!state->prepared) {
+      kvz_encoder_next_frame(state);
 
-  if (pic_in != NULL) {
-    // FIXME: The frame number printed here is wrong when GOP is enabled.
-    CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->el_control->cfg->seek);
-  }
+      //Also add base layer to the reference list
+      encoder_state_t *bl_state = &enc->states[*cur_el_state_num]; //Should return the bl state with the same poc as state.
+      assert(state->global->poc == bl_state->global->poc);
+      //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
+      kvz_image_list_add(state->global->ref, kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1+1]), kvz_cu_array_alloc(pic_in->width, pic_in->height), bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );
+    }
 
-  if (kvz_encoder_feed_frame(&enc->el_input_buffer, state, pic_in)) {
-    assert(state->global->frame == enc->el_frames_started);
-    // Start encoding.
-    kvz_encode_one_frame(state);
-    enc->el_frames_started += 1;
-  }
+    if (pic_in != NULL) {
+      // FIXME: The frame number printed here is wrong when GOP is enabled.
+      CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->el_control[layer_id_minus1]->cfg->seek);
+    }
 
-  // If we have finished encoding as many frames as we have started, we are done.
-  if (enc->el_frames_done == enc->el_frames_started) {
-    return 1;
-  }
+    if (kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, pic_in)) {
+      assert(state->global->frame == *el_frames_started);
+      // Start encoding.
+      kvz_encode_one_frame(state);
+      *el_frames_started += 1;
+    }
 
-  if (!state->frame_done) {
-    // We started encoding a frame; move to the next encoder state.
-    enc->cur_el_state_num = (enc->cur_el_state_num + 1) % (enc->num_encoder_states);
-  }
+    // If we have finished encoding as many frames as we have started, we are done.
+    if (*el_frames_done == *el_frames_started) {
+      return 1;
+    }
 
-  encoder_state_t *output_state = &enc->el_states[enc->out_el_state_num];
-  if (!output_state->frame_done &&
-      (pic_in == NULL || enc->cur_el_state_num == enc->out_el_state_num)) {
+    if (!state->frame_done) {
+      // We started encoding a frame; move to the next encoder state.
+      *cur_el_state_num = (*cur_el_state_num + 1) % (enc->num_encoder_states);
+    }
 
-    kvz_threadqueue_waitfor(enc->el_control->threadqueue, output_state->tqj_bitstream_written);
-    // The job pointer must be set to NULL here since it won't be usable after
-    // the next frame is done.
-    output_state->tqj_bitstream_written = NULL;
+    encoder_state_t *output_state = &enc->el_states[layer_id_minus1][*out_el_state_num];
+    if (!output_state->frame_done &&
+      (pic_in == NULL || *cur_el_state_num == *out_el_state_num)) {
 
-    // Get stream length before taking chunks since that clears the stream.
-    if (len_out) *len_out += kvz_bitstream_tell(&output_state->stream) / 8;
-    if (data_out) {
-      //Concatenate data to the end of data_out from bl
-      kvz_data_chunk* bl_end_chunk = *data_out;
-      while(bl_end_chunk->next != NULL) {
-        bl_end_chunk = bl_end_chunk->next;
+      kvz_threadqueue_waitfor(enc->el_control[layer_id_minus1]->threadqueue, output_state->tqj_bitstream_written);
+      // The job pointer must be set to NULL here since it won't be usable after
+      // the next frame is done.
+      output_state->tqj_bitstream_written = NULL;
+
+      // Get stream length before taking chunks since that clears the stream.
+      if (len_out) *len_out += kvz_bitstream_tell(&output_state->stream) / 8;
+      if (last_l_chunk) {
+        //Concatenate data to the end of last layer's data chunk
+        while (last_l_chunk->next != NULL) {
+          last_l_chunk = last_l_chunk->next;
+        }
+
+        last_l_chunk->next = kvz_bitstream_take_chunks(&output_state->stream);
+      }
+      if (last_l_pic_out) {
+        //Set cur layer pic_out as the base pic for last_l out pic
+        last_l_pic_out->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
+        last_l_pic_out = last_l_pic_out->base_image;
+      }
+      if (last_l_src_out) {
+        //Set cur layer src_out as the base pic for last_l out pic
+        last_l_src_out->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
+        last_l_src_out = last_l_src_out->base_image;
+      }
+      if (&info_out[layer_id_minus1]) {
+        set_frame_info(&info_out[layer_id_minus1], output_state);
       }
 
-      bl_end_chunk->next = kvz_bitstream_take_chunks(&output_state->stream);
-    }
-    if (pic_out) {
-      //Set el pic_out as the base pic for bl out pic
-      (*pic_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
-    }
-    if (src_out) {
-      //Set el src_out as the base pic for bl out pic
-      (*src_out)->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
-    }
-    if (info_out) {
-      set_el_frame_info(info_out, output_state);
+      output_state->frame_done = 1;
+      output_state->prepared = 0;
+      *el_frames_done += 1;
+
+      *out_el_state_num = (*out_el_state_num + 1) % (enc->num_encoder_states);
     }
 
-    output_state->frame_done = 1;
-    output_state->prepared = 0;
-    enc->el_frames_done += 1;
-
-    enc->out_el_state_num = (enc->out_el_state_num + 1) % (enc->num_encoder_states);
+    kvz_image_free(l_pic_in);
   }
-
   return 1;
 }
 

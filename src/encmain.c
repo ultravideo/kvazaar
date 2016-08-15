@@ -393,6 +393,8 @@ int main(int argc, char *argv[])
     // Modified for SHVC
     uint8_t padding_x = get_padding(opts->config->in_width);
     uint8_t padding_y = get_padding(opts->config->in_height);
+
+    kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*opts->config->max_layers);
     // ***********************************************
 
     pthread_t input_thread;
@@ -453,18 +455,21 @@ int main(int argc, char *argv[])
       kvz_picture *img_rec = NULL;
       kvz_picture *img_src = NULL;
       uint32_t len_out = 0;
-      kvz_frame_info info_out;
+      // ***********************************************
+      // Modified for SHVC
+      //TODO: Move relevant de/allocation to done tag.
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
                                &len_out,
                                &img_rec,
                                &img_src,
-                               &info_out)) {
+                               info_out)) {
         fprintf(stderr, "Failed to encode image.\n");
         api->picture_free(cur_in_img);
         goto exit_failure;
       }
+      // ***********************************************
 
       if (chunks_out == NULL && cur_in_img == NULL) {
         // We are done since there is no more input and output left.
@@ -515,44 +520,54 @@ int main(int argc, char *argv[])
         psnr_sum[0] += frame_psnr[0];
         psnr_sum[1] += frame_psnr[1];
         psnr_sum[2] += frame_psnr[2];
-
-        print_frame_info(&info_out, frame_psnr, len_out);
-
+        
         // ***********************************************
         // Modified for SHVC
+        print_frame_info(info_out, frame_psnr, len_out);
+
+        
         //TODO: Figure out a better way?
-        //We use the subimage to pass bl and el images from the encoder at several at the time.
-        //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
-        kvz_picture* el_img_src = img_src->base_image;
-        kvz_picture* el_img_rec = img_rec->base_image;
+        //Loop over layers
+        kvz_picture* last_l_src = img_src->base_image;
+        kvz_picture* last_l_rec = img_rec->base_image;
         img_src->base_image = img_src; //Need to set correct base image for deallocation
         img_rec->base_image = img_rec;
+        for (int layer_id = 1; layer_id < opts->config->max_layers; layer_id++) {
+          //We use the subimage to pass bl and el images from the encoder at several at the time.
+          //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
+          kvz_picture* el_img_src = last_l_src;
+          kvz_picture* el_img_rec = last_l_rec;
+          last_l_src = last_l_src->base_image;
+          last_l_rec = last_l_rec->base_image;
+          el_img_src->base_image = el_img_src; //Need to set correct base image for deallocation
+          el_img_rec->base_image = el_img_rec;
 
-        //Calculate info
-        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
-          // Do not compute PSNR for interlaced frames, because img_rec does not contain
-          // the deinterlaced frame yet.
-          compute_psnr(el_img_src, el_img_rec, frame_psnr);
-        }
-
-        if (recout) {
-          // Since chunks_out was not NULL, img_rec should have been set.
-          assert(el_img_rec);
-          if (!yuv_io_write(recout,
-                            el_img_rec,
-                            opts->config->width,
-                            opts->config->height)) {
-            fprintf(stderr, "Failed to write reconstructed picture!\n");
+          //Calculate info
+          if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+            // Do not compute PSNR for interlaced frames, because img_rec does not contain
+            // the deinterlaced frame yet.
+            compute_psnr(el_img_src, el_img_rec, frame_psnr);
           }
+
+          if (recout) {
+            // Since chunks_out was not NULL, img_rec should have been set.
+            assert(el_img_rec);
+            if (!yuv_io_write(recout,
+              el_img_rec,
+              opts->config->width,
+              opts->config->height)) {
+              fprintf(stderr, "Failed to write reconstructed picture!\n");
+            }
+          }
+
+          //TODO: Print el info correctly. Do calculate psnr_sum for el
+          print_el_frame_info(info_out, frame_psnr, len_out, layer_id);
+
+          //Deallocate el_img_*
+          //TODO: Need to deallocate even if no data is output?
+          api->picture_free(el_img_rec);
+          api->picture_free(el_img_src);
         }
-
-        //TODO: Print el info correctly. Do calculate psnr_sum for el
-        print_el_frame_info(&info_out, frame_psnr, len_out);
-
-        //Deallocate el_img_*
-        //TODO: Need to deallocate even if no data is output?
-        api->picture_free(el_img_rec);
-        api->picture_free(el_img_src);
       }
 
       
@@ -629,14 +644,19 @@ int main(int argc, char *argv[])
 
         print_frame_info(&info_out, frame_psnr, len_out);
       }
-      *///********************************
+      */
+      
+      
 
       api->picture_free(cur_in_img);
       api->chunk_free(chunks_out);
       api->picture_free(img_rec);
       api->picture_free(img_src);
     }
-
+    
+    free(info_out);
+    //********************************
+    
     KVZ_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     // Coding finished
