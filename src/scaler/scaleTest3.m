@@ -9,7 +9,7 @@ rgb = imread('ngc6543a.jpg');
 rgb = rgb(1:600,1:600,:);%250:300,275:325,:);
 yuv = rgb2ycbcr(rgb);
 factor = 2;
-s1 = uint32([100 100]);
+s1 = uint32([10 10]);
 s2 = uint32([600 600]);%size(yuv(:,:,1))./factor);%uint32(size(yuv(275:300,300:325,1))./factor);
 
 %% Downscale
