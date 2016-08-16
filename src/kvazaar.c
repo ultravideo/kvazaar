@@ -287,11 +287,11 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   } first = { 0, 0 }, second = { 0, 0 };
 
   if (pic_in != NULL) {
-    first_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);
+    first_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (first_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
-    second_field = kvz_image_alloc(state->encoder_control->in.width, state->encoder_control->in.height);
+    second_field = kvz_image_alloc(state->encoder_control->chroma_format, state->encoder_control->in.width, state->encoder_control->in.height);
     if (second_field == NULL) {
       goto kvazaar_field_encoding_adapter_failure;
     }
@@ -355,7 +355,7 @@ static const kvz_api kvz_8bit_api = {
   .config_destroy = kvz_config_destroy,
   .config_parse = kvz_config_parse,
 
-  .picture_alloc = kvz_image_alloc,
+  .picture_alloc = kvz_image_alloc_420,
   .picture_free = kvz_image_free,
 
   .chunk_free = kvz_bitstream_free_chunks,
@@ -364,6 +364,8 @@ static const kvz_api kvz_8bit_api = {
   .encoder_close = kvazaar_close,
   .encoder_headers = kvazaar_headers,
   .encoder_encode = kvazaar_field_encoding_adapter,
+
+  .picture_alloc_csp = kvz_image_alloc,
 };
 
 

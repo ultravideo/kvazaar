@@ -98,14 +98,15 @@ static unsigned get_padding(unsigned width_or_height){
  */
 static void compute_psnr(const kvz_picture *const src,
                          const kvz_picture *const rec,
-                         double psnr[NUM_COLORS])
+                         double psnr[3])
 {
   assert(src->width  == rec->width);
   assert(src->height == rec->height);
 
   int32_t pixels = src->width * src->height;
+  int colors = rec->chroma_format == KVZ_CSP_400 ? 1 : 3;
 
-  for (int32_t c = 0; c < NUM_COLORS; ++c) {
+  for (int32_t c = 0; c < colors; ++c) {
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
       num_pixels >>= 2;
@@ -178,8 +179,10 @@ static void* input_read_thread(void* in_args)
       goto done;
     }
 
-    frame_in = args->api->picture_alloc(args->opts->config->width  + args->padding_x,
-                                        args->opts->config->height + args->padding_y);
+    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(args->opts->config->input_format);
+    frame_in = args->api->picture_alloc_csp(csp,
+                                            args->opts->config->width  + args->padding_x,
+                                            args->opts->config->height + args->padding_y);
 
     if (!frame_in) {
       fprintf(stderr, "Failed to allocate image.\n");

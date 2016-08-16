@@ -791,7 +791,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
     // In lossless mode, the reconstruction is equal to the source frame.
     state->tile->frame->rec = kvz_image_copy_ref(frame);
   } else {
-    state->tile->frame->rec = kvz_image_alloc(frame->width, frame->height);
+    state->tile->frame->rec = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
   }
 
   kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);

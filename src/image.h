@@ -52,7 +52,8 @@ typedef struct {
 } yuv_t;
 
 
-kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc_420(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_t width, const int32_t height);
 
 void kvz_image_free(kvz_picture *im);
 

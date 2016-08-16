@@ -64,12 +64,12 @@ static kvz_picture *g_ref = 0;
 // SETUP, TEARDOWN AND HELPER FUNCTIONS
 static void setup_tests()
 {
-  g_pic = kvz_image_alloc(8, 8);
+  g_pic = kvz_image_alloc(KVZ_CSP_420, 8, 8);
   for (int i = 0; i < 64; ++i) {
     g_pic->y[i] = pic_data[i] + 48;
   }
 
-  g_ref = kvz_image_alloc(8, 8);
+  g_ref = kvz_image_alloc(KVZ_CSP_420, 8, 8);
   for (int i = 0; i < 64; ++i) {
     g_ref->y[i] = ref_data[i] + 48;
   }

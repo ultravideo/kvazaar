@@ -27,10 +27,20 @@
 #include "threads.h"
 
 /**
+* \brief Allocate a new image with 420.
+* This function signature is part of the libkvz API.
+* \return image pointer or NULL on failure
+*/
+kvz_picture * kvz_image_alloc_420(const int32_t width, const int32_t height)
+{
+  return kvz_image_alloc(KVZ_CSP_420, width, height);
+}
+
+/**
  * \brief Allocate a new image.
  * \return image pointer or NULL on failure
  */
-kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
+kvz_picture * kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_t width, const int32_t height)
 {
   //Assert that we have a well defined image
   assert((width % 2) == 0);
@@ -40,7 +50,10 @@ kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
   if (!im) return NULL;
 
   unsigned int luma_size = width * height;
-  unsigned int chroma_size = luma_size / 4;
+  unsigned chroma_sizes[] = { 0, luma_size / 4, luma_size / 2, luma_size };
+  unsigned chroma_size = chroma_sizes[chroma_format];
+
+  im->chroma_format = chroma_format;
 
   //Allocate memory
   im->fulldata = MALLOC(kvz_pixel, (luma_size + 2 * chroma_size));
@@ -54,10 +67,17 @@ kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height)
   im->width = width;
   im->height = height;
   im->stride = width;
+  im->chroma_format = chroma_format;
 
   im->y = im->data[COLOR_Y] = &im->fulldata[0];
-  im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
-  im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
+
+  if (chroma_format == KVZ_CSP_400) {
+    im->u = im->data[COLOR_U] = NULL;
+    im->v = im->data[COLOR_V] = NULL;
+  } else {
+    im->u = im->data[COLOR_U] = &im->fulldata[luma_size];
+    im->v = im->data[COLOR_V] = &im->fulldata[luma_size + chroma_size];
+  }
 
   im->pts = 0;
   im->dts = 0;
@@ -138,10 +158,13 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   im->width = width;
   im->height = height;
   im->stride = orig_image->stride;
+  im->chroma_format = orig_image->chroma_format;
 
   im->y = im->data[COLOR_Y] = &orig_image->y[x_offset + y_offset * orig_image->stride];
-  im->u = im->data[COLOR_U] = &orig_image->u[x_offset/2 + y_offset/2 * orig_image->stride/2];
-  im->v = im->data[COLOR_V] = &orig_image->v[x_offset/2 + y_offset/2 * orig_image->stride/2];
+  if (orig_image->chroma_format != KVZ_CSP_400) {
+    im->u = im->data[COLOR_U] = &orig_image->u[x_offset / 2 + y_offset / 2 * orig_image->stride / 2];
+    im->v = im->data[COLOR_V] = &orig_image->v[x_offset / 2 + y_offset / 2 * orig_image->stride / 2];
+  }
 
   im->pts = 0;
   im->dts = 0;

@@ -339,6 +339,7 @@ typedef struct kvz_picture {
   int64_t dts;             //!< \brief Decompression timestamp.
 
   enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
+  enum kvz_chroma_format chroma_format;
 } kvz_picture;
 
 /**
@@ -616,6 +617,19 @@ typedef struct kvz_api {
                                   kvz_picture **pic_out,
                                   kvz_picture **src_out,
                                   kvz_frame_info *info_out);
+
+  /**
+   * \brief Allocate a kvz_picture.
+   *
+   * The returned kvz_picture should be deallocated by calling picture_free.
+   *
+   * \since 3.12.0
+   * \param chroma_fomat  Chroma subsampling to use.
+   * \param width   width of luma pixel array to allocate
+   * \param height  height of luma pixel array to allocate
+   * \return        allocated picture, or NULL if allocation failed.
+   */
+  kvz_picture * (*picture_alloc_csp)(enum kvz_chroma_format chroma_fomat, int32_t width, int32_t height);
 } kvz_api;
 
 
