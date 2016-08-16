@@ -561,7 +561,7 @@ int main(int argc, char *argv[])
           }
 
           //TODO: Print el info correctly. Do calculate psnr_sum for el
-          print_el_frame_info(info_out, frame_psnr, len_out, layer_id);
+          print_el_frame_info(&info_out[layer_id], frame_psnr, len_out, layer_id);
 
           //Deallocate el_img_*
           //TODO: Need to deallocate even if no data is output?

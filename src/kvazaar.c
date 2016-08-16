@@ -153,8 +153,11 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     }
 
     //Set scaling param for base layer
-    encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,cfg->width,cfg->height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[0] = newScalingParameters(cfg->width,cfg->height,cfg->width,cfg->height,CHROMA_420);
+    //Need to use the padded size
+    uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->downscaling[0] = newScalingParameters(cfg->in_width + padding_x,cfg->in_height + padding_y,encoder->control->in.width,encoder->control->in.height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
+    encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.width,encoder->control->in.height,CHROMA_420);
   }
   else {
     encoder->el_control = NULL;
@@ -169,7 +172,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   }
 
   for (int layer_id_minus1 = 0; layer_id_minus1 < el_layers; layer_id_minus1++) {
-    //TODO: Set correct size based on cfg
+    //TODO: Set correct size etc. based on cfg
     kvz_config* el_cfg = kvz_config_alloc();
     *el_cfg = *cfg;
     el_cfg->qp = 1;
@@ -210,8 +213,19 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     encoder->el_states[layer_id_minus1][encoder->cur_el_state_num[layer_id_minus1]].global->frame = -1;
 
     //Prepare scaling parameters so that up/downscaling[layer_id] gives the correct parameters for up/downscaling from orig/prev_layer to layer_id
-    encoder->downscaling[layer_id_minus1+1] = newScalingParameters(cfg->in_width,cfg->in_height,cfg->el_width,cfg->el_height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[layer_id_minus1+1] = newScalingParameters(encoder->upscaling[layer_id_minus1].trgt_width,encoder->upscaling[layer_id_minus1].trgt_height,cfg->el_width,cfg->el_height,CHROMA_420); //TODO: Account for irrecular reference structures?
+    //Need to use the padded size
+    uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->downscaling[layer_id_minus1 + 1] = newScalingParameters(cfg->in_width + padding_x,
+                                                                     cfg->in_height + padding_y,
+                                                                     encoder->el_control[layer_id_minus1]->in.width,
+                                                                     encoder->el_control[layer_id_minus1]->in.height,
+                                                                     CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
+    encoder->upscaling[layer_id_minus1 + 1] = newScalingParameters(encoder->upscaling[layer_id_minus1].trgt_width,
+                                                                   encoder->upscaling[layer_id_minus1].trgt_height,
+                                                                   encoder->el_control[layer_id_minus1]->in.width,
+                                                                   encoder->el_control[layer_id_minus1]->in.height,
+                                                                   CHROMA_420); //TODO: Account for irrecular reference structures?
   }
   // ***********************************************
   
@@ -419,8 +433,18 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, param->chroma, 0);
   yuv_buffer_t* trgt_pic = yuvScaling(src_pic, param, NULL );
   
+  if( trgt_pic == NULL ) {
+    deallocateYuvBuffer(src_pic);
+    return NULL;
+  }
+
   //Create a new kvz picture from the buffer
   kvz_picture* pic_out = kvz_image_alloc(param->trgt_width, param->trgt_height);
+  if( pic_out == NULL) {
+    deallocateYuvBuffer(src_pic);
+    deallocateYuvBuffer(trgt_pic);
+    return NULL;
+  }
   pic_out->dts = pic_in->dts;
   pic_out->pts = pic_in->pts;
 
@@ -444,6 +468,7 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   //DO scaling here
+  //Pic_in for the layer being currently encoded
   kvz_picture* l_pic_in = kvazaar_scaling(pic_in, &enc->downscaling[0]);//pic_in->width/2, pic_in->height/2); 
 
   //Encode Bl first
@@ -474,7 +499,9 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
     unsigned* el_frames_started = &enc->el_frames_started[layer_id_minus1];
     unsigned* el_frames_done = &enc->el_frames_done[layer_id_minus1];
     encoder_state_t *state = &enc->el_states[layer_id_minus1][*cur_el_state_num];
-    l_pic_in = kvazaar_scaling(pic_in, &enc->downscaling[layer_id_minus1+1]);
+
+    kvz_picture* last_l_pic_in = pic_in; //This is the src frame that should be used when downscaling. TODO: Use higher layers pic to speed up downscaling?
+    l_pic_in = kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
 
     if (!state->prepared) {
       kvz_encoder_next_frame(state);
@@ -483,15 +510,18 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
       encoder_state_t *bl_state = &enc->states[*cur_el_state_num]; //Should return the bl state with the same poc as state.
       assert(state->global->poc == bl_state->global->poc);
       //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
-      kvz_image_list_add(state->global->ref, kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1+1]), kvz_cu_array_alloc(pic_in->width, pic_in->height), bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );
+      kvz_image_list_add(state->global->ref,
+                         kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
+                         kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
+                         bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );
     }
 
-    if (pic_in != NULL) {
+    if (l_pic_in != NULL) {
       // FIXME: The frame number printed here is wrong when GOP is enabled.
       CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->el_control[layer_id_minus1]->cfg->seek);
     }
 
-    if (kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, pic_in)) {
+    if (kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, l_pic_in)) {
       assert(state->global->frame == *el_frames_started);
       // Start encoding.
       kvz_encode_one_frame(state);
@@ -510,7 +540,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
 
     encoder_state_t *output_state = &enc->el_states[layer_id_minus1][*out_el_state_num];
     if (!output_state->frame_done &&
-      (pic_in == NULL || *cur_el_state_num == *out_el_state_num)) {
+      (l_pic_in == NULL || *cur_el_state_num == *out_el_state_num)) {
 
       kvz_threadqueue_waitfor(enc->el_control[layer_id_minus1]->threadqueue, output_state->tqj_bitstream_written);
       // The job pointer must be set to NULL here since it won't be usable after
@@ -537,8 +567,8 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
         last_l_src_out->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
         last_l_src_out = last_l_src_out->base_image;
       }
-      if (&info_out[layer_id_minus1]) {
-        set_frame_info(&info_out[layer_id_minus1], output_state);
+      if (&info_out[layer_id_minus1+1]) {
+        set_frame_info(&info_out[layer_id_minus1+1], output_state);
       }
 
       output_state->frame_done = 1;
