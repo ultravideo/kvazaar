@@ -187,16 +187,32 @@ static void* input_read_thread(void* in_args)
       goto done;
     }
 
-    if (!yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in)) {
+    bool read_success = yuv_io_read(args->input, 
+                                    args->opts->config->width,
+                                    args->opts->config->height,
+                                    args->encoder->cfg->input_bitdepth,
+                                    args->encoder->bitdepth,
+                                    frame_in);
+    if (!read_success) {
       // reading failed
       if (feof(args->input)) {
         // When looping input, re-open the file and re-read data.
         if (args->opts->loop_input && args->input != stdin) {
           fclose(args->input);
           args->input = fopen(args->opts->input, "rb");
-          if (args->input == NULL ||
-              !yuv_io_read(args->input, args->opts->config->width, args->opts->config->height, frame_in))
+          if (args->input == NULL)
           {
+            fprintf(stderr, "Could not re-open input file, shutting down!\n");
+            retval = RETVAL_FAILURE;
+            goto done;
+          }
+          bool read_success = yuv_io_read(args->input,
+                                          args->opts->config->width,
+                                          args->opts->config->height,
+                                          args->encoder->cfg->input_bitdepth,
+                                          args->encoder->bitdepth,
+                                          frame_in);
+          if (!read_success) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");
             retval = RETVAL_FAILURE;
             goto done;

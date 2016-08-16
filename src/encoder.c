@@ -128,6 +128,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
 
   encoder->bitdepth = KVZ_BIT_DEPTH;
 
+  encoder->chroma_format = KVZ_FORMAT2CSP(cfg->input_format);
+
   // deblocking filter
   encoder->deblock_enable    = 1;
   encoder->beta_offset_div2  = 0;
@@ -394,7 +396,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   encoder->pu_depth_intra.max = cfg->pu_depth_intra.max;
 
   // input init (TODO: read from commandline / config)  
-  encoder->in.video_format    = FORMAT_420;
+  encoder->chroma_format      = KVZ_CSP_420;
 
   // deblocking filter
   encoder->deblock_enable     = (int8_t)  (encoder->cfg->deblock_enable &&
@@ -496,7 +498,6 @@ void kvz_encoder_control_input_init(encoder_control_t * const encoder,
   encoder->in.height = height;
   encoder->in.real_width = width;
   encoder->in.real_height = height;
-  encoder->in.bitdepth = encoder->bitdepth;
 
   // If input dimensions are not divisible by the smallest block size, add
   // pixels to the dimensions, so that they are. These extra pixels will be

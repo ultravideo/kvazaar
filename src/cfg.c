@@ -115,6 +115,9 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->rdoq_skip = 0;
 
+  cfg->input_format = KVZ_FORMAT_P420;
+  cfg->input_bitdepth = 8;
+
   return 1;
 }
 
@@ -948,6 +951,32 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("rdoq-skip"){
     cfg->rdoq_skip = atobool(value);
+  }
+  else if OPT("input-format") {
+    static enum kvz_input_format const formats[] = { KVZ_FORMAT_P400, KVZ_FORMAT_P420 };
+    static const char * const format_names[] = { "P400", "P420", NULL };
+
+    int8_t format = 0;
+    if (!parse_enum(value, format_names, &format)) {
+      fprintf(stderr, "input-format not recognized.\n");
+      return 0;
+    }
+
+    cfg->input_format = formats[format];
+  }
+  else if OPT("input-bitdepth") {
+    cfg->input_bitdepth = atoi(value);
+    if (cfg->input_bitdepth < 8 || cfg->input_bitdepth > 16) {
+      fprintf(stderr, "input-bitdepth not between 8 and 16.\n");
+      return 0;
+    }
+    if (cfg->input_bitdepth > 8 && KVZ_BIT_DEPTH == 8) {
+      // Because the image is read straight into the reference buffers,
+      // reading >8 bit samples doesn't work when sizeof(kvz_pixel)==1.
+      fprintf(stderr, "input-bitdepth can't be set to larger than 8 because"
+                      " Kvazaar is compiled with KVZ_BIT_DEPTH=8.\n");
+      return 0;
+    }
   }
   else
     return 0;

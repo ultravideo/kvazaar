@@ -243,7 +243,7 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
       encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
       encoder->vui.colormatrix != 2) {
     WRITE_U(stream, 1, 1, "video_signal_type_present_flag");
-    WRITE_U(stream, encoder->vui.videoformat, 3, "video_format");
+    WRITE_U(stream, encoder->vui.videoformat, 3, "chroma_format");
     WRITE_U(stream, encoder->vui.fullrange, 1, "video_full_range_flag");
 
     if (encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
@@ -310,10 +310,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   encoder_state_write_bitstream_PTL(stream, state);
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, encoder->in.video_format,
+  WRITE_UE(stream, encoder->chroma_format,
            "chroma_format_idc");
 
-  if (encoder->in.video_format == 3) {
+  if (encoder->chroma_format == 3) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 

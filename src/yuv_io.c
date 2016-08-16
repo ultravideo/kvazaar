@@ -68,20 +68,36 @@ static int read_and_fill_frame_data(FILE *file,
 }
 
 
-/**
-* \brief Convert 8 bit (single byte per pixel) to 10bit (two bytes per pixel) array
-*
-* \param input   input/output buffer
-* \return        1
-*/
-int frame_8bit_to_10bit(kvz_pixel* input, int width, int height) {
-  uint8_t* temp_buffer = (uint8_t*)input;
-  const uint32_t pixels = width*height;
-  for (int i = pixels - 1; i >= 0; i--) {
-    input[i] = temp_buffer[i] << 2;
+static void swap_16b_buffer_bytes(kvz_pixel* input, int size)
+{
+  for (int i = 0; i < size; ++i) {
+    input[i] = ((input[i] & 0xff) << 8) + ((input[i] & 0xff00) >> 8);
   }
-  return 1;
 }
+
+
+static void shift_to_bitdepth(kvz_pixel* input, int size, int from_bitdepth, int to_bitdepth)
+{
+  int shift = from_bitdepth - to_bitdepth;
+  for (int i = 0; i < size; ++i) {
+    // Shifting by a negative number is undefined.
+    if (shift > 0) {
+      input[i] <<= shift;
+    } else {
+      input[i] >>= shift;
+    }
+  }
+}
+
+
+bool machine_is_big_endian()
+{
+  uint16_t number = 1;
+  char first_byte = *(char*)&number;
+
+  return (first_byte != 0);
+}
+
 
 /**
  * \brief Read a single frame from a file.
@@ -98,15 +114,20 @@ int frame_8bit_to_10bit(kvz_pixel* input, int width, int height) {
  */
 int yuv_io_read(FILE* file,
                 unsigned input_width, unsigned input_height,
+                unsigned input_bitdepth, unsigned to_bitdepth,
                 kvz_picture *img_out)
 {
   assert(input_width % 2 == 0);
   assert(input_height % 2 == 0);
 
+  unsigned bytes_per_sample = input_bitdepth > 8 ? 2 : 1;
+
   const unsigned y_size = input_width * input_height;
+  const unsigned y_bytes = y_size * bytes_per_sample;
   const unsigned uv_input_width  = input_width  / 2;
   const unsigned uv_input_height = input_height / 2;
   const unsigned uv_size = uv_input_width * uv_input_height;
+  const unsigned uv_bytes = uv_size * bytes_per_sample;
 
   const unsigned uv_array_width  = img_out->width  / 2;
   const unsigned uv_array_height = img_out->height  / 2;
@@ -114,9 +135,9 @@ int yuv_io_read(FILE* file,
   if (input_width == img_out->width) {
     // No need to extend pixels.
     const size_t pixel_size = sizeof(unsigned char);
-    if (fread(img_out->y, pixel_size, y_size,  file) != y_size)  return 0;
-    if (fread(img_out->u, pixel_size, uv_size, file) != uv_size) return 0;
-    if (fread(img_out->v, pixel_size, uv_size, file) != uv_size) return 0;
+    if (fread(img_out->y, pixel_size, y_bytes,  file) != y_bytes)  return 0;
+    if (fread(img_out->u, pixel_size, uv_bytes, file) != uv_bytes) return 0;
+    if (fread(img_out->v, pixel_size, uv_bytes, file) != uv_bytes) return 0;
   } else {
     // Need to copy pixels to fill the image in horizontal direction.
     if (!read_and_fill_frame_data(file, input_width,    input_height,    img_out->width, img_out->y)) return 0;
@@ -126,17 +147,25 @@ int yuv_io_read(FILE* file,
 
   if (input_height != img_out->height) {
     // Need to copy pixels to fill the image in vertical direction.
-    fill_after_frame(input_height,    img_out->width, img_out->height,    img_out->y);
+    fill_after_frame(input_height,    img_out->width, img_out->height, img_out->y);
     fill_after_frame(uv_input_height, uv_array_width, uv_array_height, img_out->u);
     fill_after_frame(uv_input_height, uv_array_width, uv_array_height, img_out->v);
   }
+  
+  if (bytes_per_sample == 2) {
+    if (machine_is_big_endian()) {
+      swap_16b_buffer_bytes(img_out->y, y_size);
+      swap_16b_buffer_bytes(img_out->u, uv_size);
+      swap_16b_buffer_bytes(img_out->v, uv_size);
+    }
 
-#if KVZ_BIT_DEPTH == 10
-  frame_8bit_to_10bit(img_out->y, img_out->width, img_out->height);
-	frame_8bit_to_10bit(img_out->u, img_out->width >> 1, img_out->height >> 1);
-	frame_8bit_to_10bit(img_out->v, img_out->width >> 1, img_out->height >> 1);
-#endif
-
+    if (input_bitdepth != to_bitdepth) {
+      shift_to_bitdepth(img_out->y, y_size, input_bitdepth, to_bitdepth);
+      shift_to_bitdepth(img_out->u, uv_size, input_bitdepth, to_bitdepth);
+      shift_to_bitdepth(img_out->v, uv_size, input_bitdepth, to_bitdepth);
+    }
+  }
+  
   return 1;
 }
 

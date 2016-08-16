@@ -163,6 +163,34 @@ enum kvz_me_early_termination
   KVZ_ME_EARLY_TERMINATION_SENSITIVE = 2
 };
 
+
+/**
+ * \brief Format the pixels are read in.
+ * This is separate from chroma subsampling, because we might want to read
+ * interleaved formats in the future.
+ * \since 3.12.0
+ */
+enum kvz_input_format {
+  KVZ_FORMAT_P400 = 0,
+  KVZ_FORMAT_P420 = 1,
+  KVZ_FORMAT_P422 = 2,
+  KVZ_FORMAT_P444 = 3,
+};
+
+/**
+* \brief Chroma subsampling format used for encoding.
+* \since 3.12.0
+*/
+enum kvz_chroma_format {
+  KVZ_CSP_400 = 0,
+  KVZ_CSP_420 = 1,
+  KVZ_CSP_422 = 2,
+  KVZ_CSP_444 = 3,
+};
+
+// Map from input format to chroma format.
+#define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
+
 /**
  * \brief GoP picture configuration.
  */
@@ -282,6 +310,8 @@ typedef struct kvz_config
 
   int32_t rdoq_skip; /*!< \brief Mode of rdoq skip */
 
+  enum kvz_input_format input_format; /*!< \brief Use Temporal Motion Vector Predictors. */
+  int32_t input_bitdepth; /*!< \brief Use Temporal Motion Vector Predictors. */
 } kvz_config;
 
 /**
