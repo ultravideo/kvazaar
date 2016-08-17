@@ -172,16 +172,22 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
   return im;
 }
 
-yuv_t * kvz_yuv_t_alloc(int luma_size)
+yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size)
 {
-  // Get buffers with separate mallocs in order to take advantage of
-  // automatic buffer overrun checks.
   yuv_t *yuv = (yuv_t *)malloc(sizeof(*yuv));
-  yuv->y = (kvz_pixel *)malloc(luma_size * sizeof(*yuv->y));
-  yuv->u = (kvz_pixel *)malloc(luma_size / 2 * sizeof(*yuv->u));
-  yuv->v = (kvz_pixel *)malloc(luma_size / 2 * sizeof(*yuv->v));
   yuv->size = luma_size;
 
+  // Get buffers with separate mallocs in order to take advantage of
+  // automatic buffer overrun checks.
+  yuv->y = (kvz_pixel *)malloc(luma_size * sizeof(*yuv->y));
+  if (chroma_size == 0) {
+    yuv->u = NULL;
+    yuv->v = NULL;
+  } else {
+    yuv->u = (kvz_pixel *)malloc(chroma_size * sizeof(*yuv->u));
+    yuv->v = (kvz_pixel *)malloc(chroma_size * sizeof(*yuv->v));
+  }
+  
   return yuv;
 }
 

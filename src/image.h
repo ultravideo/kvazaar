@@ -65,7 +65,7 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
                              const unsigned width,
                              const unsigned height);
 
-yuv_t * kvz_yuv_t_alloc(int luma_size);
+yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size);
 void kvz_yuv_t_free(yuv_t * yuv);
 
 hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size);

@@ -84,14 +84,20 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   
   state->tile->lcu_offset_in_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_offset_x + lcu_offset_y * encoder->in.width_in_lcu];
   
-  //Allocate buffers
-  //order by row of (LCU_WIDTH * frame->width_in_lcu) pixels
-  state->tile->hor_buf_search = kvz_yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
-  //order by column of (LCU_WIDTH * encoder_state->height_in_lcu) pixels (there is no more extra pixel, since we can use a negative index)
-  state->tile->ver_buf_search = kvz_yuv_t_alloc(LCU_WIDTH * state->tile->frame->height_in_lcu * state->tile->frame->width_in_lcu);
+  // hor_buf_search and ver_buf_search store single row/col from each LCU row/col.
+  // Because these lines are independent, the chroma subsampling only matters in one
+  // of the directions, .
+  unsigned luma_size = LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
+  unsigned chroma_sizes_hor[] = { 0, luma_size / 2, luma_size / 2, luma_size };
+  unsigned chroma_sizes_ver[] = { 0, luma_size / 2, luma_size, luma_size };
+  unsigned chroma_size_hor = chroma_sizes_hor[state->encoder_control->chroma_format];
+  unsigned chroma_size_ver = chroma_sizes_ver[state->encoder_control->chroma_format];
+
+  state->tile->hor_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
+  state->tile->ver_buf_search = kvz_yuv_t_alloc(luma_size, chroma_size_ver);
   
   if (encoder->sao_enable) {
-    state->tile->hor_buf_before_sao = kvz_yuv_t_alloc(LCU_WIDTH * state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu);
+    state->tile->hor_buf_before_sao = kvz_yuv_t_alloc(luma_size, chroma_size_hor);
   } else {
     state->tile->hor_buf_before_sao = NULL;
   }
