@@ -825,16 +825,26 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       // number of allocated pixels left.
       int x_max = MIN(LCU_REF_PX_WIDTH, pic_width - x);
       int x_min_in_lcu = (x>0) ? 0 : 1;
-      memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[OFFSET_HOR_BUF(x, y, frame, x_min_in_lcu-1)], (x_max + (1-x_min_in_lcu))*sizeof(kvz_pixel));
-      memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[OFFSET_HOR_BUF_C(x, y, frame, x_min_in_lcu - 1)], (x_max / 2 + (1 - x_min_in_lcu))*sizeof(kvz_pixel));
-      memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[OFFSET_HOR_BUF_C(x, y, frame, x_min_in_lcu - 1)], (x_max / 2 + (1 - x_min_in_lcu))*sizeof(kvz_pixel));
+      int luma_offset = OFFSET_HOR_BUF(x, y, frame, x_min_in_lcu - 1);
+      int chroma_offset = OFFSET_HOR_BUF_C(x, y, frame, x_min_in_lcu - 1);
+      int luma_bytes = (x_max + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
+      int chroma_bytes = (x_max / 2 + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
+
+      memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[luma_offset], luma_bytes);
+      memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[chroma_offset], chroma_bytes);
+      memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[chroma_offset], chroma_bytes);
     }
     // Copy left reference pixels.
     if (x > 0) {
       int y_min_in_lcu = (y>0) ? 0 : 1;
-      memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[OFFSET_VER_BUF(x, y, frame, y_min_in_lcu - 1)], (LCU_WIDTH + (1 - y_min_in_lcu))*sizeof(kvz_pixel));
-      memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu - 1)], (LCU_WIDTH / 2 + (1 - y_min_in_lcu))*sizeof(kvz_pixel));
-      memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu - 1)], (LCU_WIDTH / 2 + (1 - y_min_in_lcu))*sizeof(kvz_pixel));
+      int luma_offset = OFFSET_VER_BUF(x, y, frame, y_min_in_lcu - 1);
+      int chroma_offset = OFFSET_VER_BUF_C(x, y, frame, y_min_in_lcu - 1);
+      int luma_bytes = (LCU_WIDTH + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
+      int chroma_bytes = (LCU_WIDTH / 2 + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
+
+      memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
+      memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[chroma_offset], chroma_bytes);
+      memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[chroma_offset], chroma_bytes);
     }
   }
 
