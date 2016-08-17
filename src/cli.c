@@ -112,6 +112,7 @@ static const struct option long_options[] = {
   { "no-lossless",              no_argument, NULL, 0 },
   { "tmvp",                     no_argument, NULL, 0 },
   { "no-tmvp",                  no_argument, NULL, 0 },
+  { "rdoq-skip",                no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -394,6 +395,7 @@ void print_help(void)
     "                                     \"sensitive\": Sensitive early termination is on\n"
     "          --lossless             : Use lossless coding\n"
     "          --no-tmvp              : Disable Temporal Motion Vector Prediction\n"
+    "          --rdoq-skip            : Enable rdoq-skip\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"

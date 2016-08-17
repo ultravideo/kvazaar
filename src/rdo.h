@@ -54,6 +54,9 @@ kvz_mvd_cost_func kvz_calc_mvd_cost_cabac;
 
 uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, cabac_data_t* cabac);
 
+uint8_t skip_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
+              int32_t height, int8_t type, int8_t scan_mode, int8_t block_type);
+
 extern const float kvz_f_entropy_bits[128];
 #define CTX_ENTROPY_FBITS(ctx,val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
 

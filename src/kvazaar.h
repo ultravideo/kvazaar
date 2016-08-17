@@ -280,6 +280,8 @@ typedef struct kvz_config
 
   int32_t tmvp_enable; /*!> \brief Use Temporal Motion Vector Predictors. */
 
+  int32_t rdoq_skip; /*!< \brief Mode of rdoq skip */
+
 } kvz_config;
 
 /**

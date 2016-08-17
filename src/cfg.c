@@ -113,6 +113,8 @@ int kvz_config_init(kvz_config *cfg)
 
   cfg->me_early_termination = 0;
 
+  cfg->rdoq_skip = 0;
+
   return 1;
 }
 
@@ -943,6 +945,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "Cannot enable TMVP because tiles are used.\n");
       cfg->tmvp_enable = false;
     }
+  }
+  else if OPT("rdoq-skip"){
+    cfg->rdoq_skip = atobool(value);
   }
   else
     return 0;

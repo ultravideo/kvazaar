@@ -344,6 +344,36 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   last_y_bits[ctx] = bits_y;
 }
 
+
+//Check if we should skip rdoq
+//If we should skip rdoq do normal quantization instead
+uint8_t skip_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
+  int32_t height, int8_t type, int8_t scan_mode, int8_t block_type)
+{
+  if (width > 4 || !state->encoder_control->cfg->rdoq_skip) return 0;
+  const uint32_t cg_size = 16;
+  uint32_t cg_num = width * height >> 4;
+  uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
+  const uint32_t *scan = kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+
+  int quant_sum = 0;
+  for (int32_t i = (cg_num - 1); i > 0; i--)
+  {
+    for (uint32_t j = (cg_size - 1); j > 0; j--)
+    {
+      int32_t  scanpos = i*cg_size + j;
+      uint32_t blkpos = scan[scanpos];
+      int32_t level_double = coef[blkpos];
+      quant_sum += abs(level_double);
+    }
+  }
+  if (quant_sum == 0) {
+    return 1;
+  }
+  return 0;
+}
+
+
 void kvz_rdoq_sign_hiding(const encoder_state_t *const state,
                       const int32_t qp_scaled,
                       const uint32_t *const scan,
