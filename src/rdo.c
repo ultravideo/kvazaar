@@ -1,4 +1,4 @@
-/*****************************************************************************
+﻿/*****************************************************************************
  * This file is part of Kvazaar HEVC encoder.
  *
  * Copyright (C) 2013-2015 Tampere University of Technology and others (see
@@ -347,30 +347,36 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
 
 //Check if we should skip rdoq
 //If we should skip rdoq do normal quantization instead
-uint8_t skip_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
+uint8_t kvz_skip_unnecessary_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
   int32_t height, int8_t type, int8_t scan_mode, int8_t block_type)
 {
-  if (width > 4 || !state->encoder_control->cfg->rdoq_skip) return 0;
-  const uint32_t cg_size = 16;
-  uint32_t cg_num = width * height >> 4;
-  uint32_t log2_block_size = kvz_g_convert_to_bit[width] + 2;
-  const uint32_t *scan = kvz_g_sig_last_scan[scan_mode][log2_block_size - 1];
+  if (width > 4 || !state->encoder_control->cfg->rdoq_skip) {
+    return 0;
+  }
+  else {
+    const encoder_control_t * const encoder = state->encoder_control;
+    uint32_t log2_tr_size = kvz_g_convert_to_bit[width] + 2;
+    int32_t  scalinglist_type = (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
+    int32_t  transform_shift = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
+    int32_t qp_scaled = kvz_get_scaled_qp(type, state->frame->QP, (encoder->bitdepth - 8) * 6);
+    const int32_t *quant_coeff = encoder->scaling_list.quant_coeff[log2_tr_size - 2][scalinglist_type][qp_scaled % 6];
+    int32_t q_bits = QUANT_SHIFT + qp_scaled / 6 + transform_shift;
 
-  int quant_sum = 0;
-  for (int32_t i = (cg_num - 1); i > 0; i--)
-  {
-    for (uint32_t j = (cg_size - 1); j > 0; j--)
-    {
-      int32_t  scanpos = i*cg_size + j;
-      uint32_t blkpos = scan[scanpos];
-      int32_t level_double = coef[blkpos];
-      quant_sum += abs(level_double);
+    int abs_sum = 0;
+    for (int32_t i = (width*height - 1); i >= 0; i--) {
+      int32_t level_double = coef[i];
+      int32_t q = quant_coeff[i];
+      level_double = MIN(abs(level_double) * q, MAX_INT - (1 << (q_bits - 1)));
+      int32_t max_abs_level = (level_double + (1 << (q_bits - 1))) >> q_bits;
+      abs_sum += max_abs_level;
+    }
+    if (abs_sum <= q_bits) {
+      return 1;
+    }
+    else {
+      return 0;
     }
   }
-  if (quant_sum == 0) {
-    return 1;
-  }
-  return 0;
 }
 
 

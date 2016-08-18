@@ -395,7 +395,7 @@ void print_help(void)
     "                                     \"sensitive\": Sensitive early termination is on\n"
     "          --lossless             : Use lossless coding\n"
     "          --no-tmvp              : Disable Temporal Motion Vector Prediction\n"
-    "          --rdoq-skip            : Enable rdoq-skip\n"
+    "          --rdoq-skip            : Skips unnecessary rdoq\n"
     "\n"
     "  Video Usability Information:\n"
     "          --sar <width:height>   : Specify Sample Aspect Ratio\n"
