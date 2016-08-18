@@ -939,12 +939,18 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
   int8_t reflist2nd = !reflist;
 
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
-#define APPLY_MV_SCALING(cu, cand, list) {int td = state->frame->poc - state->frame->ref->pocs[(cu)->inter.mv_ref[list]];\
+
+//*********************************************
+//For scalable extension. TODO: Interlayer mv cands need to be set to 0 (td==0?). Move check to somewhere else?#define APPLY_MV_SCALING(cu, cand, list) {int td = state->frame->poc - state->frame->ref->pocs[(cu)->inter.mv_ref[list]];\
                                    int tb = state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]];\
-                                   if (td != tb) { \
+                                   if (td == 0){\
+                                     mv_cand[cand][0] = 0; \
+                                     mv_cand[cand][1] = 0; }\
+                                   else if (td != tb) { \
                                       int scale = CALCULATE_SCALE(cu,tb,td); \
                                        mv_cand[cand][0] = ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 ); \
                                        mv_cand[cand][1] = ((scale * (cu)->inter.mv[list][1] + 127 + (scale * (cu)->inter.mv[list][1] < 0)) >> 8 ); }}
+  //*********************************************
 
   // Left predictors
   if (a0 && (

@@ -122,12 +122,35 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_lp_definition.d = 3;
   cfg->gop_lp_definition.t = 1;
 
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  cfg->layer = 0;
+  cfg->max_layers = 1;
+  //cfg->el_width = 0;
+  //cfg->el_height = 0;
+  cfg->in_width = 0;
+  cfg->in_height = 0;
+
+  cfg->el_cfg = NULL;
+
+  //*********************************************
+
   return 1;
 }
 
 int kvz_config_destroy(kvz_config *cfg)
 {
-  if (cfg) {
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  for( int layer = 1; layer < cfg->max_layers; layer++) {
+    //Deallocate el cfgs here
+    if(cfg->el_cfg != NULL) kvz_config_destroy(cfg->el_cfg[layer-1]);
+  }
+  FREE_POINTER(cfg->el_cfg);
+  //*********************************************
+
+  //TODO: Remove layer condition if deep copy is used in el_cfgs.
+  if (cfg && cfg->layer == 0) {
     FREE_POINTER(cfg->cqmfile);
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);

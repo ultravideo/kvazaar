@@ -55,12 +55,17 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
+    // ***********************************************
+    // Modified for SHVC
+    int layers = encoder->control->cfg->max_layers;
+    // ***********************************************
+
     kvz_encoder_control_free(encoder->control);
     encoder->control = NULL;
 
     // ***********************************************
     // Modified for SHVC
-    for (int layer_id_minus1 = 0; layer_id_minus1 < encoder->control->cfg->max_layers-1; layer_id_minus1++) {
+    for (int layer_id_minus1 = 0; layer_id_minus1 < layers-1; layer_id_minus1++) {
       if (encoder->el_states[layer_id_minus1]) {
         for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
           kvz_encoder_state_finalize(&encoder->el_states[layer_id_minus1][i]);
@@ -68,10 +73,10 @@ static void kvazaar_close(kvz_encoder *encoder)
       }
       FREE_POINTER(encoder->el_states[layer_id_minus1]);
 
-      const kvz_config* el_cfg = encoder->el_control[layer_id_minus1]->cfg;
+      //kvz_config* el_cfg = (kvz_config*)encoder->el_control[layer_id_minus1]->cfg;
       kvz_encoder_control_free(encoder->el_control[layer_id_minus1]);
       encoder->el_control = NULL;
-      kvz_config_destroy((kvz_config*)el_cfg); //TODO: Figure out a better way 
+      //kvz_config_destroy(el_cfg); //TODO: Figure out a better way 
     }
     FREE_POINTER(encoder->el_control);
     FREE_POINTER(encoder->el_states);
@@ -80,8 +85,9 @@ static void kvazaar_close(kvz_encoder *encoder)
     FREE_POINTER(encoder->el_input_buffer);
     FREE_POINTER(encoder->el_frames_started);
     FREE_POINTER(encoder->el_frames_done);
-    FREE_POINTER(encoder->downscaling);
     FREE_POINTER(encoder->upscaling);
+    FREE_POINTER(encoder->downscaling);
+    
   // ***********************************************
   }
   FREE_POINTER(encoder);
@@ -90,11 +96,6 @@ static void kvazaar_close(kvz_encoder *encoder)
 
 }
 
-
-// ***********************************************
-// Modified for SHVC
-
-// ***********************************************
 
 
 static kvz_encoder * kvazaar_open(const kvz_config *cfg)
@@ -143,8 +144,8 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     encoder->el_input_buffer = MALLOC(input_frame_buffer_t, el_layers);
     encoder->el_frames_started = MALLOC(unsigned, el_layers);
     encoder->el_frames_done = MALLOC(unsigned, el_layers);
-    encoder->downscaling = calloc(el_layers+1,sizeof(scaling_parameter_t*));
-    encoder->upscaling = calloc(el_layers+1,sizeof(scaling_parameter_t*));
+    encoder->downscaling = MALLOC(scaling_parameter_t, el_layers+1);
+    encoder->upscaling = MALLOC(scaling_parameter_t, el_layers+1);
 
     if (!encoder->el_control || !encoder->el_states || !encoder->cur_el_state_num ||
       !encoder->out_el_state_num || !encoder->el_input_buffer || !encoder->el_frames_started ||
@@ -171,16 +172,19 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     encoder->upscaling = NULL;
   }
 
+  
   for (int layer_id_minus1 = 0; layer_id_minus1 < el_layers; layer_id_minus1++) {
     //TODO: Set correct size etc. based on cfg
-    kvz_config* el_cfg = kvz_config_alloc();
-    *el_cfg = *cfg;
-    el_cfg->qp = 1;
-    el_cfg->width = el_cfg->el_width;
-    el_cfg->height = el_cfg->el_height;
-    el_cfg->layer = layer_id_minus1;
-    encoder->el_control[layer_id_minus1] = kvz_encoder_control_init(el_cfg);
-
+    //kvz_config* el_cfg = kvz_config_alloc();
+    //kvz_config_init(el_cfg);
+    //*el_cfg = *cfg;
+    //el_cfg->qp = 5;
+    //el_cfg->width = el_cfg->el_width;
+    //el_cfg->height = el_cfg->el_height;
+    //el_cfg->layer = layer_id_minus1;
+    
+    encoder->el_control[layer_id_minus1] = kvz_encoder_control_init(cfg->el_cfg[layer_id_minus1]);
+    
     encoder->cur_el_state_num[layer_id_minus1] = 0;
     encoder->out_el_state_num[layer_id_minus1] = 0;
     encoder->el_frames_started[layer_id_minus1] = 0;
@@ -200,7 +204,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
         goto kvazaar_open_failure;
       }
 
-      encoder->el_states[layer_id_minus1][i].global->QP = (int8_t)el_cfg->qp;
+      encoder->el_states[layer_id_minus1][i].global->QP = (int8_t)cfg->el_cfg[layer_id_minus1]->qp;
     }
 
     for (int i = 0; i < encoder->num_encoder_states; ++i) {
@@ -469,7 +473,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
 {
   //DO scaling here
   //Pic_in for the layer being currently encoded
-  kvz_picture* l_pic_in = kvazaar_scaling(pic_in, &enc->downscaling[0]);//pic_in->width/2, pic_in->height/2); 
+  kvz_picture* l_pic_in = pic_in == NULL ? NULL : kvazaar_scaling(pic_in, &enc->downscaling[0]);//pic_in->width/2, pic_in->height/2); 
 
   //Encode Bl first
   if (!kvazaar_encode(enc, l_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
@@ -501,7 +505,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
     encoder_state_t *state = &enc->el_states[layer_id_minus1][*cur_el_state_num];
 
     kvz_picture* last_l_pic_in = pic_in; //This is the src frame that should be used when downscaling. TODO: Use higher layers pic to speed up downscaling?
-    l_pic_in = kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
+    l_pic_in = last_l_pic_in == NULL ? NULL : kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
 
     if (!state->prepared) {
       kvz_encoder_next_frame(state);

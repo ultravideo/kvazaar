@@ -347,12 +347,12 @@ int main(int argc, char *argv[])
 
   //******************************************
   //TODO: Replace with proper implementation. Move to encoder?
-  opts->config->layer = 0;
-  opts->config->max_layers = 2;
-  opts->config->el_width = opts->config->in_width = opts->config->width;
-  opts->config->el_height = opts->config->in_height = opts->config->height;
-  opts->config->width /= 2;
-  opts->config->height /= 2;
+  //opts->config->layer = 0;
+  //opts->config->max_layers = 2;
+  //opts->config->el_width = opts->config->in_width = opts->config->width;
+  //opts->config->el_height = opts->config->in_height = opts->config->height;
+  //opts->config->width /= 2;
+  //opts->config->height /= 2;
   /*kvz_encoder *el_enc = api->encoder_open(opts->config);
   if (!el_enc) {
     fprintf(stderr, "Failed to open encoder.\n");
