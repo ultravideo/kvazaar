@@ -295,11 +295,6 @@
   <ItemGroup>
     <ProjectReference Include="..\kvazaar_scaler\kvazaar_scaler.vcxproj">
       <Project>{42f395f1-58a3-4a03-a425-7f7440ec6a6d}</Project>
-      <Private>false</Private>
-      <ReferenceOutputAssembly>true</ReferenceOutputAssembly>
-      <CopyLocalSatelliteAssemblies>false</CopyLocalSatelliteAssemblies>
-      <LinkLibraryDependencies>true</LinkLibraryDependencies>
-      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
