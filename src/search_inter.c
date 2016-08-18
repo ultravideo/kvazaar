@@ -1517,8 +1517,8 @@ static void search_pu_inter(encoder_state_t * const state,
           {
             // Don't try merge candidates that don't satisfy mv constraints.
             vector2d_t orig = { x, y };
-            if (fracmv_within_tile(state, &orig, mv[0][0], mv[0][1], width, height, -1) ||
-                fracmv_within_tile(state, &orig, mv[1][0], mv[1][1], width, height, -1))
+            if (!fracmv_within_tile(state, &orig, mv[0][0], mv[0][1], width, height, -1) ||
+                !fracmv_within_tile(state, &orig, mv[1][0], mv[1][1], width, height, -1))
             {
               continue;
             }
