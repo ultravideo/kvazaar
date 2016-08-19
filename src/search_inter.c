@@ -902,8 +902,8 @@ static unsigned search_mv_full(encoder_state_t * const state,
         if (cost < best_cost) {
           best_cost = cost;
           best_bitcost = bitcost;
-          mv.x = x;
-          mv.y = y;
+          best_mv.x = x;
+          best_mv.y = y;
         }
       }
     }
