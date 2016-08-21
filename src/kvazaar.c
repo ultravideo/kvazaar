@@ -213,7 +213,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-  if (!state->prepared) {
+  if (!state->frame->prepared) {
     kvz_encoder_prepare(state);
   }
 
@@ -235,13 +235,13 @@ static int kvazaar_encode(kvz_encoder *enc,
     return 1;
   }
 
-  if (!state->frame_done) {
+  if (!state->frame->done) {
     // We started encoding a frame; move to the next encoder state.
     enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
   }
 
   encoder_state_t *output_state = &enc->states[enc->out_state_num];
-  if (!output_state->frame_done &&
+  if (!output_state->frame->done &&
       (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
 
     kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
@@ -256,8 +256,8 @@ static int kvazaar_encode(kvz_encoder *enc,
     if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
     if (info_out) set_frame_info(info_out, output_state);
 
-    output_state->frame_done = 1;
-    output_state->prepared = 0;
+    output_state->frame->done = 1;
+    output_state->frame->prepared = 0;
     enc->frames_done += 1;
 
     enc->out_state_num = (enc->out_state_num + 1) % (enc->num_encoder_states);

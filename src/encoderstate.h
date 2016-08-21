@@ -88,6 +88,19 @@ typedef struct encoder_state_config_frame_t {
   double rc_alpha;
   double rc_beta;
 
+  /**
+   * \brief Indicates that this encoder state is ready for encoding the
+   * next frame i.e. kvz_encoder_prepare has been called.
+   */
+  bool prepared;
+
+  /**
+   * \brief Indicates that the previous frame has been encoded and the
+   * encoded data written and the encoding the next frame has not been
+   * started yet.
+   */
+  bool done;
+
 } encoder_state_config_frame_t;
 
 typedef struct encoder_state_config_tile_t {
@@ -184,19 +197,6 @@ typedef struct encoder_state_t {
   
   bitstream_t stream;
   cabac_data_t cabac;
-
-  /**
-   * \brief Indicates that this encoder state is ready for encoding the
-   * next frame i.e. kvz_encoder_prepare has been called.
-   */
-  int prepared;
-
-  /**
-   * \brief Indicates that the previous frame has been encoded and the
-   * encoded data written and the encoding the next frame has not been
-   * started yet.
-   */
-  int frame_done;
 
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
   

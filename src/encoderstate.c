@@ -967,7 +967,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
     assert(!state->tqj_bitstream_written);
     state->tqj_bitstream_written = job;
   }
-  state->frame_done = 0;
+  state->frame->done = 0;
   //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
@@ -985,7 +985,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   const encoder_control_t * const encoder = state->encoder_control;
 
   // The previous frame must be done before the next one is started.
-  assert(state->frame_done);
+  assert(state->frame->done);
 
   if (state->frame->num == -1) {
     // We're at the first frame, so don't care about all this stuff.
@@ -993,7 +993,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->frame->poc   = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
-    state->prepared = 1;
+    state->frame->prepared = 1;
     return;
   }
 
@@ -1034,7 +1034,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   state->frame->num = prev_state->frame->num + 1;
   state->frame->poc   = prev_state->frame->poc   + 1;
 
-  state->prepared = 1;
+  state->frame->prepared = 1;
 }
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)

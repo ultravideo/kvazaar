@@ -48,8 +48,11 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->poc = 0;
   state->frame->total_bits_coded = 0;
   state->frame->cur_gop_bits_coded = 0;
+  state->frame->prepared = 0;
+  state->frame->done = 1;
   state->frame->rc_alpha = 3.2003;
   state->frame->rc_beta = -1.367;
+
   return 1;
 }
 
@@ -303,8 +306,6 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->children[0].encoder_control = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
-  child_state->prepared = 0;
-  child_state->frame_done = 1;
   
   if (!parent_state) {
     const encoder_control_t * const encoder = child_state->encoder_control;
