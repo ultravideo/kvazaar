@@ -33,7 +33,7 @@
 
 double kvz_select_picture_lambda(encoder_state_t * const state);
 
-int8_t kvz_lambda_to_QP(const double lambda);
+int8_t kvz_lambda_to_qp(const double lambda);
 
 double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state);
 

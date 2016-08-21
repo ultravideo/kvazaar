@@ -117,7 +117,7 @@ static double get_cost(encoder_state_t * const state,
       trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
     }
 
-    double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->frame->cur_lambda_cost_sqrt * trskip_bits;
+    double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->lambda_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
       return sad_cost;
     }
@@ -164,7 +164,7 @@ static void get_cost_dual(encoder_state_t * const state,
     double sad_costs[PARALLEL_BLKS] = { 0 };
     sad_twin_func(preds, orig_block, PARALLEL_BLKS, unsigned_sad_costs);
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->frame->cur_lambda_cost_sqrt * trskip_bits;
+      sad_costs[i] = TRSKIP_RATIO * (double)unsigned_sad_costs[i] + state->lambda_sqrt * trskip_bits;
       if (sad_costs[i] < (double)satd_costs[i]) {
         costs_out[i] = sad_costs[i];
       }
@@ -254,7 +254,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   //     max_depth.
   // - Min transform size hasn't been reached (MAX_PU_DEPTH).
   if (depth < max_depth && depth < MAX_PU_DEPTH) {
-    split_cost = 3 * state->frame->cur_lambda_cost;
+    split_cost = 3 * state->lambda;
 
     split_cost += search_intra_trdepth(state, x_px, y_px, depth + 1, max_depth, intra_mode, nosplit_cost, pred_cu, lcu);
     if (split_cost < nosplit_cost) {
@@ -296,7 +296,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     }
 
     double bits = tr_split_bit + cbf_bits;
-    split_cost += bits * state->frame->cur_lambda_cost;
+    split_cost += bits * state->lambda;
   } else {
     assert(width <= TR_MAX_WIDTH);
   }
@@ -529,7 +529,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
   // Add prediction mode coding cost as the last thing. We don't want this
   // affecting the halving search.
-  int lambda_cost = (int)(state->frame->cur_lambda_cost_sqrt + 0.5);
+  int lambda_cost = (int)(state->lambda_sqrt + 0.5);
   for (int mode_i = 0; mode_i < modes_selected; ++mode_i) {
     costs[mode_i] += lambda_cost * kvz_luma_mode_bits(state, modes[mode_i], intra_preds);
   }
@@ -600,7 +600,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
 
   for(int rdo_mode = 0; rdo_mode < modes_to_check; rdo_mode ++) {
     int rdo_bitcost = kvz_luma_mode_bits(state, modes[rdo_mode], intra_preds);
-    costs[rdo_mode] = rdo_bitcost * (int)(state->frame->cur_lambda_cost + 0.5);
+    costs[rdo_mode] = rdo_bitcost * (int)(state->lambda + 0.5);
 
     // Perform transform split search and save mode RD cost for the best one.
     cu_info_t pred_cu;
@@ -701,7 +701,7 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);
-      chroma.cost += mode_bits * state->frame->cur_lambda_cost;
+      chroma.cost += mode_bits * state->lambda;
 
       if (chroma.cost < best_chroma.cost) {
         best_chroma = chroma;

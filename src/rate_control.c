@@ -49,7 +49,7 @@ static void update_rc_parameters(encoder_state_t * state)
   // lambda computed from real bpp
   const double lambda_comp = CLIP(MIN_LAMBDA, MAX_LAMBDA, alpha_old * pow(bpp, beta_old));
   // lambda used in encoding
-  const double lambda_real = state->frame->cur_lambda_cost;
+  const double lambda_real = state->frame->lambda;
   const double lambda_log_ratio = log(lambda_real) - log(lambda_comp);
 
   const double alpha = alpha_old + 0.1 * lambda_log_ratio * alpha_old;
@@ -148,7 +148,7 @@ double kvz_select_picture_lambda(encoder_state_t * const state)
   return CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
 }
 
-int8_t kvz_lambda_to_QP(const double lambda)
+int8_t kvz_lambda_to_qp(const double lambda)
 {
   const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
   return CLIP(0, 51, qp);

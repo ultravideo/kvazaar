@@ -253,7 +253,7 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(state->frame->cur_lambda_cost_sqrt+0.5);
+  return temp_bitcost*(int32_t)(state->lambda_sqrt + 0.5);
 }
 
 

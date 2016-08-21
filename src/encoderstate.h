@@ -51,16 +51,29 @@ typedef enum {
 
 
 typedef struct encoder_state_config_frame_t {
-  double cur_lambda_cost; //!< \brief Lambda for SSE
-  double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
-  
+  /**
+   * \brief Frame-level lambda.
+   *
+   * Use state->lambda or state->lambda_sqrt for cost computations.
+   *
+   * \see encoder_state_t::lambda
+   * \see encoder_state_t::lambda_sqrt
+   */
+  double lambda;
+
   int32_t num;       /*!< \brief Frame number */
   int32_t poc;       /*!< \brief Picture order count */
   int8_t gop_offset; /*!< \brief Offset in the gop structure */
-  
-  int8_t QP;   //!< \brief Quantization parameter
-  double QP_factor; //!< \brief Quantization factor
-  
+
+  /**
+   * \brief Frame-level quantization parameter
+   *
+   * \see encoder_state_t::qp
+   */
+  int8_t QP;
+  //! \brief quantization factor
+  double QP_factor;
+
   //Current picture available references
   image_list_t *ref;
   int8_t ref_list;
@@ -199,7 +212,14 @@ typedef struct encoder_state_t {
   cabac_data_t cabac;
 
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
-  
+
+  //! \brief Lambda for SSE
+  double lambda;
+  //! \brief Lambda for SAD and SATD
+  double lambda_sqrt;
+  //! \brief Quantization parameter for the current LCU
+  int8_t qp;
+
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
