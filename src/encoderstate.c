@@ -255,6 +255,10 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
   
+
+  // QP delta is not used when rate control is turned off.
+  state->must_code_qp_delta = (state->encoder_control->cfg->target_bitrate > 0);
+
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
@@ -305,6 +309,9 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 	  InitC(state->tile->dbs_g);
 	  state->tile->m_prev_pos = 0;
    }
+
+  state->ref_qp = state->frame->QP;
+
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;

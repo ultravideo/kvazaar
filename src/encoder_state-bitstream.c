@@ -451,9 +451,14 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_SE(stream, ((int8_t)encoder->cfg->qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
-  WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
-  //if cu_qp_delta_enabled_flag
-  //WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
+
+  if (encoder->cfg->target_bitrate > 0) {
+    // Use separate QP for each LCU when rate control is enabled.
+    WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
+    WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
+  } else {
+    WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
+  }
 
   //TODO: add QP offsets
   WRITE_SE(stream, 0, "pps_cb_qp_offset");

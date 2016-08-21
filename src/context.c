@@ -121,6 +121,12 @@ static const uint8_t INIT_QT_CBF[3][8] = {
   { 111,  141,  CNU,  CNU,    94,  138,  182,  154 },
 };
 
+static const uint8_t INIT_CU_QP_DELTA_ABS[3][2] = {
+  { 154, 154 },
+  { 154, 154 },
+  { 154, 154 },
+};
+
 static const uint8_t INIT_SIG_CG_FLAG[3][4] = {
   { 121,  140,  61,  154  },
   { 121,  140,  61,  154 },
@@ -242,6 +248,9 @@ void kvz_init_contexts(encoder_state_t *state, int8_t QP, int8_t slice)
   kvz_ctx_init(&cabac->ctx.cu_ref_pic_model[1], QP, INIT_REF_PIC[slice][1]);
   kvz_ctx_init(&cabac->ctx.mvp_idx_model[0], QP, INIT_MVP_IDX[slice][0]);
   kvz_ctx_init(&cabac->ctx.mvp_idx_model[1], QP, INIT_MVP_IDX[slice][1]);
+
+  kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[0], QP, INIT_CU_QP_DELTA_ABS[slice][0]);
+  kvz_ctx_init(&cabac->ctx.cu_qp_delta_abs[1], QP, INIT_CU_QP_DELTA_ABS[slice][1]);
 
   for (i = 0; i < 4; i++) {
     kvz_ctx_init(&cabac->ctx.cu_sig_coeff_group_model[i], QP, INIT_SIG_CG_FLAG[slice][i]);

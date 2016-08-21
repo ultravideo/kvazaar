@@ -517,6 +517,28 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
+    if (state->must_code_qp_delta) {
+      const int qp_delta      = state->qp - state->ref_qp;
+      const int qp_delta_abs  = ABS(qp_delta);
+      cabac_data_t* cabac     = &state->cabac;
+
+      // cu_qp_delta_abs prefix
+      cabac->cur_ctx = &cabac->ctx.cu_qp_delta_abs[0];
+      kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5);
+
+      if (qp_delta_abs >= 5) {
+        // cu_qp_delta_abs suffix
+        kvz_cabac_write_ep_ex_golomb(state, cabac, qp_delta_abs - 5, 0);
+      }
+
+      if (qp_delta != 0) {
+        CABAC_BIN_EP(cabac, (qp_delta >= 0 ? 0 : 1), "qp_delta_sign_flag");
+      }
+
+      state->must_code_qp_delta = false;
+      state->ref_qp = state->qp;
+    }
+
     encode_transform_unit(state, x_pu, y_pu, depth);
   }
 }
@@ -894,14 +916,16 @@ static void encode_part_mode(encoder_state_t * const state,
 }
 
 void kvz_encode_coding_tree(encoder_state_t * const state,
-                        uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
+                            uint16_t x_ctb,
+                            uint16_t y_ctb,
+                            uint8_t depth)
 {
   cabac_data_t * const cabac = &state->cabac;
   const videoframe_t * const frame = state->tile->frame;
   const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
-  
+
   //Absolute ctb
   uint16_t abs_x_ctb = x_ctb + (state->tile->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
   uint16_t abs_y_ctb = y_ctb + (state->tile->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);

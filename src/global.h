@@ -158,6 +158,7 @@ typedef int16_t coeff_t;
 #define MRG_MAX_NUM_CANDS 5
 
 /* Some tools */
+#define ABS(a) ((a) >= 0 ? (a) : (-a))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))

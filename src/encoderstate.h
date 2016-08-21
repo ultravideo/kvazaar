@@ -220,6 +220,17 @@ typedef struct encoder_state_t {
   //! \brief Quantization parameter for the current LCU
   int8_t qp;
 
+  /**
+   * \brief Whether a QP delta value must be coded for the current LCU.
+   */
+  bool must_code_qp_delta;
+
+  /**
+   * \brief Reference for computing QP delta for the next LCU that is coded
+   * next. Updated whenever a QP delta is coded.
+   */
+  int8_t ref_qp;
+
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
