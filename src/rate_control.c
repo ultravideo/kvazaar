@@ -122,73 +122,77 @@ static double pic_allocate_bits(encoder_state_t * const state)
   return MAX(100, pic_target_bits);
 }
 
-/**
- * \brief Select a lambda value for encoding the next picture
- * \param state   the main encoder state
- * \return        lambda for the next picture
- *
- * Rate control must be enabled (i.e. cfg->target_bitrate > 0) when this
- * function is called.
- */
-double kvz_select_picture_lambda(encoder_state_t * const state)
-{
-  const encoder_control_t * const encoder = state->encoder_control;
-
-  assert(encoder->cfg->target_bitrate > 0);
-
-  if (state->frame->num > encoder->owf) {
-    // At least one frame has been written.
-    update_rc_parameters(state);
-  }
-
-  // TODO: take the picture headers into account
-  const double pic_target_bits = pic_allocate_bits(state);
-  const double target_bpp = pic_target_bits / encoder->in.pixels_per_pic;
-  const double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);
-  return CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
-}
-
-int8_t kvz_lambda_to_qp(const double lambda)
+int8_t lambda_to_qp(const double lambda)
 {
   const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
   return CLIP(0, 51, qp);
 }
 
 /**
- * \brief Select a lambda value according to current QP value
+ * \brief Allocate bits and set lambda and QP for the current picture.
  * \param state the main encoder state
- * \return lambda for the next picture
- *
- * This function should be used to select lambda when rate control is
- * disabled.
  */
-double kvz_select_picture_lambda_from_qp(encoder_state_t const * const state)
+void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 {
-  const int gop_len = state->encoder_control->cfg->gop_len;
-  const int intra_period = state->encoder_control->cfg->intra_period;
-  const int keyframe_period = gop_len > 0 ? gop_len : intra_period;
-  
-  double lambda = pow(2.0, (state->frame->QP - 12) / 3.0);
+  const encoder_control_t * const ctrl = state->encoder_control;
 
-  if (state->frame->slicetype == KVZ_SLICE_I) {
-    lambda *= 0.57;
-    
-    // Reduce lambda for I-frames according to the number of references.
-    if (keyframe_period == 0) {
-      lambda *= 0.5;
-    } else {
-      lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (keyframe_period - 1));
+  if (ctrl->cfg->target_bitrate > 0) {
+    // Rate control enabled
+
+    if (state->frame->num > ctrl->owf) {
+      // At least one frame has been written.
+      update_rc_parameters(state);
     }
-  } else if (gop_len > 0) {
-    lambda *= state->frame->QP_factor;
-  } else {
-    lambda *= 0.4624;
-  }
 
-  // Increase lambda if not key-frame.
-  if (keyframe_period > 0 && state->frame->poc % keyframe_period != 0) {
-    lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
+    // TODO: take the picture headers into account
+    const double pic_target_bits = pic_allocate_bits(state);
+    const double target_bpp = pic_target_bits / ctrl->in.pixels_per_pic;
+    const double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);
+    state->frame->lambda = CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
+    state->frame->QP = lambda_to_qp(lambda);
+
+  } else {
+    // Rate control disabled
+    kvz_gop_config const * const gop = &ctrl->cfg->gop[state->frame->gop_offset];
+    const int gop_len = ctrl->cfg->gop_len;
+    const int period  = gop_len > 0 ? gop_len : ctrl->cfg->intra_period;
+
+    state->frame->QP = ctrl->cfg->qp;
+
+    if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
+      state->frame->QP += gop->qp_offset;
+    }
+
+    double lambda = pow(2.0, (state->frame->QP - 12) / 3.0);
+
+    if (state->frame->slicetype == KVZ_SLICE_I) {
+      lambda *= 0.57;
+
+      // Reduce lambda for I-frames according to the number of references.
+      if (period == 0) {
+        lambda *= 0.5;
+      } else {
+        lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (period - 1));
+      }
+    } else if (gop_len > 0) {
+      lambda *= gop->qp_factor;
+
+    } else {
+      lambda *= 0.4624;
+    }
+
+    // Increase lambda if not key-frame.
+    if (period > 0 && state->frame->poc % period != 0) {
+      lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
+    }
+
+    state->frame->lambda = lambda;
   }
-  
-  return lambda;
+}
+
+void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state)
+{
+  state->lambda      = state->frame->lambda;
+  state->lambda_sqrt = sqrt(state->frame->lambda);
+  state->qp          = state->frame->QP;
 }

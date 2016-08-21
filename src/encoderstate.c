@@ -202,9 +202,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
 
-  state->lambda      = state->frame->lambda;
-  state->lambda_sqrt = sqrt(state->frame->lambda);
-  state->qp          = state->frame->QP;
+  kvz_set_lcu_lambda_and_qp(state);
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   
@@ -909,23 +907,8 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   encoder_state_remove_refs(state);
   encoder_state_ref_sort(state);
-  double lambda;
-  if (cfg->target_bitrate > 0) {
-    // Rate control enabled.
-    lambda = kvz_select_picture_lambda(state);
-    state->frame->QP = kvz_lambda_to_qp(lambda);
-  } else {
-    if (cfg->gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
-      kvz_gop_config const * const gop =
-        cfg->gop + state->frame->gop_offset;
-      state->frame->QP = cfg->qp + gop->qp_offset;
-      state->frame->QP_factor = gop->qp_factor;
-    } else {
-      state->frame->QP = cfg->qp;
-    }
-    lambda = kvz_select_picture_lambda_from_qp(state);
-  }
-  state->frame->lambda = lambda;
+
+  kvz_set_picture_lambda_and_qp(state);
 
   encoder_state_init_children(state);
 }
