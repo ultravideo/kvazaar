@@ -273,8 +273,8 @@ done:
   //Add the necessary cfgs for els here and set parameters as needed here
   opts->config->in_width = opts->config->width;
   opts->config->in_height = opts->config->height;
-  opts->config->width /= 2;
-  opts->config->height /= 2;
+  //opts->config->width /= 2;
+  //opts->config->height /= 2;
   opts->config->max_layers = 2;
 
   int layers = opts->config->max_layers;

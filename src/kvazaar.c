@@ -516,7 +516,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
       //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
       kvz_image_list_add(state->global->ref,
                          kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
-                         kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
+                         bl_state->tile->frame->cu_array, //kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
                          bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );
     }
 
