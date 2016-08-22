@@ -34,7 +34,6 @@
 #include "strategies/generic/picture-generic.h"
 #include "strategies/strategies-ipol.h"
 #include "strategyselector.h"
-#include "strategies/strategies-common.h"
 #include "strategies/generic/ipol-generic.h"
 
 
@@ -99,12 +98,12 @@ static __m128i kvz_eight_tap_filter_flip_x8_16bit_avx2(__m128i *row, int8_t *fil
   temp_lo = _mm_unpacklo_epi32(temp[0], temp[2]);
   temp_hi = _mm_unpackhi_epi32(temp[0], temp[2]);
   temp[0] = _mm_add_epi32(temp_lo, temp_hi);
-  temp[0] = _mm_shuffle_epi32(temp[0], KVZ_PERMUTE(0, 2, 1, 3));
+  temp[0] = _mm_shuffle_epi32(temp[0], _MM_SHUFFLE(0, 2, 1, 3));
 
   temp_lo = _mm_unpacklo_epi32(temp[4], temp[6]);
   temp_hi = _mm_unpackhi_epi32(temp[4], temp[6]);
   temp[4] = _mm_add_epi32(temp_lo, temp_hi);
-  temp[4] = _mm_shuffle_epi32(temp[4], KVZ_PERMUTE(0, 2, 1, 3));
+  temp[4] = _mm_shuffle_epi32(temp[4], _MM_SHUFFLE(0, 2, 1, 3));
 
   __m128i add = _mm_set1_epi32(offset23);
   temp[0] = _mm_add_epi32(temp[0], add);
@@ -152,12 +151,12 @@ static __m256i kvz_eight_tap_filter_flip_x8_16bit_dual_avx2(__m256i *row, int8_t
   temp_lo = _mm256_unpacklo_epi32(temp[0], temp[2]);
   temp_hi = _mm256_unpackhi_epi32(temp[0], temp[2]);
   temp[0] = _mm256_add_epi32(temp_lo, temp_hi);
-  temp[0] = _mm256_shuffle_epi32(temp[0], KVZ_PERMUTE(0, 2, 1, 3));
+  temp[0] = _mm256_shuffle_epi32(temp[0], _MM_SHUFFLE(0, 2, 1, 3));
 
   temp_lo = _mm256_unpacklo_epi32(temp[4], temp[6]);
   temp_hi = _mm256_unpackhi_epi32(temp[4], temp[6]);
   temp[4] = _mm256_add_epi32(temp_lo, temp_hi);
-  temp[4] = _mm256_shuffle_epi32(temp[4], KVZ_PERMUTE(0, 2, 1, 3));
+  temp[4] = _mm256_shuffle_epi32(temp[4], _MM_SHUFFLE(0, 2, 1, 3));
 
   __m256i add = _mm256_set1_epi32(offset23);
   temp[0] = _mm256_add_epi32(temp[0], add);
@@ -205,7 +204,7 @@ static __m256i kvz_eight_tap_filter_flip_x8_dual_avx2(__m256i *row, int8_t *filt
 {
   __m256i temp[4];
   __m256i fir = _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadl_epi64((__m128i*)filter[0])), _mm_loadl_epi64((__m128i*)filter[1]), 1);
-  fir = _mm256_shuffle_epi32(fir, KVZ_PERMUTE(0, 1, 0, 1));
+  fir = _mm256_shuffle_epi32(fir, _MM_SHUFFLE(0, 1, 0, 1));
   
   temp[0] = _mm256_unpacklo_epi64(row[0], row[1]);
   temp[0] = _mm256_maddubs_epi16(temp[0], fir);
@@ -398,8 +397,8 @@ int16_t kvz_eight_tap_filter_hor_avx2(int8_t *filter, kvz_pixel *data)
   __m128i packed_filter = _mm_loadl_epi64((__m128i*)filter);
 
   sample = _mm_maddubs_epi16(packed_data, packed_filter);
-  sample = _mm_add_epi16(sample, _mm_shuffle_epi32(sample, KVZ_PERMUTE(1, 0, 1, 0)));
-  sample = _mm_add_epi16(sample, _mm_shufflelo_epi16(sample, KVZ_PERMUTE(1, 0, 1, 0)));
+  sample = _mm_add_epi16(sample, _mm_shuffle_epi32(sample, _MM_SHUFFLE(1, 0, 1, 0)));
+  sample = _mm_add_epi16(sample, _mm_shufflelo_epi16(sample, _MM_SHUFFLE(1, 0, 1, 0)));
 
   return (int16_t)_mm_cvtsi128_si32(sample);
 }
@@ -413,8 +412,8 @@ int32_t kvz_eight_tap_filter_hor_16bit_avx2(int8_t *filter, int16_t *data)
   __m128i packed_filter = _mm_cvtepi8_epi16(_mm_loadl_epi64((__m128i*)filter));
 
   sample = _mm_madd_epi16(packed_data, packed_filter);
-  sample = _mm_add_epi32(sample, _mm_shuffle_epi32(sample, KVZ_PERMUTE(2, 3, 0, 1)));
-  sample = _mm_add_epi32(sample, _mm_shuffle_epi32(sample, KVZ_PERMUTE(1, 0, 1, 0)));
+  sample = _mm_add_epi32(sample, _mm_shuffle_epi32(sample, _MM_SHUFFLE(2, 3, 0, 1)));
+  sample = _mm_add_epi32(sample, _mm_shuffle_epi32(sample, _MM_SHUFFLE(1, 0, 1, 0)));
 
   return _mm_extract_epi32(sample, 0);
 }
@@ -533,7 +532,7 @@ void kvz_eight_tap_filter_x8_hor_avx2(int8_t *filter, kvz_pixel *data, int shift
 
   temp0 = _mm256_srai_epi16(temp0, shift);
 
-  temp0 = _mm256_permute4x64_epi64(temp0, KVZ_PERMUTE(0, 2, 1, 3));
+  temp0 = _mm256_permute4x64_epi64(temp0, _MM_SHUFFLE(0, 2, 1, 3));
 
   _mm_storeu_si128((__m128i*)dst, _mm256_castsi256_si128(temp0));
 }

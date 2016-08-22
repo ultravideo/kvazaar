@@ -30,7 +30,6 @@
 #include "kvazaar.h"
 #include "strategies/strategies-picture.h"
 #include "strategyselector.h"
-#include "strategies/strategies-common.h"
 #include "strategies/generic/picture-generic.h"
 
 
@@ -175,9 +174,9 @@ static unsigned satd_4x4_8bit_avx2(const kvz_pixel *org, const kvz_pixel *cur)
 
   row3 = _mm_add_epi16(row2, row3);
 
-  row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, KVZ_PERMUTE(2, 3, 0, 1) ));
-  row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, KVZ_PERMUTE(1, 0, 1, 0) ));
-  row3 = _mm_add_epi16(row3, _mm_shufflelo_epi16(row3, KVZ_PERMUTE(1, 0, 1, 0) ));
+  row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, _MM_SHUFFLE(2, 3, 0, 1) ));
+  row3 = _mm_add_epi16(row3, _mm_shuffle_epi32(row3, _MM_SHUFFLE(1, 0, 1, 0) ));
+  row3 = _mm_add_epi16(row3, _mm_shufflelo_epi16(row3, _MM_SHUFFLE(1, 0, 1, 0) ));
 
   unsigned sum = _mm_extract_epi16(row3, 0);
   unsigned satd = (sum + 1) >> 1;
@@ -222,9 +221,9 @@ static void satd_8bit_4x4_dual_avx2(
 
   row3 = _mm256_add_epi16(row2, row3);
 
-  row3 = _mm256_add_epi16(row3, _mm256_shuffle_epi32(row3, KVZ_PERMUTE(2, 3, 0, 1) ));
-  row3 = _mm256_add_epi16(row3, _mm256_shuffle_epi32(row3, KVZ_PERMUTE(1, 0, 1, 0) ));
-  row3 = _mm256_add_epi16(row3, _mm256_shufflelo_epi16(row3, KVZ_PERMUTE(1, 0, 1, 0) ));
+  row3 = _mm256_add_epi16(row3, _mm256_shuffle_epi32(row3, _MM_SHUFFLE(2, 3, 0, 1) ));
+  row3 = _mm256_add_epi16(row3, _mm256_shuffle_epi32(row3, _MM_SHUFFLE(1, 0, 1, 0) ));
+  row3 = _mm256_add_epi16(row3, _mm256_shufflelo_epi16(row3, _MM_SHUFFLE(1, 0, 1, 0) ));
 
   unsigned sum1 = _mm_extract_epi16(_mm256_castsi256_si128(row3), 0);
   sum1 = (sum1 + 1) >> 1;
@@ -241,18 +240,18 @@ static INLINE void hor_transform_row_avx2(__m128i* row){
   __m128i mask_pos = _mm_set1_epi16(1);
   __m128i mask_neg = _mm_set1_epi16(-1);
   __m128i sign_mask = _mm_unpacklo_epi64(mask_pos, mask_neg);
-  __m128i temp = _mm_shuffle_epi32(*row, KVZ_PERMUTE(2, 3, 0, 1));
+  __m128i temp = _mm_shuffle_epi32(*row, _MM_SHUFFLE(2, 3, 0, 1));
   *row = _mm_sign_epi16(*row, sign_mask);
   *row = _mm_add_epi16(*row, temp);
 
   sign_mask = _mm_unpacklo_epi32(mask_pos, mask_neg);
-  temp = _mm_shuffle_epi32(*row, KVZ_PERMUTE(1, 0, 3, 2));
+  temp = _mm_shuffle_epi32(*row, _MM_SHUFFLE(1, 0, 3, 2));
   *row = _mm_sign_epi16(*row, sign_mask);
   *row = _mm_add_epi16(*row, temp);
 
   sign_mask = _mm_unpacklo_epi16(mask_pos, mask_neg);
-  temp = _mm_shufflelo_epi16(*row, KVZ_PERMUTE(1,0,3,2));
-  temp = _mm_shufflehi_epi16(temp, KVZ_PERMUTE(1,0,3,2));
+  temp = _mm_shufflelo_epi16(*row, _MM_SHUFFLE(1,0,3,2));
+  temp = _mm_shufflehi_epi16(temp, _MM_SHUFFLE(1,0,3,2));
   *row = _mm_sign_epi16(*row, sign_mask);
   *row = _mm_add_epi16(*row, temp);
 }
@@ -262,18 +261,18 @@ static INLINE void hor_transform_row_dual_avx2(__m256i* row){
   __m256i mask_pos = _mm256_set1_epi16(1);
   __m256i mask_neg = _mm256_set1_epi16(-1);
   __m256i sign_mask = _mm256_unpacklo_epi64(mask_pos, mask_neg);
-  __m256i temp = _mm256_shuffle_epi32(*row, KVZ_PERMUTE(2, 3, 0, 1));
+  __m256i temp = _mm256_shuffle_epi32(*row, _MM_SHUFFLE(2, 3, 0, 1));
   *row = _mm256_sign_epi16(*row, sign_mask);
   *row = _mm256_add_epi16(*row, temp);
 
   sign_mask = _mm256_unpacklo_epi32(mask_pos, mask_neg);
-  temp = _mm256_shuffle_epi32(*row, KVZ_PERMUTE(1, 0, 3, 2));
+  temp = _mm256_shuffle_epi32(*row, _MM_SHUFFLE(1, 0, 3, 2));
   *row = _mm256_sign_epi16(*row, sign_mask);
   *row = _mm256_add_epi16(*row, temp);
 
   sign_mask = _mm256_unpacklo_epi16(mask_pos, mask_neg);
-  temp = _mm256_shufflelo_epi16(*row, KVZ_PERMUTE(1,0,3,2));
-  temp = _mm256_shufflehi_epi16(temp, KVZ_PERMUTE(1,0,3,2));
+  temp = _mm256_shufflelo_epi16(*row, _MM_SHUFFLE(1,0,3,2));
+  temp = _mm256_shufflehi_epi16(temp, _MM_SHUFFLE(1,0,3,2));
   *row = _mm256_sign_epi16(*row, sign_mask);
   *row = _mm256_add_epi16(*row, temp);
 }
@@ -357,8 +356,8 @@ INLINE static unsigned sum_block_avx2(__m128i *ver_row)
   haddwd_accumulate_avx2(&sad, ver_row + 6);
   haddwd_accumulate_avx2(&sad, ver_row + 7);
 
-  sad = _mm_add_epi32(sad, _mm_shuffle_epi32(sad, KVZ_PERMUTE(2, 3, 0, 1)));
-  sad = _mm_add_epi32(sad, _mm_shuffle_epi32(sad, KVZ_PERMUTE(1, 0, 1, 0)));
+  sad = _mm_add_epi32(sad, _mm_shuffle_epi32(sad, _MM_SHUFFLE(2, 3, 0, 1)));
+  sad = _mm_add_epi32(sad, _mm_shuffle_epi32(sad, _MM_SHUFFLE(1, 0, 1, 0)));
 
   return _mm_cvtsi128_si32(sad);
 }
@@ -375,8 +374,8 @@ INLINE static void sum_block_dual_avx2(__m256i *ver_row, unsigned *sum0, unsigne
   haddwd_accumulate_dual_avx2(&sad, ver_row + 6);
   haddwd_accumulate_dual_avx2(&sad, ver_row + 7);
 
-  sad = _mm256_add_epi32(sad, _mm256_shuffle_epi32(sad, KVZ_PERMUTE(2, 3, 0, 1)));
-  sad = _mm256_add_epi32(sad, _mm256_shuffle_epi32(sad, KVZ_PERMUTE(1, 0, 1, 0)));
+  sad = _mm256_add_epi32(sad, _mm256_shuffle_epi32(sad, _MM_SHUFFLE(2, 3, 0, 1)));
+  sad = _mm256_add_epi32(sad, _mm256_shuffle_epi32(sad, _MM_SHUFFLE(1, 0, 1, 0)));
 
   *sum0 = _mm_cvtsi128_si32(_mm256_extracti128_si256(sad, 0));
   *sum1 = _mm_cvtsi128_si32(_mm256_extracti128_si256(sad, 1));
