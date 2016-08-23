@@ -131,8 +131,8 @@ int kvz_sao_edge_ddistortion_avx2(const kvz_pixel *orig_data, const kvz_pixel *r
 
   //Full horizontal sum
   v_accum = _mm256_add_epi32(v_accum, _mm256_castsi128_si256(_mm256_extracti128_si256(v_accum, 1)));
-  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(2, 3, 0, 1)));
-  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(1, 0, 1, 0)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(1, 0, 3, 2)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(0, 1, 0, 1)));
   sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(v_accum));
 
   return sum;
@@ -223,14 +223,14 @@ void kvz_calc_sao_edge_dir_avx2(const kvz_pixel *orig_data, const kvz_pixel *rec
 
     //Full horizontal sum of accumulated values
     v_diff_accum[eo_cat] = _mm256_add_epi32(v_diff_accum[eo_cat], _mm256_castsi128_si256(_mm256_extracti128_si256(v_diff_accum[eo_cat], 1)));
-    v_diff_accum[eo_cat] = _mm256_add_epi32(v_diff_accum[eo_cat], _mm256_shuffle_epi32(v_diff_accum[eo_cat], _MM_SHUFFLE(2, 3, 0, 1)));
-    v_diff_accum[eo_cat] = _mm256_add_epi32(v_diff_accum[eo_cat], _mm256_shuffle_epi32(v_diff_accum[eo_cat], _MM_SHUFFLE(1, 0, 1, 0)));
+    v_diff_accum[eo_cat] = _mm256_add_epi32(v_diff_accum[eo_cat], _mm256_shuffle_epi32(v_diff_accum[eo_cat], _MM_SHUFFLE(1, 0, 3, 2)));
+    v_diff_accum[eo_cat] = _mm256_add_epi32(v_diff_accum[eo_cat], _mm256_shuffle_epi32(v_diff_accum[eo_cat], _MM_SHUFFLE(0, 1, 0, 1)));
     accum += _mm_cvtsi128_si32(_mm256_castsi256_si128(v_diff_accum[eo_cat]));
 
     //Full horizontal sum of accumulated values
     v_count[eo_cat] = _mm256_add_epi32(v_count[eo_cat], _mm256_castsi128_si256(_mm256_extracti128_si256(v_count[eo_cat], 1)));
-    v_count[eo_cat] = _mm256_add_epi32(v_count[eo_cat], _mm256_shuffle_epi32(v_count[eo_cat], _MM_SHUFFLE(2, 3, 0, 1)));
-    v_count[eo_cat] = _mm256_add_epi32(v_count[eo_cat], _mm256_shuffle_epi32(v_count[eo_cat], _MM_SHUFFLE(1, 0, 1, 0)));
+    v_count[eo_cat] = _mm256_add_epi32(v_count[eo_cat], _mm256_shuffle_epi32(v_count[eo_cat], _MM_SHUFFLE(1, 0, 3, 2)));
+    v_count[eo_cat] = _mm256_add_epi32(v_count[eo_cat], _mm256_shuffle_epi32(v_count[eo_cat], _MM_SHUFFLE(0, 1, 0, 1)));
     count += _mm_cvtsi128_si32(_mm256_castsi256_si128(v_count[eo_cat]));
 
     cat_sum_cnt[0][eo_cat] += accum;
@@ -334,8 +334,8 @@ int kvz_sao_band_ddistortion_avx2(const encoder_state_t * const state, const kvz
 
   //Full horizontal sum
   v_accum = _mm256_add_epi32(v_accum, _mm256_castsi128_si256(_mm256_extracti128_si256(v_accum, 1)));
-  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(2, 3, 0, 1)));
-  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(1, 0, 1, 0)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(1, 0, 3, 2)));
+  v_accum = _mm256_add_epi32(v_accum, _mm256_shuffle_epi32(v_accum, _MM_SHUFFLE(0, 1, 0, 1)));
   sum += _mm_cvtsi128_si32(_mm256_castsi256_si128(v_accum));
 
   return sum;

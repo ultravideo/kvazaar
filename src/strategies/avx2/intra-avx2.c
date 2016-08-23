@@ -251,14 +251,14 @@ static void filter_16x16_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sam
       int rx = 0;
       int ry = y;
 
-      row0 = _mm256_permute4x64_epi64(row0, _MM_SHUFFLE(0,2,1,3));
-      row1 = _mm256_permute4x64_epi64(row1, _MM_SHUFFLE(1,3,0,2));
-      row2 = _mm256_permute4x64_epi64(row2, _MM_SHUFFLE(0,2,1,3));
-      row3 = _mm256_permute4x64_epi64(row3, _MM_SHUFFLE(1,3,0,2));
-      row4 = _mm256_permute4x64_epi64(row4, _MM_SHUFFLE(0,2,1,3));
-      row5 = _mm256_permute4x64_epi64(row5, _MM_SHUFFLE(1,3,0,2));
-      row6 = _mm256_permute4x64_epi64(row6, _MM_SHUFFLE(0,2,1,3));
-      row7 = _mm256_permute4x64_epi64(row7, _MM_SHUFFLE(1,3,0,2));
+      row0 = _mm256_permute4x64_epi64(row0, _MM_SHUFFLE(3,1,2,0));
+      row1 = _mm256_permute4x64_epi64(row1, _MM_SHUFFLE(2,0,3,1));
+      row2 = _mm256_permute4x64_epi64(row2, _MM_SHUFFLE(3,1,2,0));
+      row3 = _mm256_permute4x64_epi64(row3, _MM_SHUFFLE(2,0,3,1));
+      row4 = _mm256_permute4x64_epi64(row4, _MM_SHUFFLE(3,1,2,0));
+      row5 = _mm256_permute4x64_epi64(row5, _MM_SHUFFLE(2,0,3,1));
+      row6 = _mm256_permute4x64_epi64(row6, _MM_SHUFFLE(3,1,2,0));
+      row7 = _mm256_permute4x64_epi64(row7, _MM_SHUFFLE(2,0,3,1));
 
       _mm_storeu_si128((__m128i*)(dst + (ry + 0) * 16 + rx), _mm256_castsi256_si128(row0));
       _mm_storeu_si128((__m128i*)(dst + (ry + 1) * 16 + rx), _mm256_castsi256_si128(row1));
@@ -342,14 +342,14 @@ static void filter_NxN_avx2(kvz_pixel *dst, const kvz_pixel *ref_main, int sampl
       } else {
 
         //Move all filtered pixels to the lower lane to reduce memory accesses
-        row0 = _mm256_permute4x64_epi64(row0, _MM_SHUFFLE(0,2,1,3));
-        row1 = _mm256_permute4x64_epi64(row1, _MM_SHUFFLE(1,3,0,2));
-        row2 = _mm256_permute4x64_epi64(row2, _MM_SHUFFLE(0,2,1,3));
-        row3 = _mm256_permute4x64_epi64(row3, _MM_SHUFFLE(1,3,0,2));
-        row4 = _mm256_permute4x64_epi64(row4, _MM_SHUFFLE(0,2,1,3));
-        row5 = _mm256_permute4x64_epi64(row5, _MM_SHUFFLE(1,3,0,2));
-        row6 = _mm256_permute4x64_epi64(row6, _MM_SHUFFLE(0,2,1,3));
-        row7 = _mm256_permute4x64_epi64(row7, _MM_SHUFFLE(1,3,0,2));
+        row0 = _mm256_permute4x64_epi64(row0, _MM_SHUFFLE(3,1,2,0));
+        row1 = _mm256_permute4x64_epi64(row1, _MM_SHUFFLE(2,0,3,1));
+        row2 = _mm256_permute4x64_epi64(row2, _MM_SHUFFLE(3,1,2,0));
+        row3 = _mm256_permute4x64_epi64(row3, _MM_SHUFFLE(2,0,3,1));
+        row4 = _mm256_permute4x64_epi64(row4, _MM_SHUFFLE(3,1,2,0));
+        row5 = _mm256_permute4x64_epi64(row5, _MM_SHUFFLE(2,0,3,1));
+        row6 = _mm256_permute4x64_epi64(row6, _MM_SHUFFLE(3,1,2,0));
+        row7 = _mm256_permute4x64_epi64(row7, _MM_SHUFFLE(2,0,3,1));
 
         _mm_storeu_si128((__m128i*)(dst + (y + 0) * width + x), _mm256_castsi256_si128(row0));
         _mm_storeu_si128((__m128i*)(dst + (y + 1) * width + x), _mm256_castsi256_si128(row1));

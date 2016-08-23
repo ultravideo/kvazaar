@@ -100,8 +100,8 @@ void kvz_quant_flat_avx2(const encoder_state_t * const state, coeff_t *coef, coe
   }
 
   __m128i temp = _mm_add_epi32(_mm256_castsi256_si128(v_ac_sum), _mm256_extracti128_si256(v_ac_sum, 1));
-  temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(2, 3, 0, 1)));
-  temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(1, 0, 1, 0)));
+  temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(1, 0, 3, 2)));
+  temp = _mm_add_epi32(temp, _mm_shuffle_epi32(temp, _MM_SHUFFLE(0, 1, 0, 1)));
   ac_sum += _mm_cvtsi128_si32(temp);
 
   if (!(encoder->sign_hiding && ac_sum >= 2)) return;
