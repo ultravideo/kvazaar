@@ -949,7 +949,10 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   }
 
   // Start search from depth 0.
-  search_cu(state, x, y, 0, work_tree);
+  double cost = search_cu(state, x, y, 0, work_tree);
+
+  // Save squared cost for rate control.
+  kvz_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight = cost * cost;
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.

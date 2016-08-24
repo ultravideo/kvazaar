@@ -53,11 +53,16 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
   state->frame->rc_alpha = 3.2003;
   state->frame->rc_beta = -1.367;
 
+  const encoder_control_t * const encoder = state->encoder_control;
+  const int num_lcus = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
+  state->frame->lcu_stats = MALLOC(lcu_stats_t, num_lcus);
+
   return 1;
 }
 
 static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
   kvz_image_list_destroy(state->frame->ref);
+  FREE_POINTER(state->frame->lcu_stats);
 }
 
 static int encoder_state_config_tile_init(encoder_state_t * const state, 

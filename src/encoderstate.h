@@ -49,6 +49,23 @@ typedef enum {
 } encoder_state_type;
 
 
+typedef struct lcu_stats_t {
+  //! \brief Number of bits that were spent
+  uint32_t bits;
+
+  //! \brief Weight of the LCU for rate control
+  double weight;
+
+  //! \brief Lambda value which was used for this LCU
+  double lambda;
+
+  //! \brief Rate control alpha parameter
+  double rc_alpha;
+
+  //! \brief Rate control beta parameter
+  double rc_beta;
+} lcu_stats_t;
+
 
 typedef struct encoder_state_config_frame_t {
   /**
@@ -113,6 +130,13 @@ typedef struct encoder_state_config_frame_t {
    * started yet.
    */
   bool done;
+
+  /**
+   * \brief Information about the coded LCUs.
+   *
+   * Used for rate control.
+   */
+  lcu_stats_t *lcu_stats;
 
 } encoder_state_config_frame_t;
 
@@ -248,6 +272,8 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
 void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
                                int ref_list_len_out[2],
                                int ref_list_poc_out[2][16]);
+
+lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,

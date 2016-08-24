@@ -202,7 +202,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
 
-  kvz_set_lcu_lambda_and_qp(state);
+  kvz_set_lcu_lambda_and_qp(state, lcu->position);
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   
@@ -241,6 +241,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   }
   
   //Now write data to bitstream (required to have a correct CABAC state)
+  const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
   
   //First LCU, and we are in a slice. We need a slice header
   if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
@@ -266,7 +267,10 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     //Always 0 since otherwise it would be split
     kvz_cabac_encode_bin_trm(&state->cabac, 0);  // end_of_slice_segment_flag
   }
-  
+
+  const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
+  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
+
   //Wavefronts need the context to be copied to the next row
   if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
     int j;
@@ -860,6 +864,22 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   }
 }
 
+static void normalize_lcu_weights(encoder_state_t * const state)
+{
+  if (state->frame->num == 0) return;
+
+  const uint32_t num_lcus = state->encoder_control->in.width_in_lcu *
+                            state->encoder_control->in.height_in_lcu;
+  double sum = 0.0;
+  for (uint32_t i = 0; i < num_lcus; i++) {
+    sum += state->frame->lcu_stats[i].weight;
+  }
+
+  for (uint32_t i = 0; i < num_lcus; i++) {
+    state->frame->lcu_stats[i].weight /= sum;
+  }
+}
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
@@ -908,6 +928,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   encoder_state_remove_refs(state);
   encoder_state_ref_sort(state);
 
+  normalize_lcu_weights(state);
   kvz_set_picture_lambda_and_qp(state);
 
   encoder_state_init_children(state);
@@ -1044,4 +1065,12 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
   }
 
   return SCAN_DIAG;
+}
+
+lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
+{
+  const int index = lcu_x + state->tile->lcu_offset_x +
+                    (lcu_y + state->tile->lcu_offset_y) *
+                    state->encoder_control->in.width_in_lcu;
+  return &state->frame->lcu_stats[index];
 }
