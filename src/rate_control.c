@@ -40,31 +40,28 @@ static double clip_lambda(double lambda) {
 
 /**
  * \brief Update alpha and beta parameters.
- * \param state the main encoder state
  *
- * Sets global->rc_alpha and global->rc_beta of the encoder state.
+ * \param         bits        number of bits spent for coding the area
+ * \param         pixels      size of the area in pixels
+ * \param         lambda_real lambda used for coding the area
+ * \param[in,out] alpha       alpha parameter to update
+ * \param[in,out] beta        beta parameter to update
  */
-static void update_rc_parameters(encoder_state_t * state)
+static void update_parameters(uint32_t bits,
+                              uint32_t pixels,
+                              double lambda_real,
+                              double *alpha,
+                              double *beta)
 {
-  const encoder_control_t * const encoder = state->encoder_control;
-
-  const double pixels_per_picture = encoder->in.width * encoder->in.height;
-  const double bpp = state->stats_bitstream_length * 8 / pixels_per_picture;
-  const double log_bpp = log(bpp);
-
-  const double alpha_old = state->frame->rc_alpha;
-  const double beta_old = state->frame->rc_beta;
-  // lambda computed from real bpp
-  const double lambda_comp = clip_lambda(alpha_old * pow(bpp, beta_old));
-  // lambda used in encoding
-  const double lambda_real = state->frame->lambda;
+  const double bpp              = bits / (double)pixels;
+  const double lambda_comp      = clip_lambda(*alpha * pow(bpp, *beta));
   const double lambda_log_ratio = log(lambda_real) - log(lambda_comp);
 
-  const double alpha = alpha_old + 0.1 * lambda_log_ratio * alpha_old;
-  state->frame->rc_alpha = CLIP(0.05, 20, alpha);
+  *alpha += 0.10 * lambda_log_ratio * (*alpha);
+  *alpha = CLIP(0.05, 20, *alpha);
 
-  const double beta = beta_old + 0.05 * lambda_log_ratio * CLIP(-5, 1, log_bpp);
-  state->frame->rc_beta = CLIP(-3, -0.1, beta);
+  *beta  += 0.05 * lambda_log_ratio * CLIP(-5.0, -1.0, log(bpp));
+  *beta  = CLIP(-3, -0.1, *beta);
 }
 
 /**
@@ -149,7 +146,11 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 
     if (state->frame->num > ctrl->owf) {
       // At least one frame has been written.
-      update_rc_parameters(state);
+      update_parameters(state->stats_bitstream_length * 8,
+                        ctrl->in.pixels_per_pic,
+                        state->frame->lambda,
+                        &state->frame->rc_alpha,
+                        &state->frame->rc_beta);
     }
 
     // TODO: take the picture headers into account
@@ -232,24 +233,30 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
   const encoder_control_t * const ctrl = state->encoder_control;
 
   if (ctrl->cfg->target_bitrate > 0) {
-    const int32_t pixels     = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
+    lcu_stats_t *lcu         = kvz_get_lcu_stats(state, pos.x, pos.y);
+    const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
+
+    if (state->frame->num > ctrl->owf) {
+      update_parameters(lcu->bits,
+                        pixels,
+                        lcu->lambda,
+                        &lcu->rc_alpha,
+                        &lcu->rc_beta);
+    } else {
+      lcu->rc_alpha = state->frame->rc_alpha;
+      lcu->rc_beta  = state->frame->rc_beta;
+    }
+
     const double target_bits = lcu_allocate_bits(state, pos);
     const double target_bpp  = target_bits / pixels;
-    const double alpha = state->frame->rc_alpha;
-    const double beta  = state->frame->rc_beta;
 
-    double lambda = alpha * pow(target_bpp, beta);
-    lambda = clip_lambda(lambda);
+    double lambda = clip_lambda(lcu->rc_alpha * pow(target_bpp, lcu->rc_beta));
 
-    state->qp          = lambda_to_qp(lambda);
+    lcu->lambda        = lambda;
     state->lambda      = lambda;
     state->lambda_sqrt = sqrt(lambda);
-
-    lcu_stats_t *lcu_stats = kvz_get_lcu_stats(state, pos.x, pos.y);
-    lcu_stats->lambda      = lambda;
-    lcu_stats->rc_alpha    = alpha;
-    lcu_stats->rc_beta     = beta;
+    state->qp          = lambda_to_qp(lambda);
 
   } else {
     state->qp          = state->frame->QP;
