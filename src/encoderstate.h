@@ -114,6 +114,9 @@ typedef struct encoder_state_config_frame_t {
   //! Number of bits targeted for the current GOP.
   double cur_gop_target_bits;
 
+  //! Number of bits targeted for the current picture.
+  double cur_pic_target_bits;
+
   // Parameters used in rate control
   double rc_alpha;
   double rc_beta;

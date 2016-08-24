@@ -31,6 +31,14 @@ static const double MIN_LAMBDA    = 0.1;
 static const double MAX_LAMBDA    = 10000;
 
 /**
+ * \brief Clip lambda value to a valid range.
+ */
+static double clip_lambda(double lambda) {
+  if (isnan(lambda)) return MAX_LAMBDA;
+  return CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
+}
+
+/**
  * \brief Update alpha and beta parameters.
  * \param state the main encoder state
  *
@@ -47,7 +55,7 @@ static void update_rc_parameters(encoder_state_t * state)
   const double alpha_old = state->frame->rc_alpha;
   const double beta_old = state->frame->rc_beta;
   // lambda computed from real bpp
-  const double lambda_comp = CLIP(MIN_LAMBDA, MAX_LAMBDA, alpha_old * pow(bpp, beta_old));
+  const double lambda_comp = clip_lambda(alpha_old * pow(bpp, beta_old));
   // lambda used in encoding
   const double lambda_real = state->frame->lambda;
   const double lambda_log_ratio = log(lambda_real) - log(lambda_comp);
@@ -147,9 +155,12 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     // TODO: take the picture headers into account
     const double pic_target_bits = pic_allocate_bits(state);
     const double target_bpp = pic_target_bits / ctrl->in.pixels_per_pic;
-    const double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);
-    state->frame->lambda = CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
-    state->frame->QP = lambda_to_qp(lambda);
+    double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);
+    lambda = clip_lambda(lambda);
+
+    state->frame->lambda              = lambda;
+    state->frame->QP                  = lambda_to_qp(lambda);
+    state->frame->cur_pic_target_bits = pic_target_bits;
 
   } else {
     // Rate control disabled
@@ -190,15 +201,59 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
   }
 }
 
+/**
+ * \brief Allocate bits for a LCU.
+ * \param state   the main encoder state
+ * \param pos     location of the LCU as number of LCUs from top left
+ * \return number of bits allocated for the LCU
+ */
+static double lcu_allocate_bits(encoder_state_t * const state,
+                                vector2d_t pos)
+{
+  double lcu_weight;
+  if (state->frame->num > state->encoder_control->owf) {
+    lcu_weight = kvz_get_lcu_stats(state, pos.x, pos.y)->weight;
+  } else {
+    const uint32_t num_lcus = state->encoder_control->in.width_in_lcu *
+                              state->encoder_control->in.height_in_lcu;
+    lcu_weight = 1.0 / num_lcus;
+  }
+
+  // Target number of bits for the current LCU.
+  const double lcu_target_bits = state->frame->cur_pic_target_bits * lcu_weight;
+
+  // Allocate at least one bit for each LCU.
+  return MAX(1, lcu_target_bits);
+}
+
 void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
                                vector2d_t pos)
 {
-  state->lambda      = state->frame->lambda;
-  state->lambda_sqrt = sqrt(state->frame->lambda);
-  state->qp          = state->frame->QP;
+  const encoder_control_t * const ctrl = state->encoder_control;
 
-  lcu_stats_t *lcu_stats = kvz_get_lcu_stats(state, pos.x, pos.y);
-  lcu_stats->lambda      = state->lambda;
-  lcu_stats->rc_alpha    = state->frame->rc_alpha;
-  lcu_stats->rc_beta     = state->frame->rc_beta;
+  if (ctrl->cfg->target_bitrate > 0) {
+    const int32_t pixels     = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
+                               MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
+    const double target_bits = lcu_allocate_bits(state, pos);
+    const double target_bpp  = target_bits / pixels;
+    const double alpha = state->frame->rc_alpha;
+    const double beta  = state->frame->rc_beta;
+
+    double lambda = alpha * pow(target_bpp, beta);
+    lambda = clip_lambda(lambda);
+
+    state->qp          = lambda_to_qp(lambda);
+    state->lambda      = lambda;
+    state->lambda_sqrt = sqrt(lambda);
+
+    lcu_stats_t *lcu_stats = kvz_get_lcu_stats(state, pos.x, pos.y);
+    lcu_stats->lambda      = lambda;
+    lcu_stats->rc_alpha    = alpha;
+    lcu_stats->rc_beta     = beta;
+
+  } else {
+    state->qp          = state->frame->QP;
+    state->lambda      = state->frame->lambda;
+    state->lambda_sqrt = sqrt(state->frame->lambda);
+  }
 }
