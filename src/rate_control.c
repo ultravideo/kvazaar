@@ -252,6 +252,19 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     const double target_bpp  = target_bits / pixels;
 
     double lambda = clip_lambda(lcu->rc_alpha * pow(target_bpp, lcu->rc_beta));
+    // Clip lambda according to the equations 24 and 26 in
+    // https://doi.org/10.1109/TIP.2014.2336550
+    if (state->frame->num > ctrl->owf) {
+      const double bpp         = lcu->bits / (double)pixels;
+      const double lambda_comp = clip_lambda(lcu->rc_alpha * pow(bpp, lcu->rc_beta));
+      lambda = CLIP(lambda_comp * 0.7937005259840998,
+                    lambda_comp * 1.2599210498948732,
+                    lambda);
+    }
+    lambda = CLIP(state->frame->lambda * 0.6299605249474366,
+                  state->frame->lambda * 1.5874010519681994,
+                  lambda);
+    lambda = clip_lambda(lambda);
 
     lcu->lambda        = lambda;
     state->lambda      = lambda;
