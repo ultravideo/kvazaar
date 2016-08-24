@@ -239,6 +239,44 @@ static void inter_recon_14bit_frac_chroma(const encoder_state_t * const state,
   if (src_v.malloc_used) free(src_v.buffer);
 }
 
+
+/**
+* \brief Copy from frame with extended border.
+*
+* \param ref_buf      pointer to the start of ref buffer
+* \param ref_stride   stride of ref buffer
+* \param ref_width    width of frame
+* \param ref_height   height of frame
+* \param rec_buf      pointer to the start of pu in rec buffer
+* \param rec_stride   stride of rec buffer
+* \param width        width of copied block
+* \param height       height of copied block
+* \param mv_in_frame  coordinates of copied block in frame coordinates
+*/
+static void inter_cp_with_ext_border(const kvz_pixel *ref_buf, int ref_stride,
+                                     int ref_width, int ref_height,
+                                     kvz_pixel *rec_buf, int rec_stride,
+                                     int width, int height,
+                                     const vector2d_t *mv_in_frame)
+{
+  for (int y = mv_in_frame->y; y < mv_in_frame->y + height; ++y) {
+    for (int x = mv_in_frame->x; x < mv_in_frame->x + width; ++x) {
+      vector2d_t in_frame = {
+        CLIP(0, ref_width - 1, x),
+        CLIP(0, ref_height - 1, y),
+      };
+      vector2d_t in_pu = {
+        x - mv_in_frame->x,
+        y - mv_in_frame->y,
+      };
+      int pu_index = in_pu.y * rec_stride + in_pu.x;
+      int frame_index = in_frame.y * ref_stride + in_frame.x;
+      rec_buf[pu_index] = ref_buf[frame_index];
+    }
+  }
+}
+
+
 /**
  * \brief Reconstruct inter block
  *
@@ -262,148 +300,101 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
                          lcu_t *lcu,
                          hi_prec_buf_t *hi_prec_out)
 {
-  int x,y,coord_x,coord_y;
-  int16_t mv[2] = { mv_param[0], mv_param[1] };
+  const vector2d_t tile_in_frame = {
+    state->tile->lcu_offset_x * LCU_WIDTH,
+    state->tile->lcu_offset_y * LCU_WIDTH
+  };
+  const vector2d_t pu_in_tile = { xpos, ypos };
+  const vector2d_t pu_in_lcu = { xpos % LCU_WIDTH, ypos % LCU_WIDTH };
 
-  int32_t dst_width_c = LCU_WIDTH>>1; //!< Destination picture width in chroma pixels
-  int32_t ref_width_c = ref->width>>1; //!< Reference picture width in chroma pixels
+  const vector2d_t mv_in_pu = { mv_param[0] >> 2, mv_param[1] >> 2 };
+  const vector2d_t mv_in_frame = {
+    mv_in_pu.x + pu_in_tile.x + tile_in_frame.x,
+    mv_in_pu.y + pu_in_tile.y + tile_in_frame.y
+  };
 
-  // negative overflow flag
-  int8_t overflow_neg_x = (state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) < 0)?1:0;
-  int8_t overflow_neg_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) < 0)?1:0;
+  const bool mv_is_outside_frame = mv_in_frame.x < 0 ||
+      mv_in_frame.y < 0 ||
+      mv_in_frame.x + width > ref->width ||
+      mv_in_frame.y + height > ref->height;
 
-  // positive overflow flag
-  int8_t overflow_pos_x = (state->tile->lcu_offset_x * LCU_WIDTH + xpos + (mv[0]>>2) + width > ref->width )?1:0;
-  int8_t overflow_pos_y = (state->tile->lcu_offset_y * LCU_WIDTH + ypos + (mv[1]>>2) + height > ref->height)?1:0;
+  // With 420, odd coordinates need interpolation.
+  const int8_t fractional_chroma = (mv_in_pu.x & 1) || (mv_in_pu.y & 1);
+  const int8_t fractional_luma = ((mv_param[0] & 3) || (mv_param[1] & 3));
 
-  int8_t chroma_halfpel = ((mv[0]>>2)&1) || ((mv[1]>>2)&1); //!< (luma integer mv) lsb is set -> chroma is half-pel
-  // Luma quarter-pel
-  int8_t fractional_mv = (mv[0]&1) || (mv[1]&1) || (mv[0]&2) || (mv[1]&2); // either of 2 lowest bits of mv set -> mv is fractional
-
-  if(fractional_mv) {
-    if (state->encoder_control->cfg->bipred && hi_prec_out){
-      inter_recon_14bit_frac_luma(state, ref, xpos, ypos, width, height, mv_param, hi_prec_out);
-      inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, hi_prec_out);
+  // Generate prediction for luma.
+  if (fractional_luma) {
+    // With a fractional MV, do interpolation.
+    if (state->encoder_control->cfg->bipred && hi_prec_out) {
+      inter_recon_14bit_frac_luma(state, ref,
+                                  pu_in_tile.x, pu_in_tile.y,
+                                  width, height,
+                                  mv_param, hi_prec_out);
     } else {
-      inter_recon_frac_luma(state, ref, xpos, ypos, width, height, mv_param, lcu);
-      inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
+      inter_recon_frac_luma(state, ref,
+                            pu_in_tile.x, pu_in_tile.y,
+                            width, height,
+                            mv_param, lcu);
+    }
+  } else {
+    // With an integer MV, copy pixels directly from the reference.
+    const int lcu_pu_index = pu_in_lcu.y * LCU_WIDTH + pu_in_lcu.x;
+    if (mv_is_outside_frame) {
+      inter_cp_with_ext_border(ref->y, ref->width,
+                               ref->width, ref->height,
+                               &lcu->rec.y[lcu_pu_index], LCU_WIDTH,
+                               width, height,
+                               &mv_in_frame);
+    } else {
+      const int frame_mv_index = mv_in_frame.y * ref->width + mv_in_frame.x;
+      kvz_pixels_blit(&ref->y[frame_mv_index],
+                      &lcu->rec.y[lcu_pu_index],
+                      width, height,
+                      ref->width, LCU_WIDTH);
     }
   }
 
-  mv[0] >>= 2;
-  mv[1] >>= 2;
-
-  // Chroma half-pel
-  // get half-pel interpolated block and push it to output
-  if(!fractional_mv) {
-    if(chroma_halfpel) {
-      if (state->encoder_control->cfg->bipred && hi_prec_out){
-        inter_recon_14bit_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, hi_prec_out);
-      } else {
-        inter_recon_frac_chroma(state, ref, xpos, ypos, width, height, mv_param, lcu);
-      }
+  // Generate prediction for chroma.
+  if (fractional_luma || fractional_chroma) {
+    // With a fractional MV, do interpolation.
+    if (state->encoder_control->cfg->bipred && hi_prec_out) {
+      inter_recon_14bit_frac_chroma(state, ref,
+                                    pu_in_tile.x, pu_in_tile.y,
+                                    width, height,
+                                    mv_param, hi_prec_out);
+    } else {
+      inter_recon_frac_chroma(state, ref,
+                              pu_in_tile.x, pu_in_tile.y,
+                              width, height,
+                              mv_param, lcu);
     }
+  } else {
+    // With an integer MV, copy pixels directly from the reference.
+    const int lcu_pu_index_c = pu_in_lcu.y / 2 * LCU_WIDTH_C + pu_in_lcu.x / 2;
+    const vector2d_t mv_in_frame_c = { mv_in_frame.x / 2, mv_in_frame.y / 2 };
 
-    // With overflow present, more checking
-    if (overflow_neg_x || overflow_neg_y || overflow_pos_x || overflow_pos_y) {
-      // Copy Luma with boundary checking
-      for (y = ypos; y < ypos + height; y++) {
-        for (x = xpos; x < xpos + width; x++) {
-          int x_in_lcu = (x & ((LCU_WIDTH)-1));
-          int y_in_lcu = (y & ((LCU_WIDTH)-1));
+    if (mv_is_outside_frame) {
+      inter_cp_with_ext_border(ref->u, ref->width / 2,
+                               ref->width / 2, ref->height / 2,
+                               &lcu->rec.u[lcu_pu_index_c], LCU_WIDTH_C,
+                               width / 2, height / 2,
+                               &mv_in_frame_c);
+      inter_cp_with_ext_border(ref->v, ref->width / 2,
+                               ref->width / 2, ref->height / 2,
+                               &lcu->rec.v[lcu_pu_index_c], LCU_WIDTH_C,
+                               width / 2, height / 2,
+                               &mv_in_frame_c);
+    } else {
+      const int frame_mv_index = mv_in_frame_c.y * ref->width / 2 + mv_in_frame_c.x;
 
-          coord_x = (x + state->tile->lcu_offset_x * LCU_WIDTH) + mv[0];
-          coord_y = (y + state->tile->lcu_offset_y * LCU_WIDTH) + mv[1];
-          overflow_neg_x = (coord_x < 0)?1:0;
-          overflow_neg_y = (coord_y < 0)?1:0;
-
-          overflow_pos_x = (coord_x >= ref->width )?1:0;
-          overflow_pos_y = (coord_y >= ref->height)?1:0;
-
-          // On x-overflow set coord_x accordingly
-          if (overflow_neg_x) {
-            coord_x = 0;
-          } else if (overflow_pos_x) {
-            coord_x = ref->width - 1;
-          }
-
-          // On y-overflow set coord_y accordingly
-          if (overflow_neg_y) {
-            coord_y = 0;
-          } else if (overflow_pos_y) {
-            coord_y = ref->height - 1;
-          }
-
-          // set destination to (corrected) pixel value from the reference
-          lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu] = ref->y[coord_y*ref->width + coord_x];
-        }
-      }
-
-      if(!chroma_halfpel) {
-        // Copy Chroma with boundary checking
-        for (y = ypos>>1; y < (ypos + height)>>1; y++) {
-          for (x = xpos>>1; x < (xpos + width)>>1; x++) {
-            int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
-            int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-
-            coord_x = (x + state->tile->lcu_offset_x * (LCU_WIDTH >> 1)) + (mv[0]>>1);
-            coord_y = (y + state->tile->lcu_offset_y * (LCU_WIDTH >> 1)) + (mv[1]>>1);
-
-            overflow_neg_x = (coord_x < 0)?1:0;
-            overflow_neg_y = (coord_y < 0)?1:0;
-
-            overflow_pos_x = (coord_x >= ref->width>>1 )?1:0;
-            overflow_pos_y = (coord_y >= ref->height>>1)?1:0;
-
-            // On x-overflow set coord_x accordingly
-            if(overflow_neg_x) {
-              coord_x = 0;
-            } else if(overflow_pos_x) {
-              coord_x = (ref->width>>1) - 1;
-            }
-
-            // On y-overflow set coord_y accordingly
-            if(overflow_neg_y) {
-              coord_y = 0;
-            } else if(overflow_pos_y) {
-              coord_y = (ref->height>>1) - 1;
-            }
-
-            // set destinations to (corrected) pixel value from the reference
-            lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u[coord_y * ref_width_c + coord_x];
-            lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v[coord_y * ref_width_c + coord_x];
-          }
-        }
-      }
-    } else { //If no overflow, we can copy without checking boundaries
-
-      // Copy Luma
-      for (y = ypos; y < ypos + height; y++) {
-        int y_in_lcu = (y & ((LCU_WIDTH)-1));
-        coord_y = ((y + state->tile->lcu_offset_y * LCU_WIDTH) + mv[1]) * ref->width; // pre-calculate
-        for (x = xpos; x < xpos + width; x+=sizeof(int32_t)/sizeof(kvz_pixel)) {
-          int x_in_lcu = (x & ((LCU_WIDTH)-1));
-          kvz_pixel *dst = &(lcu->rec.y[y_in_lcu * LCU_WIDTH + x_in_lcu]);
-          kvz_pixel *src = &(ref->y[coord_y + (x + state->tile->lcu_offset_x * LCU_WIDTH) + mv[0]]);
-
-          //Copy one or many pixels simultaneously
-          *(int32_t*)dst = *(int32_t*)src;
-        }
-      }
-
-      if(!chroma_halfpel) {
-        // Copy Chroma
-        // TODO: chroma fractional pixel interpolation
-        for (y = ypos>>1; y < (ypos + height)>>1; y++) {
-          int y_in_lcu = (y & ((LCU_WIDTH>>1)-1));
-          coord_y = ((y + state->tile->lcu_offset_y * (LCU_WIDTH>>1)) + (mv[1]>>1)) * ref_width_c; // pre-calculate
-          for (x = xpos>>1; x < (xpos + width)>>1; x++) {
-            int x_in_lcu = (x & ((LCU_WIDTH>>1)-1));
-            lcu->rec.u[y_in_lcu*dst_width_c + x_in_lcu] = ref->u[coord_y + (x + state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
-            lcu->rec.v[y_in_lcu*dst_width_c + x_in_lcu] = ref->v[coord_y + (x + state->tile->lcu_offset_x * (LCU_WIDTH>>1)) + (mv[0]>>1)];
-          }
-        }
-      }
+      kvz_pixels_blit(&ref->u[frame_mv_index],
+                      &lcu->rec.u[lcu_pu_index_c],
+                      width / 2, height / 2,
+                      ref->width / 2, LCU_WIDTH_C);
+      kvz_pixels_blit(&ref->v[frame_mv_index],
+                      &lcu->rec.v[lcu_pu_index_c],
+                      width / 2, height / 2,
+                      ref->width / 2, LCU_WIDTH_C);
     }
   }
 }
