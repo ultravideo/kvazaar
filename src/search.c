@@ -94,20 +94,24 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
     lcu_coeff_t *to_coeff = &work_tree[depth].coeff;
 
     kvz_pixels_blit(&from->y[luma_index], &to->y[luma_index],
-                        width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    kvz_pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
-                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    kvz_pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
-                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+                    width_px, width_px, LCU_WIDTH, LCU_WIDTH);
+    if (from->chroma_format != KVZ_CSP_400) {
+      kvz_pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
+                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+      kvz_pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
+                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+    }
 
     // Copy coefficients up. They do not have to be copied down because they
     // are not used for the search.
     kvz_coefficients_blit(&from_coeff->y[luma_index], &to_coeff->y[luma_index],
-                        width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    kvz_coefficients_blit(&from_coeff->u[chroma_index], &to_coeff->u[chroma_index],
-                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    kvz_coefficients_blit(&from_coeff->v[chroma_index], &to_coeff->v[chroma_index],
-                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+                          width_px, width_px, LCU_WIDTH, LCU_WIDTH);
+    if (from->chroma_format != KVZ_CSP_400) {
+      kvz_coefficients_blit(&from_coeff->u[chroma_index], &to_coeff->u[chroma_index],
+                            width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+      kvz_coefficients_blit(&from_coeff->v[chroma_index], &to_coeff->v[chroma_index],
+                            width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+    }
   }
 }
 
@@ -149,11 +153,13 @@ static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[M
     lcu_yuv_t *to = &work_tree[d].rec;
 
     kvz_pixels_blit(&from->y[luma_index], &to->y[luma_index],
-                        width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    kvz_pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
-                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    kvz_pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
-                        width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+                    width_px, width_px, LCU_WIDTH, LCU_WIDTH);
+    if (from->chroma_format != KVZ_CSP_400) {
+      kvz_pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
+                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+      kvz_pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
+                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+    }
   }
 }
 
@@ -444,7 +450,8 @@ static double calc_mode_bits(const encoder_state_t *state,
   }
 
   double mode_bits = kvz_luma_mode_bits(state, cur_cu->intra.mode, candidate_modes);
-  if (x % 8 == 0 && y % 8 == 0) {
+
+  if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
     mode_bits += kvz_chroma_mode_bits(state, cur_cu->intra.mode_chroma, cur_cu->intra.mode);
   }
 
@@ -584,7 +591,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          cur_cu->part_size);
       kvz_intra_recon_lcu_luma(state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
 
-      if (x % 8 == 0 && y % 8 == 0) {
+      if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
         int8_t intra_mode_chroma = intra_mode;
 
         // There is almost no benefit to doing the chroma mode search for
@@ -643,7 +650,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       }
 
       kvz_quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
-      kvz_quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
+      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+        kvz_quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
+      }
 
       int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
@@ -661,7 +670,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
     cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
-    cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+    }
 
     double mode_bits;
     if (cur_cu->type == CU_INTRA) {
@@ -728,9 +739,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            cur_cu->intra.mode, cur_cu->intra.mode_chroma,
                            cur_cu->part_size);
         kvz_intra_recon_lcu_luma(state, x, y, depth, cur_cu->intra.mode, NULL, &work_tree[depth]);
-        kvz_intra_recon_lcu_chroma(state, x, y, depth, cur_cu->intra.mode_chroma, NULL, &work_tree[depth]);
         cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
-        cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+
+        if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+          kvz_intra_recon_lcu_chroma(state, x, y, depth, cur_cu->intra.mode_chroma, NULL, &work_tree[depth]);
+          cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+        }
 
         // Add the cost of coding no-split.
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
@@ -784,6 +798,9 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
   FILL(*lcu, 0);
   
+  lcu->rec.chroma_format = state->encoder_control->chroma_format;
+  lcu->ref.chroma_format = state->encoder_control->chroma_format;
+
   // Copy reference cu_info structs from neighbouring LCUs.
 
   // Copy top CU row.
@@ -831,8 +848,10 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int chroma_bytes = (x_max / 2 + (1 - x_min_in_lcu))*sizeof(kvz_pixel);
 
       memcpy(&lcu->top_ref.y[x_min_in_lcu], &hor_buf->y[luma_offset], luma_bytes);
-      memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[chroma_offset], chroma_bytes);
-      memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[chroma_offset], chroma_bytes);
+      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+        memcpy(&lcu->top_ref.u[x_min_in_lcu], &hor_buf->u[chroma_offset], chroma_bytes);
+        memcpy(&lcu->top_ref.v[x_min_in_lcu], &hor_buf->v[chroma_offset], chroma_bytes);
+      }
     }
     // Copy left reference pixels.
     if (x > 0) {
@@ -843,8 +862,10 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
       int chroma_bytes = (LCU_WIDTH / 2 + (1 - y_min_in_lcu)) * sizeof(kvz_pixel);
 
       memcpy(&lcu->left_ref.y[y_min_in_lcu], &ver_buf->y[luma_offset], luma_bytes);
-      memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[chroma_offset], chroma_bytes);
-      memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[chroma_offset], chroma_bytes);
+      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+        memcpy(&lcu->left_ref.u[y_min_in_lcu], &ver_buf->u[chroma_offset], chroma_bytes);
+        memcpy(&lcu->left_ref.v[y_min_in_lcu], &ver_buf->v[chroma_offset], chroma_bytes);
+      }
     }
   }
 
@@ -861,10 +882,12 @@ static void init_lcu_t(const encoder_state_t * const state, const int x, const i
 
     kvz_pixels_blit(&frame->source->y[x + y * frame->source->stride], lcu->ref.y,
                         x_max, y_max, frame->source->stride, LCU_WIDTH);
-    kvz_pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride/2], lcu->ref.u,
-                        x_max_c, y_max_c, frame->source->stride/2, LCU_WIDTH / 2);
-    kvz_pixels_blit(&frame->source->v[x_c + y_c * frame->source->stride/2], lcu->ref.v,
-                        x_max_c, y_max_c, frame->source->stride/2, LCU_WIDTH / 2);
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      kvz_pixels_blit(&frame->source->u[x_c + y_c * frame->source->stride / 2], lcu->ref.u,
+                      x_max_c, y_max_c, frame->source->stride / 2, LCU_WIDTH / 2);
+      kvz_pixels_blit(&frame->source->v[x_c + y_c * frame->source->stride / 2], lcu->ref.v,
+                      x_max_c, y_max_c, frame->source->stride / 2, LCU_WIDTH / 2);
+    }
   }
 }
 
@@ -891,14 +914,16 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
     kvz_coefficients_blit(lcu->coeff.y, &pic->coeff_y[luma_index],
                         x_max, y_max, LCU_WIDTH, pic_width);
 
-    kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
-                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
-    kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
-                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
-    kvz_coefficients_blit(lcu->coeff.u, &pic->coeff_u[chroma_index],
-                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-    kvz_coefficients_blit(lcu->coeff.v, &pic->coeff_v[chroma_index],
-                        x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
+                      x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
+      kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
+                      x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
+      kvz_coefficients_blit(lcu->coeff.u, &pic->coeff_u[chroma_index],
+                            x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+      kvz_coefficients_blit(lcu->coeff.v, &pic->coeff_v[chroma_index],
+                            x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
+    }
   }
 }
 

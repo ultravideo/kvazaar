@@ -52,38 +52,57 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const l
   videoframe_t* const frame = state->tile->frame;
   
   if (hor_buf) {
-    const int rdpx = lcu->position_px.x;
-    const int rdpy = lcu->position_px.y + lcu->size.y - 1;
-    const int by = lcu->position.y;
-    
     //Copy the bottom row of this LCU to the horizontal buffer
-    kvz_pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
-                        &hor_buf->y[lcu->position_px.x + by * frame->width],
-                        lcu->size.x, 1, frame->rec->stride, frame->width);
-    kvz_pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
-                        &hor_buf->u[lcu->position_px.x / 2 + by * frame->width / 2],
-                        lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
-    kvz_pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
-                        &hor_buf->v[lcu->position_px.x / 2 + by * frame->width / 2],
-                        lcu->size.x / 2, 1, frame->rec->stride / 2, frame->width / 2);
+    vector2d_t bottom = { lcu->position_px.x, lcu->position_px.y + lcu->size.y - 1 };
+    const int lcu_row = lcu->position.y;
+
+    unsigned from_index = bottom.y * frame->rec->stride + bottom.x;
+    unsigned to_index = lcu->position_px.x + lcu_row * frame->width;
+    
+    kvz_pixels_blit(&frame->rec->y[from_index],
+                    &hor_buf->y[to_index],
+                    lcu->size.x, 1,
+                    frame->rec->stride, frame->width);
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      unsigned from_index_c = (bottom.y / 2) * frame->rec->stride / 2 + (bottom.x / 2);
+      unsigned to_index_c = lcu->position_px.x / 2 + lcu_row * frame->width / 2;
+
+      kvz_pixels_blit(&frame->rec->u[from_index_c],
+                      &hor_buf->u[to_index_c],
+                      lcu->size.x / 2, 1, 
+                      frame->rec->stride / 2, frame->width / 2);
+      kvz_pixels_blit(&frame->rec->v[from_index_c],
+                      &hor_buf->v[to_index_c],
+                      lcu->size.x / 2, 1,
+                      frame->rec->stride / 2, frame->width / 2);
+    }
   }
   
   if (ver_buf) {
-    const int rdpx = lcu->position_px.x + lcu->size.x - 1;
-    const int rdpy = lcu->position_px.y;
-    const int bx = lcu->position.x;
-    
-    
     //Copy the right row of this LCU to the vertical buffer.
-    kvz_pixels_blit(&frame->rec->y[rdpy * frame->rec->stride + rdpx],
-                        &ver_buf->y[lcu->position_px.y + bx * frame->height],
-                        1, lcu->size.y, frame->rec->stride, 1);
-    kvz_pixels_blit(&frame->rec->u[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
-                        &ver_buf->u[lcu->position_px.y / 2 + bx * frame->height / 2],
-                        1, lcu->size.y / 2, frame->rec->stride / 2, 1);
-    kvz_pixels_blit(&frame->rec->v[(rdpy/2) * frame->rec->stride/2 + (rdpx/2)],
-                        &ver_buf->v[lcu->position_px.y / 2 + bx * frame->height / 2],
-                        1, lcu->size.y / 2, frame->rec->stride / 2, 1);
+    
+    const int lcu_col = lcu->position.x;
+    vector2d_t left = { lcu->position_px.x + lcu->size.x - 1, lcu->position_px.y };
+    
+    kvz_pixels_blit(&frame->rec->y[left.y * frame->rec->stride + left.x],
+                    &ver_buf->y[lcu->position_px.y + lcu_col * frame->height],
+                    1, lcu->size.y,
+                    frame->rec->stride, 1);
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      unsigned from_index = (left.y / 2) * frame->rec->stride / 2 + (left.x / 2);
+      unsigned to_index = lcu->position_px.y / 2 + lcu_col * frame->height / 2;
+
+      kvz_pixels_blit(&frame->rec->u[from_index],
+                      &ver_buf->u[to_index],
+                      1, lcu->size.y / 2,
+                      frame->rec->stride / 2, 1);
+      kvz_pixels_blit(&frame->rec->v[from_index],
+                      &ver_buf->v[to_index],
+                      1, lcu->size.y / 2,
+                      frame->rec->stride / 2, 1);
+    }
   }
   
 }
@@ -169,8 +188,10 @@ static void encode_sao(encoder_state_t * const state,
   // If SAO is merged, nothing else needs to be coded.
   if (!sao_luma->merge_left_flag && !sao_luma->merge_up_flag) {
     encode_sao_color(state, sao_luma, COLOR_Y);
-    encode_sao_color(state, sao_chroma, COLOR_U);
-    encode_sao_color(state, sao_chroma, COLOR_V);
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      encode_sao_color(state, sao_chroma, COLOR_U);
+      encode_sao_color(state, sao_chroma, COLOR_V);
+    }
   }
 }
 
@@ -432,8 +453,12 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   
   //TODO: copy only needed data
   kvz_pixel *new_y_data = MALLOC(kvz_pixel, frame->width * frame->height);
-  kvz_pixel *new_u_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
-  kvz_pixel *new_v_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
+  kvz_pixel *new_u_data = NULL;
+  kvz_pixel *new_v_data = NULL;
+  if (frame->rec->chroma_format != KVZ_CSP_400) {
+    new_u_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
+    new_v_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
+  }
   
   const int offset = frame->width * (data->y*LCU_WIDTH);
   const int offset_c = frame->width/2 * (data->y*LCU_WIDTH_C);
@@ -444,14 +469,18 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   }
   
   memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(kvz_pixel) * num_pixels);
-  memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
-  memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
+  if (frame->rec->chroma_format != KVZ_CSP_400) {
+    memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
+    memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
+  }
   
   if (data->y>0) {
     //copy first row from buffer
     memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(kvz_pixel));
-    memcpy(&new_u_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(kvz_pixel));
-    memcpy(&new_v_data[frame->width/2 * (data->y*LCU_WIDTH_C-1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width/2 * (data->y-1)], frame->width/2 * sizeof(kvz_pixel));
+    if (frame->rec->chroma_format != KVZ_CSP_400) {
+      memcpy(&new_u_data[frame->width / 2 * (data->y*LCU_WIDTH_C - 1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width / 2 * (data->y - 1)], frame->width / 2 * sizeof(kvz_pixel));
+      memcpy(&new_v_data[frame->width / 2 * (data->y*LCU_WIDTH_C - 1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width / 2 * (data->y - 1)], frame->width / 2 * sizeof(kvz_pixel));
+    }
   }
 
   for (x = 0; x < frame->width_in_lcu; x++) {
@@ -459,8 +488,10 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
     sao_info_t *sao_luma = &frame->sao_luma[data->y * stride + x];
     sao_info_t *sao_chroma = &frame->sao_chroma[data->y * stride + x];
     kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_y_data, x, data->y, sao_luma, COLOR_Y);
-    kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_u_data, x, data->y, sao_chroma, COLOR_U);
-    kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_v_data, x, data->y, sao_chroma, COLOR_V);
+    if (frame->rec->chroma_format != KVZ_CSP_400) {
+      kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_u_data, x, data->y, sao_chroma, COLOR_U);
+      kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_v_data, x, data->y, sao_chroma, COLOR_V);
+    }
   }
   
   free(new_y_data);

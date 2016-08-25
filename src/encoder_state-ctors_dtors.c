@@ -62,7 +62,7 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
                                           const int width, const int height, const int width_in_lcu, const int height_in_lcu) {
   
   const encoder_control_t * const encoder = state->encoder_control;
-  state->tile->frame = kvz_videoframe_alloc(width, height, 0);
+  state->tile->frame = kvz_videoframe_alloc(width, height, state->encoder_control->chroma_format);
   
   state->tile->frame->rec = NULL;
   

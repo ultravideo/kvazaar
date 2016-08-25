@@ -42,7 +42,7 @@ static void fill_after_frame(unsigned height, unsigned array_width,
 
 
 static int read_and_fill_frame_data(FILE *file,
-                                    unsigned width, unsigned height,
+                                    unsigned width, unsigned height, unsigned bytes_per_sample,
                                     unsigned array_width, kvz_pixel *data)
 {
   kvz_pixel* p = data;
@@ -52,7 +52,7 @@ static int read_and_fill_frame_data(FILE *file,
 
   while (p < end) {
     // Read the beginning of the line from input.
-    if (width != fread(p, sizeof(unsigned char), width, file))
+    if (width != fread(p, bytes_per_sample, width, file))
       return 0;
 
     // Fill the rest with the last pixel value.
@@ -99,6 +99,44 @@ bool machine_is_big_endian()
 }
 
 
+static int yuv_io_read_plane(
+    FILE* file,
+    unsigned in_width, unsigned in_height, unsigned in_bitdepth,
+    unsigned out_width, unsigned out_height, unsigned out_bitdepth,
+    kvz_pixel *out_buf)
+{
+  unsigned bytes_per_sample = in_bitdepth > 8 ? 2 : 1;
+  unsigned buf_length = in_width * in_height;
+  unsigned buf_bytes = buf_length * bytes_per_sample;
+
+  if (in_width == out_width) {
+    // No need to extend pixels.
+    const size_t pixel_size = sizeof(unsigned char);
+    if (fread(out_buf, pixel_size, buf_bytes, file) != buf_bytes)  return 0;
+  } else {
+    // Need to copy pixels to fill the image in horizontal direction.
+    if (!read_and_fill_frame_data(file, in_width, in_height, bytes_per_sample, out_width, out_buf)) return 0;
+  }
+
+  if (in_height != out_height) {
+    // Need to copy pixels to fill the image in vertical direction.
+    fill_after_frame(in_height, out_width, out_height, out_buf);
+  }
+
+  if (in_bitdepth > 8) {
+    if (machine_is_big_endian()) {
+      swap_16b_buffer_bytes(out_buf, buf_length);
+    }
+
+    if (in_bitdepth != out_bitdepth) {
+      shift_to_bitdepth(out_buf, buf_length, in_bitdepth, out_bitdepth);
+    }
+  }
+
+  return 1;
+}
+
+
 /**
  * \brief Read a single frame from a file.
  *
@@ -113,57 +151,41 @@ bool machine_is_big_endian()
  * \return              1 on success, 0 on failure
  */
 int yuv_io_read(FILE* file,
-                unsigned input_width, unsigned input_height,
-                unsigned input_bitdepth, unsigned to_bitdepth,
+                unsigned in_width, unsigned out_width,
+                unsigned in_bitdepth, unsigned out_bitdepth,
                 kvz_picture *img_out)
 {
-  assert(input_width % 2 == 0);
-  assert(input_height % 2 == 0);
+  assert(in_width % 2 == 0);
+  assert(out_width % 2 == 0);
 
-  unsigned bytes_per_sample = input_bitdepth > 8 ? 2 : 1;
+  int ok;
 
-  const unsigned y_size = input_width * input_height;
-  const unsigned y_bytes = y_size * bytes_per_sample;
-  const unsigned uv_input_width  = input_width  / 2;
-  const unsigned uv_input_height = input_height / 2;
-  const unsigned uv_size = uv_input_width * uv_input_height;
-  const unsigned uv_bytes = uv_size * bytes_per_sample;
+  ok = yuv_io_read_plane(
+      file, 
+      in_width, out_width, in_bitdepth,
+      img_out->width, img_out->height, out_bitdepth,
+      img_out->y);
+  if (!ok) return 0;
 
-  const unsigned uv_array_width  = img_out->width  / 2;
-  const unsigned uv_array_height = img_out->height  / 2;
+  if (img_out->chroma_format != KVZ_CSP_400) {
+    unsigned uv_width_in = in_width / 2;
+    unsigned uv_height_in = out_width / 2;
+    unsigned uv_width_out = img_out->width / 2;
+    unsigned uv_height_out = img_out->height / 2;
 
-  if (input_width == img_out->width) {
-    // No need to extend pixels.
-    const size_t pixel_size = sizeof(unsigned char);
-    if (fread(img_out->y, pixel_size, y_bytes,  file) != y_bytes)  return 0;
-    if (fread(img_out->u, pixel_size, uv_bytes, file) != uv_bytes) return 0;
-    if (fread(img_out->v, pixel_size, uv_bytes, file) != uv_bytes) return 0;
-  } else {
-    // Need to copy pixels to fill the image in horizontal direction.
-    if (!read_and_fill_frame_data(file, input_width,    input_height,    img_out->width, img_out->y)) return 0;
-    if (!read_and_fill_frame_data(file, uv_input_width, uv_input_height, uv_array_width, img_out->u)) return 0;
-    if (!read_and_fill_frame_data(file, uv_input_width, uv_input_height, uv_array_width, img_out->v)) return 0;
-  }
+    ok = yuv_io_read_plane(
+        file,
+        uv_width_in, uv_height_in, in_bitdepth,
+        uv_width_out, uv_height_out, out_bitdepth,
+        img_out->u);
+    if (!ok) return 0;
 
-  if (input_height != img_out->height) {
-    // Need to copy pixels to fill the image in vertical direction.
-    fill_after_frame(input_height,    img_out->width, img_out->height, img_out->y);
-    fill_after_frame(uv_input_height, uv_array_width, uv_array_height, img_out->u);
-    fill_after_frame(uv_input_height, uv_array_width, uv_array_height, img_out->v);
-  }
-  
-  if (bytes_per_sample == 2) {
-    if (machine_is_big_endian()) {
-      swap_16b_buffer_bytes(img_out->y, y_size);
-      swap_16b_buffer_bytes(img_out->u, uv_size);
-      swap_16b_buffer_bytes(img_out->v, uv_size);
-    }
-
-    if (input_bitdepth != to_bitdepth) {
-      shift_to_bitdepth(img_out->y, y_size, input_bitdepth, to_bitdepth);
-      shift_to_bitdepth(img_out->u, uv_size, input_bitdepth, to_bitdepth);
-      shift_to_bitdepth(img_out->v, uv_size, input_bitdepth, to_bitdepth);
-    }
+    ok = yuv_io_read_plane(
+        file, 
+        uv_width_in, uv_height_in, in_bitdepth,
+        uv_width_out, uv_height_out, out_bitdepth,
+        img_out->v);
+    if (!ok) return 0;
   }
   
   return 1;
@@ -223,11 +245,14 @@ int yuv_io_write(FILE* file,
     fwrite(&img->y[y * width], sizeof(*img->y), output_width, file);
     // TODO: Check that fwrite succeeded.
   }
-  for (int y = 0; y < output_height / 2; ++y) {
-    fwrite(&img->u[y * width / 2], sizeof(*img->u), output_width / 2, file);
-  }
-  for (int y = 0; y < output_height / 2; ++y) {
-    fwrite(&img->v[y * width / 2], sizeof(*img->v), output_width / 2, file);
+
+  if (img->chroma_format != KVZ_CSP_400) {
+    for (int y = 0; y < output_height / 2; ++y) {
+      fwrite(&img->u[y * width / 2], sizeof(*img->u), output_width / 2, file);
+    }
+    for (int y = 0; y < output_height / 2; ++y) {
+      fwrite(&img->v[y * width / 2], sizeof(*img->v), output_width / 2, file);
+    }
   }
 
   return 1;

@@ -487,7 +487,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - they have already been signaled to 0 previously
   // When they are not present they are inferred to be 0, except for size 4
   // when the flags from previous level are used.
-  if (depth < MAX_PU_DEPTH) {
+  if (depth < MAX_PU_DEPTH && state->encoder_control->chroma_format != KVZ_CSP_400) {
     cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_chroma[tr_depth]);
     if (tr_depth == 0 || parent_coeff_u) {
       CABAC_BIN(cabac, cb_flag_u, "cbf_cb");
@@ -763,7 +763,8 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
   }
 
-  {  // start intra chroma pred mode coding
+  // Code chroma prediction mode.
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
     unsigned pred_mode = 5;
     unsigned chroma_pred_modes[4] = {0, 26, 10, 1};
 
@@ -804,7 +805,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");
       CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
     }
-  }  // end intra chroma pred mode coding
+  }
 
   encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
 }

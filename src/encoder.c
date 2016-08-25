@@ -395,9 +395,6 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
   encoder->pu_depth_intra.min = cfg->pu_depth_intra.min;
   encoder->pu_depth_intra.max = cfg->pu_depth_intra.max;
 
-  // input init (TODO: read from commandline / config)  
-  encoder->chroma_format      = KVZ_CSP_420;
-
   // deblocking filter
   encoder->deblock_enable     = (int8_t)  (encoder->cfg->deblock_enable &&
                                            !encoder->cfg->lossless);

@@ -55,7 +55,7 @@ typedef struct videoframe
 } videoframe_t;
 
 
-videoframe_t *kvz_videoframe_alloc(int32_t width, int32_t height, int32_t poc);
+videoframe_t *kvz_videoframe_alloc(int32_t width, int32_t height, enum kvz_chroma_format chroma_format);
 int kvz_videoframe_free(videoframe_t * const frame);
 
 void kvz_videoframe_set_poc(videoframe_t * frame, int32_t poc);
