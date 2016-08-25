@@ -90,6 +90,33 @@ static void shift_to_bitdepth(kvz_pixel* input, int size, int from_bitdepth, int
 }
 
 
+// Shift and copy 1-byte aligned samples to 2-byte aligned array
+static void shift_to_bitdepth_and_spread(kvz_pixel *input,
+                                         int size,
+                                         int from_bitdepth,
+                                         int to_bitdepth)
+{
+  assert(sizeof(kvz_pixel) > 1);
+  int shift = to_bitdepth - from_bitdepth;
+  unsigned char *byte_buf = (unsigned char *)input;
+  
+  // Starting from the back of the 1-byte samples, copy each sample to it's
+  // place in the 2-byte per sample array, overwriting the bytes that have
+  // already been copied in the process.
+  // Even though the two pointers are aliased, this should work because the
+  // future values read through byte_buf poiner never change as a result of
+  // writing through input pointer.
+  for (int i = size - 1; i >= 0; --i) {
+    // Shifting by a negative number is undefined.
+    if (shift > 0) {
+      input[i] = byte_buf[i] << shift;
+    } else {
+      input[i] = byte_buf[i] >> shift;
+    }
+  }
+}
+
+
 bool machine_is_big_endian()
 {
   uint16_t number = 1;
@@ -127,12 +154,14 @@ static int yuv_io_read_plane(
     if (machine_is_big_endian()) {
       swap_16b_buffer_bytes(out_buf, buf_length);
     }
-
-    if (in_bitdepth != out_bitdepth) {
-      shift_to_bitdepth(out_buf, buf_length, in_bitdepth, out_bitdepth);
-    }
   }
 
+  if (in_bitdepth <= 8 && out_bitdepth > 8) {
+    shift_to_bitdepth_and_spread(out_buf, buf_length, in_bitdepth, out_bitdepth);
+  } else if (in_bitdepth != out_bitdepth) {
+    shift_to_bitdepth(out_buf, buf_length, in_bitdepth, out_bitdepth);
+  }
+  
   return 1;
 }
 
