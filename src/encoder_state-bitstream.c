@@ -243,7 +243,7 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
       encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
       encoder->vui.colormatrix != 2) {
     WRITE_U(stream, 1, 1, "video_signal_type_present_flag");
-    WRITE_U(stream, encoder->vui.videoformat, 3, "video_format");
+    WRITE_U(stream, encoder->vui.videoformat, 3, "chroma_format");
     WRITE_U(stream, encoder->vui.fullrange, 1, "video_full_range_flag");
 
     if (encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
@@ -310,10 +310,9 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   encoder_state_write_bitstream_PTL(stream, state);
 
   WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
-  WRITE_UE(stream, encoder->in.video_format,
-           "chroma_format_idc");
+  WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
 
-  if (encoder->in.video_format == 3) {
+  if (encoder->chroma_format == KVZ_CSP_444) {
     WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
   }
 
@@ -759,7 +758,9 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 
   if (encoder->sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
-    WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
+    if (encoder->chroma_format != KVZ_CSP_400) {
+      WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
+    }
   }
 
   if (state->frame->slicetype != KVZ_SLICE_I) {
@@ -815,15 +816,17 @@ static void add_checksum(encoder_state_t * const state)
 
   WRITE_U(stream, 132, 8, "sei_type");
 
+  int num_colors = (state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : 3);
+
   switch (state->encoder_control->cfg->hash)
   {
   case KVZ_HASH_CHECKSUM:
     kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
 
-    WRITE_U(stream, 1 + 3 * 4, 8, "size");
+    WRITE_U(stream, 1 + num_colors * 4, 8, "size");
     WRITE_U(stream, 2, 8, "hash_type");  // 2 = checksum
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < num_colors; ++i) {
       uint32_t checksum_val = (
         (checksum[i][0] << 24) + (checksum[i][1] << 16) +
         (checksum[i][2] << 8) + (checksum[i][3]));
@@ -836,10 +839,10 @@ static void add_checksum(encoder_state_t * const state)
   case KVZ_HASH_MD5:
     kvz_image_md5(frame->rec, checksum, state->encoder_control->bitdepth);
 
-    WRITE_U(stream, 1 + 3 * 16, 8, "size");
+    WRITE_U(stream, 1 + num_colors * 16, 8, "size");
     WRITE_U(stream, 0, 8, "hash_type");  // 0 = md5
 
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < num_colors; ++i) {
       for (int b = 0; b < 16; ++b) {
         WRITE_U(stream, checksum[i][b], 8, "picture_md5");
       }

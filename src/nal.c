@@ -67,8 +67,10 @@ void kvz_image_checksum(const kvz_picture *im, unsigned char checksum_out[][SEI_
   kvz_array_checksum(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
-  kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
-  kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+  if (im->chroma_format != KVZ_CSP_400) {
+    kvz_array_checksum(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
+    kvz_array_checksum(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+  }
 }
 
 /*!
@@ -82,6 +84,8 @@ void kvz_image_md5(const kvz_picture *im, unsigned char checksum_out[][SEI_HASH_
   kvz_array_md5(im->y, im->height, im->width, im->width, checksum_out[0], bitdepth);
 
   /* The number of chroma pixels is half that of luma. */
-  kvz_array_md5(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
-  kvz_array_md5(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+  if (im->chroma_format != KVZ_CSP_400) {
+    kvz_array_md5(im->u, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[1], bitdepth);
+    kvz_array_md5(im->v, im->height >> 1, im->width >> 1, im->width >> 1, checksum_out[2], bitdepth);
+  }
 }

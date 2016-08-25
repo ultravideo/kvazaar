@@ -111,8 +111,11 @@ static double get_cost(encoder_state_t * const state,
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
     const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
-    ctx = &state->cabac.ctx.transform_skip_model_chroma;
-    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      ctx = &state->cabac.ctx.transform_skip_model_chroma;
+      trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+    }
 
     double sad_cost = TRSKIP_RATIO * sad_func(pred, orig_block) + state->frame->cur_lambda_cost_sqrt * trskip_bits;
     if (sad_cost < satd_cost) {
@@ -151,8 +154,11 @@ static void get_cost_dual(encoder_state_t * const state,
     // versus signaling 'luma and chroma don't use trskip' to the SAD cost.
     const cabac_ctx_t *ctx = &state->cabac.ctx.transform_skip_model_luma;
     double trskip_bits = CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0);
-    ctx = &state->cabac.ctx.transform_skip_model_chroma;
-    trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      ctx = &state->cabac.ctx.transform_skip_model_chroma;
+      trskip_bits += 2.0 * (CTX_ENTROPY_FBITS(ctx, 1) - CTX_ENTROPY_FBITS(ctx, 0));
+    }
 
     unsigned unsigned_sad_costs[PARALLEL_BLKS] = { 0 };
     double sad_costs[PARALLEL_BLKS] = { 0 };
@@ -195,7 +201,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
   const vector2d_t lcu_px = { SUB_SCU(x_px), SUB_SCU(y_px) };
   cu_info_t *const tr_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
 
-  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4);
+  const bool reconstruct_chroma = !(x_px & 4 || y_px & 4) && state->encoder_control->chroma_format != KVZ_CSP_400;
 
   struct {
     kvz_pixel y[TR_MAX_WIDTH*TR_MAX_WIDTH];
@@ -277,7 +283,7 @@ static double search_intra_trdepth(encoder_state_t * const state,
     // if this and any previous transform block has no chroma coefficients.
     // When searching the first block we don't actually know the real values,
     // so this will code cbf as 0 and not code the cbf at all for descendants.
-    {
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       const uint8_t tr_depth = depth - pred_cu->depth;
 
       const cabac_ctx_t *ctx = &(state->cabac.ctx.qt_cbf_model_chroma[tr_depth]);

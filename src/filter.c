@@ -581,7 +581,7 @@ static void filter_deblock_unit(encoder_state_t * const state,
   // Chroma pixel coordinates.
   const int32_t x_c = x >> 1;
   const int32_t y_c = y >> 1;
-  if (is_on_8x8_grid(x_c, y_c, dir)) {
+  if (state->encoder_control->chroma_format != KVZ_CSP_400 && is_on_8x8_grid(x_c, y_c, dir)) {
     filter_deblock_edge_chroma(state, x_c, y_c, length_c, dir, tu_boundary);
   }
 }
@@ -642,16 +642,18 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
   }
 
   // Chroma
-  const int x_px_c = x_px >> 1;
-  const int y_px_c = y_px >> 1;
-  const int x_c = x_px_c - 4;
-  const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> 1);
-  for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
-    // The top edge of the whole frame is not filtered.
-    bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-    bool pu_boundary = is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
-    if (y_c > 0 && (tu_boundary || pu_boundary)) {
-      filter_deblock_edge_chroma(state, x_c, y_c, 4, EDGE_HOR, tu_boundary);
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    const int x_px_c = x_px >> 1;
+    const int y_px_c = y_px >> 1;
+    const int x_c = x_px_c - 4;
+    const int end_c = MIN(y_px_c + LCU_WIDTH_C, state->tile->frame->height >> 1);
+    for (int y_c = y_px_c; y_c < end_c; y_c += 8) {
+      // The top edge of the whole frame is not filtered.
+      bool tu_boundary = is_tu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
+      bool pu_boundary = is_pu_boundary(state, x_c << 1, y_c << 1, EDGE_HOR);
+      if (y_c > 0 && (tu_boundary || pu_boundary)) {
+        filter_deblock_edge_chroma(state, x_c, y_c, 4, EDGE_HOR, tu_boundary);
+      }
     }
   }
 }

@@ -163,6 +163,34 @@ enum kvz_me_early_termination
   KVZ_ME_EARLY_TERMINATION_SENSITIVE = 2
 };
 
+
+/**
+ * \brief Format the pixels are read in.
+ * This is separate from chroma subsampling, because we might want to read
+ * interleaved formats in the future.
+ * \since 3.12.0
+ */
+enum kvz_input_format {
+  KVZ_FORMAT_P400 = 0,
+  KVZ_FORMAT_P420 = 1,
+  KVZ_FORMAT_P422 = 2,
+  KVZ_FORMAT_P444 = 3,
+};
+
+/**
+* \brief Chroma subsampling format used for encoding.
+* \since 3.12.0
+*/
+enum kvz_chroma_format {
+  KVZ_CSP_400 = 0,
+  KVZ_CSP_420 = 1,
+  KVZ_CSP_422 = 2,
+  KVZ_CSP_444 = 3,
+};
+
+// Map from input format to chroma format.
+#define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
+
 /**
  * \brief GoP picture configuration.
  */
@@ -282,6 +310,8 @@ typedef struct kvz_config
 
   int32_t rdoq_skip; /*!< \brief Mode of rdoq skip */
 
+  enum kvz_input_format input_format; /*!< \brief Use Temporal Motion Vector Predictors. */
+  int32_t input_bitdepth; /*!< \brief Use Temporal Motion Vector Predictors. */
 } kvz_config;
 
 /**
@@ -309,6 +339,7 @@ typedef struct kvz_picture {
   int64_t dts;             //!< \brief Decompression timestamp.
 
   enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
+  enum kvz_chroma_format chroma_format;
 } kvz_picture;
 
 /**
@@ -586,6 +617,19 @@ typedef struct kvz_api {
                                   kvz_picture **pic_out,
                                   kvz_picture **src_out,
                                   kvz_frame_info *info_out);
+
+  /**
+   * \brief Allocate a kvz_picture.
+   *
+   * The returned kvz_picture should be deallocated by calling picture_free.
+   *
+   * \since 3.12.0
+   * \param chroma_fomat  Chroma subsampling to use.
+   * \param width   width of luma pixel array to allocate
+   * \param height  height of luma pixel array to allocate
+   * \return        allocated picture, or NULL if allocation failed.
+   */
+  kvz_picture * (*picture_alloc_csp)(enum kvz_chroma_format chroma_fomat, int32_t width, int32_t height);
 } kvz_api;
 
 

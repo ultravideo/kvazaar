@@ -354,6 +354,10 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
     }
   }
 
+  if (state->encoder_control->chroma_format == KVZ_CSP_400) {
+    return;
+  }
+
   // Generate prediction for chroma.
   if (fractional_luma || fractional_chroma) {
     // With a fractional MV, do interpolation.

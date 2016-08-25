@@ -32,8 +32,6 @@
 #include "threadqueue.h"
 
 
-enum { FORMAT_400 = 0, FORMAT_420, FORMAT_422, FORMAT_444 };
-
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
 {
@@ -48,8 +46,6 @@ typedef struct encoder_control_t
     int32_t height_in_lcu;
     int32_t real_width;  /*!< \brief real input picture width */
     int32_t real_height; /*!< \brief real input picture width */
-    int8_t video_format;
-    int8_t bitdepth;  /*!< \brief input bit depth (8,10) */
     int64_t pixels_per_pic;
     int8_t source_scan_type;
   } in;
@@ -62,6 +58,8 @@ typedef struct encoder_control_t
   } me;
   
   int8_t bitdepth;
+  enum kvz_chroma_format chroma_format;
+
   int8_t tr_depth_intra;
 
   int8_t fme_level;

@@ -31,7 +31,10 @@
  * \param pic picture pointer
  * \return picture pointer
  */
-videoframe_t *kvz_videoframe_alloc(const int32_t width, const int32_t height, const int32_t poc) {
+videoframe_t * kvz_videoframe_alloc(int32_t width,
+                                    int32_t height,
+                                    enum kvz_chroma_format chroma_format)
+{
   videoframe_t *frame = MALLOC(videoframe_t, 1);
 
   if (!frame) return 0;
@@ -54,7 +57,9 @@ videoframe_t *kvz_videoframe_alloc(const int32_t width, const int32_t height, co
   frame->coeff_y = NULL; frame->coeff_u = NULL; frame->coeff_v = NULL;
 
   frame->sao_luma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
-  frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
+  if (chroma_format != KVZ_CSP_400) {
+    frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
+  }
 
   return frame;
 }

@@ -35,6 +35,7 @@ typedef struct {
   kvz_pixel y[LCU_LUMA_SIZE];
   kvz_pixel u[LCU_CHROMA_SIZE];
   kvz_pixel v[LCU_CHROMA_SIZE];
+  enum kvz_chroma_format chroma_format;
 } lcu_yuv_t;
 
 typedef struct {
@@ -52,7 +53,8 @@ typedef struct {
 } yuv_t;
 
 
-kvz_picture *kvz_image_alloc(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc_420(const int32_t width, const int32_t height);
+kvz_picture *kvz_image_alloc(enum kvz_chroma_format chroma_format, const int32_t width, const int32_t height);
 
 void kvz_image_free(kvz_picture *im);
 
@@ -64,7 +66,7 @@ kvz_picture *kvz_image_make_subimage(kvz_picture *const orig_image,
                              const unsigned width,
                              const unsigned height);
 
-yuv_t * kvz_yuv_t_alloc(int luma_size);
+yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size);
 void kvz_yuv_t_free(yuv_t * yuv);
 
 hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size);

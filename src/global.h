@@ -249,7 +249,7 @@ typedef int16_t coeff_t;
 #define EXP_GOLOMB_TABLE_SIZE (4096*8)
 
 //Constants
-typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V, NUM_COLORS } color_t;
+typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 
 
 // Hardware data (abstraction of defines). Extend for other compilers

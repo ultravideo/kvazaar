@@ -748,16 +748,29 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
   int32_t merge_cost_luma[3] = { INT32_MAX };
   int32_t merge_cost_chroma[3] = { INT32_MAX };
   sao_info_t *sao_luma = &frame->sao_luma[lcu_y * stride + lcu_x];
-  sao_info_t *sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
+  sao_info_t *sao_chroma = NULL;
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    sao_chroma = &frame->sao_chroma[lcu_y * stride + lcu_x];
+  }
 
   // Merge candidates
   sao_info_t *sao_top_luma    = lcu_y != 0 ? &frame->sao_luma  [(lcu_y - 1) * stride + lcu_x] : NULL;
   sao_info_t *sao_left_luma   = lcu_x != 0 ? &frame->sao_luma  [lcu_y       * stride + lcu_x - 1] : NULL;
-  sao_info_t *sao_top_chroma  = lcu_y != 0 ? &frame->sao_chroma[(lcu_y - 1) * stride + lcu_x] : NULL;
-  sao_info_t *sao_left_chroma = lcu_x != 0 ? &frame->sao_chroma[lcu_y       * stride + lcu_x - 1] : NULL;
+  sao_info_t *sao_top_chroma  = NULL;
+  sao_info_t *sao_left_chroma = NULL;
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    if (lcu_y != 0) sao_top_chroma =  &frame->sao_chroma[(lcu_y - 1) * stride + lcu_x];
+    if (lcu_x != 0) sao_left_chroma = &frame->sao_chroma[lcu_y       * stride + lcu_x - 1];
+  }
 
   sao_search_luma(state, frame, lcu_x, lcu_y, sao_luma, sao_top_luma, sao_left_luma, merge_cost_luma);
-  sao_search_chroma(state, frame, lcu_x, lcu_y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    sao_search_chroma(state, frame, lcu_x, lcu_y, sao_chroma, sao_top_chroma, sao_left_chroma, merge_cost_chroma);
+  } else {
+    merge_cost_chroma[0] = 0;
+    merge_cost_chroma[1] = 0;
+    merge_cost_chroma[2] = 0;
+  }
 
   sao_luma->merge_up_flag = sao_luma->merge_left_flag = 0;
   // Check merge costs
@@ -765,7 +778,7 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
     // Merge up if cost is equal or smaller to the searched mode cost
     if (merge_cost_luma[2] + merge_cost_chroma[2] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
       *sao_luma = *sao_top_luma;
-      *sao_chroma = *sao_top_chroma;
+      if (sao_top_chroma) *sao_chroma = *sao_top_chroma;
       sao_luma->merge_up_flag = 1;
       sao_luma->merge_left_flag = 0;
     }
@@ -776,17 +789,19 @@ void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y
     if (merge_cost_luma[1] + merge_cost_chroma[1] <= merge_cost_luma[0] + merge_cost_chroma[0]) {
       if (!sao_luma->merge_up_flag || merge_cost_luma[1] + merge_cost_chroma[1] < merge_cost_luma[2] + merge_cost_chroma[2]) {
         *sao_luma = *sao_left_luma;
-        *sao_chroma = *sao_left_chroma;
+        if (sao_left_chroma) *sao_chroma = *sao_left_chroma;
         sao_luma->merge_left_flag = 1;
         sao_luma->merge_up_flag = 0;
       }
     }
   }
   assert(sao_luma->eo_class < SAO_NUM_EO);
-  assert(sao_chroma->eo_class < SAO_NUM_EO);
-
   CHECKPOINT_SAO_INFO("sao_luma", *sao_luma);
-  CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
+
+  if (sao_chroma) {
+    assert(sao_chroma->eo_class < SAO_NUM_EO);
+    CHECKPOINT_SAO_INFO("sao_chroma", *sao_chroma);
+  }
 }
 
 void kvz_sao_reconstruct_frame(encoder_state_t * const state)
@@ -798,27 +813,36 @@ void kvz_sao_reconstruct_frame(encoder_state_t * const state)
   // top LCUs. Single pixel wide buffers, like what kvz_search_lcu takes, would
   // be enough though.
   kvz_pixel *new_y_data = MALLOC(kvz_pixel, frame->rec->width * frame->rec->height);
-  kvz_pixel *new_u_data = MALLOC(kvz_pixel, (frame->rec->width * frame->rec->height) >> 2);
-  kvz_pixel *new_v_data = MALLOC(kvz_pixel, (frame->rec->width * frame->rec->height) >> 2);
-  
   kvz_pixels_blit(frame->rec->y, new_y_data, frame->rec->width, frame->rec->height, frame->rec->stride, frame->rec->width);
-  kvz_pixels_blit(frame->rec->u, new_u_data, frame->rec->width/2, frame->rec->height/2, frame->rec->stride/2, frame->rec->width/2);
-  kvz_pixels_blit(frame->rec->v, new_v_data, frame->rec->width/2, frame->rec->height/2, frame->rec->stride/2, frame->rec->width/2);
-
   for (lcu.y = 0; lcu.y < frame->height_in_lcu; lcu.y++) {
     for (lcu.x = 0; lcu.x < frame->width_in_lcu; lcu.x++) {
       unsigned stride = frame->width_in_lcu;
       sao_info_t *sao_luma = &frame->sao_luma[lcu.y * stride + lcu.x];
-      sao_info_t *sao_chroma = &frame->sao_chroma[lcu.y * stride + lcu.x];
-
+      
       // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
       kvz_sao_reconstruct(state->encoder_control, frame, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
-      kvz_sao_reconstruct(state->encoder_control, frame, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
-      kvz_sao_reconstruct(state->encoder_control, frame, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
     }
   }
-
   free(new_y_data);
-  free(new_u_data);
-  free(new_v_data);
+
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    kvz_pixel *new_u_data = MALLOC(kvz_pixel, (frame->rec->width * frame->rec->height) >> 2);
+    kvz_pixel *new_v_data = MALLOC(kvz_pixel, (frame->rec->width * frame->rec->height) >> 2);
+
+    kvz_pixels_blit(frame->rec->u, new_u_data, frame->rec->width / 2, frame->rec->height / 2, frame->rec->stride / 2, frame->rec->width / 2);
+    kvz_pixels_blit(frame->rec->v, new_v_data, frame->rec->width / 2, frame->rec->height / 2, frame->rec->stride / 2, frame->rec->width / 2);
+
+    for (lcu.y = 0; lcu.y < frame->height_in_lcu; lcu.y++) {
+      for (lcu.x = 0; lcu.x < frame->width_in_lcu; lcu.x++) {
+        unsigned stride = frame->width_in_lcu;
+        sao_info_t *sao_chroma = &frame->sao_chroma[lcu.y * stride + lcu.x];
+
+        kvz_sao_reconstruct(state->encoder_control, frame, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
+        kvz_sao_reconstruct(state->encoder_control, frame, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
+      }
+    }
+
+    free(new_u_data);
+    free(new_v_data);
+  }
 }
