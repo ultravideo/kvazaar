@@ -78,7 +78,7 @@ static void swap_16b_buffer_bytes(kvz_pixel* input, int size)
 
 static void shift_to_bitdepth(kvz_pixel* input, int size, int from_bitdepth, int to_bitdepth)
 {
-  int shift = from_bitdepth - to_bitdepth;
+  int shift = to_bitdepth - from_bitdepth;
   for (int i = 0; i < size; ++i) {
     // Shifting by a negative number is undefined.
     if (shift > 0) {
