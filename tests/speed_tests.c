@@ -126,8 +126,9 @@ TEST test_intra_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
 
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s:%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     test_env.strategy->strategy_name);
   PASSm(test_env.msg);
@@ -166,8 +167,9 @@ TEST test_intra_dual_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
 
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s:%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     test_env.strategy->strategy_name);
   PASSm(test_env.msg);
@@ -210,8 +212,9 @@ TEST test_inter_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
 
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s(%ix%i):%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     width,
     width,
@@ -261,8 +264,9 @@ TEST dct_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
   
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s:%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     test_env.strategy->strategy_name);
   PASSm(test_env.msg);
