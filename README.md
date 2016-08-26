@@ -106,6 +106,9 @@ Optional parameters:
                                      "sensitive": Sensitive early termination is on
           --lossless             : Use lossless coding
           --no-tmvp              : Disable Temporal Motion Vector Prediction
+          --rdoq-skip            : Skips unnecessary rdoq
+          --input-format         : P420 or P400
+          --input-bitdepth       : 8-16
 
   Video Usability Information:
           --sar <width:height>   : Specify Sample Aspect Ratio
