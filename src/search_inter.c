@@ -175,7 +175,7 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
 }
 
 
-static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *mvd, cabac_data_t* cabac)
+static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* cabac)
 {
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
@@ -1223,7 +1223,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                                 inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS],
                                 int16_t num_cand,
                                 unsigned ref_idx,
-                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, cabac_data_t*),
+                                uint32_t(*get_mvd_cost)(encoder_state_t * const, vector2d_t *, const cabac_data_t*),
                                 double *inter_cost,
                                 uint32_t *inter_bitcost)
 {
@@ -1363,11 +1363,11 @@ static void search_pu_inter_ref(encoder_state_t * const state,
 
     mvd_temp1.x = mv.x - mv_cand[0][0];
     mvd_temp1.y = mv.y - mv_cand[0][1];
-    cand1_cost = get_mvd_cost(state, &mvd_temp1, (cabac_data_t*)&state->cabac);
+    cand1_cost = get_mvd_cost(state, &mvd_temp1, &state->cabac);
 
     mvd_temp2.x = mv.x - mv_cand[1][0];
     mvd_temp2.y = mv.y - mv_cand[1][1];
-    cand2_cost = get_mvd_cost(state, &mvd_temp2, (cabac_data_t*)&state->cabac);
+    cand2_cost = get_mvd_cost(state, &mvd_temp2, &state->cabac);
 
     // Select candidate 1 if it has lower cost
     if (cand2_cost < cand1_cost) {
@@ -1448,7 +1448,7 @@ static void search_pu_inter(encoder_state_t * const state,
                                               merge_cand,
                                               lcu);
 
-  uint32_t(*get_mvd_cost)(encoder_state_t * const state, vector2d_t *, cabac_data_t*) = get_mvd_coding_cost;
+  uint32_t(*get_mvd_cost)(encoder_state_t * const state, vector2d_t *, const cabac_data_t*) = get_mvd_coding_cost;
   if (state->encoder_control->cfg->mv_rdo) {
     get_mvd_cost = kvz_get_mvd_coding_cost_cabac;
   }

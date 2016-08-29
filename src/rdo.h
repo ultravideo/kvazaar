@@ -52,7 +52,7 @@ uint32_t kvz_get_coded_level(encoder_state_t * state, double* coded_cost, double
 
 kvz_mvd_cost_func kvz_calc_mvd_cost_cabac;
 
-uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, cabac_data_t* cabac);
+uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* cabac);
 
 uint8_t kvz_skip_unnecessary_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
               int32_t height, int8_t type, int8_t scan_mode, int8_t block_type);
