@@ -39,16 +39,6 @@ static unsigned kvz_sad_32x32_avx(const kvz_pixel *data1, const kvz_pixel *data2
   return sad;
 }
 
-static unsigned kvz_sad_32x32_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride)
-{
-  unsigned sad = 0;
-  sad += kvz_sad_16x16_stride_avx(data1, data2, stride);
-  sad += kvz_sad_16x16_stride_avx(data1 + 16, data2 + 16, stride);
-  sad += kvz_sad_16x16_stride_avx(data1 + 16 * stride, data2 + 16 * stride, stride);
-  sad += kvz_sad_16x16_stride_avx(data1 + 16 * stride + 16, data2 + 16 * stride + 16, stride);
-  return sad;
-}
-
 static unsigned kvz_sad_64x64_avx(const kvz_pixel *data1, const kvz_pixel *data2)
 {
   unsigned sad = 0;
@@ -56,16 +46,6 @@ static unsigned kvz_sad_64x64_avx(const kvz_pixel *data1, const kvz_pixel *data2
   sad += kvz_sad_32x32_avx(data1 + 16 * 64, data2 + 16 * 64);
   sad += kvz_sad_32x32_avx(data1 + 32 * 64, data2 + 32 * 64);
   sad += kvz_sad_32x32_avx(data1 + 48 * 64, data2 + 48 * 64);
-  return sad;
-}
-
-static unsigned kvz_sad_64x64_stride_avx(const kvz_pixel *data1, const kvz_pixel *data2, unsigned stride)
-{
-  unsigned sad = 0;
-  sad += kvz_sad_32x32_stride_avx(data1, data2, stride);
-  sad += kvz_sad_32x32_stride_avx(data1 + 32, data2 + 32, stride);
-  sad += kvz_sad_32x32_stride_avx(data1 + 32 * stride, data2 + 32 * stride, stride);
-  sad += kvz_sad_32x32_stride_avx(data1 + 32 * stride + 32, data2 + 32 * stride + 32, stride);
   return sad;
 }
 
