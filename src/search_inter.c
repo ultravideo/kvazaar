@@ -184,28 +184,29 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
 
 static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* cabac)
 {
-  double bitcost = 0;
+  unsigned bitcost = 0;
   const vector2d_t abs_mvd = { abs(mvd->x), abs(mvd->y) };
 
-  bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.x > 0);
+  bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.x > 0);
   if (abs_mvd.x > 0) {
-    bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.x > 1);
+    bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.x > 1);
     if (abs_mvd.x > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2);
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2) << 15;
     }
-    bitcost += 1; // sign
+    bitcost += 1 << 15; // sign
   }
 
-  bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.y > 0);
+  bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.y > 0);
   if (abs_mvd.y > 0) {
-    bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.y > 1);
+    bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.y > 1);
     if (abs_mvd.y > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2);
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2) << 15;
     }
-    bitcost += 1; // sign
+    bitcost += 1 << 15; // sign
   }
 
-  return bitcost + 0.5;
+  // Round and shift back to integer bits.
+  return (bitcost + (1 << 14)) >> 15;
 }
 
 

@@ -57,7 +57,12 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
 uint8_t kvz_skip_unnecessary_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff, int32_t width,
               int32_t height, int8_t type, int8_t scan_mode, int8_t block_type);
 
+// Fixed points fractional bits, 16b.16b
+extern const uint32_t kvz_entropy_bits[128];
+#define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[(ctx)->uc_state ^ (val)]
+
+// Floating point fractional bits, derived from kvz_entropy_bits
 extern const float kvz_f_entropy_bits[128];
-#define CTX_ENTROPY_FBITS(ctx,val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
+#define CTX_ENTROPY_FBITS(ctx, val) kvz_f_entropy_bits[(ctx)->uc_state ^ (val)]
 
 #endif
