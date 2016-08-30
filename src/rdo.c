@@ -840,7 +840,8 @@ void  kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff
 * \returns int
 * Calculates cost of actual motion vectors using CABAC coding
 */
-uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, cabac_data_t* cabac) {
+uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* real_cabac)
+{
   uint32_t bitcost = 0;
   const int32_t mvd_hor = mvd->x;
   const int32_t mvd_ver = mvd->y;
@@ -850,7 +851,8 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
   const uint32_t mvd_ver_abs = abs(mvd_ver);
 
   cabac_data_t cabac_copy;
-  memcpy(&cabac_copy, cabac, sizeof(cabac_data_t));
+  memcpy(&cabac_copy, real_cabac, sizeof(cabac_data_t));
+  cabac_data_t *cabac = &cabac_copy;
   cabac->only_count = 1;
 
   cabac->cur_ctx = &(cabac->ctx.cu_mvd_model[0]);
@@ -875,9 +877,7 @@ uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t
     }
     CABAC_BIN_EP(cabac, (mvd_ver > 0) ? 0 : 1, "mvd_sign_flag_ver");
   }
-  bitcost = ((23 - cabac->bits_left) + (cabac->num_buffered_bytes << 3)) - ((23 - cabac_copy.bits_left) + (cabac_copy.num_buffered_bytes << 3));
-
-  memcpy(cabac, &cabac_copy, sizeof(cabac_data_t));
+  bitcost = ((23 - cabac->bits_left) + (cabac->num_buffered_bytes << 3)) - ((23 - real_cabac->bits_left) + (real_cabac->num_buffered_bytes << 3));
 
   return bitcost;
 }
