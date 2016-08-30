@@ -126,8 +126,50 @@ TEST test_intra_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
 
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s:%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
+    test_env.strategy->type,
+    test_env.strategy->strategy_name);
+  PASSm(test_env.msg);
+}
+
+
+TEST test_intra_dual_speed(const int width)
+{
+  const int size = width * width;
+  uint64_t call_cnt = 0;
+  KVZ_CLOCK_T clock_now;
+  KVZ_GET_TIME(&clock_now);
+  double test_end = KVZ_CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
+
+  // Loop until time allocated for test has passed.
+  for (unsigned i = 0;
+    test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
+    ++i)
+  {
+    int test = i % NUM_TESTS;
+    uint64_t sum = 0;
+    for (int offset = 0; offset < NUM_CHUNKS * 64 * 64; offset += NUM_CHUNKS * size) {
+      // Compare the first chunk against the 35 other chunks to simulate real usage.
+      kvz_pixel * buf1 = &bufs[test][offset];
+      for (int chunk = 0; chunk < NUM_CHUNKS; chunk += 2) {
+        cost_pixel_nxn_multi_func *tested_func = test_env.tested_func;
+        const kvz_pixel *buf_pair[2] = { &bufs[test][chunk * size + offset], &bufs[test][(chunk + 1) * size + offset] };
+        unsigned costs[2] = { 0, 0 };
+        tested_func((pred_buffer)buf_pair, buf1, 2, costs);
+        sum += costs[0] + costs[1];
+        ++call_cnt;
+      }
+    }
+
+    ASSERT(sum > 0);
+    KVZ_GET_TIME(&clock_now)
+  }
+
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
+  sprintf(test_env.msg, "%.3fM x %s:%s",
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     test_env.strategy->strategy_name);
   PASSm(test_env.msg);
@@ -170,8 +212,9 @@ TEST test_inter_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
 
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s(%ix%i):%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     width,
     width,
@@ -221,8 +264,9 @@ TEST dct_speed(const int width)
     KVZ_GET_TIME(&clock_now)
   }
   
+  double test_time = TIME_PER_TEST + KVZ_CLOCK_T_AS_DOUBLE(clock_now) - test_end;
   sprintf(test_env.msg, "%.3fM x %s:%s",
-    (double)call_cnt / 1000000.0,
+    (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     test_env.strategy->strategy_name);
   PASSm(test_env.msg);
@@ -236,10 +280,24 @@ TEST intra_sad(void)
 }
 
 
+TEST intra_sad_dual(void)
+{
+  const int width = 1 << test_env.log_width;
+  return test_intra_dual_speed(width);
+}
+
+
 TEST intra_satd(void)
 {
   const int width = 1 << test_env.log_width;
   return test_intra_speed(width);
+}
+
+
+TEST intra_satd_dual(void)
+{
+  const int width = 1 << test_env.log_width;
+  return test_intra_dual_speed(width);
 }
 
 
@@ -279,47 +337,17 @@ SUITE(speed_tests)
   for (unsigned i = 0; i < strategies.count; ++i) {
     const strategy_t * strategy = &strategies.strategies[i];
 
-    // Select buffer width according to function name for intra cost functions.
-    if (strcmp(strategy->type, "sad_4x4") == 0) {
+    // Select buffer width according to function name.
+    if (strstr(strategy->type, "_4x4")) {
       test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "sad_8x8") == 0) {
+    } else if (strstr(strategy->type, "_8x8")) {
       test_env.log_width = 3;
-    } else if (strcmp(strategy->type, "sad_16x16") == 0) {
+    } else if (strstr(strategy->type, "_16x16")) {
       test_env.log_width = 4;
-    } else if (strcmp(strategy->type, "sad_32x32") == 0) {
+    } else if (strstr(strategy->type, "_32x32")) {
       test_env.log_width = 5;
-    } else if (strcmp(strategy->type, "sad_64x64") == 0) {
+    } else if (strstr(strategy->type, "_64x64")) {
       test_env.log_width = 6;
-    } else if (strcmp(strategy->type, "satd_4x4") == 0) {
-      test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "satd_8x8") == 0) {
-      test_env.log_width = 3;
-    } else if (strcmp(strategy->type, "satd_16x16") == 0) {
-      test_env.log_width = 4;
-    } else if (strcmp(strategy->type, "satd_32x32") == 0) {
-      test_env.log_width = 5;
-    } else if (strcmp(strategy->type, "satd_64x64") == 0) {
-      test_env.log_width = 6;
-    } else if (strcmp(strategy->type, "dct_4x4") == 0) {
-      test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "dct_8x8") == 0) {
-      test_env.log_width = 3;
-    } else if (strcmp(strategy->type, "dct_16x16") == 0) {
-      test_env.log_width = 4;
-    } else if (strcmp(strategy->type, "dct_32x32") == 0) {
-      test_env.log_width = 5;
-    } else if (strcmp(strategy->type, "idct_4x4") == 0) {
-      test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "idct_8x8") == 0) {
-      test_env.log_width = 3;
-    } else if (strcmp(strategy->type, "idct_16x16") == 0) {
-      test_env.log_width = 4;
-    } else if (strcmp(strategy->type, "idct_32x32") == 0) {
-      test_env.log_width = 5;
-    } else if (strcmp(strategy->type, "fast_forward_dst_4x4") == 0) {
-      test_env.log_width = 2;
-    } else if (strcmp(strategy->type, "fast_inverse_dst_4x4") == 0) {
-      test_env.log_width = 2;
     } else {
       test_env.log_width = 0;
     }
@@ -329,10 +357,18 @@ SUITE(speed_tests)
 
     // Call different tests depending on type of function.
     // This allows for selecting a subset of tests with -t parameter.
-    if (strncmp(strategy->type, "satd_", 5) == 0) {
-      RUN_TEST(intra_satd);
+    if (strncmp(strategy->type, "satd_", 5) == 0 && strcmp(strategy->type, "satd_any_size") != 0) {
+      if (strlen(strategy->type) <= 10) {
+        RUN_TEST(intra_satd);
+      } else if (strstr(strategy->type, "_dual")) {
+        RUN_TEST(intra_satd_dual);
+      }
     } else if (strncmp(strategy->type, "sad_", 4) == 0) {
-      RUN_TEST(intra_sad);
+      if (strlen(strategy->type) <= 9) {
+        RUN_TEST(intra_sad);
+      } else if (strstr(strategy->type, "_dual")) {
+        RUN_TEST(intra_sad_dual);
+      }
     } else if (strcmp(strategy->type, "reg_sad") == 0) {
       // Call reg_sad with all the sizes it is actually called with.
       for (int width = 3; width <= 6; ++width) {
