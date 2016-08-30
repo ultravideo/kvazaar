@@ -100,53 +100,16 @@ static INLINE bool intmv_within_tile(const encoder_state_t *state, const vector2
 }
 
 
-static uint32_t get_ep_ex_golomb_bitcost(uint32_t symbol)
+static unsigned get_ep_ex_golomb_bitcost(unsigned symbol)
 {
-  unsigned bins;
+  // Calculate 2 * log2(symbol + 2)
 
-  // Balanced decision tree based on a measurement of actual calls to this
-  // function on: --preset=ultrafast --me=tz --subme=4.
-  if (symbol >= 30) {
-    if (symbol >= 126) {
-      if (symbol < 254) {
-        bins = 14; // 21%
-      } else if (symbol < 510) {
-        bins = 16; // 19%
-      } else if (symbol < 1022) {
-        bins = 18; // 2%
-      } else if (symbol < 2046) {
-        bins = 20; // 0.1%
-      } else if (symbol < 4094) {
-        bins = 22; // 0%
-      } else if (symbol < 8190) {
-        bins = 24; // 0%
-      } else {
-        // Estimate bigger symbols with the current slope.
-        // (2 bits per 8192)
-        bins = 26 + (2 * (symbol - 8190) >> 13);
-      }
-    } else {
-      if (symbol >= 62) {
-        bins = 12; // 15%
-      } else {
-        bins = 10; // 11%
-      }
-    }
-  } else {
-    if (symbol >= 6) {
-      if (symbol >= 14) {
-        bins = 8; // 9%
-      } else {
-        bins = 6; // 8%
-      }
-    } else {
-      if (symbol >= 2) {
-        bins = 4; // 8%
-      } else {
-        bins = 2; // 8%
-      }
-    }
-  }
+  unsigned bins = 0;
+  symbol += 2;
+  if (symbol >= 1 << 8) { bins += 16; symbol >>= 8; }
+  if (symbol >= 1 << 4) { bins += 8; symbol >>= 4; }
+  if (symbol >= 1 << 2) { bins += 4; symbol >>= 2; }
+  if (symbol >= 1 << 1) { bins += 2; }
 
   // TODO: It might be a good idea to put a small slope on this function to
   // make sure any search function that follows the gradient heads towards
@@ -221,28 +184,29 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
 
 static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* cabac)
 {
-  double bitcost = 0;
+  unsigned bitcost = 0;
   const vector2d_t abs_mvd = { abs(mvd->x), abs(mvd->y) };
 
-  bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.x > 0);
+  bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.x > 0);
   if (abs_mvd.x > 0) {
-    bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.x > 1);
+    bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.x > 1);
     if (abs_mvd.x > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2);
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2) << 15;
     }
-    bitcost += 1; // sign
+    bitcost += 1 << 15; // sign
   }
 
-  bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.y > 0);
+  bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.y > 0);
   if (abs_mvd.y > 0) {
-    bitcost += CTX_ENTROPY_FBITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.y > 1);
+    bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.y > 1);
     if (abs_mvd.y > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2);
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2) << 15;
     }
-    bitcost += 1; // sign
+    bitcost += 1 << 15; // sign
   }
 
-  return bitcost + 0.5;
+  // Round and shift back to integer bits.
+  return (bitcost + (1 << 14)) >> 15;
 }
 
 

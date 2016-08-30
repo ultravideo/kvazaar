@@ -42,8 +42,6 @@
 const uint32_t kvz_g_go_rice_range[5] = { 7, 14, 26, 46, 78 };
 const uint32_t kvz_g_go_rice_prefix_len[5] = { 8, 7, 6, 5, 4 };
 
-
-#define CTX_ENTROPY_BITS(ctx,val) kvz_entropy_bits[(ctx)->uc_state ^ val]
 /**
  * Entropy bits to estimate coded bits in RDO / RDOQ (From HM 12.0)
  */
