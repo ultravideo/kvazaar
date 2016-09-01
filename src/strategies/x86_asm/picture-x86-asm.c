@@ -26,6 +26,7 @@
 #include "kvazaar.h"
 #include "strategies/x86_asm/picture-x86-asm-sad.h"
 #include "strategies/x86_asm/picture-x86-asm-satd.h"
+#include "strategies/sse41/picture-sse41.h"
 #include "strategyselector.h"
 
 
@@ -49,42 +50,50 @@ static unsigned kvz_sad_64x64_avx(const kvz_pixel *data1, const kvz_pixel *data2
   return sad;
 }
 
-static unsigned kvz_sad_other_avx(const kvz_pixel * const data1, const kvz_pixel * const data2,
-  const int width, const int height, const unsigned stride1, const unsigned stride2)
+static unsigned kvz_sad_other_avx(const kvz_pixel *data1, const kvz_pixel *data2,
+                                  int width, int height,
+                                  unsigned stride)
 {
-  int y, x;
   unsigned sad = 0;
 
-  for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; ++x) {
-      sad += abs(data1[y * stride1 + x] - data2[y * stride2 + x]);
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      sad += abs(data1[y * stride + x] - data2[y * stride + x]);
     }
   }
 
   return sad;
 }
 
-static unsigned reg_sad_x86_asm(const kvz_pixel * const data1, const kvz_pixel * const data2,
-const int width, const int height, const unsigned stride1, const unsigned stride2)
+static unsigned reg_sad_x86_asm(const kvz_pixel *data1, const kvz_pixel * data2,
+                                const int width, const int height,
+                                const unsigned stride1, const unsigned stride2)
 {
-  if (width == 4 && height == 4) {
-    return kvz_sad_4x4_stride_avx(data1, data2, stride1);
-  } else if (width == 8 && height == 8) {
-    return kvz_sad_8x8_stride_avx(data1, data2, stride1);
-  } else if (width == 16 && height == 16) {
-    return kvz_sad_16x16_stride_avx(data1, data2, stride1);
-  } else if (width == 32 && height == 32) {
-    return kvz_sad_32x32_stride_avx(data1, data2, stride1);
-  } else if (width == 64 && height == 64) {
-    return kvz_sad_64x64_stride_avx(data1, data2, stride1);
+  if (width == height) {
+    if (width == 8) {
+      return kvz_sad_8x8_stride_avx(data1, data2, stride1);
+    } else if (width == 16) {
+      return kvz_sad_16x16_stride_avx(data1, data2, stride1);
+    } else if (width == 32) {
+      return kvz_sad_32x32_stride_avx(data1, data2, stride1);
+    } else if (width == 64) {
+      return kvz_sad_64x64_stride_avx(data1, data2, stride1);
+    }
+  }
+
+  if (width * height >= 16) {
+    // Call the vectorized general SAD SSE41 function when the block
+    // is big enough to make it worth it.
+    return kvz_reg_sad_sse41(data1, data2, width, height, stride1, stride2);
   } else {
-    return kvz_sad_other_avx(data1, data2, width, height, stride1, stride2);
+    return kvz_sad_other_avx(data1, data2, width, height, stride1);
   }
 }
 
 #endif //defined(KVZ_COMPILE_ASM)
 
-int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth) {
+int kvz_strategy_register_picture_x86_asm_avx(void* opaque, uint8_t bitdepth)
+{
   bool success = true;
 #if defined(KVZ_COMPILE_ASM)
   if (bitdepth == 8){

@@ -28,8 +28,8 @@
 #include "strategyselector.h"
 
 
-static unsigned reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * const data2,
-                        const int width, const int height, const unsigned stride1, const unsigned stride2)
+unsigned kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                           const int width, const int height, const unsigned stride1, const unsigned stride2)
 {
   int y, x;
   unsigned sad = 0;
@@ -94,7 +94,7 @@ int kvz_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth) {
   bool success = true;
 #if COMPILE_INTEL_SSE41
   if (bitdepth == 8){
-    success &= kvz_strategyselector_register(opaque, "reg_sad", "sse41", 20, &reg_sad_sse41);
+    success &= kvz_strategyselector_register(opaque, "reg_sad", "sse41", 20, &kvz_reg_sad_sse41);
   }
 #endif
   return success;
