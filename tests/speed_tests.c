@@ -43,11 +43,18 @@
 static kvz_pixel * bufs[NUM_TESTS]; // SIMD aligned pointers.
 static kvz_pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
 
+#define WIDTH_4K 3840 
+#define HEIGHT_4K 2160
+
 static struct test_env_t {
-  int log_width; // for selecting dim from bufs
+  int log_width;
+  int log_height;
   void * tested_func;
   const strategy_t * strategy;
   char msg[1024];
+  
+  kvz_picture *inter_a;
+  kvz_picture *inter_b;
 } test_env;
 
 
@@ -83,6 +90,16 @@ static void setup_tests()
       init_gradient(width - x, y, width, 255 / width, &bufs[test][chunk * 64*64]);
     }
   }
+
+  test_env.inter_a = kvz_image_alloc(KVZ_CSP_420, WIDTH_4K, HEIGHT_4K);
+  test_env.inter_b = kvz_image_alloc(KVZ_CSP_420, WIDTH_4K, HEIGHT_4K);
+  for (unsigned i = 0; i < WIDTH_4K * HEIGHT_4K; ++i) {
+    kvz_pixel pattern1 = ((i*i >> 10) % 255) >> 2;
+    kvz_pixel pattern2 = ((i*i >> 15) % 255) >> 2;
+    kvz_pixel gradient = (i >> 12) + i;
+    test_env.inter_a->y[i] = (pattern1 + gradient) % PIXEL_MAX;
+    test_env.inter_b->y[i] = (pattern2 + gradient) % PIXEL_MAX;
+  }
 }
 
 static void tear_down_tests()
@@ -90,6 +107,8 @@ static void tear_down_tests()
   for (int test = 0; test < NUM_TESTS; ++test) {
     free(actual_bufs[test]);
   }
+  kvz_image_free(test_env.inter_a);
+  kvz_image_free(test_env.inter_b);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -176,38 +195,47 @@ TEST test_intra_dual_speed(const int width)
 }
 
 
-TEST test_inter_speed(const int width)
+TEST test_inter_speed(const int width, const int height)
 {
-  const int size = width * width;
   unsigned call_cnt = 0;
   KVZ_CLOCK_T clock_now;
   KVZ_GET_TIME(&clock_now);
   double test_end = KVZ_CLOCK_T_AS_DOUBLE(clock_now) + TIME_PER_TEST;
 
+  const vector2d_t dims_lcu = { WIDTH_4K / 64 - 2, HEIGHT_4K / 64 - 2 };
+  const int step = 3;
+  const int range = 2 * step;
+
   // Loop until time allocated for test has passed.
-  for (unsigned i = 0;
+  for (uint64_t i = 0;
       test_end > KVZ_CLOCK_T_AS_DOUBLE(clock_now);
       ++i)
   {
-    int test = i % NUM_TESTS;
+    // Do a sparse full search on the first CU of every LCU.
+    
     uint64_t sum = 0;
-    for (int offset = 0; offset < NUM_CHUNKS * 64 * 64; offset += NUM_CHUNKS * size) {
-      // Treat 4 consecutive chunks as one chunk with double width and height,
-      // and do a 8x8 grid search against the first chunk to simulate real usage.
-      kvz_pixel * buf1 = &bufs[test][offset];
-      for (int chunk = 0; chunk < NUM_CHUNKS; chunk += 4) {
-        kvz_pixel * buf2 = &bufs[test][chunk * size + offset];
-        for (int y = 0; y < 8; ++y) {
-          for (int x = 0; x < 8; ++x) {
-            const int stride1 = 2 * 64;
-            const int stride2 = 2 * 64;
-            reg_sad_func *tested_func = test_env.tested_func;
-            sum += tested_func(buf1, &buf2[y * stride2 + x], width, width, stride1, stride2);
-            ++call_cnt;
-          }
-        }
+
+    // Go through the non-edge LCU's in raster scan order.
+    const vector2d_t lcu = {
+      1 + i % dims_lcu.x,
+      1 + (i / dims_lcu.y) % dims_lcu.y,
+    };
+
+    vector2d_t mv;
+    for (mv.y = -range; mv.y <= range; mv.y += step) {
+      for (mv.x = -range; mv.x <= range; mv.x += step) {
+        reg_sad_func *tested_func = test_env.tested_func;
+
+        int lcu_index = lcu.y * 64 * WIDTH_4K + lcu.x * 64;
+        int mv_index = mv.y * WIDTH_4K + mv.x;
+        kvz_pixel *buf1 = &test_env.inter_a->y[lcu_index];
+        kvz_pixel *buf2 = &test_env.inter_a->y[lcu_index + mv_index];
+
+        sum += tested_func(buf1, buf2, width, height, WIDTH_4K, WIDTH_4K);
+        ++call_cnt;
       }
     }
+
     ASSERT(sum > 0);
     KVZ_GET_TIME(&clock_now)
   }
@@ -217,7 +245,7 @@ TEST test_inter_speed(const int width)
     (double)call_cnt / 1000000.0 / test_time,
     test_env.strategy->type,
     width,
-    width,
+    height,
     test_env.strategy->strategy_name);
   PASSm(test_env.msg);
 }
@@ -304,7 +332,8 @@ TEST intra_satd_dual(void)
 TEST inter_sad(void)
 {
   const int width = 1 << test_env.log_width;
-  return test_inter_speed(width);
+  const int height = 1 << test_env.log_height;
+  return test_inter_speed(width, height);
 }
 
 
@@ -340,14 +369,19 @@ SUITE(speed_tests)
     // Select buffer width according to function name.
     if (strstr(strategy->type, "_4x4")) {
       test_env.log_width = 2;
+      test_env.log_height = 2;
     } else if (strstr(strategy->type, "_8x8")) {
       test_env.log_width = 3;
+      test_env.log_height = 3;
     } else if (strstr(strategy->type, "_16x16")) {
       test_env.log_width = 4;
+      test_env.log_height = 4;
     } else if (strstr(strategy->type, "_32x32")) {
       test_env.log_width = 5;
+      test_env.log_height = 5;
     } else if (strstr(strategy->type, "_64x64")) {
       test_env.log_width = 6;
+      test_env.log_height = 6;
     } else {
       test_env.log_width = 0;
     }
@@ -373,6 +407,7 @@ SUITE(speed_tests)
       // Call reg_sad with all the sizes it is actually called with.
       for (int width = 3; width <= 6; ++width) {
         test_env.log_width = width;
+        test_env.log_height = width;
         RUN_TEST(inter_sad);
       }
     } else if (strncmp(strategy->type, "dct_", 4) == 0 ||
