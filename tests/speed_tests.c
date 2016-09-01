@@ -47,8 +47,8 @@ static kvz_pixel * actual_bufs[NUM_TESTS]; // pointers returned by malloc.
 #define HEIGHT_4K 2160
 
 static struct test_env_t {
-  int log_width;
-  int log_height;
+  int width;
+  int height;
   void * tested_func;
   const strategy_t * strategy;
   char msg[1024];
@@ -303,51 +303,43 @@ TEST dct_speed(const int width)
 
 TEST intra_sad(void)
 {
-  const int width = 1 << test_env.log_width;
-  return test_intra_speed(width);
+  return test_intra_speed(test_env.width);
 }
 
 
 TEST intra_sad_dual(void)
 {
-  const int width = 1 << test_env.log_width;
-  return test_intra_dual_speed(width);
+  return test_intra_dual_speed(test_env.width);
 }
 
 
 TEST intra_satd(void)
 {
-  const int width = 1 << test_env.log_width;
-  return test_intra_speed(width);
+  return test_intra_speed(test_env.width);
 }
 
 
 TEST intra_satd_dual(void)
 {
-  const int width = 1 << test_env.log_width;
-  return test_intra_dual_speed(width);
+  return test_intra_dual_speed(test_env.width);
 }
 
 
 TEST inter_sad(void)
 {
-  const int width = 1 << test_env.log_width;
-  const int height = 1 << test_env.log_height;
-  return test_inter_speed(width, height);
+  return test_inter_speed(test_env.width, test_env.height);
 }
 
 
 TEST fdct(void)
 {
-  const int width = 1 << test_env.log_width;
-  return dct_speed(width);
+  return dct_speed(test_env.width);
 }
 
 
 TEST idct(void)
 {
-  const int width = 1 << test_env.log_width;
-  return dct_speed(width);
+  return dct_speed(test_env.width);
 }
 
 
@@ -368,22 +360,23 @@ SUITE(speed_tests)
 
     // Select buffer width according to function name.
     if (strstr(strategy->type, "_4x4")) {
-      test_env.log_width = 2;
-      test_env.log_height = 2;
+      test_env.width = 4;
+      test_env.height = 4;
     } else if (strstr(strategy->type, "_8x8")) {
-      test_env.log_width = 3;
-      test_env.log_height = 3;
+      test_env.width = 8;
+      test_env.height = 8;
     } else if (strstr(strategy->type, "_16x16")) {
-      test_env.log_width = 4;
-      test_env.log_height = 4;
+      test_env.width = 16;
+      test_env.height = 16;
     } else if (strstr(strategy->type, "_32x32")) {
-      test_env.log_width = 5;
-      test_env.log_height = 5;
+      test_env.width = 32;
+      test_env.height = 32;
     } else if (strstr(strategy->type, "_64x64")) {
-      test_env.log_width = 6;
-      test_env.log_height = 6;
+      test_env.width = 64;
+      test_env.height = 64;
     } else {
-      test_env.log_width = 0;
+      test_env.width = 0;
+      test_env.height = 0;
     }
 
     test_env.tested_func = strategies.strategies[i].fptr;
@@ -404,12 +397,20 @@ SUITE(speed_tests)
         RUN_TEST(intra_sad_dual);
       }
     } else if (strcmp(strategy->type, "reg_sad") == 0) {
+      static const vector2d_t tested_dims[] = { 
+          { 8, 8 }, { 16, 16 }, { 32, 32 }, { 64, 64 },
+          { 64, 63 }, { 1, 1 }
+      };
+
+      int num_tested_dims = sizeof(tested_dims) / sizeof(*tested_dims);
+
       // Call reg_sad with all the sizes it is actually called with.
-      for (int width = 3; width <= 6; ++width) {
-        test_env.log_width = width;
-        test_env.log_height = width;
+      for (int dim_i = 0; dim_i < num_tested_dims; ++dim_i) {
+        test_env.width = tested_dims[dim_i].x;
+        test_env.height = tested_dims[dim_i].y;
         RUN_TEST(inter_sad);
       }
+
     } else if (strncmp(strategy->type, "dct_", 4) == 0 ||
                strcmp(strategy->type, "fast_forward_dst_4x4") == 0)
     {
