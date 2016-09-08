@@ -286,7 +286,7 @@ done:
       api->config_init(el_configs[el_layer_id]);
       *el_configs[el_layer_id] = *(opts->config); //Copy default values. TODO: Don't copy pointer (as reference), make a deep copy.
       el_configs[el_layer_id]->layer = el_layer_id+1;
-      el_configs[el_layer_id]->qp = 4;
+      el_configs[el_layer_id]->qp = 50;
       el_configs[el_layer_id]->width = opts->config->in_width;
       el_configs[el_layer_id]->height = opts->config->in_height;
     }

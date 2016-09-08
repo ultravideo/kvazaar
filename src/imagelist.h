@@ -49,6 +49,14 @@ int kvz_image_list_destroy(image_list_t *list);
 int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
 int kvz_image_list_rem(image_list_t *list, unsigned n);
 
+// ***********************************************
+  // Modified for SHVC
+
+int kvz_image_list_add_back(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
+
+// ***********************************************
+
+
 int kvz_image_list_copy_contents(image_list_t *target, image_list_t *source);
 
 enum { REF_PIC_LIST_0 = 0, REF_PIC_LIST_1 = 1, REF_PIC_LIST_X = 100 };
