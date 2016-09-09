@@ -380,7 +380,7 @@ int kvz_quantize_residual_avx2(encoder_state_t *const state,
   }
 
   // Quantize coeffs. (coeff -> quant_coeff)
-  if (state->encoder_control->rdoq_enable && !kvz_skip_unnecessary_rdoq(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2), scan_order, cur_cu->type)) {
+  if (state->encoder_control->rdoq_enable && (width > 4 || !state->encoder_control->cfg->rdoq_skip)) {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     kvz_rdoq(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),

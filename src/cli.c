@@ -397,7 +397,7 @@ void print_help(void)
     "                                     \"sensitive\": Sensitive early termination is on\n"
     "          --lossless             : Use lossless coding\n"
     "          --no-tmvp              : Disable Temporal Motion Vector Prediction\n"
-    "          --rdoq-skip            : Skips unnecessary rdoq\n"
+    "          --rdoq-skip            : Skips RDOQ for 4x4 blocks\n"
     "          --input-format         : P420 or P400\n"
     "          --input-bitdepth       : 8-16\n"
     "\n"
