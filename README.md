@@ -106,7 +106,7 @@ Optional parameters:
                                      "sensitive": Sensitive early termination is on
           --lossless             : Use lossless coding
           --no-tmvp              : Disable Temporal Motion Vector Prediction
-          --rdoq-skip            : Skips unnecessary rdoq
+          --rdoq-skip            : Skips RDOQ for 4x4 blocks
           --input-format         : P420 or P400
           --input-bitdepth       : 8-16
 
@@ -151,13 +151,6 @@ Optional parameters:
   Wpp:
           --wpp                  : Enable wavefront parallel processing
           --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.
-
-  Slices:
-          --slice-addresses <string>|u<int> :
-                                   Specifies a comma separated list of LCU
-                                   positions in tile scan order of tile separations.
-                                   Can also be u followed by and a single int n,
-                                   in which case it produces uniform slice length.
 
   Deprecated parameters: (might be removed at some point)
      Use --input-res:

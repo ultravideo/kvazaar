@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "August 2016" "kvazaar v0.8.3" "User Commands"
+.TH KVAZAAR "1" "September 2016" "kvazaar v0.8.3" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -180,7 +180,7 @@ Use lossless coding
 Disable Temporal Motion Vector Prediction
 .TP
 \fB\-\-rdoq\-skip           
-Skips unnecessary rdoq
+Skips RDOQ for 4x4 blocks
 .TP
 \fB\-\-input\-format        
 P420 or P400
@@ -255,12 +255,4 @@ Enable wavefront parallel processing
 .TP
 \fB\-\-owf <integer>|auto  
 Number of parallel frames to process. 0 to disable.
-
-.SS "Slices:"
-.TP
-\fB\-\-slice\-addresses <string>|u<int>
-Specifies a comma separated list of LCU
-positions in tile scan order of tile separations.
-Can also be u followed by and a single int n,
-in which case it produces uniform slice length.
 
