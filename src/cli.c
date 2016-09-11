@@ -113,6 +113,7 @@ static const struct option long_options[] = {
   { "tmvp",                     no_argument, NULL, 0 },
   { "no-tmvp",                  no_argument, NULL, 0 },
   { "rdoq-skip",                no_argument, NULL, 0 },
+  { "no-rdoq-skip",             no_argument, NULL, 0 },
   { "input-bitdepth",     required_argument, NULL, 0 },
   { "input-format",       required_argument, NULL, 0 },
   {0, 0, 0, 0}
