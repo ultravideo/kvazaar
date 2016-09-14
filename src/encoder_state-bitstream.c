@@ -972,11 +972,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
   state->frame->total_bits_coded += newpos - curpos;
 
-  if (encoder->cfg->gop_len > 0 && state->frame->gop_offset > 0) {
-    state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
-  } else {
-    state->frame->cur_gop_bits_coded = 0;
-  }
+  state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 

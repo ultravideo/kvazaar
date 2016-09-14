@@ -27,6 +27,8 @@
 
 
 static const int SMOOTHING_WINDOW = 40;
+static const double MIN_LAMBDA    = 0.1;
+static const double MAX_LAMBDA    = 10000;
 
 /**
  * \brief Update alpha and beta parameters.
@@ -45,7 +47,7 @@ static void update_rc_parameters(encoder_state_t * state)
   const double alpha_old = state->frame->rc_alpha;
   const double beta_old = state->frame->rc_beta;
   // lambda computed from real bpp
-  const double lambda_comp = CLIP(0.1, 10000, alpha_old * pow(bpp, beta_old));
+  const double lambda_comp = CLIP(MIN_LAMBDA, MAX_LAMBDA, alpha_old * pow(bpp, beta_old));
   // lambda used in encoding
   const double lambda_real = state->frame->cur_lambda_cost;
   const double lambda_log_ratio = log(lambda_real) - log(lambda_comp);
@@ -59,13 +61,10 @@ static void update_rc_parameters(encoder_state_t * state)
 
 /**
  * \brief Allocate bits for the current GOP.
- * \param state the main encoder state
- *
- * If GOPs are not used, allocates bits for a single picture.
- *
- * Sets the cur_gop_target_bits of the encoder state.
+ * \param state   the main encoder state
+ * \return        target number of bits
  */
-static void gop_allocate_bits(encoder_state_t * const state)
+static double gop_allocate_bits(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
@@ -83,20 +82,34 @@ static void gop_allocate_bits(encoder_state_t * const state)
     pictures_coded -= gop_offset + 1;
   }
 
+  // Equation 12 from https://doi.org/10.1109/TIP.2014.2336550
   double gop_target_bits =
     (encoder->target_avg_bppic * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
     * MAX(1, encoder->cfg->gop_len) / SMOOTHING_WINDOW;
-  state->frame->cur_gop_target_bits = MAX(200, gop_target_bits);
+  // Allocate at least 200 bits for each GOP like HM does.
+  return MAX(200, gop_target_bits);
 }
 
 /**
  * Allocate bits for the current picture.
- * \param state the main encoder state
- * \return target number of bits
+ * \param state   the main encoder state
+ * \return        target number of bits
  */
-static double pic_allocate_bits(const encoder_state_t * const state)
+static double pic_allocate_bits(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
+
+  if (encoder->cfg->gop_len == 0 ||
+      state->frame->gop_offset == 0 ||
+      state->frame->num == 0)
+  {
+    // A new GOP starts at this frame.
+    state->frame->cur_gop_target_bits = gop_allocate_bits(state);
+    state->frame->cur_gop_bits_coded  = 0;
+  } else {
+    state->frame->cur_gop_target_bits =
+      state->previous_encoder_state->frame->cur_gop_target_bits;
+  }
 
   if (encoder->cfg->gop_len <= 0) {
     return state->frame->cur_gop_target_bits;
@@ -105,13 +118,14 @@ static double pic_allocate_bits(const encoder_state_t * const state)
   const double pic_weight = encoder->gop_layer_weights[
     encoder->cfg->gop[state->frame->gop_offset].layer - 1];
   double pic_target_bits = state->frame->cur_gop_target_bits * pic_weight;
+  // Allocate at least 100 bits for each picture like HM does.
   return MAX(100, pic_target_bits);
 }
 
 /**
  * \brief Select a lambda value for encoding the next picture
- * \param state the main encoder state
- * \return lambda for the next picture
+ * \param state   the main encoder state
+ * \return        lambda for the next picture
  *
  * Rate control must be enabled (i.e. cfg->target_bitrate > 0) when this
  * function is called.
@@ -127,24 +141,11 @@ double kvz_select_picture_lambda(encoder_state_t * const state)
     update_rc_parameters(state);
   }
 
-  if (encoder->cfg->gop_len == 0 ||
-      state->frame->gop_offset == 0 ||
-      state->frame->num == 0)
-  {
-    // A new GOP begins at this frame.
-    gop_allocate_bits(state);
-  } else {
-    state->frame->cur_gop_target_bits =
-      state->previous_encoder_state->frame->cur_gop_target_bits;
-  }
-
   // TODO: take the picture headers into account
-  const double target_bits_current_picture = pic_allocate_bits(state);
-  const double target_bits_per_pixel =
-    target_bits_current_picture / encoder->in.pixels_per_pic;
-  const double lambda =
-    state->frame->rc_alpha * pow(target_bits_per_pixel, state->frame->rc_beta);
-  return CLIP(0.1, 10000, lambda);
+  const double pic_target_bits = pic_allocate_bits(state);
+  const double target_bpp = pic_target_bits / encoder->in.pixels_per_pic;
+  const double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);
+  return CLIP(MIN_LAMBDA, MAX_LAMBDA, lambda);
 }
 
 int8_t kvz_lambda_to_QP(const double lambda)
