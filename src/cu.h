@@ -126,6 +126,13 @@ typedef struct
 
   uint16_t cbf;
 
+  /**
+   * \brief QP used for the CU.
+   *
+   * This is required for deblocking when per-LCU QPs are enabled.
+   */
+  uint8_t qp;
+
   union {
     struct {
       int8_t mode;

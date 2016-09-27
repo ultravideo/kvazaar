@@ -196,7 +196,76 @@ static void encode_sao(encoder_state_t * const state,
 }
 
 
-static void encoder_state_worker_encode_lcu(void * opaque) {
+/**
+ * \brief Sets the QP for each CU in state->tile->frame->cu_array.
+ *
+ * The QPs are used in deblocking.
+ *
+ * The delta QP for an LCU is coded when the first CU with coded block flag
+ * set is encountered. Hence, for the purposes of deblocking, all CUs
+ * before the first one with cbf set use state->ref_qp and all CUs after
+ * that use state->qp.
+ *
+ * \param state           encoder state
+ * \param x               x-coordinate of the left edge of the root CU
+ * \param y               y-coordinate of the top edge of the root CU
+ * \param depth           depth in the CU quadtree
+ * \param coeffs_coded    Used for tracking whether a CU with a residual
+ *                        has been encountered. Should be set to false at
+ *                        the top level.
+ * \return Whether there were any CUs with residual or not.
+ */
+static bool set_cu_qps(encoder_state_t *state, int x, int y, int depth, bool coeffs_coded)
+{
+  if (state->qp == state->ref_qp) {
+    // If the QPs are equal there is no need to care about the residuals.
+    coeffs_coded = true;
+  }
+
+  cu_info_t *cu = kvz_cu_array_at(state->tile->frame->cu_array, x, y);
+  const int cu_width = LCU_WIDTH >> depth;
+  coeffs_coded = coeffs_coded || cbf_is_set_any(cu->cbf, cu->depth);
+
+  if (!coeffs_coded && cu->depth > depth) {
+    // Recursively process sub-CUs.
+    const int d = cu_width >> 1;
+    coeffs_coded = set_cu_qps(state, x,     y,     depth + 1, coeffs_coded);
+    coeffs_coded = set_cu_qps(state, x + d, y,     depth + 1, coeffs_coded);
+    coeffs_coded = set_cu_qps(state, x,     y + d, depth + 1, coeffs_coded);
+    coeffs_coded = set_cu_qps(state, x + d, y + d, depth + 1, coeffs_coded);
+
+  } else {
+    if (!coeffs_coded && cu->tr_depth > depth) {
+      // The CU is split into smaller transform units. Check whether coded
+      // block flag is set for any of the TUs.
+      const int tu_width = LCU_WIDTH >> cu->tr_depth;
+      for (int y_scu = y; y_scu < y + cu_width; y_scu += tu_width) {
+        for (int x_scu = x; x_scu < x + cu_width; x_scu += tu_width) {
+          cu_info_t *tu = kvz_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
+          if (cbf_is_set_any(tu->cbf, cu->depth)) {
+            coeffs_coded = true;
+          }
+        }
+      }
+    }
+
+    // Set the correct QP for all state->tile->frame->cu_array elements in
+    // the area covered by the CU.
+    const int8_t qp = coeffs_coded ? state->qp : state->ref_qp;
+
+    for (int y_scu = y; y_scu < y + cu_width; y_scu += SCU_WIDTH) {
+      for (int x_scu = x; x_scu < x + cu_width; x_scu += SCU_WIDTH) {
+        kvz_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu)->qp = qp;
+      }
+    }
+  }
+
+  return coeffs_coded;
+}
+
+
+static void encoder_state_worker_encode_lcu(void * opaque)
+{
   const lcu_order_element_t * const lcu = opaque;
   encoder_state_t *state = lcu->encoder_state;
   const encoder_control_t * const encoder = state->encoder_control;
@@ -211,6 +280,10 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
   if (encoder->deblock_enable) {
+    if (encoder->cfg->target_bitrate > 0) {
+      set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, false);
+    }
+
     kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
