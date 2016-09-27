@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 
 
 kvz_config *kvz_config_alloc(void)
@@ -90,13 +91,14 @@ int kvz_config_init(kvz_config *cfg)
   cfg->tiles_width_split  = NULL;
   cfg->tiles_height_split = NULL;
   
-  cfg->wpp = 0;
+  cfg->wpp = 1;
   cfg->owf = -1;
   cfg->slice_count = 1;
   cfg->slice_addresses_in_ts = MALLOC(int32_t, 1);
   cfg->slice_addresses_in_ts[0] = 0;
   
-  cfg->threads = 0;
+  // Set number of threads to equal number of processors available.
+  cfg->threads = pthread_num_processors_np();
   cfg->cpuid = 1;
 
   // Defaults for what sizes of PUs are tried.
