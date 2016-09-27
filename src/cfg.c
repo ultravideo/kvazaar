@@ -1045,11 +1045,11 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->gop_len &&
-      cfg->intra_period &&
-      cfg->intra_period % cfg->gop_len != 0) {
+  if (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay &&
+      cfg->intra_period % cfg->gop_len != 0)
+  {
     fprintf(stderr,
-            "Input error: intra period (%d) not a multiple of gop length (%d)\n",
+            "Input error: intra period (%d) not a multiple of B-gop length (%d)\n",
             cfg->intra_period,
             cfg->gop_len);
     error = 1;
