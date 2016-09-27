@@ -36,41 +36,65 @@ static int size_of_wpp_ends(int threads)
 
 static int select_owf_auto(const kvz_config *const cfg)
 {
-  if (cfg->wpp) {
-    // If wpp is on, select owf such that less than 15% of the
-    // frame is covered by the are threads can not work at the same time.
+  if (cfg->intra_period == 1) {
+    if (cfg->wpp) {
+      // If wpp is on, select owf such that less than 15% of the
+      // frame is covered by the are threads can not work at the same time.
+      const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
+      const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
+
+      // Find the largest number of threads per frame that satifies the
+      // the condition: wpp start/stop inefficiency takes up  less than 15%
+      // of frame area.
+      int threads_per_frame = 1;
+      const int wpp_treshold = lcu_width * lcu_height * 15 / 100;
+      while ((threads_per_frame + 1) * 2 < lcu_width &&
+        threads_per_frame + 1 < lcu_height &&
+        size_of_wpp_ends(threads_per_frame + 1) < wpp_treshold) {
+        ++threads_per_frame;
+      }
+
+      const int threads = MAX(cfg->threads, 1);
+      const int frames = CEILDIV(threads, threads_per_frame);
+
+      // Convert from number of parallel frames to number of additional frames.
+      return CLIP(0, threads - 1, frames - 1);
+    } else {
+      // If wpp is not on, select owf such that there is enough
+      // tiles for twice the number of threads.
+
+      int tiles_per_frame = cfg->tiles_width_count * cfg->tiles_height_count;
+      int threads = (cfg->threads > 1 ? cfg->threads : 1);
+      int frames = CEILDIV(threads * 4, tiles_per_frame);
+
+      // Limit number of frames to 1.25x the number of threads for the case
+      // where there is only 1 tile per frame.
+      frames = CLIP(1, threads * 4 / 3, frames);
+      return frames - 1;
+    }
+  } else {
+    // Try and estimate a good number of parallel frames for inter.
     const int lcu_width = CEILDIV(cfg->width, LCU_WIDTH);
     const int lcu_height = CEILDIV(cfg->height, LCU_WIDTH);
+    int threads_per_frame = MIN(lcu_width / 2, lcu_height);
+    int threads = cfg->threads;
 
-    // Find the largest number of threads per frame that satifies the
-    // the condition: wpp start/stop inefficiency takes up  less than 15%
-    // of frame area.
-    int threads_per_frame = 1;
-    const int wpp_treshold = lcu_width * lcu_height * 15 / 100;
-    while ((threads_per_frame + 1) * 2 < lcu_width &&
-           threads_per_frame + 1 < lcu_height &&
-           size_of_wpp_ends(threads_per_frame + 1) < wpp_treshold)
-    {
-      ++threads_per_frame;
+    // If all threads fit into one frame, at least two parallel frames should
+    // be used to reduce the effect of WPP spin-up and wind-down.
+    int frames = 1;
+
+    while (threads > 0 && threads_per_frame > 0) {
+      frames += 1;
+      threads -= threads_per_frame;
+      threads_per_frame -= 2;
     }
 
-    const int threads = MAX(cfg->threads, 1);
-    const int frames = CEILDIV(threads, threads_per_frame);
-
-    // Convert from number of parallel frames to number of additional frames.
-    return CLIP(0, threads - 1, frames - 1);
-  } else {
-    // If wpp is not on, select owf such that there is enough
-    // tiles for twice the number of threads.
-
-    int tiles_per_frame= cfg->tiles_width_count * cfg->tiles_height_count;
-    int threads = (cfg->threads > 1 ? cfg->threads : 1);
-    int frames = CEILDIV(threads * 4, tiles_per_frame);
-
-    // Limit number of frames to 1.25x the number of threads for the case
-    // where there is only 1 tile per frame.
-    frames = CLIP(1, threads * 4 / 3, frames);
-    return frames - 1;
+    if (cfg->gop_lowdelay && cfg->gop_lp_definition.t > 1) {
+      // Temporal skipping makes every other frame very fast to encode so
+      // more parallel frames should be used.
+      frames *= 2;
+    }
+    return CLIP(0, cfg->threads * 2 - 1, frames - 1);
   }
 }
 
