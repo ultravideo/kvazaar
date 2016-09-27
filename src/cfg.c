@@ -54,13 +54,14 @@ int kvz_config_init(kvz_config *cfg)
   cfg->deblock_tc      = 0;
   cfg->sao_enable      = 1;
   cfg->rdoq_enable     = 1;
+  cfg->rdoq_skip       = 1;
   cfg->signhide_enable = true;
   cfg->smp_enable      = false;
   cfg->amp_enable      = false;
   cfg->rdo             = 1;
   cfg->mv_rdo          = 0;
   cfg->full_intra_search = 0;
-  cfg->trskip_enable   = 1;
+  cfg->trskip_enable   = 0;
   cfg->tr_depth_intra  = 0;
   cfg->ime_algorithm   = 0; /* hexbs */
   cfg->fme_level       = 4;
@@ -103,9 +104,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->cpuid = 1;
 
   // Defaults for what sizes of PUs are tried.
-  cfg->pu_depth_inter.min = 1; // 0-3
+  cfg->pu_depth_inter.min = 2; // 0-3
   cfg->pu_depth_inter.max = 3; // 0-3
-  cfg->pu_depth_intra.min = 1; // 0-4
+  cfg->pu_depth_intra.min = 2; // 0-4
   cfg->pu_depth_intra.max = 3; // 0-4
 
   cfg->add_encoder_info = true;
@@ -114,9 +115,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->mv_constraint = KVZ_MV_CONSTRAIN_NONE;
   cfg->crypto_features = KVZ_CRYPTO_OFF;
 
-  cfg->me_early_termination = 0;
-
-  cfg->rdoq_skip = 0;
+  cfg->me_early_termination = 1;
 
   cfg->input_format = KVZ_FORMAT_P420;
   cfg->input_bitdepth = 8;
