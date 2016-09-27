@@ -312,6 +312,11 @@ typedef struct kvz_config
 
   enum kvz_input_format input_format; /*!< \brief Use Temporal Motion Vector Predictors. */
   int32_t input_bitdepth; /*!< \brief Use Temporal Motion Vector Predictors. */
+
+  struct {
+    unsigned d;  // depth
+    unsigned t;  // temporal
+  } gop_lp_definition;
 } kvz_config;
 
 /**

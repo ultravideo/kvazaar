@@ -80,12 +80,22 @@ static int select_owf_auto(const kvz_config *const cfg)
  * \param cfg   encoder configuration
  * \return      initialized encoder control or NULL on failure
  */
-encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg) {
+encoder_control_t* kvz_encoder_control_init(kvz_config *const cfg) {
   encoder_control_t *encoder = NULL;
 
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
     goto init_failed;
+  }
+
+  if (cfg->gop_len > 0) {
+    if (cfg->tmvp_enable) {
+      cfg->tmvp_enable = false;
+      fprintf(stderr, "Disabling TMVP because GOP is used.\n");
+    }
+    if (cfg->gop_lowdelay) {
+      kvz_config_process_lp_gop(cfg);
+    }
   }
 
   // Make sure that the parameters make sense.
