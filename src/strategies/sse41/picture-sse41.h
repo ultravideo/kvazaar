@@ -27,7 +27,10 @@
  */
 
 #include "global.h" // IWYU pragma: keep
+#include "kvazaar.h"
 
+unsigned kvz_reg_sad_sse41(const kvz_pixel * const data1, const kvz_pixel * const data2,
+                           const int width, const int height, const unsigned stride1, const unsigned stride2);
 
 int kvz_strategy_register_picture_sse41(void* opaque, uint8_t bitdepth);
 

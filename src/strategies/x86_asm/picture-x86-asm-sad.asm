@@ -291,3 +291,83 @@ cglobal sad_16x16_stride, 3, 3, 5
     vmovd eax, m4
 
     RET
+
+
+;KVZ_SAD_32x32_STRIDE
+;Calculates SAD of a 32x32 block inside a frame with stride
+;r0 address of the first value(current)
+;r1 address of the first value(reference)
+;r2 stride
+cglobal sad_32x32_stride, 3, 3, 5
+    vpxor m4, m4
+
+	; Handle 2 lines per iteration
+    %rep 16
+        vmovdqu m0, [r0]
+        vmovdqu m1, [r0 + 16]
+        vmovdqu m2, [r0 + r2]
+        vmovdqu m3, [r0 + r2 + 16]
+        lea r0, [r0 + 2 * r2]
+
+        vpsadbw m0, [r1]
+        vpsadbw m1, [r1 + 16]
+        vpsadbw m2, [r1 + r2]
+        vpsadbw m3, [r1 + r2 + 16]
+        lea r1, [r1 + 2 * r2]
+ 
+        vpaddd m4, m0
+        vpaddd m4, m1
+        vpaddd m4, m2
+        vpaddd m4, m3
+    %endrep
+
+    vmovhlps m0, m4
+    vpaddd m4, m0
+
+    vmovd eax, m4
+
+    RET
+
+
+;KVZ_SAD_64x64_STRIDE
+;Calculates SAD of a 64x64 block inside a frame with stride
+;r0 address of the first value(current)
+;r1 address of the first value(reference)
+;r2 stride
+cglobal sad_64x64_stride, 3, 4, 5
+    vpxor m4, m4 ; sum accumulation register
+	mov r3, 4 ; number of iterations in the loop
+
+Process16Lines:
+	; Intel optimization manual says to not unroll beyond 500 instructions.
+	; Didn't seem to have much of an affect on Ivy Bridge or Haswell, but
+	; smaller is better, when speed is the same, right?
+    %rep 16
+        vmovdqu m0, [r0]
+        vmovdqu m1, [r0 + 1*16]
+        vmovdqu m2, [r0 + 2*16]
+        vmovdqu m3, [r0 + 3*16]
+
+        vpsadbw m0, [r1]
+        vpsadbw m1, [r1 + 1*16]
+        vpsadbw m2, [r1 + 2*16]
+        vpsadbw m3, [r1 + 3*16]
+
+        lea r0, [r0 + r2]
+        lea r1, [r1 + r2]
+ 
+        vpaddd m4, m0
+        vpaddd m4, m1
+        vpaddd m4, m2
+        vpaddd m4, m3
+    %endrep
+
+	dec r3
+	jnz Process16Lines
+
+    vmovhlps m0, m4
+    vpaddd m4, m0
+
+    vmovd eax, m4
+
+    RET
