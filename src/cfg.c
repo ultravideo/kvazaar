@@ -46,8 +46,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->framerate       = 25; // deprecated and will be removed.
   cfg->framerate_num   = 0;
   cfg->framerate_denom = 1;
-  cfg->qp              = 32;
-  cfg->intra_period    = 0;
+  cfg->qp              = 22;
+  cfg->intra_period    = 64;
   cfg->vps_period      = 0;
   cfg->deblock_enable  = 1;
   cfg->deblock_beta    = 0;
@@ -77,7 +77,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
   cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
-  cfg->gop_len         = 0;
+  cfg->gop_len         = 4;
+  cfg->gop_lowdelay    = true;
   cfg->bipred          = 0;
   cfg->target_bitrate  = 0;
   cfg->hash            = KVZ_HASH_CHECKSUM;
@@ -102,10 +103,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->cpuid = 1;
 
   // Defaults for what sizes of PUs are tried.
-  cfg->pu_depth_inter.min = 0; // 0-3
+  cfg->pu_depth_inter.min = 1; // 0-3
   cfg->pu_depth_inter.max = 3; // 0-3
   cfg->pu_depth_intra.min = 1; // 0-4
-  cfg->pu_depth_intra.max = 4; // 0-4
+  cfg->pu_depth_intra.max = 3; // 0-4
 
   cfg->add_encoder_info = true;
   cfg->calc_psnr = true;
@@ -120,8 +121,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->input_format = KVZ_FORMAT_P420;
   cfg->input_bitdepth = 8;
 
-  cfg->gop_lp_definition.d = 0;
-  cfg->gop_lp_definition.t = 0;
+  cfg->gop_lp_definition.d = 3;
+  cfg->gop_lp_definition.t = 1;
 
   return 1;
 }
