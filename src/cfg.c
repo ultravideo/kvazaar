@@ -969,14 +969,14 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
     kvz_gop_config *gop_pic = &cfg->gop[g - 1];
 
     // Find gop depth for picture.
-    int gop_layer = 0;
-    while (gop_layer < gop.d && (g % depth_modulos[gop_layer])) {
+    int gop_layer = 1;
+    while (gop_layer < gop.d && (g % depth_modulos[gop_layer - 1])) {
       ++gop_layer;
     }
 
     gop_pic->poc_offset = g;
-    gop_pic->layer = gop_layer + 1;
-    gop_pic->qp_offset = gop_layer + 1;
+    gop_pic->layer = gop_layer;
+    gop_pic->qp_offset = gop_layer;
     gop_pic->ref_pos_count = 0;
     gop_pic->ref_neg_count = cfg->ref_frames;
     gop_pic->is_ref = 0;
