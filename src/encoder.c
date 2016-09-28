@@ -24,6 +24,7 @@
 #include <stdlib.h>
 
 #include "cfg.h"
+#include "strategyselector.h"
 
 
 static int encoder_control_init_gop_layer_weights(encoder_control_t * const);
@@ -98,6 +99,21 @@ static int select_owf_auto(const kvz_config *const cfg)
   }
 }
 
+
+static unsigned cfg_num_threads(void)
+{
+  unsigned cpus = kvz_g_hardware_flags.physical_cpu_count;
+  unsigned fake_cpus = kvz_g_hardware_flags.logical_cpu_count - cpus;
+
+  // Default to 4 if we don't know the number of CPUs.
+  if (cpus == 0) return 4;
+
+  // 1.5 times the number of physical cores seems to be a good compromise
+  // when hyperthreading is available on Haswell.
+  return cpus + fake_cpus / 2;
+}
+
+
 /**
  * \brief Allocate and initialize an encoder control structure.
  *
@@ -110,6 +126,10 @@ encoder_control_t* kvz_encoder_control_init(kvz_config *const cfg) {
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
     goto init_failed;
+  }
+
+  if (cfg->threads == -1) {
+    cfg->threads = cfg_num_threads();
   }
 
   if (cfg->gop_len > 0) {
