@@ -312,7 +312,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   static const char * const me_early_termination_names[] = { "off", "on", "sensitive", NULL };
 
-  static const char * const preset_values[11][19*2] = {
+  static const char * const preset_values[11][20*2] = {
       { 
         "ultrafast", 
         "pu-depth-intra", "2-3",
@@ -333,6 +333,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "gop", "lp-g4d3t1",
         NULL 
       },
       { 
@@ -355,6 +356,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "gop", "lp-g4d3t1",
         NULL
       },
       {
@@ -377,6 +379,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "gop", "lp-g4d3t1",
         NULL
       },
       {
@@ -399,11 +402,35 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "sensitive",
+        "gop", "lp-g4d3t1",
         NULL
       },
       {
         "fast",
         "pu-depth-intra", "2-3",
+        "pu-depth-inter", "1-3",
+        "rd", "1",
+        "me", "hexbs",
+        "ref", "1",
+        "deblock", "0:0",
+        "signhide", "0",
+        "subme", "4",
+        "sao", "1",
+        "rdoq", "0",
+        "rdoq-skip", "1",
+        "transform-skip", "0",
+        "full-intra-search", "0",
+        "mv-rdo", "0",
+        "smp", "0",
+        "amp", "0",
+        "cu-split-termination", "zero",
+        "me-early-termination", "on",
+        "gop", "lp-g4d3t1",
+        NULL
+      },
+      {
+        "medium",
+        "pu-depth-intra", "1-3",
         "pu-depth-inter", "1-3",
         "rd", "1",
         "me", "hexbs",
@@ -421,37 +448,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
-        NULL
-      },
-      {
-        "medium",
-        "pu-depth-intra", "1-3",
-        "pu-depth-inter", "1-3",
-        "rd", "1",
-        "me", "hexbs",
-        "ref", "1",
-        "deblock", "0:0",
-        "signhide", "1",
-        "subme", "4",
-        "sao", "1",
-        "rdoq", "1",
-        "rdoq-skip", "1",
-        "transform-skip", "0",
-        "full-intra-search", "0",
-        "mv-rdo", "0",
-        "smp", "0",
-        "amp", "0",
-        "cu-split-termination", "zero",
-        "me-early-termination", "on",
+        "gop", "lp-g4d3t1",
         NULL
       },
       {
         "slow",
         "pu-depth-intra", "1-3",
-        "pu-depth-inter", "0-3",
+        "pu-depth-inter", "1-3",
         "rd", "1",
         "me", "hexbs",
-        "ref", "1",
+        "ref", "2",
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
@@ -465,15 +471,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
+        "gop", "lp-g4d2t1",
         NULL
       },
       {
         "slower",
-        "pu-depth-intra", "1-4",
+        "pu-depth-intra", "1-3",
         "pu-depth-inter", "0-3",
         "rd", "1",
         "me", "hexbs",
-        "ref", "3",
+        "ref", "2",
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
@@ -487,6 +494,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "amp", "0",
         "cu-split-termination", "zero",
         "me-early-termination", "on",
+        "gop", "lp-g4d2t1",
         NULL
       },
       {
@@ -494,28 +502,29 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
         "rd", "1",
-        "me", "tz",
+        "me", "hexbs",
         "ref", "3",
         "deblock", "0:0",
         "signhide", "1",
         "subme", "4",
         "sao", "1",
         "rdoq", "1",
-        "rdoq-skip", "0",
+        "rdoq-skip", "1",
         "transform-skip", "0",
         "full-intra-search", "0",
         "mv-rdo", "0",
         "smp", "0",
         "amp", "0",
-        "cu-split-termination", "off",
-        "me-early-termination", "off",
+        "cu-split-termination", "zero",
+        "me-early-termination", "on",
+        "gop", "lp-g4d2t1",
         NULL
       },
       {
         "placebo",
-        "pu-depth-intra", "0-4",
+        "pu-depth-intra", "1-4",
         "pu-depth-inter", "0-3",
-        "rd", "2",
+        "rd", "1",
         "me", "tz",
         "ref", "4",
         "deblock", "0:0",
@@ -525,12 +534,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         "rdoq", "1",
         "rdoq-skip", "0",
         "transform-skip", "1",
-        "full-intra-search", "1",
+        "full-intra-search", "0",
         "mv-rdo", "1",
         "smp", "1",
         "amp", "1",
         "cu-split-termination", "off",
         "me-early-termination", "off",
+        "gop", "lp-g4d2t1",
         NULL
       },
       { NULL }
