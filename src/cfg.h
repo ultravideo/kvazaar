@@ -36,6 +36,7 @@ kvz_config *kvz_config_alloc(void);
 int kvz_config_init(kvz_config *cfg);
 int kvz_config_destroy(kvz_config *cfg);
 int kvz_config_parse(kvz_config *cfg, const char *name, const char *value);
+void kvz_config_process_lp_gop(kvz_config *cfg);
 int kvz_config_validate(const kvz_config *cfg);
 
 #endif

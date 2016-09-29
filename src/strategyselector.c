@@ -24,6 +24,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#elif MACOS
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#else
+#include <unistd.h>
+#endif
+
 hardware_flags_t kvz_g_hardware_flags;
 hardware_flags_t kvz_g_strategies_in_use;
 hardware_flags_t kvz_g_strategies_available;
@@ -410,6 +419,7 @@ static void set_hardware_flags(int32_t cpuid) {
       CPUID1_EDX_MMX = 1 << 23,
       CPUID1_EDX_SSE = 1 << 25,
       CPUID1_EDX_SSE2 = 1 << 26,
+      CPUID1_EDX_HYPER_THREADING = 1 << 28,
     };
     enum {
       CPUID1_ECX_SSE3 = 1 << 0,
@@ -430,6 +440,21 @@ static void set_hardware_flags(int32_t cpuid) {
 
     // Dig CPU features with cpuid
     get_cpuid(1, 0, &cpuid1);
+
+#ifdef _WIN32
+    SYSTEM_INFO systeminfo;
+    GetSystemInfo(&systeminfo);
+
+    kvz_g_hardware_flags.logical_cpu_count = systeminfo.dwNumberOfProcessors;
+#else
+    kvz_g_hardware_flags.logical_cpu_count = sysconf(_SC_NPROCESSORS_ONLN);
+#endif
+
+    kvz_g_hardware_flags.physical_cpu_count = kvz_g_hardware_flags.logical_cpu_count;
+    kvz_g_hardware_flags.intel_flags.hyper_threading = cpuid1.edx & CPUID1_EDX_HYPER_THREADING;
+    if (kvz_g_hardware_flags.intel_flags.hyper_threading) {
+      kvz_g_hardware_flags.physical_cpu_count /= 2;
+    }
     
     // EDX
     if (cpuid1.edx & CPUID1_EDX_MMX)   kvz_g_hardware_flags.intel_flags.mmx = 1;

@@ -63,6 +63,8 @@ typedef struct {
     int sse42;
     int avx;
     int avx2;
+
+    bool hyper_threading;
   } intel_flags;
   
   struct {
@@ -72,6 +74,9 @@ typedef struct {
   struct {
     int neon;
   } arm_flags;
+
+  int logical_cpu_count;
+  int physical_cpu_count;
 } hardware_flags_t;
 
 extern hardware_flags_t kvz_g_hardware_flags;

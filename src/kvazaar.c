@@ -75,7 +75,9 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  encoder->control = kvz_encoder_control_init(cfg);
+  // FIXME: const qualifier disgarded. I don't want to change kvazaar_open
+  // but I really need to change cfg.
+  encoder->control = kvz_encoder_control_init((kvz_config*)cfg);
   if (!encoder->control) {
     goto kvazaar_open_failure;
   }
