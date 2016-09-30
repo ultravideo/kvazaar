@@ -460,7 +460,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
     WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
   } else {
-    WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
+  WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
   }
 
   //TODO: add QP offsets
@@ -704,10 +704,10 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     int last_poc = 0;
     int poc_shift = 0;
 
-    WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
-    WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
-    WRITE_UE(stream, ref_negative, "num_negative_pics");
-    WRITE_UE(stream, ref_positive, "num_positive_pics");
+      WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
+      WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
+      WRITE_UE(stream, ref_negative, "num_negative_pics");
+      WRITE_UE(stream, ref_positive, "num_positive_pics");
     for (j = 0; j < ref_negative; j++) {      
       int8_t delta_poc = 0;
       
@@ -777,18 +777,27 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
     }
   }
-
+    
   if (state->frame->slicetype != KVZ_SLICE_I) {
       WRITE_U(stream, 1, 1, "num_ref_idx_active_override_flag");
       WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
+      if (state->frame->slicetype == KVZ_SLICE_B) {
+        WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
+        WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+      }
+
+      // Temporal Motion Vector Prediction flags
+      if (state->encoder_control->cfg->tmvp_enable && ref_negative > 1) {
         if (state->frame->slicetype == KVZ_SLICE_B) {
-          WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
-          WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+          // Always use L0 for prediction
+          WRITE_U(stream, 1, 1, "collocated_from_l0_flag");
         }
 
-      // ToDo: handle B-frames with TMVP
-      if (state->encoder_control->cfg.tmvp_enable && ref_negative > 1) {
-        WRITE_UE(stream, 0, "collocated_ref_idx");
+        if (ref_negative > 1) {
+          // Use first reference from L0
+          // ToDo: use better reference
+          WRITE_UE(stream, 0, "collocated_ref_idx");
+        }
       }
 
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
@@ -852,7 +861,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     if (state->is_leaf) {
       num_entry_points = 1;
     } else {
-      encoder_state_entry_points_explore(state, &num_entry_points, &max_length_seen);
+    encoder_state_entry_points_explore(state, &num_entry_points, &max_length_seen);
     }
     
     int num_offsets = num_entry_points - 1;
@@ -1031,7 +1040,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
   state->frame->total_bits_coded += newpos - curpos;
 
-  state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
+    state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 

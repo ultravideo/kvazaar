@@ -679,7 +679,7 @@ static void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * cons
     for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
       int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
 
-      td = td < 0 ? -td : td;
+      td = td < 0 ? UINT_MAX : td;
       if (td < poc_diff) {
         closest_ref = temporal_cand;
         poc_diff = td;
@@ -1088,12 +1088,12 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
   if (state->encoder_control->cfg.tmvp_enable) {
     /*
     Predictor block locations
-    _________
+    __________
     |CurrentPU|
     | |C0|__  |
     |    |C3| |
     |_________|_
-    |H|
+              |H|
     */
 
     // Find temporal reference, closest POC
@@ -1102,7 +1102,7 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
 
       for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
         int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
-        td = td < 0 ? -td : td;
+        td = td < 0 ? UINT_MAX : td;
         if (td < poc_diff) {
           poc_diff = td;
         }
@@ -1113,6 +1113,10 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
       if (selected_CU) {
         int td = selected_CU->inter.mv_ref[reflist] + 1;
         int tb = cur_cu->inter.mv_ref[reflist] + 1;
+        // If the selected CU does not have the correct list (L0/L1) vector, use the other
+        if (!selected_CU->inter.mv_dir & (1 << reflist)) {
+          td = selected_CU->inter.mv_ref[reflist2nd] + 1;
+        }
 
         int scale = CALCULATE_SCALE(NULL, tb, td);
         mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
@@ -1330,18 +1334,32 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
 
       if (selected_CU) {
+        uint32_t poc_diff = UINT_MAX;
+        for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+          int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
+          td = td < 0 ? UINT_MAX : td;
+          if (td < poc_diff) {
+            poc_diff = td;
+          }
+        }
+
         int td = selected_CU->inter.mv_ref[0] + 1;
-        int tb = 1;
+        int tb = poc_diff;
 
         int scale = CALCULATE_SCALE(NULL, tb, td);
-        mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-        mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
 
-        /*
-        ToDo: temporal prediction in B-pictures
-        mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[1][0];
-        mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[1][1];
-        */
+        // L0 list
+        if (selected_CU->inter.mv_dir & 0x1) {
+          mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+          mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+        }
+
+        // L1 list
+        if (selected_CU->inter.mv_dir & 0x2) {
+          mv_cand[candidates].mv[1][0] = ((scale * selected_CU->inter.mv[1][0] + 127 + (scale * selected_CU->inter.mv[1][0] < 0)) >> 8);
+          mv_cand[candidates].mv[1][1] = ((scale * selected_CU->inter.mv[1][1] + 127 + (scale * selected_CU->inter.mv[1][1] < 0)) >> 8);
+        }
+
         mv_cand[candidates].dir = selected_CU->inter.mv_dir;
         mv_cand[candidates].ref[0] = 0;
         candidates++;
