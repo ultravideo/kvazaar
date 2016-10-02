@@ -183,23 +183,26 @@ superfast, veryfast, faster, fast, medium, slow, slower, veryslow and
 placebo. The effects of the presets are listed in the following table,
 where the names have been abbreviated to fit the layout in GitHub.
 
-                  | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p
------------------ | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -----
-rd                | 0     | 1     | 1     | 1     | 1     | 1     | 2     | 2     | 2     | 3
-pu-depth-intra    | 2-3   | 1-3   | 1-3   | 1-3   | 1-3   | 1-4   | 1-4   | 1-4   | 1-4   | 0-4
-pu-depth-inter    | 1-3   | 1-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3   | 0-3
-me                | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz    | tz    | tz
-ref               | 1     | 1     | 2     | 2     | 2     | 3     | 3     | 4     | 4     | 6
-deblock           | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1
-signhide          | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1
-subme             | 0     | 0     | 0     | 0     | 4     | 4     | 4     | 4     | 4     | 4
-sao               | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1
-rdoq              | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1
-transform-skip    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1
-mv-rdo            | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1
-full-intra-search | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
-smp               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
-amp               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
+                     | 0-uf  | 1-sf  | 2-vf  | 3-fr  | 4-f   | 5-m   | 6-s   | 7-sr  | 8-vs  | 9-p
+-------------------- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | ----- | -----
+rd                   | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1
+pu-depth-intra       | 2-3   | 2-3   | 2-3   | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 1-4   | 1-4
+pu-depth-inter       | 2-3   | 2-3   | 2-3   | 1-3   | 1-3   | 1-3   | 1-3   | 0-3   | 0-3   | 0-3
+me                   | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | hexbs | tz
+ref                  | 1     | 1     | 1     | 1     | 1     | 1     | 2     | 2     | 3     | 4
+deblock              | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1
+signhide             | 0     | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1
+subme                | 0     | 0     | 2     | 2     | 4     | 4     | 4     | 4     | 4     | 4
+sao                  | 0     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1
+rdoq                 | 0     | 0     | 0     | 0     | 0     | 1     | 1     | 1     | 1     | 1
+rdoq-skip            | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 0
+transform-skip       | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
+mv-rdo               | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
+full-intra-search    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0
+smp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
+amp                  | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 1
+cu-split-termination | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | zero  | off
+me-early-termination | sens. | sens. | sens. | sens. | on    | on    | on    | on    | on    | off
 
 
 ## Kvazaar library
