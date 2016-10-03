@@ -317,6 +317,8 @@ typedef struct kvz_config
     unsigned d;  // depth
     unsigned t;  // temporal
   } gop_lp_definition;
+
+  int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
 } kvz_config;
 
 /**

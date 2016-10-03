@@ -144,6 +144,8 @@ typedef struct encoder_control_t
 
   bool sign_hiding;
 
+  bool implicit_rdpcm;
+
   //! Target average bits per picture.
   double target_avg_bppic;
 

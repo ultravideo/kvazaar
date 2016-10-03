@@ -82,18 +82,20 @@ void kvz_intra_build_reference(
 
 /**
  * \brief Generate intra predictions.
- * \param refs   Reference pixels used for the prediction.     
- * \param log2_width  Width of the predicted block.
- * \param mode   Intra mode used for the prediction.
- * \param color  Color of the prediction.
- * \param dst    Buffer for the predicted pixels.
+ * \param refs            Reference pixels used for the prediction.
+ * \param log2_width      Width of the predicted block.
+ * \param mode            Intra mode used for the prediction.
+ * \param color           Color of the prediction.
+ * \param dst             Buffer for the predicted pixels.
+ * \param filter_boundary Whether to filter the boundary on modes 10 and 26.
  */
 void kvz_intra_predict(
   kvz_intra_references *refs,
   int_fast8_t log2_width,
   int_fast8_t mode,
   color_t color,
-  kvz_pixel *dst);
+  kvz_pixel *dst,
+  bool filter_boundary);
 
 /**
  * \brief Do a full intra prediction cycle on a CU in lcu for luma.

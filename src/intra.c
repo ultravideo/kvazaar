@@ -198,7 +198,8 @@ void kvz_intra_predict(
   int_fast8_t log2_width,
   int_fast8_t mode,
   color_t color,
-  kvz_pixel *dst)
+  kvz_pixel *dst,
+  bool filter_boundary)
 {
   const int_fast8_t width = 1 << log2_width;
 
@@ -234,7 +235,7 @@ void kvz_intra_predict(
     }
   } else {
     kvz_angular_pred(log2_width, mode, used_ref->top, used_ref->left, dst);
-    if (color == COLOR_Y && width < 32) {
+    if (color == COLOR_Y && width < 32 && filter_boundary) {
       if (mode == 10) {
         intra_post_process_angular(width, 1, used_ref->top, dst);
       } else if (mode == 26) {
@@ -453,7 +454,9 @@ void kvz_intra_recon_lcu_luma(
   kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
 
   kvz_pixel pred[32 * 32];
-  kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred);
+  const kvz_config *cfg = state->encoder_control->cfg;
+  bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
+  kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred, filter_boundary);
   
   kvz_pixel *block_in_lcu = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
   kvz_pixels_blit(pred, block_in_lcu, width, width, width, LCU_WIDTH);
@@ -510,7 +513,7 @@ void kvz_intra_recon_lcu_chroma(
       kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs);
 
       kvz_pixel pred[32 * 32];
-      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_U, pred);
+      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_U, pred, false);
 
       kvz_pixel *pu_in_lcu = &lcu->rec.u[lcu_px.x / 2 + (lcu_px.y * LCU_WIDTH) / 4];
       kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);
@@ -522,7 +525,7 @@ void kvz_intra_recon_lcu_chroma(
       kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs);
       
       kvz_pixel pred[32 * 32];
-      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_V, pred);
+      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_V, pred, false);
 
       kvz_pixel *pu_in_lcu = &lcu->rec.v[lcu_px.x / 2 + (lcu_px.y * LCU_WIDTH) / 4];
       kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);

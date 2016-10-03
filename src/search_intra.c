@@ -349,7 +349,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_u, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred);
+    kvz_intra_predict(refs_u, log2_width_c, modes[i], COLOR_U, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -357,7 +357,7 @@ static void search_intra_chroma_rough(encoder_state_t * const state,
   kvz_pixels_blit(orig_v, orig_block, width, width, origstride, width);
   for (int i = 0; i < 5; ++i) {
     if (modes[i] == luma_mode) continue;
-    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred);
+    kvz_intra_predict(refs_v, log2_width_c, modes[i], COLOR_V, pred, false);
     //costs[i] += get_cost(encoder_state, pred, orig_block, satd_func, sad_func, width);
     costs[i] += satd_func(pred, orig_block);
   }
@@ -410,6 +410,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   cost_pixel_nxn_multi_func *satd_dual_func = kvz_pixels_get_satd_dual_func(width);
   cost_pixel_nxn_multi_func *sad_dual_func = kvz_pixels_get_sad_dual_func(width);
 
+  const kvz_config *cfg = state->encoder_control->cfg;
+  const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
+
   // Temporary block arrays
   kvz_pixel _preds[PARALLEL_BLKS * 32 * 32 + SIMD_ALIGNMENT];
   pred_buffer preds = ALIGNED_POINTER(_preds, SIMD_ALIGNMENT);
@@ -440,7 +443,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     
     double costs_out[PARALLEL_BLKS] = { 0 };
     for (int i = 0; i < PARALLEL_BLKS; ++i) {
-      if (mode + i * offset <= 34) kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i]);
+      if (mode + i * offset <= 34) {
+        kvz_intra_predict(refs, log2_width, mode + i * offset, COLOR_Y, preds[i], filter_boundary);
+      }
     }
     
     //TODO: add generic version of get cost  multi
@@ -477,7 +482,9 @@ static int8_t search_intra_rough(encoder_state_t * const state,
 
       if (mode_in_range) {
         for (int i = 0; i < PARALLEL_BLKS; ++i) {
-          if (test_modes[i] >= 2 && test_modes[i] <= 34) kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i]);
+          if (test_modes[i] >= 2 && test_modes[i] <= 34) {
+            kvz_intra_predict(refs, log2_width, test_modes[i], COLOR_Y, preds[i], filter_boundary);
+          }
         }
 
         //TODO: add generic version of get cost multi
@@ -513,7 +520,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
     }
 
     if (!has_mode) {
-      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, preds[0]);
+      kvz_intra_predict(refs, log2_width, mode, COLOR_Y, preds[0], filter_boundary);
       costs[modes_selected] = get_cost(state, preds[0], orig_block, satd_func, sad_func, width);
       modes[modes_selected] = mode;
       ++modes_selected;

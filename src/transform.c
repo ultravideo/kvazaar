@@ -27,6 +27,13 @@
 #include "strategies/strategies-quant.h"
 #include "tables.h"
 
+/**
+ * \brief RDPCM direction.
+ */
+typedef enum rdpcm_dir {
+  RDPCM_VER = 0, // vertical
+  RDPCM_HOR = 1, // horizontal
+} rdpcm_dir;
 
 //////////////////////////////////////////////////////////////////////////
 // INITIALIZATIONS
@@ -88,6 +95,31 @@ static bool bypass_transquant(const int width,
   }
 
   return nonzero_coeffs;
+}
+
+/**
+ * Apply DPCM to residual.
+ *
+ * \param width   width of the block
+ * \param stride  stride of coeff array
+ * \param dir     RDPCM direction
+ * \param coeff   coefficients (residual) to filter
+ */
+static void rdpcm(const int width,
+                  const int stride,
+                  const rdpcm_dir dir,
+                  coeff_t *coeff)
+{
+  const int offset = (dir == RDPCM_HOR) ? 1 : stride;
+  const int min_x  = (dir == RDPCM_HOR) ? 1 : 0;
+  const int min_y  = (dir == RDPCM_HOR) ? 0 : 1;
+
+  for (int y = width - 1; y >= min_y; y--) {
+    for (int x = width - 1; x >= min_x; x--) {
+      const int index = x + y * stride;
+      coeff[index] -= coeff[index - offset];
+    }
+  }
 }
 
 /**
@@ -316,6 +348,15 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
                             recbase_y, orig_coeff_y)) {
         cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
+      if (state->encoder_control->cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
+        // implicit rdpcm for horizontal and vertical intra modes
+        if (cur_pu->intra.mode == 10) {
+          rdpcm(width, LCU_WIDTH, RDPCM_HOR, orig_coeff_y);
+
+        } else if (cur_pu->intra.mode == 26) {
+          rdpcm(width, LCU_WIDTH, RDPCM_VER, orig_coeff_y);
+        }
+      }
     } else if (width == 4 && state->encoder_control->trskip_enable) {
       // Try quantization with trskip and use it if it's better.
       int has_coeffs = kvz_quantize_residual_trskip(
@@ -409,6 +450,17 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
                             base_v, recbase_v,
                             recbase_v, orig_coeff_v)) {
         cbf_set(&cur_cu->cbf, depth, COLOR_V);
+      }
+      if (state->encoder_control->cfg->implicit_rdpcm && cur_cu->type == CU_INTRA) {
+        // implicit rdpcm for horizontal and vertical intra modes
+        if (cur_cu->intra.mode_chroma == 10) {
+          rdpcm(chroma_width, LCU_WIDTH_C, RDPCM_HOR, orig_coeff_u);
+          rdpcm(chroma_width, LCU_WIDTH_C, RDPCM_HOR, orig_coeff_v);
+
+        } else if (cur_cu->intra.mode_chroma == 26) {
+          rdpcm(chroma_width, LCU_WIDTH_C, RDPCM_VER, orig_coeff_u);
+          rdpcm(chroma_width, LCU_WIDTH_C, RDPCM_VER, orig_coeff_v);
+        }
       }
     } else {
       if (kvz_quantize_residual(state, cur_cu, chroma_width, COLOR_U, scan_idx_chroma, tr_skip, LCU_WIDTH_C, LCU_WIDTH_C, base_u, recbase_u, recbase_u, orig_coeff_u)) {

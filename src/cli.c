@@ -116,6 +116,8 @@ static const struct option long_options[] = {
   { "no-rdoq-skip",             no_argument, NULL, 0 },
   { "input-bitdepth",     required_argument, NULL, 0 },
   { "input-format",       required_argument, NULL, 0 },
+  { "implicit-rdpcm",           no_argument, NULL, 0 },
+  { "no-implicit-rdpcm",        no_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -397,6 +399,8 @@ void print_help(void)
     "                                     \"on\": Early termination is on\n"
     "                                     \"sensitive\": Sensitive early termination is on\n"
     "          --lossless             : Use lossless coding\n"
+    "          --implicit-rdpcm       : Enable implicit residual DPCM. Currently only supported\n"
+    "                                   with lossless coding.\n"
     "          --no-tmvp              : Disable Temporal Motion Vector Prediction\n"
     "          --rdoq-skip            : Skips RDOQ for 4x4 blocks\n"
     "          --input-format         : P420 or P400\n"
