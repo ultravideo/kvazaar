@@ -278,6 +278,19 @@ void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
 
 lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
 
+
+/**
+ * Whether the parameter sets should be written with the current frame.
+ */
+static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
+{
+  const int32_t frame = state->frame->num;
+  const int32_t vps_period = state->encoder_control->vps_period;
+
+  return (vps_period >  0 && frame % vps_period == 0) ||
+         (vps_period >= 0 && frame == 0);
+}
+
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,
   6, 6, 7, 7, 7, 7, 8, 8, 8, 8,

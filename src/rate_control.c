@@ -96,9 +96,48 @@ static double gop_allocate_bits(encoder_state_t * const state)
 }
 
 /**
+ * Estimate number of bits used for headers of the current picture.
+ * \param state   the main encoder state
+ * \return        number of header bits
+ */
+static uint64_t pic_header_bits(encoder_state_t * const state)
+{
+  const kvz_config* cfg = state->encoder_control->cfg;
+
+  // nal type and slice header
+  uint64_t bits = 48 + 24;
+
+  // entry points
+  bits += 12 * state->encoder_control->in.height_in_lcu;
+
+  switch (cfg->hash) {
+    case KVZ_HASH_CHECKSUM:
+      bits += 168;
+      break;
+
+    case KVZ_HASH_MD5:
+      bits += 456;
+      break;
+
+    case KVZ_HASH_NONE:
+      break;
+  }
+
+  if (encoder_state_must_write_vps(state)) {
+    bits += 613;
+  }
+
+  if (state->frame->num == 0 && cfg->add_encoder_info) {
+    bits += 1392;
+  }
+
+  return bits;
+}
+
+/**
  * Allocate bits for the current picture.
  * \param state   the main encoder state
- * \return        target number of bits
+ * \return        target number of bits, excluding headers
  */
 static double pic_allocate_bits(encoder_state_t * const state)
 {
@@ -122,7 +161,8 @@ static double pic_allocate_bits(encoder_state_t * const state)
 
   const double pic_weight = encoder->gop_layer_weights[
     encoder->cfg->gop[state->frame->gop_offset].layer - 1];
-  double pic_target_bits = state->frame->cur_gop_target_bits * pic_weight;
+  const double pic_target_bits =
+    state->frame->cur_gop_target_bits * pic_weight - pic_header_bits(state);
   // Allocate at least 100 bits for each picture like HM does.
   return MAX(100, pic_target_bits);
 }
@@ -153,7 +193,6 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
                         &state->frame->rc_beta);
     }
 
-    // TODO: take the picture headers into account
     const double pic_target_bits = pic_allocate_bits(state);
     const double target_bpp = pic_target_bits / ctrl->in.pixels_per_pic;
     double lambda = state->frame->rc_alpha * pow(target_bpp, state->frame->rc_beta);

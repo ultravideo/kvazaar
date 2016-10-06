@@ -918,10 +918,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     first_nal_in_au = false;
     encoder_state_write_bitstream_aud(state);
   }
-  
-  if ((encoder->vps_period > 0 && state->frame->num % encoder->vps_period == 0)
-      || (state->frame->num == 0 && encoder->vps_period >= 0))
-  {
+
+  if (encoder_state_must_write_vps(state)) {
     first_nal_in_au = false;
     kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
