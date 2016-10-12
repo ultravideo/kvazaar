@@ -941,7 +941,18 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
  #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
 //*********************************************
-//For scalable extension. TODO: Interlayer mv cands need to be set to 0 (td==0?). Move check to somewhere else?#define APPLY_MV_SCALING(cu, cand, list) {int td = state->frame->poc - state->frame->ref->pocs[(cu)->inter.mv_ref[list]];\
+//If we have a IRL ref then we need to set motion cand to 0
+  if(state->layer->layer_id > 0 && (state->global->poc == state->global->ref->pocs[cur_cu->inter.mv_ref[reflist]]) ) {
+    while (candidates < AMVP_MAX_NUM_CANDS) {
+    mv_cand[candidates][0] = 0;
+    mv_cand[candidates][1] = 0;
+    candidates++;
+  }
+    return;
+  }
+
+//For scalable extension. TODO: Interlayer mv cands need to be set to 0 (td==0?). Move check to somewhere else?
+#define APPLY_MV_SCALING(cu, cand, list) {int td = state->frame->poc - state->frame->ref->pocs[(cu)->inter.mv_ref[list]];\
                                    int tb = state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]];\
                                    if (td == 0){\
                                      mv_cand[cand][0] = 0; \

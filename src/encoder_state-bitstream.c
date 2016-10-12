@@ -666,7 +666,7 @@ void writeSTermRSet(encoder_state_t* const state)
   int ref_positive = 0;
   
   //TODO: Make a better implementation
-  //if( ref_negative > 0 && state->global->ref->pocs[state->global->ref->used_size-1] == state->global->poc) --ref_negative;
+  if( ref_negative > 1 && state->layer->layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
 
   int last_poc = 0;
   int poc_shift = 0;
@@ -857,7 +857,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 
-  uint8_t ref_sets = 0;//state->layer->max_layers > 1 ? 1 : 0; //TODO: remove
+  uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: remove
   WRITE_UE(stream, ref_sets, "num_short_term_ref_pic_sets");
 
   //IF num short term ref pic sets
@@ -958,12 +958,14 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "pps_scaling_list_data_present_flag");
   //IF scaling_list
   //ENDIF
-  WRITE_U(stream, 0, 1, "lists_modification_present_flag");
+
+  //*******************************************
+  //For scalability extension. TODO: add asserts.
+  WRITE_U(stream, state->layer->layer_id>0?1:0, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
   
-  //*******************************************
-  //For scalability extension. TODO: add asserts.
+  
   //TODO: set in cfg
   uint8_t pps_extension_flag = 0; // state->layer->max_layers > 1 ? 1 : 0;
   uint8_t pps_multilayer_extension_flag = 0; //pps_extension_flag;
@@ -1220,9 +1222,9 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 
     //WRITE_U(stream, state->frame->poc & 0x1f, 5, "pic_order_cnt_lsb");
 //***********************************************
-    uint8_t ref_sets = 0;//state->layer->max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
-      WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
-      if(ref_sets==0){
+    uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
+    WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
+    if (ref_sets == 0) {
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
     for (j = 0; j < ref_negative; j++) {      
@@ -1236,25 +1238,27 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
             if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
               found = 1;
               break;
+              }
             }
-          }
-          if (!found) poc_shift++;
-          if (j + poc_shift == ref_negative) {
-            fprintf(stderr, "Failure, reference not found!");
-            exit(EXIT_FAILURE);
-          }
-        } while (!found);
-      }
+            if (!found) poc_shift++;
+            if (j + poc_shift == ref_negative) {
+              fprintf(stderr, "Failure, reference not found!");
+              exit(EXIT_FAILURE);
+            }
+          } while (!found);
+        }
 
-      WRITE_UE(stream, encoder->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
-      last_poc = delta_poc;
-      WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
-    }
-    last_poc = 0;
-    poc_shift = 0;
-    for (j = 0; j < ref_positive; j++) {      
-      int8_t delta_poc = 0;
-      
+        WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
+        last_poc = delta_poc;
+        WRITE_U(stream, 1, 1, "used_by_curr_pic_s0_flag");
+      }
+      last_poc = 0;
+      poc_shift = 0;
+      for (j = 0; j < ref_positive; j++) {
+        int8_t delta_poc = 0;
+
+
+
       if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
@@ -1265,26 +1269,26 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
               break;
             }
           }
-          if (!found) poc_shift++;
-          if (j + poc_shift == ref_positive) {
-            fprintf(stderr, "Failure, reference not found!");
-            exit(EXIT_FAILURE);
-          }
-        } while (!found);
+            if (!found) poc_shift++;
+            if (j + poc_shift == ref_positive) {
+              fprintf(stderr, "Failure, reference not found!");
+              exit(EXIT_FAILURE);
+            }
+          } while (!found);
+        }
+
+        WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+        last_poc = delta_poc;
+        WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
       }
-      
-      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
-      last_poc = delta_poc;
-      WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
+      //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
     }
-    //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
     
     if (state->encoder_control->cfg->tmvp_enable) {
       WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
-  }
-
+}
     //end if
   //end if
 
@@ -1300,7 +1304,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       //TODO: Write stuff if there are more than one inter layer ref for this slice
     }
   }
-  //***********************************************
+  
 
   if (encoder->sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
@@ -1314,8 +1318,32 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       WRITE_UE(stream, ref_negative != 0 ? ref_negative - 1: 0, "num_ref_idx_l0_active_minus1");
         if (state->frame->slicetype == KVZ_SLICE_B) {
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
-          WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+    }
+    //if( lists_modification_present_flag && NumPicTotalCurr>1 )
+    if( state->layer->layer_id > 0 && state->frame->ref->used_size > 1) {
+    //  ref_pic_lists_modification()
+      uint8_t ref_pic_lists_modification_flag_l0 = 1;
+      WRITE_U(stream, ref_pic_lists_modification_flag_l0, 1,"ref_pic_lists_modification_flag_l0");
+      if( ref_pic_lists_modification_flag_l0 ) {
+        for (int i = 0; i < ref_negative; ++i) {
+          //We want to move the ILR pic first
+          WRITE_U(stream, (ref_negative+i-1)%ref_negative, kvz_math_ceil_log2(state->frame->ref->used_size), "list_entry_l0[i]");
         }
+      }
+      if (state->frame->slicetype == KVZ_SLICE_B) {
+        uint8_t ref_pic_lists_modification_flag_l1 = 0;
+        WRITE_U(stream, ref_pic_lists_modification_flag_l1, 1, "ref_pic_lists_modification_flag_l0");
+        if (ref_pic_lists_modification_flag_l1) {
+          for (int i = 0; i < ref_positive; ++i) {
+           WRITE_U(stream, i, kvz_math_ceil_log2(state->frame->ref->used_size), "list_entry_l1[i]");
+          }
+        }
+      }
+    }
+    //
+    if (state->frame->slicetype == KVZ_SLICE_B) {
+      WRITE_U(stream, 0, 1, "mvd_l1_zero_flag");
+    }
 
       // ToDo: handle B-frames with TMVP
       if (state->encoder_control->cfg->tmvp_enable && ref_negative > 1) {
@@ -1324,7 +1352,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 
       WRITE_UE(stream, 5-MRG_MAX_NUM_CANDS, "five_minus_max_num_merge_cand");
   }
-
+  //***********************************************
   {
     int slice_qp_delta = state->frame->QP - encoder->cfg->qp;
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
