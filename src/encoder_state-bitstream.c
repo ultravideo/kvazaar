@@ -758,7 +758,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     encoder_state_write_bitstream_PTL(stream, state);
   }
 
-  WRITE_UE(stream, 0, "sps_seq_parameter_set_id");
+  // ***********************************************
+  // Modified for SHVC
+  // parameter set ids are global (layer id does not matter)
+  // so set the correct sps id (use layer id as the pset id)
+  // vps is the same for all layers
+  WRITE_UE(stream, state->layer->layer_id, "sps_seq_parameter_set_id");
+  // ***********************************************
+ 
 
   if (multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "update_rep_format_flag");
@@ -890,8 +897,16 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 #ifdef KVZ_DEBUG
   printf("=========== Picture Parameter Set ID: 0 ===========\n");
 #endif
-  WRITE_UE(stream, 0, "pic_parameter_set_id");
-  WRITE_UE(stream, 0, "seq_parameter_set_id");
+  // ***********************************************
+  // Modified for SHVC
+  // parameter set ids are global (layer id does not matter)
+  // so set the correct pps/sps id (use layer id as the pset id)
+ 
+  WRITE_UE(stream, state->layer->layer_id, "pic_parameter_set_id");
+  WRITE_UE(stream, state->layer->layer_id, "seq_parameter_set_id");
+  // ***********************************************
+ 
+  
   WRITE_U(stream, 0, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
@@ -1191,7 +1206,13 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
   }
 
-  WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
+  // ***********************************************
+  // Modified for SHVC
+  // parameter set ids are global (layer id does not matter)
+  // so set the correct pps id (use layer id as the pset id)
+  WRITE_UE(stream, state->layer->layer_id, "slice_pic_parameter_set_id");
+  // ***********************************************
+  
   if (state->slice->start_in_rs > 0) {
     //For now, we don't support dependent slice segments
     //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
