@@ -976,6 +976,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   //*******************************************
   //For scalability extension. TODO: add asserts.
+  uint8_t list_modification_present_flag = state->layer->layer_id>0?1:0;
   WRITE_U(stream, state->layer->layer_id>0?1:0, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
   WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
