@@ -523,7 +523,7 @@ int main(int argc, char *argv[])
         
         // ***********************************************
         // Modified for SHVC
-        print_frame_info(info_out, frame_psnr, len_out);
+        print_el_frame_info(info_out, frame_psnr, len_out, 0);
 
         
         //TODO: Figure out a better way?
