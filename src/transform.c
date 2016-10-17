@@ -409,7 +409,8 @@ static void quantize_tr_residual(encoder_state_t * const state,
  * - lcu->cu.intra.tr_skip  tr skip flags for the area (in case of luma)
  */
 void kvz_quantize_lcu_residual(encoder_state_t * const state,
-                               const color_t color,
+                               const bool luma,
+                               const bool chroma,
                                const int32_t x,
                                const int32_t y,
                                const uint8_t depth,
@@ -431,27 +432,40 @@ void kvz_quantize_lcu_residual(encoder_state_t * const state,
          width == 32 ||
          width == 64);
 
-  // Split transform and increase depth
   if (depth == 0 || cur_pu->tr_depth > depth) {
-    int offset = width / 2;
-    kvz_quantize_lcu_residual(state, color, x,          y,          depth+1, NULL, lcu);
-    kvz_quantize_lcu_residual(state, color, x + offset, y,          depth+1, NULL, lcu);
-    kvz_quantize_lcu_residual(state, color, x,          y + offset, depth+1, NULL, lcu);
-    kvz_quantize_lcu_residual(state, color, x + offset, y + offset, depth+1, NULL, lcu);
+    // Split transform and increase depth
+    const int offset = width / 2;
+    const int32_t x2 = x + offset;
+    const int32_t y2 = y + offset;
+
+    kvz_quantize_lcu_residual(state, luma, chroma, x,  y,  depth + 1, NULL, lcu);
+    kvz_quantize_lcu_residual(state, luma, chroma, x2, y,  depth + 1, NULL, lcu);
+    kvz_quantize_lcu_residual(state, luma, chroma, x,  y2, depth + 1, NULL, lcu);
+    kvz_quantize_lcu_residual(state, luma, chroma, x2, y2, depth + 1, NULL, lcu);
 
     // Propagate coded block flags from child CUs to parent CU.
-    const int max_depth = (color == COLOR_Y) ? MAX_DEPTH - 1 : MAX_DEPTH;
+    uint16_t child_cbfs[3] = {
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+    };
 
-    if (depth <= max_depth) {
-      uint16_t child_cbfs[3] = {
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
-      };
-      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, color);
+    if (luma && depth < MAX_DEPTH) {
+      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_Y);
+    }
+    if (chroma && depth <= MAX_DEPTH) {
+      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_U);
+      cbf_set_conditionally(&cur_pu->cbf, child_cbfs, depth, COLOR_V);
     }
 
   } else {
-    quantize_tr_residual(state, color, x, y, depth, cur_pu, lcu);
+    // Process a leaf TU.
+    if (luma) {
+      quantize_tr_residual(state, COLOR_Y, x, y, depth, cur_pu, lcu);
+    }
+    if (chroma) {
+      quantize_tr_residual(state, COLOR_U, x, y, depth, cur_pu, lcu);
+      quantize_tr_residual(state, COLOR_V, x, y, depth, cur_pu, lcu);
+    }
   }
 }

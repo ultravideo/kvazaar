@@ -637,7 +637,10 @@ void kvz_intra_recon_lcu_luma(
   kvz_pixel *block_in_lcu = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
   kvz_pixels_blit(pred, block_in_lcu, width, width, width, LCU_WIDTH);
 
-  kvz_quantize_lcu_residual(state, COLOR_Y, x, y, depth, cur_cu, lcu);
+  kvz_quantize_lcu_residual(state,
+                            true, false, // process luma only
+                            x, y, depth,
+                            cur_cu, lcu);
 }
 
 
@@ -707,7 +710,9 @@ void kvz_intra_recon_lcu_chroma(
       kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);
     }
 
-    kvz_quantize_lcu_residual(state, COLOR_U, x, y, depth, cur_cu, lcu);
-    kvz_quantize_lcu_residual(state, COLOR_V, x, y, depth, cur_cu, lcu);
+    kvz_quantize_lcu_residual(state,
+                              false, true, // process chroma only
+                              x, y, depth,
+                              cur_cu, lcu);
   }
 }
