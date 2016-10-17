@@ -664,9 +664,10 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
       }
 
-      kvz_quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
+      kvz_quantize_lcu_residual(state, COLOR_Y, x, y, depth, NULL, &work_tree[depth]);
       if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-        kvz_quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
+        kvz_quantize_lcu_residual(state, COLOR_U, x, y, depth, NULL, &work_tree[depth]);
+        kvz_quantize_lcu_residual(state, COLOR_V, x, y, depth, NULL, &work_tree[depth]);
       }
 
       int cbf = cbf_is_set_any(cur_cu->cbf, depth);
