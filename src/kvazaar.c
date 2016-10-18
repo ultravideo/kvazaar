@@ -517,7 +517,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
         assert(state->global->poc == bl_state->global->poc);
         //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
         //Skip on first frame? Skip if inter frame
-        if (state->global->frame > 0 && false) {
+        if (state->global->frame > 0) {
           kvz_image_list_add/*_back*/(state->global->ref,
             kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
             bl_state->tile->frame->cu_array, //kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),

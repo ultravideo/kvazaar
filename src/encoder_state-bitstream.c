@@ -657,16 +657,24 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 
 //*******************************************
 //For scalability extension. TODO: remove if pointless
-void writeSTermRSet(encoder_state_t* const state)
+void writeSTermRSet(encoder_state_t* const state, int neg_ref_minus)
 {
+  
   const encoder_control_t* const encoder = state->encoder_control;
   bitstream_t* const stream = &state->stream;
+
+  //IF stRpsIdx != 0
+  if( neg_ref_minus != 0) {
+    WRITE_U(stream, 0, 1, "inter_ref_pic_set_prediction_flag"); //TODO: Use inter rps pred?
+  }
+
   int j;
-  int ref_negative = state->encoder_control->cfg->ref_frames;
+  int ref_negative = state->encoder_control->cfg->ref_frames - neg_ref_minus;
+  ref_negative = ref_negative < 0 ? 0 : ref_negative;
   int ref_positive = 0;
   
-  //TODO: Make a better implementation
-  if( ref_negative > 1 && state->layer->layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
+  //TODO: Make a better implementation. Use neg_ref_minus?
+  if( ref_negative > 0 && state->layer->layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
 
   int last_poc = 0;
   int poc_shift = 0;
@@ -864,11 +872,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 
-  uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: remove
-  WRITE_UE(stream, ref_sets, "num_short_term_ref_pic_sets");
+  //Need to make sure the first frames don't reference non-existant pocs
+  uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
+  WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
 
   //IF num short term ref pic sets
-  if(ref_sets) writeSTermRSet(state);
+  for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
+    writeSTermRSet(state, i);
+  }
   //ENDIF
 
 
@@ -1245,6 +1256,8 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 
     //WRITE_U(stream, state->frame->poc & 0x1f, 5, "pic_order_cnt_lsb");
 //***********************************************
+    
+    uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: get this number from somewhere else
     uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
     WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
     if (ref_sets == 0) {
@@ -1305,6 +1318,11 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
         WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
       }
       //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
+    }
+    else if( num_short_term_ref_pic_sets > 1 ){
+      uint32_t poc = state->frame->poc;
+      int stRpsIdx = num_short_term_ref_pic_sets <= poc ? 0 : num_short_term_ref_pic_sets - poc; //stRpsIdx==0 should be the one with max ref, so for the first frames use num_short_term_ref_pic_sets - Poc
+      WRITE_U(stream, stRpsIdx, kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx"); //TODO: Get correct idx from somewhere
     }
     
     if (state->encoder_control->cfg->tmvp_enable) {
