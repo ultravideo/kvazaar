@@ -478,24 +478,6 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int 
 }
 
 
-unsigned kvz_pixels_calc_ssd(const kvz_pixel *const ref, const kvz_pixel *const rec,
-                 const int ref_stride, const int rec_stride,
-                 const int width)
-{
-  int ssd = 0;
-  int y, x;
-
-  for (y = 0; y < width; ++y) {
-    for (x = 0; x < width; ++x) {
-      int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
-      ssd += diff * diff;
-    }
-  }
-
-  return ssd;
-}
-
-
 /**
  * \brief BLock Image Transfer from one buffer to another.
  *

@@ -518,6 +518,23 @@ SAD_DUAL_NXN(16, kvz_pixel)
 SAD_DUAL_NXN(32, kvz_pixel)
 SAD_DUAL_NXN(64, kvz_pixel)
 
+static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pixel *const rec,
+                 const int ref_stride, const int rec_stride,
+                 const int width)
+{
+  int ssd = 0;
+  int y, x;
+
+  for (y = 0; y < width; ++y) {
+    for (x = 0; x < width; ++x) {
+      int diff = ref[x + y * ref_stride] - rec[x + y * rec_stride];
+      ssd += diff * diff;
+    }
+  }
+
+  return ssd;
+}
+
 
 int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
 {
@@ -550,6 +567,8 @@ int kvz_strategy_register_picture_generic(void* opaque, uint8_t bitdepth)
   success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "generic", 0, &satd_64x64_dual_generic);
   success &= kvz_strategyselector_register(opaque, "satd_any_size", "generic", 0, &satd_any_size_generic);
   success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "generic", 0, &satd_any_size_quad_generic);
+
+  success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "generic", 0, &pixels_calc_ssd_generic);
 
   return success;
 }

@@ -25,6 +25,7 @@
 #include "rdo.h"
 #include "strategies/strategies-dct.h"
 #include "strategies/strategies-quant.h"
+#include "strategies/strategies-picture.h"
 #include "tables.h"
 
 /**

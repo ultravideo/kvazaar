@@ -35,6 +35,7 @@
 #include "threadqueue.h"
 #include "transform.h"
 #include "videoframe.h"
+#include "strategies/strategies-picture.h"
 
 
 #define IN_FRAME(x, y, width, height, block_width, block_height) \
