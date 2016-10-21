@@ -638,6 +638,83 @@ SATD_NXN_DUAL_AVX2(64)
 
 SATD_ANY_SIZE_MULTI_AVX2(quad_avx2, 4)
 
+
+static unsigned pixels_calc_ssd_avx2(const kvz_pixel *const ref, const kvz_pixel *const rec,
+                 const int ref_stride, const int rec_stride,
+                 const int width)
+{
+  __m256i ssd_part;
+  __m256i diff = _mm256_setzero_si256();
+  __m128i sum;
+
+  __m128i temp = _mm_setzero_si128();
+  __m256i ref_epi16;
+  __m256i rec_epi16;
+
+  __m128i ref_row0, ref_row1, ref_row2, ref_row3;
+  __m128i rec_row0, rec_row1, rec_row2, rec_row3;
+
+  int ssd;
+
+  switch (width) {
+
+  case 4:
+
+    ref_row0 = _mm_cvtsi32_si128(*(int32_t*)&(ref[0 * ref_stride]));
+    ref_row1 = _mm_cvtsi32_si128(*(int32_t*)&(ref[1 * ref_stride]));
+    ref_row2 = _mm_cvtsi32_si128(*(int32_t*)&(ref[2 * ref_stride]));
+    ref_row3 = _mm_cvtsi32_si128(*(int32_t*)&(ref[3 * ref_stride]));
+
+    ref_row0 = _mm_unpacklo_epi32(ref_row0, ref_row1);
+    ref_row1 = _mm_unpacklo_epi32(ref_row2, ref_row3);
+    ref_epi16 = _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(ref_row0, ref_row1) );
+
+    rec_row0 = _mm_cvtsi32_si128(*(int32_t*)&(rec[0 * rec_stride]));
+    rec_row1 = _mm_cvtsi32_si128(*(int32_t*)&(rec[1 * rec_stride]));
+    rec_row2 = _mm_cvtsi32_si128(*(int32_t*)&(rec[2 * rec_stride]));
+    rec_row3 = _mm_cvtsi32_si128(*(int32_t*)&(rec[3 * rec_stride]));
+
+    rec_row0 = _mm_unpacklo_epi32(rec_row0, rec_row1);
+    rec_row1 = _mm_unpacklo_epi32(rec_row2, rec_row3);
+    rec_epi16 = _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(rec_row0, rec_row1) );
+
+    diff = _mm256_sub_epi16(ref_epi16, rec_epi16);
+    ssd_part =  _mm256_madd_epi16(diff, diff);
+
+    sum = _mm_add_epi32(_mm256_castsi256_si128(ssd_part), _mm256_extracti128_si256(ssd_part, 1));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2)));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, _MM_SHUFFLE(0, 1, 0, 1)));
+
+    ssd = _mm_cvtsi128_si32(sum);
+
+    return ssd;
+    break;
+
+  default:
+
+    ssd_part = _mm256_setzero_si256();
+    for (int y = 0; y < width; y += 8) {
+      for (int x = 0; x < width; x += 8) {
+        for (int i = 0; i < 8; i += 2) {
+          ref_epi16 = _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(_mm_loadl_epi64((__m128i*)&(ref[x + (y + i) * ref_stride])), _mm_loadl_epi64((__m128i*)&(ref[x + (y + i + 1) * ref_stride]))));
+          rec_epi16 = _mm256_cvtepu8_epi16(_mm_unpacklo_epi64(_mm_loadl_epi64((__m128i*)&(rec[x + (y + i) * rec_stride])), _mm_loadl_epi64((__m128i*)&(rec[x + (y + i + 1) * rec_stride]))));
+          diff = _mm256_sub_epi16(ref_epi16, rec_epi16);
+          ssd_part = _mm256_add_epi32(ssd_part, _mm256_madd_epi16(diff, diff));
+        }
+      }
+    }
+
+    sum = _mm_add_epi32(_mm256_castsi256_si128(ssd_part), _mm256_extracti128_si256(ssd_part, 1));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, _MM_SHUFFLE(1, 0, 3, 2)));
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, _MM_SHUFFLE(0, 1, 0, 1)));
+
+    ssd = _mm_cvtsi128_si32(sum);
+
+    return ssd;
+    break;
+  }
+}
+
 #endif //COMPILE_INTEL_AVX2
 
 
@@ -668,6 +745,8 @@ int kvz_strategy_register_picture_avx2(void* opaque, uint8_t bitdepth)
     success &= kvz_strategyselector_register(opaque, "satd_64x64_dual", "avx2", 40, &satd_8bit_64x64_dual_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_any_size", "avx2", 40, &satd_any_size_8bit_avx2);
     success &= kvz_strategyselector_register(opaque, "satd_any_size_quad", "avx2", 40, &satd_any_size_quad_avx2);
+
+    success &= kvz_strategyselector_register(opaque, "pixels_calc_ssd", "avx2", 40, &pixels_calc_ssd_avx2);
   }
 #endif
   return success;
