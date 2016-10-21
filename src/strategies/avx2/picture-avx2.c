@@ -647,7 +647,6 @@ static unsigned pixels_calc_ssd_avx2(const kvz_pixel *const ref, const kvz_pixel
   __m256i diff = _mm256_setzero_si256();
   __m128i sum;
 
-  __m128i temp = _mm_setzero_si128();
   __m256i ref_epi16;
   __m256i rec_epi16;
 
