@@ -1,0 +1,28 @@
+branches:
+  only:
+    - master
+    - appveyor
+
+environment:
+  matrix:
+    - MSYSTEM: MINGW64
+    - MSYSTEM: MINGW32
+
+shallow_clone: true
+test: off
+
+install:
+  # Update core packages
+  - C:\msys64\usr\bin\pacman -Syyuu --noconfirm --noprogressbar
+  # Update non-core packages
+  - C:\msys64\usr\bin\pacman -Suu --noconfirm --noprogressbar
+  # Install required MSYS2 packages
+  - C:\msys64\usr\bin\pacman -S --noconfirm --noprogressbar --needed automake-wrapper make
+  # Now MSYS2 is up to date, do the rest of the install from a bash script
+  - C:\msys64\usr\bin\bash -lc "cd \"$APPVEYOR_BUILD_FOLDER\" && exec ./tools/appveyor-install.sh"
+
+build_script:
+  - C:\msys64\usr\bin\bash -lc "cd \"$APPVEYOR_BUILD_FOLDER\" && exec ./tools/appveyor-build.sh"
+
+cache:
+  - C:\msys64\var\cache\pacman\pkg
