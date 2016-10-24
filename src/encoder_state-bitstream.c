@@ -657,7 +657,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 
 //*******************************************
 //For scalability extension. TODO: remove if pointless
-void writeSTermRSet(encoder_state_t* const state, int neg_ref_minus)
+void writeSTermRSet_(encoder_state_t* const state, int neg_ref_minus)
 {
   
   const encoder_control_t* const encoder = state->encoder_control;
@@ -734,7 +734,95 @@ void writeSTermRSet(encoder_state_t* const state, int neg_ref_minus)
     WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
   }
 }
+//Use inter rps_set pred. Write ref sets for the case that n prev frames are referenced.
+void writeSTermRSet(encoder_state_t* const state, int idx )
+{
+  
+  const encoder_control_t* const encoder = state->encoder_control;
+  bitstream_t* const stream = &state->stream;
 
+  //IF stRpsIdx != 0
+  if( idx != 0) {
+    WRITE_U(stream, 1, 1, "inter_ref_pic_set_prediction_flag"); //TODO: Use inter rps pred?
+  }
+
+  int j;
+  int ref_negative = idx + 1;//state->encoder_control->cfg->ref_frames;
+  ref_negative = ref_negative < 0 ? 0 : ref_negative;
+  int ref_positive = 0;
+  
+  //TODO: Make a better implementation. Use neg_ref_minus?
+  if( ref_negative > 0 && state->layer->layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
+
+  if( idx != 0) {
+    //IF slice header WRITE "delta_idx_minus1" ?
+    WRITE_U( stream, 1, 1, "delta_rps_sign" ); //only ref prev frame rps
+    WRITE_UE( stream, 0, "abs_delta_rps_minus1" ); //only ref prev frames rps
+    for( int i = 0; i < ref_negative + ref_positive; i++ ) {
+      WRITE_U( stream, 1, 1, "used_by_curr_pic_flag[j]" );
+      //IF !used_by_curr_pic_flag[j] WRITE use_delta_flag[j]
+    }
+  }
+  else {
+    int last_poc = 0;
+    int poc_shift = 0;
+
+    WRITE_UE(stream, ref_negative, "num_negative_pics");
+    WRITE_UE(stream, ref_positive, "num_positive_pics");
+    for (j = 0; j < ref_negative; j++) {
+      int8_t delta_poc = 0;
+
+      if (encoder->cfg->gop_len) {
+        int8_t found = 0;
+        do {
+          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
+          for (int i = 0; i < state->global->ref->used_size; i++) {
+            if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
+              found = 1;
+              break;
+            }
+          }
+          if (!found) poc_shift++;
+          if (j + poc_shift == ref_negative) {
+            fprintf(stderr, "Failure, reference not found!");
+            exit(EXIT_FAILURE);
+          }
+        } while (!found);
+      }
+
+      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
+      last_poc = delta_poc;
+      WRITE_U(stream, 1, 1, "used_by_curr_pic_s0_flag");
+    }
+    last_poc = 0;
+    poc_shift = 0;
+    for (j = 0; j < ref_positive; j++) {
+      int8_t delta_poc = 0;
+
+      if (encoder->cfg->gop_len) {
+        int8_t found = 0;
+        do {
+          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
+          for (int i = 0; i < state->global->ref->used_size; i++) {
+            if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
+              found = 1;
+              break;
+            }
+          }
+          if (!found) poc_shift++;
+          if (j + poc_shift == ref_positive) {
+            fprintf(stderr, "Failure, reference not found!");
+            exit(EXIT_FAILURE);
+          }
+        } while (!found);
+      }
+
+      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+      last_poc = delta_poc;
+      WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
+    }
+  }
+}
 //*******************************************
   
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
@@ -874,6 +962,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   //Need to make sure the first frames don't reference non-existant pocs
   uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
+  //if( state->layer->layer_id > 0 ) num_short_term_ref_pic_sets--; //Reserve one "reference" for ILR 
   WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
 
   //IF num short term ref pic sets
@@ -1258,6 +1347,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 //***********************************************
     
     uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: get this number from somewhere else
+    //if( state->layer->layer_id > 0 ) num_short_term_ref_pic_sets--; //Reserve a "reference" for IRL
     uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
     WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
     if (ref_sets == 0) {
@@ -1321,7 +1411,8 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     }
     else if( num_short_term_ref_pic_sets > 1 ){
       uint32_t poc = state->frame->poc;
-      int stRpsIdx = num_short_term_ref_pic_sets <= poc ? 0 : num_short_term_ref_pic_sets - poc; //stRpsIdx==0 should be the one with max ref, so for the first frames use num_short_term_ref_pic_sets - Poc
+      //int stRpsIdx = num_short_term_ref_pic_sets <= poc ? 0 : num_short_term_ref_pic_sets - poc; //stRpsIdx==0 should be the one with max ref, so for the first frames use num_short_term_ref_pic_sets - Poc
+      int stRpsIdx = (num_short_term_ref_pic_sets <= poc ? num_short_term_ref_pic_sets : poc) - 1; // num of (available) refs increases with idx/poc
       WRITE_U(stream, stRpsIdx, kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx"); //TODO: Get correct idx from somewhere
     }
     

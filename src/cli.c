@@ -289,6 +289,7 @@ done:
       el_configs[el_layer_id]->qp = 20;
       el_configs[el_layer_id]->width = opts->config->in_width;
       el_configs[el_layer_id]->height = opts->config->in_height;
+      //el_configs[el_layer_id]->ref_frames = el_configs[el_layer_id]->ref_frames == 0 ? 0 : el_configs[el_layer_id]->ref_frames-1; //"Reserve one frame for ILR. TODO: infer correct num from somewhere.
     }
 
     opts->config->el_cfg = el_configs;

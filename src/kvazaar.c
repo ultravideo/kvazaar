@@ -424,6 +424,19 @@ static int kvazaar_encode(kvz_encoder *enc,
 //  kvz_encoder_get_ref_lists(state, info->el_ref_list_len[layer_id_minus1], info->el_ref_list[layer_id_minus1]);
 //}
 
+//TODO: Move somewhere more appropriate.
+void remove_ILR_pics( encoder_state_t* const state)
+{
+  //Loop over refs and remove IL refs from the list
+  for( unsigned i = 0; i < state->global->ref->used_size; i++) {
+    //TODO: Figure out a better way? Eg. extra info.
+    //If a ref_poc matches the prev frames poc, the ref should have been an ILR in the prev frame.
+    if( state->global->ref->pocs[i] == state->previous_encoder_state->global->poc ) {
+      kvz_image_list_rem( state->global->ref, i);
+    }
+  }
+}
+
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //Create a new kvz picture based on pic_in with size given by width and height
 kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_t* param)
@@ -508,6 +521,8 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
     l_pic_in = last_l_pic_in == NULL ? NULL : kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
 
     if (!state->prepared) {
+
+      remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
 
       kvz_encoder_next_frame(state);
 
