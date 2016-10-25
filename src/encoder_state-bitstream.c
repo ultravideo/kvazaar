@@ -735,7 +735,7 @@ void writeSTermRSet_(encoder_state_t* const state, int neg_ref_minus)
   }
 }
 //Use inter rps_set pred. Write ref sets for the case that n prev frames are referenced.
-void writeSTermRSet(encoder_state_t* const state, int idx )
+void writeSTermRSet(encoder_state_t* const state, unsigned idx )
 {
   
   const encoder_control_t* const encoder = state->encoder_control;
@@ -748,11 +748,10 @@ void writeSTermRSet(encoder_state_t* const state, int idx )
 
   int j;
   int ref_negative = idx + 1;//state->encoder_control->cfg->ref_frames;
-  ref_negative = ref_negative < 0 ? 0 : ref_negative;
   int ref_positive = 0;
   
   //TODO: Make a better implementation. Use neg_ref_minus?
-  if( ref_negative > 0 && state->layer->layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
+  if(state->layer->layer_id > 0 && encoder->cfg->ref_frames <= ref_negative+ref_positive) --ref_negative; //One frame needs to be for the ILR ref
 
   if( idx != 0) {
     //IF slice header WRITE "delta_idx_minus1" ?
@@ -960,15 +959,21 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 
-  //Need to make sure the first frames don't reference non-existant pocs
-  uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
-  //if( state->layer->layer_id > 0 ) num_short_term_ref_pic_sets--; //Reserve one "reference" for ILR 
-  WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
+    if (state->layer->max_layers > 1) {
+      //Need to make sure the first frames don't reference non-existant pocs
+      uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
+      if (state->layer->layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve one "reference" for ILR 
+      WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
 
-  //IF num short term ref pic sets
-  for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
-    writeSTermRSet(state, i);
-  }
+      //IF num short term ref pic sets
+      for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
+        writeSTermRSet(state, i);
+      }
+    }
+    else {
+      WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
+    }
+  
   //ENDIF
 
 
@@ -1347,7 +1352,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 //***********************************************
     
     uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: get this number from somewhere else
-    //if( state->layer->layer_id > 0 ) num_short_term_ref_pic_sets--; //Reserve a "reference" for IRL
+    if( state->layer->layer_id > 0 ) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets-1 : 1; //Reserve a "reference" for IRL
     uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
     WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
     if (ref_sets == 0) {
