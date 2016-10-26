@@ -30,6 +30,6 @@ EOF
        s|, \\-\\-|\\fR, \\fB\\-\\-|g;' \
   >> $manpage_file
 
-for s in Slices Wpp Tiles "Parallel processing" "Video Usability Information"; do
-  sed -i "s|^  ${s}:|.SS \"${s}:\"|g" $manpage_file
+for s in Required Presets Input Options "Video structure" "Compression tools" "Parallel processing" "Video Usability Information"; do
+  sed -i "s|^${s}:|.SS \"${s}:\"|g" $manpage_file
 done
