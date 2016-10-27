@@ -1,29 +1,82 @@
-.TH KVAZAAR "1" "October 2016" "kvazaar v0.8.3" "User Commands"
+.TH KVAZAAR "1" "October 2016" "kvazaar v1.0.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
 \fBkvazaar \fR\-i <input> \-\-input\-res <width>x<height> \-o <output>
 .SH DESCRIPTION
 .TP
-\fB\-\-help                    
-Print this help message and exit
+\fB\-i\fR, \fB\-\-input          \-\-input\-res <res>     
+Input resolution [auto]
+  auto: detect from file name
+  <int>x<int>: width times height
 .TP
-\fB\-\-version                 
-Print version information and exit
+\fB\-o\fR, \fB\-\-output              
+Output file
+
+.SS "Presets:"
+.TP
+\fB\-\-preset=<preset>     
+Set options to a preset [medium]
+  ultrafast, superfast, veryfast, faster,
+  fast, medium, slow, slower, veryslow,
+  placebo
+
+.SS "Input:"
 .TP
 \fB\-n\fR, \fB\-\-frames <integer>    
 Number of frames to code [all]
 .TP
-\fB\-\-seek <integer>          
+\fB\-\-seek <integer>      
 First frame to code [0]
 .TP
-\fB\-\-input\-res <int>x<int>   
-Input resolution (width x height) or
-auto          
-try to detect from file name [auto]
-.TP
-\fB\-\-input\-fps <num>/<denom> 
+\fB\-\-input\-fps <num>/<denom>
 Framerate of the input video [25.0]
+.TP
+\fB\-\-source\-scan\-type <string>
+Set source scan type ["progressive"].
+  "progressive": progressive scan
+  "tff": top field first
+  "bff": bottom field first
+.TP
+\fB\-\-input\-format        
+P420 or P400
+.TP
+\fB\-\-input\-bitdepth      
+8\-16
+.TP
+\fB\-\-loop\-input          
+Re\-read input file forever
+
+.SS "Options:"
+.TP
+\fB\-\-help                
+Print this help message and exit
+.TP
+\fB\-\-version             
+Print version information and exit
+.TP
+\fB\-\-aud                 
+Use access unit delimiters
+.TP
+\fB\-\-debug <string>      
+Output encoders reconstruction.
+.TP
+\fB\-\-cpuid <integer>     
+Disable runtime cpu optimizations with value 0.
+.TP
+\fB\-\-hash                
+Specify which decoded picture hash to use [checksum]
+  "none": 0 bytes
+  "checksum": 18 bytes
+  "md5": 56 bytes
+.TP
+\fB\-\-no\-psnr             
+Don't calculate PSNR for frames
+.TP
+\fB\-\-no\-info             
+Don't add information about the encoder to settings.
+
+.SS "Video structure:"
 .TP
 \fB\-q\fR, \fB\-\-qp <integer>        
 Quantization Parameter [32]
@@ -43,6 +96,31 @@ re\-sent. [0]
 .TP
 \fB\-r\fR, \fB\-\-ref <integer>       
 Reference frames, range 1..15 [3]
+.TP
+\fB\-\-gop <string>        
+Definition of GOP structure [0]
+  "0":           disabled
+  "8":           B\-frame pyramid of length 8
+  "lp\-<string>": lp\-gop definition (e.g. lp\-g8d4r3t2)
+.TP
+\fB\-\-cqmfile <string>    
+Custom Quantization Matrices from a file
+.TP
+\fB\-\-bitrate <integer>   
+Target bitrate. [0]
+  0: disable rate\-control
+  N: target N bits per second
+.TP
+\fB\-\-lossless            
+Use lossless coding
+.TP
+\fB\-\-mv\-constraint       
+Constrain movement vectors
+  "none": no constraint
+  "frametile": constrain within the tile
+  "frametilemargin": constrain even more
+
+.SS "Compression tools:"
 .TP
 \fB\-\-no\-deblock          
 Disable deblocking filter
@@ -81,18 +159,6 @@ Try all intra modes.
 \fB\-\-no\-transform\-skip   
 Disable transform skip
 .TP
-\fB\-\-aud                 
-Use access unit delimiters
-.TP
-\fB\-\-cqmfile <string>    
-Custom Quantization Matrices from a file
-.TP
-\fB\-\-debug <string>      
-Output encoders reconstruction.
-.TP
-\fB\-\-cpuid <integer>     
-Disable runtime cpu optimizations with value 0.
-.TP
 \fB\-\-me <string>         
 Set integer motion estimation algorithm ["hexbs"]
   "hexbs": Hexagon Based Search (faster)
@@ -107,12 +173,6 @@ Set fractional pixel motion estimation level [4].
   3: + 1/4\-pixel horizontal and vertical
   4: + 1/4\-pixel diagonal
 .TP
-\fB\-\-source\-scan\-type <string>
-Set source scan type ["progressive"].
-  "progressive": progressive scan
-  "tff": top field first
-  "bff": bottom field first
-.TP
 \fB\-\-pu\-depth\-inter <int>\-<int>
 Range for sizes of inter prediction units to try.
   0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8
@@ -121,45 +181,8 @@ Range for sizes of inter prediction units to try.
 Range for sizes of intra prediction units to try.
   0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4
 .TP
-\fB\-\-no\-info             
-Don't add information about the encoder to settings.
-.TP
-\fB\-\-gop <string>        
-Definition of GOP structure [0]
-  "0":           disabled
-  "8":           B\-frame pyramid of length 8
-  "lp\-<string>": lp\-gop definition (e.g. lp\-g8d4r3t2)
-.TP
 \fB\-\-bipred              
 Enable bi\-prediction search
-.TP
-\fB\-\-bitrate <integer>   
-Target bitrate. [0]
-  0: disable rate\-control
-  N: target N bits per second
-.TP
-\fB\-\-preset <string>     
-Use preset. This will override previous options.
-  ultrafast, superfast, veryfast, faster,
-  fast, medium, slow, slower, veryslow, placebo
-.TP
-\fB\-\-no\-psnr             
-Don't calculate PSNR for frames
-.TP
-\fB\-\-loop\-input          
-Re\-read input file forever
-.TP
-\fB\-\-mv\-constraint       
-Constrain movement vectors
-  "none": no constraint
-  "frametile": constrain within the tile
-  "frametilemargin": constrain even more
-.TP
-\fB\-\-hash                
-Specify which decoded picture hash to use [checksum]
-  "none": 0 bytes
-  "checksum": 18 bytes
-  "md5": 56 bytes
 .TP
 \fB\-\-cu\-split\-termination
 Specify the cu split termination behaviour
@@ -173,9 +196,6 @@ Specify the me early termination behaviour
   "on": Early termination is on
   "sensitive": Sensitive early termination is on
 .TP
-\fB\-\-lossless            
-Use lossless coding
-.TP
 \fB\-\-implicit\-rdpcm      
 Enable implicit residual DPCM. Currently only supported
 with lossless coding.
@@ -185,12 +205,35 @@ Disable Temporal Motion Vector Prediction
 .TP
 \fB\-\-rdoq\-skip           
 Skips RDOQ for 4x4 blocks
+
+.SS "Parallel processing:"
 .TP
-\fB\-\-input\-format        
-P420 or P400
+\fB\-\-threads <integer>   
+Maximum number of threads to use.
+Disable threads if set to 0.
 .TP
-\fB\-\-input\-bitdepth      
-8\-16
+\fB\-\-owf <integer>|auto  
+Number of parallel frames to process. 0 to disable.
+.TP
+\fB\-\-wpp\fR, \fB\-\-no\-wpp       
+Wavefront parallel processing [enabled]
+Enabling tiles automatically disabled WPP. To enable
+WPP with tiles, re\-enable it after enabling tiles.
+.TP
+\fB\-\-tiles <int>x<int>   
+Split picture into width x height uniform tiles.
+.TP
+\fB\-\-tiles\-width\-split <string>|u<int>
+Specifies a comma separated list of pixel
+positions of tiles columns separation coordinates.
+Can also be u followed by and a single int n,
+in which case it produces columns of uniform width.
+.TP
+\fB\-\-tiles\-height\-split <string>|u<int>
+Specifies a comma separated list of pixel
+positions of tiles rows separation coordinates.
+Can also be u followed by and a single int n,
+in which case it produces rows of uniform height.
 
 .SS "Video Usability Information:"
 .TP
@@ -228,35 +271,4 @@ Specify color matrix setting ["undef"]
 .TP
 \fB\-\-chromaloc <integer> 
 Specify chroma sample location (0 to 5) [0]
-
-.SS "Parallel processing:"
-.TP
-\fB\-\-threads <integer>   
-Maximum number of threads to use.
-Disable threads if set to 0.
-
-.SS "Tiles:"
-.TP
-\fB\-\-tiles <int>x<int>   
-Split picture into width x height uniform tiles.
-.TP
-\fB\-\-tiles\-width\-split <string>|u<int>
-Specifies a comma separated list of pixel
-positions of tiles columns separation coordinates.
-Can also be u followed by and a single int n,
-in which case it produces columns of uniform width.
-.TP
-\fB\-\-tiles\-height\-split <string>|u<int>
-Specifies a comma separated list of pixel
-positions of tiles rows separation coordinates.
-Can also be u followed by and a single int n,
-in which case it produces rows of uniform height.
-
-.SS "Wpp:"
-.TP
-\fB\-\-wpp                 
-Enable wavefront parallel processing
-.TP
-\fB\-\-owf <integer>|auto  
-Number of parallel frames to process. 0 to disable.
 

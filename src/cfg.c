@@ -655,18 +655,32 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->cqmfile = strdup(value);
   else if OPT("tiles-width-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
+    
     if (cfg->tiles_width_count > 1 && cfg->tmvp_enable) {
       cfg->tmvp_enable = false;
       fprintf(stderr, "Disabling TMVP because tiles are used.\n");
     }
+
+    if (cfg->wpp) {
+      cfg->wpp = false;
+      fprintf(stderr, "Disabling WPP because tiles were enabled.\n");
+    }
+
     return retval;
   }
   else if OPT("tiles-height-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_height_count, &cfg->tiles_height_split);
+    
     if (cfg->tiles_height_count > 1 && cfg->tmvp_enable) {
       cfg->tmvp_enable = false;
       fprintf(stderr, "Disabling TMVP because tiles are used.\n");
     }
+
+    if (cfg->wpp) {
+      cfg->wpp = false;
+      fprintf(stderr, "Disabling WPP because tiles were enabled.\n");
+    }
+
     return retval;
   }
   else if OPT("tiles")
@@ -697,6 +711,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     if (cfg->tmvp_enable) {
       cfg->tmvp_enable = false;
       fprintf(stderr, "Disabling TMVP because tiles are used.\n");
+    }
+
+    if (cfg->wpp) {
+      cfg->wpp = false;
+      fprintf(stderr, "Disabling WPP because tiles were enabled.\n");
     }
 
     return 1;
