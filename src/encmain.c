@@ -283,6 +283,7 @@ int main(int argc, char *argv[])
   FILE *input  = NULL; //!< input file (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
   FILE *recout = NULL; //!< reconstructed YUV output, --debug
+  FILE *recout_el = NULL; 
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
   KVZ_CLOCK_T encoding_start_real_time;
@@ -343,6 +344,15 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", opts->debug);
       goto exit_failure;
     }
+    char *el_file = malloc( sizeof(char)*(strlen(opts->debug)+4));
+    strcpy(el_file, "el_"); strcat(el_file,opts->debug);
+    recout_el = open_output_file(el_file);
+    if (recout_el == NULL) {
+      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", el_file);
+      free(el_file);
+      goto exit_failure;
+    }
+    free(el_file);
   }
 
   //******************************************
@@ -549,13 +559,13 @@ int main(int argc, char *argv[])
             compute_psnr(el_img_src, el_img_rec, frame_psnr);
           }
 
-          if (recout) {
+          if (recout_el) {
             // Since chunks_out was not NULL, img_rec should have been set.
             assert(el_img_rec);
-            if (!yuv_io_write(recout,
+            if (!yuv_io_write(recout_el,
               el_img_rec,
-              opts->config->width,
-              opts->config->height)) {
+              opts->config->in_width,
+              opts->config->in_height)) {
               fprintf(stderr, "Failed to write reconstructed picture!\n");
             }
           }

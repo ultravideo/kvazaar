@@ -1248,9 +1248,15 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
+  //*********************************************
+  //For scalable extension. TODO: A better way to check if ILR?
+
+  bool is_ILR = state->global->poc == state->global->ref->pocs[ref_idx];
+  
 
   vector2d_t mv = { 0, 0 };
-  {
+  //Skip for ILR (bitsream requires 0-mv for ILR)
+  if(!is_ILR){
     // Take starting point for MV search from previous frame.
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
@@ -1273,28 +1279,30 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     }
   }
 
-  int search_range = 32;
-  switch (state->encoder_control->cfg->ime_algorithm) {
+  // Skip search for ILR
+  if (!is_ILR) {
+    int search_range = 32;
+    switch (state->encoder_control->cfg->ime_algorithm) {
     case KVZ_IME_FULL64: search_range = 64; break;
     case KVZ_IME_FULL32: search_range = 32; break;
     case KVZ_IME_FULL16: search_range = 16; break;
     case KVZ_IME_FULL8: search_range = 8; break;
     default: break;
-  }
+    }
 
-  switch (state->encoder_control->cfg->ime_algorithm) {
+    switch (state->encoder_control->cfg->ime_algorithm) {
     case KVZ_IME_TZ:
       temp_cost += tz_search(state,
-                             width, height,
-                             frame->source,
-                             ref_image,
-                             &orig,
-                             &mv,
-                             mv_cand,
-                             merge_cand,
-                             num_cand,
-                             ref_idx,
-                             &temp_bitcost);
+        width, height,
+        frame->source,
+        ref_image,
+        &orig,
+        &mv,
+        mv_cand,
+        merge_cand,
+        num_cand,
+        ref_idx,
+        &temp_bitcost);
       break;
 
 
@@ -1304,34 +1312,51 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     case KVZ_IME_FULL8:
     case KVZ_IME_FULL:
       temp_cost += search_mv_full(state,
-                                  width, height,
-                                  frame->source,
-                                  ref_image,
-                                  &orig,
-                                  &mv,
-                                  mv_cand,
-                                  merge_cand,
-                                  num_cand,
-                                  ref_idx,
-                                  search_range,
-                                  &temp_bitcost);
+        width, height,
+        frame->source,
+        ref_image,
+        &orig,
+        &mv,
+        mv_cand,
+        merge_cand,
+        num_cand,
+        ref_idx,
+        search_range,
+        &temp_bitcost);
       break;
 
     default:
       temp_cost += hexagon_search(state,
-                                  width, height,
-                                  frame->source,
-                                  ref_image,
-                                  &orig,
-                                  &mv,
-                                  mv_cand,
-                                  merge_cand,
-                                  num_cand,
-                                  ref_idx,
-                                  &temp_bitcost);
+        width, height,
+        frame->source,
+        ref_image,
+        &orig,
+        &mv,
+        mv_cand,
+        merge_cand,
+        num_cand,
+        ref_idx,
+        &temp_bitcost);
       break;
+    }
   }
-
+  else {
+    //Calc cost for 0-mv. TODO: Better cost calc check?
+    //TODO: Enough to use get_mvd_cost? 
+    //temp_cost += 1;
+    //temp_cost += INT_MAX - 1;
+    temp_cost += kvz_image_calc_sad(frame->source, ref_image, orig.x, orig.y,
+                                    state->tile->lcu_offset_x * LCU_WIDTH + orig.x,
+                                    state->tile->lcu_offset_y * LCU_WIDTH + orig.y,
+                                    width, height, -1);
+    if( state->encoder_control->cfg->mv_rdo ){
+      temp_cost += kvz_calc_mvd_cost_cabac( state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost );
+    }
+    else {
+      temp_cost += calc_mvd_cost(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost);
+    }
+  }
+  //TODO: Handle frac search
   if (state->encoder_control->cfg->fme_level > 0) {
     temp_cost = search_frac(state,
                             width, height,
@@ -1345,7 +1370,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                             ref_idx,
                             &temp_bitcost);
   }
-  
+  //*********************************************
   merged = 0;
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {

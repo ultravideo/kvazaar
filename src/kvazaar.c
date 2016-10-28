@@ -521,10 +521,15 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
     l_pic_in = last_l_pic_in == NULL ? NULL : kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
 
     if (!state->prepared) {
-
+      
+      //TODO: Find a better way.
+      //deallocate dummy cu_array
+      cu_array_t* cua = state->global->ref->cu_arrays[0]; //ILR pic should be first
+      int used_size = state->global->ref->used_size;
       remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
-
-      kvz_encoder_next_frame(state);
+      if( used_size > 0 ) kvz_cu_array_free(cua);
+      
+        kvz_encoder_next_frame(state);
 
       //TODO: Move somewhere else. slicetype still refers to the prev slice?
       //TODO: Allow first EL layer to be a P-slice
@@ -537,7 +542,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
         //if (state->global->frame > 0) {
           kvz_image_list_add/*_back*/(state->global->ref,
             kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
-            bl_state->tile->frame->cu_array, //kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
+            /*bl_state->tile->frame->cu_array,*/ kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
             bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );//
         //}
       }
@@ -552,6 +557,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
       assert(state->global->frame == *el_frames_started);
       // Start encoding.
       kvz_encode_one_frame(state);
+
       *el_frames_started += 1;
     }
 

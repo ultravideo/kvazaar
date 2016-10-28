@@ -295,18 +295,22 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   }
 
-  uint8_t vps_num_rep_formats_minus1 = 0;
-  WRITE_UE(stream, vps_num_rep_formats_minus1, "vps_num_rep_formats_minus1");
-  
+
   //Write rep formats here
   //TODO: Implement own settings for alternate rep formats.
+  //TODO: Need to add separate rep format when the layers have different sizes
+  uint8_t vps_num_rep_formats_minus1 = state->layer->max_layers-1; //TODO: add rep format only for different sizes
+  WRITE_UE(stream, vps_num_rep_formats_minus1, "vps_num_rep_formats_minus1");
+  
   for (int i = 0; i <= vps_num_rep_formats_minus1; i++) {
     //rep_format(){
     const encoder_control_t* encoder = state->encoder_control;
-    WRITE_U(stream, encoder->in.width, 16, "pic_width_vps_in_luma_samples");
-    WRITE_U(stream, encoder->in.height, 16, "pic_height_vps_in_luma_samples");
+    unsigned shift = i==0?0:1; //TODO: remove. Only for quick testing.
+    unsigned offset = i==0?0:8; //TODO: remove. Only for quick testing.
+    WRITE_U(stream, encoder->in.width<<shift, 16, "pic_width_vps_in_luma_samples");
+    WRITE_U(stream, (encoder->in.height<<shift)-offset, 16, "pic_height_vps_in_luma_samples");
     
-    uint8_t chroma_and_bit_depth_vps_present_flag = 1; //Has to be one in the first rep format
+    uint8_t chroma_and_bit_depth_vps_present_flag = i==0; //Has to be one in the first rep format
     WRITE_U(stream, chroma_and_bit_depth_vps_present_flag, 1, "chroma_and_bit_depth_vps_present_flag");
 
     if (chroma_and_bit_depth_vps_present_flag) {
@@ -317,19 +321,23 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
       WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_luma_minus8");
       WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_chroma_minus8");
     }
-    uint8_t conformance_window_flag = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+    uint8_t conformance_window_flag = encoder->in.width<<shift != encoder->in.real_width<<shift || (encoder->in.height<<shift)-offset != encoder->in.real_height<<shift;
     WRITE_U(stream, conformance_window_flag, 1, "conformance_window_pvs_flag");
 
     if (conformance_window_flag) {
       WRITE_UE(stream, 0, "conf_win_vps_left_offset");
-      WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1, "conf_win_vps_right_offset");
+      WRITE_UE(stream, ((encoder->in.width<<shift) - (encoder->in.real_width<<shift)) >> 1, "conf_win_vps_right_offset");
       WRITE_UE(stream, 0, "conf_win_vps_top_offset");
-      WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1, "conf_win_vps_bottom_offset");
+      WRITE_UE(stream, ((encoder->in.height<<shift) - (encoder->in.real_height<<shift)) >> 1, "conf_win_vps_bottom_offset");
     }
     //}
   }
 
   //if vps_num_rep_formats_minus1 > 0 Write rep_format_idx_present_flag here
+  if( vps_num_rep_formats_minus1 > 0) {
+    WRITE_U(stream, 0, 1, "rep_format_idx_present_flag");
+  }
+
   //if rep_format_idx_present_flag Write rep_format_idx[i] here
 
   //Only allow one interlayer ref. TODO: allow multible?
@@ -376,7 +384,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   WRITE_UE(stream, direct_dep_type_len_minus2, "direct_dep_type_len_minus2");
   WRITE_U(stream, 1, 1, "direct_dependency_all_layers_flag");
   //if "direct_dependency_all_layers_flag"
-  WRITE_U(stream, 0, direct_dep_type_len_minus2+2, "direct_dependency_all_layers_type"); //Value 2 used in SHM. 0: Only use IL sample prediction, 1: Only use IL Motion prediction, 2: Use both
+  WRITE_U(stream, 2, direct_dep_type_len_minus2+2, "direct_dependency_all_layers_type"); //Value 2 used in SHM. 0: Only use IL sample prediction, 1: Only use IL Motion prediction, 2: Use both
   //Else write separately for each layer
 
   WRITE_UE(stream, 0, "vps_non_vui_extension_length");
@@ -1085,16 +1093,15 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   uint8_t list_modification_present_flag = (state->layer->layer_id>0)&&(state->encoder_control->cfg->ref_frames>1)&&(state->encoder_control->cfg->intra_period!=1)?1:0;
   WRITE_U(stream, list_modification_present_flag, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
-  WRITE_U(stream, 0, 1, "slice_segment_header_extension_present_flag");
-  
-  
+    
   //TODO: set in cfg
-  uint8_t pps_extension_flag = 0; // state->layer->max_layers > 1 ? 1 : 0;
-  uint8_t pps_multilayer_extension_flag = 0; //pps_extension_flag;
+  uint8_t slice_segment_header_extension_present_flag = 0;
+  uint8_t pps_extension_flag = state->layer->layer_id!=0; // state->layer->max_layers > 1 ? 1 : 0;
+  uint8_t pps_multilayer_extension_flag = pps_extension_flag; //pps_extension_flag;
+  WRITE_U(stream, slice_segment_header_extension_present_flag, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(stream, pps_extension_flag, 1, "pps_extension_flag");
 
   //Write all possible extension flags here if pps_extension_flag defined
-  //TODO: Is multilayer_extension necessary?
   if (pps_extension_flag) {
     WRITE_U(stream, 0, 1, "pps_range_extension_flag");
     WRITE_U(stream, pps_multilayer_extension_flag, 1, "pps_multilayer_extension_flag");
@@ -1106,16 +1113,46 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     //pps_multilayer_extension()
     WRITE_U(stream, 0, 1, "poc_reset_info_present_flag");
 
-    uint8_t pps_infer_scaling_list_flag = 0; //TODO: Infer list
-    WRITE_U(stream, 0, 2, "pps_infer_scaling_list_flag");
+    uint8_t pps_infer_scaling_list_flag = 0; //TODO: Infer list?
+    WRITE_U(stream, 0, 1, "pps_infer_scaling_list_flag");
     if (pps_infer_scaling_list_flag) {
       WRITE_U(stream, state->layer->layer_id - 1, 6, "pps_scaling_list_ref_layer_id");
     }
 
-    WRITE_UE(stream, 0, "num_ref_loc_offsets");
-    //for num_ref_loc_offsets
-    //  do stuff
-    //end for
+    uint8_t num_ref_loc_offsets = state->layer->max_layers-1; //TODO: Check actual number of differently sized layers?
+    WRITE_UE(stream, num_ref_loc_offsets, "num_ref_loc_offsets");
+    for( int i = 0; i < num_ref_loc_offsets; i++ ) {
+      WRITE_U(stream, state->layer->layer_id-1, 6, "ref_loc_offset_layer_id[i]");
+      
+      //TODO: For some reason offsets are shifted in the SHM. Why? 
+      uint8_t scaled_ref_layer_offset_present_flag = 0; //TODO: get from somewhere
+      WRITE_U(stream, scaled_ref_layer_offset_present_flag, 1, "scaled_ref_layer_offset_present_flag" );
+      if( scaled_ref_layer_offset_present_flag ) {
+        WRITE_SE(stream, 0>>1, "scaled_ref_layer_left_offset");
+        WRITE_SE(stream, 0>>1, "scaled_ref_layer_top_offset");
+        WRITE_SE(stream, 0>>1, "scaled_ref_layer_right_offset");
+        WRITE_SE(stream, 4>>1, "scaled_ref_layer_bottom_offset");
+      }
+
+      uint8_t ref_region_layer_offset_present_flag = 0; //TODO: get from somewhere
+      WRITE_U(stream, ref_region_layer_offset_present_flag, 1, "ref_region_layer_offset_present_flag" );
+      //TODO: Calculate properly.
+      if( ref_region_layer_offset_present_flag ) {
+        WRITE_SE(stream, 0>>1, "ref_region_layer_left_offset");
+        WRITE_SE(stream, 0>>1, "ref_region_layer_top_offset");
+        WRITE_SE(stream, 0>>1, "ref_region_layer_right_offset");
+        WRITE_SE(stream, 4>>1, "ref_region_layer_bottom_offset");
+      }
+
+      uint8_t resample_phase_set_presetn_flag = 0; //TODO: get from somewhere
+      WRITE_U(stream, resample_phase_set_presetn_flag, 1, "resample_phase_set_present_flag");
+      if( resample_phase_set_presetn_flag ) {
+        WRITE_UE(stream, 0, "phase_hor_luma");
+        WRITE_UE(stream, 0, "phase_ver_luma");
+        WRITE_UE(stream, 8, "phase_hor_chroma_plus8");
+        WRITE_UE(stream, 8, "phase_ver_chorma_plus8");
+      }
+    }
 
     WRITE_U(stream, 0, 1, "colour_mapping_enabled_flag");
     //if colour_mapping_enabled_flag write colormapping 

@@ -695,16 +695,20 @@ void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
 
   // List all pocs of lists
   int j = 0;
+  
+  // Modified for SHVC. TODO: Does <= really help?
+  // ***********************************************
   for (j = 0; j < state->frame->ref->used_size; j++) {
-    if (state->frame->ref->pocs[j] < state->frame->poc) {
+    if (state->frame->ref->pocs[j] <= state->frame->poc) {
       ref_list_poc_out[0][ref_list_len_out[0]] = state->frame->ref->pocs[j];
       ref_list_len_out[0]++;
     } else {
       ref_list_poc_out[1][ref_list_len_out[1]] = state->frame->ref->pocs[j];
       ref_list_len_out[1]++;
     }
+    
   }
-
+// ***********************************************
   // Fill the rest of ref_list_poc_out array with -1s.
   for (; j < 16; j++) {
     ref_list_poc_out[0][j] = -1;
@@ -720,9 +724,10 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
   int ref_list_poc[2][16];
 
   kvz_encoder_get_ref_lists(state, ref_list_len, ref_list_poc);
-
+  // ***********************************************
+  // Modified for SHVC. TODO: Does <= really help?
   for (int j = 0; j < state->frame->ref->used_size; j++) {
-    if (state->frame->ref->pocs[j] < state->frame->poc) {
+    if (state->frame->ref->pocs[j] <= state->frame->poc) {
       for (int ref_idx = 0; ref_idx < ref_list_len[0]; ref_idx++) {
         if (ref_list_poc[0][ref_idx] == state->frame->ref->pocs[j]) {
           state->frame->refmap[j].idx = ref_list_len[0] - ref_idx - 1;
@@ -742,6 +747,7 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
     }
     state->frame->refmap[j].poc = state->frame->ref->pocs[j];
   }
+  // ***********************************************
 }
 
 /**
