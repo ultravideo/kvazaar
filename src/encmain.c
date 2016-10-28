@@ -190,6 +190,9 @@ static void* input_read_thread(void* in_args)
       goto done;
     }
 
+    // Set PTS to make sure we pass it on correctly.
+    frame_in->pts = frames_read;
+
     bool read_success = yuv_io_read(args->input, 
                                     args->opts->config->width,
                                     args->opts->config->height,

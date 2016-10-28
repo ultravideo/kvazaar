@@ -823,6 +823,8 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
     state->tile->frame->rec = kvz_image_copy_ref(frame);
   } else {
     state->tile->frame->rec = kvz_image_alloc(state->encoder_control->chroma_format, frame->width, frame->height);
+    state->tile->frame->rec->dts = frame->dts;
+    state->tile->frame->rec->pts = frame->pts;
   }
 
   kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
