@@ -203,16 +203,18 @@ encoder_control_t* kvz_encoder_control_init(kvz_config *const cfg) {
   kvz_scalinglist_init(&encoder->scaling_list);
 
   // CQM
-  {
-    FILE* cqmfile;
-    cqmfile = cfg->cqmfile ? fopen(cfg->cqmfile, "rb") : NULL;
+  if (cfg->cqmfile) {
+    FILE* cqmfile = fopen(cfg->cqmfile, "rb");
     if (cqmfile) {
       kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
       fclose(cqmfile);
+    } else {
+      fprintf(stderr, "Could not open CQM file.\n");
+      goto init_failed;
     }
   }
   kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
-  
+
   kvz_encoder_control_input_init(encoder, cfg->width, cfg->height);
 
   if (cfg->framerate_num != 0) {
