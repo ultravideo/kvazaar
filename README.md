@@ -19,156 +19,164 @@ Usage:
 kvazaar -i <input> --input-res <width>x<height> -o <output>
 
 Required:
-      -i, --input          --input-res <res>      : Input resolution [auto]
-                                     auto: detect from file name
-                                     <int>x<int>: width times height
-      -o, --output               : Output file
+  -i, --input                : Input file
+      --input-res <res>      : Input resolution [auto]
+                               auto: detect from file name
+                               <int>x<int>: width times height
+  -o, --output               : Output file
 
 Presets:
-          --preset=<preset>      : Set options to a preset [medium]
-                                     ultrafast, superfast, veryfast, faster,
-                                     fast, medium, slow, slower, veryslow,
+      --preset=<preset>      : Set options to a preset [medium]
+                                   - ultrafast, superfast, veryfast, faster,
+                                     fast, medium, slow, slower, veryslow
                                      placebo
 
 Input:
-      -n, --frames <integer>     : Number of frames to code [all]
-          --seek <integer>       : First frame to code [0]
-          --input-fps <num>/<denom> : Framerate of the input video [25.0]
-          --source-scan-type <string> : Set source scan type ["progressive"].
-                                     "progressive": progressive scan
-                                     "tff": top field first
-                                     "bff": bottom field first
-          --input-format         : P420 or P400
-          --input-bitdepth       : 8-16
-          --loop-input           : Re-read input file forever
+  -n, --frames <integer>     : Number of frames to code [all]
+      --seek <integer>       : First frame to code [0]
+      --input-fps <num>/<denom> : Framerate of the input video [25.0]
+      --source-scan-type <string> : Set source scan type [progressive].
+                                   - progressive: progressive scan
+                                   - tff: top field first
+                                   - bff: bottom field first
+      --input-format         : P420 or P400
+      --input-bitdepth       : 8-16
+      --loop-input           : Re-read input file forever
 
 Options:
-          --help                 : Print this help message and exit
-          --version              : Print version information and exit
-          --aud                  : Use access unit delimiters
-          --debug <string>       : Output encoders reconstruction.
-          --cpuid <integer>      : Disable runtime cpu optimizations with value 0.
-          --hash                 : Specify which decoded picture hash to use [checksum]
-                                     "none": 0 bytes
-                                     "checksum": 18 bytes
-                                     "md5": 56 bytes
-          --no-psnr              : Don't calculate PSNR for frames
-          --no-info              : Don't add information about the encoder to settings.
+      --help                 : Print this help message and exit
+      --version              : Print version information and exit
+      --aud                  : Use access unit delimiters
+      --debug <string>       : Output encoders reconstruction.
+      --cpuid <integer>      : Disable runtime cpu optimizations with value 0.
+      --hash                 : Decoded picture hash [checksum]
+                                   - none: 0 bytes
+                                   - checksum: 18 bytes
+                                   - md5: 56 bytes
+      --no-psnr              : Don't calculate PSNR for frames
+      --no-info              : Don't add encoder info SEI.
 
 Video structure:
-      -q, --qp <integer>         : Quantization Parameter [32]
-      -p, --period <integer>     : Period of intra pictures [0]
-                                     0: only first picture is intra
-                                     1: all pictures are intra
-                                     2-N: every Nth picture is intra
-          --vps-period <integer> : Specify how often the video parameter set is
-                                   re-sent. [0]
-                                     0: only send VPS with the first frame
-                                     1: send VPS with every intra frame
-                                     N: send VPS with every Nth intra frame
-      -r, --ref <integer>        : Reference frames, range 1..15 [3]
-          --gop <string>         : Definition of GOP structure [0]
-                                     "0":           disabled
-                                     "8":           B-frame pyramid of length 8
-                                     "lp-<string>": lp-gop definition (e.g. lp-g8d4r3t2)
-          --cqmfile <string>     : Custom Quantization Matrices from a file
-          --bitrate <integer>    : Target bitrate. [0]
-                                     0: disable rate-control
-                                     N: target N bits per second
-          --lossless             : Use lossless coding
-          --mv-constraint        : Constrain movement vectors
-                                     "none": no constraint
-                                     "frametile": constrain within the tile
-                                     "frametilemargin": constrain even more
+  -q, --qp <integer>         : Quantization Parameter [32]
+  -p, --period <integer>     : Period of intra pictures [0]
+                               - 0: only first picture is intra
+                               - 1: all pictures are intra
+                               - 2-N: every Nth picture is intra
+      --vps-period <integer> : Specify how often the video parameter set is
+                               re-sent. [0]
+                                   - 0: only send VPS with the first frame
+                                   - N: send VPS with every Nth intra frame
+  -r, --ref <integer>        : Reference frames, range 1..15 [3]
+      --gop <string>         : Definition of GOP structure [0]
+                                   - 0: disabled
+                                   - 8: B-frame pyramid of length 8
+                                   - lp-<string>: lp-gop definition
+                                         (e.g. lp-g8d4t2, see README)
+      --cqmfile <string>     : Custom Quantization Matrices from a file
+      --bitrate <integer>    : Target bitrate. [0]
+                                   - 0: disable rate-control
+                                   - N: target N bits per second
+      --lossless             : Use lossless coding
+      --mv-constraint        : Constrain movement vectors
+                                   - none: no constraint
+                                   - frametile: constrain within the tile
+                                   - frametilemargin: constrain even more
 
 Compression tools:
-          --no-deblock           : Disable deblocking filter
-          --deblock <beta:tc>    : Deblocking filter parameters
-                                   beta and tc range is -6..6 [0:0]
-          --no-sao               : Disable sample adaptive offset
-          --no-rdoq              : Disable RDO quantization
-          --no-signhide          : Disable sign hiding in quantization
-          --smp                  : Enable Symmetric Motion Partition
-          --amp                  : Enable Asymmetric Motion Partition
-          --rd <integer>         : Rate-Distortion Optimization level [1]
-                                     0: no RDO
-                                     1: estimated RDO
-                                     2: full RDO
-          --mv-rdo               : Enable Rate-Distortion Optimized motion vector costs
-          --full-intra-search    : Try all intra modes.
-          --no-transform-skip    : Disable transform skip
-          --me <string>          : Set integer motion estimation algorithm ["hexbs"]
-                                     "hexbs": Hexagon Based Search (faster)
-                                     "tz":    Test Zone Search (better quality)
-                                     "full":  Full Search (super slow)
-          --subme <integer>      : Set fractional pixel motion estimation level [4].
-                                     0: only integer motion estimation
-                                     1: + 1/2-pixel horizontal and vertical
-                                     2: + 1/2-pixel diagonal
-                                     3: + 1/4-pixel horizontal and vertical
-                                     4: + 1/4-pixel diagonal
-          --pu-depth-inter <int>-<int> : Range for sizes of inter prediction units to try.
-                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8
-          --pu-depth-intra <int>-<int> : Range for sizes of intra prediction units to try.
-                                     0: 64x64, 1: 32x32, 2: 16x16, 3: 8x8, 4: 4x4
-          --bipred               : Enable bi-prediction search
-          --cu-split-termination : Specify the cu split termination behaviour
-                                     "zero": Terminate when splitting gives little
-                                               improvement.
-                                     "off": Don't terminate splitting early
-          --me-early-termination : Specify the me early termination behaviour
-                                     "off": Early termination is off
-                                     "on": Early termination is on
-                                     "sensitive": Sensitive early termination is on
-          --implicit-rdpcm       : Enable implicit residual DPCM. Currently only supported
-                                   with lossless coding.
-          --no-tmvp              : Disable Temporal Motion Vector Prediction
-          --rdoq-skip            : Skips RDOQ for 4x4 blocks
+      --deblock [<beta:tc>]  : Deblocking
+                                     - beta: between -6 and 6
+                                     - tc: between -6 and 6
+      --(no-)sao             : Sample Adaptive Offset
+      --(no-)rdoq            : Rate-Distortion Optimized Quantization
+      --(no-)signhide        : Sign Hiding
+      --(no-)smp             : Symmetric Motion Partition
+      --(no-)amp             : Asymmetric Motion Partition
+      --rd <integer>         : Intra mode search complexity
+                                   - 0: skip intra if inter is good enough
+                                   - 1: rough intra mode search with SATD
+                                   - 2: refine intra mode search with SSE
+      --(no-)mv-rdo          : Rate-Distortion Optimized motion vector costs
+      --(no-)full-intra-search
+                             : Try all intra modes during rough search.
+      --(no-)transform-skip  : Transform skip
+      --me <string>          : Integer motion estimation
+                                   - hexbs: Hexagon Based Search
+                                   - tz:    Test Zone Search
+                                   - full:  Full Search
+                                   - full8, full16, full32, full64
+      --subme <integer>      : Set fractional pixel motion estimation level
+                                   - 0: only integer motion estimation
+                                   - 1: + 1/2-pixel horizontal and vertical
+                                   - 2: + 1/2-pixel diagonal
+                                   - 3: + 1/4-pixel horizontal and vertical
+                                   - 4: + 1/4-pixel diagonal
+      --pu-depth-inter <int>-<int>
+                             : Range for sizes for inter predictions
+                                   - 0, 1, 2, 3: from 64x64 to 8x8
+      --pu-depth-intra <int>-<int> : Range for sizes for intra predictions
+                                   - 0, 1, 2, 3, 4: from 64x64 to 4x4
+      --(no-)bipred          : Bi-prediction
+      --(no-)cu-split-termination
+                             : CU split search termination condition
+                                   - off: Never terminate cu-split search
+                                   - zero: Terminate with zero residual
+      --(no-)me-early-termination : ME early termination condition
+                                   - off: Don't terminate early
+                                   - on: Terminate early
+                                   - sensitive: Terminate even earlier
+      --(no-)implicit-rdpcm  : Implicit residual DPCM
+                               Currently only supported with lossless coding.
+      --(no-)tmvp            : Temporal Motion Vector Prediction
+      --(no-)rdoq-skip       : Skips RDOQ for 4x4 blocks
 
 Parallel processing:
-          --threads <integer>    : Maximum number of threads to use.
-                                   Disable threads if set to 0.
-          --owf <integer>|auto   : Number of parallel frames to process. 0 to disable.
-          --wpp, --no-wpp        : Wavefront parallel processing [enabled]
-                                   Enabling tiles automatically disabled WPP. To enable
-                                   WPP with tiles, re-enable it after enabling tiles.
-          --tiles <int>x<int>    : Split picture into width x height uniform tiles.
-          --tiles-width-split <string>|u<int> :
-                                   Specifies a comma separated list of pixel
-                                   positions of tiles columns separation coordinates.
-                                   Can also be u followed by and a single int n,
-                                   in which case it produces columns of uniform width.
-          --tiles-height-split <string>|u<int> :
-                                   Specifies a comma separated list of pixel
-                                   positions of tiles rows separation coordinates.
-                                   Can also be u followed by and a single int n,
-                                   in which case it produces rows of uniform height.
+      --threads <integer>    : Number of threads to use [auto]
+                                   - 0: process everything with main thread
+                                   - N: use N threads for encoding
+                                   - auto: select based on number of cores
+      --owf <integer>        : Frame parallelism [auto]
+                                   - N: Process N-1 frames at a time
+                                   - auto: Select automatically
+      --(no-)wpp             : Wavefront parallel processing [enabled]
+                               Enabling tiles automatically disables WPP.
+                               To enable WPP with tiles, re-enable it after
+                               enabling tiles.
+      --tiles <int>x<int>    : Split picture into width x height uniform tiles.
+      --tiles-width-split <string>|u<int> :
+                               Specifies a comma separated list of pixel
+                               positions of tiles columns separation coordinates.
+                               Can also be u followed by and a single int n,
+                               in which case it produces columns of uniform width.
+      --tiles-height-split <string>|u<int> :
+                               Specifies a comma separated list of pixel
+                               positions of tiles rows separation coordinates.
+                               Can also be u followed by and a single int n,
+                               in which case it produces rows of uniform height.
 
 Video Usability Information:
-          --sar <width:height>   : Specify Sample Aspect Ratio
-          --overscan <string>    : Specify crop overscan setting ["undef"]
-                                     - undef, show, crop
-          --videoformat <string> : Specify video format ["undef"]
-                                     - component, pal, ntsc, secam, mac, undef
-          --range <string>       : Specify color range ["tv"]
-                                     - tv, pc
-          --colorprim <string>   : Specify color primaries ["undef"]
-                                     - undef, bt709, bt470m, bt470bg,
-                                       smpte170m, smpte240m, film, bt2020
-          --transfer <string>    : Specify transfer characteristics ["undef"]
-                                     - undef, bt709, bt470m, bt470bg,
-                                       smpte170m, smpte240m, linear, log100,
-                                       log316, iec61966-2-4, bt1361e,
-                                       iec61966-2-1, bt2020-10, bt2020-12
-          --colormatrix <string> : Specify color matrix setting ["undef"]
-                                     - undef, bt709, fcc, bt470bg, smpte170m,
-                                       smpte240m, GBR, YCgCo, bt2020nc, bt2020c
-          --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
+      --sar <width:height>   : Specify Sample Aspect Ratio
+      --overscan <string>    : Specify crop overscan setting [undef]
+                                   - undef, show, crop
+      --videoformat <string> : Specify video format [undef]
+                                   - component, pal, ntsc, secam, mac, undef
+      --range <string>       : Specify color range [tv]
+                                   - tv, pc
+      --colorprim <string>   : Specify color primaries [undef]
+                                   - undef, bt709, bt470m, bt470bg,
+                                     smpte170m, smpte240m, film, bt2020
+      --transfer <string>    : Specify transfer characteristics [undef]
+                                   - undef, bt709, bt470m, bt470bg,
+                                     smpte170m, smpte240m, linear, log100,
+                                     log316, iec61966-2-4, bt1361e,
+                                     iec61966-2-1, bt2020-10, bt2020-12
+      --colormatrix <string> : Specify color matrix setting [undef]
+                                   - undef, bt709, fcc, bt470bg, smpte170m,
+                                     smpte240m, GBR, YCgCo, bt2020nc, bt2020c
+      --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
 
 Deprecated parameters: (might be removed at some point)
-     Use --input-res:
-       -w, --width               : Width of input in pixels
-       -h, --height              : Height of input in pixels
+  -w, --width                 : Use --input-res
+  -h, --height                : Use --input-res
 ```
 [comment]: # (END KVAZAAR HELP MESSAGE)
 

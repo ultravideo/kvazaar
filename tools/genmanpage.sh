@@ -21,11 +21,9 @@ EOF
 ../src/kvazaar --help 2>&1 | tail -n+5 | head -n-4 | \
   sed 's| : |\n|g;
        s| :$||g;
-       s|^          --|.TP\n\\fB--|g;
        s|^      --|.TP\n\\fB--|g;
-       s|^      -|.TP\n\\fB-|g;
-       s|^                                   ||g;
-       s|^                  ||g;
+       s|^  -|.TP\n\\fB-|g;
+       s|^                               ||g;
        s|-|\\-|g;
        s|, \\-\\-|\\fR, \\fB\\-\\-|g;' \
   >> $manpage_file
