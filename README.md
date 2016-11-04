@@ -188,15 +188,20 @@ The only accepted input format so far is 8-bit YUV 4:2:0.
 
 
 ### LP-GOP syntax
-The LP-GOP syntax is "lp-g(num)d(num)r(num)t(num)", where
+The LP-GOP syntax is "lp-g(num)d(num)t(num)", where
 - g = GOP length.
 - d = Number of GOP layers.
-- r = Number of references, where one reference is always the previous picture,
-  unless temporal scaling is used. The others are key-frames.
 - t = How many references to skip for temporal scaling, where 4 means only
   every fourth picture needs to be decoded.
 
-
+```
+QP
++4  o o o o  
++3   o   o    o o o o 
++2     o       o o o    ooooooo
++1 o       o o       o o       o ooooooooo
+   g8d4t1    g8d3t1    g8d2t1    g8d1t1
+```
 
 ## Presets
 The names of the presets are the same as with x264: ultrafast,
