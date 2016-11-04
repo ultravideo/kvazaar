@@ -1096,31 +1096,99 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
               |H|
     */
 
-    // Find temporal reference, closest POC
     if (state->frame->poc > 1 && state->frame->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
-      uint32_t poc_diff = UINT_MAX;
-
-      for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
-        int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
-        td = td < 0 ? UINT_MAX : td;
-        if (td < poc_diff) {
-          poc_diff = td;
-        }
-      }
 
       const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
 
       if (selected_CU) {
-        int td = selected_CU->inter.mv_ref[reflist] + 1;
-        int tb = cur_cu->inter.mv_ref[reflist] + 1;
-        // If the selected CU does not have the correct list (L0/L1) vector, use the other
-        if (!selected_CU->inter.mv_dir & (1 << reflist)) {
-          td = selected_CU->inter.mv_ref[reflist2nd] + 1;
+        int td, tb;
+
+        // ToDo: allow custom reference lists
+        // Without GOP, assume that every frame is a reference frame in an order
+        if (!state->encoder_control->cfg->gop_len) {
+          td = selected_CU->inter.mv_ref[reflist] + 1;
+          tb = cur_cu->inter.mv_ref[reflist] + 1;
+        } else {
+
+          // Handle with GOP
+          //ToDo: allow other than L0[0] for prediction
+
+          //Fetch ref idx of the selected CU in L0[0] ref list
+          uint32_t poc_diff = UINT_MAX;
+          uint32_t closest_ref = 0;
+          uint32_t closest_ref_poc = 0;
+
+          for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+            int ref_poc = state->frame->ref->pocs[temporal_cand];
+            int td = state->frame->poc - ref_poc;
+
+            td = td < 0 ? UINT_MAX : td;
+            if (td < poc_diff) {
+              closest_ref = temporal_cand;
+              poc_diff = td;
+            }
+          }
+
+          closest_ref_poc = state->frame->ref->pocs[closest_ref];
+
+          uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[reflist];
+
+          if (!selected_CU->inter.mv_dir & (1 << reflist)) {
+            colocated_ref_mv_ref = selected_CU->inter.mv_ref[reflist2nd];
+          }
+
+          int32_t colocated_ref_frame = state->frame->num+1;
+          uint32_t gop_len = state->encoder_control->cfg->gop_len;
+          uint32_t base_POC = state->frame->poc - (state->frame->poc % gop_len);
+
+          // Search the POC using the GOP structure
+          for (; colocated_ref_frame > 0; colocated_ref_frame--) {
+            if (base_POC + state->encoder_control->cfg->gop[colocated_ref_frame % gop_len].poc_offset == closest_ref_poc) {
+              break;
+            }
+            if (colocated_ref_frame % gop_len == 0) base_POC -= gop_len;
+          }
+          
+          uint32_t colocated_pocs[MAX_REF_PIC_COUNT];
+          base_POC = closest_ref_poc - (closest_ref_poc % gop_len);
+
+          // Reconstruct ref list
+          uint32_t max_refs = (state->encoder_control->cfg->gop[colocated_ref_frame % gop_len].ref_neg_count + state->encoder_control->cfg->gop[colocated_ref_frame % gop_len].ref_pos_count);
+          uint32_t current_ref = 0;
+          for (int32_t temp_frame = colocated_ref_frame-1; temp_frame >= 0; temp_frame--) {
+            if (state->encoder_control->cfg->gop[temp_frame % gop_len].is_ref) {
+              colocated_pocs[current_ref] = base_POC + state->encoder_control->cfg->gop[temp_frame % gop_len].poc_offset;
+              if (current_ref == max_refs) break;
+              current_ref++;
+            }
+            if (temp_frame == 0) {
+              colocated_pocs[current_ref] = 0;
+              current_ref++;
+              break;
+            }
+            if (temp_frame % gop_len == 0) base_POC -= gop_len;
+          }
+
+          td = closest_ref_poc - colocated_pocs[selected_CU->inter.mv_ref[colocated_ref_mv_ref]];
+          tb = state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]];
+          
         }
 
         int scale = CALCULATE_SCALE(NULL, tb, td);
-        mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-        mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+        int used_reflist = reflist;
+
+        // If the selected CU does not have the correct list (L0/L1) vector, use the other
+        if (!selected_CU->inter.mv_dir & (1 << reflist)) {
+          //td = state->frame->poc - state->previous_encoder_state->frame->ref->pocs[selected_CU->inter.mv_ref[reflist2nd]];
+          used_reflist = reflist2nd;
+        }
+
+
+        mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[used_reflist][0] + 127 + (scale * selected_CU->inter.mv[used_reflist][0] < 0)) >> 8);
+        mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[used_reflist][1] + 127 + (scale * selected_CU->inter.mv[used_reflist][1] < 0)) >> 8);
+        
+
+
 
         candidates++;
       }
@@ -1320,9 +1388,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       }
     }
   }
-  
+  return candidates;
   if (state->encoder_control->cfg.tmvp_enable) {
-#define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
     if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {
 
@@ -1343,29 +1410,23 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
           }
         }
 
-        int td = selected_CU->inter.mv_ref[0] + 1;
-        int tb = poc_diff;
+        int tb = state->frame->poc - state->frame->ref->pocs[selected_CU->inter.mv_ref[0]];
+        int td = poc_diff;
 
-        int scale = CALCULATE_SCALE(NULL, tb, td);
+        int scale = ((tb * ((0x4000 + (abs(td) >> 1)) / td) + 32) >> 6);
 
-        // L0 list
-        if (selected_CU->inter.mv_dir & 0x1) {
-          mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-          mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
-        }
+        mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
+        mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+        mv_cand[candidates].mv[1][0] = ((scale * selected_CU->inter.mv[1][0] + 127 + (scale * selected_CU->inter.mv[1][0] < 0)) >> 8);
+        mv_cand[candidates].mv[1][1] = ((scale * selected_CU->inter.mv[1][1] + 127 + (scale * selected_CU->inter.mv[1][1] < 0)) >> 8);
 
-        // L1 list
-        if (selected_CU->inter.mv_dir & 0x2) {
-          mv_cand[candidates].mv[1][0] = ((scale * selected_CU->inter.mv[1][0] + 127 + (scale * selected_CU->inter.mv[1][0] < 0)) >> 8);
-          mv_cand[candidates].mv[1][1] = ((scale * selected_CU->inter.mv[1][1] + 127 + (scale * selected_CU->inter.mv[1][1] < 0)) >> 8);
-        }
 
         mv_cand[candidates].dir = selected_CU->inter.mv_dir;
-        mv_cand[candidates].ref[0] = 0;
+        mv_cand[candidates].ref[0] = selected_CU->inter.mv_ref[0];
+        mv_cand[candidates].ref[1] = selected_CU->inter.mv_ref[1];
         candidates++;
       }
     }
-#undef CALCULATE_SCALE
   }
 
   if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
