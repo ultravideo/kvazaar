@@ -1059,7 +1059,7 @@ static unsigned search_frac(encoder_state_t * const state,
     height, fracpel_blocks, fme_level);
 
   kvz_pixel tmp_pic[LCU_WIDTH*LCU_WIDTH];
-  kvz_pixels_blit(pic->y + orig->y*pic->width + orig->x, tmp_pic, width, height, pic->stride, width);
+  kvz_pixels_blit(pic->y + orig->y * pic->stride + orig->x, tmp_pic, width, height, pic->stride, width);
 
   // Search integer position
   costs[0] = kvz_satd_any_size(width, height,
