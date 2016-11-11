@@ -79,12 +79,14 @@ static void swap_16b_buffer_bytes(kvz_pixel* input, int size)
 static void shift_to_bitdepth(kvz_pixel* input, int size, int from_bitdepth, int to_bitdepth)
 {
   int shift = to_bitdepth - from_bitdepth;
+  kvz_pixel bitdepth_mask = (1 << from_bitdepth) - 1;
+
   for (int i = 0; i < size; ++i) {
     // Shifting by a negative number is undefined.
     if (shift > 0) {
-      input[i] <<= shift;
+      input[i] = (input[i] & bitdepth_mask) << shift;
     } else {
-      input[i] >>= shift;
+      input[i] = (input[i] & bitdepth_mask) >> shift;
     }
   }
 }
@@ -99,6 +101,7 @@ static void shift_to_bitdepth_and_spread(kvz_pixel *input,
   assert(sizeof(kvz_pixel) > 1);
   int shift = to_bitdepth - from_bitdepth;
   unsigned char *byte_buf = (unsigned char *)input;
+  kvz_pixel bitdepth_mask = (1 << from_bitdepth) - 1;
   
   // Starting from the back of the 1-byte samples, copy each sample to it's
   // place in the 2-byte per sample array, overwriting the bytes that have
@@ -109,20 +112,33 @@ static void shift_to_bitdepth_and_spread(kvz_pixel *input,
   for (int i = size - 1; i >= 0; --i) {
     // Shifting by a negative number is undefined.
     if (shift > 0) {
-      input[i] = byte_buf[i] << shift;
+      input[i] = (byte_buf[i] & bitdepth_mask) << shift;
     } else {
-      input[i] = byte_buf[i] >> shift;
+      input[i] = (byte_buf[i] & bitdepth_mask) >> shift;
     }
   }
 }
 
 
-bool machine_is_big_endian()
+static bool machine_is_big_endian()
 {
+  // Big and little endianess refers to which end of the egg you prefer to eat
+  // first. Therefore in big endian system, the most significant bits are in
+  // the first address.
+
   uint16_t number = 1;
   char first_byte = *(char*)&number;
 
-  return (first_byte != 0);
+  return (first_byte == 0);
+}
+
+
+static void mask_to_bitdepth(kvz_pixel *buf, unsigned length, unsigned bitdepth)
+{
+  kvz_pixel bitdepth_mask = (1 << bitdepth) - 1;
+  for (int i = 0; i < length; ++i) {
+    buf[i] = buf[i] & bitdepth_mask;
+  }
 }
 
 
@@ -133,8 +149,8 @@ static int yuv_io_read_plane(
     kvz_pixel *out_buf)
 {
   unsigned bytes_per_sample = in_bitdepth > 8 ? 2 : 1;
-  unsigned buf_length = in_width * in_height;
-  unsigned buf_bytes = buf_length * bytes_per_sample;
+  unsigned buf_bytes = in_width * in_height * bytes_per_sample;
+  unsigned out_length = out_width * out_height;
 
   if (in_width == out_width) {
     // No need to extend pixels.
@@ -151,17 +167,23 @@ static int yuv_io_read_plane(
   }
 
   if (in_bitdepth > 8) {
+    // Assume little endian input.
     if (machine_is_big_endian()) {
-      swap_16b_buffer_bytes(out_buf, buf_length);
+      swap_16b_buffer_bytes(out_buf, out_length);
     }
   }
 
+  // Shift the data to the correct bitdepth.
+  // Ignore any bits larger than in_bitdepth to guarantee ouput data will be
+  // in the correct range.
   if (in_bitdepth <= 8 && out_bitdepth > 8) {
-    shift_to_bitdepth_and_spread(out_buf, buf_length, in_bitdepth, out_bitdepth);
+    shift_to_bitdepth_and_spread(out_buf, out_length, in_bitdepth, out_bitdepth);
   } else if (in_bitdepth != out_bitdepth) {
-    shift_to_bitdepth(out_buf, buf_length, in_bitdepth, out_bitdepth);
+    shift_to_bitdepth(out_buf, out_length, in_bitdepth, out_bitdepth);
+  } else if (in_bitdepth % 8 != 0) {
+    mask_to_bitdepth(out_buf, out_length, out_bitdepth);
   }
-  
+
   return 1;
 }
 
