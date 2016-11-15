@@ -297,7 +297,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
   assert(state->lcu_order_count > 0);
 
   const kvz_config *cfg = state->encoder_control->cfg;
-  
+  if ( state->encoder_control->cfg->crypto_features) {
+	  DeleteCryptoC(state->tile->dbs_g);
+	  state->tile->dbs_g = InitC();
+	  state->tile->m_prev_pos = 0;
+   }
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
