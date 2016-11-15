@@ -16,8 +16,8 @@
 extern "C" {
 #endif
     typedef void* Crypto_Handle;
-
-    STUBBED Crypto_Handle InitC();
+    STUBBED Crypto_Handle CreateC();
+    STUBBED void InitC(Crypto_Handle hdl);
     STUBBED void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream, int size_bits, unsigned char  *out_stream);
 #if AESEncryptionStreamMode
     STUBBED unsigned int ff_get_key(Crypto_Handle *hdl, int nb_bits);
@@ -38,11 +38,12 @@ extern "C" {
 
 #include <assert.h>
 
-static INLINE Crypto_Handle InitC()
-{
-  // Stub.
-  assert(0);
-  return 0;
+static INLINE Crypto_Handle CreateC() {
+    assert(0);
+    return 0;
+}
+static INLINE void InitC(Crypto_Handle hdl) {
+    assert(0);
 }
 
 static INLINE void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream,

@@ -298,8 +298,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
   const kvz_config *cfg = state->encoder_control->cfg;
   if ( state->encoder_control->cfg->crypto_features) {
-	  DeleteCryptoC(state->tile->dbs_g);
-	  state->tile->dbs_g = InitC();
+	  InitC(state->tile->dbs_g);
 	  state->tile->m_prev_pos = 0;
    }
   // Select whether to encode the frame/tile in current thread or to define
