@@ -16,8 +16,8 @@
 extern "C" {
 #endif
     typedef void* Crypto_Handle;
-
-    STUBBED Crypto_Handle InitC();
+    STUBBED Crypto_Handle CreateC();
+    STUBBED void InitC(Crypto_Handle hdl);
     STUBBED void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream, int size_bits, unsigned char  *out_stream);
 #if AESEncryptionStreamMode
     STUBBED unsigned int ff_get_key(Crypto_Handle *hdl, int nb_bits);
@@ -36,27 +36,36 @@ extern "C" {
 // Provide them in the header so we can avoid compiling the cpp file, which
 // means we don't need a C++ compiler when crypto is not enabled.
 
-#include <assert.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <inttypes.h>
 
-static INLINE Crypto_Handle InitC()
-{
-  // Stub.
-  assert(0);
-  return 0;
+static uint64_t handle_id = 1;
+
+static INLINE Crypto_Handle CreateC() {
+  printf("Crypto CreateC %" PRIu64 "\n", (uint64_t)handle_id);
+  return (void*)(handle_id++);
+}
+static INLINE void InitC(Crypto_Handle hdl) {
+  printf("Crypto InitC %" PRIu64 "\n", (uint64_t)hdl);
 }
 
 static INLINE void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream,
               int size_bits, unsigned char  *out_stream)
 {
   // Stub.
-  assert(0);
+  printf("Crypto DecryptC %" PRIu64 "\n", (uint64_t)hdl);
 }
 
 #if AESEncryptionStreamMode
 static INLINE unsigned int ff_get_key(Crypto_Handle *hdl, int nb_bits)
 {
   // Stub.
-  assert(0);
+  static Crypto_Handle ff_get_key_last_hdl = 0;
+  if (*hdl != ff_get_key_last_hdl) {
+    printf("Crypto ff_get_key %" PRIu64 "\n", (uint64_t)*hdl);
+  }
+  ff_get_key_last_hdl = *hdl;
   return 0;
 }
 #endif
@@ -64,7 +73,7 @@ static INLINE unsigned int ff_get_key(Crypto_Handle *hdl, int nb_bits)
 static INLINE void DeleteCryptoC(Crypto_Handle hdl)
 {
   // Stub.
-  assert(0);
+  printf("Crypto DeleteCryptoC %" PRIu64 "\n", (uint64_t)hdl);
 }
 
 #endif // KVZ_SEL_ENCRYPTION

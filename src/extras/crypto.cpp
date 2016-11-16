@@ -19,9 +19,12 @@ typedef struct AESDecoder {
 } AESDecoder;
 
 
-AESDecoder* Init() {
+AESDecoder* Create() {
+	AESDecoder * AESdecoder = (AESDecoder *)malloc(sizeof(AESDecoder));
+	return AESdecoder;
+}
+void  Init(AESDecoder* AESdecoder) {
     int init_val[32] = {201, 75, 219, 152, 6, 245, 237, 107, 179, 194, 81, 29, 66, 98, 198, 0, 16, 213, 27, 56, 255, 127, 242, 112, 97, 126, 197, 204, 25, 59, 38, 30};
-    AESDecoder * AESdecoder = (AESDecoder *)malloc(sizeof(AESDecoder));
     for(int i=0;i<16; i++) {
         AESdecoder->iv [i]     = init_val[i];
         AESdecoder->counter[i] = init_val[5+i];
@@ -35,7 +38,6 @@ AESDecoder* Init() {
     AESdecoder->couter_avail      = 0;
     AESdecoder->counter_index     = 0;
     AESdecoder->counter_index_pos = 0;
-    return AESdecoder;
 }
 
 void DeleteCrypto(AESDecoder * AESdecoder) {
@@ -105,11 +107,15 @@ unsigned int get_key (AESDecoder * AESdecoder, int nb_bits) {
     return key_;
 }
 #endif
-
-Crypto_Handle InitC(){
-    AESDecoder* AESdecoder = Init();
-    return AESdecoder;
+Crypto_Handle CreateC() {
+	AESDecoder* AESdecoder = Create();
+	    return AESdecoder;
 }
+
+void InitC(Crypto_Handle hdl) {
+    Init((AESDecoder*)hdl);
+}
+
 #if AESEncryptionStreamMode
 unsigned int ff_get_key (Crypto_Handle *hdl, int nb_bits) {
     return get_key ((AESDecoder*)*hdl, nb_bits);
