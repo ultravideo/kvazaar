@@ -10,6 +10,7 @@ HEVC. Compression performance will increase as we add more coding tools.
 http://ultravideo.cs.tut.fi/#encoder for more information.
 
 [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
+[![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
 
 ## Using Kvazaar
 
