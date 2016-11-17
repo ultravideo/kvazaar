@@ -686,7 +686,7 @@ static unsigned pixels_calc_ssd_avx2(const kvz_pixel *const ref, const kvz_pixel
 
     ssd = _mm_cvtsi128_si32(sum);
 
-    return ssd;
+    return ssd >> (2*(KVZ_BIT_DEPTH-8));
     break;
 
   default:
@@ -709,7 +709,7 @@ static unsigned pixels_calc_ssd_avx2(const kvz_pixel *const ref, const kvz_pixel
 
     ssd = _mm_cvtsi128_si32(sum);
 
-    return ssd;
+    return ssd >> (2*(KVZ_BIT_DEPTH-8));
     break;
   }
 }

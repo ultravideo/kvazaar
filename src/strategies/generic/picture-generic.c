@@ -532,7 +532,7 @@ static unsigned pixels_calc_ssd_generic(const kvz_pixel *const ref, const kvz_pi
     }
   }
 
-  return ssd;
+  return ssd >> (2*(KVZ_BIT_DEPTH-8));
 }
 
 
