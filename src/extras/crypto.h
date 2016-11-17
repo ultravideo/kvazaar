@@ -40,21 +40,21 @@ extern "C" {
 #include <stdint.h>
 #include <inttypes.h>
 
-static uint64_t handle_id = 1;
+static uintptr_t handle_id = 1;
 
 static INLINE Crypto_Handle CreateC() {
-  printf("Crypto CreateC %" PRIu64 "\n", (uint64_t)handle_id);
+  printf("Crypto CreateC %" PRIuPTR "\n", handle_id);
   return (void*)(handle_id++);
 }
 static INLINE void InitC(Crypto_Handle hdl) {
-  printf("Crypto InitC %" PRIu64 "\n", (uint64_t)hdl);
+  printf("Crypto InitC %" PRIuPTR "\n", (uintptr_t)hdl);
 }
 
 static INLINE void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream,
               int size_bits, unsigned char  *out_stream)
 {
   // Stub.
-  printf("Crypto DecryptC %" PRIu64 "\n", (uint64_t)hdl);
+  printf("Crypto DecryptC %" PRIuPTR "\n", (uintptr_t)hdl);
 }
 
 #if AESEncryptionStreamMode
@@ -63,7 +63,7 @@ static INLINE unsigned int ff_get_key(Crypto_Handle *hdl, int nb_bits)
   // Stub.
   static Crypto_Handle ff_get_key_last_hdl = 0;
   if (*hdl != ff_get_key_last_hdl) {
-    printf("Crypto ff_get_key %" PRIu64 "\n", (uint64_t)*hdl);
+    printf("Crypto ff_get_key %" PRIuPTR "\n", (uintptr_t)*hdl);
   }
   ff_get_key_last_hdl = *hdl;
   return 0;
@@ -73,7 +73,7 @@ static INLINE unsigned int ff_get_key(Crypto_Handle *hdl, int nb_bits)
 static INLINE void DeleteCryptoC(Crypto_Handle hdl)
 {
   // Stub.
-  printf("Crypto DeleteCryptoC %" PRIu64 "\n", (uint64_t)hdl);
+  printf("Crypto DeleteCryptoC %" PRIuPTR "\n", (uintptr_t)hdl);
 }
 
 #endif // KVZ_SEL_ENCRYPTION
