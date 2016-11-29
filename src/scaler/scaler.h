@@ -127,10 +127,20 @@ pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int h
 pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row);
 
 /**
+* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the final buffer. Stride should be the width of the input (padded image). The caller is responsible for deallocation
+*/
+pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width, int height, int stride, int has_tmp_row);
+
+/**
 * \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
 */
 yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
 yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
+
+/**
+* \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the final buffer. Stride should be the width of the input (padded image). The caller is responsible for deallocation
+*/
+yuv_buffer_t* newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row);
 
 /**
 * \brief Clone the given pic buffer

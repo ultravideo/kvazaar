@@ -335,6 +335,21 @@ pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int h
   return buffer;
 }
 
+pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width, int height, int stride, int has_tmp_row)
+{
+  pic_buffer_t* buffer = newPictureBuffer(width, height, has_tmp_row);
+
+  //If data is null skip initializing
+  if (data == NULL) return buffer;
+
+  //Initialize buffer
+  for (int row = 0; row < height; row++) {
+    memcpy(buffer->data+row*width, data+row*stride, sizeof(uint8_t)*width);
+  }
+
+  return buffer;
+}
+
 // ==============================================================================
 
 void deallocatePictureBuffer(pic_buffer_t* buffer)
@@ -469,6 +484,48 @@ yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* con
   height = height >> h_factor;
   yuv->u = newPictureBuffer_uint8(u_data, width, height, has_tmp_row);
   yuv->v = newPictureBuffer_uint8(v_data, width, height, has_tmp_row);
+
+  return yuv;
+}
+
+yuv_buffer_t* newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row)
+{
+  yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+
+  //Allocate y pic_buffer
+  yuv->y = newPictureBuffer_padded_uint8(y_data, width, height, stride, has_tmp_row);
+
+  //Allocate u and v buffers
+  int w_factor = 0;
+  int h_factor = 0;
+
+  switch (format) {
+    case CHROMA_400: {
+      //No chroma
+      width = height = 0;
+      break;
+    }
+    case CHROMA_420: {
+      w_factor = 1;
+      h_factor = 1;
+      break;
+    }
+    case CHROMA_422: {
+      w_factor = 1;
+      break;
+    }
+    case CHROMA_444: {
+      break;
+    }
+    default:
+      assert(0);//Unsupported format
+  }
+
+  width = width >> w_factor;
+  height = height >> h_factor;
+  stride = stride >> w_factor;
+  yuv->u = newPictureBuffer_padded_uint8(u_data, width, height, stride, has_tmp_row);
+  yuv->v = newPictureBuffer_padded_uint8(v_data, width, height, stride, has_tmp_row);
 
   return yuv;
 }
@@ -1136,3 +1193,5 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
 
   return dst;
 }
+
+
