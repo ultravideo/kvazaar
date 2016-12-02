@@ -1131,10 +1131,10 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
         WRITE_SE(stream, 0>>1, "scaled_ref_layer_left_offset");
         WRITE_SE(stream, 0>>1, "scaled_ref_layer_top_offset");
         WRITE_SE(stream, 0>>1, "scaled_ref_layer_right_offset");
-        WRITE_SE(stream, 4>>1, "scaled_ref_layer_bottom_offset");
+        WRITE_SE(stream, 0>>1, "scaled_ref_layer_bottom_offset");
       }
 
-      uint8_t ref_region_layer_offset_present_flag = 0; //TODO: get from somewhere
+      uint8_t ref_region_layer_offset_present_flag = 1; //TODO: get from somewhere
       WRITE_U(stream, ref_region_layer_offset_present_flag, 1, "ref_region_layer_offset_present_flag" );
       //TODO: Calculate properly.
       if( ref_region_layer_offset_present_flag ) {

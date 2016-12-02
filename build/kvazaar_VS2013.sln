@@ -27,6 +27,9 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scaler_lib", "kvazaar_scaler\kvazaar_scaler.vcxproj", "{42F395F1-58A3-4A03-A425-7F7440EC6A6D}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "scaler_tests", "scaler_tests\scaler_tests.vcxproj", "{97F19A1C-2095-4F3C-8182-2678C58CD755}"
+	ProjectSection(ProjectDependencies) = postProject
+		{42F395F1-58A3-4A03-A425-7F7440EC6A6D} = {42F395F1-58A3-4A03-A425-7F7440EC6A6D}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

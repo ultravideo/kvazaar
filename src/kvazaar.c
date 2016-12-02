@@ -42,6 +42,8 @@
 // ***********************************************
   // Modified for SHVC
 #include "scaler/scaler.h"
+#include <crtdbg.h>
+
 // ***********************************************
 
 
@@ -155,9 +157,10 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
     //Set scaling param for base layer
     //Need to use the padded size
-    uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    encoder->downscaling[0] = newScalingParameters(cfg->in_width + padding_x,cfg->in_height + padding_y,encoder->control->in.width,encoder->control->in.height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
+    //TODO: remove padding from here/figure out if it is needed
+    //uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,encoder->control->in.real_width,encoder->control->in.real_height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
     encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.width,encoder->control->in.height,CHROMA_420);
   }
   else {
@@ -218,17 +221,18 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
     //Prepare scaling parameters so that up/downscaling[layer_id] gives the correct parameters for up/downscaling from orig/prev_layer to layer_id
     //Need to use the padded size
-    uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    encoder->downscaling[layer_id_minus1 + 1] = newScalingParameters(cfg->in_width + padding_x,
-                                                                     cfg->in_height + padding_y,
-                                                                     encoder->el_control[layer_id_minus1]->in.width,
-                                                                     encoder->el_control[layer_id_minus1]->in.height,
+    //TODO: remove padding from here/figure out if it is needed
+    //uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->downscaling[layer_id_minus1 + 1] = newScalingParameters(cfg->in_width,
+                                                                     cfg->in_height,
+                                                                     encoder->el_control[layer_id_minus1]->in.real_width,
+                                                                     encoder->el_control[layer_id_minus1]->in.real_height,
                                                                      CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
     encoder->upscaling[layer_id_minus1 + 1] = newScalingParameters(encoder->upscaling[layer_id_minus1].trgt_width,
                                                                    encoder->upscaling[layer_id_minus1].trgt_height,
-                                                                   encoder->el_control[layer_id_minus1]->in.width,
-                                                                   encoder->el_control[layer_id_minus1]->in.height,
+                                                                   encoder->el_control[layer_id_minus1]->in.real_width, //TODO: Need to use padded size here?
+                                                                   encoder->el_control[layer_id_minus1]->in.real_height,
                                                                    CHROMA_420); //TODO: Account for irrecular reference structures?
   }
   // ***********************************************
@@ -438,25 +442,36 @@ void remove_ILR_pics( encoder_state_t* const state)
 }
 
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
+//TODO: remove memory db stuff
 //Create a new kvz picture based on pic_in with size given by width and height
 kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_t* param)
 {
   //Create the buffers that are passed to the scaling function
   //TODO: Consider the case when kvz_pixel is not uint8
-  assert(pic_in->width==pic_in->stride); //Should be equal or the data transfer may fail.
-  assert(pic_in->width==param->src_width); //in pic size should match the param size
-  assert(pic_in->height==param->src_height);
+  //assert(pic_in->width==pic_in->stride); //Should be equal or the data transfer may fail.
+  //assert(pic_in->width==param->src_width); //in pic size should match the param size
+  //assert(pic_in->height==param->src_height);
   
-  yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, param->chroma, 0);
+  _ASSERTE( _CrtCheckMemory() );
+
+  yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, pic_in->stride, param->chroma, 0);
+  //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, param->chroma, 0);
+  
   yuv_buffer_t* trgt_pic = yuvScaling(src_pic, param, NULL );
   
+  _ASSERTE( _CrtCheckMemory() );
+
   if( trgt_pic == NULL ) {
     deallocateYuvBuffer(src_pic);
     return NULL;
   }
+  
+  //TODO: Add proper padding
+  uint8_t padding_x = (CU_MIN_SIZE_PIXELS - param->trgt_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+  uint8_t padding_y = (CU_MIN_SIZE_PIXELS - param->trgt_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
 
   //Create a new kvz picture from the buffer
-  kvz_picture* pic_out = kvz_image_alloc(param->trgt_width, param->trgt_height);
+  kvz_picture* pic_out = kvz_image_alloc(param->trgt_width+padding_x, param->trgt_height+padding_y);
   if( pic_out == NULL) {
     deallocateYuvBuffer(src_pic);
     deallocateYuvBuffer(trgt_pic);
@@ -466,17 +481,56 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   pic_out->pts = pic_in->pts;
 
   //Copy data to kvz picture
-  int luma_size = param->trgt_width*param->trgt_height;
+  /*int luma_size = param->trgt_width*param->trgt_height;
   int chroma_size = luma_size/(param->chroma == CHROMA_420 ? 4 : param->chroma == CHROMA_444 ? 1 : 0);
   int full_size = luma_size + chroma_size*2;
   for(int i = 0; i < full_size; i++) {
     pic_out->fulldata[i] = i < luma_size ? trgt_pic->y->data[i] : (i < luma_size+chroma_size ? trgt_pic->u->data[i-luma_size] : trgt_pic->v->data[i-luma_size-chroma_size]);
+  }*/
+
+  int chroma_shift = param->chroma == CHROMA_444 ? 0 : 1;
+  pic_data_t* comp_list[] = {trgt_pic->y->data, trgt_pic->u->data, trgt_pic->v->data};
+  int stride_list[] = {trgt_pic->y->width,trgt_pic->u->width,trgt_pic->v->width};
+  int height_list[] = {trgt_pic->y->height,trgt_pic->u->height,trgt_pic->v->height};
+  int padd_x[] = {padding_x,padding_x>>chroma_shift,padding_x>>chroma_shift};
+  int padd_y[] = {padding_y,padding_y>>chroma_shift,padding_y>>chroma_shift};
+  assert(sizeof(kvz_pixel)==sizeof(char)); //Image copy (memset) only works if the pixels are the same size as char 
+  
+  _ASSERTE( _CrtCheckMemory() );
+
+  //Loop over components
+  for (int comp = 0, i = 0; comp < 3; comp++) {
+    int comp_size = height_list[comp]*stride_list[comp];
+    int pic_out_stride = pic_out->stride >> ( comp < 1 ? 0 : chroma_shift );
+    for (int src_ind = 0; src_ind < comp_size; i++, src_ind++) {
+      //TODO: go over src image correctly
+      //TODO: Make a better loop
+      //Copy value normally
+      pic_out->fulldata[i] = comp_list[comp][src_ind];
+        
+      //_ASSERTE( _CrtCheckMemory() );
+      if ( padding_x != 0 && (src_ind % stride_list[comp] == stride_list[comp]-1) ) { //Padd end of row by copying last pixel
+        memset(pic_out->fulldata + i + 1, pic_out->fulldata[i], padd_x[comp]);
+        //_ASSERTE( _CrtCheckMemory() );
+        i += padd_x[comp];
+      }
+    }
+    if (padd_y[comp] != 0 ) { //Padd image with lines copied from the prev row
+        for (int j = 0; j < padd_y[comp]; j++) {
+          memcpy(pic_out->fulldata + i, pic_out->fulldata + i - pic_out_stride, pic_out_stride);
+          //_ASSERTE( _CrtCheckMemory() );
+          i += pic_out_stride;
+        }
+    }
   }
+
+  _ASSERTE( _CrtCheckMemory() );
 
   //Do deallocation
   deallocateYuvBuffer(src_pic);
+  _ASSERTE( _CrtCheckMemory() );
   deallocateYuvBuffer(trgt_pic);
-
+  _ASSERTE( _CrtCheckMemory() );
   return pic_out;
 }
 

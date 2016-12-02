@@ -578,9 +578,54 @@ void test5()
   fclose(file);
 }
 
+//Scale videos
+void vscaling()
+{
+  int32_t out_width = 1920;
+  int32_t out_height = 1080;
+  int32_t in_width = 960;
+  int32_t in_height = 540;
+  int framerate = 24;
+  int frames = 300;
+
+  //const char* file_name_format = "Kimono1_%ix%i_%i.yuv";
+
+  char in_file_name[BUFF_SIZE];
+  sprintf(in_file_name, "Kimono1_%ix%i_%i.yuv", in_width, in_height, framerate);
+
+  char out_file_name[BUFF_SIZE];
+  sprintf(out_file_name, "Kimono1_%ix%i_%i_s.yuv", out_width, out_height, framerate);
+  
+  FILE* out_file = fopen(out_file_name, "wb");
+  FILE* file = fopen(in_file_name, "rb");
+  if (file == NULL || out_file == NULL) {
+    perror("FIle open failed");
+    printf("File name: %s", in_file_name);
+  }
+
+  yuv_buffer_t* data = newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* out = newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  int i = 0;
+  
+  while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
+
+      kvzScaling(data, &out);
+
+
+      yuv_io_write(out_file, out, out->y->width, out->y->height);
+
+      printf("Frame number %i\n",++i);
+  }
+
+  deallocateYuvBuffer(data);
+  deallocateYuvBuffer(out);
+  fclose(file);
+  fclose(out_file);
+}
+
 int main()
 {
-  test5();
+  vscaling();
 
   system("Pause");
   return EXIT_SUCCESS;

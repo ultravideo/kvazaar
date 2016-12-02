@@ -344,7 +344,9 @@ pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width
 
   //Initialize buffer
   for (int row = 0; row < height; row++) {
-    memcpy(buffer->data+row*width, data+row*stride, sizeof(uint8_t)*width);
+    for (int col = 0; col < width; col++) {
+      buffer->data[col + row*width] =  (pic_data_t)data[col + row*stride];
+    }
   }
 
   return buffer;
