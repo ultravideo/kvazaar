@@ -1251,7 +1251,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   //*********************************************
   //For scalable extension. TODO: A better way to check if ILR?
 
-  bool is_ILR = state->global->poc == state->global->ref->pocs[ref_idx];
+  bool is_ILR = state->frame->poc == state->frame->ref->pocs[ref_idx];
   
 
   vector2d_t mv = { 0, 0 };

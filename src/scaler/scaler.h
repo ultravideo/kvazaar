@@ -25,12 +25,13 @@
 
 /*=====================Scaling parameter definition=====================*/
 //Format for specifying the ratio between chroma and luma
+//Match the ones used in kvazaar.h
 typedef enum
 {
-  CHROMA_400,
-  CHROMA_420,
-  CHROMA_422,
-  CHROMA_444
+  CHROMA_400 = 0,
+  CHROMA_420 = 1,
+  CHROMA_422 = 2,
+  CHROMA_444 = 3
 } chroma_format_t;
 
 //TODO: Move to .c?

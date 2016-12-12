@@ -314,8 +314,8 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
     WRITE_U(stream, chroma_and_bit_depth_vps_present_flag, 1, "chroma_and_bit_depth_vps_present_flag");
 
     if (chroma_and_bit_depth_vps_present_flag) {
-      WRITE_U(stream, encoder->in.video_format, 2, "chroma_format_vps_idc");
-      if (encoder->in.video_format == 3) {
+      WRITE_U(stream, encoder->chroma_format, 2, "chroma_format_vps_idc");
+      if (encoder->chroma_format == KVZ_CSP_444) {
         WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
       }
       WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_luma_minus8");
@@ -695,9 +695,9 @@ void writeSTermRSet_(encoder_state_t* const state, int neg_ref_minus)
     if (encoder->cfg->gop_len) {
       int8_t found = 0;
       do {
-        delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
-        for (int i = 0; i < state->global->ref->used_size; i++) {
-          if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
+        delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+        for (int i = 0; i < state->frame->ref->used_size; i++) {
+          if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
             found = 1;
             break;
           }
@@ -722,9 +722,9 @@ void writeSTermRSet_(encoder_state_t* const state, int neg_ref_minus)
     if (encoder->cfg->gop_len) {
       int8_t found = 0;
       do {
-        delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
-        for (int i = 0; i < state->global->ref->used_size; i++) {
-          if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
+        delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+        for (int i = 0; i < state->frame->ref->used_size; i++) {
+          if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
             found = 1;
             break;
           }
@@ -782,9 +782,9 @@ void writeSTermRSet(encoder_state_t* const state, unsigned idx )
       if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_neg[j + poc_shift];
-          for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->pocs[i] == state->global->poc - delta_poc) {
+          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+          for (int i = 0; i < state->frame->ref->used_size; i++) {
+            if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
               found = 1;
               break;
             }
@@ -809,9 +809,9 @@ void writeSTermRSet(encoder_state_t* const state, unsigned idx )
       if (encoder->cfg->gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->global->gop_offset].ref_pos[j + poc_shift];
-          for (int i = 0; i < state->global->ref->used_size; i++) {
-            if (state->global->ref->pocs[i] == state->global->poc + delta_poc) {
+          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+          for (int i = 0; i < state->frame->ref->used_size; i++) {
+            if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
               found = 1;
               break;
             }
@@ -1337,7 +1337,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     }
   } else ref_negative = state->frame->ref->used_size;
   //TODO: Make a better implementation
-  //if( ref_negative > 0 && state->global->ref->pocs[state->global->ref->used_size-1] == state->global->poc) --ref_negative;
+  //if( ref_negative > 0 && state->frame->ref->pocs[state->frame->ref->used_size-1] == state->frame->poc) --ref_negative;
   // ***********************************************
   
 #ifdef KVZ_DEBUG
@@ -1462,7 +1462,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
-}
+
     //end if
   //end if
 
@@ -1471,7 +1471,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   // TODO: Get proper values.
   if (state->layer->layer_id > 0) {  //&& !default_ref_layers_active_flag && NumDirectRefLayers[nuh_layer_id] > 0 ){
     //default_ref_layers_active_flag == 0; NumDirectRefLayers[1] == 1
-    uint8_t inter_layer_pred_enabled_flag = state->global->slicetype != KVZ_SLICE_I; //TODO: A better way?
+    uint8_t inter_layer_pred_enabled_flag = state->frame->slicetype != KVZ_SLICE_I; //TODO: A better way?
     WRITE_U(stream, inter_layer_pred_enabled_flag, 1, "inter_layer_pred_enabled_flag");
     
     if( inter_layer_pred_enabled_flag /* && NumDirectRefLayers[nu_layer_id] > 1 */) {

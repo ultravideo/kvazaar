@@ -160,8 +160,9 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     //TODO: remove padding from here/figure out if it is needed
     //uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,encoder->control->in.real_width,encoder->control->in.real_height,CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.width,encoder->control->in.height,CHROMA_420);
+    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
+    encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,encoder->control->in.real_width,encoder->control->in.real_height,csp); //TODO: get proper width/height for each layer from cfg etc.
+    encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.width,encoder->control->in.height,csp);
   }
   else {
     encoder->el_control = NULL;
@@ -207,7 +208,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
         goto kvazaar_open_failure;
       }
 
-      encoder->el_states[layer_id_minus1][i].global->QP = (int8_t)cfg->el_cfg[layer_id_minus1]->qp;
+      encoder->el_states[layer_id_minus1][i].frame->QP = (int8_t)cfg->el_cfg[layer_id_minus1]->qp;
     }
 
     for (int i = 0; i < encoder->num_encoder_states; ++i) {
@@ -217,23 +218,24 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
       kvz_encoder_state_match_children_of_previous_frame(&encoder->el_states[layer_id_minus1][i]);
     }
 
-    encoder->el_states[layer_id_minus1][encoder->cur_el_state_num[layer_id_minus1]].global->frame = -1;
+    encoder->el_states[layer_id_minus1][encoder->cur_el_state_num[layer_id_minus1]].frame->num = -1;
 
     //Prepare scaling parameters so that up/downscaling[layer_id] gives the correct parameters for up/downscaling from orig/prev_layer to layer_id
     //Need to use the padded size
     //TODO: remove padding from here/figure out if it is needed
     //uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
     encoder->downscaling[layer_id_minus1 + 1] = newScalingParameters(cfg->in_width,
                                                                      cfg->in_height,
                                                                      encoder->el_control[layer_id_minus1]->in.real_width,
                                                                      encoder->el_control[layer_id_minus1]->in.real_height,
-                                                                     CHROMA_420); //TODO: get proper width/height for each layer from cfg etc.
+                                                                     csp); //TODO: get proper width/height for each layer from cfg etc.
     encoder->upscaling[layer_id_minus1 + 1] = newScalingParameters(encoder->upscaling[layer_id_minus1].trgt_width,
                                                                    encoder->upscaling[layer_id_minus1].trgt_height,
                                                                    encoder->el_control[layer_id_minus1]->in.real_width, //TODO: Need to use padded size here?
                                                                    encoder->el_control[layer_id_minus1]->in.real_height,
-                                                                   CHROMA_420); //TODO: Account for irrecular reference structures?
+                                                                   csp); //TODO: Account for irrecular reference structures?
   }
   // ***********************************************
   
@@ -422,9 +424,9 @@ static int kvazaar_encode(kvz_encoder *enc,
 //{
 //
 //
-//  info->el_qp[layer_id_minus1] = state->global->QP;
-//  info->el_nal_unit_type[layer_id_minus1] = state->global->pictype;
-//  info->el_slice_type[layer_id_minus1] = state->global->slicetype;
+//  info->el_qp[layer_id_minus1] = state->frame->QP;
+//  info->el_nal_unit_type[layer_id_minus1] = state->frame->pictype;
+//  info->el_slice_type[layer_id_minus1] = state->frame->slicetype;
 //  kvz_encoder_get_ref_lists(state, info->el_ref_list_len[layer_id_minus1], info->el_ref_list[layer_id_minus1]);
 //}
 
@@ -432,11 +434,11 @@ static int kvazaar_encode(kvz_encoder *enc,
 void remove_ILR_pics( encoder_state_t* const state)
 {
   //Loop over refs and remove IL refs from the list
-  for( unsigned i = 0; i < state->global->ref->used_size; i++) {
+  for( unsigned i = 0; i < state->frame->ref->used_size; i++) {
     //TODO: Figure out a better way? Eg. extra info.
     //If a ref_poc matches the prev frames poc, the ref should have been an ILR in the prev frame.
-    if( state->global->ref->pocs[i] == state->previous_encoder_state->global->poc ) {
-      kvz_image_list_rem( state->global->ref, i);
+    if( state->frame->ref->pocs[i] == state->previous_encoder_state->frame->poc ) {
+      kvz_image_list_rem( state->frame->ref, i);
     }
   }
 }
@@ -471,7 +473,7 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   uint8_t padding_y = (CU_MIN_SIZE_PIXELS - param->trgt_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
 
   //Create a new kvz picture from the buffer
-  kvz_picture* pic_out = kvz_image_alloc(param->trgt_width+padding_x, param->trgt_height+padding_y);
+  kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,param->trgt_width+padding_x, param->trgt_height+padding_y);
   if( pic_out == NULL) {
     deallocateYuvBuffer(src_pic);
     deallocateYuvBuffer(trgt_pic);
@@ -578,39 +580,40 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
       
       //TODO: Find a better way.
       //deallocate dummy cu_array
-      cu_array_t* cua = state->global->ref->cu_arrays[0]; //ILR pic should be first
-      int used_size = state->global->ref->used_size;
+      cu_array_t* cua = state->frame->ref->cu_arrays[0]; //ILR pic should be first
+      int used_size = state->frame->ref->used_size;
       remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
       if( used_size > 0 ) kvz_cu_array_free(cua);
       
-        kvz_encoder_next_frame(state);
+        kvz_encoder_prepare(state);
 
       //TODO: Move somewhere else. slicetype still refers to the prev slice?
       //TODO: Allow first EL layer to be a P-slice
-      if (state->global->frame > 0) {//(state->global->slicetype != KVZ_SLICE_I) {
+      if (state->frame->num > 0) {//(state->frame->slicetype != KVZ_SLICE_I) {
         //Also add base layer to the reference list.
         encoder_state_t *bl_state = &enc->states[*cur_el_state_num]; //Should return the bl state with the same poc as state.
-        //assert(state->global->poc == bl_state->global->poc);
+        //assert(state->frame->poc == bl_state->frame->poc);
         //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
         //Skip on first frame? Skip if inter frame. 
-        //if (state->global->frame > 0) {
-          kvz_image_list_add/*_back*/(state->global->ref,
+        //if (state->frame->frame > 0) {
+          kvz_image_list_add/*_back*/(state->frame->ref,
             kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
             /*bl_state->tile->frame->cu_array,*/ kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
-            bl_state->global->poc);//bl_state->tile->frame->cu_array, bl_state->global->poc );//
+            bl_state->frame->poc);//bl_state->tile->frame->cu_array, bl_state->frame->poc );//
         //}
       }
     }
 
     if (l_pic_in != NULL) {
       // FIXME: The frame number printed here is wrong when GOP is enabled.
-      CHECKPOINT_MARK("read source frame: %d", state->global->frame + enc->el_control[layer_id_minus1]->cfg->seek);
+      CHECKPOINT_MARK("read source frame: %d", state->frame->frame + enc->el_control[layer_id_minus1]->cfg->seek);
     }
 
-    if (kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, l_pic_in)) {
-      assert(state->global->frame == *el_frames_started);
+    kvz_picture* frame = kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, l_pic_in);
+    if (frame) {
+      assert(state->frame->num == *el_frames_started);
       // Start encoding.
-      kvz_encode_one_frame(state);
+      kvz_encode_one_frame(state, frame);
 
       *el_frames_started += 1;
     }

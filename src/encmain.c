@@ -208,8 +208,11 @@ static void* input_read_thread(void* in_args)
         if (args->opts->loop_input && args->input != stdin) {
           fclose(args->input);
           args->input = fopen(args->opts->input, "rb");
-          if (args->input == NULL)
-          {
+          if (args->input == NULL) {
+            fprintf(stderr, "Could not re-open input file, shutting down!\n");
+            retval = RETVAL_FAILURE;
+            goto done;
+          }
           bool read_success = yuv_io_read(args->input,
                                           args->opts->config->in_width,
                                           args->opts->config->in_height,
@@ -266,6 +269,7 @@ done:
   pthread_exit(NULL);
   return 0;
 }
+  
 
 
 /**
