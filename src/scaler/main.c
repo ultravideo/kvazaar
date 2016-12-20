@@ -581,10 +581,10 @@ void test5()
 //Scale videos
 void vscaling()
 {
-  int32_t out_width = 1920;
-  int32_t out_height = 1080;
-  int32_t in_width = 960;
-  int32_t in_height = 540;
+  int32_t in_width = 1920;
+  int32_t in_height = 1080;
+  int32_t out_width = 960;
+  int32_t out_height = 540;
   int framerate = 24;
   int frames = 300;
 

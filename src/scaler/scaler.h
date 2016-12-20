@@ -66,6 +66,13 @@ typedef struct
 
   int add_x;
   int add_y;
+
+  int delta_x;
+  int delta_y;
+
+  //Phase parameters mostly for chroma
+  //int phase_x;
+  //int phase_y;
 } scaling_parameter_t;
 
 /*==========================================================================*/

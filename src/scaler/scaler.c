@@ -657,7 +657,7 @@ void _resample(const pic_buffer_t* const buffer, const scaling_parameter_t* cons
 
     for (int j = 0; j < trgt_width; j++) {
       //Calculate reference position in src pic
-      int ref_pos_16 = (int)((unsigned int)(j * param->scale_x + param->add_x) >> shift_x);
+      int ref_pos_16 = (int)((unsigned int)(j * param->scale_x + param->add_x) >> shift_x)  - param->delta_x;
       int phase = ref_pos_16 & 15;
       int ref_pos = ref_pos_16 >> 4;
 
@@ -683,7 +683,7 @@ void _resample(const pic_buffer_t* const buffer, const scaling_parameter_t* cons
     pic_data_t* src_col = &buffer->data[i];
     for (int j = 0; j < trgt_height; j++) {
       //Calculate ref pos
-      int ref_pos_16 = (int)((unsigned int)(j * param->scale_y + param->add_y) >> shift_y);
+      int ref_pos_16 = (int)((unsigned int)(j * param->scale_y + param->add_y) >> shift_y) - param->delta_y;
       int phase = ref_pos_16 & 15;
       int ref_pos = ref_pos_16 >> 4;
 
@@ -771,7 +771,7 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
 
     for (int j = 0; j < trgt_width; j++) {
       //Calculate reference position in src pic
-      int ref_pos_16 = (int)((unsigned int)(j * param->scale_x + param->add_x) >> shift_x);
+      int ref_pos_16 = (int)((unsigned int)(j * param->scale_x + param->add_x) >> shift_x) - param->delta_x;
       int phase = ref_pos_16 & 15;
       int ref_pos = ref_pos_16 >> 4;
 
@@ -797,7 +797,7 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
     pic_data_t* src_col = &buffer->data[i];
     for (int j = 0; j < trgt_height; j++) {
       //Calculate ref pos
-      int ref_pos_16 = (int)((unsigned int)(j * param->scale_y + param->add_y) >> shift_y);
+      int ref_pos_16 = (int)((unsigned int)(j * param->scale_y + param->add_y) >> shift_y) - param->delta_y;
       int phase = ref_pos_16 & 15;
       int ref_pos = ref_pos_16 >> 4;
 
@@ -827,7 +827,7 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
 //Calculate scaling parameters and update param. Factor determines if certain values are 
 // divided eg. with chroma. 0 for no factor and -1 for halving stuff and 1 for doubling etc.
 //Calculations from SHM
-void calculateParameters(scaling_parameter_t* const param, const int w_factor, const int h_factor)
+static void calculateParameters(scaling_parameter_t* const param, const int w_factor, const int h_factor, const int is_chroma)
 {
   //First shift widths/height by an appropriate factor
   param->src_width = SHIFT(param->src_width, w_factor);
@@ -850,9 +850,25 @@ void calculateParameters(scaling_parameter_t* const param, const int w_factor, c
   param->scale_x = (((unsigned int)param->scaled_src_width << param->shift_x) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width;
   param->scale_y = (((unsigned int)param->scaled_src_height << param->shift_y) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height;
 
-  //TODO: Add dependace to phase?
-  param->add_x = (param->rnd_trgt_width >> 1) / param->rnd_trgt_width + (1 << (param->shift_x - 5));
-  param->add_y = (param->rnd_trgt_height >> 1) / param->rnd_trgt_height + (1 << (param->shift_y - 5));
+  //Phase calculations
+  //param->phase_x = 0;
+  //param->phase_y = 0;
+  int phase_x = 0;
+  int phase_y = 0;
+  //Hardcode phases for chroma, values from SHM. TODO: Find out why these values?
+  if( is_chroma != 0 && param->chroma!=CHROMA_444 ) {
+    //param->phase_y = 1;
+    phase_y = 1;
+  }
+
+  //TODO: Is delta_? strictly necessary?
+  param->add_x = (((param->scaled_src_width * phase_x) << (param->shift_x - 2)) + (param->rnd_trgt_width >> 1)) / param->rnd_trgt_width + (1 << (param->shift_x - 5));
+  param->add_y = (((param->scaled_src_height * phase_y) << (param->shift_y - 2)) + (param->rnd_trgt_height >> 1)) / param->rnd_trgt_height + (1 << (param->shift_y - 5));
+  //param->add_x = -(((phase_x * param->scale_x + 8) >> 4 ) - (1 << (param->shift_x - 5)));
+  //param->add_y = -(((phase_y * param->scale_y + 8) >> 4 ) - (1 << (param->shift_y - 5)));
+
+  param->delta_x = 4 * phase_x; //- (left_offset << 4)
+  param->delta_y = 4 * phase_y; //- (top_offset << 4)
 }
 
 scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
@@ -881,7 +897,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
   param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
   //Pre-Calculate other parameters
-  calculateParameters(&param, 0, 0);
+  calculateParameters(&param, 0, 0, 0);
 
   return param;
 }
@@ -912,7 +928,7 @@ scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trg
   param.scaled_src_height = ((scaled_src_height * param.rnd_trgt_height + (ver_div >> 1)) / ver_div) << 1;
 
   //Pre-Calculate other parameters
-  calculateParameters(&param, 0, 0);
+  calculateParameters(&param, 0, 0, 0);
 
   return param;
 }
@@ -978,7 +994,7 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
   if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
     param.src_width = yuv->y->width;
     param.src_height = yuv->y->height;
-    calculateParameters(&param, w_factor, h_factor);
+    calculateParameters(&param, w_factor, h_factor, 0);
   }
 
   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
@@ -1039,7 +1055,7 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
   if (param.chroma != CHROMA_400) {
     //If chroma size differs from luma size, we need to recalculate the parameters
     if (h_factor != 0 || w_factor != 0) {
-      calculateParameters(&param, w_factor, h_factor);
+      calculateParameters(&param, w_factor, h_factor, 1);
     }
 
     //Resample u
@@ -1103,7 +1119,7 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
   if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
     param.src_width = yuv->y->width;
     param.src_height = yuv->y->height;
-    calculateParameters(&param, w_factor, h_factor);
+    calculateParameters(&param, w_factor, h_factor, 0);
   }
 
   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
@@ -1176,7 +1192,7 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
   if (param.chroma != CHROMA_400) {
     //If chroma size differs from luma size, we need to recalculate the parameters
     if (h_factor != 0 || w_factor != 0) {
-      calculateParameters(&param, w_factor, h_factor);
+      calculateParameters(&param, w_factor, h_factor, 1);
     }
 
     //Resample u
