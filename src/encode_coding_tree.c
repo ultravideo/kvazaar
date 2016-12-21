@@ -551,7 +551,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
     uint32_t j;
     int ref_list[2] = { 0, 0 };
     for (j = 0; j < state->frame->ref->used_size; j++) {
-      if (state->frame->ref->pocs[j] < state->frame->poc) {
+      if (state->frame->ref->pocs[j] <= state->frame->poc) {
         ref_list[0]++;
       } else {
         ref_list[1]++;
