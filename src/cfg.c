@@ -830,6 +830,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
+    } else if (atoi(value) == 0) {
+      //Disable gop
+      cfg->gop_len = 0;
+      cfg->gop_lowdelay = 0;
+      cfg->gop_lp_definition.d = 0;
+      cfg->gop_lp_definition.t = 0;
     } else if (atoi(value)) {
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
