@@ -134,7 +134,9 @@ libkvazaar_la_SOURCES = \
 	strategyselector.h \
 	extras/libmd5.c \
 	extras/libmd5.h \
-	extras/crypto.h
+	extras/crypto.h \
+	scaler/scaler.h \
+	scaler/scaler.c
 
 libkvazaar_la_CFLAGS =
 
