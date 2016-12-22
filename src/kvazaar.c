@@ -162,7 +162,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
     encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,encoder->control->in.real_width,encoder->control->in.real_height,csp); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.width,encoder->control->in.height,csp);
+    encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.real_width,encoder->control->in.real_height,csp);
   }
   else {
     encoder->el_control = NULL;
@@ -236,6 +236,11 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
                                                                    encoder->el_control[layer_id_minus1]->in.real_width, //TODO: Need to use padded size here?
                                                                    encoder->el_control[layer_id_minus1]->in.real_height,
                                                                    csp); //TODO: Account for irrecular reference structures?
+    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be badded as well?
+    //Scaling parameters need to be calculated for the true sizes.
+    //TODO: Do this in scaling using offsets; check that they are the same as the paddings
+    //encoder->upscaling[layer_id_minus1 + 1].src_width += (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    //encoder->upscaling[layer_id_minus1 + 1].src_height += (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
   }
   // ***********************************************
   
@@ -455,10 +460,18 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   //assert(pic_in->height==param->src_height);
   
   _ASSERTE( _CrtCheckMemory() );
+  assert(pic_in!=NULL);
 
-  yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, pic_in->stride, param->chroma, 0);
-  //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width, param->src_height, param->chroma, 0);
+  //Change src size to be equal to. TODO: make a proper implementation
+  //param->scale_y = param->scale_x;
+  //param->add_y = param->add_x;
+  //assert(param->src_width+param->right_offset==pic_in->width);
+  //assert(param->src_height+param->bottom_offset==pic_in->height);
+  //yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->right_offset, param->src_height+param->bottom_offset, pic_in->stride, param->chroma, 0);
+  yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
   
+  
+
   yuv_buffer_t* trgt_pic = yuvScaling(src_pic, param, NULL );
   
   _ASSERTE( _CrtCheckMemory() );
@@ -537,7 +550,8 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
 }
 
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
-//TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity
+//TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
+//TODO: Merge with kvazaar_encode?
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   //DO scaling here
@@ -595,12 +609,12 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
         //assert(state->frame->poc == bl_state->frame->poc);
         //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
         //Skip on first frame? Skip if inter frame. 
-        //if (state->frame->frame > 0) {
+        if (bl_state->tile->frame->rec != NULL) {
           kvz_image_list_add/*_back*/(state->frame->ref,
             kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
             /*bl_state->tile->frame->cu_array,*/ kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
             bl_state->frame->poc);//bl_state->tile->frame->cu_array, bl_state->frame->poc );//
-        //}
+        }
       }
     }
 

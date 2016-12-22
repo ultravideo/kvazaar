@@ -455,6 +455,7 @@ yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* con
 
   //Allocate y pic_buffer
   yuv->y = newPictureBuffer_uint8(y_data, width, height, has_tmp_row);
+  yuv->format = format;
 
   //Allocate u and v buffers
   int w_factor = 0;
@@ -720,8 +721,9 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
   int ver_filter = 0;
   int hor_filter = 0;
 
-  int src_height = param->src_height;
-  int src_width = param->src_width;
+  //TODO: Should this "padding" be done only when downscaling?
+  int src_height = param->src_height - (is_upscaling?param->bottom_offset:0);
+  int src_width = param->src_width - (is_upscaling?param->right_offset:0);
   int trgt_height = param->rnd_trgt_height;//param->rnd_trgt_height;
   int trgt_width = param->rnd_trgt_width;//param->rnd_trgt_width;
 
@@ -765,7 +767,7 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
 
   pic_data_t* tmp_row = buffer->tmp_row;
 
-  // Horizontal downsampling
+  // Horizontal resampling
   for (int i = 0; i < src_height; i++) {
     pic_data_t* src_row = &buffer->data[i * buffer->width];
 
@@ -792,7 +794,7 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
 
   pic_data_t* tmp_col = tmp_row; //rename for clarity
 
-  // Vertical downsampling
+  // Vertical resampling
   for (int i = 0; i < trgt_width; i++) {
     pic_data_t* src_col = &buffer->data[i];
     for (int j = 0; j < trgt_height; j++) {
@@ -992,9 +994,10 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
 
   //Check if base param and yuv buffer are the same size, if yes we can asume parameters are initialized
   if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
-    param.src_width = yuv->y->width;
-    param.src_height = yuv->y->height;
-    calculateParameters(&param, w_factor, h_factor, 0);
+    //TODO: fix eg. account for padding
+    //param.src_width = yuv->y->width;
+    //param.src_height = yuv->y->height;
+    //calculateParameters(&param, 0, 0, 0);
   }
 
   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
