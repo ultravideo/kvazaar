@@ -77,6 +77,7 @@ void kvz_bitstream_move(bitstream_t *dst, bitstream_t *src);
 void kvz_bitstream_clear(bitstream_t *stream);
 
 void kvz_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
+void kvz_bitstream_put_byte(bitstream_t *const stream, const uint32_t data);
 /* Use macros to force inlining */
 #define bitstream_put_ue(stream, data) { kvz_bitstream_put(stream,kvz_g_exp_table[data].value,kvz_g_exp_table[data].len); }
 #define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \

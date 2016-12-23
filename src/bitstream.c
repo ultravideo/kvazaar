@@ -217,15 +217,33 @@ void kvz_bitstream_clear(bitstream_t *const stream)
 }
 
 /**
+ * \brief Write a byte to a byte aligned bitstream
+ * \param stream  stream the data is to be appended to
+ * \param data  input data
+ */
+void kvz_bitstream_put_byte(bitstream_t *const stream, uint32_t data)
+{
+  assert(stream->cur_bit == 0);
+  const uint8_t emulation_prevention_three_byte = 0x03;
+
+  if ((stream->zerocount == 2) && (data < 4)) {
+    kvz_bitstream_writebyte(stream, emulation_prevention_three_byte);
+    stream->zerocount = 0;
+  }
+  stream->zerocount = data == 0 ? stream->zerocount + 1 : 0;
+  kvz_bitstream_writebyte(stream, data);
+}
+
+/**
  * \brief Write bits to bitstream
- * \param stream pointer bitstream to put the data
- * \param data input data
- * \param bits number of bits to write from data to stream
+ *        Buffers individual bits untill they make a full byte.
+ * \param stream  stream the data is to be appended to
+ * \param data  input data
+ * \param bits  number of bits to write from data to stream
  */
 void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t bits)
 {
-  const uint8_t emulation_prevention_three_byte = 0x03;
-  while(bits--) {
+  while (bits--) {
     stream->data <<= 1;
 
     if (data & kvz_bit_set_mask[bits]) {
@@ -234,18 +252,9 @@ void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t b
     stream->cur_bit++;
 
     // write byte to output
-    if (stream->cur_bit==8) {
+    if (stream->cur_bit == 8) {
       stream->cur_bit = 0;
-      if((stream->zerocount == 2) && (stream->data < 4)) {
-        kvz_bitstream_writebyte(stream, emulation_prevention_three_byte);
-        stream->zerocount = 0;
-      }
-      if(stream->data == 0) {
-        stream->zerocount++;
-      } else {
-        stream->zerocount = 0;
-      }
-      kvz_bitstream_writebyte(stream, stream->data);
+      kvz_bitstream_put_byte(stream, stream->data);
     }
   }
 }

@@ -141,11 +141,11 @@ void kvz_cabac_write(cabac_data_t * const data)
       uint32_t carry = lead_byte >> 8;
       uint32_t byte = data->buffered_byte + carry;
       data->buffered_byte = lead_byte & 0xff;
-      kvz_bitstream_put(data->stream, byte, 8);
+      kvz_bitstream_put_byte(data->stream, byte);
 
       byte = (0xff + carry) & 0xff;
       while (data->num_buffered_bytes > 1) {
-        kvz_bitstream_put(data->stream, byte, 8);
+        kvz_bitstream_put_byte(data->stream, byte);
         data->num_buffered_bytes--;
       }
     } else {
@@ -163,18 +163,18 @@ void kvz_cabac_finish(cabac_data_t * const data)
   assert(data->bits_left <= 32);
 
   if (data->low >> (32 - data->bits_left)) {
-    kvz_bitstream_put(data->stream,data->buffered_byte + 1, 8);
+    kvz_bitstream_put_byte(data->stream, data->buffered_byte + 1);
     while (data->num_buffered_bytes > 1) {
-      kvz_bitstream_put(data->stream, 0, 8);
+      kvz_bitstream_put_byte(data->stream, 0);
       data->num_buffered_bytes--;
     }
     data->low -= 1 << (32 - data->bits_left);
   } else {
     if (data->num_buffered_bytes > 0) {
-      kvz_bitstream_put(data->stream,data->buffered_byte, 8);
+      kvz_bitstream_put_byte(data->stream, data->buffered_byte);
     }
     while (data->num_buffered_bytes > 1) {
-      kvz_bitstream_put(data->stream, 0xff, 8);
+      kvz_bitstream_put_byte(data->stream, 0xff);
       data->num_buffered_bytes--;
     }
   }
