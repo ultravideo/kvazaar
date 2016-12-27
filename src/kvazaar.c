@@ -162,7 +162,9 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
     encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,encoder->control->in.real_width,encoder->control->in.real_height,csp); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[0] = newScalingParameters(encoder->control->in.width,encoder->control->in.height,encoder->control->in.real_width,encoder->control->in.real_height,csp);
+    encoder->upscaling[0] = newScalingParameters(encoder->control->in.real_width,encoder->control->in.real_height,encoder->control->in.real_width,encoder->control->in.real_height,csp);
+    encoder->upscaling[0].src_padding_x = (CU_MIN_SIZE_PIXELS - encoder->upscaling[0].src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->upscaling[0].src_padding_y = (CU_MIN_SIZE_PIXELS - encoder->upscaling[0].src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
   }
   else {
     encoder->el_control = NULL;
@@ -236,11 +238,10 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
                                                                    encoder->el_control[layer_id_minus1]->in.real_width, //TODO: Need to use padded size here?
                                                                    encoder->el_control[layer_id_minus1]->in.real_height,
                                                                    csp); //TODO: Account for irrecular reference structures?
-    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be badded as well?
+    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
     //Scaling parameters need to be calculated for the true sizes.
-    //TODO: Do this in scaling using offsets; check that they are the same as the paddings
-    //encoder->upscaling[layer_id_minus1 + 1].src_width += (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    //encoder->upscaling[layer_id_minus1 + 1].src_height += (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->upscaling[layer_id_minus1 + 1].src_padding_x = (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->upscaling[layer_id_minus1 + 1].src_padding_y = (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
   }
   // ***********************************************
   
@@ -462,16 +463,11 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   _ASSERTE( _CrtCheckMemory() );
   assert(pic_in!=NULL);
 
-  //Change src size to be equal to. TODO: make a proper implementation
-  //param->scale_y = param->scale_x;
-  //param->add_y = param->add_x;
-  //assert(param->src_width+param->right_offset==pic_in->width);
-  //assert(param->src_height+param->bottom_offset==pic_in->height);
-  //yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->right_offset, param->src_height+param->bottom_offset, pic_in->stride, param->chroma, 0);
-  yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
-  
-  
 
+  yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->src_padding_x, param->src_height+param->src_padding_y, pic_in->stride, param->chroma, 0);
+  //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
+  
+  
   yuv_buffer_t* trgt_pic = yuvScaling(src_pic, param, NULL );
   
   _ASSERTE( _CrtCheckMemory() );

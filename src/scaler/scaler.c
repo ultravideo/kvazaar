@@ -721,11 +721,10 @@ void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const
   int ver_filter = 0;
   int hor_filter = 0;
 
-  //TODO: Should this "padding" be done only when downscaling?
-  int src_height = param->src_height - (is_upscaling?param->bottom_offset:0);
-  int src_width = param->src_width - (is_upscaling?param->right_offset:0);
-  int trgt_height = param->rnd_trgt_height;//param->rnd_trgt_height;
-  int trgt_width = param->rnd_trgt_width;//param->rnd_trgt_width;
+  int src_width = param->src_width + param->src_padding_x;
+  int src_height = param->src_height + param->src_padding_y;
+  int trgt_width = param->rnd_trgt_width;
+  int trgt_height = param->rnd_trgt_height;
 
   if (!is_upscaling) {
     int crop_width = src_width - param->right_offset; //- param->left_offset;
@@ -880,7 +879,9 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
     .src_height = src_height,
     .trgt_width = trgt_width,
     .trgt_height = trgt_height,
-    .chroma = chroma
+    .chroma = chroma,
+    .src_padding_x = 0,
+    .src_padding_y = 0
   };
 
   //Calculate Resampling parameters
@@ -993,11 +994,10 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
   }
 
   //Check if base param and yuv buffer are the same size, if yes we can asume parameters are initialized
-  if (yuv->y->width != param.src_width || yuv->y->height != param.src_height) {
-    //TODO: fix eg. account for padding
-    //param.src_width = yuv->y->width;
-    //param.src_height = yuv->y->height;
-    //calculateParameters(&param, 0, 0, 0);
+  if (yuv->y->width != param.src_width + param.src_padding_x || yuv->y->height != param.src_height + param.src_padding_y) {
+    param.src_width = yuv->y->width - param.src_padding_x;
+    param.src_height = yuv->y->height - param.src_padding_y;
+    calculateParameters(&param, 0, 0, 0);
   }
 
   //Check if we need to allocate a yuv buffer for the new image or re-use dst.
@@ -1037,8 +1037,8 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
 
   //Allocate a pic_buffer to hold the component data while the downscaling is done
   //Size calculation from SHM. TODO: Figure out why. Use yuv as buffer instead?
-  int max_width = MAX(param.src_width, param.trgt_width);
-  int max_height = MAX(param.src_height, param.trgt_height);
+  int max_width = MAX(param.src_width+param.src_padding_x, param.trgt_width);
+  int max_height = MAX(param.src_height+param.src_padding_y, param.trgt_height);
   int min_width = MIN(param.src_width, param.trgt_width);
   int min_height = MIN(param.src_height, param.trgt_height);
   int min_width_rnd16 = ((min_width + 15) >> 4) << 4;

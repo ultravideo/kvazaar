@@ -73,6 +73,11 @@ typedef struct
   //Phase parameters mostly for chroma
   //int phase_x;
   //int phase_y;
+
+  //Padding for when the src image size differes from the parameters
+  int src_padding_x;
+  int src_padding_y;
+
 } scaling_parameter_t;
 
 /*==========================================================================*/
