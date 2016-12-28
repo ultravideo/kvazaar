@@ -448,10 +448,62 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   return pic_out;
 }
 
+//Use this function to aggregate the results etc. but otherwise just call kvazaar_encode with the correct encoder
+int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+{
+  if (data_out) *data_out = NULL;
+  if (len_out) *len_out = 0;
+  if (pic_out) *pic_out = NULL;
+  if (src_out) *src_out = NULL;
+
+  //Use these to pass stuff to the actual encoder function and aggregate the results into the actual parameters
+  kvz_encoder *cur_enc = enc;
+  kvz_picture *cur_pic_in = NULL; //kvazaar_scaling(pic_in, &cur_enc->downscaling);
+  kvz_data_chunk* cur_data_out = NULL;
+  uint32_t cur_len_out = 0;
+  kvz_picture *cur_pic_out = NULL;
+  kvz_picture *cur_src_out = NULL;
+  kvz_frame_info *cur_info_out = NULL;
+
+  //TODO: Use a while loop instead?
+  for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
+    
+    kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, cur_info_out);
+
+    //Aggregate new stuff
+    if(data_out) {
+      while((*data_out)->next != NULL) {
+        data_out = &(*data_out)->next;
+      }
+      (*data_out)->next = cur_data_out;
+      cur_data_out = NULL;
+    }
+    if(len_out) *len_out += cur_len_out;
+    if(pic_out) {
+      (*pic_out)->base_image = kvz_image_copy_ref(cur_pic_out);
+      pic_out = &(*pic_out)->base_image;
+      kvz_image_free(cur_pic_out);
+      cur_pic_out = NULL;
+    }
+    if(src_out) {
+      (*src_out)->base_image = kvz_image_copy_ref(cur_src_out);
+      src_out = &(*src_out)->base_image;
+      kvz_image_free(cur_src_out);
+      cur_src_out = NULL;
+    }
+    if(info_out) {
+      
+    }
+  }
+  
+  return 1;
+}
+
+//TODO: Remove
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
 //TODO: Merge with kvazaar_encode?
-int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+int _kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   //DO scaling here
   //Pic_in for the layer being currently encoded
