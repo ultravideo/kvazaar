@@ -82,7 +82,10 @@ struct kvz_encoder {
   //scaling_parameter_t* downscaling;
   //scaling_parameter_t* upscaling;
 
+  //TODO: Add all the encoders as a list?
+
   //Point to the previous encoder (ILR) and to the next encoder (EL)
+  //TODO: Allow a more complex ref/el structure?
   kvz_encoder *prev_enc;
   kvz_encoder *next_enc;
 

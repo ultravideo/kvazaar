@@ -49,7 +49,14 @@
 
 static void kvazaar_close(kvz_encoder *encoder)
 {
+  // ***********************************************
+  // Modified for SHVC. TODO: Account for more complex ref structures?
+  kvz_encoder *next = NULL;
   if (encoder) {
+    next = encoder->next_enc;
+    encoder->next_enc = NULL;
+    encoder->prev_enc = NULL; //Prev encoder should be closed in a previous call
+
     if (encoder->states) {
       for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
         kvz_encoder_state_finalize(&encoder->states[i]);
@@ -57,52 +64,20 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
-    // ***********************************************
-    // Modified for SHVC
-    int layers = *encoder->control->cfg->max_layers;
-    // ***********************************************
-
     kvz_encoder_control_free(encoder->control);
     encoder->control = NULL;
-
-    // ***********************************************
-    // Modified for SHVC
-    for (int layer_id_minus1 = 0; layer_id_minus1 < layers-1; layer_id_minus1++) {
-      if (encoder->el_states[layer_id_minus1]) {
-        for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-          kvz_encoder_state_finalize(&encoder->el_states[layer_id_minus1][i]);
-        }
-      }
-      FREE_POINTER(encoder->el_states[layer_id_minus1]);
-
-      //kvz_config* el_cfg = (kvz_config*)encoder->el_control[layer_id_minus1]->cfg;
-      kvz_encoder_control_free(encoder->el_control[layer_id_minus1]);
-      encoder->el_control = NULL;
-      //kvz_config_destroy(el_cfg); //TODO: Figure out a better way 
-    }
-    FREE_POINTER(encoder->el_control);
-    FREE_POINTER(encoder->el_states);
-    FREE_POINTER(encoder->cur_el_state_num);
-    FREE_POINTER(encoder->out_el_state_num);
-    FREE_POINTER(encoder->el_input_buffer);
-    FREE_POINTER(encoder->el_frames_started);
-    FREE_POINTER(encoder->el_frames_done);
-    FREE_POINTER(encoder->upscaling);
-    FREE_POINTER(encoder->downscaling);
-    
-  // ***********************************************
   }
   FREE_POINTER(encoder);
-
-  
-
+ 
+  kvazaar_close(next);
+  // ***********************************************
 }
 
 
 
 static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 {
-  kvz_encoder *encoder = NULL;
+  kvz_encoder *encoder = NULL; //The base layer encoder
 
   //Initialize strategies
   // TODO: Make strategies non-global
@@ -113,167 +88,95 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
   kvz_init_exp_golomb();
 
-  encoder = calloc(1, sizeof(kvz_encoder));
-  if (!encoder) {
-    goto kvazaar_open_failure;
-  }
-
-  // FIXME: const qualifier disgarded. I don't want to change kvazaar_open
-  // but I really need to change cfg.
-  encoder->control = kvz_encoder_control_init((kvz_config*)cfg);
-  if (!encoder->control) {
-    goto kvazaar_open_failure;
-  }
-
-  encoder->num_encoder_states = encoder->control->owf + 1;
-  encoder->cur_state_num = 0;
-  encoder->out_state_num = 0;
-  encoder->frames_started = 0;
-  encoder->frames_done = 0;
-
   // ***********************************************
-  // Modified for SHVC
-  //TODO: Make a better implementaino. el_cfg is needed to pass the layer id, figure out a better way
-  //TODO: Add error checking
-  //Allocate the needed arrays etc.
-  int el_layers = *cfg->max_layers-1;
+  // Modified for SHVC. TODO: Account for more complex ref structures?
+  kvz_encoder *cur_enc = NULL;
+  kvz_encoder *prev_enc = NULL;
+  //TODO: Just use a while loop?
+  for (unsigned j = 0; j < *cfg->max_layers; j++) {
+    cur_enc = calloc(1, sizeof(kvz_encoder));
+    if (!cur_enc) {
+      goto kvazaar_open_failure;
+    }
+    if( j == 0 ) encoder = cur_enc;
 
-  if( el_layers > 0 ) {  
-    encoder->el_control = MALLOC(encoder_control_t*, el_layers);
-    encoder->el_states = MALLOC(encoder_state_t*, el_layers);
-    encoder->cur_el_state_num = MALLOC(unsigned, el_layers);
-    encoder->out_el_state_num = MALLOC(unsigned, el_layers);
-    encoder->el_input_buffer = MALLOC(input_frame_buffer_t, el_layers);
-    encoder->el_frames_started = MALLOC(unsigned, el_layers);
-    encoder->el_frames_done = MALLOC(unsigned, el_layers);
-    encoder->downscaling = MALLOC(scaling_parameter_t, el_layers+1);
-    encoder->upscaling = MALLOC(scaling_parameter_t, el_layers+1);
-
-    if (!encoder->el_control || !encoder->el_states || !encoder->cur_el_state_num ||
-      !encoder->out_el_state_num || !encoder->el_input_buffer || !encoder->el_frames_started ||
-      !encoder->el_frames_done || !encoder->downscaling || !encoder->upscaling ) {
+    // FIXME: const qualifier disgarded. I don't want to change kvazaar_open
+    // but I really need to change cfg.
+    cur_enc->control = kvz_encoder_control_init((kvz_config*)cfg);
+    if (!cur_enc->control) {
       goto kvazaar_open_failure;
     }
 
-    //Set scaling param for base layer
-    //Need to use the padded size
-    //TODO: remove padding from here/figure out if it is needed
-    //uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    encoder->downscaling[0] = newScalingParameters(cfg->in_width,cfg->in_height,encoder->control->in.real_width,encoder->control->in.real_height,csp); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[0] = newScalingParameters(encoder->control->in.real_width,encoder->control->in.real_height,encoder->control->in.real_width,encoder->control->in.real_height,csp);
-    encoder->upscaling[0].src_padding_x = (CU_MIN_SIZE_PIXELS - encoder->upscaling[0].src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    encoder->upscaling[0].src_padding_y = (CU_MIN_SIZE_PIXELS - encoder->upscaling[0].src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-  }
-  else {
-    encoder->el_control = NULL;
-    encoder->el_states = NULL;
-    encoder->cur_el_state_num = NULL;
-    encoder->out_el_state_num = NULL;
-    encoder->el_input_buffer = NULL;
-    encoder->el_frames_started = NULL;
-    encoder->el_frames_done = NULL;
-    encoder->downscaling = NULL;
-    encoder->upscaling = NULL;
-  }
+    cur_enc->num_encoder_states = cur_enc->control->owf + 1;
+    cur_enc->cur_state_num = 0;
+    cur_enc->out_state_num = 0;
+    cur_enc->frames_started = 0;
+    cur_enc->frames_done = 0;
 
-  
-  for (int layer_id_minus1 = 0; layer_id_minus1 < el_layers; layer_id_minus1++) {
-    //TODO: Set correct size etc. based on cfg
-    //kvz_config* el_cfg = kvz_config_alloc();
-    //kvz_config_init(el_cfg);
-    //*el_cfg = *cfg;
-    //el_cfg->qp = 5;
-    //el_cfg->width = el_cfg->el_width;
-    //el_cfg->height = el_cfg->el_height;
-    //el_cfg->layer = layer_id_minus1;
-    
-    encoder->el_control[layer_id_minus1] = kvz_encoder_control_init(cfg->el_cfg[layer_id_minus1]);
-    
-    encoder->cur_el_state_num[layer_id_minus1] = 0;
-    encoder->out_el_state_num[layer_id_minus1] = 0;
-    encoder->el_frames_started[layer_id_minus1] = 0;
-    encoder->el_frames_done[layer_id_minus1] = 0;
+    kvz_init_input_frame_buffer(&cur_enc->input_buffer);
 
-    kvz_init_input_frame_buffer(&encoder->el_input_buffer[layer_id_minus1]);
-
-    encoder->el_states[layer_id_minus1] = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
-    if (!encoder->el_states[layer_id_minus1]) {
+    cur_enc->states = calloc(cur_enc->num_encoder_states, sizeof(encoder_state_t));
+    if (!cur_enc->states) {
       goto kvazaar_open_failure;
     }
 
-    for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-      encoder->el_states[layer_id_minus1][i].encoder_control = encoder->el_control[layer_id_minus1];
+    for (unsigned i = 0; i < cur_enc->num_encoder_states; ++i) {
+      cur_enc->states[i].encoder_control = encoder->control;
 
-      if (!kvz_encoder_state_init(&encoder->el_states[layer_id_minus1][i], NULL)) {
+      if (!kvz_encoder_state_init(&cur_enc->states[i], NULL)) {
         goto kvazaar_open_failure;
       }
 
-      encoder->el_states[layer_id_minus1][i].frame->QP = (int8_t)cfg->el_cfg[layer_id_minus1]->qp;
+      cur_enc->states[i].frame->QP = (int8_t)cfg->qp;
     }
 
-    for (int i = 0; i < encoder->num_encoder_states; ++i) {
-
-      encoder->el_states[layer_id_minus1][i].previous_encoder_state = &encoder->el_states[layer_id_minus1][abs((i - 1) % encoder->num_encoder_states)];
-
-      kvz_encoder_state_match_children_of_previous_frame(&encoder->el_states[layer_id_minus1][i]);
+    for (int i = 0; i < cur_enc->num_encoder_states; ++i) {
+      if (i == 0) {
+        cur_enc->states[i].previous_encoder_state = &cur_enc->states[cur_enc->num_encoder_states - 1];
+      } else {
+        cur_enc->states[i].previous_encoder_state = &cur_enc->states[(i - 1) % cur_enc->num_encoder_states];
+      }
+      kvz_encoder_state_match_children_of_previous_frame(&cur_enc->states[i]);
     }
 
-    encoder->el_states[layer_id_minus1][encoder->cur_el_state_num[layer_id_minus1]].frame->num = -1;
+    cur_enc->states[cur_enc->cur_state_num].frame->num = -1;
 
-    //Prepare scaling parameters so that up/downscaling[layer_id] gives the correct parameters for up/downscaling from orig/prev_layer to layer_id
-    //Need to use the padded size
-    //TODO: remove padding from here/figure out if it is needed
-    //uint8_t padding_x = (CU_MIN_SIZE_PIXELS - cfg->in_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    //uint8_t padding_y = (CU_MIN_SIZE_PIXELS - cfg->in_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    //Set scaling parameters
+    //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    encoder->downscaling[layer_id_minus1 + 1] = newScalingParameters(cfg->in_width,
-                                                                     cfg->in_height,
-                                                                     encoder->el_control[layer_id_minus1]->in.real_width,
-                                                                     encoder->el_control[layer_id_minus1]->in.real_height,
-                                                                     csp); //TODO: get proper width/height for each layer from cfg etc.
-    encoder->upscaling[layer_id_minus1 + 1] = newScalingParameters(encoder->upscaling[layer_id_minus1].trgt_width,
-                                                                   encoder->upscaling[layer_id_minus1].trgt_height,
-                                                                   encoder->el_control[layer_id_minus1]->in.real_width, //TODO: Need to use padded size here?
-                                                                   encoder->el_control[layer_id_minus1]->in.real_height,
-                                                                   csp); //TODO: Account for irrecular reference structures?
+    cur_enc->downscaling = newScalingParameters(cfg->in_width,
+                                                cfg->in_height,
+                                                cur_enc->control->in.real_width,
+                                                cur_enc->control->in.real_height,
+                                                csp);
+    if( prev_enc ){
+      cur_enc->upscaling = newScalingParameters(prev_enc->upscaling.trgt_width,
+                                                prev_enc->upscaling.trgt_height,
+                                                cur_enc->control->in.real_width,
+                                                cur_enc->control->in.real_height,
+                                                csp);
+    }
+    else {
+      cur_enc->upscaling = newScalingParameters(cur_enc->control->in.real_width,
+                                                cur_enc->control->in.real_height,
+                                                cur_enc->control->in.real_width,
+                                                cur_enc->control->in.real_height,
+                                                csp);
+    }
     //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
     //Scaling parameters need to be calculated for the true sizes.
-    encoder->upscaling[layer_id_minus1 + 1].src_padding_x = (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    encoder->upscaling[layer_id_minus1 + 1].src_padding_y = (CU_MIN_SIZE_PIXELS - encoder->upscaling[layer_id_minus1 + 1].src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    cur_enc->upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    cur_enc->upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+
+    //Connect the sub encoders
+    cur_enc->next_enc = NULL;
+    cur_enc->prev_enc = prev_enc;
+    if( prev_enc ) prev_enc->next_enc = cur_enc;
+    
+    //Prepare for the next loop
+    prev_enc = cur_enc;
+    cfg  = cfg->next_cfg;
   }
-  // ***********************************************
-  
-
-
-  kvz_init_input_frame_buffer(&encoder->input_buffer);
-
-  encoder->states = calloc(encoder->num_encoder_states, sizeof(encoder_state_t));
-  if (!encoder->states) {
-    goto kvazaar_open_failure;
-  }
-
-  for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
-    encoder->states[i].encoder_control = encoder->control;
-
-    if (!kvz_encoder_state_init(&encoder->states[i], NULL)) {
-      goto kvazaar_open_failure;
-    }
-
-    encoder->states[i].frame->QP = (int8_t)cfg->qp;
-  }
-
-  for (int i = 0; i < encoder->num_encoder_states; ++i) {
-    if (i == 0) {
-      encoder->states[i].previous_encoder_state = &encoder->states[encoder->num_encoder_states - 1];
-    } else {
-      encoder->states[i].previous_encoder_state = &encoder->states[(i - 1) % encoder->num_encoder_states];
-    }
-    kvz_encoder_state_match_children_of_previous_frame(&encoder->states[i]);
-  }
-
-  encoder->states[encoder->cur_state_num].frame->num = -1;
 
   return encoder;
 

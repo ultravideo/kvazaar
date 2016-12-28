@@ -583,7 +583,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
 
   //*********************************************
-  //For scalable extension. TODO: Move somewhere else? Add error handling, Add printing
+  //For scalable extension. TODO: Move somewhere else? Add error handling, Add printing. Use a list instead?
   //Activate the correct el_cfg based on the max_layers param
   while( cfg->layer != (*cfg->max_layers - 1) ) {
     cfg = cfg->next_cfg;

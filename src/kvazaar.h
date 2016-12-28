@@ -328,7 +328,7 @@ typedef struct kvz_config
   //int32_t el_height;
   int32_t in_width;
   int32_t in_height;
-
+  //TODO: Add all the cfgs as a list?
   //Points to the next cfg of a higher layer (null if highest layer)
   struct kvz_config *next_cfg; //TODO: Find a better way. Pass the cfg for the els here
 
