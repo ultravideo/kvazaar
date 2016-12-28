@@ -70,17 +70,26 @@ struct kvz_encoder {
   //TODO: Clean up
   //Dublicate encoder states for enhancement layers
   //All these are pointers to arrays with control->cfg->max_layers-1 elements
-  struct encoder_control_t** el_control;
-  struct encoder_state_t** el_states;
-  unsigned* cur_el_state_num;
-  unsigned* out_el_state_num;
-  struct input_frame_buffer_t* el_input_buffer;
-  unsigned* el_frames_started;
-  unsigned* el_frames_done;
+  //struct encoder_control_t** el_control;
+  //struct encoder_state_t** el_states;
+  //unsigned* cur_el_state_num;
+  //unsigned* out_el_state_num;
+  //struct input_frame_buffer_t* el_input_buffer;
+  //unsigned* el_frames_started;
+  //unsigned* el_frames_done;
   //All these are pointers to arrays with control->cfg->max_layers elements
   //Ind 0 has the scaling from the original frame to the bl
-  scaling_parameter_t* downscaling;
-  scaling_parameter_t* upscaling;
+  //scaling_parameter_t* downscaling;
+  //scaling_parameter_t* upscaling;
+
+  //Point to the previous encoder (ILR) and to the next encoder (EL)
+  kvz_encoder *prev_enc;
+  kvz_encoder *next_enc;
+
+  //Current encoders scaling parameters relative to the prev and next encoders
+  scaling_parameter_t downscaling;
+  scaling_parameter_t upscaling;
+
   // ***********************************************
   
 };

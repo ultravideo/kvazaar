@@ -59,7 +59,7 @@ static void kvazaar_close(kvz_encoder *encoder)
 
     // ***********************************************
     // Modified for SHVC
-    int layers = encoder->control->cfg->max_layers;
+    int layers = *encoder->control->cfg->max_layers;
     // ***********************************************
 
     kvz_encoder_control_free(encoder->control);
@@ -136,7 +136,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   //TODO: Make a better implementaino. el_cfg is needed to pass the layer id, figure out a better way
   //TODO: Add error checking
   //Allocate the needed arrays etc.
-  int el_layers = cfg->max_layers-1;
+  int el_layers = *cfg->max_layers-1;
 
   if( el_layers > 0 ) {  
     encoder->el_control = MALLOC(encoder_control_t*, el_layers);
@@ -575,7 +575,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   kvz_picture* last_l_src_out = *src_out;
 
   //Calculate data for Els
-  for (int layer_id_minus1 = 0; layer_id_minus1 < enc->control->cfg->max_layers-1; layer_id_minus1++) {
+  for (int layer_id_minus1 = 0; layer_id_minus1 < *enc->control->cfg->max_layers-1; layer_id_minus1++) {
 
     unsigned* cur_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
     unsigned* out_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
@@ -696,7 +696,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   if (enc->control->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     //If several layers are used, call the apropriate function
-    if(enc->control->cfg->max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+    if(*enc->control->cfg->max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
 

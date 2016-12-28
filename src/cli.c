@@ -118,6 +118,10 @@ static const struct option long_options[] = {
   { "input-format",       required_argument, NULL, 0 },
   { "implicit-rdpcm",           no_argument, NULL, 0 },
   { "no-implicit-rdpcm",        no_argument, NULL, 0 },
+  //*********************************************
+  //For scalable extension.
+  { "layer",                    no_argument, NULL, 0 },
+  //*********************************************
   {0, 0, 0, 0}
 };
 
@@ -269,7 +273,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
 done:
 
   //*********************************************
-  //For scalable extension. TODO: Move somewhere else?
+  //For scalable extension. TODO: remove
   //Add the necessary cfgs for els here and set parameters as needed here
   opts->config->in_width = opts->config->width;
   opts->config->in_height = opts->config->height;

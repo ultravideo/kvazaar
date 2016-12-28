@@ -323,13 +323,14 @@ typedef struct kvz_config
 //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   uint8_t layer;
-  uint8_t max_layers;
+  uint8_t *max_layers; //This needs to be shared between cfgs
   //int32_t el_width;
   //int32_t el_height;
   int32_t in_width;
   int32_t in_height;
 
-  struct kvz_config **el_cfg; //TODO: Find a better way. Pass the cfg for the els here
+  //Points to the next cfg of a higher layer (null if highest layer)
+  struct kvz_config *next_cfg; //TODO: Find a better way. Pass the cfg for the els here
 
   //*********************************************
 

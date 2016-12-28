@@ -125,13 +125,14 @@ int kvz_config_init(kvz_config *cfg)
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   cfg->layer = 0;
-  cfg->max_layers = 1;
+  cfg->max_layers = malloc(sizeof(uint8_t));
+  *cfg->max_layers = 1;
   //cfg->el_width = 0;
   //cfg->el_height = 0;
   cfg->in_width = 0;
   cfg->in_height = 0;
 
-  cfg->el_cfg = NULL;
+  cfg->next_cfg = NULL;
 
   //*********************************************
 
@@ -142,20 +143,19 @@ int kvz_config_destroy(kvz_config *cfg)
 {
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
-  for( int layer = 1; layer < cfg->max_layers; layer++) {
-    //Deallocate el cfgs here
-    if(cfg->el_cfg != NULL) kvz_config_destroy(cfg->el_cfg[layer-1]);
+  //Deallocate el cfgs here
+  if(cfg->next_cfg != NULL){
+    kvz_config_destroy(cfg->next_cfg);
+    FREE_POINTER(cfg->next_cfg);
+  } else {
+    FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared field
   }
-  FREE_POINTER(cfg->el_cfg);
   //*********************************************
-
-  //TODO: Remove layer condition if deep copy is used in el_cfgs.
-  if (cfg && cfg->layer == 0) {
-    FREE_POINTER(cfg->cqmfile);
-    FREE_POINTER(cfg->tiles_width_split);
-    FREE_POINTER(cfg->tiles_height_split);
-    FREE_POINTER(cfg->slice_addresses_in_ts);
-  }
+  FREE_POINTER(cfg->cqmfile);
+  FREE_POINTER(cfg->tiles_width_split);
+  FREE_POINTER(cfg->tiles_height_split);
+  FREE_POINTER(cfg->slice_addresses_in_ts);
+  
   free(cfg);
 
   return 1;
@@ -582,6 +582,14 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     value = atobool(value) ? "false" : "true";
   }
 
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else? Add error handling, Add printing
+  //Activate the correct el_cfg based on the max_layers param
+  while( cfg->layer != (*cfg->max_layers - 1) ) {
+    cfg = cfg->next_cfg;
+  }
+  //*********************************************
+
 #define OPT(STR) (!strcmp(name, STR))
   if OPT("width")
     cfg->width = atoi(value);
@@ -995,6 +1003,19 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("implicit-rdpcm")
     cfg->implicit_rdpcm = (bool)atobool(value);
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else? Add error checking
+  else if OPT("layer") {
+    //TODO: Handle cfg switching stuff here.
+    //Allocate a new cfg for the new layer
+    cfg->next_cfg = kvz_config_alloc();
+    kvz_config_init(cfg->next_cfg);
+    cfg->next_cfg->layer = cfg->layer + 1;
+    free(cfg->next_cfg->max_layers);
+    cfg->next_cfg->max_layers = cfg->max_layers;
+    *cfg->max_layers += 1;
+  }
+  //*********************************************
   else
     return 0;
 #undef OPT

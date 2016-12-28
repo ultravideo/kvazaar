@@ -408,7 +408,7 @@ int main(int argc, char *argv[])
     uint8_t padding_x = get_padding(opts->config->in_width);
     uint8_t padding_y = get_padding(opts->config->in_height);
 
-    kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*opts->config->max_layers);
+    kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
     // ***********************************************
 
     pthread_t input_thread;
@@ -546,7 +546,7 @@ int main(int argc, char *argv[])
         kvz_picture* last_l_rec = img_rec->base_image;
         img_src->base_image = img_src; //Need to set correct base image for deallocation
         img_rec->base_image = img_rec;
-        for (int layer_id = 1; layer_id < opts->config->max_layers; layer_id++) {
+        for (int layer_id = 1; layer_id < *opts->config->max_layers; layer_id++) {
           //We use the subimage to pass bl and el images from the encoder at several at the time.
           //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
           kvz_picture* el_img_src = last_l_src;
