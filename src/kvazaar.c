@@ -364,7 +364,9 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   //assert(pic_in->height==param->src_height);
   
   _ASSERTE( _CrtCheckMemory() );
-  assert(pic_in!=NULL);
+  if( pic_in == NULL) {
+    return NULL;
+  }
 
 
   yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->src_padding_x, param->src_height+param->src_padding_y, pic_in->stride, param->chroma, 0);
@@ -448,6 +450,9 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   return pic_out;
 }
 
+//TODO: make a note of this: Asume that info_out is an array with an element for each layer
+//TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
+//TODO: Account for pic_in containing several input images for different layers
 //Use this function to aggregate the results etc. but otherwise just call kvazaar_encode with the correct encoder
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
@@ -458,17 +463,24 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
 
   //Use these to pass stuff to the actual encoder function and aggregate the results into the actual parameters
   kvz_encoder *cur_enc = enc;
-  kvz_picture *cur_pic_in = NULL; //kvazaar_scaling(pic_in, &cur_enc->downscaling);
+  kvz_picture *cur_pic_in; 
   kvz_data_chunk* cur_data_out = NULL;
   uint32_t cur_len_out = 0;
   kvz_picture *cur_pic_out = NULL;
   kvz_picture *cur_src_out = NULL;
-  kvz_frame_info *cur_info_out = NULL;
 
   //TODO: Use a while loop instead?
   for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
     
-    kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, cur_info_out);
+    cur_pic_in = kvazaar_scaling(pic_in, &cur_enc->downscaling);
+
+    if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
+      kvz_image_free(cur_pic_in);
+      return 0;
+    }
+
+    kvz_image_free(cur_pic_in);
+    cur_pic_in = NULL;
 
     //Aggregate new stuff
     if(data_out) {
@@ -491,9 +503,9 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
       kvz_image_free(cur_src_out);
       cur_src_out = NULL;
     }
-    if(info_out) {
-      
-    }
+
+    //Update other values for the next layer
+    cur_enc = cur_enc->next_enc;
   }
   
   return 1;
@@ -503,140 +515,140 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
 //TODO: Merge with kvazaar_encode?
-int _kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
-{
-  //DO scaling here
-  //Pic_in for the layer being currently encoded
-  kvz_picture* l_pic_in = pic_in == NULL ? NULL : kvazaar_scaling(pic_in, &enc->downscaling[0]);//pic_in->width/2, pic_in->height/2); 
-
-  //Encode Bl first
-  if (!kvazaar_encode(enc, l_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
-    return 0;
-  }
-
-  kvz_image_free(l_pic_in);
-
-  //TODO: checks ?
-
-  //Check if 
-  //if (data_out) *data_out = NULL;
-  //if (len_out) *len_out = 0;
-  //if (pic_out) *pic_out = NULL;
-  //if (src_out) *src_out = NULL;
-
-  //Store the pic and data pointers to the most resently encoded el layer to allow chaining them
-  kvz_data_chunk* last_l_chunk = *data_out;
-  kvz_picture* last_l_pic_out = *pic_out;
-  kvz_picture* last_l_src_out = *src_out;
-
-  //Calculate data for Els
-  for (int layer_id_minus1 = 0; layer_id_minus1 < *enc->control->cfg->max_layers-1; layer_id_minus1++) {
-
-    unsigned* cur_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
-    unsigned* out_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
-    unsigned* el_frames_started = &enc->el_frames_started[layer_id_minus1];
-    unsigned* el_frames_done = &enc->el_frames_done[layer_id_minus1];
-    encoder_state_t *state = &enc->el_states[layer_id_minus1][*cur_el_state_num];
-
-    kvz_picture* last_l_pic_in = pic_in; //This is the src frame that should be used when downscaling. TODO: Use higher layers pic to speed up downscaling?
-    l_pic_in = last_l_pic_in == NULL ? NULL : kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
-
-    if (!state->prepared) {
-      
-      //TODO: Find a better way.
-      //deallocate dummy cu_array
-      cu_array_t* cua = state->frame->ref->cu_arrays[0]; //ILR pic should be first
-      int used_size = state->frame->ref->used_size;
-      remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
-      if( used_size > 0 ) kvz_cu_array_free(cua);
-      
-        kvz_encoder_prepare(state);
-
-      //TODO: Move somewhere else. slicetype still refers to the prev slice?
-      //TODO: Allow first EL layer to be a P-slice
-      if (state->frame->num > 0) {//(state->frame->slicetype != KVZ_SLICE_I) {
-        //Also add base layer to the reference list.
-        encoder_state_t *bl_state = &enc->states[*cur_el_state_num]; //Should return the bl state with the same poc as state.
-        //assert(state->frame->poc == bl_state->frame->poc);
-        //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
-        //Skip on first frame? Skip if inter frame. 
-        if (bl_state->tile->frame->rec != NULL) {
-          kvz_image_list_add/*_back*/(state->frame->ref,
-            kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
-            /*bl_state->tile->frame->cu_array,*/ kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
-            bl_state->frame->poc);//bl_state->tile->frame->cu_array, bl_state->frame->poc );//
-        }
-      }
-    }
-
-    if (l_pic_in != NULL) {
-      // FIXME: The frame number printed here is wrong when GOP is enabled.
-      CHECKPOINT_MARK("read source frame: %d", state->frame->frame + enc->el_control[layer_id_minus1]->cfg->seek);
-    }
-
-    kvz_picture* frame = kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, l_pic_in);
-    if (frame) {
-      assert(state->frame->num == *el_frames_started);
-      // Start encoding.
-      kvz_encode_one_frame(state, frame);
-
-      *el_frames_started += 1;
-    }
-
-    // If we have finished encoding as many frames as we have started, we are done.
-    if (*el_frames_done == *el_frames_started) {
-      return 1;
-    }
-
-    if (!state->frame_done) {
-      // We started encoding a frame; move to the next encoder state.
-      *cur_el_state_num = (*cur_el_state_num + 1) % (enc->num_encoder_states);
-    }
-
-    encoder_state_t *output_state = &enc->el_states[layer_id_minus1][*out_el_state_num];
-    if (!output_state->frame_done &&
-      (l_pic_in == NULL || *cur_el_state_num == *out_el_state_num)) {
-
-      kvz_threadqueue_waitfor(enc->el_control[layer_id_minus1]->threadqueue, output_state->tqj_bitstream_written);
-      // The job pointer must be set to NULL here since it won't be usable after
-      // the next frame is done.
-      output_state->tqj_bitstream_written = NULL;
-
-      // Get stream length before taking chunks since that clears the stream.
-      if (len_out) *len_out += kvz_bitstream_tell(&output_state->stream) / 8;
-      if (last_l_chunk) {
-        //Concatenate data to the end of last layer's data chunk
-        while (last_l_chunk->next != NULL) {
-          last_l_chunk = last_l_chunk->next;
-        }
-
-        last_l_chunk->next = kvz_bitstream_take_chunks(&output_state->stream);
-      }
-      if (last_l_pic_out) {
-        //Set cur layer pic_out as the base pic for last_l out pic
-        last_l_pic_out->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
-        last_l_pic_out = last_l_pic_out->base_image;
-      }
-      if (last_l_src_out) {
-        //Set cur layer src_out as the base pic for last_l out pic
-        last_l_src_out->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
-        last_l_src_out = last_l_src_out->base_image;
-      }
-      if (&info_out[layer_id_minus1+1]) {
-        set_frame_info(&info_out[layer_id_minus1+1], output_state);
-      }
-
-      output_state->frame_done = 1;
-      output_state->prepared = 0;
-      *el_frames_done += 1;
-
-      *out_el_state_num = (*out_el_state_num + 1) % (enc->num_encoder_states);
-    }
-
-    kvz_image_free(l_pic_in);
-  }
-  return 1;
-}
+//int _kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+//{
+//  //DO scaling here
+//  //Pic_in for the layer being currently encoded
+//  kvz_picture* l_pic_in = pic_in == NULL ? NULL : kvazaar_scaling(pic_in, &enc->downscaling[0]);//pic_in->width/2, pic_in->height/2); 
+//
+//  //Encode Bl first
+//  if (!kvazaar_encode(enc, l_pic_in, data_out, len_out, pic_out, src_out, info_out)) {
+//    return 0;
+//  }
+//
+//  kvz_image_free(l_pic_in);
+//
+//  //TODO: checks ?
+//
+//  //Check if 
+//  //if (data_out) *data_out = NULL;
+//  //if (len_out) *len_out = 0;
+//  //if (pic_out) *pic_out = NULL;
+//  //if (src_out) *src_out = NULL;
+//
+//  //Store the pic and data pointers to the most resently encoded el layer to allow chaining them
+//  kvz_data_chunk* last_l_chunk = *data_out;
+//  kvz_picture* last_l_pic_out = *pic_out;
+//  kvz_picture* last_l_src_out = *src_out;
+//
+//  //Calculate data for Els
+//  for (int layer_id_minus1 = 0; layer_id_minus1 < *enc->control->cfg->max_layers-1; layer_id_minus1++) {
+//
+//    unsigned* cur_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
+//    unsigned* out_el_state_num = &enc->cur_el_state_num[layer_id_minus1];
+//    unsigned* el_frames_started = &enc->el_frames_started[layer_id_minus1];
+//    unsigned* el_frames_done = &enc->el_frames_done[layer_id_minus1];
+//    encoder_state_t *state = &enc->el_states[layer_id_minus1][*cur_el_state_num];
+//
+//    kvz_picture* last_l_pic_in = pic_in; //This is the src frame that should be used when downscaling. TODO: Use higher layers pic to speed up downscaling?
+//    l_pic_in = last_l_pic_in == NULL ? NULL : kvazaar_scaling(last_l_pic_in, &enc->downscaling[layer_id_minus1+1]);
+//
+//    if (!state->prepared) {
+//      
+//      //TODO: Find a better way.
+//      //deallocate dummy cu_array
+//      cu_array_t* cua = state->frame->ref->cu_arrays[0]; //ILR pic should be first
+//      int used_size = state->frame->ref->used_size;
+//      remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
+//      if( used_size > 0 ) kvz_cu_array_free(cua);
+//      
+//        kvz_encoder_prepare(state);
+//
+//      //TODO: Move somewhere else. slicetype still refers to the prev slice?
+//      //TODO: Allow first EL layer to be a P-slice
+//      if (state->frame->num > 0) {//(state->frame->slicetype != KVZ_SLICE_I) {
+//        //Also add base layer to the reference list.
+//        encoder_state_t *bl_state = &enc->states[*cur_el_state_num]; //Should return the bl state with the same poc as state.
+//        //assert(state->frame->poc == bl_state->frame->poc);
+//        //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
+//        //Skip on first frame? Skip if inter frame. 
+//        if (bl_state->tile->frame->rec != NULL) {
+//          kvz_image_list_add/*_back*/(state->frame->ref,
+//            kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling[layer_id_minus1 + 1]),
+//            /*bl_state->tile->frame->cu_array,*/ kvz_cu_array_alloc(enc->upscaling[layer_id_minus1 + 1].trgt_width, enc->upscaling[layer_id_minus1 + 1].trgt_height),
+//            bl_state->frame->poc);//bl_state->tile->frame->cu_array, bl_state->frame->poc );//
+//        }
+//      }
+//    }
+//
+//    if (l_pic_in != NULL) {
+//      // FIXME: The frame number printed here is wrong when GOP is enabled.
+//      CHECKPOINT_MARK("read source frame: %d", state->frame->frame + enc->el_control[layer_id_minus1]->cfg->seek);
+//    }
+//
+//    kvz_picture* frame = kvz_encoder_feed_frame(&enc->el_input_buffer[layer_id_minus1], state, l_pic_in);
+//    if (frame) {
+//      assert(state->frame->num == *el_frames_started);
+//      // Start encoding.
+//      kvz_encode_one_frame(state, frame);
+//
+//      *el_frames_started += 1;
+//    }
+//
+//    // If we have finished encoding as many frames as we have started, we are done.
+//    if (*el_frames_done == *el_frames_started) {
+//      return 1;
+//    }
+//
+//    if (!state->frame_done) {
+//      // We started encoding a frame; move to the next encoder state.
+//      *cur_el_state_num = (*cur_el_state_num + 1) % (enc->num_encoder_states);
+//    }
+//
+//    encoder_state_t *output_state = &enc->el_states[layer_id_minus1][*out_el_state_num];
+//    if (!output_state->frame_done &&
+//      (l_pic_in == NULL || *cur_el_state_num == *out_el_state_num)) {
+//
+//      kvz_threadqueue_waitfor(enc->el_control[layer_id_minus1]->threadqueue, output_state->tqj_bitstream_written);
+//      // The job pointer must be set to NULL here since it won't be usable after
+//      // the next frame is done.
+//      output_state->tqj_bitstream_written = NULL;
+//
+//      // Get stream length before taking chunks since that clears the stream.
+//      if (len_out) *len_out += kvz_bitstream_tell(&output_state->stream) / 8;
+//      if (last_l_chunk) {
+//        //Concatenate data to the end of last layer's data chunk
+//        while (last_l_chunk->next != NULL) {
+//          last_l_chunk = last_l_chunk->next;
+//        }
+//
+//        last_l_chunk->next = kvz_bitstream_take_chunks(&output_state->stream);
+//      }
+//      if (last_l_pic_out) {
+//        //Set cur layer pic_out as the base pic for last_l out pic
+//        last_l_pic_out->base_image = kvz_image_copy_ref(output_state->tile->frame->rec);
+//        last_l_pic_out = last_l_pic_out->base_image;
+//      }
+//      if (last_l_src_out) {
+//        //Set cur layer src_out as the base pic for last_l out pic
+//        last_l_src_out->base_image = kvz_image_copy_ref(output_state->tile->frame->source);
+//        last_l_src_out = last_l_src_out->base_image;
+//      }
+//      if (&info_out[layer_id_minus1+1]) {
+//        set_frame_info(&info_out[layer_id_minus1+1], output_state);
+//      }
+//
+//      output_state->frame_done = 1;
+//      output_state->prepared = 0;
+//      *el_frames_done += 1;
+//
+//      *out_el_state_num = (*out_el_state_num + 1) % (enc->num_encoder_states);
+//    }
+//
+//    kvz_image_free(l_pic_in);
+//  }
+//  return 1;
+//}
 
 
 //TODO: Remove dublicated code? Handle interlaced
