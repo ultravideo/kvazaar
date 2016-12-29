@@ -259,86 +259,8 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
   return 1;
 }
 
-
-static int kvazaar_encode(kvz_encoder *enc,
-                          kvz_picture *pic_in,
-                          kvz_data_chunk **data_out,
-                          uint32_t *len_out,
-                          kvz_picture **pic_out,
-                          kvz_picture **src_out,
-                          kvz_frame_info *info_out)
-{
-  if (data_out) *data_out = NULL;
-  if (len_out) *len_out = 0;
-  if (pic_out) *pic_out = NULL;
-  if (src_out) *src_out = NULL;
-
-  encoder_state_t *state = &enc->states[enc->cur_state_num];
-
-  if (!state->prepared) {
-    kvz_encoder_prepare(state);
-  }
-
-  if (pic_in != NULL) {
-    // FIXME: The frame number printed here is wrong when GOP is enabled.
-    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg->seek);
-  }
-
-  kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
-  if (frame) {
-    assert(state->frame->num == enc->frames_started);
-    // Start encoding.
-    kvz_encode_one_frame(state, frame);
-    enc->frames_started += 1;
-  }
-
-  // If we have finished encoding as many frames as we have started, we are done.
-  if (enc->frames_done == enc->frames_started) {
-    return 1;
-  }
-
-  if (!state->frame_done) {
-    // We started encoding a frame; move to the next encoder state.
-    enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
-  }
-
-  encoder_state_t *output_state = &enc->states[enc->out_state_num];
-  if (!output_state->frame_done &&
-      (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
-
-    kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
-    // The job pointer must be set to NULL here since it won't be usable after
-    // the next frame is done.
-    output_state->tqj_bitstream_written = NULL;
-
-    // Get stream length before taking chunks since that clears the stream.
-    if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
-    if (data_out) *data_out = kvz_bitstream_take_chunks(&output_state->stream);
-    if (pic_out) *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
-    if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
-    if (info_out) set_frame_info(info_out, output_state);
-
-    output_state->frame_done = 1;
-    output_state->prepared = 0;
-    enc->frames_done += 1;
-
-    enc->out_state_num = (enc->out_state_num + 1) % (enc->num_encoder_states);
-  }
-
-  return 1;
-}
 // ***********************************************
   // Modified for SHVC
-//static void set_el_frame_info(kvz_frame_info *const info, const encoder_state_t *const state, int layer_id_minus1)
-//{
-//
-//
-//  info->el_qp[layer_id_minus1] = state->frame->QP;
-//  info->el_nal_unit_type[layer_id_minus1] = state->frame->pictype;
-//  info->el_slice_type[layer_id_minus1] = state->frame->slicetype;
-//  kvz_encoder_get_ref_lists(state, info->el_ref_list_len[layer_id_minus1], info->el_ref_list[layer_id_minus1]);
-//}
-
 //TODO: Move somewhere more appropriate.
 void remove_ILR_pics( encoder_state_t* const state)
 {
@@ -449,6 +371,117 @@ kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_
   _ASSERTE( _CrtCheckMemory() );
   return pic_out;
 }
+// ***********************************************
+
+
+static int kvazaar_encode(kvz_encoder *enc,
+                          kvz_picture *pic_in,
+                          kvz_data_chunk **data_out,
+                          uint32_t *len_out,
+                          kvz_picture **pic_out,
+                          kvz_picture **src_out,
+                          kvz_frame_info *info_out)
+{
+  if (data_out) *data_out = NULL;
+  if (len_out) *len_out = 0;
+  if (pic_out) *pic_out = NULL;
+  if (src_out) *src_out = NULL;
+
+  encoder_state_t *state = &enc->states[enc->cur_state_num];
+
+  if (!state->prepared) {
+    // ***********************************************
+    // Modified for SHVC. TODO: Move all this to kvz_encoder_prepare?
+    if (state->layer->layer_id > 0 && enc->prev_enc != NULL) {
+      //TODO: Find a better way. Handle cu_arrays properly
+      //deallocate dummy cu_array
+      cu_array_t* cua = state->frame->ref->cu_arrays[0]; //ILR pic should be first
+      int used_size = state->frame->ref->used_size;
+      remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
+      if (used_size > 0) kvz_cu_array_free(cua);
+    }
+
+    kvz_encoder_prepare(state);
+
+    //TODO: Move somewhere else. slicetype still refers to the prev slice?
+    //TODO: Allow first EL layer to be a P-slice
+    if (state->layer->layer_id > 0 && enc->prev_enc != NULL && state->frame->num > 0) {
+      //Also add base layer to the reference list.
+      encoder_state_t *bl_state = &enc->prev_enc->states[enc->cur_state_num]; //Should return the bl state with the same poc as state.
+      //assert(state->frame->poc == bl_state->frame->poc);
+      //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
+      //TODO: Don't skip on first frame? Skip if inter frame. 
+      if (bl_state->tile->frame->rec != NULL) {
+        kvz_image_list_add(state->frame->ref,
+                           kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling),
+                           kvz_cu_array_alloc(state->tile->frame->width_in_lcu * LCU_WIDTH, state->tile->frame->height_in_lcu * LCU_WIDTH),
+                           bl_state->frame->poc);
+      }
+    }
+    // ***********************************************
+  }
+
+  if (pic_in != NULL) {
+    // FIXME: The frame number printed here is wrong when GOP is enabled.
+    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg->seek);
+  }
+
+  kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
+  if (frame) {
+    assert(state->frame->num == enc->frames_started);
+    // Start encoding.
+    kvz_encode_one_frame(state, frame);
+    enc->frames_started += 1;
+  }
+
+  // If we have finished encoding as many frames as we have started, we are done.
+  if (enc->frames_done == enc->frames_started) {
+    return 1;
+  }
+
+  if (!state->frame_done) {
+    // We started encoding a frame; move to the next encoder state.
+    enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
+  }
+
+  encoder_state_t *output_state = &enc->states[enc->out_state_num];
+  if (!output_state->frame_done &&
+      (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
+
+    kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
+    // The job pointer must be set to NULL here since it won't be usable after
+    // the next frame is done.
+    output_state->tqj_bitstream_written = NULL;
+
+    // Get stream length before taking chunks since that clears the stream.
+    if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;
+    if (data_out) *data_out = kvz_bitstream_take_chunks(&output_state->stream);
+    if (pic_out) *pic_out = kvz_image_copy_ref(output_state->tile->frame->rec);
+    if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
+    if (info_out) set_frame_info(info_out, output_state);
+
+    output_state->frame_done = 1;
+    output_state->prepared = 0;
+    enc->frames_done += 1;
+
+    enc->out_state_num = (enc->out_state_num + 1) % (enc->num_encoder_states);
+  }
+
+  return 1;
+}
+// ***********************************************
+  // Modified for SHVC
+//static void set_el_frame_info(kvz_frame_info *const info, const encoder_state_t *const state, int layer_id_minus1)
+//{
+//
+//
+//  info->el_qp[layer_id_minus1] = state->frame->QP;
+//  info->el_nal_unit_type[layer_id_minus1] = state->frame->pictype;
+//  info->el_slice_type[layer_id_minus1] = state->frame->slicetype;
+//  kvz_encoder_get_ref_lists(state, info->el_ref_list_len[layer_id_minus1], info->el_ref_list[layer_id_minus1]);
+//}
+// ***********************************************
+
 
 //TODO: make a note of this: Asume that info_out is an array with an element for each layer
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
