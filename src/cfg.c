@@ -1306,8 +1306,28 @@ int kvz_config_validate(const kvz_config *const cfg)
   }
 
   //*********************************************
-  //For scalable extension.
-  //Validate sub configs as well
-  return !error && cfg->next_cfg ? kvz_config_validate(cfg->next_cfg) : 1;
+  //For scalable extension. TODO: Relax constraints as more parameters become compatiple
+  //Validity check for scalable extension
+  if( *cfg->max_layers > 1 ) {
+    if( cfg->gop_len > 0) {
+      fprintf(stderr, "Input error: GoP is not currently supported with layers");
+      error = 1;
+    }
+    if( cfg->threads > 0 ) {
+      fprintf(stderr, "Input error: threads are not currently supported with layers");
+      error = 1;
+    }
+
+    if( cfg->next_cfg != NULL ) {
+      if( cfg->width > cfg->next_cfg->width || cfg->height > cfg->next_cfg->height ) {
+        fprintf(stderr, "Input error: a layer with a lower layer_id needs to be smaller or equal to layers with a greater layer_id\n");
+        error = 1;
+      }
+    } 
+
+
+  }
   //*********************************************
+
+  return !error;
 }
