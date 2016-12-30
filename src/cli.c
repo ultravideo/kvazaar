@@ -121,6 +121,7 @@ static const struct option long_options[] = {
   //*********************************************
   //For scalable extension.
   { "layer",                    no_argument, NULL, 0 },
+  { "layer-res",          required_argument, NULL, 0 }, //Set
   //*********************************************
   {0, 0, 0, 0}
 };
@@ -261,13 +262,18 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     ok = 0;
     goto done;
   }
-
+  //*********************************************
+  //For scalable extension. TODO: move to cfg parsing?
   // Set resolution automatically if necessary
   if (opts->config->width == 0 && opts->config->height == 0) {
     ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
+    //goto done;
+  }
+  if (*opts->config->input_width == 0 && *opts->config->input_height == 0) {
+    ok = ok && select_input_res_auto(opts->input, opts->config->input_width, opts->config->input_height);
     goto done;
   }
-
+  //*********************************************
   
 
 done:
@@ -275,29 +281,29 @@ done:
   //*********************************************
   //For scalable extension. TODO: remove
   //Add the necessary cfgs for els here and set parameters as needed here
-  opts->config->in_width = opts->config->width;
-  opts->config->in_height = opts->config->height;
-  opts->config->width /= 2;
-  opts->config->height /= 2;
-  opts->config->max_layers = 2;
+  //opts->config->in_width = opts->config->width;
+  //opts->config->in_height = opts->config->height;
+  //opts->config->width /= 2;
+  //opts->config->height /= 2;
+  //opts->config->max_layers = 2;
 
-  int layers = opts->config->max_layers;
-  if( layers > 1 ){  
-    kvz_config **el_configs = MALLOC(kvz_config*,layers);
+  //int layers = opts->config->max_layers;
+  //if( layers > 1 ){  
+  //  kvz_config **el_configs = MALLOC(kvz_config*,layers);
 
-    for( int el_layer_id = 0; el_layer_id < layers-1; el_layer_id++) {
-      el_configs[el_layer_id] = api->config_alloc();
-      api->config_init(el_configs[el_layer_id]);
-      *el_configs[el_layer_id] = *(opts->config); //Copy default values. TODO: Don't copy pointer (as reference), make a deep copy.
-      el_configs[el_layer_id]->layer = el_layer_id+1;
-      el_configs[el_layer_id]->qp = 20;
-      el_configs[el_layer_id]->width = opts->config->in_width;
-      el_configs[el_layer_id]->height = opts->config->in_height;
-      //el_configs[el_layer_id]->ref_frames = el_configs[el_layer_id]->ref_frames == 0 ? 0 : el_configs[el_layer_id]->ref_frames-1; //"Reserve one frame for ILR. TODO: infer correct num from somewhere.
-    }
+  //  for( int el_layer_id = 0; el_layer_id < layers-1; el_layer_id++) {
+  //    el_configs[el_layer_id] = api->config_alloc();
+  //    api->config_init(el_configs[el_layer_id]);
+  //    *el_configs[el_layer_id] = *(opts->config); //Copy default values. TODO: Don't copy pointer (as reference), make a deep copy.
+  //    el_configs[el_layer_id]->layer = el_layer_id+1;
+  //    el_configs[el_layer_id]->qp = 20;
+  //    el_configs[el_layer_id]->width = opts->config->in_width;
+  //    el_configs[el_layer_id]->height = opts->config->in_height;
+  //    //el_configs[el_layer_id]->ref_frames = el_configs[el_layer_id]->ref_frames == 0 ? 0 : el_configs[el_layer_id]->ref_frames-1; //"Reserve one frame for ILR. TODO: infer correct num from somewhere.
+  //  }
 
-    opts->config->el_cfg = el_configs;
-  }
+  //  opts->config->el_cfg = el_configs;
+  //}
   //*********************************************
 
   if (!ok) {

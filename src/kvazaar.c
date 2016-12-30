@@ -144,8 +144,8 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     //Set scaling parameters
     //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    cur_enc->downscaling = newScalingParameters(cfg->in_width,
-                                                cfg->in_height,
+    cur_enc->downscaling = newScalingParameters(*cfg->input_width, //TODO: Account for multiple input layers
+                                                *cfg->input_height,
                                                 cur_enc->control->in.real_width,
                                                 cur_enc->control->in.real_height,
                                                 csp);

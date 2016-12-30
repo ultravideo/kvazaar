@@ -127,10 +127,9 @@ int kvz_config_init(kvz_config *cfg)
   cfg->layer = 0;
   cfg->max_layers = malloc(sizeof(uint8_t));
   *cfg->max_layers = 1;
-  //cfg->el_width = 0;
-  //cfg->el_height = 0;
-  cfg->in_width = 0;
-  cfg->in_height = 0;
+  
+  cfg->input_width = calloc(1,sizeof(int32_t));
+  cfg->input_height = calloc(1,sizeof(int32_t));
 
   cfg->next_cfg = NULL;
 
@@ -595,12 +594,23 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->width = atoi(value);
   else if OPT("height")
     cfg->height = atoi(value);
+  //*********************************************
+  //For scalable extension. TODO: Handle multiple input layers
   else if OPT("input-res")
     if (!strcmp(value, "auto")) {
       return 1;
     } else {
-      return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
+      int32_t width, height;
+      bool success = sscanf(value, "%dx%d", &width, &height) == 2;
+      if( success ) {
+        cfg->width = *cfg->input_width = width;
+        cfg->height = *cfg->input_height = height;
+      }
+      return (success);
     }
+  else if OPT("layer-res")
+    return (sscanf(value, "%dx%d", cfg->width, cfg->height) == 2);
+  //*********************************************
   else if OPT("input-fps") {
     int32_t fps_num, fps_denom;
     if (sscanf(value, "%d/%d", &fps_num, &fps_denom) == 2) {
@@ -1010,10 +1020,18 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     //Allocate a new cfg for the new layer
     cfg->next_cfg = kvz_config_alloc();
     kvz_config_init(cfg->next_cfg);
+    
+    //Do additional initialization
     cfg->next_cfg->layer = cfg->layer + 1;
+
     free(cfg->next_cfg->max_layers);
     cfg->next_cfg->max_layers = cfg->max_layers;
     *cfg->max_layers += 1;
+
+    free(cfg->next_cfg->input_width);
+    free(cfg->next_cfg->input_height);
+    cfg->next_cfg->input_width = cfg->input_width;
+    cfg->next_cfg->input_height = cfg->input_height;
   }
   //*********************************************
   else
@@ -1118,7 +1136,7 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
  * \brief Check that configuration is sensible.
  *
  * \param cfg   config to check
- * \return      1 if the config is ok, otherwise 1
+ * \return      1 if the config is ok, otherwise 0
  */
 int kvz_config_validate(const kvz_config *const cfg)
 {
@@ -1287,5 +1305,9 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  return !error;
+  //*********************************************
+  //For scalable extension.
+  //Validate sub configs as well
+  return !error && cfg->next_cfg ? kvz_config_validate(cfg->next_cfg) : 1;
+  //*********************************************
 }

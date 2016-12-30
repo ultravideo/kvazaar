@@ -183,8 +183,8 @@ static void* input_read_thread(void* in_args)
   // Modified for SHVC
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(args->opts->config->input_format);
     frame_in = args->api->picture_alloc_csp(csp,
-                                            args->opts->config->in_width  + args->padding_x,
-                                            args->opts->config->in_height + args->padding_y);
+                                            *args->opts->config->input_width  + args->padding_x,
+                                            *args->opts->config->input_height + args->padding_y);
 
     if (!frame_in) {
       fprintf(stderr, "Failed to allocate image.\n");
@@ -196,8 +196,8 @@ static void* input_read_thread(void* in_args)
     frame_in->pts = frames_read;
 
     bool read_success = yuv_io_read(args->input, 
-                                    args->opts->config->in_width,
-                                    args->opts->config->in_height,
+                                    *args->opts->config->input_width,
+                                    *args->opts->config->input_height,
                                     args->encoder->cfg->input_bitdepth,
                                     args->encoder->bitdepth,
                                     frame_in);
@@ -214,8 +214,8 @@ static void* input_read_thread(void* in_args)
             goto done;
           }
           bool read_success = yuv_io_read(args->input,
-                                          args->opts->config->in_width,
-                                          args->opts->config->in_height,
+                                          *args->opts->config->input_width,
+                                          *args->opts->config->input_height,
                                           args->encoder->cfg->input_bitdepth,
                                           args->encoder->bitdepth,
                                           frame_in);
@@ -405,8 +405,8 @@ int main(int argc, char *argv[])
     
     // ***********************************************
     // Modified for SHVC
-    uint8_t padding_x = get_padding(opts->config->in_width);
-    uint8_t padding_y = get_padding(opts->config->in_height);
+    uint8_t padding_x = get_padding(*opts->config->input_width);
+    uint8_t padding_y = get_padding(*opts->config->input_height);
 
     kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
     // ***********************************************
@@ -540,12 +540,13 @@ int main(int argc, char *argv[])
         print_el_frame_info(info_out, frame_psnr, len_out, 0);
 
         
-        //TODO: Figure out a better way?
+        //TODO: Figure out a better way? 
         //Loop over layers
         kvz_picture* last_l_src = img_src->base_image;
         kvz_picture* last_l_rec = img_rec->base_image;
         img_src->base_image = img_src; //Need to set correct base image for deallocation
         img_rec->base_image = img_rec;
+        kvz_config *cfg = opts->config->next_cfg;
         for (int layer_id = 1; layer_id < *opts->config->max_layers; layer_id++) {
           //We use the subimage to pass bl and el images from the encoder at several at the time.
           //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
@@ -568,8 +569,8 @@ int main(int argc, char *argv[])
             assert(el_img_rec);
             if (!yuv_io_write(recout_el,
               el_img_rec,
-              opts->config->in_width,
-              opts->config->in_height)) {
+              cfg->width,
+              cfg->height)) {
               fprintf(stderr, "Failed to write reconstructed picture!\n");
             }
           }
@@ -581,6 +582,8 @@ int main(int argc, char *argv[])
           //TODO: Need to deallocate even if no data is output?
           api->picture_free(el_img_rec);
           api->picture_free(el_img_src);
+
+          cfg = cfg->next_cfg;
         }
       }
 
