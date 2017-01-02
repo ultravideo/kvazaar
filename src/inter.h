@@ -85,5 +85,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t width, int32_t height,
                                  bool use_a1, bool use_b1,
                                  inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
-                                 lcu_t *lcu);
+                                 lcu_t *lcu,
+                                 uint8_t ref_idx);
 #endif

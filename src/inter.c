@@ -1238,6 +1238,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
  * \param use_b1    true, if candidate b1 can be used
  * \param mv_cand   Returns the merge candidates.
  * \param lcu       lcu containing the block
+ * \param ref_idx   current reference index (used only by TMVP)
  * \return          number of merge candidates
  */
 uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
@@ -1245,7 +1246,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t width, int32_t height,
                                  bool use_a1, bool use_b1,
                                  inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
-                                 lcu_t *lcu)
+                                 lcu_t *lcu,
+                                 uint8_t ref_idx)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -1348,6 +1350,11 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
     if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {
 
+      uint32_t colocated_ref = UINT_MAX;
+      uint32_t colocated_ref_poc = 0;
+      int32_t td, tb;
+
+
       cu_info_t *c3 = NULL;
       cu_info_t *h = NULL;
 
@@ -1355,22 +1362,58 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
       const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
 
+      //ToDo: allow other than L0[0] for prediction
+
+      //Fetch ref idx of the selected CU in L0[0] ref list                    
+      for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+        if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
+          colocated_ref = temporal_cand;
+          break;
+        }
+      }
+
+      colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
+
       if (selected_CU) {
                 
         mv_cand[candidates].dir = 0;
 
+        // The reference id the colocated block is using
+        uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[0];
+
+        td = colocated_ref_poc - state->frame->ref->images[0]->ref_pocs[colocated_ref_mv_ref];
+        tb = state->frame->poc - state->frame->ref->pocs[ref_idx];
+
         // Find LIST_0 reference
         if (h != NULL && h->inter.mv_dir & 1) {
           mv_cand[candidates].dir |= 1;
-          mv_cand[candidates].ref[0] = 0;
-          mv_cand[candidates].mv[0][0] = h->inter.mv[0][0];
-          mv_cand[candidates].mv[0][1] = h->inter.mv[0][1];
+
+          if (td == tb) {
+            mv_cand[candidates].mv[0][0] = h->inter.mv[0][0];
+            mv_cand[candidates].mv[0][1] = h->inter.mv[0][1];
+          } else {
+            int scale = ((tb * ((0x4000 + (abs(td) >> 1)) / td) + 32) >> 6);
+            mv_cand[candidates].mv[0][0] = ((scale * h->inter.mv[0][0] + 127 + ((scale * h->inter.mv[0][0]) < 0)) >> 8);
+            mv_cand[candidates].mv[0][1] = ((scale * h->inter.mv[0][1] + 127 + ((scale * h->inter.mv[0][1]) < 0)) >> 8);
+          }
+
+          //mv_cand[candidates].mv[0][0] = h->inter.mv[0][0];
+          //mv_cand[candidates].mv[0][1] = h->inter.mv[0][1];
 
         } else if (c3 != NULL && c3->inter.mv_dir & 1) {
           mv_cand[candidates].dir |= 1;
-          mv_cand[candidates].ref[0] = 0;
-          mv_cand[candidates].mv[0][0] = c3->inter.mv[0][0];
-          mv_cand[candidates].mv[0][1] = c3->inter.mv[0][1];
+          
+          if (td == tb) {
+            mv_cand[candidates].mv[0][0] = c3->inter.mv[0][0];
+            mv_cand[candidates].mv[0][1] = c3->inter.mv[0][1];
+          } else {
+            int scale = ((tb * ((0x4000 + (abs(td) >> 1)) / td) + 32) >> 6);
+            mv_cand[candidates].mv[0][0] = ((scale * c3->inter.mv[0][0] + 127 + ((scale * c3->inter.mv[0][0]) < 0)) >> 8);
+            mv_cand[candidates].mv[0][1] = ((scale * c3->inter.mv[0][1] + 127 + ((scale * c3->inter.mv[0][1]) < 0)) >> 8);
+          }
+
+          //mv_cand[candidates].mv[0][0] = c3->inter.mv[0][0];
+          //mv_cand[candidates].mv[0][1] = c3->inter.mv[0][1];
         }
         if (state->frame->slicetype == KVZ_SLICE_B) {
           // Find LIST_1 reference
@@ -1386,7 +1429,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
             mv_cand[candidates].mv[1][1] = c3->inter.mv[1][1];
           }
         }
-        //mv_cand[candidates].ref[0] = 0;
+        mv_cand[candidates].ref[0] = colocated_ref;
         candidates++;
       }
     }
