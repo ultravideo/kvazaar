@@ -916,9 +916,9 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
 }
 
 /**
- * \brief Pick two mv candidates from the spatial candidates.
+ * \brief Pick two mv candidates from the spatial and temporal candidates.
  */
-static void get_mv_cand_from_spatial(const encoder_state_t * const state,
+static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                      int32_t x,
                                      int32_t y,
                                      int32_t width,
@@ -1190,7 +1190,7 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
                                state->tile->frame->width, state->tile->frame->height,
                                &b0, &b1, &b2, &a0, &a1, lcu);
   kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
-  get_mv_cand_from_spatial(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
+  get_mv_cand_from_candidates(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
 /**
@@ -1224,7 +1224,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                    state->tile->frame->width, state->tile->frame->height,
                                    &b0, &b1, &b2, &a0, &a1);
   kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
-  get_mv_cand_from_spatial(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
+  get_mv_cand_from_candidates(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
 /**
