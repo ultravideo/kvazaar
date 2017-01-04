@@ -1439,7 +1439,7 @@ static void search_pu_inter(encoder_state_t * const state,
   // Search for merge mode candidate
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand;
+  int16_t num_cand = 0;
   if (!state->encoder_control->cfg->tmvp_enable) {
     num_cand = kvz_inter_get_merge_cand(state,
                                         x, y,
@@ -1476,7 +1476,8 @@ static void search_pu_inter(encoder_state_t * const state,
                         width, height,
                         depth,
                         lcu, cur_cu,
-                        mv_cand, merge_cand, num_cand,
+                        mv_cand, merge_cand,
+                        num_cand,
                         ref_idx,
                         get_mvd_cost,
                         inter_cost,
