@@ -1360,13 +1360,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
       cu_info_t *c3_L0 = NULL;
       cu_info_t *h_L0 = NULL;
-
-      cu_info_t *c3_L1 = NULL;
-      cu_info_t *h_L1 = NULL;
       
       // Fetch temporal candidates for the current CU, , L0[0]
       kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3_L0, &h_L0, 1, 0);
-      //kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3_L1, &h_L1, 2, 0);
 
       cu_info_t *selected_CU = NULL;
 

@@ -763,7 +763,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
     
     if (state->encoder_control->cfg.tmvp_enable) {
-      WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
+      WRITE_U(stream, ref_negative?1:0, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
 
@@ -787,7 +787,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       }
 
       // Temporal Motion Vector Prediction flags
-      if (state->encoder_control->cfg->tmvp_enable && ref_negative > 1) {
+      if (state->encoder_control->cfg.tmvp_enable && ref_negative > 0) {
         if (state->frame->slicetype == KVZ_SLICE_B) {
           // Always use L0 for prediction
           WRITE_U(stream, 1, 1, "collocated_from_l0_flag");
