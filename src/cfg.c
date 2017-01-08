@@ -731,8 +731,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   } else if OPT("slice-addresses") {
     fprintf(stderr, "--slice-addresses doesn't do anything, because slices are not implemented.\n");
     return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
-  } else if OPT("threads")
+  } else if OPT("threads") {
     cfg->threads = atoi(value);
+    if (cfg->threads == 0 && !strcmp(value, "auto")) {
+      // -1 means automatic selection
+      cfg->threads = -1;
+    }
+  }
   else if OPT("cpuid")
     cfg->cpuid = atoi(value);
   else if OPT("pu-depth-inter")
