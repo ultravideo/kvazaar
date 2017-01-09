@@ -28,13 +28,19 @@
 #include "global.h" // IWYU pragma: keep
 #include "kvazaar.h"
 
+// ***********************************************
+        // Modified for SHVC
 typedef struct cmdline_opts_t {
-  /** \brief Input filename */
-  char *input;
+  /** \brief Input filenames */
+  char **input;
+  /** \brief number of Input layers */
+  int8_t num_inputs;
   /** \brief Output filename */
   char *output;
-  /** \brief Debug output */
-  char *debug;
+  /** \brief Debug outputs */
+  char **debug;
+  /** \brief Number of Debug outputs */
+  int8_t num_debugs;
   /** \brief Number of input frames to skip */
   int32_t seek;
   /** \brief Number of frames to encode */
@@ -48,6 +54,7 @@ typedef struct cmdline_opts_t {
   /** \brief Whether to loop input */
   bool loop_input;
 } cmdline_opts_t;
+// ***********************************************
 
 cmdline_opts_t* cmdline_opts_parse(const kvz_api *api, int argc, char *argv[]);
 void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);

@@ -133,12 +133,18 @@ typedef struct {
   const kvz_api *api;
   const cmdline_opts_t *opts;
   const encoder_control_t *encoder;
-  const uint8_t padding_x;
-  const uint8_t padding_y;
+  uint8_t padding_x;
+  uint8_t padding_y;
 
   // Picture and thread status passed from input thread to main thread.
   kvz_picture *img_in;
   int retval;
+
+   // ***********************************************
+   // Modified for SHVC
+   const int input_layer;
+   // ***********************************************
+
 } input_handler_args;
 
 #define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
@@ -183,8 +189,8 @@ static void* input_read_thread(void* in_args)
   // Modified for SHVC
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(args->opts->config->input_format);
     frame_in = args->api->picture_alloc_csp(csp,
-                                            *args->opts->config->input_width  + args->padding_x,
-                                            *args->opts->config->input_height + args->padding_y);
+                                            (*args->opts->config->input_widths)[args->input_layer]  + args->padding_x,
+                                            (*args->opts->config->input_heights)[args->input_layer] + args->padding_y);
 
     if (!frame_in) {
       fprintf(stderr, "Failed to allocate image.\n");
@@ -196,8 +202,8 @@ static void* input_read_thread(void* in_args)
     frame_in->pts = frames_read;
 
     bool read_success = yuv_io_read(args->input, 
-                                    *args->opts->config->input_width,
-                                    *args->opts->config->input_height,
+                                    (*args->opts->config->input_widths)[args->input_layer],
+                                    (*args->opts->config->input_heights)[args->input_layer],
                                     args->encoder->cfg->input_bitdepth,
                                     args->encoder->bitdepth,
                                     frame_in);
@@ -207,15 +213,15 @@ static void* input_read_thread(void* in_args)
         // When looping input, re-open the file and re-read data.
         if (args->opts->loop_input && args->input != stdin) {
           fclose(args->input);
-          args->input = fopen(args->opts->input, "rb");
+          args->input = fopen(args->opts->input[args->input_layer], "rb");
           if (args->input == NULL) {
             fprintf(stderr, "Could not re-open input file, shutting down!\n");
             retval = RETVAL_FAILURE;
             goto done;
           }
           bool read_success = yuv_io_read(args->input,
-                                          *args->opts->config->input_width,
-                                          *args->opts->config->input_height,
+                                         (*args->opts->config->input_widths)[args->input_layer],
+                                         (*args->opts->config->input_heights)[args->input_layer],
                                           args->encoder->cfg->input_bitdepth,
                                           args->encoder->bitdepth,
                                           frame_in);
@@ -270,7 +276,21 @@ done:
   return 0;
 }
   
-
+// ***********************************************
+// Modified for SHVC
+//Helper function for deallocating chained kvz_pictures
+void free_chained_img(const kvz_api const *api, kvz_picture *img )
+{
+  while( img != img->base_image ) {
+    kvz_picture *next_img = img->base_image;
+    img->base_image = img;
+    api->picture_free(img);
+    img = next_img;
+  }
+  img->base_image = img;
+  api->picture_free(img);
+}
+// ***********************************************
 
 /**
  * \brief Program main function.
@@ -284,10 +304,9 @@ int main(int argc, char *argv[])
 
   cmdline_opts_t *opts = NULL; //!< Command line options
   kvz_encoder* enc = NULL;
-  FILE *input  = NULL; //!< input file (YUV)
+  FILE **input  = NULL; //!< input files (YUV)
   FILE *output = NULL; //!< output file (HEVC NAL stream)
-  FILE *recout = NULL; //!< reconstructed YUV output, --debug
-  FILE *recout_el = NULL; 
+  FILE **recout = NULL; //!< reconstructed YUV outputs, --debug
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
   KVZ_CLOCK_T encoding_start_real_time;
@@ -320,10 +339,15 @@ int main(int argc, char *argv[])
     goto done;
   }
 
-  input = open_input_file(opts->input);
-  if (input == NULL) {
-    fprintf(stderr, "Could not open input file, shutting down!\n");
-    goto exit_failure;
+  // ***********************************************
+  // Modified for SHVC
+  input = calloc(opts->num_inputs, sizeof(FILE*));
+  for (size_t i = 0; i < opts->num_inputs; i++) {
+    input[i] = open_input_file(opts->input[i]);
+    if (input[i] == NULL) {
+      fprintf(stderr, "Could not open input file, shutting down!\n");
+      goto exit_failure;
+    }
   }
 
   output = open_output_file(opts->output);
@@ -334,7 +358,7 @@ int main(int argc, char *argv[])
 
 #ifdef _WIN32
   // Set stdin and stdout to binary for pipes.
-  if (input == stdin) {
+  if (*input == stdin) {
     _setmode(_fileno(stdin), _O_BINARY);
   }
   if (output == stdout) {
@@ -342,21 +366,15 @@ int main(int argc, char *argv[])
   }
 #endif
 
-  if (opts->debug != NULL) {
-    recout = open_output_file(opts->debug);
-    if (recout == NULL) {
-      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", opts->debug);
-      goto exit_failure;
+  recout = calloc(opts->num_debugs, sizeof(FILE*));
+  for (size_t i = 0; i < opts->num_debugs; i++) {
+    if (opts->debug[i] != NULL) {
+      recout[i] = open_output_file(opts->debug[i]);
+      if (recout == NULL) {
+        fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", opts->debug[i]);
+        goto exit_failure;
+      }
     }
-    char *el_file = malloc( sizeof(char)*(strlen(opts->debug)+4));
-    strcpy(el_file, "el_"); strcat(el_file,opts->debug);
-    recout_el = open_output_file(el_file);
-    if (recout_el == NULL) {
-      fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", el_file);
-      free(el_file);
-      goto exit_failure;
-    }
-    free(el_file);
   }
 
   //******************************************
@@ -373,7 +391,7 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
   opts->config->layer = 0;
-  *///******************************************
+  */
 
   enc = api->encoder_open(opts->config);
   if (!enc) {
@@ -383,15 +401,31 @@ int main(int argc, char *argv[])
 
   encoder_control_t *encoder = enc->control;
 
-  fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
-  fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
-         encoder->in.width, encoder->in.height,
-         encoder->in.real_width, encoder->in.real_height);
+  for ( int i = 0; i < opts->num_inputs; i++) {
+    fprintf(stderr, "Input: %s, output: %s\n", opts->input[i], opts->output);
+    fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
+      encoder->in.width, encoder->in.height,
+      encoder->in.real_width, encoder->in.real_height);
 
-  if (opts->seek > 0 && !yuv_io_seek(input, opts->seek, opts->config->width, opts->config->height)) {
-    fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
-    goto exit_failure;
+    if (opts->seek > 0 && !yuv_io_seek(input[i], opts->seek, (*opts->config->input_widths)[i], (*opts->config->input_heights)[i])) {
+      fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
+      goto exit_failure;
+    }
   }
+//******************************************
+  
+    
+  // ***********************************************
+  // Modified for SHVC
+  //Allocate space for some stuff
+  kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
+  
+  pthread_t *input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
+
+  pthread_mutex_t *input_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
+  pthread_mutex_t *main_thread_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
+
+  input_handler_args *in_args = calloc(opts->num_inputs,sizeof(input_handler_args));
 
   //Now, do the real stuff
   {
@@ -402,76 +436,80 @@ int main(int argc, char *argv[])
     uint64_t bitstream_length = 0;
     uint32_t frames_done = 0;
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
-    
-    // ***********************************************
-    // Modified for SHVC
-    uint8_t padding_x = get_padding(*opts->config->input_width);
-    uint8_t padding_y = get_padding(*opts->config->input_height);
 
-    kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
-    // ***********************************************
+    for (int i = 0; i < opts->num_inputs; i++) {
+      // Lock both mutexes at startup
+      input_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
+      main_thread_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
+      PTHREAD_LOCK(&main_thread_mutex);
+      PTHREAD_LOCK(&input_mutex);
 
-    pthread_t input_thread;
+      uint8_t padding_x = get_padding((*opts->config->input_widths)[i]);
+      uint8_t padding_y = get_padding((*opts->config->input_heights)[i]);
 
-    pthread_mutex_t input_mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t main_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+      // Give arguments via struct to the input thread
+      in_args[i].input_mutex = NULL;
+      in_args[i].main_thread_mutex = NULL;
 
-    // Lock both mutexes at startup
-    PTHREAD_LOCK(&main_thread_mutex);
-    PTHREAD_LOCK(&input_mutex);
+      in_args[i].input = input[i];
+      in_args[i].api = api;
+      in_args[i].opts = opts;
+      in_args[i].encoder = encoder;
+      in_args[i].padding_x = padding_x;
+      in_args[i].padding_y = padding_y;
 
-    // Give arguments via struct to the input thread
-    input_handler_args in_args = {
-      .input_mutex = NULL,
-      .main_thread_mutex = NULL,
+      in_args[i].img_in = NULL;
+      in_args[i].retval = RETVAL_RUNNING;
+      
+      in_args[i].input_mutex = &input_mutex[i];
+      in_args[i].main_thread_mutex = &main_thread_mutex[i];
 
-      .input = input,
-      .api = api,
-      .opts = opts,
-      .encoder = encoder,
-      .padding_x = padding_x,
-      .padding_y = padding_y,
-
-      .img_in = NULL,
-      .retval = RETVAL_RUNNING,
-    };
-    in_args.input_mutex = &input_mutex;
-    in_args.main_thread_mutex = &main_thread_mutex;
-
-    if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
-      fprintf(stderr, "pthread_create failed!\n");
-      assert(0);
-      return 0;
-    }
-    kvz_picture *cur_in_img;
-    for (;;) {
-
-      // Skip mutex locking if the input thread does not exist.
-      if (in_args.retval == RETVAL_RUNNING) {
-        // Unlock input_mutex so that the input thread can write the new
-        // img_in and retval to in_args.
-        PTHREAD_UNLOCK(&input_mutex);
-        // Wait until the input thread has updated in_args.
-        PTHREAD_LOCK(&main_thread_mutex);
-
-        cur_in_img = in_args.img_in;
-        in_args.img_in = NULL;
-
-      } else {
-        cur_in_img = NULL;
+      if (pthread_create(&input_threads[i], NULL, input_read_thread, (void*)&in_args) != 0) {
+        fprintf(stderr, "pthread_create failed!\n");
+        assert(0);
+        return 0;
       }
 
-      if (in_args.retval == EXIT_FAILURE) {
-        goto exit_failure;
+    }
+    // ***********************************************
+    kvz_picture *cur_in_img = NULL;
+    for (;;) {
+
+      // ***********************************************
+      // Modified for SHVC
+      //TODO: Move relevant de/allocation to done tag.
+      kvz_picture *cur_img;
+      for (int i = 0; i < opts->num_inputs; i++) {
+        // Skip mutex locking if the input thread does not exist.
+        if (in_args[i].retval == RETVAL_RUNNING) {
+          // Unlock input_mutex so that the input thread can write the new
+          // img_in and retval to in_args.
+          PTHREAD_UNLOCK(&input_mutex[i]);
+          // Wait until the input thread has updated in_args.
+          PTHREAD_LOCK(&main_thread_mutex[i]);
+
+          if( cur_in_img == NULL ){
+            cur_in_img = in_args[i].img_in;
+            cur_img = cur_in_img;
+          } else {
+            cur_img->base_image = in_args[i].img_in;
+            cur_img = cur_img->base_image;
+          }
+          in_args[i].img_in = NULL;
+
+        } else if(in_args[i].retval == RETVAL_EOF) {
+          cur_in_img = NULL;
+          break;
+        } else if (in_args[i].retval == EXIT_FAILURE) {
+          goto exit_failure;
+        }
       }
 
       kvz_data_chunk* chunks_out = NULL;
       kvz_picture *img_rec = NULL;
       kvz_picture *img_src = NULL;
       uint32_t len_out = 0;
-      // ***********************************************
-      // Modified for SHVC
-      //TODO: Move relevant de/allocation to done tag.
+      
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
@@ -480,7 +518,7 @@ int main(int argc, char *argv[])
                                &img_src,
                                info_out)) {
         fprintf(stderr, "Failed to encode image.\n");
-        api->picture_free(cur_in_img);
+        free_chained_img(api, cur_in_img);
         goto exit_failure;
       }
       // ***********************************************
@@ -499,7 +537,7 @@ int main(int argc, char *argv[])
           assert(written + chunk->len <= len_out);
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
-            api->picture_free(cur_in_img);
+            free_chained_img(api, cur_in_img);
             api->chunk_free(chunks_out);
             goto exit_failure;
           }
@@ -509,85 +547,98 @@ int main(int argc, char *argv[])
 
         bitstream_length += len_out;
 
+// ***********************************************
+        // Modified for SHVC
 
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
-          // Do not compute PSNR for interlaced frames, because img_rec does not contain
-          // the deinterlaced frame yet.
-          compute_psnr(img_src, img_rec, frame_psnr);
-        }
+        kvz_config *cfg = opts->config;
+        kvz_picture *cur_src = img_src;
+        kvz_picture *cur_rec = img_rec;
 
-        if (recout) {
-          // Since chunks_out was not NULL, img_rec should have been set.
-          assert(img_rec);
-          if (!yuv_io_write(recout,
-                            img_rec,
-                            opts->config->width,
-                            opts->config->height)) {
-            fprintf(stderr, "Failed to write reconstructed picture!\n");
-          }
-        }
-
-        frames_done += 1;
-        psnr_sum[0] += frame_psnr[0];
-        psnr_sum[1] += frame_psnr[1];
-        psnr_sum[2] += frame_psnr[2];
-        
-        // ***********************************************
-        // Modified for SHVC
-        print_el_frame_info(info_out, frame_psnr, len_out, 0);
-
-        
-        //TODO: Figure out a better way? 
-        //Loop over layers
-        kvz_picture* last_l_src = img_src->base_image;
-        kvz_picture* last_l_rec = img_rec->base_image;
-        img_src->base_image = img_src; //Need to set correct base image for deallocation
-        img_rec->base_image = img_rec;
-        kvz_config *cfg = opts->config->next_cfg;
-        for (int layer_id = 1; layer_id < *opts->config->max_layers; layer_id++) {
-          //We use the subimage to pass bl and el images from the encoder at several at the time.
-          //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
-          kvz_picture* el_img_src = last_l_src;
-          kvz_picture* el_img_rec = last_l_rec;
-          last_l_src = last_l_src->base_image;
-          last_l_rec = last_l_rec->base_image;
-          el_img_src->base_image = el_img_src; //Need to set correct base image for deallocation
-          el_img_rec->base_image = el_img_rec;
-
-          //Calculate info
-          if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+        for (int layer_id = 0; layer_id < *cfg->max_layers; layer_id++) { 
+          if (cfg->calc_psnr && cfg->source_scan_type == KVZ_INTERLACING_NONE) {
             // Do not compute PSNR for interlaced frames, because img_rec does not contain
             // the deinterlaced frame yet.
-            compute_psnr(el_img_src, el_img_rec, frame_psnr);
+            compute_psnr(cur_src, cur_rec, frame_psnr);
           }
 
-          if (recout_el) {
+          //Write recout only for as many layers as rec outs were given
+          if (layer_id < opts->num_debugs && recout[layer_id]) {
             // Since chunks_out was not NULL, img_rec should have been set.
-            assert(el_img_rec);
-            if (!yuv_io_write(recout_el,
-              el_img_rec,
+            assert(cur_rec);
+            if (!yuv_io_write(recout[layer_id],
+              cur_rec,
               cfg->width,
               cfg->height)) {
               fprintf(stderr, "Failed to write reconstructed picture!\n");
             }
           }
 
-          //TODO: Print el info correctly. Do calculate psnr_sum for el
-          print_el_frame_info(&info_out[layer_id], frame_psnr, len_out, layer_id);
+          frames_done += 1;
+          psnr_sum[0] += frame_psnr[0];
+          psnr_sum[1] += frame_psnr[1];
+          psnr_sum[2] += frame_psnr[2];
 
-          //Deallocate el_img_*
-          //TODO: Need to deallocate even if no data is output?
-          api->picture_free(el_img_rec);
-          api->picture_free(el_img_src);
 
+          print_el_frame_info(&info_out[layer_id], frame_psnr, len_out, layer_id); //TODO: len_out is misleading, get separate len for each layer?
+
+          //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;
+          cur_rec = cur_rec->base_image;
+          cur_src = cur_src->base_image;
         }
+        
+        //TODO: Remove
+        ////TODO: Figure out a better way? 
+        ////Loop over layers
+        //kvz_picture* last_l_src = img_src->base_image;
+        //kvz_picture* last_l_rec = img_rec->base_image;
+        //img_src->base_image = img_src; //Need to set correct base image for deallocation
+        //img_rec->base_image = img_rec;
+        //
+        //for (int layer_id = 1; layer_id < *opts->config->max_layers; layer_id++) {
+        //  //We use the subimage to pass bl and el images from the encoder at several at the time.
+        //  //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
+        //  kvz_picture* el_img_src = last_l_src;
+        //  kvz_picture* el_img_rec = last_l_rec;
+        //  last_l_src = last_l_src->base_image;
+        //  last_l_rec = last_l_rec->base_image;
+        //  el_img_src->base_image = el_img_src; //Need to set correct base image for deallocation
+        //  el_img_rec->base_image = el_img_rec;
+
+        //  //Calculate info
+        //  if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+        //    // Do not compute PSNR for interlaced frames, because img_rec does not contain
+        //    // the deinterlaced frame yet.
+        //    compute_psnr(el_img_src, el_img_rec, frame_psnr);
+        //  }
+
+        //  if (recout_el) {
+        //    // Since chunks_out was not NULL, img_rec should have been set.
+        //    assert(el_img_rec);
+        //    if (!yuv_io_write(recout_el,
+        //      el_img_rec,
+        //      cfg->width,
+        //      cfg->height)) {
+        //      fprintf(stderr, "Failed to write reconstructed picture!\n");
+        //    }
+        //  }
+
+        //  //TODO: Print el info correctly. Do calculate psnr_sum for el
+        //  print_el_frame_info(&info_out[layer_id], frame_psnr, len_out, layer_id);
+
+        //  //Deallocate el_img_*
+        //  //TODO: Need to deallocate even if no data is output?
+        //  api->picture_free(el_img_rec);
+        //  api->picture_free(el_img_src);
+
+        //  cfg = cfg->next_cfg;
+        //}
       }
 
-      
+      //TODO: Remove
 // ***********************************************
       /******************************************
       //DO EL coding here
@@ -665,14 +716,11 @@ int main(int argc, char *argv[])
       
       
 
-      api->picture_free(cur_in_img);
+      free_chained_img(api, cur_in_img);
       api->chunk_free(chunks_out);
-      api->picture_free(img_rec);
-      api->picture_free(img_src);
+      free_chained_img(api, img_rec);
+      free_chained_img(api, img_src);
     }
-    
-    free(info_out);
-    //********************************
     
     KVZ_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
@@ -699,7 +747,11 @@ int main(int argc, char *argv[])
       fprintf(stderr, " Encoding CPU usage: %.2f%%\n", encoding_time/wall_time*100.f);
       fprintf(stderr, " FPS: %.2f\n", ((double)frames_done)/wall_time);
     }
-    pthread_join(input_thread, NULL);
+    for (int i = 0; i < opts->num_inputs; i++) {
+      pthread_join(input_threads[i], NULL);
+    }
+
+    //********************************
   }
 
   goto done;
@@ -708,14 +760,33 @@ exit_failure:
   retval = EXIT_FAILURE;
 
 done:
+  // ***********************************************
+  // Modified for SHVC
   // deallocate structures
   if (enc) api->encoder_close(enc);
-  if (opts) cmdline_opts_free(api, opts);
-
+  
   // close files
-  if (input)  fclose(input);
+  for (size_t i = 0; i < opts->num_inputs; i++) {
+    if (input[i])  fclose(input[i]);
+  }
+  free(input);
+  
   if (output) fclose(output);
-  if (recout) fclose(recout);
+  
+  for (size_t i = 0; i < opts->num_debugs; i++) {
+    if (recout[i]) fclose(recout[i]);
+  }
+  free(recout);
+
+  //Free some stuff
+  free(info_out);
+  free(in_args);
+  free(input_threads);
+  free(input_mutex);
+  free(main_thread_mutex);
+  
+  if (opts) cmdline_opts_free(api, opts);
+  // ***********************************************
 
   CHECKPOINTS_FINALIZE();
 

@@ -172,6 +172,14 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     ok = 0;
     goto done;
   }
+  //*********************************************
+  //For scalable extension. TODO: Add error checking
+  //Initialize input and debug arrays
+  opts->input = calloc(1, sizeof(char*));
+  opts->num_inputs = 1;
+  opts->debug = calloc(1, sizeof(char*));
+  opts->num_debugs = 1;
+  //*********************************************
 
   opts->config = api->config_alloc();
   if (!opts->config || !api->config_init(opts->config)) {
@@ -201,14 +209,18 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       }
     }
 
+    //*********************************************
+  //For scalable extension. TODO: Add error cheching
     const char* name = long_options[long_options_index].name;
     if (!strcmp(name, "input")) {
-      if (opts->input) {
-        fprintf(stderr, "Input error: More than one input file given.\n");
+      if (*opts->input) {
+       /* fprintf(stderr, "Input error: More than one input file given.\n");
         ok = 0;
-        goto done;
+        goto done;*/
+        //Increase input array size
+        opts->input = realloc(opts->input, ++opts->num_inputs);
       }
-      opts->input = strdup(optarg);
+      opts->input[opts->num_inputs-1] = strdup(optarg);
     } else if (!strcmp(name, "output")) {
       if (opts->output) {
         fprintf(stderr, "Input error: More than one output file given.\n");
@@ -218,11 +230,12 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       opts->output = strdup(optarg);
     } else if (!strcmp(name, "debug")) {
       if (opts->debug) {
-        fprintf(stderr, "Input error: More than one debug output file given.\n");
+        /*fprintf(stderr, "Input error: More than one debug output file given.\n");
         ok = 0;
-        goto done;
+        goto done;*/
+        opts->debug = realloc(opts->debug, ++opts->num_debugs);
       }
-      opts->debug = strdup(optarg);
+      opts->debug[opts->num_debugs-1] = strdup(optarg);
     } else if (!strcmp(name, "seek")) {
       opts->seek = atoi(optarg);
     } else if (!strcmp(name, "frames")) {
@@ -241,7 +254,8 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       goto done;
     }
   }
-
+  //*********************************************
+  
   // Check for extra arguments.
   if (argc - optind > 0) {
     fprintf(stderr, "Input error: Extra argument found: \"%s\"\n", argv[optind]);
@@ -263,14 +277,14 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     goto done;
   }
   //*********************************************
-  //For scalable extension. TODO: move to cfg parsing?
+  //For scalable extension. TODO: move to cfg parsing? Handle multiple inputs
   // Set resolution automatically if necessary
   if (opts->config->width == 0 && opts->config->height == 0) {
-    ok = select_input_res_auto(opts->input, &opts->config->width, &opts->config->height);
+    ok = select_input_res_auto(*opts->input, &opts->config->width, &opts->config->height);
     //goto done;
   }
   if (*opts->config->input_width == 0 && *opts->config->input_height == 0) {
-    ok = ok && select_input_res_auto(opts->input, opts->config->input_width, opts->config->input_height);
+    ok = ok && select_input_res_auto(*opts->input, opts->config->input_width, opts->config->input_height);
     goto done;
   }
   //*********************************************
@@ -321,9 +335,18 @@ done:
 void cmdline_opts_free(const kvz_api *const api, cmdline_opts_t *opts)
 {
   if (opts) {
+    //*********************************************
+    //For scalable extension
+    for (size_t i = 0; i < opts->num_inputs; i++) {
+      FREE_POINTER(opts->input[i]);
+    }
     FREE_POINTER(opts->input);
     FREE_POINTER(opts->output);
+    for (size_t i = 0; i < opts->num_debugs; i++) {
+      FREE_POINTER(opts->debug[i]);
+    }
     FREE_POINTER(opts->debug);
+    //*********************************************
     api->config_destroy(opts->config);
     opts->config = NULL;
   }

@@ -325,12 +325,12 @@ typedef struct kvz_config
   uint8_t layer;
   uint8_t *max_layers; //This needs to be shared between cfgs
   
-  //Size of the input picture. TODO: handle multiple input images
-  int32_t *input_width;  
-  int32_t *input_height; 
+  //Size of the input pictures. TODO: A better way?
+  int32_t **input_widths;  
+  int32_t **input_heights; 
   //TODO: Add all the cfgs as a list?
   //Points to the next cfg of a higher layer (null if highest layer)
-  struct kvz_config *next_cfg; //TODO: Find a better way. Pass the cfg for the els here
+  struct kvz_config *next_cfg; //TODO: Find a better way? Pass the cfg for the els here
 
   //*********************************************
 
