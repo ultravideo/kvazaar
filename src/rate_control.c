@@ -167,7 +167,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
   return MAX(100, pic_target_bits);
 }
 
-int8_t lambda_to_qp(const double lambda)
+static int8_t lambda_to_qp(const double lambda)
 {
   const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
   return CLIP(0, 51, qp);
