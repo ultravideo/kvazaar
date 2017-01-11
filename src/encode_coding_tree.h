@@ -29,7 +29,7 @@
 #include "encoderstate.h"
 #include "global.h"
 
-void kvz_encode_coding_tree(encoder_state_t *state,
+void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint16_t x_ctb,
                             uint16_t y_ctb,
                             uint8_t depth);

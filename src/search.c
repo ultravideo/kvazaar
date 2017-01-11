@@ -321,7 +321,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + tr_tree_bits * state->frame->cur_lambda_cost;
+    return sum + tr_tree_bits * state->lambda;
   }
 
   // Add transform_tree cbf_luma bit cost.
@@ -353,7 +353,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * LUMA_MULT + bits * state->frame->cur_lambda_cost;
+  return (double)ssd * LUMA_MULT + bits * state->lambda;
 }
 
 
@@ -398,7 +398,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + tr_tree_bits * state->frame->cur_lambda_cost;
+    return sum + tr_tree_bits * state->lambda;
   }
 
   // Chroma SSD
@@ -428,7 +428,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CHROMA_MULT + bits * state->frame->cur_lambda_cost;
+  return (double)ssd * CHROMA_MULT + bits * state->lambda;
 }
 
 
@@ -682,7 +682,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       mode_bits = inter_bitcost;
     }
 
-    cost += mode_bits * state->frame->cur_lambda_cost;
+    cost += mode_bits * state->lambda;
   }
   
   // Recursively split all the way to max search depth.
@@ -695,15 +695,15 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Add cost of cu_split_flag.
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
       const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;
-      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->frame->cur_lambda_cost;
+      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
+      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;
     }
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
       // Add cost of intra part_size.
       const cabac_ctx_t *ctx = &(state->cabac.ctx.part_size_model[0]);
-      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->frame->cur_lambda_cost;  // 2Nx2N
-      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;  // NxN
+      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;  // 2Nx2N
+      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;  // NxN
     }
 
     // If skip mode was selected for the block, skip further search.
@@ -750,11 +750,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // Add the cost of coding no-split.
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
         const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;
+        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
 
         // Add the cost of coding intra mode only once.
         double mode_bits = calc_mode_bits(state, &work_tree[depth], cur_cu, x, y);
-        cost += mode_bits * state->frame->cur_lambda_cost;
+        cost += mode_bits * state->lambda;
       }
     }
 
@@ -949,7 +949,10 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   }
 
   // Start search from depth 0.
-  search_cu(state, x, y, 0, work_tree);
+  double cost = search_cu(state, x, y, 0, work_tree);
+
+  // Save squared cost for rate control.
+  kvz_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight = cost * cost;
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.

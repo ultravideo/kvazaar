@@ -247,6 +247,27 @@ static bool is_on_8x8_grid(int x, int y, edge_dir dir)
   }
 }
 
+static int8_t get_qp_y_pred(const encoder_state_t* state, int x, int y, edge_dir dir)
+{
+  if (state->encoder_control->cfg->target_bitrate <= 0) {
+    return state->qp;
+  }
+
+  int32_t qp_p;
+  if (dir == EDGE_HOR && y > 0) {
+    qp_p = kvz_cu_array_at_const(state->tile->frame->cu_array, x, y - 1)->qp;
+  } else if (dir == EDGE_VER && x > 0) {
+    qp_p = kvz_cu_array_at_const(state->tile->frame->cu_array, x - 1, y)->qp;
+  } else {
+    qp_p = state->frame->QP;
+  }
+
+  const int32_t qp_q =
+    kvz_cu_array_at_const(state->tile->frame->cu_array, x, y)->qp;
+
+  return (qp_p + qp_q + 1) >> 1;
+}
+
 /**
  * \brief Apply the deblocking filter to luma pixels on a single edge.
  *
@@ -290,8 +311,9 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
     kvz_pixel *orig_src = &frame->rec->y[x + y*stride];
     kvz_pixel *src = orig_src;
 
+    const int32_t qp = get_qp_y_pred(state, x, y, dir);
+
     int8_t strength = 0;
-    int32_t qp              = state->frame->QP;
     int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
     int32_t beta            = kvz_g_beta_table_8x8[b_index] * bitdepth_scale;
@@ -490,7 +512,8 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     };
     int8_t strength = 2;
 
-    int32_t QP             = kvz_g_chroma_scale[state->frame->QP];
+    const int32_t luma_qp  = get_qp_y_pred(state, x << 1, y << 1, dir);
+    int32_t QP             = kvz_g_chroma_scale[luma_qp];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = kvz_g_tc_table_8x8[TC_index]*bitdepth_scale;

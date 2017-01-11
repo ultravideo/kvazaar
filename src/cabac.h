@@ -60,6 +60,7 @@ typedef struct
     cabac_ctx_t trans_subdiv_model[3]; //!< \brief intra mode context models
     cabac_ctx_t qt_cbf_model_luma[4];
     cabac_ctx_t qt_cbf_model_chroma[4];
+    cabac_ctx_t cu_qp_delta_abs[4];
     cabac_ctx_t part_size_model[4];
     cabac_ctx_t cu_sig_coeff_group_model[4];
     cabac_ctx_t cu_sig_model_luma[27];

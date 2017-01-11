@@ -451,9 +451,14 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_SE(stream, ((int8_t)encoder->cfg->qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
-  WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
-  //if cu_qp_delta_enabled_flag
-  //WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
+
+  if (encoder->cfg->target_bitrate > 0) {
+    // Use separate QP for each LCU when rate control is enabled.
+    WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
+    WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
+  } else {
+    WRITE_U(stream, 0, 1, "cu_qp_delta_enabled_flag");
+  }
 
   //TODO: add QP offsets
   WRITE_SE(stream, 0, "pps_cb_qp_offset");
@@ -913,10 +918,8 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     first_nal_in_au = false;
     encoder_state_write_bitstream_aud(state);
   }
-  
-  if ((encoder->vps_period > 0 && state->frame->num % encoder->vps_period == 0)
-      || (state->frame->num == 0 && encoder->vps_period >= 0))
-  {
+
+  if (encoder_state_must_write_vps(state)) {
     first_nal_in_au = false;
     kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
@@ -972,11 +975,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
   state->frame->total_bits_coded += newpos - curpos;
 
-  if (encoder->cfg->gop_len > 0 && state->frame->gop_offset > 0) {
-    state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
-  } else {
-    state->frame->cur_gop_bits_coded = 0;
-  }
+  state->frame->cur_gop_bits_coded = state->previous_encoder_state->frame->cur_gop_bits_coded;
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 
