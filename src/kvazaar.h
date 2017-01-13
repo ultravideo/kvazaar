@@ -324,7 +324,9 @@ typedef struct kvz_config
   //For scalable extension. TODO: Move somewhere else?
   uint8_t layer;
   uint8_t *max_layers; //This needs to be shared between cfgs
-  
+  uint8_t *max_input_layers; //Keep trach of how many input layers there are (size of input_*s listst)
+  int8_t input_layer; //Which input layer this layer uses
+
   //Size of the input pictures. TODO: A better way?
   int32_t **input_widths;  
   int32_t **input_heights; 

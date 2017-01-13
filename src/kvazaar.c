@@ -144,8 +144,8 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     //Set scaling parameters
     //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    cur_enc->downscaling = newScalingParameters(*cfg->input_width, //TODO: Account for multiple input layers
-                                                *cfg->input_height,
+    cur_enc->downscaling = newScalingParameters((*cfg->input_widths)[cfg->input_layer],
+                                                (*cfg->input_heights)[cfg->input_layer],
                                                 cur_enc->control->in.real_width,
                                                 cur_enc->control->in.real_height,
                                                 csp);
@@ -494,6 +494,16 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   if (pic_out) *pic_out = NULL;
   if (src_out) *src_out = NULL;
 
+  //Pic_in should contain the input images chained using base_image.
+  //Move them to a list for easier access
+  kvz_picture **pics_in = calloc(*enc->control->cfg->max_layers, sizeof(kvz_picture*));
+  pics_in[0] = pic_in;
+
+  for( int i = 1; pic_in->base_image != pic_in; i++ ) {
+    pics_in[i] = pic_in->base_image;
+    pic_in = pic_in->base_image;
+  }
+  
   //Use these to pass stuff to the actual encoder function and aggregate the results into the actual parameters
   kvz_encoder *cur_enc = enc;
   kvz_picture *cur_pic_in; 
@@ -505,10 +515,11 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   //TODO: Use a while loop instead?
   for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
     
-    cur_pic_in = kvazaar_scaling(pic_in, &cur_enc->downscaling);
+    cur_pic_in = kvazaar_scaling(pics_in[cur_enc->control->cfg->input_layer], &cur_enc->downscaling);
 
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
       kvz_image_free(cur_pic_in);
+      free(pics_in);
       return 0;
     }
 
@@ -540,6 +551,8 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
     //Update other values for the next layer
     cur_enc = cur_enc->next_enc;
   }
+
+  free(pics_in);
   
   return 1;
 }

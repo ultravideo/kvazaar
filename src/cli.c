@@ -120,8 +120,9 @@ static const struct option long_options[] = {
   { "no-implicit-rdpcm",        no_argument, NULL, 0 },
   //*********************************************
   //For scalable extension.
-  { "layer",                    no_argument, NULL, 0 },
-  { "layer-res",          required_argument, NULL, 0 }, //Set
+  { "layer",                    no_argument, NULL, 0 }, //New layer
+  { "layer-res",          required_argument, NULL, 0 }, //Set resolution of layer
+  { "input-layer-set",    required_argument, NULL, 0 }, //Manualy set the input layer the current layer uses
   //*********************************************
   {0, 0, 0, 0}
 };
@@ -213,14 +214,16 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   //For scalable extension. TODO: Add error cheching
     const char* name = long_options[long_options_index].name;
     if (!strcmp(name, "input")) {
-      if (*opts->input) {
+      if (*opts->input != NULL) {
        /* fprintf(stderr, "Input error: More than one input file given.\n");
         ok = 0;
         goto done;*/
         //Increase input array size
-        opts->input = realloc(opts->input, ++opts->num_inputs);
+        opts->input = realloc(opts->input, ++opts->num_inputs * sizeof(char*));
+
       }
       opts->input[opts->num_inputs-1] = strdup(optarg);
+      api->config_parse(opts->config, name, optarg); //Send input for parsing so that input layers can be set correctly.
     } else if (!strcmp(name, "output")) {
       if (opts->output) {
         fprintf(stderr, "Input error: More than one output file given.\n");
@@ -229,11 +232,11 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       }
       opts->output = strdup(optarg);
     } else if (!strcmp(name, "debug")) {
-      if (opts->debug) {
+      if (opts->debug != NULL) {
         /*fprintf(stderr, "Input error: More than one debug output file given.\n");
         ok = 0;
         goto done;*/
-        opts->debug = realloc(opts->debug, ++opts->num_debugs);
+        opts->debug = realloc(opts->debug, ++opts->num_debugs * sizeof(char*));
       }
       opts->debug[opts->num_debugs-1] = strdup(optarg);
     } else if (!strcmp(name, "seek")) {
@@ -277,18 +280,24 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     goto done;
   }
   //*********************************************
-  //For scalable extension. TODO: move to cfg parsing? Handle multiple inputs
+  //For scalable extension. TODO: move to cfg parsing?
   // Set resolution automatically if necessary
-  if (opts->config->width == 0 && opts->config->height == 0) {
-    ok = select_input_res_auto(*opts->input, &opts->config->width, &opts->config->height);
-    //goto done;
-  }
-  if (*opts->config->input_width == 0 && *opts->config->input_height == 0) {
-    ok = ok && select_input_res_auto(*opts->input, opts->config->input_width, opts->config->input_height);
-    goto done;
+  for (int i = 0; i < opts->num_inputs; i++) {
+    //Automatically set layer size to match the respective input layer size
+    kvz_config *cfg = opts->config;
+    for(int j = 0; j < *cfg->max_layers ; ++j) {
+      if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
+        ok = ok && select_input_res_auto(opts->input[i], &cfg->width, &cfg->height);
+        //goto done;
+      }
+      cfg = cfg->next_cfg;
+    }
+    if ((*opts->config->input_widths)[i] == 0 && (*opts->config->input_heights)[i] == 0) {
+      ok = ok && select_input_res_auto(opts->input[i], &(*opts->config->input_widths)[i], &(*opts->config->input_heights)[i]);
+      goto done;
+    }
   }
   //*********************************************
-  
 
 done:
 

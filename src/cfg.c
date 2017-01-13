@@ -127,9 +127,14 @@ int kvz_config_init(kvz_config *cfg)
   cfg->layer = 0;
   cfg->max_layers = malloc(sizeof(uint8_t));
   *cfg->max_layers = 1;
-  
-  cfg->input_width = calloc(1,sizeof(int32_t));
-  cfg->input_height = calloc(1,sizeof(int32_t));
+  cfg->max_input_layers = malloc(sizeof(uint8_t));
+  *cfg->max_input_layers = 0;
+  cfg->input_layer = -1;
+
+  cfg->input_widths = calloc(1,sizeof(int32_t**));
+  cfg->input_heights = calloc(1,sizeof(int32_t**));
+  *cfg->input_widths = calloc(1,sizeof(int32_t*));
+  *cfg->input_heights = calloc(1,sizeof(int32_t*));
 
   cfg->next_cfg = NULL;
 
@@ -147,7 +152,12 @@ int kvz_config_destroy(kvz_config *cfg)
     kvz_config_destroy(cfg->next_cfg);
     FREE_POINTER(cfg->next_cfg);
   } else {
-    FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared field
+    FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared fields
+    FREE_POINTER(cfg->max_input_layers);
+    FREE_POINTER(*cfg->input_widths);
+    FREE_POINTER(*cfg->input_heights);
+    FREE_POINTER(cfg->input_widths);
+    FREE_POINTER(cfg->input_heights);
   }
   //*********************************************
   FREE_POINTER(cfg->cqmfile);
@@ -596,18 +606,33 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->height = atoi(value);
   //*********************************************
   //For scalable extension. TODO: Handle multiple input layers
-  else if OPT("input-res")
+  else if OPT("input-layer-set")
+    cfg->input_layer = atoi(value);
+  else if OPT("input"){
+    //Allocate a new spot for the new input layer
+    *cfg->input_widths = realloc(*cfg->input_widths, ++(*cfg->max_input_layers) * sizeof(int32_t*));
+    *cfg->input_heights = realloc(*cfg->input_heights, (*cfg->max_input_layers) * sizeof(int32_t*));
+
+    //If cur layers input layer has not been set, set the newest layer as the input layer set
+    //Associates the first input in the layer with the input layer
+    if( cfg->input_layer == -1 ) {
+      cfg->input_layer = *cfg->max_input_layers - 1;
+    }
+  }
+  else if OPT("input-res"){
     if (!strcmp(value, "auto")) {
       return 1;
-    } else {
-      int32_t width, height;
-      bool success = sscanf(value, "%dx%d", &width, &height) == 2;
-      if( success ) {
-        cfg->width = *cfg->input_width = width;
-        cfg->height = *cfg->input_height = height;
-      }
-      return (success);
+    } 
+
+    int32_t width, height;
+    bool success = sscanf(value, "%dx%d", &width, &height) == 2;
+    if( success ) {
+      int i = (*cfg->max_input_layers) == 0 ? 0 : *cfg->max_input_layers - 1;
+      (*cfg->input_widths)[i] = width;
+      (*cfg->input_heights)[i] = height;
     }
+    return (success);
+  }
   else if OPT("layer-res")
     return (sscanf(value, "%dx%d", cfg->width, cfg->height) == 2);
   //*********************************************
@@ -1028,10 +1053,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->next_cfg->max_layers = cfg->max_layers;
     *cfg->max_layers += 1;
 
-    free(cfg->next_cfg->input_width);
-    free(cfg->next_cfg->input_height);
-    cfg->next_cfg->input_width = cfg->input_width;
-    cfg->next_cfg->input_height = cfg->input_height;
+    free(cfg->next_cfg->input_widths);
+    free(cfg->next_cfg->input_heights);
+    cfg->next_cfg->input_widths = cfg->input_widths;
+    cfg->next_cfg->input_heights = cfg->input_heights;
+
+    //Set a value for the input layer if not set yet.
+    //Associate the latest input in the (old) layer with the (old) input layer
+    if( cfg->input_layer == -1 ) {
+      cfg->input_layer = MAX(*cfg->max_input_layers-1,0);
+    }
   }
   //*********************************************
   else
