@@ -319,6 +319,12 @@ typedef struct kvz_config
   } gop_lp_definition;
 
   int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
+
+  struct {
+    int32_t width;
+    int32_t height;
+    uint8_t *dqps;
+  } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
 } kvz_config;
 
 /**

@@ -280,7 +280,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
   if (encoder->deblock_enable) {
-    if (encoder->cfg->target_bitrate > 0) {
+    if (encoder->cfg->target_bitrate > 0 || encoder->cfg->roi.dqps != NULL) {
       set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, false);
     }
 
@@ -329,7 +329,9 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   
 
   // QP delta is not used when rate control is turned off.
-  state->must_code_qp_delta = (state->encoder_control->cfg->target_bitrate > 0);
+  state->must_code_qp_delta = (
+      state->encoder_control->cfg->target_bitrate > 0
+      || state->encoder_control->cfg->roi.dqps != NULL);
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);

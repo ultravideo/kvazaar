@@ -122,6 +122,10 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_lp_definition.d = 3;
   cfg->gop_lp_definition.t = 1;
 
+  cfg->roi.width = 0;
+  cfg->roi.height = 0;
+  cfg->roi.dqps = NULL;
+
   return 1;
 }
 
@@ -977,6 +981,33 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("implicit-rdpcm")
     cfg->implicit_rdpcm = (bool)atobool(value);
+  else if OPT("roi") {
+    // The ROI description is as follows:
+    // First number is width, second number is height,
+    // then follows width * height number of dqp values.
+    FILE* f = fopen(value, "rb");
+    int width = 0;
+    int height = 0;
+    if (!fscanf(f, "%d", &width) || !fscanf(f, "%d", &height)) {
+      fprintf(stderr, "Failed to read ROI size.\n");
+      return 0;
+    }
+    cfg->roi.width = width;
+    cfg->roi.height = height;
+    cfg->roi.dqps = malloc(width * height * sizeof(*cfg->roi.dqps));
+    if (!cfg->roi.dqps) {
+      fprintf(stderr, "Failed to allocate memory for ROI table.\n");
+      return 0;
+    }
+    for (int i = 0; i < width * height; ++i) {
+      int number; // Need a pointer to int for fscanf
+      if (!fscanf(f, "%d", &number)) {
+        fprintf(stderr, "Reading ROI file failed.\n");
+        return 0;
+      }
+      cfg->roi.dqps[i] = (uint8_t)number;
+    }
+  }
   else
     return 0;
 #undef OPT

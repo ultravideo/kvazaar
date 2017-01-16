@@ -118,6 +118,7 @@ static const struct option long_options[] = {
   { "input-format",       required_argument, NULL, 0 },
   { "implicit-rdpcm",           no_argument, NULL, 0 },
   { "no-implicit-rdpcm",        no_argument, NULL, 0 },
+  { "roi",                required_argument, NULL, 0 },
   {0, 0, 0, 0}
 };
 
@@ -380,6 +381,13 @@ void print_help(void)
     "                                   - none: no constraint\n"
     "                                   - frametile: constrain within the tile\n"
     "                                   - frametilemargin: constrain even more\n"
+    "      --roi <string>         : Use a delta QP map for region of interest\n"
+    "                                   Read an array of delta QP values from\n"
+    "                                   a file, where the first two values are the\n"
+    "                                   width and height, followed by width*height\n"
+    "                                   delta QP values in raster order.\n"
+    "                                   The delta QP map can be any size or aspect\n"
+    "                                   ratio, and will be mapped to LCU's.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") ************/
     "Compression tools:\n"

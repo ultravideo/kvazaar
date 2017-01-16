@@ -173,6 +173,39 @@ static int8_t lambda_to_qp(const double lambda)
   return CLIP(0, 51, qp);
 }
 
+static double qp_to_lamba(encoder_state_t * const state, int qp)
+{
+  const encoder_control_t * const ctrl = state->encoder_control;
+  const int gop_len = ctrl->cfg->gop_len;
+  const int period = gop_len > 0 ? gop_len : ctrl->cfg->intra_period;
+
+  kvz_gop_config const * const gop = &ctrl->cfg->gop[state->frame->gop_offset];
+
+  double lambda = pow(2.0, (qp - 12) / 3.0);
+
+  if (state->frame->slicetype == KVZ_SLICE_I) {
+    lambda *= 0.57;
+
+    // Reduce lambda for I-frames according to the number of references.
+    if (period == 0) {
+      lambda *= 0.5;
+    } else {
+      lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (period - 1));
+    }
+  } else if (gop_len > 0) {
+    lambda *= gop->qp_factor;
+  } else {
+    lambda *= 0.4624;
+  }
+
+  // Increase lambda if not key-frame.
+  if (period > 0 && state->frame->poc % period != 0) {
+    lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
+  }
+
+  return lambda;
+}
+
 /**
  * \brief Allocate bits and set lambda and QP for the current picture.
  * \param state the main encoder state
@@ -206,7 +239,6 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     // Rate control disabled
     kvz_gop_config const * const gop = &ctrl->cfg->gop[state->frame->gop_offset];
     const int gop_len = ctrl->cfg->gop_len;
-    const int period  = gop_len > 0 ? gop_len : ctrl->cfg->intra_period;
 
     state->frame->QP = ctrl->cfg->qp;
 
@@ -214,30 +246,7 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
       state->frame->QP += gop->qp_offset;
     }
 
-    double lambda = pow(2.0, (state->frame->QP - 12) / 3.0);
-
-    if (state->frame->slicetype == KVZ_SLICE_I) {
-      lambda *= 0.57;
-
-      // Reduce lambda for I-frames according to the number of references.
-      if (period == 0) {
-        lambda *= 0.5;
-      } else {
-        lambda *= 1.0 - CLIP(0.0, 0.5, 0.05 * (period - 1));
-      }
-    } else if (gop_len > 0) {
-      lambda *= gop->qp_factor;
-
-    } else {
-      lambda *= 0.4624;
-    }
-
-    // Increase lambda if not key-frame.
-    if (period > 0 && state->frame->poc % period != 0) {
-      lambda *= CLIP(2.0, 4.0, (state->frame->QP - 12) / 6.0);
-    }
-
-    state->frame->lambda = lambda;
+    state->frame->lambda = qp_to_lamba(state, state->frame->QP);
   }
 }
 
@@ -271,7 +280,22 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
 {
   const encoder_control_t * const ctrl = state->encoder_control;
 
-  if (ctrl->cfg->target_bitrate > 0) {
+  if (ctrl->cfg->roi.dqps != NULL) {
+    vector2d_t lcu = {
+      pos.x + state->tile->lcu_offset_x,
+      pos.y + state->tile->lcu_offset_y
+    };
+    vector2d_t roi = {
+      lcu.x * ctrl->cfg->roi.width / ctrl->in.width_in_lcu,
+      lcu.y * ctrl->cfg->roi.height / ctrl->in.height_in_lcu
+    };
+    int roi_index = roi.x + roi.y * ctrl->cfg->roi.width;
+    int dqp = ctrl->cfg->roi.dqps[roi_index];
+    state->qp = state->frame->QP + dqp;
+    state->lambda = qp_to_lamba(state, state->qp);
+    state->lambda_sqrt = sqrt(state->frame->lambda);
+
+  } else if (ctrl->cfg->target_bitrate > 0) {
     lcu_stats_t *lcu         = kvz_get_lcu_stats(state, pos.x, pos.y);
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
