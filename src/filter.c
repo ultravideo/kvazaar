@@ -268,6 +268,14 @@ static int8_t get_qp_y_pred(const encoder_state_t* state, int x, int y, edge_dir
   return (qp_p + qp_q + 1) >> 1;
 }
 
+static INLINE void gather_deblock_pixels(const kvz_pixel *src, int stride, int offset, kvz_pixel result[2][8])
+{
+  for (int i = 0; i < 8; ++i) {
+    result[0][i] = src[(i - 4) * stride];
+    result[1][i] = src[(i - 4) * stride + offset];
+  }
+}
+
 /**
  * \brief Apply the deblocking filter to luma pixels on a single edge.
  *
@@ -331,8 +339,6 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
     // For each 4-pixel part in the edge
     for (uint32_t block_idx = 0; block_idx < num_4px_parts; ++block_idx) {
-      int32_t dp0, dq0, dp3, dq3, d0, d3, dp, dq, d;
-
       {
         // CUs on both sides of the edge
         cu_info_t *cu_p;
@@ -432,30 +438,36 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
         tc              = kvz_g_tc_table_8x8[tc_index] * bitdepth_scale;
         thr_cut         = tc * 10;
       }
-      if(!strength) continue;
-      // Check conditions for filtering
-      // TODO: Get rid of these inline defines.
-      #define calc_DP(s,o) abs( (int16_t)s[-o*3] - (int16_t)2*s[-o*2] + (int16_t)s[-o] )
-      #define calc_DQ(s,o) abs( (int16_t)s[0]    - (int16_t)2*s[o]    + (int16_t)s[o*2] )
 
-      dp0 = calc_DP((src+step*(block_idx*4+0)), offset);
-      dq0 = calc_DQ((src+step*(block_idx*4+0)), offset);
-      dp3 = calc_DP((src+step*(block_idx*4+3)), offset);
-      dq3 = calc_DQ((src+step*(block_idx*4+3)), offset);
-      d0 = dp0 + dq0;
-      d3 = dp3 + dq3;
-      dp = dp0 + dp3;
-      dq = dq0 + dq3;
-      d  =  d0 + d3;
+      if (strength == 0) continue;
 
-      if (d < beta) {
+      // Gather the 6 pixels from each line required for the filter on/off
+      // decision. Include 2 more for the weak/strong filtering decision.
+      kvz_pixel b[2][8];
+      if (dir == EDGE_VER) {
+        gather_deblock_pixels(&src[block_idx * 4 * step], 1, 3 * stride, b);
+      } else {
+        gather_deblock_pixels(&src[block_idx * 4 * step], stride, 3, b);
+      }
+
+      int_fast32_t dp0 = abs(b[0][1] - 2 * b[0][2] + b[0][3]);
+      int_fast32_t dq0 = abs(b[0][4] - 2 * b[0][5] + b[0][6]);
+      int_fast32_t dp3 = abs(b[1][1] - 2 * b[1][2] + b[1][3]);
+      int_fast32_t dq3 = abs(b[1][4] - 2 * b[1][5] + b[1][6]);
+      int_fast32_t dp = dp0 + dp3;
+      int_fast32_t dq = dq0 + dq3;
+
+      if (dp + dq < beta) {
         int8_t filter_P = (dp < side_threshold) ? 1 : 0;
         int8_t filter_Q = (dq < side_threshold) ? 1 : 0;
 
         // Strong filtering flag checking
-        #define useStrongFiltering(o,d,s) ( ((abs(s[-o*4]-s[-o]) + abs(s[o*3]-s[0])) < (beta>>3)) && (d<(beta>>2)) && ( abs(s[-o]-s[0]) < ((tc*5+1)>>1)) )
-        int8_t sw = useStrongFiltering(offset, 2*d0, (src+step*(block_idx*4+0))) &&
-                    useStrongFiltering(offset, 2*d3, (src+step*(block_idx*4+3)));
+        int8_t sw = 2 * (dp0 + dq0) < beta >> 2 &&
+                    2 * (dp3 + dq3) < beta >> 2 &&
+                    abs(b[0][3] - b[0][4]) < (5 * tc + 1) >> 1 &&
+                    abs(b[1][3] - b[1][4]) < (5 * tc + 1) >> 1 &&
+                    abs(b[0][0] - b[0][3]) + abs(b[0][4] - b[0][7]) < beta >> 3 &&
+                    abs(b[1][0] - b[1][3]) + abs(b[1][4] - b[1][7]) < beta >> 3;
 
         // Filter four rows/columns
         for (int i = 0; i < 4; i++) {
