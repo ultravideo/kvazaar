@@ -490,7 +490,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   if (data_out) *data_out = NULL;
-  if (len_out) *len_out = 0;
+  if (len_out) memset(len_out, 0, sizeof(uint32_t)*(*enc->control->cfg->max_layers));
   if (pic_out) *pic_out = NULL;
   if (src_out) *src_out = NULL;
 
@@ -534,7 +534,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
       (*data_out)->next = cur_data_out;
       cur_data_out = NULL;
     }
-    if(len_out) *len_out += cur_len_out;
+    if(len_out) len_out[i] += cur_len_out;
     if(pic_out) {
       (*pic_out)->base_image = kvz_image_copy_ref(cur_pic_out);
       pic_out = &(*pic_out)->base_image;

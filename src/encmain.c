@@ -419,6 +419,7 @@ int main(int argc, char *argv[])
   // Modified for SHVC
   //Allocate space for some stuff
   kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
+  uint32_t *len_out = calloc(*opts->config->max_layers, sizeof(uint32_t)); // Each layer has their own len_out
   
   pthread_t *input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
 
@@ -508,12 +509,12 @@ int main(int argc, char *argv[])
       kvz_data_chunk* chunks_out = NULL;
       kvz_picture *img_rec = NULL;
       kvz_picture *img_src = NULL;
-      uint32_t len_out = 0;
+      //uint32_t len_out = 0;
       
       if (!api->encoder_encode(enc,
                                cur_in_img,
                                &chunks_out,
-                               &len_out,
+                               len_out,
                                &img_rec,
                                &img_src,
                                info_out)) {
@@ -528,13 +529,20 @@ int main(int argc, char *argv[])
         break;
       }
 
+      // ***********************************************
+      // Modified for SHVC
+      uint32_t tot_len_out = 0;
+      for (int i = 0; i < *opts->config->max_layers; ++i) {
+        tot_len_out += len_out[i];
+      }
+
       if (chunks_out != NULL) {
         uint64_t written = 0;
         // Write data into the output file.
         for (kvz_data_chunk *chunk = chunks_out;
              chunk != NULL;
              chunk = chunk->next) {
-          assert(written + chunk->len <= len_out);
+          assert(written + chunk->len <= tot_len_out);
           if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
             fprintf(stderr, "Failed to write data to file.\n");
             free_chained_img(api, cur_in_img);
@@ -545,7 +553,7 @@ int main(int argc, char *argv[])
         }
         fflush(output);
 
-        bitstream_length += len_out;
+        bitstream_length += tot_len_out;
 
 // ***********************************************
         // Modified for SHVC
@@ -582,7 +590,7 @@ int main(int argc, char *argv[])
           psnr_sum[2] += frame_psnr[2];
 
 
-          print_el_frame_info(&info_out[layer_id], frame_psnr, len_out, layer_id); //TODO: len_out is misleading, get separate len for each layer?
+          print_el_frame_info(&info_out[layer_id], frame_psnr, len_out[layer_id], layer_id); 
 
           //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;
@@ -780,6 +788,7 @@ done:
 
   //Free some stuff
   free(info_out);
+  free(len_out);
   free(in_args);
   free(input_threads);
   free(input_mutex);
