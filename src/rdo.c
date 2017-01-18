@@ -188,7 +188,7 @@ int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     int8_t type)
 {
   cabac_data_t * const cabac = &state->cabac;
-  int32_t rate = 32768;
+  int32_t rate = 1 << CTX_FRAC_BITS;
   uint32_t base_level  =  (c1_idx < C1FLAG_NUMBER)? (2 + (c2_idx < C2FLAG_NUMBER)) : 1;
   cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
   cabac_ctx_t *base_abs_ctx = (type == 0) ? &(cabac->ctx.cu_abs_model_luma[0]) : &(cabac->ctx.cu_abs_model_chroma[0]);
@@ -198,14 +198,14 @@ int32_t kvz_get_ic_rate(encoder_state_t * const state,
     int32_t length;
     if (symbol < (COEF_REMAIN_BIN_REDUCTION << abs_go_rice)) {
       length = symbol>>abs_go_rice;
-      rate += (length+1+abs_go_rice)<< 15;
+      rate += (length+1+abs_go_rice) << CTX_FRAC_BITS;
     } else {
       length = abs_go_rice;
       symbol  = symbol - ( COEF_REMAIN_BIN_REDUCTION << abs_go_rice);
       while (symbol >= (1<<length)) {
         symbol -=  (1<<(length++));
       }
-      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length)<< 15;
+      rate += (COEF_REMAIN_BIN_REDUCTION+length+1-abs_go_rice+length) << CTX_FRAC_BITS;
     }
     if (c1_idx < C1FLAG_NUMBER) {
       rate += CTX_ENTROPY_BITS(&base_one_ctx[ctx_num_one],1);
@@ -303,10 +303,10 @@ static double get_rate_last(const encoder_state_t * const state,
   uint32_t ctx_y   = g_group_idx[pos_y];
   double uiCost = last_x_bits[ ctx_x ] + last_y_bits[ ctx_y ];
   if( ctx_x > 3 ) {
-    uiCost += 32768.0 * ((ctx_x-2)>>1);
+    uiCost += CTX_FRAC_ONE_BIT * ((ctx_x - 2) >> 1);
   }
   if( ctx_y > 3 ) {
-    uiCost += 32768.0 * ((ctx_y-2)>>1);
+    uiCost += CTX_FRAC_ONE_BIT * ((ctx_y - 2) >> 1);
   }
   return state->lambda * uiCost;
 }
@@ -342,7 +342,14 @@ static void calc_last_bits(encoder_state_t * const state, int32_t width, int32_t
   last_y_bits[ctx] = bits_y;
 }
 
-
+/**
+ * \brief Select which coefficient to change for sign hiding, and change it.
+ *
+ * When sign hiding is enabled, the last sign bit of the last coefficient is
+ * calculated from the parity of the other coefficients. If the parity is not
+ * correct, one coefficient has to be changed by one. This function uses
+ * tables generated during RDOQ to select the best coefficient to change.
+ */
 void kvz_rdoq_sign_hiding(const encoder_state_t *const state,
                       const int32_t qp_scaled,
                       const uint32_t *const scan,
@@ -356,10 +363,12 @@ void kvz_rdoq_sign_hiding(const encoder_state_t *const state,
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  int64_t rd_factor = (int64_t)(
-    kvz_g_inv_quant_scales[qp_scaled % 6] * kvz_g_inv_quant_scales[qp_scaled % 6] * (1 << (2 * (qp_scaled / 6)))
-    / state->lambda / 16 / (1 << (2 * (encoder->bitdepth - 8)))
-    + 0.5);
+  int inv_quant = kvz_g_inv_quant_scales[qp_scaled % 6];
+  // This somehow scales delta_u into fractional bits. Instead of the bits
+  // being multiplied by lambda, the residual is divided by it, or something
+  // like that.
+  int64_t rd_factor = (inv_quant * inv_quant * (1 << (2 * (qp_scaled / 6)))
+                      / state->lambda / 16 / (1 << (2 * (encoder->bitdepth - 8))) + 0.5);
   int32_t lastCG = -1;
   int32_t absSum = 0;
 
@@ -397,14 +406,29 @@ void kvz_rdoq_sign_hiding(const encoder_state_t *const state,
 
         for (int32_t n = (lastCG == 1 ? lastNZPosInCG : SCAN_SET_SIZE - 1); n >= 0; --n) {
           uint32_t blkpos = scan[n + subPos];
-          if (dest_coeff[blkpos] != 0) {
-            int64_t costUp = rd_factor * (-delta_u[blkpos]) + rate_inc_up[blkpos];
-            int64_t costDown = rd_factor * (delta_u[blkpos]) + rate_inc_down[blkpos]
-              - (abs(dest_coeff[blkpos]) == 1 ? ((1 << 15) + sig_rate_delta[blkpos]) : 0);
+          // Shift the calculation back into original precision to avoid
+          // changing the bitstream.
+#         define PRECISION_INC (15 - CTX_FRAC_BITS)
+          int64_t rd_bit_cost = rd_factor * delta_u[blkpos] + (delta_u[blkpos] >= 0 ? 2 : -2);
 
-            if (lastCG == 1 && lastNZPosInCG == n && abs(dest_coeff[blkpos]) == 1) {
-              costDown -= (4 << 15);
+          if (dest_coeff[blkpos] != 0) {
+            int64_t costUp = rate_inc_up[blkpos];
+            int64_t costDown = rate_inc_down[blkpos];
+            if (abs(dest_coeff[blkpos]) == 1) {
+              // If magnitude turns to zero, sign no longer needs to be coded.
+              costDown -= CTX_FRAC_ONE_BIT + sig_rate_delta[blkpos];
             }
+            if (lastCG == 1 && lastNZPosInCG == n && abs(dest_coeff[blkpos]) == 1) {
+              // Changing the last non-zero bit in the last cg to zero.
+              // This might save a lot of bits if the next bits are already
+              // zeros, or just a coupple fractional bits if they are not.
+              // TODO: Check if calculating the real savings makes sense.
+              costDown -= 4 * CTX_FRAC_ONE_BIT;
+            }
+
+            costUp = -rd_bit_cost + (costUp << PRECISION_INC);
+            costDown = rd_bit_cost + (costDown << PRECISION_INC);
+
 
             if (costUp<costDown) {
               curCost = costUp;
@@ -418,7 +442,8 @@ void kvz_rdoq_sign_hiding(const encoder_state_t *const state,
               }
             }
           } else {
-            curCost = rd_factor * (-(abs(delta_u[blkpos]))) + (1 << 15) + rate_inc_up[blkpos] + sig_rate_delta[blkpos];
+            int cost = CTX_FRAC_ONE_BIT + rate_inc_up[blkpos] + sig_rate_delta[blkpos];
+            curCost = -abs(rd_bit_cost) + (cost << PRECISION_INC);
             curChange = 1;
 
             if (n<firstNZPosInCG) {
@@ -1002,7 +1027,7 @@ int kvz_calc_mvd_cost_cabac(encoder_state_t * const state, int x, int y, int mv_
 
     }
   }
-  
+
   *bitcost = (23 - state_cabac_copy.bits_left) + (state_cabac_copy.num_buffered_bytes << 3);
 
   // Store bitcost before restoring cabac

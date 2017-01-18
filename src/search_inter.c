@@ -191,22 +191,22 @@ static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *m
   if (abs_mvd.x > 0) {
     bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.x > 1);
     if (abs_mvd.x > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2) << 15;
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2) << CTX_FRAC_BITS;
     }
-    bitcost += 1 << 15; // sign
+    bitcost += CTX_FRAC_ONE_BIT; // sign
   }
 
   bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.y > 0);
   if (abs_mvd.y > 0) {
     bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.y > 1);
     if (abs_mvd.y > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2) << 15;
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2) << CTX_FRAC_BITS;
     }
-    bitcost += 1 << 15; // sign
+    bitcost += CTX_FRAC_ONE_BIT; // sign
   }
 
   // Round and shift back to integer bits.
-  return (bitcost + (1 << 14)) >> 15;
+  return (bitcost + CTX_FRAC_HALF_BIT) >> CTX_FRAC_BITS;
 }
 
 
