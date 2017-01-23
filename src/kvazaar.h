@@ -204,6 +204,7 @@ typedef struct kvz_gop_config {
   int8_t ref_pos[16];  /*!< \brief reference picture offset list */
   int8_t ref_neg_count;/*!< \brief Reference picture count */
   int8_t ref_neg[16];  /*!< \brief reference picture offset list */
+  int8_t tId;          /*!< \brief temporal id for the current layer*/
 } kvz_gop_config;
 
 /**
@@ -289,6 +290,7 @@ typedef struct kvz_config
   int8_t gop_len;            /*!< \brief length of GOP for the video sequence */
   int8_t gop_lowdelay;       /*!< \brief specifies that the GOP does not use future pictures */
   kvz_gop_config gop[KVZ_MAX_GOP_LENGTH];  /*!< \brief Array of GOP settings */
+  uint8_t max_temporal_layer; /*!< \brief specify the maximum temporal layer */
 
   int32_t target_bitrate;
 
