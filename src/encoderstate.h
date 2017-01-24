@@ -169,6 +169,7 @@ typedef struct{
   uint8_t max_layers; //Total number of layers
   uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
   uint16_t num_output_layer_sets;
+  uint8_t list_modification_present_flag; //TODO: Move somewhere else?
 } encoder_state_config_layer_t;
 //*********************************************
 

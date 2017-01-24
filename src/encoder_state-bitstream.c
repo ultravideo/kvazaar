@@ -1090,8 +1090,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   //*******************************************
   //For scalability extension. TODO: add asserts.
   //TODO: Make a better check? Move to somewhere else?
-  uint8_t list_modification_present_flag = (state->layer->layer_id>0)&&(state->encoder_control->cfg->ref_frames>1)&&(state->encoder_control->cfg->intra_period!=1)?1:0;
-  WRITE_U(stream, list_modification_present_flag, 1, "lists_modification_present_flag");
+  state->layer->list_modification_present_flag = (state->layer->layer_id>0)&&(state->encoder_control->cfg->ref_frames>1)&&(state->encoder_control->cfg->intra_period!=1)?1:0;
+  WRITE_U(stream, state->layer->list_modification_present_flag, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
     
   //TODO: set in cfg
@@ -1494,12 +1494,11 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
           WRITE_UE(stream, ref_positive != 0 ? ref_positive - 1 : 0, "num_ref_idx_l1_active_minus1");
     }
     //TODO: Make a better check?
-    uint8_t list_modification_present_flag = (state->layer->layer_id>0)&&(state->encoder_control->cfg->ref_frames>1)&&(state->encoder_control->cfg->intra_period!=1)?1:0;
     //if( lists_modification_present_flag && NumPicTotalCurr>1 )
-    if( state->layer->layer_id > 0 && state->frame->ref->used_size > 1) {
+    if( state->layer->list_modification_present_flag && state->frame->ref->used_size > 1) {
     //  ref_pic_lists_modification()
       uint8_t ref_pic_lists_modification_flag_l0 = 1;
-      WRITE_U(stream, ref_pic_lists_modification_flag_l0, 1,"ref_pic_lists_modification_flag_l0");
+      WRITE_U(stream, ref_pic_lists_modification_flag_l0, 1,"ref_pic_list_modification_flag_l0");
       if( ref_pic_lists_modification_flag_l0 ) {
         for (int i = 0; i < ref_negative; ++i) {
           //We want to move the ILR pic first
@@ -1508,7 +1507,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
       }
       if (state->frame->slicetype == KVZ_SLICE_B) {
         uint8_t ref_pic_lists_modification_flag_l1 = 0;
-        WRITE_U(stream, ref_pic_lists_modification_flag_l1, 1, "ref_pic_lists_modification_flag_l0");
+        WRITE_U(stream, ref_pic_lists_modification_flag_l1, 1, "ref_pic_list_modification_flag_l0");
         if (ref_pic_lists_modification_flag_l1) {
           for (int i = 0; i < ref_positive; ++i) {
            WRITE_U(stream, i, kvz_math_ceil_log2(state->frame->ref->used_size), "list_entry_l1[i]");
