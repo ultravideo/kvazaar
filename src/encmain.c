@@ -420,7 +420,7 @@ int main(int argc, char *argv[])
   //Allocate space for some stuff
   kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
   uint32_t *len_out = calloc(*opts->config->max_layers, sizeof(uint32_t)); // Each layer has their own len_out
-  
+
   pthread_t *input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
 
   pthread_mutex_t *input_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
@@ -442,8 +442,8 @@ int main(int argc, char *argv[])
       // Lock both mutexes at startup
       input_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
       main_thread_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
-      PTHREAD_LOCK(&main_thread_mutex);
-      PTHREAD_LOCK(&input_mutex);
+      PTHREAD_LOCK(&main_thread_mutex[i]);
+      PTHREAD_LOCK(&input_mutex[i]);
 
       uint8_t padding_x = get_padding((*opts->config->input_widths)[i]);
       uint8_t padding_y = get_padding((*opts->config->input_heights)[i]);
@@ -479,7 +479,7 @@ int main(int argc, char *argv[])
       // ***********************************************
       // Modified for SHVC
       //TODO: Move relevant de/allocation to done tag.
-      kvz_picture *cur_img;
+      kvz_picture *cur_img = NULL;
       for (int i = 0; i < opts->num_inputs; i++) {
         // Skip mutex locking if the input thread does not exist.
         if (in_args[i].retval == RETVAL_RUNNING) {

@@ -67,6 +67,9 @@ static void kvazaar_close(kvz_encoder *encoder)
     kvz_encoder_control_free(encoder->control);
     encoder->control = NULL;
   }
+  else {
+    return;
+  }
   FREE_POINTER(encoder);
  
   kvazaar_close(next);
