@@ -109,6 +109,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     if (!cur_enc->control) {
       goto kvazaar_open_failure;
     }
+    if( prev_enc != NULL ) prev_enc->control->next_enc_ctrl = cur_enc->control;
 
     cur_enc->num_encoder_states = cur_enc->control->owf + 1;
     cur_enc->cur_state_num = 0;

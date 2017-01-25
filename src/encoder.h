@@ -155,6 +155,11 @@ typedef struct encoder_control_t
   //! Picture weights when GOP is used.
   double gop_layer_weights[MAX_GOP_LAYERS];
 
+  // ***********************************************
+  // Modified for SHVC. TODO: Needed to set rep_formats in vps. Find a better way?
+  const encoder_control_t* next_enc_ctrl;
+  // ***********************************************
+
 } encoder_control_t;
 
 encoder_control_t* kvz_encoder_control_init(kvz_config *cfg);

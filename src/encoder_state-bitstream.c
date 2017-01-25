@@ -116,7 +116,7 @@ static void encoder_state_write_bitstream_PTL_no_profile(bitstream_t *stream,
   // end PTL
 }
 
-//TODO: Merger with other ptl
+//TODO: Merger with other ptl / use profile function
 static void encoder_state_write_bitstream_PTL_scalable(bitstream_t *stream,
   encoder_state_t * const state)
 {
@@ -182,7 +182,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint8_t splitting_flag = 0; //TODO: implement splitting_flag in configuration?
   WRITE_U(stream, splitting_flag, 1, "splitting_flag");
   
-  uint16_t  num_scalability_types = 1; //TODO: calculate from actual mask
+  uint16_t  num_scalability_types = 1; //TODO: calculate from actual mask?
 
   //for (int i = 0; i < 16; i++){
     //TODO: Implement scalability mask flags in configuration?
@@ -299,38 +299,41 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //Write rep formats here
   //TODO: Implement own settings for alternate rep formats.
   //TODO: Need to add separate rep format when the layers have different sizes
-  uint8_t vps_num_rep_formats_minus1 = state->layer->max_layers-1; //TODO: add rep format only for different sizes
+  uint8_t vps_num_rep_formats_minus1 = state->layer->max_layers-1; //TODO: add rep format only for different sizes?
   WRITE_UE(stream, vps_num_rep_formats_minus1, "vps_num_rep_formats_minus1");
   
-  for (int i = 0; i <= vps_num_rep_formats_minus1; i++) {
-    //rep_format(){
+  {
     const encoder_control_t* encoder = state->encoder_control;
-    unsigned shift = i==0?0:1; //TODO: remove. Only for quick testing.
-    unsigned offset = i==0?0:8; //TODO: remove. Only for quick testing.
-    WRITE_U(stream, encoder->in.width<<shift, 16, "pic_width_vps_in_luma_samples");
-    WRITE_U(stream, (encoder->in.height<<shift)-offset, 16, "pic_height_vps_in_luma_samples");
-    
-    uint8_t chroma_and_bit_depth_vps_present_flag = i==0; //Has to be one in the first rep format
-    WRITE_U(stream, chroma_and_bit_depth_vps_present_flag, 1, "chroma_and_bit_depth_vps_present_flag");
+    for (int i = 0; i <= vps_num_rep_formats_minus1; i++) {
+    //rep_format(){  
+      //unsigned shift = i==0?0:1; //TODO: remove. Only for quick testing.
+      //unsigned offset = i==0?0:8; //TODO: remove. Only for quick testing.
+      WRITE_U(stream, encoder->in.width, 16, "pic_width_vps_in_luma_samples");
+      WRITE_U(stream, encoder->in.height, 16, "pic_height_vps_in_luma_samples");
 
-    if (chroma_and_bit_depth_vps_present_flag) {
-      WRITE_U(stream, encoder->chroma_format, 2, "chroma_format_vps_idc");
-      if (encoder->chroma_format == KVZ_CSP_444) {
-        WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
+      uint8_t chroma_and_bit_depth_vps_present_flag = i==0; //Has to be one in the first rep format
+      WRITE_U(stream, chroma_and_bit_depth_vps_present_flag, 1, "chroma_and_bit_depth_vps_present_flag");
+
+      if (chroma_and_bit_depth_vps_present_flag) {
+        WRITE_U(stream, encoder->chroma_format, 2, "chroma_format_vps_idc");
+        if (encoder->chroma_format == KVZ_CSP_444) {
+          WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
+        }
+        WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_luma_minus8");
+        WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_chroma_minus8");
       }
-      WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_luma_minus8");
-      WRITE_U(stream, encoder->bitdepth - 8, 4, "bit_depth_chroma_minus8");
-    }
-    uint8_t conformance_window_flag = encoder->in.width<<shift != encoder->in.real_width<<shift || (encoder->in.height<<shift)-offset != encoder->in.real_height<<shift;
-    WRITE_U(stream, conformance_window_flag, 1, "conformance_window_pvs_flag");
+      uint8_t conformance_window_flag = encoder->in.width != encoder->in.real_width || encoder->in.height != encoder->in.real_height;
+      WRITE_U(stream, conformance_window_flag, 1, "conformance_window_pvs_flag");
 
-    if (conformance_window_flag) {
-      WRITE_UE(stream, 0, "conf_win_vps_left_offset");
-      WRITE_UE(stream, ((encoder->in.width<<shift) - (encoder->in.real_width<<shift)) >> 1, "conf_win_vps_right_offset");
-      WRITE_UE(stream, 0, "conf_win_vps_top_offset");
-      WRITE_UE(stream, ((encoder->in.height<<shift) - (encoder->in.real_height<<shift)) >> 1, "conf_win_vps_bottom_offset");
+      if (conformance_window_flag) {
+        WRITE_UE(stream, 0, "conf_win_vps_left_offset");
+        WRITE_UE(stream, (encoder->in.width - encoder->in.real_width) >> 1, "conf_win_vps_right_offset");
+        WRITE_UE(stream, 0, "conf_win_vps_top_offset");
+        WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1, "conf_win_vps_bottom_offset");
+      }
+  //}
+      encoder = encoder->next_enc_ctrl;
     }
-    //}
   }
 
   //if vps_num_rep_formats_minus1 > 0 Write rep_format_idx_present_flag here
