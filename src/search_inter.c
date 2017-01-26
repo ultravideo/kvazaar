@@ -1332,7 +1332,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
       break;
   }
 
-  if (state->encoder_control->cfg->fme_level > 0) {
+  if (state->encoder_control->cfg->fme_level > 0 && temp_cost < *inter_cost) {
     temp_cost = search_frac(state,
                             width, height,
                             frame->source,
