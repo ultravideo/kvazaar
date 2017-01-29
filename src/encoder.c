@@ -90,7 +90,7 @@ static int select_owf_auto(const kvz_config *const cfg)
       threads_per_frame -= 2;
     }
 
-    if (cfg->gop_lowdelay && cfg->gop_lp_definition.t > 1) {
+    if (cfg->gop_len && cfg->gop_lowdelay && cfg->gop_lp_definition.t > 1) {
       // Temporal skipping makes every other frame very fast to encode so
       // more parallel frames should be used.
       frames *= 2;

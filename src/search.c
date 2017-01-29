@@ -733,7 +733,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
-        cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
+        cur_cu->part_size = SIZE_2Nx2N;
 
         kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, cur_cu->tr_depth);
         lcu_set_intra_mode(&work_tree[depth], x, y, depth,

@@ -987,7 +987,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->frame->slicetype = cfg->intra_period==1 ? KVZ_SLICE_I : (state->encoder_control->cfg->gop_len?KVZ_SLICE_B:KVZ_SLICE_P);
 
     // Use P-slice for lowdelay.
-    if (state->frame->slicetype == KVZ_SLICE_B && cfg->gop_lowdelay) {
+    if (state->frame->slicetype == KVZ_SLICE_B &&
+        cfg->gop_len > 0 &&
+        cfg->gop_lowdelay) {
       state->frame->slicetype = KVZ_SLICE_P;
     }
 

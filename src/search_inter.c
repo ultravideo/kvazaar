@@ -1229,20 +1229,16 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                                 double *inter_cost,
                                 uint32_t *inter_bitcost)
 {
-  const int x_cu = x >> 3;
-  const int y_cu = y >> 3;
   const videoframe_t * const frame = state->tile->frame;
   kvz_picture *ref_image = state->frame->ref->images[ref_idx];
+  const vector2d_t orig = { x, y };
   uint32_t temp_bitcost = 0;
   uint32_t temp_cost = 0;
-  vector2d_t orig;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
   int8_t ref_list = state->frame->refmap[ref_idx].list-1;
   int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
-  orig.x = x_cu * CU_MIN_SIZE_PIXELS;
-  orig.y = y_cu * CU_MIN_SIZE_PIXELS;
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = ref_idx;
   kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
