@@ -986,27 +986,53 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     // First number is width, second number is height,
     // then follows width * height number of dqp values.
     FILE* f = fopen(value, "rb");
+    if (!f) {
+      fprintf(stderr, "Could not open ROI file.\n");
+      return 0;
+    }
+
     int width = 0;
     int height = 0;
     if (!fscanf(f, "%d", &width) || !fscanf(f, "%d", &height)) {
       fprintf(stderr, "Failed to read ROI size.\n");
+      fclose(f);
       return 0;
     }
-    cfg->roi.width = width;
+
+    if (width <= 0 || height <= 0) {
+      fprintf(stderr, "Invalid ROI size: %dx%d.\n", width, height);
+      fclose(f);
+      return 0;
+    }
+
+    const long long unsigned size = (long long unsigned) width *
+                                    (long long unsigned) height;
+    if (size > SIZE_MAX) {
+      fprintf(stderr, "Too large ROI size: %llu (maximum %zu).\n", size, SIZE_MAX);
+      return 0;
+    }
+
+    cfg->roi.width  = width;
     cfg->roi.height = height;
-    cfg->roi.dqps = malloc(width * height * sizeof(*cfg->roi.dqps));
+    // FIXME: this array is never freed
+    cfg->roi.dqps   = calloc((size_t)size, sizeof(*cfg->roi.dqps));
     if (!cfg->roi.dqps) {
       fprintf(stderr, "Failed to allocate memory for ROI table.\n");
+      fclose(f);
       return 0;
     }
-    for (int i = 0; i < width * height; ++i) {
+
+    for (int i = 0; i < size; ++i) {
       int number; // Need a pointer to int for fscanf
-      if (!fscanf(f, "%d", &number)) {
+      if (fscanf(f, "%d", &number) != 1) {
         fprintf(stderr, "Reading ROI file failed.\n");
+        fclose(f);
         return 0;
       }
       cfg->roi.dqps[i] = (uint8_t)number;
     }
+
+    fclose(f);
   }
   else
     return 0;
