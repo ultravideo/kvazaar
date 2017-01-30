@@ -515,7 +515,6 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   int32_t  transform_shift   = MAX_TR_DYNAMIC_RANGE - encoder->bitdepth - log2_tr_size;  // Represents scaling through forward transform
   uint16_t go_rice_param     = 0;
   uint32_t log2_block_size   = kvz_g_convert_to_bit[ width ] + 2;
-  uint32_t max_num_coeff     = width * height;
   int32_t  scalinglist_type= (block_type == CU_INTRA ? 0 : 3) + (int8_t)("\0\3\1\2"[type]);
 
   int32_t qp_scaled = kvz_get_scaled_qp(type, state->qp, (encoder->bitdepth - 8) * 6);
@@ -556,6 +555,16 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   uint32_t cg_num = width * height >> 4;
 
+  // Explicitly tell the only possible numbers of elements to be zeroed.
+  // Hope the compiler is able to utilize this information.
+  switch (cg_num) {
+    case  1: memset(sig_coeffgroup_flag, 0,  1 * sizeof(sig_coeffgroup_flag[0])); break;
+    case  4: memset(sig_coeffgroup_flag, 0,  4 * sizeof(sig_coeffgroup_flag[0])); break;
+    case 16: memset(sig_coeffgroup_flag, 0, 16 * sizeof(sig_coeffgroup_flag[0])); break;
+    case 64: memset(sig_coeffgroup_flag, 0, 64 * sizeof(sig_coeffgroup_flag[0])); break;
+    default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
+  }
+
   cabac_ctx_t *base_coeff_group_ctx = &(cabac->ctx.cu_sig_coeff_group_model[type]);
   cabac_ctx_t *baseCtx              = (type == 0) ? &(cabac->ctx.cu_sig_model_luma[0]) : &(cabac->ctx.cu_sig_model_chroma[0]);
   cabac_ctx_t *base_one_ctx = (type == 0) ? &(cabac->ctx.cu_one_model_luma[0]) : &(cabac->ctx.cu_one_model_chroma[0]);
@@ -569,7 +578,8 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   } rd_stats;
 
   //Find last cg and last scanpos
-  for (int32_t cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
+  int32_t cg_scanpos;
+  for (cg_scanpos = (cg_num - 1); cg_scanpos >= 0; cg_scanpos--)
   {
     for (int32_t scanpos_in_cg = (cg_size - 1); scanpos_in_cg >= 0; scanpos_in_cg--)
     {
@@ -596,10 +606,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     return;
   }
 
-  FILL_ARRAY(cost_coeff, 0, max_num_coeff);
-  FILL_ARRAY(cost_sig, 0, max_num_coeff);
-  FILL(cost_coeffgroup_sig, 0);
-  FILL(sig_coeffgroup_flag, 0);
+  for (; cg_scanpos >= 0; cg_scanpos--) cost_coeffgroup_sig[cg_scanpos] = 0;
 
   int32_t last_x_bits[32], last_y_bits[32];
   calc_last_bits(state, width, height, type, last_x_bits, last_y_bits);
