@@ -709,11 +709,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
+    // It is ok to interrupt the search as soon as it is known that
+    // the split costs at least as much as not splitting.
     if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg->cu_split_termination == KVZ_CU_SPLIT_TERMINATION_OFF) {
-      split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
-      split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
-      split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
-      split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
     } else {
       split_cost = INT_MAX;
     }
