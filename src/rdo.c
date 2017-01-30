@@ -584,6 +584,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
         last_scanpos    = scanpos;
         ctx_set         = (scanpos > 0 && type == 0) ? 2 : 0;
         cg_last_scanpos = cg_scanpos;
+        sh_rates.sig_coeff_inc[blkpos] = 0;
         break;
       }
       dest_coeff[blkpos] = 0;
@@ -597,11 +598,6 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   FILL_ARRAY(cost_coeff, 0, max_num_coeff);
   FILL_ARRAY(cost_sig, 0, max_num_coeff);
-
-  if (encoder->cfg.signhide_enable) {
-    memset(&sh_rates, 0, sizeof(sh_rates));
-  }
-
   FILL(cost_coeffgroup_sig, 0);
   FILL(sig_coeffgroup_flag, 0);
 
