@@ -695,18 +695,23 @@ void kvz_encoder_state_write_bitstream_slice_header(
 #ifdef KVZ_DEBUG
   printf("=========== Slice ===========\n");
 #endif
-  WRITE_U(stream, (state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
+
+  bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
+
+  WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
 
   if (state->frame->pictype >= KVZ_NAL_BLA_W_LP
-      && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
-    WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
+    && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
+    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
   }
 
   WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
-  if (state->slice->start_in_rs > 0) {
-    //For now, we don't support dependent slice segments
-    //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
-    WRITE_UE(stream, state->slice->start_in_rs, "slice_segment_address");
+
+  if (!first_slice_segment_in_pic) {
+    int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
+    int num_bits = kvz_math_ceil_log2(lcu_cnt);
+    int slice_start_rs = state->slice->start_in_rs;
+    WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
   }
 
   WRITE_UE(stream, state->frame->slicetype, "slice_type");
@@ -821,10 +826,16 @@ void kvz_encoder_state_write_bitstream_slice_header(
     int num_entry_points = 0;
     int max_length_seen = 0;
     
-    encoder_state_entry_points_explore(state, &num_entry_points, &max_length_seen);
+    if (state->is_leaf) {
+      num_entry_points = 1;
+    } else {
+      encoder_state_entry_points_explore(state, &num_entry_points, &max_length_seen);
+    }
     
-    WRITE_UE(stream, num_entry_points - 1, "num_entry_point_offsets");
-    if (num_entry_points > 0) {
+    int num_offsets = num_entry_points - 1;
+
+    WRITE_UE(stream, num_offsets, "num_entry_point_offsets");
+    if (num_offsets > 0) {
       int entry_points_written = 0;
       int offset_len = kvz_math_floor_log2(max_length_seen) + 1;
       WRITE_UE(stream, offset_len - 1, "offset_len_minus1");
