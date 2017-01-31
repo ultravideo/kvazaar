@@ -68,8 +68,6 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  kvz_init_exp_golomb();
-
   encoder = calloc(1, sizeof(kvz_encoder));
   if (!encoder) {
     goto kvazaar_open_failure;

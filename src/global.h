@@ -247,8 +247,6 @@ typedef int16_t coeff_t;
 
 #define MAX_TR_DYNAMIC_RANGE 15
 
-#define EXP_GOLOMB_TABLE_SIZE (4096*8)
-
 //Constants
 typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 

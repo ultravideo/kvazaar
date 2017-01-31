@@ -39,8 +39,6 @@ const uint32_t kvz_bit_set_mask[] =
 0x10000000,0x20000000,0x40000000,0x80000000
 };
 
-bit_table_t kvz_g_exp_table[EXP_GOLOMB_TABLE_SIZE];
-
 
 //#define VERBOSE
 
@@ -55,29 +53,6 @@ void printf_bitstream(char *msg, ...)
   printf("%s",buffer);
 }
 #endif
-
-/**
- * \brief Initialize the Exp Golomb code table.
- *
- * Fills kvz_g_exp_table with exponential golomb codes.
- */
-void kvz_init_exp_golomb()
-{
-  static int exp_table_initialized = 0;
-  if (exp_table_initialized) return;
-
-  uint32_t code_num;
-  uint8_t M;
-  uint32_t info;
-  for (code_num = 0; code_num < EXP_GOLOMB_TABLE_SIZE; code_num++) {
-    M = kvz_math_floor_log2(code_num + 1);
-    info = code_num + 1 - (uint32_t)pow(2, M);
-    kvz_g_exp_table[code_num].len = M * 2 + 1;
-    kvz_g_exp_table[code_num].value = (1<<M) | info;
-  }
-
-  exp_table_initialized = 1;
-}
 
 /**
  * \brief Initialize a new bitstream.
@@ -257,6 +232,30 @@ void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t b
       kvz_bitstream_put_byte(stream, stream->data);
     }
   }
+}
+
+/**
+ * \brief Write unsigned Exp-Golomb bit string
+ */
+void bitstream_put_ue(bitstream_t *stream, uint32_t code_num)
+{
+  unsigned code_num_log2 = kvz_math_floor_log2(code_num + 1);
+  unsigned prefix = 1 << code_num_log2;
+  unsigned suffix = code_num + 1 - prefix;
+  unsigned num_bits = code_num_log2 * 2 + 1;
+  unsigned value = prefix | suffix;
+
+  kvz_bitstream_put(stream, value, num_bits);
+}
+
+/**
+ * \brief Write signed Exp-Golomb bit string
+ */
+void bitstream_put_se(bitstream_t *stream, int32_t data)
+{
+  // Map positive values to even and negative to odd values.
+  uint32_t code_num = data <= 0 ? (-data) << 1 : (data << 1) - 1;
+  bitstream_put_ue(stream, code_num);
 }
 
 /**
