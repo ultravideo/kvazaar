@@ -141,6 +141,11 @@ typedef struct encoder_state_config_frame_t {
    */
   lcu_stats_t *lcu_stats;
 
+  /**
+   * \brief Whether next NAL is the first NAL in the access unit.
+   */
+  bool first_nal;
+
 } encoder_state_config_frame_t;
 
 typedef struct encoder_state_config_tile_t {

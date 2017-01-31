@@ -911,22 +911,23 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   uint64_t curpos = kvz_bitstream_tell(stream);
 
   // The first NAL unit of the access unit must use a long start code.
-  bool first_nal_in_au = true;
+  state->frame->first_nal = true;
 
   // Access Unit Delimiter (AUD)
   if (encoder->aud_enable) {
-    first_nal_in_au = false;
+    state->frame->first_nal = false;
     encoder_state_write_bitstream_aud(state);
   }
 
   if (encoder_state_must_write_vps(state)) {
-    first_nal_in_au = false;
+    state->frame->first_nal = false;
     kvz_encoder_state_write_parameter_sets(&state->stream, state);
   }
 
   // Send Kvazaar version information only in the first frame.
   if (state->frame->num == 0 && encoder->cfg->add_encoder_info) {
-    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
+    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
+    state->frame->first_nal = false;
     encoder_state_write_bitstream_prefix_sei_version(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
@@ -934,14 +935,15 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   //SEI messages for interlacing
-  if (encoder->vui.frame_field_info_present_flag){
+  if (encoder->vui.frame_field_info_present_flag) {
     // These should be optional, needed for earlier versions
     // of HM decoder to accept bitstream
     //kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, 0);
     //encoder_state_write_active_parameter_sets_sei_message(state);
     //kvz_bitstream_rbsp_trailing_bits(stream);
 
-    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
+    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
+    state->frame->first_nal = false;
     encoder_state_write_picture_timing_sei_message(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
@@ -950,7 +952,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   {
     uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-    kvz_nal_write(stream, nal_type, 0, first_nal_in_au);
+    kvz_nal_write(stream, nal_type, 0, state->frame->first_nal);
   }
 
   {
