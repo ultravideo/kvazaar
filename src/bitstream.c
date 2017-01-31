@@ -237,7 +237,7 @@ void kvz_bitstream_put(bitstream_t *const stream, const uint32_t data, uint8_t b
 /**
  * \brief Write unsigned Exp-Golomb bit string
  */
-void bitstream_put_ue(bitstream_t *stream, uint32_t code_num)
+void kvz_bitstream_put_ue(bitstream_t *stream, uint32_t code_num)
 {
   unsigned code_num_log2 = kvz_math_floor_log2(code_num + 1);
   unsigned prefix = 1 << code_num_log2;
@@ -251,11 +251,11 @@ void bitstream_put_ue(bitstream_t *stream, uint32_t code_num)
 /**
  * \brief Write signed Exp-Golomb bit string
  */
-void bitstream_put_se(bitstream_t *stream, int32_t data)
+void kvz_bitstream_put_se(bitstream_t *stream, int32_t data)
 {
   // Map positive values to even and negative to odd values.
   uint32_t code_num = data <= 0 ? (-data) << 1 : (data << 1) - 1;
-  bitstream_put_ue(stream, code_num);
+  kvz_bitstream_put_ue(stream, code_num);
 }
 
 /**

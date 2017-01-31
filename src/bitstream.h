@@ -75,8 +75,8 @@ void kvz_bitstream_clear(bitstream_t *stream);
 void kvz_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
 void kvz_bitstream_put_byte(bitstream_t *const stream, const uint32_t data);
 
-void bitstream_put_ue(bitstream_t *stream, uint32_t data);
-void bitstream_put_se(bitstream_t *stream, int32_t data);
+void kvz_bitstream_put_ue(bitstream_t *stream, uint32_t data);
+void kvz_bitstream_put_se(bitstream_t *stream, int32_t data);
 
 void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t *stream);
 void kvz_bitstream_align(bitstream_t *stream);
@@ -86,12 +86,12 @@ void kvz_bitstream_align_zero(bitstream_t *stream);
 #ifdef KVZ_DEBUG_PRINT_CABAC
 /* Counter to keep up with bits written */
 #define WRITE_U(stream, data, bits, name) { printf("%-40s u(%d) : %d\n", name,bits,data); kvz_bitstream_put(stream,data,bits);}
-#define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); bitstream_put_ue(stream,data);}
-#define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); bitstream_put_se(stream,(data));}
+#define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); kvz_bitstream_put_ue(stream,data);}
+#define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); kvz_bitstream_put_se(stream,(data));}
 #else
 #define WRITE_U(stream, data, bits, name) { kvz_bitstream_put(stream,data,bits); }
-#define WRITE_UE(stream, data, name) { bitstream_put_ue(stream,data); }
-#define WRITE_SE(stream, data, name) { bitstream_put_se(stream,data); }
+#define WRITE_UE(stream, data, name) { kvz_bitstream_put_ue(stream,data); }
+#define WRITE_SE(stream, data, name) { kvz_bitstream_put_se(stream,data); }
 #endif
 
 
