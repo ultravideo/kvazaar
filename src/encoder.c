@@ -376,8 +376,32 @@ encoder_control_t* kvz_encoder_control_init(kvz_config *const cfg) {
       }
     }
 
+    if (cfg->slices & KVZ_SLICES_WPP) {
+      // Each WPP row will be put into a dependent slice.
+      encoder->pps.dependent_slice_segments_enabled_flag = 1;
+    }
+
     //Slices
-    {
+    if (cfg->slices & KVZ_SLICES_TILES) {
+      // Configure a single independent slice per tile.
+
+      int *slice_addresses_in_ts;
+      encoder->slice_count = encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows;
+      encoder->slice_addresses_in_ts = slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
+
+      int slice_id = 0;
+      for (int tile_row = 0; tile_row < encoder->tiles_num_tile_rows; ++tile_row) {
+        for (int tile_col = 0; tile_col < encoder->tiles_num_tile_columns; ++tile_col) {
+          int x = tiles_col_bd[tile_col];
+          int y = tiles_row_bd[tile_row];
+          int rs = y * encoder->in.width_in_lcu + x;
+          int ts = tiles_ctb_addr_rs_to_ts[rs];
+          slice_addresses_in_ts[slice_id] = ts;
+          slice_id += 1;
+        }
+      }
+
+    } else {
       int *slice_addresses_in_ts;
       encoder->slice_count = encoder->cfg->slice_count;
       if (encoder->slice_count == 0) {

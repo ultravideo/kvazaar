@@ -188,6 +188,16 @@ enum kvz_chroma_format {
   KVZ_CSP_444 = 3,
 };
 
+/**
+ * \brief Chroma subsampling format used for encoding.
+ * \since 3.15.0
+ */
+enum kvz_slices {
+  KVZ_SLICES_NONE,
+  KVZ_SLICES_TILES = (1 << 0), /*!< \brief Put each tile in a slice. */
+  KVZ_SLICES_WPP   = (1 << 1), /*!< \brief Put each row in a slice. */
+};
+
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -325,6 +335,8 @@ typedef struct kvz_config
     int32_t height;
     uint8_t *dqps;
   } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
+
+  unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
 } kvz_config;
 
 /**

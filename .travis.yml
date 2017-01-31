@@ -119,6 +119,11 @@ matrix:
     # Tests for --mv-constraint
     - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --pu-depth-inter=0-3 --mv-constraint=frametilemargin"
     - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --subme=4 --mv-constraint=frametilemargin"
+    
+    # Tests for --slices
+    - env: TEST_DIM=512x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --tiles=2x2 --slices=tiles"
+    - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --slices=wpp"
+
 
 install:
   - source .travis-install.sh

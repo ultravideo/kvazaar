@@ -316,12 +316,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   //Now write data to bitstream (required to have a correct CABAC state)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
   
-  //First LCU, and we are in a slice. We need a slice header
-  if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
-    kvz_encoder_state_write_bitstream_slice_header(state);
-    kvz_bitstream_add_rbsp_trailing_bits(&state->stream); 
-  }
-  
   //Encode SAO
   if (encoder->sao_enable) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
@@ -336,11 +330,43 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
-  //Terminator
-  if (lcu->index < state->lcu_order_count - 1) {
-    //Since we don't handle slice segments, end of slice segment == end of slice
-    //Always 0 since otherwise it would be split
-    kvz_cabac_encode_bin_trm(&state->cabac, 0);  // end_of_slice_segment_flag
+  bool end_of_slice_segment_flag;
+  if (state->encoder_control->cfg->slices & KVZ_SLICES_WPP) {
+    // Slice segments end after each WPP row.
+    end_of_slice_segment_flag = lcu->last_column;
+  } else if (state->encoder_control->cfg->slices & KVZ_SLICES_TILES) {
+    // Slices end after each tile.
+    end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
+  } else {
+    // Slice ends after the last row of the last tile.
+    int last_tile_id = -1 + encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows;
+    bool is_last_tile = state->tile->id == last_tile_id;
+    end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
+  }
+  kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
+
+  {
+    const bool end_of_tile = lcu->last_column && lcu->last_row;
+    const bool end_of_wpp_row = encoder->cfg->wpp && lcu->last_column;
+
+
+    if (end_of_tile || end_of_wpp_row) {
+      if (!end_of_slice_segment_flag) {
+        // end_of_sub_stream_one_bit
+        kvz_cabac_encode_bin_trm(&state->cabac, 1);
+      }
+
+      // Finish the substream by writing out remaining state.
+      kvz_cabac_finish(&state->cabac);
+
+      // Write a rbsp_trailing_bits or a byte_alignment. The first one is used
+      // for ending a slice_segment_layer_rbsp and the second one for ending
+      // a substream. They are identical and align the byte stream.
+      kvz_bitstream_put(state->cabac.stream, 1, 1);
+      kvz_bitstream_align_zero(state->cabac.stream);
+
+      kvz_cabac_start(&state->cabac);
+    }
   }
 
   const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
@@ -503,31 +529,23 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
 static void encoder_state_encode(encoder_state_t * const main_state);
 
-static void encoder_state_worker_encode_children(void * opaque) {
+static void encoder_state_worker_encode_children(void * opaque)
+{
   encoder_state_t *sub_state = opaque;
   encoder_state_encode(sub_state);
-  if (sub_state->is_leaf) {
-    if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_BSLEAF);
-      kvz_encoder_state_write_bitstream_leaf(sub_state);
-      PERFORMANCE_MEASURE_END(KVZ_PERF_BSLEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->frame->num, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count - 1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count - 1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count - 1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count - 1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
-    } else {
-      threadqueue_job_t *job;
-#ifdef KVZ_DEBUG
-      char job_description[256];
-      sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->frame->num, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
-#else
-      char* job_description = NULL;
-#endif
-      job = kvz_threadqueue_submit(sub_state->encoder_control->threadqueue, kvz_encoder_state_worker_write_bitstream_leaf, sub_state, 1, job_description);
-      kvz_threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->frame->width_in_lcu + sub_state->lcu_order_count - 1]);
-      kvz_threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
-      
-      assert(!sub_state->tqj_bitstream_written);
-      //Bitstream is written for the row, if we're at the last LCU
-      sub_state->tqj_bitstream_written = job;
-      return;
-    }
+
+  if (sub_state->is_leaf && sub_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+    // Set the last wavefront job of this row as the job that completes
+    // the bitstream for this wavefront row state.
+
+    int wpp_row = sub_state->wfrow->lcu_offset_y;
+    int tile_width = sub_state->tile->frame->width_in_lcu;
+    int end_of_row = (wpp_row + 1) * tile_width - 1;
+    threadqueue_job_t *job = sub_state->tile->wf_jobs[end_of_row];
+
+    assert(!sub_state->tqj_bitstream_written);
+    sub_state->tqj_bitstream_written = job;
+    return;
   }
 }
 

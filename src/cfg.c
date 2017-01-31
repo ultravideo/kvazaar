@@ -126,6 +126,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->roi.height = 0;
   cfg->roi.dqps = NULL;
 
+  cfg->slices = KVZ_SLICES_NONE;
+
   return 1;
 }
 
@@ -732,9 +734,20 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       // -1 means automatic selection
       cfg->owf = -1;
     }
-  } else if OPT("slice-addresses") {
-    fprintf(stderr, "--slice-addresses doesn't do anything, because slices are not implemented.\n");
-    return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
+  } else if OPT("slices") {
+    if (!strcmp(value, "tiles")) {
+      cfg->slices = KVZ_SLICES_TILES;
+      return 1;
+    } else if (!strcmp(value, "wpp")) {
+      cfg->slices = KVZ_SLICES_WPP;
+      return 1;
+    } else if (!strcmp(value, "tiles+wpp")) {
+      cfg->slices = KVZ_SLICES_TILES | KVZ_SLICES_WPP;
+      return 1;
+    } else {
+      return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
+    }
+
   } else if OPT("threads") {
     cfg->threads = atoi(value);
     if (cfg->threads == 0 && !strcmp(value, "auto")) {
@@ -1302,6 +1315,11 @@ int kvz_config_validate(const kvz_config *const cfg)
 
   if (cfg->implicit_rdpcm && !cfg->lossless) {
     fprintf(stderr, "Input error: --implicit-rdpcm is not suppoted without --lossless\n");
+    error = 1;
+  }
+
+  if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->wpp) {
+    fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
     error = 1;
   }
 

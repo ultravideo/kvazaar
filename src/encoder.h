@@ -155,6 +155,11 @@ typedef struct encoder_control_t
   //! Picture weights when GOP is used.
   double gop_layer_weights[MAX_GOP_LAYERS];
 
+  //! pic_parameter_set
+  struct {
+    uint8_t dependent_slice_segments_enabled_flag;
+  } pps;
+
 } encoder_control_t;
 
 encoder_control_t* kvz_encoder_control_init(kvz_config *cfg);
