@@ -331,7 +331,13 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
   bool end_of_slice_segment_flag;
-  {
+  if (state->encoder_control->cfg->slices & KVZ_SLICES_WPP) {
+    // Slice segments end after each WPP row.
+    end_of_slice_segment_flag = lcu->last_column;
+  } else if (state->encoder_control->cfg->slices & KVZ_SLICES_TILES) {
+    // Slices end after each tile.
+    end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
+  } else {
     // Slice ends after the last row of the last tile.
     int last_tile_id = -1 + encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows;
     bool is_last_tile = state->tile->id == last_tile_id;
@@ -528,7 +534,7 @@ static void encoder_state_worker_encode_children(void * opaque)
   encoder_state_t *sub_state = opaque;
   encoder_state_encode(sub_state);
 
-  if (sub_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+  if (sub_state->is_leaf && sub_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
     // Set the last wavefront job of this row as the job that completes
     // the bitstream for this wavefront row state.
 

@@ -84,7 +84,7 @@ static const struct option long_options[] = {
   { "wpp",                      no_argument, NULL, 0 },
   { "no-wpp",                   no_argument, NULL, 0 },
   { "owf",                required_argument, NULL, 0 },
-  { "slice-addresses",    required_argument, NULL, 0 },
+  { "slices",             required_argument, NULL, 0 },
   { "threads",            required_argument, NULL, 0 },
   { "cpuid",              required_argument, NULL, 0 },
   { "pu-depth-inter",     required_argument, NULL, 0 },
@@ -461,13 +461,10 @@ void print_help(void)
     "                               positions of tiles rows separation coordinates.\n"
     "                               Can also be u followed by and a single int n,\n"
     "                               in which case it produces rows of uniform height.\n"
-    /*
-    "      --slice-addresses <string>|u<int> :\n"
-    "                               Specifies a comma separated list of LCU\n"
-    "                               positions in tile scan order of tile separations.\n"
-    "                               Can also be u followed by and a single int n,\n"
-    "                               in which case it produces uniform slice length.\n"
-    */
+    "      --slices <string>      : Control how slices are used\n"
+    "                                   - tiles: put tiles in independent slices\n"
+    "                                   - wpp: put rows in dependent slices\n"
+    "                                   - tiles+wpp: do both\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") ************/
     "Video Usability Information:\n"

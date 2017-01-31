@@ -809,6 +809,11 @@ void kvz_encoder_state_write_bitstream_slice_header(
 #endif
 
   bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
+  if ((state->encoder_control->cfg->slices & KVZ_SLICES_WPP)
+      && state->wfrow->lcu_offset_y > 0)
+  {
+    first_slice_segment_in_pic = false;
+  }
 
   WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
 
@@ -827,6 +832,9 @@ void kvz_encoder_state_write_bitstream_slice_header(
     int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
     int num_bits = kvz_math_ceil_log2(lcu_cnt);
     int slice_start_rs = state->slice->start_in_rs;
+    if (state->encoder_control->cfg->slices & KVZ_SLICES_WPP) {
+      slice_start_rs += state->wfrow->lcu_offset_y * state->tile->frame->width_in_lcu;
+    }
     WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
   }
 
@@ -941,6 +949,11 @@ static void encoder_state_write_bitstream_children(encoder_state_t * const state
   for (int i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
       encoder_state_write_slice_header(&state->stream, &state->children[i], true);
+    } else if (state->children[i].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+      if ((state->encoder_control->cfg->slices & KVZ_SLICES_WPP) && i != 0) {
+        // Add header for dependent WPP row slice.
+        encoder_state_write_slice_header(&state->stream, &state->children[i], false);
+      }
     }
     kvz_encoder_state_write_bitstream(&state->children[i]);
     kvz_bitstream_move(&state->stream, &state->children[i].stream);
