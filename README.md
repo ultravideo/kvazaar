@@ -82,6 +82,13 @@ Video structure:
                                    - none: no constraint
                                    - frametile: constrain within the tile
                                    - frametilemargin: constrain even more
+      --roi <string>         : Use a delta QP map for region of interest
+                                   Read an array of delta QP values from
+                                   a file, where the first two values are the
+                                   width and height, followed by width*height
+                                   delta QP values in raster order.
+                                   The delta QP map can be any size or aspect
+                                   ratio, and will be mapped to LCU's.
 
 Compression tools:
       --deblock [<beta:tc>]  : Deblocking
@@ -153,6 +160,10 @@ Parallel processing:
                                positions of tiles rows separation coordinates.
                                Can also be u followed by and a single int n,
                                in which case it produces rows of uniform height.
+      --slices <string>      : Control how slices are used
+                                   - tiles: put tiles in independent slices
+                                   - wpp: put rows in dependent slices
+                                   - tiles+wpp: do both
 
 Video Usability Information:
       --sar <width:height>   : Specify Sample Aspect Ratio
