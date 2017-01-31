@@ -951,11 +951,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   {
-    uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-    kvz_nal_write(stream, nal_type, 0, state->frame->first_nal);
-  }
-
-  {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     encoder_state_write_bitstream_children(state);
     PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->frame->num, state->type);
@@ -1018,8 +1013,12 @@ static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
 
 static void encoder_state_write_bitstream_slice(encoder_state_t * const state)
 {
+  uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
+  kvz_nal_write(state->cabac.stream, nal_type, 0, state->frame->first_nal);
+
   kvz_encoder_state_write_bitstream_slice_header(state);
   kvz_bitstream_add_rbsp_trailing_bits(&state->stream);
+
   encoder_state_write_bitstream_children(state);
 }
 
