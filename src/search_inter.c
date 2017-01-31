@@ -1477,18 +1477,16 @@ static void search_pu_inter(encoder_state_t * const state,
   if (can_use_bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
     unsigned cu_width = LCU_WIDTH >> depth;
-    #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
-    uint8_t cutoff = num_cand;
-
+    const unsigned num_cand_pairs = MIN(num_cand * (num_cand - 1), 12);
 
     kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
     if (state->encoder_control->cfg->mv_rdo) {
       calc_mvd = kvz_calc_mvd_cost_cabac;
     }
 
-    for (int32_t idx = 0; idx<cutoff*(cutoff - 1); idx++) {
+    for (int32_t idx = 0; idx < num_cand_pairs; idx++) {
       uint8_t i = priorityList0[idx];
       uint8_t j = priorityList1[idx];
       if (i >= num_cand || j >= num_cand) break;
