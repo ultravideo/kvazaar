@@ -194,6 +194,8 @@ encoder_control_t* kvz_encoder_control_init(kvz_config *const cfg) {
   encoder->rdo        = 1;
   encoder->full_intra_search = 0;
 
+  encoder->pps.dependent_slice_segments_enabled_flag = 0;
+
   // Interlacing
   encoder->in.source_scan_type = (int8_t)cfg->source_scan_type;
   encoder->vui.field_seq_flag = encoder->cfg->source_scan_type != 0;

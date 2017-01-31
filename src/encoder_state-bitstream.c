@@ -440,7 +440,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 #endif
   WRITE_UE(stream, 0, "pic_parameter_set_id");
   WRITE_UE(stream, 0, "seq_parameter_set_id");
-  WRITE_U(stream, 0, 1, "dependent_slice_segments_enabled_flag");
+  WRITE_U(stream, encoder->pps.dependent_slice_segments_enabled_flag, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
   WRITE_U(stream, encoder->sign_hiding, 1, "sign_data_hiding_flag");
@@ -674,11 +674,12 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   }
 }
 
-void kvz_encoder_state_write_bitstream_slice_header(
+static void kvz_encoder_state_write_bitstream_slice_header_independent(
     struct bitstream_t * const stream,
     struct encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
+
   int j;
   int ref_negative = 0;
   int ref_positive = 0;
@@ -692,45 +693,18 @@ void kvz_encoder_state_write_bitstream_slice_header(
     }
   } else ref_negative = state->frame->ref->used_size;
 
-#ifdef KVZ_DEBUG
-  printf("=========== Slice ===========\n");
-#endif
-
-  bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
-
-  WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
-
-  if (state->frame->pictype >= KVZ_NAL_BLA_W_LP
-    && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
-    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
-  }
-
-  WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
-
-  if (!first_slice_segment_in_pic) {
-    int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
-    int num_bits = kvz_math_ceil_log2(lcu_cnt);
-    int slice_start_rs = state->slice->start_in_rs;
-    WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
-  }
-
   WRITE_UE(stream, state->frame->slicetype, "slice_type");
 
-  // if !entropy_slice_flag
-
-    //if output_flag_present_flag
-      //WRITE_U(stream, 1, 1, "pic_output_flag");
-    //end if
-    //if( IdrPicFlag ) <- nal_unit_type == 5
   if (state->frame->pictype != KVZ_NAL_IDR_W_RADL
-      && state->frame->pictype != KVZ_NAL_IDR_N_LP) {
+      && state->frame->pictype != KVZ_NAL_IDR_N_LP)
+  {
     int last_poc = 0;
     int poc_shift = 0;
 
-      WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
-      WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
-      WRITE_UE(stream, ref_negative, "num_negative_pics");
-      WRITE_UE(stream, ref_positive, "num_positive_pics");
+    WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
+    WRITE_U(stream, 0, 1, "short_term_ref_pic_set_sps_flag");
+    WRITE_UE(stream, ref_negative, "num_negative_pics");
+    WRITE_UE(stream, ref_positive, "num_positive_pics");
     for (j = 0; j < ref_negative; j++) {      
       int8_t delta_poc = 0;
       
@@ -821,6 +795,44 @@ void kvz_encoder_state_write_bitstream_slice_header(
     int slice_qp_delta = state->frame->QP - encoder->cfg->qp;
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
+}
+
+void kvz_encoder_state_write_bitstream_slice_header(
+    struct bitstream_t * const stream,
+    struct encoder_state_t * const state,
+    bool independent)
+{
+  const encoder_control_t * const encoder = state->encoder_control;
+
+#ifdef KVZ_DEBUG
+  printf("=========== Slice ===========\n");
+#endif
+
+  bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
+
+  WRITE_U(stream, first_slice_segment_in_pic, 1, "first_slice_segment_in_pic_flag");
+
+  if (state->frame->pictype >= KVZ_NAL_BLA_W_LP
+    && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
+    WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
+  }
+
+  WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
+
+  if (!first_slice_segment_in_pic) {
+    if (encoder->pps.dependent_slice_segments_enabled_flag) {
+      WRITE_U(stream, !independent, 1, "dependent_slice_segment_flag");
+    }
+
+    int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
+    int num_bits = kvz_math_ceil_log2(lcu_cnt);
+    int slice_start_rs = state->slice->start_in_rs;
+    WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
+  }
+
+  if (independent) {
+    kvz_encoder_state_write_bitstream_slice_header_independent(stream, state);
+  }
    
   if (encoder->tiles_enable || encoder->wpp) {
     int num_entry_points = 0;
@@ -907,14 +919,15 @@ static void add_checksum(encoder_state_t * const state)
 
 static void encoder_state_write_slice_header(
   bitstream_t * stream,
-  encoder_state_t * state)
+  encoder_state_t * state,
+  bool independent)
 {
   uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
 
   kvz_nal_write(stream, nal_type, 0, state->frame->first_nal);
   state->frame->first_nal = false;
 
-  kvz_encoder_state_write_bitstream_slice_header(stream, state);
+  kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
@@ -927,7 +940,7 @@ static void encoder_state_write_bitstream_children(encoder_state_t * const state
   // in case the child stream is a leaf with something in it already.
   for (int i = 0; state->children[i].encoder_control; ++i) {
     if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
-      encoder_state_write_slice_header(&state->stream, &state->children[i]);
+      encoder_state_write_slice_header(&state->stream, &state->children[i], true);
     }
     kvz_encoder_state_write_bitstream(&state->children[i]);
     kvz_bitstream_move(&state->stream, &state->children[i].stream);
