@@ -976,36 +976,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 
-void kvz_encoder_state_write_bitstream_leaf(encoder_state_t * const state)
-{
-  const encoder_control_t * const encoder = state->encoder_control;
-  //Write terminator of the leaf
-  assert(state->is_leaf);
-  
-  //Last LCU
-  {
-    const lcu_order_element_t * const lcu = &state->lcu_order[state->lcu_order_count - 1];
-    const int lcu_addr_in_ts = lcu->id + state->tile->lcu_offset_in_ts;
-    const int end_of_slice_segment_flag = kvz_lcu_at_slice_end(encoder, lcu_addr_in_ts);
-  
-    kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);  // end_of_slice_segment_flag
-  
-    if (!end_of_slice_segment_flag) {
-      assert(kvz_lcu_at_tile_end(encoder, lcu_addr_in_ts) || lcu->position.x == (state->tile->frame->width_in_lcu - 1));
-      kvz_cabac_encode_bin_trm(&state->cabac, 1); // end_of_sub_stream_one_bit == 1
-      kvz_cabac_flush(&state->cabac);
-    } else {
-      kvz_cabac_flush(&state->cabac);
-      kvz_bitstream_align_zero(&state->stream);
-    }
-  }
-}
-
-void kvz_encoder_state_worker_write_bitstream_leaf(void * opaque)
-{
-  kvz_encoder_state_write_bitstream_leaf((encoder_state_t *) opaque);
-}
-
 static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
 {
   encoder_state_write_bitstream_children(state);

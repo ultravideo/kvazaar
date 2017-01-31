@@ -213,17 +213,6 @@ void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
 /**
  * \brief
  */
-void kvz_cabac_flush(cabac_data_t * const data)
-{
-  kvz_cabac_finish(data);
-  kvz_bitstream_put(data->stream, 1, 1);
-  kvz_bitstream_align_zero(data->stream);
-  kvz_cabac_start(data);
-}
-
-/**
- * \brief
- */
 void kvz_cabac_encode_bin_ep(cabac_data_t * const data, const uint32_t bin_value)
 {
   data->low <<= 1;
