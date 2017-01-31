@@ -674,10 +674,11 @@ static void encoder_state_write_bitstream_entry_points_write(bitstream_t * const
   }
 }
 
-void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const state)
+void kvz_encoder_state_write_bitstream_slice_header(
+    struct bitstream_t * const stream,
+    struct encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
-  bitstream_t * const stream = &state->stream;
   int j;
   int ref_negative = 0;
   int ref_positive = 0;
@@ -893,12 +894,30 @@ static void add_checksum(encoder_state_t * const state)
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
 
+static void encoder_state_write_slice_header(
+  bitstream_t * stream,
+  encoder_state_t * state)
+{
+  uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
+
+  kvz_nal_write(stream, nal_type, 0, state->frame->first_nal);
+  state->frame->first_nal = false;
+
+  kvz_encoder_state_write_bitstream_slice_header(stream, state);
+  kvz_bitstream_add_rbsp_trailing_bits(stream);
+}
+
 /**
  * \brief Move child state bitstreams to the parent stream.
  */
 static void encoder_state_write_bitstream_children(encoder_state_t * const state)
 {
+  // Write Slice headers to the parent stream instead of the child stream
+  // in case the child stream is a leaf with something in it already.
   for (int i = 0; state->children[i].encoder_control; ++i) {
+    if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
+      encoder_state_write_slice_header(&state->stream, &state->children[i]);
+    }
     kvz_encoder_state_write_bitstream(&state->children[i]);
     kvz_bitstream_move(&state->stream, &state->children[i].stream);
   }
@@ -976,22 +995,6 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   state->frame->cur_gop_bits_coded += newpos - curpos;
 }
 
-static void encoder_state_write_bitstream_tile(encoder_state_t * const state)
-{
-  encoder_state_write_bitstream_children(state);
-}
-
-static void encoder_state_write_bitstream_slice(encoder_state_t * const state)
-{
-  uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-  kvz_nal_write(state->cabac.stream, nal_type, 0, state->frame->first_nal);
-
-  kvz_encoder_state_write_bitstream_slice_header(state);
-  kvz_bitstream_add_rbsp_trailing_bits(&state->stream);
-
-  encoder_state_write_bitstream_children(state);
-}
-
 void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
 {
   if (!state->is_leaf) {
@@ -1000,10 +1003,8 @@ void kvz_encoder_state_write_bitstream(encoder_state_t * const state)
         encoder_state_write_bitstream_main(state);
         break;
       case ENCODER_STATE_TYPE_TILE:
-        encoder_state_write_bitstream_tile(state);
-        break;
       case ENCODER_STATE_TYPE_SLICE:
-        encoder_state_write_bitstream_slice(state);
+        encoder_state_write_bitstream_children(state);
         break;
       default:
         fprintf(stderr, "Unsupported node type %c!\n", state->type);

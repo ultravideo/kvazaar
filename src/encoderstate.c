@@ -316,12 +316,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   //Now write data to bitstream (required to have a correct CABAC state)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
   
-  //First LCU, and we are in a slice. We need a slice header
-  if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
-    kvz_encoder_state_write_bitstream_slice_header(state);
-    kvz_bitstream_add_rbsp_trailing_bits(&state->stream); 
-  }
-  
   //Encode SAO
   if (encoder->sao_enable) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
