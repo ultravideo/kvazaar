@@ -472,7 +472,7 @@ void kvz_rdoq_sign_hiding(
 
         // Add sign bit, other bits and sig_coeff goes to one.
         int bits = CTX_FRAC_ONE_BIT + sh_rates->inc[current.pos] + sh_rates->sig_coeff_inc[current.pos];
-        current.cost = -abs(quant_cost_in_bits) + (bits << PRECISION_INC);
+        current.cost = -llabs(quant_cost_in_bits) + (bits << PRECISION_INC);
         current.change = 1;
 
         if (coeff_scan < first_nz_scan) {
