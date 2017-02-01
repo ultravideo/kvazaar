@@ -1018,12 +1018,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       return 0;
     }
 
-    const long long unsigned size = (long long unsigned) width *
-                                    (long long unsigned) height;
-    if (size > SIZE_MAX) {
-      fprintf(stderr, "Too large ROI size: %llu (maximum %zu).\n", size, SIZE_MAX);
+    if (width > 10000 || height > 10000) {
+      fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
       return 0;
     }
+    const unsigned size = width * height;
 
     cfg->roi.width  = width;
     cfg->roi.height = height;
