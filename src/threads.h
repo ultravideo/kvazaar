@@ -42,19 +42,16 @@
 
 #ifdef __MACH__
 // Workaround Mac OS not having clock_gettime.
-#include <mach/clock.h> // IWYU pragma: export
-#include <mach/mach.h> // IWYU pragma: export
-#define KVZ_GET_TIME(clock_t) { \
-  clock_serv_t cclock; \
-  mach_timespec_t mts; \
-  host_get_clock_service(mach_host_self(), SYSTEM_CLOCK, &cclock); \
-  clock_get_time(cclock, &mts); \
-  mach_port_deallocate(mach_task_self(), cclock); \
-  (clock_t)->tv_sec = mts.tv_sec; \
-  (clock_t)->tv_nsec = mts.tv_nsec; \
-}
+// This needs to work with pthread_cond_timedwait.
+#  include <sys/time.h>
+#  define KVZ_GET_TIME(clock_t) { \
+     struct timeval tv; \
+     gettimeofday(&tv, NULL); \
+     (clock_t)->tv_sec = tv.tv_sec; \
+     (clock_t)->tv_nsec = tv.tv_usec * 1000; \
+   }
 #else
-#define KVZ_GET_TIME(clock_t) { clock_gettime(CLOCK_MONOTONIC, (clock_t)); }
+#  define KVZ_GET_TIME(clock_t) { clock_gettime(CLOCK_MONOTONIC, (clock_t)); }
 #endif
 
 #define KVZ_CLOCK_T_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / 1e9)
