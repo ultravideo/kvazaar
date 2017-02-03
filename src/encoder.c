@@ -501,6 +501,15 @@ encoder_control_t* kvz_encoder_control_init(kvz_config *const cfg) {
     encoder->vps_period = -1;
   }
 
+  //*********************************************
+  //For scalable extension.
+  encoder->layer.layer_id = cfg->layer;
+  encoder->layer.max_layers = *cfg->max_layers;
+  encoder->layer.num_layer_sets = encoder->layer.num_output_layer_sets = encoder->layer.max_layers;
+  encoder->layer.list_modification_present_flag = (encoder->layer.layer_id>0)&&(cfg->ref_frames>1)&&(cfg->intra_period!=1)?1:0;
+  encoder->layer.upscaling = NULL; //This is set later when the parameters have been set
+  //*********************************************
+
   return encoder;
 
 init_failed:

@@ -165,19 +165,6 @@ typedef struct lcu_order_element {
   struct lcu_order_element *right;
 } lcu_order_element_t;
 
-//*********************************************
-//For scalable extension. TODO: Move somewhere else?
-//Hold current layer info
-typedef struct{
-  uint8_t layer_id; //id of the current layer
-  uint8_t max_layers; //Total number of layers
-  uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
-  uint16_t num_output_layer_sets;
-  uint8_t list_modification_present_flag; //TODO: Move somewhere else?
-  scaling_parameter_t* upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
-} encoder_state_config_layer_t;
-//*********************************************
-
 typedef struct encoder_state_t {
   const encoder_control_t *encoder_control;
   encoder_state_type type;
@@ -194,11 +181,6 @@ typedef struct encoder_state_t {
   encoder_state_config_tile_t   *tile;
   encoder_state_config_slice_t  *slice;
   encoder_state_config_wfrow_t  *wfrow;
-
-  //*********************************************
-  //For scalable extension. TODO: Move somewhere else?
-  encoder_state_config_layer_t *layer;
-  //*********************************************
 
   int is_leaf; //A leaf encoder state is one which should encode LCUs...
   lcu_order_element_t *lcu_order;

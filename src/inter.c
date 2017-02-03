@@ -942,7 +942,7 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
 
 //*********************************************
 //If we have a IRL ref then we need to set motion cand to 0
-  if(state->layer->layer_id > 0 && (state->frame->poc == state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]]) ) {
+  if(state->encoder_control->layer.layer_id > 0 && (state->frame->poc == state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]]) ) {
     while (candidates < AMVP_MAX_NUM_CANDS) {
     mv_cand[candidates][0] = 0;
     mv_cand[candidates][1] = 0;

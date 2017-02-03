@@ -172,6 +172,9 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     cur_enc->upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
     cur_enc->upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
 
+    //Set the reference to the upscaling parameters in control
+    cur_enc->control->layer.upscaling = &cur_enc->upscaling;
+
     //Connect the sub encoders
     cur_enc->next_enc = NULL;
     cur_enc->prev_enc = prev_enc;
@@ -396,7 +399,7 @@ static int kvazaar_encode(kvz_encoder *enc,
   if (!state->prepared) {
     // ***********************************************
     // Modified for SHVC. TODO: Move all this to kvz_encoder_prepare?
-    if (state->layer->layer_id > 0 && enc->prev_enc != NULL) {
+    if (state->encoder_control->layer.layer_id > 0 && enc->prev_enc != NULL) {
       //TODO: Find a better way. Handle cu_arrays properly
       //deallocate dummy cu_array
       cu_array_t* cua = state->frame->ref->cu_arrays[0]; //ILR pic should be first
@@ -409,7 +412,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
     //TODO: Move somewhere else. slicetype still refers to the prev slice?
     //TODO: Allow first EL layer to be a P-slice
-    if (state->layer->layer_id > 0 && enc->prev_enc != NULL && state->frame->num > 0) {
+    if (state->encoder_control->layer.layer_id > 0 && enc->prev_enc != NULL && state->frame->num > 0) {
       //Also add base layer to the reference list.
       encoder_state_t *bl_state = &enc->prev_enc->states[enc->cur_state_num]; //Should return the bl state with the same poc as state.
       //assert(state->frame->poc == bl_state->frame->poc);

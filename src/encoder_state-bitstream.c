@@ -46,7 +46,7 @@ static void encoder_state_write_bitstream_aud(encoder_state_t * const state)
   bitstream_t * const stream = &state->stream;
   // ***********************************************
   // Modified for SHVC. TODO: only in base layer?
-  kvz_nal_ext_write(stream, KVZ_NAL_AUD_NUT, 0, 1, state->layer->layer_id);
+  kvz_nal_ext_write(stream, KVZ_NAL_AUD_NUT, 0, 1, state->encoder_control->layer.layer_id);
   // ***********************************************
 
   uint8_t pic_type = state->frame->slicetype == KVZ_SLICE_I ? 0
@@ -205,7 +205,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint16_t dimension_id[2][1] = { 0, 1 }; //Values from SHM
   
   //TODO: implement settings?
-  for (int i = 1; i < state->layer->max_layers; i++) {
+  for (int i = 1; i < state->encoder_control->layer.max_layers; i++) {
     if (vps_nuh_layer_id_present_flag){
       WRITE_U(stream, i, 6, "layer_id_in_nuh[i]"); //Sets alternate ids for layers. Defaults to i
     }
@@ -225,7 +225,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   //Generate a default layer reference structure where a layer only depends on the layer directly "below".
   //TODO: implement dependecy specification in config?
-  for (int layer = 1; layer < state->layer->max_layers; layer++){
+  for (int layer = 1; layer < state->encoder_control->layer.max_layers; layer++){
     for (int ref_layer = 0; ref_layer < layer; ref_layer++){
       uint8_t dep_flag = 0;
       if (ref_layer == layer - 1){
@@ -242,7 +242,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   WRITE_U(stream, vps_sub_layers_max_minus1_present_flag, 1, "vps_sub_layers_max_minus1_present_flag");
   //if vps_sub_layers_max_minus1_present_flag write sub_layers_max_minus1[i]=0
   if (vps_sub_layers_max_minus1_present_flag) {
-    for (int i = 0; i < state->layer->max_layers; i++) {
+    for (int i = 0; i < state->encoder_control->layer.max_layers; i++) {
       WRITE_U(stream, 0, 3, "sub_layers_vps_max_minus1[i]");
     }
   }
@@ -264,8 +264,8 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   }
   
   //TODO: Find out proper values? Set in config
-  if (state->layer->num_layer_sets > 1) {
-    WRITE_UE(stream, state->layer->num_output_layer_sets - state->layer->num_layer_sets, "num_add_olss");
+  if (state->encoder_control->layer.num_layer_sets > 1) {
+    WRITE_UE(stream, state->encoder_control->layer.num_output_layer_sets - state->encoder_control->layer.num_layer_sets, "num_add_olss");
     WRITE_U(stream, 1, 2, "default_output_layer_idc"); //value 1 says the layer with the largest nuh_layer_id is the output layer
   }
   
@@ -275,7 +275,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   //TODO: Add proper conditions
   uint8_t num_layers_in_id_list = 2;
-  for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
+  for (int i = 1; i < state->encoder_control->layer.num_output_layer_sets; i++) {
     //If numLayerSets > 2 && i >= numLayerSets write "layer_set_idx_for_ols_minus1[i]"
     //If i > vps_num_layer_sets_minus1 || defaultOutputLayerIdc == 2 write "output_layer_flag[i][j]
     
@@ -299,7 +299,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //Write rep formats here
   //TODO: Implement own settings for alternate rep formats.
   //TODO: Need to add separate rep format when the layers have different sizes
-  uint8_t vps_num_rep_formats_minus1 = state->layer->max_layers-1; //TODO: add rep format only for different sizes?
+  uint8_t vps_num_rep_formats_minus1 = state->encoder_control->layer.max_layers-1; //TODO: add rep format only for different sizes?
   WRITE_UE(stream, vps_num_rep_formats_minus1, "vps_num_rep_formats_minus1");
   
   {
@@ -349,7 +349,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "vps_poc_lsb_aligned_flag");
   
   //TODO: implement numDirectRefLayer and layer_id_in_nuh
-  //for (int i = 1; i < state->layer->max_layers; i++){
+  //for (int i = 1; i < state->encoder_control->layer.max_layers; i++){
   //  if (NumDirectRefLayers[layer_id_in_nuh[i]] == 0){
   //    Starts from the first EL
   //    WRITE_U(stream, 0, 1, "poc_lsb_not_present_flag[0]"); 
@@ -362,8 +362,8 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg->ref_frames + state->encoder_control->cfg->gop_len;
   uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = { 0, 0, max_dec_pic_buffering_minus1,
                                                          max_dec_pic_buffering_minus1 }; //needs to be in line (<=) sps values
-  //for (int i = 1; i < state->layer->num_output_layer_sets; i++) {
-  //  state->layer->num_output_layer_sets == 2
+  //for (int i = 1; i < state->encoder_control->layer.num_output_layer_sets; i++) {
+  //  state->encoder_control->layer.num_output_layer_sets == 2
   WRITE_U(stream, 0, 1, "sub_layer_flag_info_present_flag[i]");
   //  for (int j=0; j <= MaxSubLayersInLayerSetMinus1[OlsIdxToLsIdx[i]]; j++){
   //    OlsIdxToLsIdx[1]==1; MaxSubLayerInLayersSetMinus1[1] == 0
@@ -410,7 +410,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
-   WRITE_U(stream, state->layer->max_layers-1, 6, "vps_max_layers_minus1" );
+   WRITE_U(stream, state->encoder_control->layer.max_layers-1, 6, "vps_max_layers_minus1" );
   //*********************************************
 
   WRITE_U(stream, 1, 3, "vps_max_sub_layers_minus1");
@@ -434,12 +434,12 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
-  WRITE_U(stream, state->layer->max_layers - 1, 6, "vps_max_layer_id");
+  WRITE_U(stream, state->encoder_control->layer.max_layers - 1, 6, "vps_max_layer_id");
   
   //TODO: Find out what it does
-  WRITE_UE(stream, state->layer->num_layer_sets - 1, "vps_num_layer_sets_minus1");
-  for (int i = 1; i < state->layer->num_layer_sets; i++) {
-    for (int j = 0; j < state->layer->max_layers; j++) {
+  WRITE_UE(stream, state->encoder_control->layer.num_layer_sets - 1, "vps_num_layer_sets_minus1");
+  for (int i = 1; i < state->encoder_control->layer.num_layer_sets; i++) {
+    for (int j = 0; j < state->encoder_control->layer.max_layers; j++) {
       WRITE_U(stream, 1, 1, "layer_id_included_flag[i][j]"); //By default include all.
     }
   }
@@ -453,11 +453,11 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   //WRITE_U(stream, 0, 1, "vps_extension_flag");
   //*********************************************
   //For scalable extension. TODO: Move somewhere else? Set based on extension used
-  WRITE_U(stream, (state->layer->max_layers - 1) > 0 ? 1 : 0 , 1, "vps_extension_flag");
+  WRITE_U(stream, (state->encoder_control->layer.max_layers - 1) > 0 ? 1 : 0 , 1, "vps_extension_flag");
 
   //Align with ones
   //TODO: a better way?
-  if (state->layer->max_layers > 0){
+  if (state->encoder_control->layer.max_layers > 0){
     //while (stream->cur_bit != 0) {
     if (stream->cur_bit != 0){
       //kvz_bitstream_align(stream);
@@ -685,7 +685,7 @@ void writeSTermRSet_(encoder_state_t* const state, int neg_ref_minus)
   int ref_positive = 0;
   
   //TODO: Make a better implementation. Use neg_ref_minus?
-  if( ref_negative > 0 && state->layer->layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
+  if( ref_negative > 0 && state->encoder_control->layer.layer_id > 0) --ref_negative; //One frame needs to be for the ILR ref
 
   int last_poc = 0;
   int poc_shift = 0;
@@ -762,7 +762,7 @@ void writeSTermRSet(encoder_state_t* const state, unsigned idx )
   int ref_positive = 0;
   
   //TODO: Make a better implementation. Use neg_ref_minus?
-  if(state->layer->layer_id > 0 && encoder->cfg->ref_frames <= ref_negative+ref_positive) --ref_negative; //One frame needs to be for the ILR ref
+  if(state->encoder_control->layer.layer_id > 0 && encoder->cfg->ref_frames <= ref_negative+ref_positive) --ref_negative; //One frame needs to be for the ILR ref
 
   if( idx != 0) {
     //IF slice header WRITE "delta_idx_minus1" ?
@@ -850,14 +850,14 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //*******************************************
   //For scalability extension. TODO: add asserts.
   //TODO: set sps_max_sub_layers in cfg?
-  if (state->layer->layer_id == 0) {
+  if (state->encoder_control->layer.layer_id == 0) {
     WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
   }
   else {
     WRITE_U(stream, 7, 3, "sps_ext_or_max_sub_layers_minus1")
   }
   //TODO: Add sps_ext_of_max_sub_layers_minus1 to cfg?
-  uint8_t multi_layer_ext_sps_flag = (state->layer->layer_id != 0); // && sps_ext_or_max_sub_layers_minus1 == 7);
+  uint8_t multi_layer_ext_sps_flag = (state->encoder_control->layer.layer_id != 0); // && sps_ext_or_max_sub_layers_minus1 == 7);
 
   if (!multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
@@ -869,7 +869,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // parameter set ids are global (layer id does not matter)
   // so set the correct sps id (use layer id as the pset id)
   // vps is the same for all layers
-  WRITE_UE(stream, state->layer->layer_id, "sps_seq_parameter_set_id");
+  WRITE_UE(stream, state->encoder_control->layer.layer_id, "sps_seq_parameter_set_id");
   // ***********************************************
  
 
@@ -949,7 +949,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
       WRITE_U(stream, sps_infer_scaling_list_flag, 1, "sps_infer_scaling_list_flag");
     }
     if (sps_infer_scaling_list_flag) {
-      WRITE_U(stream, state->layer->layer_id - 1, 6, "sps_scaling_list_ref_layer_id");
+      WRITE_U(stream, state->encoder_control->layer.layer_id - 1, 6, "sps_scaling_list_ref_layer_id");
     }
     else {
       WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
@@ -970,10 +970,10 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 
-  if (state->layer->max_layers > 1) {
+  if (state->encoder_control->layer.max_layers > 1) {
     //Need to make sure the first frames don't reference non-existant pocs
     uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
-    if (state->layer->layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve one "reference" for ILR 
+    if (state->encoder_control->layer.layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve one "reference" for ILR 
     WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
          //IF num short term ref pic sets
     for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
@@ -1017,8 +1017,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   // parameter set ids are global (layer id does not matter)
   // so set the correct pps/sps id (use layer id as the pset id)
  
-  WRITE_UE(stream, state->layer->layer_id, "pic_parameter_set_id");
-  WRITE_UE(stream, state->layer->layer_id, "seq_parameter_set_id");
+  WRITE_UE(stream, state->encoder_control->layer.layer_id, "pic_parameter_set_id");
+  WRITE_UE(stream, state->encoder_control->layer.layer_id, "seq_parameter_set_id");
   // ***********************************************
  
   
@@ -1092,13 +1092,12 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   //*******************************************
   //For scalability extension. TODO: add asserts.
   //TODO: Make a better check? Move to somewhere else?
-  state->layer->list_modification_present_flag = (state->layer->layer_id>0)&&(state->encoder_control->cfg->ref_frames>1)&&(state->encoder_control->cfg->intra_period!=1)?1:0;
-  WRITE_U(stream, state->layer->list_modification_present_flag, 1, "lists_modification_present_flag");
+  WRITE_U(stream, state->encoder_control->layer.list_modification_present_flag, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
     
   //TODO: set in cfg?
   uint8_t slice_segment_header_extension_present_flag = 0;
-  uint8_t pps_extension_flag = state->layer->layer_id!=0; // state->layer->max_layers > 1 ? 1 : 0;
+  uint8_t pps_extension_flag = state->encoder_control->layer.layer_id!=0; // state->encoder_control->layer.max_layers > 1 ? 1 : 0;
   uint8_t pps_multilayer_extension_flag = pps_extension_flag; //pps_extension_flag;
   WRITE_U(stream, slice_segment_header_extension_present_flag, 1, "slice_segment_header_extension_present_flag");
   WRITE_U(stream, pps_extension_flag, 1, "pps_extension_flag");
@@ -1118,15 +1117,15 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
     uint8_t pps_infer_scaling_list_flag = 0; //TODO: Infer list?
     WRITE_U(stream, 0, 1, "pps_infer_scaling_list_flag");
     if (pps_infer_scaling_list_flag) {
-      WRITE_U(stream, state->layer->layer_id - 1, 6, "pps_scaling_list_ref_layer_id");
+      WRITE_U(stream, state->encoder_control->layer.layer_id - 1, 6, "pps_scaling_list_ref_layer_id");
     }
 
     //TODO: Check actual number of differently sized layers?
     //TODO: Account for more complex ref structure?
-    uint8_t num_ref_loc_offsets = 1;//state->layer->max_layers-1; 
+    uint8_t num_ref_loc_offsets = 1;//state->encoder_control->layer.max_layers-1; 
     WRITE_UE(stream, num_ref_loc_offsets, "num_ref_loc_offsets");
     for( int i = 0; i < num_ref_loc_offsets; i++ ) {
-      WRITE_U(stream, state->layer->layer_id-1-i, 6, "ref_loc_offset_layer_id[i]");
+      WRITE_U(stream, state->encoder_control->layer.layer_id-1-i, 6, "ref_loc_offset_layer_id[i]");
       
       //TODO: For some reason offsets are shifted in the SHM. Why? 
       uint8_t scaled_ref_layer_offset_present_flag = 0; //TODO: get from somewhere
@@ -1140,12 +1139,12 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
       uint8_t ref_region_layer_offset_present_flag = 1; //TODO: get from somewhere
       WRITE_U(stream, ref_region_layer_offset_present_flag, 1, "ref_region_layer_offset_present_flag" );
-      //TODO: Calculate properly.
+      //TODO: Need to use the src_padding_* ?
       if( ref_region_layer_offset_present_flag ) {
         WRITE_SE(stream, 0>>1, "ref_region_layer_left_offset");
         WRITE_SE(stream, 0>>1, "ref_region_layer_top_offset");
-        WRITE_SE(stream, 0>>1, "ref_region_layer_right_offset");
-        WRITE_SE(stream, 4>>1, "ref_region_layer_bottom_offset");
+        WRITE_SE(stream, state->encoder_control->layer.upscaling->right_offset>>1, "ref_region_layer_right_offset");
+        WRITE_SE(stream, state->encoder_control->layer.upscaling->bottom_offset>>1, "ref_region_layer_bottom_offset");
       }
 
       uint8_t resample_phase_set_presetn_flag = 0; //TODO: get from somewhere
@@ -1358,7 +1357,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   // Modified for SHVC
   // parameter set ids are global (layer id does not matter)
   // so set the correct pps id (use layer id as the pset id)
-  WRITE_UE(stream, state->layer->layer_id, "slice_pic_parameter_set_id");
+  WRITE_UE(stream, state->encoder_control->layer.layer_id, "slice_pic_parameter_set_id");
   // ***********************************************
   
   if (state->slice->start_in_rs > 0) {
@@ -1380,7 +1379,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   // Modified for SHVC
   // TODO: Get proper values.
   uint8_t poc_lsb_not_present_flag = 0; //Infered to be 0 if not present
-  if ((state->layer->layer_id > 0 && !poc_lsb_not_present_flag) || (state->frame->pictype != KVZ_NAL_IDR_W_RADL
+  if ((state->encoder_control->layer.layer_id > 0 && !poc_lsb_not_present_flag) || (state->frame->pictype != KVZ_NAL_IDR_W_RADL
       && state->frame->pictype != KVZ_NAL_IDR_N_LP)) {  
     WRITE_U(stream, state->frame->poc&0x1f, 5, "pic_order_cnt_lsb");
   }
@@ -1393,8 +1392,8 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
 //***********************************************
     
     uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: get this number from somewhere else
-    if( state->layer->layer_id > 0 ) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets-1 : 1; //Reserve a "reference" for IRL
-    uint8_t ref_sets = state->layer->max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
+    if( state->encoder_control->layer.layer_id > 0 ) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets-1 : 1; //Reserve a "reference" for IRL
+    uint8_t ref_sets = state->encoder_control->layer.max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
     WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
     if (ref_sets == 0) {
       WRITE_UE(stream, ref_negative, "num_negative_pics");
@@ -1473,7 +1472,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
   // ***********************************************
   // Modified for SHVC
   // TODO: Get proper values.
-  if (state->layer->layer_id > 0) {  //&& !default_ref_layers_active_flag && NumDirectRefLayers[nuh_layer_id] > 0 ){
+  if (state->encoder_control->layer.layer_id > 0) {  //&& !default_ref_layers_active_flag && NumDirectRefLayers[nuh_layer_id] > 0 ){
     //default_ref_layers_active_flag == 0; NumDirectRefLayers[1] == 1
     uint8_t inter_layer_pred_enabled_flag = state->frame->slicetype != KVZ_SLICE_I; //TODO: A better way?
     WRITE_U(stream, inter_layer_pred_enabled_flag, 1, "inter_layer_pred_enabled_flag");
@@ -1499,7 +1498,7 @@ void kvz_encoder_state_write_bitstream_slice_header(encoder_state_t * const stat
     }
     //TODO: Make a better check?
     //if( lists_modification_present_flag && NumPicTotalCurr>1 )
-    if( state->layer->list_modification_present_flag && state->frame->ref->used_size > 1) {
+    if( state->encoder_control->layer.list_modification_present_flag && state->frame->ref->used_size > 1) {
     //  ref_pic_lists_modification()
       uint8_t ref_pic_lists_modification_flag_l0 = 1;
       WRITE_U(stream, ref_pic_lists_modification_flag_l0, 1,"ref_pic_list_modification_flag_l0");
@@ -1567,7 +1566,7 @@ static void add_checksum(encoder_state_t * const state)
 
   // ***********************************************
   // Modified for SHVC
-  kvz_nal_ext_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0, state->layer->layer_id);
+  kvz_nal_ext_write(stream, KVZ_NAL_SUFFIX_SEI_NUT, 0, 0, state->encoder_control->layer.layer_id);
   // ***********************************************
 
   WRITE_U(stream, 132, 8, "sei_type");
@@ -1653,7 +1652,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   // ***********************************************
   // Modified for SHVC. TODO: only in base layer?
   // Send Kvazaar version information only in the first frame.
-  if (state->frame->num == 0 && encoder->cfg->add_encoder_info && state->layer->layer_id == 0) {
+  if (state->frame->num == 0 && encoder->cfg->add_encoder_info && state->encoder_control->layer.layer_id == 0) {
     kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au);
     encoder_state_write_bitstream_prefix_sei_version(state);
 
@@ -1679,7 +1678,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
 
   {
     uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-    kvz_nal_ext_write(stream, nal_type, 0, first_nal_in_au, state->layer->layer_id);
+    kvz_nal_ext_write(stream, nal_type, 0, first_nal_in_au, state->encoder_control->layer.layer_id);
   }
  // ***********************************************
   {
@@ -1787,18 +1786,18 @@ void kvz_encoder_state_write_parameter_sets(bitstream_t *stream,
   // SPS and PPS need layer id in nalu header. TODO: Write VPS and SPS only when first in sequence?
 
   // Video Parameter Set (VPS)
-  if (state->layer->layer_id == 0) //only call for base layer
+  if (state->encoder_control->layer.layer_id == 0) //only call for base layer
   {
     kvz_nal_write(stream, KVZ_NAL_VPS_NUT, 0, 1);
     encoder_state_write_bitstream_vid_parameter_set(stream, state);
   }
 
   // Sequence Parameter Set (SPS)
-  kvz_nal_ext_write(stream, KVZ_NAL_SPS_NUT, 0, 1, state->layer->layer_id);
+  kvz_nal_ext_write(stream, KVZ_NAL_SPS_NUT, 0, 1, state->encoder_control->layer.layer_id);
   encoder_state_write_bitstream_seq_parameter_set(stream, state);
 
   // Picture Parameter Set (PPS)
-  kvz_nal_ext_write(stream, KVZ_NAL_PPS_NUT, 0, 1, state->layer->layer_id);
+  kvz_nal_ext_write(stream, KVZ_NAL_PPS_NUT, 0, 1, state->encoder_control->layer.layer_id);
   encoder_state_write_bitstream_pic_parameter_set(stream, state);
   //***********************************************
 }

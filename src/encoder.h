@@ -31,6 +31,10 @@
 #include "scalinglist.h"
 #include "threadqueue.h"
 
+// ***********************************************
+  // Modified for SHVC
+#include "scaler/scaler.h" //TODO: Possible without?
+// ***********************************************
 
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
@@ -156,8 +160,24 @@ typedef struct encoder_control_t
   double gop_layer_weights[MAX_GOP_LAYERS];
 
   // ***********************************************
-  // Modified for SHVC. TODO: Needed to set rep_formats in vps. Find a better way?
-  const encoder_control_t* next_enc_ctrl;
+  // Modified for SHVC.
+  //*********************************************
+  //For scalable extension. TODO: Move somewhere else?
+  //Hold current layer info
+  struct
+  {
+    uint8_t layer_id; //id of the current layer
+    uint8_t max_layers; //Total number of layers
+    uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
+    uint16_t num_output_layer_sets;
+    uint8_t list_modification_present_flag; //TODO: Move somewhere else?
+    scaling_parameter_t* upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
+  } layer;
+
+  //*********************************************
+
+  // TODO: Needed to set rep_formats in vps. Find a better way?
+  const struct encoder_control_t* next_enc_ctrl;
   // ***********************************************
 
 } encoder_control_t;
