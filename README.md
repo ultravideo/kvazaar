@@ -285,8 +285,9 @@ Run the following commands to compile and install Kvazaar.
 See `./configure --help` for more options.
 
 ### OS X
-- The program should compile and work on OS X but you might need a newer
-  version of GCC than what comes with the platform.
+- Install Homebrew
+- run ```brew install automake libtool pkg-config yasm```
+- Refer to Autotools instructions
 
 ### Visual Studio
 - VS2010 and older do not have support for some of the C99 features that
