@@ -341,6 +341,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     }
     child_state->layer->layer_id = encoder->cfg->layer;
     child_state->layer->max_layers = *encoder->cfg->max_layers;
+    child_state->layer->upscaling = NULL; //TODO: OK to set somewhere else?
     child_state->layer->num_layer_sets = child_state->layer->num_output_layer_sets = *encoder->cfg->max_layers;
     //*********************************************
   } else {

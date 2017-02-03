@@ -452,7 +452,7 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
 
   //WRITE_U(stream, 0, 1, "vps_extension_flag");
   //*********************************************
-  //For scalable extension. TODO: Move somewhere else? Set based on extencion used
+  //For scalable extension. TODO: Move somewhere else? Set based on extension used
   WRITE_U(stream, (state->layer->max_layers - 1) > 0 ? 1 : 0 , 1, "vps_extension_flag");
 
   //Align with ones
@@ -879,9 +879,9 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   else {
     WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
   
-  if (encoder->chroma_format == KVZ_CSP_444) {
-    WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
-  }
+    if (encoder->chroma_format == KVZ_CSP_444) {
+      WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
+    }
 
 
 
@@ -970,20 +970,19 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
   #endif
 
-    if (state->layer->max_layers > 1) {
-      //Need to make sure the first frames don't reference non-existant pocs
-      uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
-      if (state->layer->layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve one "reference" for ILR 
-      WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
-
-      //IF num short term ref pic sets
-      for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
-        writeSTermRSet(state, i);
-      }
+  if (state->layer->max_layers > 1) {
+    //Need to make sure the first frames don't reference non-existant pocs
+    uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
+    if (state->layer->layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve one "reference" for ILR 
+    WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
+         //IF num short term ref pic sets
+    for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
+      writeSTermRSet(state, i);
     }
-    else {
-      WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
-    }
+  }
+  else {
+    WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
+  }
   
   //ENDIF
 
@@ -1097,7 +1096,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, state->layer->list_modification_present_flag, 1, "lists_modification_present_flag");
   WRITE_UE(stream, 0, "log2_parallel_merge_level_minus2");
     
-  //TODO: set in cfg
+  //TODO: set in cfg?
   uint8_t slice_segment_header_extension_present_flag = 0;
   uint8_t pps_extension_flag = state->layer->layer_id!=0; // state->layer->max_layers > 1 ? 1 : 0;
   uint8_t pps_multilayer_extension_flag = pps_extension_flag; //pps_extension_flag;
@@ -1122,10 +1121,12 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
       WRITE_U(stream, state->layer->layer_id - 1, 6, "pps_scaling_list_ref_layer_id");
     }
 
-    uint8_t num_ref_loc_offsets = state->layer->max_layers-1; //TODO: Check actual number of differently sized layers?
+    //TODO: Check actual number of differently sized layers?
+    //TODO: Account for more complex ref structure?
+    uint8_t num_ref_loc_offsets = 1;//state->layer->max_layers-1; 
     WRITE_UE(stream, num_ref_loc_offsets, "num_ref_loc_offsets");
     for( int i = 0; i < num_ref_loc_offsets; i++ ) {
-      WRITE_U(stream, state->layer->layer_id-1, 6, "ref_loc_offset_layer_id[i]");
+      WRITE_U(stream, state->layer->layer_id-1-i, 6, "ref_loc_offset_layer_id[i]");
       
       //TODO: For some reason offsets are shifted in the SHM. Why? 
       uint8_t scaled_ref_layer_offset_present_flag = 0; //TODO: get from somewhere

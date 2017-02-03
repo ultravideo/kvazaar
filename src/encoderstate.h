@@ -39,6 +39,10 @@
 #include "videoframe.h"
 #include "extras/crypto.h"
 
+// ***********************************************
+  // Modified for SHVC
+#include "scaler/scaler.h" //TODO: Possible without?
+// ***********************************************
 
 typedef enum {
   ENCODER_STATE_TYPE_INVALID = 'i',
@@ -170,6 +174,7 @@ typedef struct{
   uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
   uint16_t num_output_layer_sets;
   uint8_t list_modification_present_flag; //TODO: Move somewhere else?
+  scaling_parameter_t* upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
 } encoder_state_config_layer_t;
 //*********************************************
 
