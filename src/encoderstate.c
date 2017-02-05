@@ -280,7 +280,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
   if (encoder->deblock_enable) {
-    if (encoder->cfg->target_bitrate > 0 || encoder->cfg->roi.dqps != NULL) {
+    if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps != NULL) {
       set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, false);
     }
 
@@ -324,17 +324,17 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   // QP delta is not used when rate control is turned off.
   state->must_code_qp_delta = (
-      state->encoder_control->cfg->target_bitrate > 0
-      || state->encoder_control->cfg->roi.dqps != NULL);
+      state->encoder_control->cfg.target_bitrate > 0
+      || state->encoder_control->cfg.roi.dqps != NULL);
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
   bool end_of_slice_segment_flag;
-  if (state->encoder_control->cfg->slices & KVZ_SLICES_WPP) {
+  if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
     // Slice segments end after each WPP row.
     end_of_slice_segment_flag = lcu->last_column;
-  } else if (state->encoder_control->cfg->slices & KVZ_SLICES_TILES) {
+  } else if (state->encoder_control->cfg.slices & KVZ_SLICES_TILES) {
     // Slices end after each tile.
     end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
   } else {
@@ -347,7 +347,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   {
     const bool end_of_tile = lcu->last_column && lcu->last_row;
-    const bool end_of_wpp_row = encoder->cfg->wpp && lcu->last_column;
+    const bool end_of_wpp_row = encoder->cfg.wpp && lcu->last_column;
 
 
     if (end_of_tile || end_of_wpp_row) {
@@ -407,11 +407,11 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
 
-  const kvz_config *cfg = state->encoder_control->cfg;
-  if ( state->encoder_control->cfg->crypto_features) {
-	  InitC(state->tile->dbs_g);
-	  state->tile->m_prev_pos = 0;
-   }
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  if (cfg->crypto_features) {
+    InitC(state->tile->dbs_g);
+    state->tile->m_prev_pos = 0;
+  }
 
   state->ref_qp = state->frame->QP;
 
@@ -856,20 +856,20 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   
-  int neg_refs = encoder->cfg->gop[state->frame->gop_offset].ref_neg_count;
-  int pos_refs = encoder->cfg->gop[state->frame->gop_offset].ref_pos_count;
+  int neg_refs = encoder->cfg.gop[state->frame->gop_offset].ref_neg_count;
+  int pos_refs = encoder->cfg.gop[state->frame->gop_offset].ref_pos_count;
 
   unsigned target_ref_num;
-  if (encoder->cfg->gop_len) {
+  if (encoder->cfg.gop_len) {
     target_ref_num = neg_refs + pos_refs;
   } else {
-    target_ref_num = encoder->cfg->ref_frames;
+    target_ref_num = encoder->cfg.ref_frames;
   }
   if (state->frame->slicetype == KVZ_SLICE_I) {
     target_ref_num = 0;
   }
 
-  if (encoder->cfg->gop_len && target_ref_num > 0) {
+  if (encoder->cfg.gop_len && target_ref_num > 0) {
     // With GOP in use, go through all the existing reference pictures and
     // remove any picture that is not referenced by the current picture.
 
@@ -879,7 +879,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
       int ref_poc = state->frame->ref->pocs[ref];
       
       for (int i = 0; i < neg_refs; i++) {
-        int ref_relative_poc = -encoder->cfg->gop[state->frame->gop_offset].ref_neg[i];
+        int ref_relative_poc = -encoder->cfg.gop[state->frame->gop_offset].ref_neg[i];
         if (ref_poc == state->frame->poc + ref_relative_poc) {
           is_referenced = true;
           break;
@@ -888,7 +888,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
 
       
       for (int i = 0; i < pos_refs; i++) {
-        int ref_relative_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[i];
+        int ref_relative_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[i];
         if (ref_poc == state->frame->poc + ref_relative_poc) {
           is_referenced = true;
           break;
@@ -927,7 +927,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   assert(!state->tile->frame->rec);
 
   state->tile->frame->source = frame;
-  if (state->encoder_control->cfg->lossless) {
+  if (state->encoder_control->cfg.lossless) {
     // In lossless mode, the reconstruction is equal to the source frame.
     state->tile->frame->rec = kvz_image_copy_ref(frame);
   } else {
@@ -976,7 +976,7 @@ static void normalize_lcu_weights(encoder_state_t * const state)
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
-  const kvz_config * const cfg = state->encoder_control->cfg;
+  const kvz_config * const cfg = &state->encoder_control->cfg;
 
   encoder_set_source_picture(state, frame);
 
@@ -1002,7 +1002,13 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->frame->slicetype = KVZ_SLICE_I;
     state->frame->pictype = KVZ_NAL_IDR_W_RADL;
   } else {
-    state->frame->slicetype = cfg->intra_period==1 ? KVZ_SLICE_I : (state->encoder_control->cfg->gop_len?KVZ_SLICE_B:KVZ_SLICE_P);
+    if (cfg->intra_period == 1) {
+      state->frame->slicetype = KVZ_SLICE_I;
+    } else if (cfg->gop_len != 0) {
+      state->frame->slicetype = KVZ_SLICE_B;
+    } else {
+      state->frame->slicetype = KVZ_SLICE_P;
+    }
 
     // Use P-slice for lowdelay.
     if (state->frame->slicetype == KVZ_SLICE_B &&
@@ -1012,7 +1018,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     }
 
     state->frame->pictype = KVZ_NAL_TRAIL_R;
-    if (state->encoder_control->cfg->gop_len) {
+    if (state->encoder_control->cfg.gop_len) {
       if (cfg->intra_period > 1 && (state->frame->poc % cfg->intra_period) == 0) {
         state->frame->slicetype = KVZ_SLICE_I;
       }
@@ -1119,9 +1125,9 @@ void kvz_encoder_prepare(encoder_state_t *state)
     kvz_image_list_copy_contents(state->frame->ref, prev_state->frame->ref);
   }
 
-  if (!encoder->cfg->gop_len ||
+  if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
-      encoder->cfg->gop[prev_state->frame->gop_offset].is_ref) {
+      encoder->cfg.gop[prev_state->frame->gop_offset].is_ref) {
     // Add previous reconstructed picture as a reference
     kvz_image_list_add(state->frame->ref,
                    prev_state->tile->frame->rec,

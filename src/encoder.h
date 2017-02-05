@@ -35,9 +35,19 @@
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
 {
-  /* Configuration */
-  const kvz_config *cfg;
-  
+  /**
+   * \brief Configuration.
+   *
+   * NOTE: The following fields are not copied from the config passed to
+   * kvz_encoder_control_init and must not be accessed:
+   *    - cqmfile
+   *    - tiles_width_split
+   *    - tiles_height_split
+   *    - slice_addresses_in_ts
+   * Use appropriate fields in encoder_control_t instead.
+   */
+  kvz_config cfg;
+
   /* Input */
   struct {
     int32_t width;
@@ -49,14 +59,14 @@ typedef struct encoder_control_t
     int64_t pixels_per_pic;
     int8_t source_scan_type;
   } in;
-  
+
   /* TODO: add ME data */
   struct {
     void(*IME)();
     void(*FME)();
     int range;
   } me;
-  
+
   int8_t bitdepth;
   enum kvz_chroma_format chroma_format;
 
@@ -101,44 +111,44 @@ typedef struct encoder_control_t
 
   //scaling list
   scaling_list_t scaling_list;
-  
+
   //spec: references to variables defined in Rec. ITU-T H.265 (04/2013)
   int8_t tiles_enable; /*!<spec: tiles_enabled */
-  
+
   int8_t tiles_uniform_spacing_flag; /*!<spec: uniform_spacing_flag */
-  
+
   uint8_t tiles_num_tile_columns; /*!<spec: num_tile_columns_minus1 + 1 */
   uint8_t tiles_num_tile_rows; /*!<spec: num_tile_rows_minus1 + 1*/
-  
+
   const int32_t *tiles_col_width; /*!<spec: colWidth (6.5.1); dimension: tiles_num_tile_columns */
   const int32_t *tiles_row_height; /*!<spec: rowHeight (6.5.1); dimension: tiles_num_tile_rows */
-  
+
   const int32_t *tiles_col_bd; /*!<spec: colBd (6.5.1); dimension: tiles_num_tile_columns + 1 */
   const int32_t *tiles_row_bd; /*!<spec: rowBd (6.5.1); dimension: tiles_num_tile_rows + 1  */
-  
+
   //PicSizeInCtbsY = height_in_lcu * width_in_lcu
   const int32_t *tiles_ctb_addr_rs_to_ts; /*!<spec:  CtbAddrRsToTs (6.5.1); dimension: PicSizeInCtbsY */
   const int32_t *tiles_ctb_addr_ts_to_rs; /*!<spec:  CtbAddrTsToRs (6.5.1); dimension: PicSizeInCtbsY */
-  
+
   const int32_t *tiles_tile_id; /*!<spec:  TileId (6.5.1); dimension: PicSizeInCtbsY */
-  
+
   //WPP
   int wpp;
-  
+
   //OWF 0 = no owf, 1 = 1 frame, 2 = 2 frames, etc.
   int owf;
-  
+
   //Slices
   int slice_count;
   const int* slice_addresses_in_ts;
-  
+
   threadqueue_queue_t *threadqueue;
 
   struct {
     uint8_t min;
     uint8_t max;
   } pu_depth_inter, pu_depth_intra;
-  
+
   // How often Video Parameter Set is re-sent.
   int32_t vps_period;
 
@@ -162,7 +172,7 @@ typedef struct encoder_control_t
 
 } encoder_control_t;
 
-encoder_control_t* kvz_encoder_control_init(kvz_config *cfg);
+encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);
 void kvz_encoder_control_free(encoder_control_t *encoder);
 
 void kvz_encoder_control_input_init(encoder_control_t *encoder, int32_t width, int32_t height);

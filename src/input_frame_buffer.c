@@ -54,7 +54,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
                                     kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
-  const kvz_config* const cfg = encoder->cfg;
+  const kvz_config* const cfg = &encoder->cfg;
 
   const int gop_buf_size = 3 * cfg->gop_len;
 

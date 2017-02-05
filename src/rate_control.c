@@ -78,9 +78,9 @@ static double gop_allocate_bits(encoder_state_t * const state)
   uint64_t bits_coded = state->frame->total_bits_coded;
   int pictures_coded = MAX(0, state->frame->num - encoder->owf);
 
-  int gop_offset = (state->frame->gop_offset - encoder->owf) % MAX(1, encoder->cfg->gop_len);
+  int gop_offset = (state->frame->gop_offset - encoder->owf) % MAX(1, encoder->cfg.gop_len);
   // Only take fully coded GOPs into account.
-  if (encoder->cfg->gop_len > 0 && gop_offset != encoder->cfg->gop_len - 1) {
+  if (encoder->cfg.gop_len > 0 && gop_offset != encoder->cfg.gop_len - 1) {
     // Subtract number of bits in the partially coded GOP.
     bits_coded -= state->frame->cur_gop_bits_coded;
     // Subtract number of pictures in the partially coded GOP.
@@ -90,7 +90,7 @@ static double gop_allocate_bits(encoder_state_t * const state)
   // Equation 12 from https://doi.org/10.1109/TIP.2014.2336550
   double gop_target_bits =
     (encoder->target_avg_bppic * (pictures_coded + SMOOTHING_WINDOW) - bits_coded)
-    * MAX(1, encoder->cfg->gop_len) / SMOOTHING_WINDOW;
+    * MAX(1, encoder->cfg.gop_len) / SMOOTHING_WINDOW;
   // Allocate at least 200 bits for each GOP like HM does.
   return MAX(200, gop_target_bits);
 }
@@ -102,7 +102,7 @@ static double gop_allocate_bits(encoder_state_t * const state)
  */
 static uint64_t pic_header_bits(encoder_state_t * const state)
 {
-  const kvz_config* cfg = state->encoder_control->cfg;
+  const kvz_config* cfg = &state->encoder_control->cfg;
 
   // nal type and slice header
   uint64_t bits = 48 + 24;
@@ -143,7 +143,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
 {
   const encoder_control_t * const encoder = state->encoder_control;
 
-  if (encoder->cfg->gop_len == 0 ||
+  if (encoder->cfg.gop_len == 0 ||
       state->frame->gop_offset == 0 ||
       state->frame->num == 0)
   {
@@ -155,12 +155,12 @@ static double pic_allocate_bits(encoder_state_t * const state)
       state->previous_encoder_state->frame->cur_gop_target_bits;
   }
 
-  if (encoder->cfg->gop_len <= 0) {
+  if (encoder->cfg.gop_len <= 0) {
     return state->frame->cur_gop_target_bits;
   }
 
   const double pic_weight = encoder->gop_layer_weights[
-    encoder->cfg->gop[state->frame->gop_offset].layer - 1];
+    encoder->cfg.gop[state->frame->gop_offset].layer - 1];
   const double pic_target_bits =
     state->frame->cur_gop_target_bits * pic_weight - pic_header_bits(state);
   // Allocate at least 100 bits for each picture like HM does.
@@ -176,10 +176,10 @@ static int8_t lambda_to_qp(const double lambda)
 static double qp_to_lamba(encoder_state_t * const state, int qp)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
-  const int gop_len = ctrl->cfg->gop_len;
-  const int period = gop_len > 0 ? gop_len : ctrl->cfg->intra_period;
+  const int gop_len = ctrl->cfg.gop_len;
+  const int period = gop_len > 0 ? gop_len : ctrl->cfg.intra_period;
 
-  kvz_gop_config const * const gop = &ctrl->cfg->gop[state->frame->gop_offset];
+  kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
 
   double lambda = pow(2.0, (qp - 12) / 3.0);
 
@@ -214,7 +214,7 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 {
   const encoder_control_t * const ctrl = state->encoder_control;
 
-  if (ctrl->cfg->target_bitrate > 0) {
+  if (ctrl->cfg.target_bitrate > 0) {
     // Rate control enabled
 
     if (state->frame->num > ctrl->owf) {
@@ -237,10 +237,10 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
 
   } else {
     // Rate control disabled
-    kvz_gop_config const * const gop = &ctrl->cfg->gop[state->frame->gop_offset];
-    const int gop_len = ctrl->cfg->gop_len;
+    kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
+    const int gop_len = ctrl->cfg.gop_len;
 
-    state->frame->QP = ctrl->cfg->qp;
+    state->frame->QP = ctrl->cfg.qp;
 
     if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
       state->frame->QP += gop->qp_offset;
@@ -280,22 +280,22 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
 {
   const encoder_control_t * const ctrl = state->encoder_control;
 
-  if (ctrl->cfg->roi.dqps != NULL) {
+  if (ctrl->cfg.roi.dqps != NULL) {
     vector2d_t lcu = {
       pos.x + state->tile->lcu_offset_x,
       pos.y + state->tile->lcu_offset_y
     };
     vector2d_t roi = {
-      lcu.x * ctrl->cfg->roi.width / ctrl->in.width_in_lcu,
-      lcu.y * ctrl->cfg->roi.height / ctrl->in.height_in_lcu
+      lcu.x * ctrl->cfg.roi.width / ctrl->in.width_in_lcu,
+      lcu.y * ctrl->cfg.roi.height / ctrl->in.height_in_lcu
     };
-    int roi_index = roi.x + roi.y * ctrl->cfg->roi.width;
-    int dqp = ctrl->cfg->roi.dqps[roi_index];
+    int roi_index = roi.x + roi.y * ctrl->cfg.roi.width;
+    int dqp = ctrl->cfg.roi.dqps[roi_index];
     state->qp = state->frame->QP + dqp;
     state->lambda = qp_to_lamba(state, state->qp);
     state->lambda_sqrt = sqrt(state->frame->lambda);
 
-  } else if (ctrl->cfg->target_bitrate > 0) {
+  } else if (ctrl->cfg.target_bitrate > 0) {
     lcu_stats_t *lcu         = kvz_get_lcu_stats(state, pos.x, pos.y);
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);

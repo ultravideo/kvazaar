@@ -297,8 +297,8 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
                                                         encoder_state_t * const state)
 {
-  if (state->encoder_control->cfg->implicit_rdpcm &&
-      state->encoder_control->cfg->lossless) {
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  if (cfg->implicit_rdpcm && cfg->lossless) {
     WRITE_U(stream, 1, 1, "sps_extension_present_flag");
 
     WRITE_U(stream, 1, 1, "sps_range_extension_flag");
@@ -372,12 +372,12 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
   //for each layer
-  if (encoder->cfg->gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg->ref_frames, "sps_max_dec_pic_buffering");
+  if (encoder->cfg.gop_lowdelay) {
+    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
     WRITE_UE(stream, 0, "sps_num_reorder_pics");
   } else {
-    WRITE_UE(stream, encoder->cfg->ref_frames + encoder->cfg->gop_len, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, encoder->cfg->gop_len, "sps_num_reorder_pics");
+    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
+    WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
   }
   WRITE_UE(stream, 0, "sps_max_latency_increase");
   //end for
@@ -396,7 +396,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     encoder_state_write_bitstream_scaling_list(stream, state);
   }
 
-  WRITE_U(stream, (encoder->cfg->amp_enable ? 1 : 0), 1, "amp_enabled_flag");
+  WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
   WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
@@ -419,7 +419,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //IF long_term_ref_pics_present
   //ENDIF
 
-  WRITE_U(stream, state->encoder_control->cfg->tmvp_enable, 1,
+  WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
           "sps_temporal_mvp_enable_flag");
   WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
@@ -448,11 +448,11 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
-  WRITE_SE(stream, ((int8_t)encoder->cfg->qp) - 26, "pic_init_qp_minus26");
+  WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
   WRITE_U(stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
 
-  if (encoder->cfg->target_bitrate > 0 || encoder->cfg->roi.dqps != NULL) {
+  if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps != NULL) {
     // Use separate QP for each LCU when rate control is enabled.
     WRITE_U(stream, 1, 1, "cu_qp_delta_enabled_flag");
     WRITE_UE(stream, 0, "diff_cu_qp_delta_depth");
@@ -468,7 +468,7 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, 0, 1, "weighted_bipred_idc");
 
   //WRITE_U(stream, 0, 1, "dependent_slices_enabled_flag");
-  WRITE_U(stream, encoder->cfg->lossless, 1, "transquant_bypass_enable_flag");
+  WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enable_flag");
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
   //wavefronts
   WRITE_U(stream, encoder->wpp, 1, "entropy_coding_sync_enabled_flag");
@@ -526,7 +526,7 @@ static void encoder_state_write_bitstream_prefix_sei_version(encoder_state_t * c
   int i, length;
   char buf[STR_BUF_LEN] = { 0 };
   char *s = buf + 16;
-  const kvz_config * const cfg = state->encoder_control->cfg;
+  const kvz_config * const cfg = &state->encoder_control->cfg;
 
   // random uuid_iso_iec_11578 generated with www.famkruithof.net/uuid/uuidgen
   static const uint8_t uuid[16] = {
@@ -683,7 +683,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   int j;
   int ref_negative = 0;
   int ref_positive = 0;
-  if (encoder->cfg->gop_len) {
+  if (encoder->cfg.gop_len) {
     for (j = 0; j < state->frame->ref->used_size; j++) {
       if (state->frame->ref->pocs[j] < state->frame->poc) {
         ref_negative++;
@@ -708,10 +708,10 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     for (j = 0; j < ref_negative; j++) {      
       int8_t delta_poc = 0;
       
-      if (encoder->cfg->gop_len) {
+      if (encoder->cfg.gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
           for (int i = 0; i < state->frame->ref->used_size; i++) {
             if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
               found = 1;
@@ -726,7 +726,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
         } while (!found);
       }
 
-      WRITE_UE(stream, encoder->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
+      WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
       last_poc = delta_poc;
       WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
     }
@@ -735,10 +735,10 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     for (j = 0; j < ref_positive; j++) {      
       int8_t delta_poc = 0;
       
-      if (encoder->cfg->gop_len) {
+      if (encoder->cfg.gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
           for (int i = 0; i < state->frame->ref->used_size; i++) {
             if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
               found = 1;
@@ -753,13 +753,13 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
         } while (!found);
       }
       
-      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+      WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
       last_poc = delta_poc;
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
     //WRITE_UE(stream, 0, "short_term_ref_pic_set_idx");
     
-    if (state->encoder_control->cfg->tmvp_enable) {
+    if (state->encoder_control->cfg.tmvp_enable) {
       WRITE_U(stream, 1, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
@@ -784,7 +784,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
         }
 
       // ToDo: handle B-frames with TMVP
-      if (state->encoder_control->cfg->tmvp_enable && ref_negative > 1) {
+      if (state->encoder_control->cfg.tmvp_enable && ref_negative > 1) {
         WRITE_UE(stream, 0, "collocated_ref_idx");
       }
 
@@ -792,7 +792,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   }
 
   {
-    int slice_qp_delta = state->frame->QP - encoder->cfg->qp;
+    int slice_qp_delta = state->frame->QP - encoder->cfg.qp;
     WRITE_SE(stream, slice_qp_delta, "slice_qp_delta");
   }
 }
@@ -809,7 +809,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
 #endif
 
   bool first_slice_segment_in_pic = (state->slice->start_in_rs == 0);
-  if ((state->encoder_control->cfg->slices & KVZ_SLICES_WPP)
+  if ((state->encoder_control->cfg.slices & KVZ_SLICES_WPP)
       && state->wfrow->lcu_offset_y > 0)
   {
     first_slice_segment_in_pic = false;
@@ -832,7 +832,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     int lcu_cnt = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
     int num_bits = kvz_math_ceil_log2(lcu_cnt);
     int slice_start_rs = state->slice->start_in_rs;
-    if (state->encoder_control->cfg->slices & KVZ_SLICES_WPP) {
+    if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
       slice_start_rs += state->wfrow->lcu_offset_y * state->tile->frame->width_in_lcu;
     }
     WRITE_U(stream, slice_start_rs, num_bits, "slice_segment_address");
@@ -882,7 +882,7 @@ static void add_checksum(encoder_state_t * const state)
 
   int num_colors = (state->encoder_control->chroma_format == KVZ_CSP_400 ? 1 : 3);
 
-  switch (state->encoder_control->cfg->hash)
+  switch (state->encoder_control->cfg.hash)
   {
   case KVZ_HASH_CHECKSUM:
     kvz_image_checksum(frame->rec, checksum, state->encoder_control->bitdepth);
@@ -950,7 +950,7 @@ static void encoder_state_write_bitstream_children(encoder_state_t * const state
     if (state->children[i].type == ENCODER_STATE_TYPE_SLICE) {
       encoder_state_write_slice_header(&state->stream, &state->children[i], true);
     } else if (state->children[i].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-      if ((state->encoder_control->cfg->slices & KVZ_SLICES_WPP) && i != 0) {
+      if ((state->encoder_control->cfg.slices & KVZ_SLICES_WPP) && i != 0) {
         // Add header for dependent WPP row slice.
         encoder_state_write_slice_header(&state->stream, &state->children[i], false);
       }
@@ -981,7 +981,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   }
 
   // Send Kvazaar version information only in the first frame.
-  if (state->frame->num == 0 && encoder->cfg->add_encoder_info) {
+  if (state->frame->num == 0 && encoder->cfg.add_encoder_info) {
     kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal);
     state->frame->first_nal = false;
     encoder_state_write_bitstream_prefix_sei_version(state);
@@ -1012,7 +1012,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     PERFORMANCE_MEASURE_END(KVZ_PERF_FRAME, encoder->threadqueue, "type=write_bitstream_append,frame=%d,encoder_type=%c", state->frame->num, state->type);
   }
   
-  if (state->encoder_control->cfg->hash != KVZ_HASH_NONE) {
+  if (state->encoder_control->cfg.hash != KVZ_HASH_NONE) {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);
     // Calculate checksum
     add_checksum(state);

@@ -135,7 +135,7 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
-  if (state->encoder_control->cfg->crypto_features && state->tile->dbs_g) {
+  if (state->encoder_control->cfg.crypto_features && state->tile->dbs_g) {
     DeleteCryptoC(state->tile->dbs_g);
   }
   FREE_POINTER(state->tile->wf_jobs);
@@ -464,7 +464,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         new_child->type  = ENCODER_STATE_TYPE_TILE;
         new_child->frame = child_state->frame;
         new_child->tile  = MALLOC(encoder_state_config_tile_t, 1);
-        if (child_state->encoder_control->cfg->crypto_features) {
+        if (child_state->encoder_control->cfg.crypto_features) {
           new_child->tile->dbs_g = CreateC();
         }
         new_child->slice = child_state->slice;

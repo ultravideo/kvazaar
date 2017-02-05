@@ -410,7 +410,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   cost_pixel_nxn_multi_func *satd_dual_func = kvz_pixels_get_satd_dual_func(width);
   cost_pixel_nxn_multi_func *sad_dual_func = kvz_pixels_get_sad_dual_func(width);
 
-  const kvz_config *cfg = state->encoder_control->cfg;
+  const kvz_config *cfg = &state->encoder_control->cfg;
   const bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
 
   // Temporary block arrays

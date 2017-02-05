@@ -336,7 +336,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 
   // SSD between reconstruction and original
   int ssd = 0;
-  if (!state->encoder_control->cfg->lossless) {
+  if (!state->encoder_control->cfg.lossless) {
     int index = y_px * LCU_WIDTH + x_px;
     ssd = kvz_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
                                         LCU_WIDTH,          LCU_WIDTH,
@@ -403,7 +403,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
 
   // Chroma SSD
   int ssd = 0;
-  if (!state->encoder_control->cfg->lossless) {
+  if (!state->encoder_control->cfg.lossless) {
     int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
     int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                     LCU_WIDTH_C,         LCU_WIDTH_C,
@@ -541,8 +541,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         SIZE_nLx2N, SIZE_nRx2N,
       };
 
-      const int first_mode = ctrl->cfg->smp_enable ? 0 : 2;
-      const int last_mode  = (ctrl->cfg->amp_enable && cu_width >= 16) ? 5 : 1;
+      const int first_mode = ctrl->cfg.smp_enable ? 0 : 2;
+      const int last_mode  = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
       for (int i = first_mode; i <= last_mode; ++i) {
         kvz_search_cu_smp(state,
                           x, y,
@@ -711,7 +711,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // might not give any better results but takes more time to do.
     // It is ok to interrupt the search as soon as it is known that
     // the split costs at least as much as not splitting.
-    if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg->cu_split_termination == KVZ_CU_SPLIT_TERMINATION_OFF) {
+    if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == KVZ_CU_SPLIT_TERMINATION_OFF) {
       if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
       if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
       if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
