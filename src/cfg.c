@@ -1023,16 +1023,19 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
       return 0;
     }
-    const unsigned size = width * height;
 
-    cfg->roi.width  = width;
-    cfg->roi.height = height;
-    cfg->roi.dqps   = calloc((size_t)size, sizeof(*cfg->roi.dqps));
-    if (!cfg->roi.dqps) {
+    const unsigned size = width * height;
+    uint8_t *dqp_array  = calloc((size_t)size, sizeof(cfg->roi.dqps[0]));
+    if (!dqp_array) {
       fprintf(stderr, "Failed to allocate memory for ROI table.\n");
       fclose(f);
       return 0;
     }
+
+    FREE_POINTER(cfg->roi.dqps);
+    cfg->roi.dqps   = dqp_array;
+    cfg->roi.width  = width;
+    cfg->roi.height = height;
 
     for (int i = 0; i < size; ++i) {
       int number; // Need a pointer to int for fscanf
@@ -1041,7 +1044,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         fclose(f);
         return 0;
       }
-      cfg->roi.dqps[i] = (uint8_t)number;
+      dqp_array[i] = (uint8_t)number;
     }
 
     fclose(f);
