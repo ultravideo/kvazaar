@@ -658,8 +658,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->vui.chroma_loc = atoi(value);
   else if OPT("aud")
     cfg->aud_enable = atobool(value);
-  else if OPT("cqmfile")
-    cfg->cqmfile = strdup(value);
+  else if OPT("cqmfile") {
+    char* cqmfile = strdup(value);
+    if (!cqmfile) {
+      fprintf(stderr, "Failed to allocate memory for CQM file name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->cqmfile);
+    cfg->cqmfile = cqmfile;
+  }
   else if OPT("tiles-width-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
     
