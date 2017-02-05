@@ -138,6 +138,7 @@ int kvz_config_destroy(kvz_config *cfg)
     FREE_POINTER(cfg->tiles_width_split);
     FREE_POINTER(cfg->tiles_height_split);
     FREE_POINTER(cfg->slice_addresses_in_ts);
+    FREE_POINTER(cfg->roi.dqps);
   }
   free(cfg);
 
@@ -1026,7 +1027,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     cfg->roi.width  = width;
     cfg->roi.height = height;
-    // FIXME: this array is never freed
     cfg->roi.dqps   = calloc((size_t)size, sizeof(*cfg->roi.dqps));
     if (!cfg->roi.dqps) {
       fprintf(stderr, "Failed to allocate memory for ROI table.\n");
