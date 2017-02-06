@@ -79,7 +79,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  encoder->num_encoder_states = encoder->control->owf + 1;
+  encoder->num_encoder_states = encoder->control->cfg.owf + 1;
   encoder->cur_state_num = 0;
   encoder->out_state_num = 0;
   encoder->frames_started = 0;

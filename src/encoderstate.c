@@ -279,7 +279,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
-  if (encoder->deblock_enable) {
+  if (encoder->cfg.deblock_enable) {
     if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps != NULL) {
       set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, false);
     }
@@ -287,7 +287,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
-  if (encoder->sao_enable) {
+  if (encoder->cfg.sao_enable) {
     kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
   }
 
@@ -317,7 +317,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
   
   //Encode SAO
-  if (encoder->sao_enable) {
+  if (encoder->cfg.sao_enable) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
   
@@ -339,7 +339,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
   } else {
     // Slice ends after the last row of the last tile.
-    int last_tile_id = -1 + encoder->tiles_num_tile_columns * encoder->tiles_num_tile_rows;
+    int last_tile_id = -1 + encoder->cfg.tiles_width_count * encoder->cfg.tiles_height_count;
     bool is_last_tile = state->tile->id == last_tile_id;
     end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
   }
@@ -384,7 +384,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
     }
   }
   
-  if (encoder->sao_enable && lcu->above) {
+  if (encoder->cfg.sao_enable && lcu->above) {
     // Add the post-deblocking but pre-SAO pixels of the LCU row above this
     // row to a buffer so this row can use them on it's own SAO
     // reconstruction.
@@ -436,7 +436,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 #endif //KVZ_DEBUG
     }
     
-    if (state->encoder_control->sao_enable) {
+    if (state->encoder_control->cfg.sao_enable) {
       PERFORMANCE_MEASURE_START(KVZ_PERF_SAOREC);
       kvz_sao_reconstruct_frame(state);
       PERFORMANCE_MEASURE_END(KVZ_PERF_SAOREC, state->encoder_control->threadqueue, "type=kvz_sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count - 1].position.y + state->tile->lcu_offset_y,
@@ -455,7 +455,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
     {
       // For LP-gop, depend on the state of the first reference.
       int ref_neg = cfg->gop[(state->frame->poc - 1) % cfg->gop_len].ref_neg[0];
-      if (ref_neg > state->encoder_control->owf) {
+      if (ref_neg > state->encoder_control->cfg.owf) {
         // If frame is not within OWF range, it's already done.
         ref_state = NULL;
       } else {
@@ -519,7 +519,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
       // In the case where SAO is not enabled, the wavefront row is
       // done when the last LCU in the row is done.
-      if (!state->encoder_control->sao_enable && i + 1 == state->lcu_order_count) {
+      if (!state->encoder_control->cfg.sao_enable && i + 1 == state->lcu_order_count) {
         assert(!state->tqj_recon_done);
         state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
       }
@@ -700,7 +700,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       }
       
       // Add SAO reconstruction jobs and their dependancies when using WPP coding.
-      if (main_state->encoder_control->sao_enable && 
+      if (main_state->encoder_control->cfg.sao_enable && 
           main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW)
       {
         int y;

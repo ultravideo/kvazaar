@@ -117,7 +117,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int32_t i;
   uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
 
-  int8_t be_valid = encoder->sign_hiding;
+  int8_t be_valid = encoder->cfg.signhide_enable;
   int32_t scan_pos_sig;
   uint32_t go_rice_param = 0;
   uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;
@@ -174,7 +174,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int pos_last = scan[scan_pos_last];
 
   // transform skip flag
-  if(width == 4 && encoder->trskip_enable) {
+  if(width == 4 && encoder->cfg.trskip_enable) {
     cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
@@ -459,7 +459,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
-  int tr_depth_intra = state->encoder_control->tr_depth_intra;
+  int tr_depth_intra = state->encoder_control->cfg.tr_depth_intra;
   int max_tr_depth = (cur_cu->type == CU_INTRA ? tr_depth_intra + intra_split_flag : TR_DEPTH_INTER);
 
   int8_t split = (cur_cu->tr_depth > depth);

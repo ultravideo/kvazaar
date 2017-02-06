@@ -68,14 +68,14 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
 static INLINE int get_wpp_limit(const encoder_state_t *state, const vector2d_t* orig)
 {
   const encoder_control_t *ctrl = state->encoder_control;
-  if (ctrl->owf && ctrl->wpp) {
+  if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Limit motion vectors to the LCU-row below this row.
     // To avoid fractional pixel interpolation depending on things outside
     // this range, add a margin of 4 pixels.
     // - fme needs 4 pixels
     // - odd chroma interpolation needs 4 pixels
     int wpp_limit = 2 * LCU_WIDTH - 4 - orig->y % LCU_WIDTH;
-    if (ctrl->deblock_enable && !ctrl->sao_enable) {
+    if (ctrl->cfg.deblock_enable && !ctrl->cfg.sao_enable) {
       // As a special case, when deblocking is enabled but SAO is not, we have
       // to avoid the possibility of interpolation filters reaching the
       // non-deblocked pixels. The deblocking for the horizontal edge on the
@@ -1043,7 +1043,7 @@ static unsigned search_frac(encoder_state_t * const state,
   hpel_pos[6] = fracpel_blocks[HPEL_POS_DIA] + (LCU_WIDTH + 1);
   hpel_pos[7] = fracpel_blocks[HPEL_POS_DIA] + (LCU_WIDTH + 1) + 1;
 
-  int fme_level = state->encoder_control->fme_level;
+  int fme_level = state->encoder_control->cfg.fme_level;
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
   if (state->encoder_control->cfg.mv_rdo) {

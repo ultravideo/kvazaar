@@ -195,7 +195,7 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
 #ifdef KVZ_DEBUG
   printf("=========== VUI Set ID: 0 ===========\n");
 #endif
-  if (encoder->vui.sar_width > 0 && encoder->vui.sar_height > 0) {
+  if (encoder->cfg.vui.sar_width > 0 && encoder->cfg.vui.sar_height > 0) {
     int i;
     static const struct
     {
@@ -213,16 +213,16 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
     };
 
     for (i = 0; sar[i].idc != 255; i++)
-      if (sar[i].width  == encoder->vui.sar_width &&
-          sar[i].height == encoder->vui.sar_height)
+      if (sar[i].width  == encoder->cfg.vui.sar_width &&
+          sar[i].height == encoder->cfg.vui.sar_height)
         break;
 
     WRITE_U(stream, 1, 1, "aspect_ratio_info_present_flag");
     WRITE_U(stream, sar[i].idc, 8, "aspect_ratio_idc");
     if (sar[i].idc == 255) {
       // EXTENDED_SAR
-      WRITE_U(stream, encoder->vui.sar_width, 16, "sar_width");
-      WRITE_U(stream, encoder->vui.sar_height, 16, "sar_height");
+      WRITE_U(stream, encoder->cfg.vui.sar_width, 16, "sar_width");
+      WRITE_U(stream, encoder->cfg.vui.sar_height, 16, "sar_height");
     }
   } else
     WRITE_U(stream, 0, 1, "aspect_ratio_info_present_flag");
@@ -230,28 +230,31 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   //IF aspect ratio info
   //ENDIF
 
-  if (encoder->vui.overscan > 0) {
+  if (encoder->cfg.vui.overscan > 0) {
     WRITE_U(stream, 1, 1, "overscan_info_present_flag");
-    WRITE_U(stream, encoder->vui.overscan - 1, 1, "overscan_appropriate_flag");
+    WRITE_U(stream, encoder->cfg.vui.overscan - 1, 1, "overscan_appropriate_flag");
   } else
     WRITE_U(stream, 0, 1, "overscan_info_present_flag");
 
   //IF overscan info
   //ENDIF
 
-  if (encoder->vui.videoformat != 5 || encoder->vui.fullrange ||
-      encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
-      encoder->vui.colormatrix != 2) {
+  if (encoder->cfg.vui.videoformat != 5 ||
+      encoder->cfg.vui.fullrange   != 0 ||
+      encoder->cfg.vui.colorprim   != 2 ||
+      encoder->cfg.vui.transfer    != 2 ||
+      encoder->cfg.vui.colormatrix != 2) {
     WRITE_U(stream, 1, 1, "video_signal_type_present_flag");
-    WRITE_U(stream, encoder->vui.videoformat, 3, "chroma_format");
-    WRITE_U(stream, encoder->vui.fullrange, 1, "video_full_range_flag");
+    WRITE_U(stream, encoder->cfg.vui.videoformat, 3, "chroma_format");
+    WRITE_U(stream, encoder->cfg.vui.fullrange, 1, "video_full_range_flag");
 
-    if (encoder->vui.colorprim != 2 || encoder->vui.transfer != 2 ||
-        encoder->vui.colormatrix != 2) {
+    if (encoder->cfg.vui.colorprim   != 2 ||
+        encoder->cfg.vui.transfer    != 2 ||
+        encoder->cfg.vui.colormatrix != 2) {
       WRITE_U(stream, 1, 1, "colour_description_present_flag");
-      WRITE_U(stream, encoder->vui.colorprim, 8, "colour_primaries");
-      WRITE_U(stream, encoder->vui.transfer, 8, "transfer_characteristics");
-      WRITE_U(stream, encoder->vui.colormatrix, 8, "matrix_coeffs");
+      WRITE_U(stream, encoder->cfg.vui.colorprim, 8, "colour_primaries");
+      WRITE_U(stream, encoder->cfg.vui.transfer, 8, "transfer_characteristics");
+      WRITE_U(stream, encoder->cfg.vui.colormatrix, 8, "matrix_coeffs");
     } else
       WRITE_U(stream, 0, 1, "colour_description_present_flag");
   } else
@@ -260,10 +263,10 @@ static void encoder_state_write_bitstream_VUI(bitstream_t *stream,
   //IF video type
   //ENDIF
 
-  if (encoder->vui.chroma_loc > 0) {
+  if (encoder->cfg.vui.chroma_loc > 0) {
     WRITE_U(stream, 1, 1, "chroma_loc_info_present_flag");
-    WRITE_UE(stream, encoder->vui.chroma_loc, "chroma_sample_loc_type_top_field");
-    WRITE_UE(stream, encoder->vui.chroma_loc, "chroma_sample_loc_type_bottom_field");
+    WRITE_UE(stream, encoder->cfg.vui.chroma_loc, "chroma_sample_loc_type_top_field");
+    WRITE_UE(stream, encoder->cfg.vui.chroma_loc, "chroma_sample_loc_type_bottom_field");
   } else
     WRITE_U(stream, 0, 1, "chroma_loc_info_present_flag");
 
@@ -387,7 +390,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, 0, "log2_min_transform_block_size_minus2");   // 4x4
   WRITE_UE(stream, 3, "log2_diff_max_min_transform_block_size"); // 4x4...32x32
   WRITE_UE(stream, TR_DEPTH_INTER, "max_transform_hierarchy_depth_inter");
-  WRITE_UE(stream, encoder->tr_depth_intra, "max_transform_hierarchy_depth_intra");
+  WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
 
   // scaling list
   WRITE_U(stream, encoder->scaling_list.enable, 1, "scaling_list_enable_flag");
@@ -398,7 +401,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
-  WRITE_U(stream, encoder->sao_enable ? 1 : 0, 1,
+  WRITE_U(stream, encoder->cfg.sao_enable ? 1 : 0, 1,
           "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
   #if ENABLE_PCM == 1
@@ -443,14 +446,14 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->pps.dependent_slice_segments_enabled_flag, 1, "dependent_slice_segments_enabled_flag");
   WRITE_U(stream, 0, 1, "output_flag_present_flag");
   WRITE_U(stream, 0, 3, "num_extra_slice_header_bits");
-  WRITE_U(stream, encoder->sign_hiding, 1, "sign_data_hiding_flag");
+  WRITE_U(stream, encoder->cfg.signhide_enable, 1, "sign_data_hiding_flag");
   WRITE_U(stream, 0, 1, "cabac_init_present_flag");
 
   WRITE_UE(stream, 0, "num_ref_idx_l0_default_active_minus1");
   WRITE_UE(stream, 0, "num_ref_idx_l1_default_active_minus1");
   WRITE_SE(stream, ((int8_t)encoder->cfg.qp) - 26, "pic_init_qp_minus26");
   WRITE_U(stream, 0, 1, "constrained_intra_pred_flag");
-  WRITE_U(stream, encoder->trskip_enable, 1, "transform_skip_enabled_flag");
+  WRITE_U(stream, encoder->cfg.trskip_enable, 1, "transform_skip_enabled_flag");
 
   if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps != NULL) {
     // Use separate QP for each LCU when rate control is enabled.
@@ -471,20 +474,20 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
   WRITE_U(stream, encoder->cfg.lossless, 1, "transquant_bypass_enable_flag");
   WRITE_U(stream, encoder->tiles_enable, 1, "tiles_enabled_flag");
   //wavefronts
-  WRITE_U(stream, encoder->wpp, 1, "entropy_coding_sync_enabled_flag");
+  WRITE_U(stream, encoder->cfg.wpp, 1, "entropy_coding_sync_enabled_flag");
 
   if (encoder->tiles_enable) {
-    WRITE_UE(stream, encoder->tiles_num_tile_columns - 1, "num_tile_columns_minus1");
-    WRITE_UE(stream, encoder->tiles_num_tile_rows - 1, "num_tile_rows_minus1");
+    WRITE_UE(stream, encoder->cfg.tiles_width_count  - 1, "num_tile_columns_minus1");
+    WRITE_UE(stream, encoder->cfg.tiles_height_count - 1, "num_tile_rows_minus1");
     
     WRITE_U(stream, encoder->tiles_uniform_spacing_flag, 1, "uniform_spacing_flag");
     
     if (!encoder->tiles_uniform_spacing_flag) {
       int i;
-      for (i = 0; i < encoder->tiles_num_tile_columns - 1; ++i) {
+      for (i = 0; i < encoder->cfg.tiles_width_count - 1; ++i) {
         WRITE_UE(stream, encoder->tiles_col_width[i] - 1, "column_width_minus1[...]");
       }
-      for (i = 0; i < encoder->tiles_num_tile_rows - 1; ++i) {
+      for (i = 0; i < encoder->cfg.tiles_height_count - 1; ++i) {
         WRITE_UE(stream, encoder->tiles_row_height[i] - 1, "row_height_minus1[...]");
       }
     }
@@ -497,13 +500,13 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
 
   //IF deblocking_filter
     WRITE_U(stream, 0, 1, "deblocking_filter_override_enabled_flag");
-  WRITE_U(stream, encoder->deblock_enable ? 0 : 1, 1,
+  WRITE_U(stream, encoder->cfg.deblock_enable ? 0 : 1, 1,
           "pps_disable_deblocking_filter_flag");
 
     //IF !disabled
-  if (encoder->deblock_enable) {
-     WRITE_SE(stream, encoder->beta_offset_div2, "beta_offset_div2");
-     WRITE_SE(stream, encoder->tc_offset_div2, "tc_offset_div2");
+  if (encoder->cfg.deblock_enable) {
+     WRITE_SE(stream, encoder->cfg.deblock_beta, "beta_offset_div2");
+     WRITE_SE(stream, encoder->cfg.deblock_tc, "tc_offset_div2");
     }
 
     //ENDIF
@@ -768,7 +771,7 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   //end if
 
 
-  if (encoder->sao_enable) {
+  if (encoder->cfg.sao_enable) {
     WRITE_U(stream, 1, 1, "slice_sao_luma_flag");
     if (encoder->chroma_format != KVZ_CSP_400) {
       WRITE_U(stream, 1, 1, "slice_sao_chroma_flag");
@@ -842,7 +845,7 @@ void kvz_encoder_state_write_bitstream_slice_header(
     kvz_encoder_state_write_bitstream_slice_header_independent(stream, state);
   }
    
-  if (encoder->tiles_enable || encoder->wpp) {
+  if (encoder->tiles_enable || encoder->cfg.wpp) {
     int num_entry_points = 0;
     int max_length_seen = 0;
     
@@ -970,7 +973,7 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   state->frame->first_nal = true;
 
   // Access Unit Delimiter (AUD)
-  if (encoder->aud_enable) {
+  if (encoder->cfg.aud_enable) {
     state->frame->first_nal = false;
     encoder_state_write_bitstream_aud(state);
   }

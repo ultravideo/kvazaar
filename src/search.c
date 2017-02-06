@@ -516,7 +516,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     bool can_use_inter =
         state->frame->slicetype != KVZ_SLICE_I
-        && WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max);
+        && WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max);
 
     if (can_use_inter) {
       double mode_cost;
@@ -563,11 +563,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // Try to skip intra search in rd==0 mode.
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
-    bool skip_intra = state->encoder_control->rdo == 0
+    bool skip_intra = state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
                       && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
     if (!skip_intra
-        && WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max))
+        && WITHIN(depth, ctrl->cfg.pu_depth_intra.min, ctrl->cfg.pu_depth_intra.max))
     {
       int8_t intra_mode;
       double intra_cost;
@@ -599,7 +599,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        if (state->encoder_control->rdo == 3) {
+        if (state->encoder_control->cfg.rdo == 3) {
           intra_mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, &work_tree[depth]);
           lcu_set_intra_mode(&work_tree[depth], x, y, depth,
                              intra_mode, intra_mode_chroma,
@@ -686,7 +686,9 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
   }
   
   // Recursively split all the way to max search depth.
-  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->frame->slicetype != KVZ_SLICE_I)) {
+  if (depth < ctrl->cfg.pu_depth_intra.max ||
+      (depth < ctrl->cfg.pu_depth_inter.max && state->frame->slicetype != KVZ_SLICE_I))
+  {
     int half_cu = cu_width / 2;
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf, depth);

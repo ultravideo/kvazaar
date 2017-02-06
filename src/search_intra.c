@@ -102,7 +102,7 @@ static double get_cost(encoder_state_t * const state,
                        int width)
 {
   double satd_cost = satd_func(pred, orig_block);
-  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->trskip_enable) {
+  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
@@ -145,7 +145,7 @@ static void get_cost_dual(encoder_state_t * const state,
   costs_out[0] = (double)satd_costs[0];
   costs_out[1] = (double)satd_costs[1];
 
-  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->trskip_enable) {
+  if (TRSKIP_RATIO != 0 && width == 4 && state->encoder_control->cfg.trskip_enable) {
     // If the mode looks better with SAD than SATD it might be a good
     // candidate for transform skip. How much better SAD has to be is
     // controlled by TRSKIP_RATIO.
@@ -430,7 +430,7 @@ static int8_t search_intra_rough(encoder_state_t * const state,
   // Initial offset decides how many modes are tried before moving on to the
   // recursive search.
   int offset;
-  if (state->encoder_control->full_intra_search) {
+  if (state->encoder_control->cfg.full_intra_search) {
     offset = 1;
   } else {
     static const int8_t offsets[4] = { 2, 4, 8, 8 };
@@ -573,7 +573,7 @@ static int8_t search_intra_rdo(encoder_state_t * const state,
                              int8_t modes[35], double costs[35],
                              lcu_t *lcu)
 {
-  const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->tr_depth_intra);
+  const int tr_depth = CLIP(1, MAX_PU_DEPTH, depth + state->encoder_control->cfg.tr_depth_intra);
   const int width = LCU_WIDTH >> depth;
 
   kvz_pixel orig_block[LCU_WIDTH * LCU_WIDTH + 1];
@@ -737,7 +737,7 @@ int8_t kvz_search_cu_intra_chroma(encoder_state_t * const state,
   const int8_t modes_in_depth[5] = { 1, 1, 1, 1, 2 };
   int num_modes = modes_in_depth[depth];
 
-  if (state->encoder_control->rdo == 3) {
+  if (state->encoder_control->cfg.rdo == 3) {
     num_modes = 5;
   }
 
@@ -819,7 +819,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   kvz_pixel *ref_pixels = &lcu->ref.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
 
   int8_t number_of_modes;
-  bool skip_rough_search = (depth == 0 || state->encoder_control->rdo >= 3);
+  bool skip_rough_search = (depth == 0 || state->encoder_control->cfg.rdo >= 3);
   if (!skip_rough_search) {
     number_of_modes = search_intra_rough(state,
                                          ref_pixels, LCU_WIDTH,
@@ -838,11 +838,12 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   kvz_lcu_set_trdepth(lcu, x_px, y_px, depth, depth);
 
   // Refine results with slower search or get some results if rough search was skipped.
-  if (state->encoder_control->rdo >= 2 || skip_rough_search) {
+  const int32_t rdo_level = state->encoder_control->cfg.rdo;
+  if (rdo_level >= 2 || skip_rough_search) {
     int number_of_modes_to_search;
-    if (state->encoder_control->rdo == 3) {
+    if (rdo_level == 3) {
       number_of_modes_to_search = 35;
-    } else if (state->encoder_control->rdo == 2) {
+    } else if (rdo_level == 2) {
       number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
     } else {
       // Check only the predicted modes.

@@ -76,9 +76,9 @@ static double gop_allocate_bits(encoder_state_t * const state)
   // At this point, total_bits_coded of the current state contains the
   // number of bits written encoder->owf frames before the current frame.
   uint64_t bits_coded = state->frame->total_bits_coded;
-  int pictures_coded = MAX(0, state->frame->num - encoder->owf);
+  int pictures_coded = MAX(0, state->frame->num - encoder->cfg.owf);
 
-  int gop_offset = (state->frame->gop_offset - encoder->owf) % MAX(1, encoder->cfg.gop_len);
+  int gop_offset = (state->frame->gop_offset - encoder->cfg.owf) % MAX(1, encoder->cfg.gop_len);
   // Only take fully coded GOPs into account.
   if (encoder->cfg.gop_len > 0 && gop_offset != encoder->cfg.gop_len - 1) {
     // Subtract number of bits in the partially coded GOP.
@@ -217,7 +217,7 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
   if (ctrl->cfg.target_bitrate > 0) {
     // Rate control enabled
 
-    if (state->frame->num > ctrl->owf) {
+    if (state->frame->num > ctrl->cfg.owf) {
       // At least one frame has been written.
       update_parameters(state->stats_bitstream_length * 8,
                         ctrl->in.pixels_per_pic,
@@ -260,7 +260,7 @@ static double lcu_allocate_bits(encoder_state_t * const state,
                                 vector2d_t pos)
 {
   double lcu_weight;
-  if (state->frame->num > state->encoder_control->owf) {
+  if (state->frame->num > state->encoder_control->cfg.owf) {
     lcu_weight = kvz_get_lcu_stats(state, pos.x, pos.y)->weight;
   } else {
     const uint32_t num_lcus = state->encoder_control->in.width_in_lcu *
@@ -300,7 +300,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     const uint32_t pixels    = MIN(LCU_WIDTH, state->tile->frame->width  - LCU_WIDTH * pos.x) *
                                MIN(LCU_WIDTH, state->tile->frame->height - LCU_WIDTH * pos.y);
 
-    if (state->frame->num > ctrl->owf) {
+    if (state->frame->num > ctrl->cfg.owf) {
       update_parameters(lcu->bits,
                         pixels,
                         lcu->lambda,
@@ -317,7 +317,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     double lambda = clip_lambda(lcu->rc_alpha * pow(target_bpp, lcu->rc_beta));
     // Clip lambda according to the equations 24 and 26 in
     // https://doi.org/10.1109/TIP.2014.2336550
-    if (state->frame->num > ctrl->owf) {
+    if (state->frame->num > ctrl->cfg.owf) {
       const double bpp         = lcu->bits / (double)pixels;
       const double lambda_comp = clip_lambda(lcu->rc_alpha * pow(bpp, lcu->rc_beta));
       lambda = CLIP(lambda_comp * 0.7937005259840998,

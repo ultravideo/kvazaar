@@ -290,7 +290,7 @@ lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
 static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
 {
   const int32_t frame = state->frame->num;
-  const int32_t vps_period = state->encoder_control->vps_period;
+  const int32_t vps_period = state->encoder_control->cfg.vps_period;
 
   return (vps_period >  0 && frame % vps_period == 0) ||
          (vps_period >= 0 && frame == 0);

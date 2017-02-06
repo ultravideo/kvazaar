@@ -358,7 +358,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
           rdpcm(width, LCU_WIDTH, RDPCM_VER, orig_coeff_y);
         }
       }
-    } else if (width == 4 && state->encoder_control->trskip_enable) {
+    } else if (width == 4 && state->encoder_control->cfg.trskip_enable) {
       // Try quantization with trskip and use it if it's better.
       int has_coeffs = kvz_quantize_residual_trskip(
           state, cur_pu, width, COLOR_Y, scan_idx_luma,
