@@ -61,6 +61,8 @@ static int encoder_state_config_frame_init(encoder_state_t * const state) {
 }
 
 static void encoder_state_config_frame_finalize(encoder_state_t * const state) {
+  if (state->frame == NULL) return;
+
   kvz_image_list_destroy(state->frame->ref);
   FREE_POINTER(state->frame->lcu_stats);
 }
@@ -128,6 +130,8 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
 }
 
 static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
+  if (state->tile == NULL) return;
+
   if (state->tile->hor_buf_before_sao) kvz_yuv_t_free(state->tile->hor_buf_before_sao);
   
   kvz_yuv_t_free(state->tile->hor_buf_search);
@@ -160,19 +164,11 @@ static int encoder_state_config_slice_init(encoder_state_t * const state,
   return 1;
 }
 
-static void encoder_state_config_slice_finalize(encoder_state_t * const state) {
-  //Nothing to do (yet?)
-}
-
 static int encoder_state_config_wfrow_init(encoder_state_t * const state, 
                                           const int lcu_offset_y) {
   
   state->wfrow->lcu_offset_y = lcu_offset_y;
   return 1;
-}
-
-static void encoder_state_config_wfrow_finalize(encoder_state_t * const state) {
-  //Nothing to do (yet?)
 }
 
 #ifdef KVZ_DEBUG_PRINT_THREADING_INFO
@@ -692,12 +688,10 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   state->lcu_order_count = 0;
   
   if (!state->parent || (state->parent->wfrow != state->wfrow)) {
-    encoder_state_config_wfrow_finalize(state);
     FREE_POINTER(state->wfrow);
   }
   
   if (!state->parent || (state->parent->slice != state->slice)) {
-    encoder_state_config_slice_finalize(state);
     FREE_POINTER(state->slice);
   }
   
