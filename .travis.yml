@@ -123,7 +123,11 @@ matrix:
     # Tests for --slices
     - env: TEST_DIM=512x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --tiles=2x2 --slices=tiles"
     - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --slices=wpp"
-
+    
+    # Test weird shapes.
+    - env: TEST_DIM=16x16 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
+    - env: TEST_DIM=256x16 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
+    - env: TEST_DIM=16x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
 
 install:
   - source .travis-install.sh
