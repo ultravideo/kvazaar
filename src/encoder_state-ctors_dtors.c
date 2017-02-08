@@ -113,6 +113,9 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
   if (encoder->wpp) {
     int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
     state->tile->wf_jobs = MALLOC(threadqueue_job_t*, num_jobs);
+    for (int i = 0; i < num_jobs; ++i) {
+      state->tile->wf_jobs[i] = NULL;
+    }
     if (!state->tile->wf_jobs) {
       printf("Error allocating wf_jobs array!\n");
       return 0;
@@ -365,7 +368,10 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
     int children_allow_tile = 0;
     int range_start;
     
-    int start_in_ts, end_in_ts;
+    // First index of this encoder state in tile scan order.
+    int start_in_ts;
+    // Index of the first LCU after this state in tile scan order.
+    int end_in_ts;
     
     switch(child_state->type) {
       case ENCODER_STATE_TYPE_MAIN:
@@ -377,14 +383,15 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       case ENCODER_STATE_TYPE_SLICE:
         assert(child_state->parent);
         if (child_state->parent->type != ENCODER_STATE_TYPE_TILE) children_allow_tile = 1;
-        children_allow_wavefront_row = encoder->wpp;
         start_in_ts = child_state->slice->start_in_ts;
-        end_in_ts = child_state->slice->end_in_ts;
+        end_in_ts = child_state->slice->end_in_ts + 1;
+        int num_wpp_rows = (end_in_ts - start_in_ts) / child_state->tile->frame->width_in_lcu;
+        children_allow_wavefront_row = encoder->wpp && num_wpp_rows > 1;
         break;
       case ENCODER_STATE_TYPE_TILE:
         assert(child_state->parent);
         if (child_state->parent->type != ENCODER_STATE_TYPE_SLICE) children_allow_slice = 1;
-        children_allow_wavefront_row = encoder->wpp;
+        children_allow_wavefront_row = encoder->wpp && child_state->tile->frame->height_in_lcu > 1;
         start_in_ts = child_state->tile->lcu_offset_in_ts;
         end_in_ts = child_state->tile->lcu_offset_in_ts + child_state->tile->frame->width_in_lcu * child_state->tile->frame->height_in_lcu;
         break;
