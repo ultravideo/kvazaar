@@ -20,6 +20,7 @@
 
 #include "cfg.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1174,6 +1175,21 @@ int kvz_config_validate(const kvz_config *const cfg)
   if (cfg->height % 2 != 0) {
     fprintf(stderr, "Input error: height must be a multiple of two\n");
     error = 1;
+  }
+
+  if (cfg->width > 0 && cfg->height > 0) {
+    // We must be able to store the total number of luma and chroma pixels
+    // in an int32_t. For 4:4:4 chroma mode, the number of pixels is
+    // 3 * width * height. Width and height are rounded up to a multiple of
+    // LCU size.
+    const uint32_t max_lcus = INT_MAX / (3 * LCU_WIDTH * LCU_WIDTH);
+    const uint64_t num_lcus = CEILDIV((uint64_t)cfg->width,  LCU_WIDTH) *
+                              CEILDIV((uint64_t)cfg->height, LCU_WIDTH);
+    if (num_lcus > max_lcus) {
+      fprintf(stderr, "Input error: resolution %dx%d too large (max %u CTUs)\n",
+              cfg->width, cfg->height, max_lcus);
+      error = 1;
+    }
   }
 
   if (cfg->framerate < 0.0) {
