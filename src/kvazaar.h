@@ -569,9 +569,6 @@ typedef struct kvz_api {
    *
    * Only one encoder may be open at a time.
    *
-   * The caller must not modify the config between passing it to this function
-   * and calling encoder_close.
-   *
    * \param cfg   encoder configuration
    * \return      created encoder, or NULL if creation failed.
    */

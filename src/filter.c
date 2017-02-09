@@ -262,8 +262,8 @@ static bool is_on_8x8_grid(int x, int y, edge_dir dir)
 
 static int8_t get_qp_y_pred(const encoder_state_t* state, int x, int y, edge_dir dir)
 {
-  if (state->encoder_control->cfg->target_bitrate <= 0
-      && state->encoder_control->cfg->roi.dqps == NULL)
+  if (state->encoder_control->cfg.target_bitrate <= 0
+      && state->encoder_control->cfg.roi.dqps == NULL)
   {
     return state->qp;
   }
@@ -350,8 +350,8 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
   {
     int32_t stride = frame->rec->stride;
-    int32_t beta_offset_div2 = encoder->beta_offset_div2;
-    int32_t tc_offset_div2   = encoder->tc_offset_div2;
+    int32_t beta_offset_div2 = encoder->cfg.deblock_beta;
+    int32_t tc_offset_div2   = encoder->cfg.deblock_tc;
     // TODO: support 10+bits
     kvz_pixel *orig_src = &frame->rec->y[x + y*stride];
     kvz_pixel *src = orig_src;
@@ -563,7 +563,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
   // For each subpart
   {
     int32_t stride = frame->rec->stride >> 1;
-    int32_t tc_offset_div2 = encoder->tc_offset_div2;
+    int32_t tc_offset_div2 = encoder->cfg.deblock_tc;
     // TODO: support 10+bits
     kvz_pixel *src[] = {
       &frame->rec->u[x + y*stride],
@@ -768,7 +768,7 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  */
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
-  assert(!state->encoder_control->cfg->lossless);
+  assert(!state->encoder_control->cfg.lossless);
 
   filter_deblock_lcu_inside(state, x_px, y_px, EDGE_VER);
   if (x_px > 0) {

@@ -66,7 +66,7 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
     q_coef[n] = (coeff_t)(CLIP(-32768, 32767, level));
   }
 
-  if (!(encoder->sign_hiding && ac_sum >= 2)) return;
+  if (!encoder->cfg.signhide_enable || ac_sum < 2) return;
 
   int32_t delta_u[LCU_WIDTH*LCU_WIDTH >> 2];
 
@@ -213,13 +213,14 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   }
 
   // Quantize coeffs. (coeff -> quant_coeff)
-  if (state->encoder_control->rdoq_enable && (width > 4 || !state->encoder_control->cfg->rdoq_skip)) {
+  if (state->encoder_control->cfg.rdoq_enable &&
+      (width > 4 || !state->encoder_control->cfg.rdoq_skip))
+  {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
     kvz_rdoq(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type, tr_depth);
-  }
-  else {
+  } else {
     kvz_quant(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type);
   }

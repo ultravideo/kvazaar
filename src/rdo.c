@@ -598,7 +598,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   FILL_ARRAY(cost_coeff, 0, max_num_coeff);
   FILL_ARRAY(cost_sig, 0, max_num_coeff);
 
-  if (encoder->sign_hiding) {
+  if (encoder->cfg.signhide_enable) {
     memset(&sh_rates, 0, sizeof(sh_rates));
   }
 
@@ -647,14 +647,14 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
         level              = kvz_get_coded_level(state, &cost_coeff[ scanpos ], &cost_coeff0[ scanpos ], &cost_sig[ scanpos ],
                                              level_double, max_abs_level, ctx_sig, one_ctx, abs_ctx, go_rice_param,
                                              c1_idx, c2_idx, q_bits, temp, 0, type );
-        if (encoder->sign_hiding) {
+        if (encoder->cfg.signhide_enable) {
           int greater_than_zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 1);
           int zero = CTX_ENTROPY_BITS(&baseCtx[ctx_sig], 0);
           sh_rates.sig_coeff_inc[blkpos] = greater_than_zero - zero;
         }
       }
 
-      if (encoder->sign_hiding) {
+      if (encoder->cfg.signhide_enable) {
         sh_rates.quant_delta[blkpos] = (level_double - (level << q_bits)) >> (q_bits - 8);
         if (level > 0) {
           int32_t rate_now  = kvz_get_ic_rate(state, level, one_ctx, abs_ctx, go_rice_param, c1_idx, c2_idx, type);
@@ -833,7 +833,7 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
     dest_coeff[scan[scanpos]] = 0;
   }
 
-  if (encoder->sign_hiding && abs_sum >= 2) {
+  if (encoder->cfg.signhide_enable && abs_sum >= 2) {
     kvz_rdoq_sign_hiding(state, qp_scaled, scan, &sh_rates, best_last_idx_p1, coef, dest_coeff);
   }
 }

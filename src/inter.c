@@ -325,7 +325,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
   // Generate prediction for luma.
   if (fractional_luma) {
     // With a fractional MV, do interpolation.
-    if (state->encoder_control->cfg->bipred && hi_prec_out) {
+    if (state->encoder_control->cfg.bipred && hi_prec_out) {
       inter_recon_14bit_frac_luma(state, ref,
                                   pu_in_tile.x, pu_in_tile.y,
                                   width, height,
@@ -361,7 +361,7 @@ void kvz_inter_recon_lcu(const encoder_state_t * const state,
   // Generate prediction for chroma.
   if (fractional_luma || fractional_chroma) {
     // With a fractional MV, do interpolation.
-    if (state->encoder_control->cfg->bipred && hi_prec_out) {
+    if (state->encoder_control->cfg.bipred && hi_prec_out) {
       inter_recon_14bit_frac_chroma(state, ref,
                                     pu_in_tile.x, pu_in_tile.y,
                                     width, height,
@@ -1085,7 +1085,7 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
     candidates = 1;
   }
 
-  if (state->encoder_control->cfg->tmvp_enable) {
+  if (state->encoder_control->cfg.tmvp_enable) {
     /*
     Predictor block locations
     _________
@@ -1317,7 +1317,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
   }
   
-  if (state->encoder_control->cfg->tmvp_enable) {
+  if (state->encoder_control->cfg.tmvp_enable) {
 #define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
 
     if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {

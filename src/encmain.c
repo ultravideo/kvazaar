@@ -196,7 +196,7 @@ static void* input_read_thread(void* in_args)
     bool read_success = yuv_io_read(args->input, 
                                     args->opts->config->width,
                                     args->opts->config->height,
-                                    args->encoder->cfg->input_bitdepth,
+                                    args->encoder->cfg.input_bitdepth,
                                     args->encoder->bitdepth,
                                     frame_in);
     if (!read_success) {
@@ -215,7 +215,7 @@ static void* input_read_thread(void* in_args)
           bool read_success = yuv_io_read(args->input,
                                           args->opts->config->width,
                                           args->opts->config->height,
-                                          args->encoder->cfg->input_bitdepth,
+                                          args->encoder->cfg.input_bitdepth,
                                           args->encoder->bitdepth,
                                           frame_in);
           if (!read_success) {
@@ -236,9 +236,9 @@ static void* input_read_thread(void* in_args)
 
     frames_read++;
 
-    if (args->encoder->cfg->source_scan_type != 0) {
+    if (args->encoder->cfg.source_scan_type != 0) {
       // Set source scan type for frame, so that it will be turned into fields.
-      frame_in->interlacing = args->encoder->cfg->source_scan_type;
+      frame_in->interlacing = args->encoder->cfg.source_scan_type;
     }
 
     // Wait until main thread is ready to receive the next frame.
@@ -352,8 +352,8 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  encoder_control_t *encoder = enc->control;
-  
+  const encoder_control_t *encoder = enc->control;
+
   fprintf(stderr, "Input: %s, output: %s\n", opts->input, opts->output);
   fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
          encoder->in.width, encoder->in.height,
@@ -475,7 +475,7 @@ int main(int argc, char *argv[])
         // Compute and print stats.
 
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+        if (encoder->cfg.calc_psnr && encoder->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
           // Do not compute PSNR for interlaced frames, because img_rec does not contain
           // the deinterlaced frame yet.
           compute_psnr(img_src, img_rec, frame_psnr);

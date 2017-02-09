@@ -50,7 +50,8 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
-    kvz_encoder_control_free(encoder->control);
+    // Discard const from the pointer.
+    kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
   }
   FREE_POINTER(encoder);
@@ -73,14 +74,12 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  // FIXME: const qualifier disgarded. I don't want to change kvazaar_open
-  // but I really need to change cfg.
-  encoder->control = kvz_encoder_control_init((kvz_config*)cfg);
+  encoder->control = kvz_encoder_control_init(cfg);
   if (!encoder->control) {
     goto kvazaar_open_failure;
   }
 
-  encoder->num_encoder_states = encoder->control->owf + 1;
+  encoder->num_encoder_states = encoder->control->cfg.owf + 1;
   encoder->cur_state_num = 0;
   encoder->out_state_num = 0;
   encoder->frames_started = 0;
@@ -217,7 +216,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   if (pic_in != NULL) {
     // FIXME: The frame number printed here is wrong when GOP is enabled.
-    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg->seek);
+    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
   kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
@@ -273,7 +272,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
                                           kvz_picture **src_out,
                                           kvz_frame_info *info_out)
 {
-  if (enc->control->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+  if (enc->control->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }

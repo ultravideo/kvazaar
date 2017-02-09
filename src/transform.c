@@ -342,14 +342,14 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
     cbf_clear(&cur_pu->cbf, depth, COLOR_Y);
 
 
-    if (state->encoder_control->cfg->lossless) {
+    if (state->encoder_control->cfg.lossless) {
       if (bypass_transquant(width,
                             LCU_WIDTH, LCU_WIDTH,
                             base_y, recbase_y,
                             recbase_y, orig_coeff_y)) {
         cbf_set(&cur_pu->cbf, depth, COLOR_Y);
       }
-      if (state->encoder_control->cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
+      if (state->encoder_control->cfg.implicit_rdpcm && cur_pu->type == CU_INTRA) {
         // implicit rdpcm for horizontal and vertical intra modes
         if (cur_pu->intra.mode == 10) {
           rdpcm(width, LCU_WIDTH, RDPCM_HOR, orig_coeff_y);
@@ -358,7 +358,7 @@ void kvz_quantize_lcu_luma_residual(encoder_state_t * const state, int32_t x, in
           rdpcm(width, LCU_WIDTH, RDPCM_VER, orig_coeff_y);
         }
       }
-    } else if (width == 4 && state->encoder_control->trskip_enable) {
+    } else if (width == 4 && state->encoder_control->cfg.trskip_enable) {
       // Try quantization with trskip and use it if it's better.
       int has_coeffs = kvz_quantize_residual_trskip(
           state, cur_pu, width, COLOR_Y, scan_idx_luma,
@@ -439,7 +439,7 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
 
     scan_idx_chroma = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
 
-    if (state->encoder_control->cfg->lossless) {
+    if (state->encoder_control->cfg.lossless) {
       if (bypass_transquant(chroma_width,
                             LCU_WIDTH_C, LCU_WIDTH_C,
                             base_u, recbase_u,
@@ -452,7 +452,7 @@ void kvz_quantize_lcu_chroma_residual(encoder_state_t * const state, int32_t x, 
                             recbase_v, orig_coeff_v)) {
         cbf_set(&cur_cu->cbf, depth, COLOR_V);
       }
-      if (state->encoder_control->cfg->implicit_rdpcm && cur_cu->type == CU_INTRA) {
+      if (state->encoder_control->cfg.implicit_rdpcm && cur_cu->type == CU_INTRA) {
         // implicit rdpcm for horizontal and vertical intra modes
         if (cur_cu->intra.mode_chroma == 10) {
           rdpcm(chroma_width, LCU_WIDTH_C, RDPCM_HOR, orig_coeff_u);
