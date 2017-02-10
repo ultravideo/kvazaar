@@ -115,9 +115,6 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
     if (!kvz_image_list_resize(list, new_size)) return 0;
   }
   
-  // Store current list of POCs for used in TMVP derivation
-  memcpy(im->ref_pocs, list->pocs, sizeof(int32_t)*list->used_size);
-
   for (i = list->used_size; i > 0; i--) {
     list->images[i] = list->images[i - 1];
     list->cu_arrays[i] = list->cu_arrays[i - 1];
