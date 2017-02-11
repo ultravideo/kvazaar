@@ -27,15 +27,7 @@
 
 kvz_config *kvz_config_alloc(void)
 {
-  kvz_config *cfg = (kvz_config *)malloc(sizeof(kvz_config));
-  if (!cfg) {
-    fprintf(stderr, "Failed to allocate a config object!\n");
-    return cfg;
-  }
-
-  FILL(*cfg, 0);
-
-  return cfg;
+  return calloc(1, sizeof(kvz_config));
 }
 
 int kvz_config_init(kvz_config *cfg)
