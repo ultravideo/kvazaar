@@ -57,23 +57,6 @@
 #define KVZ_CLOCK_T_AS_DOUBLE(ts) ((double)((ts).tv_sec) + (double)((ts).tv_nsec) / 1e9)
 #define KVZ_CLOCK_T_DIFF(start, stop) ((double)((stop).tv_sec - (start).tv_sec) + (double)((stop).tv_nsec - (start).tv_nsec) / 1e9)
 
-static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, int wait_ms)
-{
-  KVZ_GET_TIME(result);
-  int64_t secs = result->tv_sec + wait_ms / E3;
-  int64_t nsecs = result->tv_nsec + (wait_ms % E3) * (E9 / E3);
-  
-  if (nsecs >= E9) {
-    secs += 1;
-    nsecs -= E9;
-  }
-  
-  result->tv_sec = secs;
-  result->tv_nsec = nsecs;
-
-  return result;
-}
-
 #define KVZ_ATOMIC_INC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, 1)
 #define KVZ_ATOMIC_DEC(ptr)                     __sync_add_and_fetch((volatile int32_t*)ptr, -1)
 
@@ -87,28 +70,6 @@ static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, i
 #define KVZ_CLOCK_T_AS_DOUBLE(ts) ((double)(((uint64_t)(ts).dwHighDateTime)<<32 | (uint64_t)(ts).dwLowDateTime) / 1e7)
 #define KVZ_CLOCK_T_DIFF(start, stop) ((double)((((uint64_t)(stop).dwHighDateTime)<<32 | (uint64_t)(stop).dwLowDateTime) - \
                                   (((uint64_t)(start).dwHighDateTime)<<32 | (uint64_t)(start).dwLowDateTime)) / 1e7)
-
-static INLINE struct timespec * ms_from_now_timespec(struct timespec * result, int wait_ms)
-{
-  KVZ_CLOCK_T now;
-  KVZ_GET_TIME(&now);
-
-  int64_t moment_100ns = (int64_t)now.dwHighDateTime << 32 | (int64_t)now.dwLowDateTime;
-  moment_100ns -= (int64_t)FILETIME_TO_EPOCH;
-   
-  int64_t secs = moment_100ns / (E9 / 100) + (wait_ms / E3);
-  int64_t nsecs = (moment_100ns % (E9 / 100))*100 + ((wait_ms % E3) * (E9 / E3));
-  
-  if (nsecs >= E9) {
-    secs += 1;
-    nsecs -= E9;
-  }
-
-  result->tv_sec = secs;
-  result->tv_nsec = nsecs;
-
-  return result;
-}
 
 #define KVZ_ATOMIC_INC(ptr)                     InterlockedIncrement((volatile LONG*)ptr)
 #define KVZ_ATOMIC_DEC(ptr)                     InterlockedDecrement((volatile LONG*)ptr)
