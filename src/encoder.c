@@ -153,10 +153,6 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
   }
 
   if (encoder->cfg.gop_len > 0) {
-    if (encoder->cfg.tmvp_enable) {
-      encoder->cfg.tmvp_enable = false;
-      fprintf(stderr, "Disabling TMVP because GOP is used.\n");
-    }
     if (encoder->cfg.gop_lowdelay) {
       kvz_config_process_lp_gop(&encoder->cfg);
     }

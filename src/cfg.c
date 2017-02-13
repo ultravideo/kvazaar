@@ -955,10 +955,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->lossless = (bool)atobool(value);
   else if OPT("tmvp") {
     cfg->tmvp_enable = atobool(value);
-    if (cfg->gop_len && cfg->tmvp_enable) {
-      fprintf(stderr, "Cannot enable TMVP because GOP is used.\n");
-      cfg->tmvp_enable = false;
-    }
     if (cfg->tiles_width_count > 1 || cfg->tiles_height_count > 1) {
       fprintf(stderr, "Cannot enable TMVP because tiles are used.\n");
       cfg->tmvp_enable = false;

@@ -1439,12 +1439,16 @@ static void search_pu_inter(encoder_state_t * const state,
   // Search for merge mode candidate
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = kvz_inter_get_merge_cand(state,
-                                              x, y,
-                                              width, height,
-                                              merge_a1, merge_b1,
-                                              merge_cand,
-                                              lcu);
+  int16_t num_cand = 0;
+  if (!state->encoder_control->cfg.tmvp_enable) {
+    num_cand = kvz_inter_get_merge_cand(state,
+                                        x, y,
+                                        width, height,
+                                        merge_a1, merge_b1,
+                                        merge_cand,
+                                        lcu,
+                                        0);
+  }
 
   uint32_t(*get_mvd_cost)(encoder_state_t * const state, vector2d_t *, const cabac_data_t*) = get_mvd_coding_cost;
   if (state->encoder_control->cfg.mv_rdo) {
@@ -1457,12 +1461,23 @@ static void search_pu_inter(encoder_state_t * const state,
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
+    if (state->encoder_control->cfg.tmvp_enable) {
+      // Get list of candidates, TMVP required MV scaling for each reference
+      num_cand = kvz_inter_get_merge_cand(state,
+                                          x, y,
+                                          width, height,
+                                          merge_a1, merge_b1,
+                                          merge_cand,
+                                          lcu,
+                                          ref_idx);
+    }
     search_pu_inter_ref(state,
                         x, y,
                         width, height,
                         depth,
                         lcu, cur_cu,
-                        mv_cand, merge_cand, num_cand,
+                        mv_cand, merge_cand,
+                        num_cand,
                         ref_idx,
                         get_mvd_cost,
                         inter_cost,

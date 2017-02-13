@@ -365,6 +365,8 @@ typedef struct kvz_picture {
 
   enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
   enum kvz_chroma_format chroma_format;
+
+  int32_t ref_pocs[16];
 } kvz_picture;
 
 /**

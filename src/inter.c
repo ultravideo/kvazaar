@@ -657,7 +657,9 @@ static void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * cons
                                              int32_t width,
                                              int32_t height,
                                              cu_info_t **C3,
-                                             cu_info_t **H) {
+                                             cu_info_t **H,
+                                             uint8_t ref_list,
+                                             uint8_t ref_idx) {
   /*
   Predictor block locations
   _________
@@ -671,22 +673,21 @@ static void kvz_inter_get_temporal_merge_candidates(const encoder_state_t * cons
   *C3 = NULL;
   *H  = NULL;
 
-  // Find temporal reference, closest POC
+  // Find temporal reference
   if (state->frame->ref->used_size) {
-    uint32_t poc_diff = UINT_MAX;
-    int32_t closest_ref = 0;
+    uint32_t colocated_ref = UINT_MAX;
 
+    // Select L0/L1 ref_idx reference
     for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
-      int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
-
-      td = td < 0 ? -td : td;
-      if (td < poc_diff) {
-        closest_ref = temporal_cand;
-        poc_diff = td;
+      if (state->frame->refmap[temporal_cand].list == ref_list && state->frame->refmap[temporal_cand].idx == ref_idx) {
+        colocated_ref = temporal_cand;
+        break;
       }
     }
+    
+    if (colocated_ref == UINT_MAX) return;
 
-    cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[closest_ref];
+    cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[colocated_ref];
     int cu_per_width = ref_cu_array->width / SCU_WIDTH;
 
     uint32_t xColBr = x + width;
@@ -916,9 +917,9 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
 }
 
 /**
- * \brief Pick two mv candidates from the spatial candidates.
+ * \brief Pick two mv candidates from the spatial and temporal candidates.
  */
-static void get_mv_cand_from_spatial(const encoder_state_t * const state,
+static void get_mv_cand_from_candidates(const encoder_state_t * const state,
                                      int32_t x,
                                      int32_t y,
                                      int32_t width,
@@ -1081,44 +1082,71 @@ static void get_mv_cand_from_spatial(const encoder_state_t * const state,
   }
 
   // Remove identical candidate
-  if(candidates == 2 && mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]) {
+  if (candidates == 2 && mv_cand[0][0] == mv_cand[1][0] && mv_cand[0][1] == mv_cand[1][1]) {
     candidates = 1;
   }
 
+  // Use Temporal Motion Vector Prediction when enabled
   if (state->encoder_control->cfg.tmvp_enable) {
     /*
     Predictor block locations
-    _________
+    __________
     |CurrentPU|
     | |C0|__  |
     |    |C3| |
     |_________|_
-    |H|
+              |H|
     */
 
-    // Find temporal reference, closest POC
+    // TMVP required at least two sequential P/B-frames
     if (state->frame->poc > 1 && state->frame->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
-      uint32_t poc_diff = UINT_MAX;
 
-      for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
-        int td = state->frame->poc - state->frame->ref->pocs[temporal_cand];
-        td = td < 0 ? -td : td;
-        if (td < poc_diff) {
-          poc_diff = td;
-        }
-      }
-
+      // Use "H" as the primary predictor and "C3" as secondary
       const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
 
       if (selected_CU) {
-        int td = selected_CU->inter.mv_ref[reflist] + 1;
-        int tb = cur_cu->inter.mv_ref[reflist] + 1;
+        uint32_t colocated_ref = UINT_MAX;
+        uint32_t colocated_ref_poc = 0;
+        int td, tb;
 
-        int scale = CALCULATE_SCALE(NULL, tb, td);
-        mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-        mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+        //ToDo: allow other than L0[0] for prediction
 
-        candidates++;
+        //Fetch ref idx of the selected CU in L0[0] ref list                    
+        for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+          if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
+            colocated_ref = temporal_cand;
+            break;
+          }
+        }
+
+        if (colocated_ref != UINT_MAX) {
+
+          uint8_t used_reflist = reflist;
+
+          colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
+
+          if (!(selected_CU->inter.mv_dir & (1 << used_reflist))) {
+            used_reflist = !reflist;
+          }
+
+          // The reference id the colocated block is using
+          uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[used_reflist];
+
+          td = colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref];
+          tb = state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]];
+
+          if (td == tb) {
+            mv_cand[candidates][0] = selected_CU->inter.mv[used_reflist][0];
+            mv_cand[candidates][1] = selected_CU->inter.mv[used_reflist][1];
+          } else {
+            int scale = CALCULATE_SCALE(NULL, tb, td);
+            mv_cand[candidates][0] = ((scale * selected_CU->inter.mv[used_reflist][0] + 127 + ((scale * selected_CU->inter.mv[used_reflist][0]) < 0)) >> 8);
+            mv_cand[candidates][1] = ((scale * selected_CU->inter.mv[used_reflist][1] + 127 + ((scale * selected_CU->inter.mv[used_reflist][1]) < 0)) >> 8);
+          }
+           
+          candidates++;
+
+        }
       }
 #undef CALCULATE_SCALE
     }
@@ -1162,8 +1190,8 @@ void kvz_inter_get_mv_cand(const encoder_state_t * const state,
   get_spatial_merge_candidates(x, y, width, height,
                                state->tile->frame->width, state->tile->frame->height,
                                &b0, &b1, &b2, &a0, &a1, lcu);
-  kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
-  get_mv_cand_from_spatial(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
+  kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h, 1, 0);
+  get_mv_cand_from_candidates(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
 /**
@@ -1196,8 +1224,8 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
                                    x, y, width, height,
                                    state->tile->frame->width, state->tile->frame->height,
                                    &b0, &b1, &b2, &a0, &a1);
-  kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
-  get_mv_cand_from_spatial(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
+  kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h, 1, 0);
+  get_mv_cand_from_candidates(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
 /**
@@ -1211,6 +1239,7 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
  * \param use_b1    true, if candidate b1 can be used
  * \param mv_cand   Returns the merge candidates.
  * \param lcu       lcu containing the block
+ * \param ref_idx   current reference index (used only by TMVP)
  * \return          number of merge candidates
  */
 uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
@@ -1218,7 +1247,8 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  int32_t width, int32_t height,
                                  bool use_a1, bool use_b1,
                                  inter_merge_cand_t mv_cand[MRG_MAX_NUM_CANDS],
-                                 lcu_t *lcu)
+                                 lcu_t *lcu,
+                                 uint8_t ref_idx)
 {
   uint8_t candidates = 0;
   int8_t duplicate = 0;
@@ -1316,38 +1346,129 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       }
     }
   }
-  
+
   if (state->encoder_control->cfg.tmvp_enable) {
-#define CALCULATE_SCALE(cu,tb,td) ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6)
+
+    #define CALCULATE_SCALE(tb,td) ((tb * ((0x4000 + (abs(td) >> 1)) / td) + 32) >> 6)
 
     if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {
 
-      cu_info_t *c3 = NULL;
-      cu_info_t *h = NULL;
+      uint32_t colocated_ref = UINT_MAX;
+      uint32_t colocated_ref_poc = 0;
+      int32_t td, tb;
+      uint8_t selected_reflist = 0;
 
-      kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3, &h);
+      cu_info_t *c3_L0 = NULL;
+      cu_info_t *h_L0 = NULL;
+      
+      // Fetch temporal candidates for the current CU, , L0[0]
+      kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3_L0, &h_L0, 1, 0);
 
-      const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
+      cu_info_t *selected_CU = NULL;
 
+      selected_CU = (h_L0 != NULL) ? h_L0 : (c3_L0 != NULL) ? c3_L0 : NULL;
+
+
+      mv_cand[candidates].dir = 0;
+
+      // Find LIST_0 reference
       if (selected_CU) {
-        int td = selected_CU->inter.mv_ref[0] + 1;
-        int tb = 1;
 
-        int scale = CALCULATE_SCALE(NULL, tb, td);
-        mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[0][0] + 127 + (scale * selected_CU->inter.mv[0][0] < 0)) >> 8);
-        mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[0][1] + 127 + (scale * selected_CU->inter.mv[0][1] < 0)) >> 8);
+        if (!(selected_CU->inter.mv_dir & (selected_reflist + 1))) {
+          selected_reflist = !selected_reflist;
+        }
 
-        /*
-        ToDo: temporal prediction in B-pictures
-        mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[1][0];
-        mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[1][1];
-        */
-        mv_cand[candidates].dir = selected_CU->inter.mv_dir;
-        mv_cand[candidates].ref[0] = 0;
-        candidates++;
+        uint8_t colocated_ref_found = 0;
+
+        //Fetch ref idx of the selected CU in L0[0] ref list                    
+        for (int32_t temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+          if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
+            colocated_ref = temporal_cand;
+            colocated_ref_found = 1;
+            break;
+          }
+        }
+
+        if (colocated_ref_found) {
+          colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
+
+          // The reference id the colocated block is using
+          uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[selected_reflist];
+
+          td = colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref];
+          tb = state->frame->poc - state->frame->ref->pocs[ref_idx];
+
+          mv_cand[candidates].dir |= 1;
+
+          if (td == tb) {
+            mv_cand[candidates].mv[0][0] = selected_CU->inter.mv[selected_reflist][0];
+            mv_cand[candidates].mv[0][1] = selected_CU->inter.mv[selected_reflist][1];
+          } else {
+            int32_t scale = CALCULATE_SCALE(tb, td);
+            mv_cand[candidates].mv[0][0] = ((scale * selected_CU->inter.mv[selected_reflist][0] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][0]) < 0)) >> 8);
+            mv_cand[candidates].mv[0][1] = ((scale * selected_CU->inter.mv[selected_reflist][1] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][1]) < 0)) >> 8);
+          }
+          mv_cand[candidates].ref[0] = colocated_ref;
+        }
       }
+
+
+      if (state->frame->slicetype == KVZ_SLICE_B) {
+
+        selected_reflist = 1;
+
+        // ToDo: enable L1 TMVP candidate
+        // Fetch temporal candidates for the current CU, L0[0]
+        kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3_L0, &h_L0, 1, 0);
+        //kvz_inter_get_temporal_merge_candidates(state, x, y, width, height, &c3_L1, &h_L1, 2, 0);
+
+        selected_CU = (h_L0 != NULL) ? h_L0 : (c3_L0 != NULL) ? c3_L0 : NULL;
+
+        // Find LIST_1 reference
+        if (selected_CU) {
+          if (!(selected_CU->inter.mv_dir & (selected_reflist + 1))) {
+            selected_reflist = !selected_reflist;
+          }
+          uint8_t colocated_ref_found = 0;
+          
+          //Fetch ref idx of the selected CU in L0[0] ref list                    
+          for (int32_t temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+            if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
+              colocated_ref = temporal_cand;
+              colocated_ref_found = 1;
+              break;
+            }
+          }
+
+          colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
+
+          if (colocated_ref_found) {
+            // The reference id the colocated block is using
+            uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[selected_reflist];
+
+            // POC differences in current and in candidate
+            td = colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref];
+            tb = state->frame->poc - state->frame->ref->pocs[ref_idx];
+            mv_cand[candidates].dir |= 2;
+
+            // No need for scaling when POC difference is the same
+            if (td == tb) {
+              mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[selected_reflist][0];
+              mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[selected_reflist][1];
+            } else {
+              int32_t scale = CALCULATE_SCALE(tb, td);
+              mv_cand[candidates].mv[1][0] = ((scale * selected_CU->inter.mv[selected_reflist][0] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][0]) < 0)) >> 8);
+              mv_cand[candidates].mv[1][1] = ((scale * selected_CU->inter.mv[selected_reflist][1] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][1]) < 0)) >> 8);
+            }
+            mv_cand[candidates].ref[1] = colocated_ref;
+          }
+        }
+      }
+        
+      if (mv_cand[candidates].dir != 0) candidates++;
+
     }
-#undef CALCULATE_SCALE
+    #undef CALCULATE_SCALE
   }
 
   if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
@@ -1365,12 +1486,12 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
         mv_cand[candidates].dir = 3;
 
         // get Mv from cand[i] and cand[j]
-        mv_cand[candidates].mv[0][0] = mv_cand[i].mv[0][0];
-        mv_cand[candidates].mv[0][1] = mv_cand[i].mv[0][1];
-        mv_cand[candidates].mv[1][0] = mv_cand[j].mv[1][0];
-        mv_cand[candidates].mv[1][1] = mv_cand[j].mv[1][1];
-        mv_cand[candidates].ref[0]   = mv_cand[i].ref[0];
-        mv_cand[candidates].ref[1]   = mv_cand[j].ref[1];
+        mv_cand[candidates].mv[0][0]  = mv_cand[i].mv[0][0];
+        mv_cand[candidates].mv[0][1]  = mv_cand[i].mv[0][1];
+        mv_cand[candidates].mv[1][0]  = mv_cand[j].mv[1][0];
+        mv_cand[candidates].mv[1][1]  = mv_cand[j].mv[1][1];
+        mv_cand[candidates].ref[0]    = mv_cand[i].ref[0];
+        mv_cand[candidates].ref[1]    = mv_cand[j].ref[1];
 
         if (mv_cand[i].ref[0] == mv_cand[j].ref[1] &&
           mv_cand[i].mv[0][0] == mv_cand[j].mv[1][0] && 

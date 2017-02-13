@@ -1128,6 +1128,10 @@ void kvz_encoder_prepare(encoder_state_t *state)
   if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
       encoder->cfg.gop[prev_state->frame->gop_offset].is_ref) {
+
+    // Store current list of POCs for use in TMVP derivation
+    memcpy(prev_state->tile->frame->rec->ref_pocs, state->frame->ref->pocs, sizeof(int32_t)*state->frame->ref->used_size);
+
     // Add previous reconstructed picture as a reference
     kvz_image_list_add(state->frame->ref,
                    prev_state->tile->frame->rec,
