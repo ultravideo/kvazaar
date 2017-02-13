@@ -69,7 +69,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
-  cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
+  cfg->ref_frames      = 1;
   cfg->gop_len         = 4;
   cfg->gop_lowdelay    = true;
   cfg->bipred          = 0;
