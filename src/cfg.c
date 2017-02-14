@@ -1348,7 +1348,10 @@ int kvz_config_validate(const kvz_config *const cfg)
       fprintf(stderr, "Input error: threads are not currently supported with layers");
       error = 1;
     }
-
+    if( cfg->ref_frames > 1 ) {
+      fprintf(stderr, "Input error: Only one (IL) reference currently supported");
+      error = 1;
+    }
     if( cfg->next_cfg != NULL ) {
       if( cfg->width > cfg->next_cfg->width || cfg->height > cfg->next_cfg->height ) {
         fprintf(stderr, "Input error: a layer with a lower layer_id needs to be smaller or equal to layers with a greater layer_id\n");

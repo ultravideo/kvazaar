@@ -370,7 +370,7 @@ int main(int argc, char *argv[])
   for (size_t i = 0; i < opts->num_debugs; i++) {
     if (opts->debug[i] != NULL) {
       recout[i] = open_output_file(opts->debug[i]);
-      if (recout == NULL) {
+      if (recout[i] == NULL) {
         fprintf(stderr, "Could not open reconstruction file (%s), shutting down!\n", opts->debug[i]);
         goto exit_failure;
       }
@@ -402,8 +402,9 @@ int main(int argc, char *argv[])
   encoder_control_t *encoder = enc->control;
 
   for ( int i = 0; i < opts->num_inputs; i++) {
-    fprintf(stderr, "Input: %s, output: %s\n", opts->input[i], opts->output);
-    fprintf(stderr, "  Video size: %dx%d (input=%dx%d)\n",
+    fprintf(stderr, "Input layer %d:\n", i);
+    fprintf(stderr, "  Input: %s, output: %s\n", opts->input[i], opts->output);
+    fprintf(stderr, "    Video size: %dx%d (input=%dx%d)\n",
       encoder->in.width, encoder->in.height,
       encoder->in.real_width, encoder->in.real_height);
 
@@ -465,7 +466,7 @@ int main(int argc, char *argv[])
       in_args[i].input_mutex = &input_mutex[i];
       in_args[i].main_thread_mutex = &main_thread_mutex[i];
 
-      if (pthread_create(&input_threads[i], NULL, input_read_thread, (void*)&in_args) != 0) {
+      if (pthread_create(&input_threads[i], NULL, input_read_thread, (void*)&in_args[i]) != 0) {
         fprintf(stderr, "pthread_create failed!\n");
         assert(0);
         return 0;
@@ -565,7 +566,7 @@ int main(int argc, char *argv[])
         kvz_picture *cur_src = img_src;
         kvz_picture *cur_rec = img_rec;
 
-        for (int layer_id = 0; layer_id < *cfg->max_layers; layer_id++) { 
+        for (int layer_id = 0; cfg != NULL; layer_id++) { 
           if (cfg->calc_psnr && cfg->source_scan_type == KVZ_INTERLACING_NONE) {
             // Do not compute PSNR for interlaced frames, because img_rec does not contain
             // the deinterlaced frame yet.
@@ -724,10 +725,10 @@ int main(int argc, char *argv[])
       
       
 
-      free_chained_img(api, cur_in_img);
+      free_chained_img(api, cur_in_img); cur_in_img = NULL;
       api->chunk_free(chunks_out);
-      free_chained_img(api, img_rec);
-      free_chained_img(api, img_src);
+      free_chained_img(api, img_rec); img_rec = NULL;
+      free_chained_img(api, img_src); img_src = NULL;
     }
     
     KVZ_GET_TIME(&encoding_end_real_time);
@@ -739,10 +740,13 @@ int main(int argc, char *argv[])
             frames_done,
             (long long unsigned int)bitstream_length * 8);
     if (frames_done > 0) {
+      // ***********************************************
+      // Modified for SHVC. TODO: Compute seperatly for each layer?
       fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
-              psnr_sum[0] / frames_done,
-              psnr_sum[1] / frames_done,
-              psnr_sum[2] / frames_done);
+              psnr_sum[0] / frames_done / *opts->config->max_layers,
+              psnr_sum[1] / frames_done / *opts->config->max_layers,
+              psnr_sum[2] / frames_done / *opts->config->max_layers);
+      // ***********************************************
     }
     fprintf(stderr, "\n");
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);

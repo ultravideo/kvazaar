@@ -178,8 +178,8 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   //Initialize input and debug arrays
   opts->input = calloc(1, sizeof(char*));
   opts->num_inputs = 1;
-  opts->debug = calloc(1, sizeof(char*));
-  opts->num_debugs = 1;
+  opts->debug = NULL;//calloc(1, sizeof(char*));
+  opts->num_debugs = 0;
   //*********************************************
 
   opts->config = api->config_alloc();
@@ -211,7 +211,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     }
 
     //*********************************************
-  //For scalable extension. TODO: Add error cheching
+    //For scalable extension. TODO: Add error cheching
     const char* name = long_options[long_options_index].name;
     if (!strcmp(name, "input")) {
       if (*opts->input != NULL) {
@@ -237,6 +237,10 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
         ok = 0;
         goto done;*/
         opts->debug = realloc(opts->debug, ++opts->num_debugs * sizeof(char*));
+      }
+      else {
+        opts->debug = calloc(1, sizeof(char*));
+        opts->num_debugs++;
       }
       opts->debug[opts->num_debugs-1] = strdup(optarg);
     } else if (!strcmp(name, "seek")) {
@@ -285,7 +289,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
   for (int i = 0; i < opts->num_inputs; i++) {
     //Automatically set layer size to match the respective input layer size
     kvz_config *cfg = opts->config;
-    for(int j = 0; j < *cfg->max_layers ; ++j) {
+    while( cfg != NULL ) {
       if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
         ok = ok && select_input_res_auto(opts->input[i], &cfg->width, &cfg->height);
         //goto done;

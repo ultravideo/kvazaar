@@ -96,7 +96,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   kvz_encoder *cur_enc = NULL;
   kvz_encoder *prev_enc = NULL;
   //TODO: Just use a while loop?
-  for (unsigned j = 0; j < *cfg->max_layers; j++) {
+  for (unsigned j = 0; cfg != NULL ; j++) {
     cur_enc = calloc(1, sizeof(kvz_encoder));
     if (!cur_enc) {
       goto kvazaar_open_failure;
@@ -182,7 +182,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     
     //Prepare for the next loop
     prev_enc = cur_enc;
-    cfg  = cfg->next_cfg;
+    cfg = cfg->next_cfg;
   }
 
   return encoder;
