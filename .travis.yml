@@ -22,8 +22,6 @@ addons:
 
 matrix:
   fast_finish: true
-  allow_failures:
-  - os: osx  # Don't know what's wrong. Something changed in the environment.
   
   include:
     - compiler: clang
@@ -134,3 +132,6 @@ install:
 
 script:
   - source .travis-script.sh
+  
+after_script:
+  - set +e # Disable errors to work around Travis not knowing how to fix their stuff.
