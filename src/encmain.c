@@ -314,6 +314,17 @@ int main(int argc, char *argv[])
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
 
+  // ***********************************************
+  // Modified for SHVC
+  //Need to declare these here because goto may jump over the initialization
+  kvz_frame_info* info_out = NULL;
+  uint32_t *len_out = NULL;
+  pthread_t *input_threads = NULL;
+  pthread_mutex_t *input_mutex = NULL;
+  pthread_mutex_t *main_thread_mutex = NULL;
+  input_handler_args *in_args = NULL;
+  //*************************************************
+
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
   setmode( _fileno( stderr ), _O_TEXT );
@@ -419,15 +430,15 @@ int main(int argc, char *argv[])
   // ***********************************************
   // Modified for SHVC
   //Allocate space for some stuff
-  kvz_frame_info* info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
-  uint32_t *len_out = calloc(*opts->config->max_layers, sizeof(uint32_t)); // Each layer has their own len_out
+  info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
+  len_out = calloc(*opts->config->max_layers, sizeof(uint32_t)); // Each layer has their own len_out
 
-  pthread_t *input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
+  input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
 
-  pthread_mutex_t *input_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
-  pthread_mutex_t *main_thread_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
+  input_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
+  main_thread_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
 
-  input_handler_args *in_args = calloc(opts->num_inputs,sizeof(input_handler_args));
+  in_args = calloc(opts->num_inputs,sizeof(input_handler_args));
 
   //Now, do the real stuff
   {
@@ -778,16 +789,16 @@ done:
   if (enc) api->encoder_close(enc);
   
   // close files
-  for (size_t i = 0; i < opts->num_inputs; i++) {
-    if (input[i])  fclose(input[i]);
+  if (opts != NULL) {
+    for (size_t i = 0; i < opts->num_inputs; i++) {
+      if (input[i])  fclose(input[i]);
+    }
+    for (size_t i = 0; i < opts->num_debugs; i++) {
+      if (recout[i]) fclose(recout[i]);
+    }
   }
   free(input);
-  
-  if (output) fclose(output);
-  
-  for (size_t i = 0; i < opts->num_debugs; i++) {
-    if (recout[i]) fclose(recout[i]);
-  }
+  if (output) fclose(output);  
   free(recout);
 
   //Free some stuff

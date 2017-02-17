@@ -150,7 +150,7 @@ int kvz_config_destroy(kvz_config *cfg)
   //Deallocate el cfgs here
   if(cfg->next_cfg != NULL){
     kvz_config_destroy(cfg->next_cfg);
-    FREE_POINTER(cfg->next_cfg);
+    cfg->next_cfg = NULL;//FREE_POINTER(cfg->next_cfg);
   } else {
     FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared fields
     FREE_POINTER(cfg->max_input_layers);
@@ -610,7 +610,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->input_layer = atoi(value);
   else if OPT("input"){
     //Allocate a new spot for the new input layer
-    *cfg->input_widths = realloc(*cfg->input_widths, ++(*cfg->max_input_layers) * sizeof(int32_t*));
+    (*cfg->max_input_layers)++;
+    *cfg->input_widths = realloc(*cfg->input_widths, (*cfg->max_input_layers) * sizeof(int32_t*));
     *cfg->input_heights = realloc(*cfg->input_heights, (*cfg->max_input_layers) * sizeof(int32_t*));
 
     //If cur layers input layer has not been set, set the newest layer as the input layer set
@@ -1053,13 +1054,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->next_cfg->max_layers = cfg->max_layers;
     *cfg->max_layers += 1;
 
+    free(cfg->next_cfg->max_input_layers);
+    cfg->next_cfg->max_input_layers = cfg->max_input_layers;
+
     free(cfg->next_cfg->input_widths);
     free(cfg->next_cfg->input_heights);
     cfg->next_cfg->input_widths = cfg->input_widths;
     cfg->next_cfg->input_heights = cfg->input_heights;
 
     //Set a value for the input layer if not set yet.
-    //Associate the latest input in the (old) layer with the (old) input layer
+    //Associate the latest input in the (old) layer with the (old) input layer or default to 0
     if( cfg->input_layer == -1 ) {
       cfg->input_layer = MAX(*cfg->max_input_layers-1,0);
     }

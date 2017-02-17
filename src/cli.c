@@ -290,6 +290,10 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     //Automatically set layer size to match the respective input layer size
     kvz_config *cfg = opts->config;
     while( cfg != NULL ) {
+      //Default input_layer to 0
+      if( cfg->input_layer == -1 ) {
+        cfg->input_layer = 0;
+      }
       if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
         ok = ok && select_input_res_auto(opts->input[i], &cfg->width, &cfg->height);
         //goto done;
