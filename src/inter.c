@@ -916,6 +916,47 @@ static void get_spatial_merge_candidates_cua(const cu_array_t *cua,
   }
 }
 
+static INLINE int16_t get_scaled_mv(int16_t mv, int scale)
+{
+  int32_t scaled = scale * mv;
+  return CLIP(-32768, 32767, (scaled + 127 + (scaled < 0)) >> 8);
+}
+
+static void apply_mv_scaling_pocs(int32_t current_poc,
+                                  int32_t current_ref_poc,
+                                  int32_t neighbor_poc,
+                                  int32_t neighbor_ref_poc,
+                                  int16_t mv_cand[2])
+{
+  int32_t diff_current  = current_poc  - current_ref_poc;
+  int32_t diff_neighbor = neighbor_poc - neighbor_ref_poc;
+
+  if (diff_current == diff_neighbor) return;
+
+  diff_current  = CLIP(-128, 127, diff_current);
+  diff_neighbor = CLIP(-128, 127, diff_neighbor);
+
+  int scale = CLIP(-4096, 4095,
+    (diff_current * ((0x4000 + (abs(diff_neighbor) >> 1)) / diff_neighbor) + 32) >> 6);
+
+  mv_cand[0] = get_scaled_mv(mv_cand[0], scale);
+  mv_cand[1] = get_scaled_mv(mv_cand[1], scale);
+}
+
+static INLINE void apply_mv_scaling(const encoder_state_t *state,
+                                    const cu_info_t *current_cu,
+                                    const cu_info_t *neighbor_cu,
+                                    int8_t current_reflist,
+                                    int8_t neighbor_reflist,
+                                    int16_t mv_cand[2])
+{
+  apply_mv_scaling_pocs(state->frame->poc,
+                        state->frame->ref->pocs[current_cu->inter.mv_ref[current_reflist]],
+                        state->frame->poc,
+                        state->frame->ref->pocs[neighbor_cu->inter.mv_ref[neighbor_reflist]],
+                        mv_cand);
+}
+
 /**
  * \brief Pick two mv candidates from the spatial and temporal candidates.
  */
@@ -939,64 +980,52 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
   uint8_t b_candidates = 0;
   int8_t reflist2nd = !reflist;
 
-#define CALCULATE_SCALE(cu,tb,td) CLIP(-4096, 4095, ((tb * ((0x4000 + (abs(td)>>1))/td) + 32) >> 6))
-#define APPLY_MV_SCALING(cu, cand, list) {int td = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[(cu)->inter.mv_ref[list]]);\
-                                   int tb = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]]);\
-                                   if (td != tb) { \
-                                      int scale = CALCULATE_SCALE(cu,tb,td); \
-                                       mv_cand[cand][0] = CLIP(-32768, 32767, ((scale * (cu)->inter.mv[list][0] + 127 + (scale * (cu)->inter.mv[list][0] < 0)) >> 8 )); \
-                                       mv_cand[cand][1] = CLIP(-32768, 32767, ((scale * (cu)->inter.mv[list][1] + 127 + (scale * (cu)->inter.mv[list][1] < 0)) >> 8 )); }}
-
   // Left predictors
-  if (a0 && (
-    ((a0->inter.mv_dir & 1) && a0->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
-    ((a0->inter.mv_dir & 2) && a0->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
-    if (a0->inter.mv_dir & (1 << reflist) && a0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-      mv_cand[candidates][0] = a0->inter.mv[reflist][0];
-      mv_cand[candidates][1] = a0->inter.mv[reflist][1];
-    } else {
-      mv_cand[candidates][0] = a0->inter.mv[reflist2nd][0];
-      mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
-    }
-    candidates++;
-  } else if (a1 && (
-    ((a1->inter.mv_dir & 1) && a1->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
-    ((a1->inter.mv_dir & 2) && a1->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
-    if (a1->inter.mv_dir & (1 << reflist) && a1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-      mv_cand[candidates][0] = a1->inter.mv[reflist][0];
-      mv_cand[candidates][1] = a1->inter.mv[reflist][1];
-    } else {
-      mv_cand[candidates][0] = a1->inter.mv[reflist2nd][0];
-      mv_cand[candidates][1] = a1->inter.mv[reflist2nd][1];
-    }
-    candidates++;
-  }
+  if (a0 &&
+      a0->inter.mv_dir & (1 << reflist) &&
+      a0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
 
-  if(!candidates) {
-      // Left predictors
-    if (a0) {
-      if (a0->inter.mv_dir & (1 << reflist)) {
-        mv_cand[candidates][0] = a0->inter.mv[reflist][0];
-        mv_cand[candidates][1] = a0->inter.mv[reflist][1];
-        APPLY_MV_SCALING(a0, candidates, reflist);
-      } else {
-        mv_cand[candidates][0] = a0->inter.mv[reflist2nd][0];
-        mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
-        APPLY_MV_SCALING(a0, candidates, reflist2nd);
-      }
-      candidates++;
-    } else if (a1) {
-      if (a1->inter.mv_dir & (1 << reflist)) {
-        mv_cand[candidates][0] = a1->inter.mv[reflist][0];
-        mv_cand[candidates][1] = a1->inter.mv[reflist][1];
-        APPLY_MV_SCALING(a1, candidates, reflist);
-      } else {
-        mv_cand[candidates][0] = a1->inter.mv[reflist2nd][0];
-        mv_cand[candidates][1] = a1->inter.mv[reflist2nd][1];
-        APPLY_MV_SCALING(a1, candidates, reflist2nd);
-      }
-      candidates++;
-    }
+    mv_cand[candidates][0] = a0->inter.mv[reflist][0];
+    mv_cand[candidates][1] = a0->inter.mv[reflist][1];
+    candidates++;
+
+  } else if (a0 &&
+      a0->inter.mv_dir & (1 << reflist2nd) &&
+      a0->inter.mv_ref[reflist2nd] == cur_cu->inter.mv_ref[reflist]) {
+
+    mv_cand[candidates][0] = a0->inter.mv[reflist2nd][0];
+    mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
+    candidates++;
+
+  } else if (a1 &&
+      a1->inter.mv_dir & (1 << reflist) &&
+      a1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
+
+    mv_cand[candidates][0] = a1->inter.mv[reflist][0];
+    mv_cand[candidates][1] = a1->inter.mv[reflist][1];
+    candidates++;
+
+  } else if (a1 &&
+      a1->inter.mv_dir & (1 << reflist2nd) &&
+      a1->inter.mv_ref[reflist2nd] == cur_cu->inter.mv_ref[reflist]) {
+
+    mv_cand[candidates][0] = a1->inter.mv[reflist2nd][0];
+    mv_cand[candidates][1] = a1->inter.mv[reflist2nd][1];
+    candidates++;
+
+  } else if (a0) {
+    int cand_list = a0->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
+    mv_cand[candidates][0] = a0->inter.mv[cand_list][0];
+    mv_cand[candidates][1] = a0->inter.mv[cand_list][1];
+    apply_mv_scaling(state, cur_cu, a0, reflist, cand_list, mv_cand[candidates]);
+    candidates++;
+
+  } else if (a1) {
+    int cand_list = a1->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
+    mv_cand[candidates][0] = a1->inter.mv[cand_list][0];
+    mv_cand[candidates][1] = a1->inter.mv[cand_list][1];
+    apply_mv_scaling(state, cur_cu, a1, reflist, cand_list, mv_cand[candidates]);
+    candidates++;
   }
 
   // Top predictors
@@ -1043,40 +1072,27 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     b_candidates = 0;
   }
 
-  if(!b_candidates) {
-    // Top predictors
+  if (!b_candidates) {
+    // Top predictors with scaling
     if (b0) {
-      if (b0->inter.mv_dir & (1 << reflist)) {
-        mv_cand[candidates][0] = b0->inter.mv[reflist][0];
-        mv_cand[candidates][1] = b0->inter.mv[reflist][1];
-        APPLY_MV_SCALING(b0, candidates, reflist);
-      } else {
-        mv_cand[candidates][0] = b0->inter.mv[reflist2nd][0];
-        mv_cand[candidates][1] = b0->inter.mv[reflist2nd][1];
-        APPLY_MV_SCALING(b0, candidates, reflist2nd);
-      }
+      int cand_list = b0->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
+      mv_cand[candidates][0] = b0->inter.mv[cand_list][0];
+      mv_cand[candidates][1] = b0->inter.mv[cand_list][1];
+      apply_mv_scaling(state, cur_cu, b0, reflist, cand_list, mv_cand[candidates]);
       candidates++;
+
     } else if (b1) {
-      if (b1->inter.mv_dir & (1 << reflist)) {
-        mv_cand[candidates][0] = b1->inter.mv[reflist][0];
-        mv_cand[candidates][1] = b1->inter.mv[reflist][1];
-        APPLY_MV_SCALING(b1, candidates, reflist);
-      } else {
-        mv_cand[candidates][0] = b1->inter.mv[reflist2nd][0];
-        mv_cand[candidates][1] = b1->inter.mv[reflist2nd][1];
-        APPLY_MV_SCALING(b1, candidates, reflist2nd);
-      }
+      int cand_list = b1->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
+      mv_cand[candidates][0] = b1->inter.mv[cand_list][0];
+      mv_cand[candidates][1] = b1->inter.mv[cand_list][1];
+      apply_mv_scaling(state, cur_cu, b1, reflist, cand_list, mv_cand[candidates]);
       candidates++;
+
     } else if (b2) {
-      if (b2->inter.mv_dir & (1 << reflist)) {
-        mv_cand[candidates][0] = b2->inter.mv[reflist][0];
-        mv_cand[candidates][1] = b2->inter.mv[reflist][1];
-        APPLY_MV_SCALING(b2, candidates, reflist);
-      } else {
-        mv_cand[candidates][0] = b2->inter.mv[reflist2nd][0];
-        mv_cand[candidates][1] = b2->inter.mv[reflist2nd][1];
-        APPLY_MV_SCALING(b2, candidates, reflist2nd);
-      }
+      int cand_list = b2->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
+      mv_cand[candidates][0] = b2->inter.mv[cand_list][0];
+      mv_cand[candidates][1] = b2->inter.mv[cand_list][1];
+      apply_mv_scaling(state, cur_cu, b2, reflist, cand_list, mv_cand[candidates]);
       candidates++;
     }
   }
@@ -1124,9 +1140,6 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     if (colocated_ref != UINT_MAX) {
 
       uint8_t used_reflist = reflist;
-
-      int32_t colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
-
       if (!(selected_CU->inter.mv_dir & (1 << used_reflist))) {
         used_reflist = !reflist;
       }
@@ -1134,18 +1147,15 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
       // The reference id the colocated block is using
       uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[used_reflist];
 
-      int td = CLIP(-128, 127, colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref]);
-      int tb = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]]);
-
-      if (td == tb) {
-        mv_cand[candidates][0] = selected_CU->inter.mv[used_reflist][0];
-        mv_cand[candidates][1] = selected_CU->inter.mv[used_reflist][1];
-      } else {
-        int scale = CALCULATE_SCALE(NULL, tb, td);
-        mv_cand[candidates][0] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[used_reflist][0] + 127 + ((scale * selected_CU->inter.mv[used_reflist][0]) < 0)) >> 8));
-        mv_cand[candidates][1] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[used_reflist][1] + 127 + ((scale * selected_CU->inter.mv[used_reflist][1]) < 0)) >> 8));
-      }
-
+      mv_cand[candidates][0] = selected_CU->inter.mv[used_reflist][0];
+      mv_cand[candidates][1] = selected_CU->inter.mv[used_reflist][1];
+      apply_mv_scaling_pocs(
+        state->frame->poc,
+        state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]],
+        state->frame->ref->pocs[colocated_ref],
+        state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref],
+        mv_cand[candidates]
+      );
       candidates++;
     }
   } // TMVP
@@ -1156,8 +1166,6 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     mv_cand[candidates][1] = 0;
     candidates++;
   }
-#undef CALCULATE_SCALE
-#undef APPLY_MV_SCALING
 }
 
 /**
@@ -1346,14 +1354,9 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
   }
 
   if (state->encoder_control->cfg.tmvp_enable) {
-
-#define CALCULATE_SCALE(tb,td) CLIP(-4096, 4095, ((tb * ((0x4000 + (abs(td) >> 1)) / td) + 32) >> 6))
-
     if (candidates < MRG_MAX_NUM_CANDS && state->frame->ref->used_size) {
 
       uint32_t colocated_ref = UINT_MAX;
-      int32_t colocated_ref_poc = 0;
-      int32_t td, tb;
       uint8_t selected_reflist = 0;
 
       cu_info_t *c3_L0 = NULL;
@@ -1366,7 +1369,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
       selected_CU = (h_L0 != NULL) ? h_L0 : (c3_L0 != NULL) ? c3_L0 : NULL;
 
-
       mv_cand[candidates].dir = 0;
 
       // Find LIST_0 reference
@@ -1378,7 +1380,7 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
 
         uint8_t colocated_ref_found = 0;
 
-        //Fetch ref idx of the selected CU in L0[0] ref list                    
+        //Fetch ref idx of the selected CU in L0[0] ref list
         for (int32_t temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
           if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
             colocated_ref = temporal_cand;
@@ -1388,28 +1390,22 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
         }
 
         if (colocated_ref_found) {
-          colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
-
           // The reference id the colocated block is using
           uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[selected_reflist];
 
-          td = CLIP(-128, 127, colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref]);
-          tb = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[ref_idx]);
-
           mv_cand[candidates].dir |= 1;
-
-          if (td == tb) {
-            mv_cand[candidates].mv[0][0] = selected_CU->inter.mv[selected_reflist][0];
-            mv_cand[candidates].mv[0][1] = selected_CU->inter.mv[selected_reflist][1];
-          } else {
-            int32_t scale = CALCULATE_SCALE(tb, td);
-            mv_cand[candidates].mv[0][0] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[selected_reflist][0] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][0]) < 0)) >> 8));
-            mv_cand[candidates].mv[0][1] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[selected_reflist][1] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][1]) < 0)) >> 8));
-          }
           mv_cand[candidates].ref[0] = colocated_ref;
+          mv_cand[candidates].mv[0][0] = selected_CU->inter.mv[selected_reflist][0];
+          mv_cand[candidates].mv[0][1] = selected_CU->inter.mv[selected_reflist][1];
+          apply_mv_scaling_pocs(
+            state->frame->poc,
+            state->frame->ref->pocs[ref_idx],
+            state->frame->ref->pocs[colocated_ref],
+            state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref],
+            mv_cand[candidates].mv[0]
+          );
         }
       }
-
 
       if (state->frame->slicetype == KVZ_SLICE_B) {
 
@@ -1438,27 +1434,23 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
             }
           }
 
-          colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
+          int colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
 
           if (colocated_ref_found) {
             // The reference id the colocated block is using
             uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[selected_reflist];
 
-            // POC differences in current and in candidate
-            td = CLIP(-128, 127, colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref]);
-            tb = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[ref_idx]);
             mv_cand[candidates].dir |= 2;
-
-            // No need for scaling when POC difference is the same
-            if (td == tb) {
-              mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[selected_reflist][0];
-              mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[selected_reflist][1];
-            } else {
-              int32_t scale = CALCULATE_SCALE(tb, td);
-              mv_cand[candidates].mv[1][0] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[selected_reflist][0] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][0]) < 0)) >> 8));
-              mv_cand[candidates].mv[1][1] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[selected_reflist][1] + 127 + ((scale * selected_CU->inter.mv[selected_reflist][1]) < 0)) >> 8));
-            }
             mv_cand[candidates].ref[1] = colocated_ref;
+            mv_cand[candidates].mv[1][0] = selected_CU->inter.mv[selected_reflist][0];
+            mv_cand[candidates].mv[1][1] = selected_CU->inter.mv[selected_reflist][1];
+            apply_mv_scaling_pocs(
+              colocated_ref_poc,
+              state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref],
+              state->frame->poc,
+              state->frame->ref->pocs[ref_idx],
+              mv_cand[candidates].mv[1]
+            );
           }
         }
       }
@@ -1466,7 +1458,6 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
       if (mv_cand[candidates].dir != 0) candidates++;
 
     }
-    #undef CALCULATE_SCALE
   }
 
   if (candidates < MRG_MAX_NUM_CANDS && state->frame->slicetype == KVZ_SLICE_B) {
