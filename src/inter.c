@@ -1246,6 +1246,45 @@ void kvz_inter_get_mv_cand_cua(const encoder_state_t * const state,
   get_mv_cand_from_candidates(state, x, y, width, height, b0, b1, b2, a0, a1, c3, h, cur_cu, reflist, mv_cand);
 }
 
+static bool is_duplicate_candidate(const cu_info_t* cu1, const cu_info_t* cu2)
+{
+  if (!cu2) return false;
+  if (cu1->inter.mv_dir != cu2->inter.mv_dir) return false;
+
+  for (int reflist = 0; reflist < 2; reflist++) {
+    if (cu1->inter.mv_dir & (1 << reflist)) {
+      if (cu1->inter.mv[reflist][0]  != cu2->inter.mv[reflist][0]  ||
+          cu1->inter.mv[reflist][1]  != cu2->inter.mv[reflist][1]  ||
+          cu1->inter.mv_ref[reflist] != cu2->inter.mv_ref[reflist]) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+static bool add_merge_candidate(const cu_info_t *cand,
+                                const cu_info_t *possible_duplicate1,
+                                const cu_info_t *possible_duplicate2,
+                                inter_merge_cand_t *merge_cand_out)
+{
+  if (!cand ||
+      is_duplicate_candidate(cand, possible_duplicate1) ||
+      is_duplicate_candidate(cand, possible_duplicate2)) {
+    return false;
+  }
+
+  merge_cand_out->mv[0][0] = cand->inter.mv[0][0];
+  merge_cand_out->mv[0][1] = cand->inter.mv[0][1];
+  merge_cand_out->mv[1][0] = cand->inter.mv[1][0];
+  merge_cand_out->mv[1][1] = cand->inter.mv[1][1];
+  merge_cand_out->ref[0]   = cand->inter.mv_ref[0];
+  merge_cand_out->ref[1]   = cand->inter.mv_ref[1];
+  merge_cand_out->dir      = cand->inter.mv_dir;
+  return true;
+}
+
 /**
  * \brief Get merge predictions for current block
  * \param state     the encoder state
@@ -1269,101 +1308,23 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
                                  uint8_t ref_idx)
 {
   uint8_t candidates = 0;
-  int8_t duplicate = 0;
-
-  cu_info_t *b0, *b1, *b2, *a0, *a1;
   int8_t zero_idx = 0;
+  cu_info_t *b0, *b1, *b2, *a0, *a1;
   b0 = b1 = b2 = a0 = a1 = NULL;
   get_spatial_merge_candidates(x, y, width, height,
-                               state->tile->frame->width, state->tile->frame->height,
+                               state->tile->frame->width,
+                               state->tile->frame->height,
                                &b0, &b1, &b2, &a0, &a1, lcu);
 
   if (!use_a1) a1 = NULL;
   if (!use_b1) b1 = NULL;
 
-#define CHECK_DUPLICATE(CU1,CU2) {duplicate = 0; if ((CU2) && \
-                                                     (CU1)->inter.mv_dir == (CU2)->inter.mv_dir && \
-                                                    (!(((CU1)->inter.mv_dir & 1) && ((CU2)->inter.mv_dir & 1)) || \
-                                                      ((CU1)->inter.mv[0][0] == (CU2)->inter.mv[0][0] && \
-                                                       (CU1)->inter.mv[0][1] ==  (CU2)->inter.mv[0][1] && \
-                                                       (CU1)->inter.mv_ref[0] == (CU2)->inter.mv_ref[0]) ) && \
-                                                    (!(((CU1)->inter.mv_dir & 2) && ((CU2)->inter.mv_dir & 2) )  || \
-                                                      ((CU1)->inter.mv[1][0] == (CU2)->inter.mv[1][0] && \
-                                                       (CU1)->inter.mv[1][1] == (CU2)->inter.mv[1][1] && \
-                                                       (CU1)->inter.mv_ref[1] == (CU2)->inter.mv_ref[1]) ) \
-                                                      ) duplicate = 1; }
-
-  if (a1) {
-    mv_cand[candidates].mv[0][0] = a1->inter.mv[0][0];
-    mv_cand[candidates].mv[0][1] = a1->inter.mv[0][1];
-    mv_cand[candidates].mv[1][0] = a1->inter.mv[1][0];
-    mv_cand[candidates].mv[1][1] = a1->inter.mv[1][1];
-    mv_cand[candidates].ref[0] = a1->inter.mv_ref[0];
-    mv_cand[candidates].ref[1] = a1->inter.mv_ref[1];
-    mv_cand[candidates].dir = a1->inter.mv_dir;
-    candidates++;
-  }
-
-  if (b1) {
-    if(candidates) CHECK_DUPLICATE(b1, a1);
-    if(!duplicate) {
-      mv_cand[candidates].mv[0][0] = b1->inter.mv[0][0];
-      mv_cand[candidates].mv[0][1] = b1->inter.mv[0][1];
-      mv_cand[candidates].mv[1][0] = b1->inter.mv[1][0];
-      mv_cand[candidates].mv[1][1] = b1->inter.mv[1][1];
-      mv_cand[candidates].ref[0] = b1->inter.mv_ref[0];
-      mv_cand[candidates].ref[1] = b1->inter.mv_ref[1];
-      mv_cand[candidates].dir = b1->inter.mv_dir;
-      candidates++;
-    }
-  }
-
-  if (b0) {
-    if(candidates) CHECK_DUPLICATE(b0,b1);
-    if(!duplicate) {
-      mv_cand[candidates].mv[0][0] = b0->inter.mv[0][0];
-      mv_cand[candidates].mv[0][1] = b0->inter.mv[0][1];
-      mv_cand[candidates].mv[1][0] = b0->inter.mv[1][0];
-      mv_cand[candidates].mv[1][1] = b0->inter.mv[1][1];
-      mv_cand[candidates].ref[0] = b0->inter.mv_ref[0];
-      mv_cand[candidates].ref[1] = b0->inter.mv_ref[1];
-      mv_cand[candidates].dir = b0->inter.mv_dir;
-      candidates++;
-    }
-  }
-
-  if (a0) {
-    if(candidates) CHECK_DUPLICATE(a0,a1);
-    if(!duplicate) {
-      mv_cand[candidates].mv[0][0] = a0->inter.mv[0][0];
-      mv_cand[candidates].mv[0][1] = a0->inter.mv[0][1];
-      mv_cand[candidates].mv[1][0] = a0->inter.mv[1][0];
-      mv_cand[candidates].mv[1][1] = a0->inter.mv[1][1];
-      mv_cand[candidates].ref[0] = a0->inter.mv_ref[0];
-      mv_cand[candidates].ref[1] = a0->inter.mv_ref[1];
-      mv_cand[candidates].dir = a0->inter.mv_dir;
-      candidates++;
-    }
-  }
-
-  if (candidates != 4) {
-    if (b2) {
-      CHECK_DUPLICATE(b2,a1);
-      if(!duplicate) {
-        CHECK_DUPLICATE(b2,b1);
-        if(!duplicate) {
-          mv_cand[candidates].mv[0][0] = b2->inter.mv[0][0];
-          mv_cand[candidates].mv[0][1] = b2->inter.mv[0][1];
-          mv_cand[candidates].mv[1][0] = b2->inter.mv[1][0];
-          mv_cand[candidates].mv[1][1] = b2->inter.mv[1][1];
-          mv_cand[candidates].ref[0] = b2->inter.mv_ref[0];
-          mv_cand[candidates].ref[1] = b2->inter.mv_ref[1];
-          mv_cand[candidates].dir = b2->inter.mv_dir;
-          candidates++;
-        }
-      }
-    }
-  }
+  if (add_merge_candidate(a1, NULL, NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(b1, a1,   NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(b0, b1,   NULL, &mv_cand[candidates])) candidates++;
+  if (add_merge_candidate(a0, a1,   NULL, &mv_cand[candidates])) candidates++;
+  if (candidates < 4 &&
+      add_merge_candidate(b2, a1,   b1,   &mv_cand[candidates])) candidates++;
 
   bool can_use_tmvp =
     state->encoder_control->cfg.tmvp_enable &&
@@ -1444,12 +1405,12 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
     }
     num_ref = MIN(ref_negative, ref_positive);
   }
-  
+
   // Add (0,0) prediction
   while (candidates != MRG_MAX_NUM_CANDS) {
     mv_cand[candidates].mv[0][0] = 0;
     mv_cand[candidates].mv[0][1] = 0;
-    mv_cand[candidates].ref[0] = (zero_idx>=num_ref-1)?0:zero_idx;
+    mv_cand[candidates].ref[0] = (zero_idx >= num_ref - 1) ? 0 : zero_idx;
     mv_cand[candidates].ref[1] = mv_cand[candidates].ref[0];
     mv_cand[candidates].dir = 1;
     if (state->frame->slicetype == KVZ_SLICE_B) {
