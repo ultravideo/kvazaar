@@ -606,7 +606,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->height = atoi(value);
   //*********************************************
   //For scalable extension. TODO: Handle multiple input layers
-  else if OPT("input-layer-set")
+  else if OPT("input-layer")
     cfg->input_layer = atoi(value);
   else if OPT("input"){
     //Allocate a new spot for the new input layer
@@ -635,7 +635,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     return (success);
   }
   else if OPT("layer-res")
-    return (sscanf(value, "%dx%d", cfg->width, cfg->height) == 2);
+    return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
   //*********************************************
   else if OPT("input-fps") {
     int32_t fps_num, fps_denom;
@@ -1345,15 +1345,15 @@ int kvz_config_validate(const kvz_config *const cfg)
   //Validity check for scalable extension
   if( *cfg->max_layers > 1 ) {
     if( cfg->gop_len > 0) {
-      fprintf(stderr, "Input error: GoP is not currently supported with layers");
+      fprintf(stderr, "Input error: GoP is not currently supported with layers\n");
       error = 1;
     }
     if( cfg->threads > 0 ) {
-      fprintf(stderr, "Input error: threads are not currently supported with layers");
+      fprintf(stderr, "Input error: threads are not currently supported with layers\n");
       error = 1;
     }
     if( cfg->ref_frames > 1 ) {
-      fprintf(stderr, "Input error: Only one (IL) reference currently supported");
+      fprintf(stderr, "Input error: Only one (IL) reference currently supported\n");
       error = 1;
     }
     if( cfg->next_cfg != NULL ) {

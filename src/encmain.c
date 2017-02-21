@@ -281,6 +281,7 @@ done:
 //Helper function for deallocating chained kvz_pictures
 void free_chained_img(const kvz_api const *api, kvz_picture *img )
 {
+  if( img == NULL ) return;
   while( img != img->base_image ) {
     kvz_picture *next_img = img->base_image;
     img->base_image = img;
@@ -415,13 +416,23 @@ int main(int argc, char *argv[])
   for ( int i = 0; i < opts->num_inputs; i++) {
     fprintf(stderr, "Input layer %d:\n", i);
     fprintf(stderr, "  Input: %s, output: %s\n", opts->input[i], opts->output);
-    fprintf(stderr, "    Video size: %dx%d (input=%dx%d)\n",
-      encoder->in.width, encoder->in.height,
-      encoder->in.real_width, encoder->in.real_height);
+    fprintf(stderr, "    Video input size: %dx%d\n",
+      *(opts->config->input_widths[i]), *(opts->config->input_heights[i]));
 
     if (opts->seek > 0 && !yuv_io_seek(input[i], opts->seek, (*opts->config->input_widths)[i], (*opts->config->input_heights)[i])) {
       fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
       goto exit_failure;
+    }
+  }
+  for( const encoder_control_t* ctrl = encoder; ctrl != NULL ; ctrl = ctrl->next_enc_ctrl) {
+    const kvz_config* cfg = ctrl->cfg;
+    fprintf(stderr, "Layer %d:\n", cfg->layer);
+    fprintf(stderr, "  Input layer: %d\n", cfg->input_layer);
+    fprintf(stderr, "    Video size: %dx%d (input=%dx%d)\n",
+      ctrl->in.width, ctrl->in.height,
+      ctrl->in.real_width, ctrl->in.real_height);
+    if( cfg->layer < opts->num_debugs ){
+      fprintf(stderr, "  Debug output: %s\n", opts->debug[cfg->layer]);
     }
   }
 //******************************************

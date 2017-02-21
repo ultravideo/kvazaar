@@ -122,7 +122,7 @@ static const struct option long_options[] = {
   //For scalable extension.
   { "layer",                    no_argument, NULL, 0 }, //New layer
   { "layer-res",          required_argument, NULL, 0 }, //Set resolution of layer
-  { "input-layer-set",    required_argument, NULL, 0 }, //Manualy set the input layer the current layer uses
+  { "input-layer",    required_argument, NULL, 0 }, //Manualy set the input layer the current layer uses
   //*********************************************
   {0, 0, 0, 0}
 };
@@ -290,9 +290,9 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     //Automatically set layer size to match the respective input layer size
     kvz_config *cfg = opts->config;
     while( cfg != NULL ) {
-      //Default input_layer to 0
+      //Default input_layer to highest input layer
       if( cfg->input_layer == -1 ) {
-        cfg->input_layer = 0;
+        cfg->input_layer = *cfg->max_input_layers - 1;
       }
       if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
         ok = ok && select_input_res_auto(opts->input[i], &cfg->width, &cfg->height);
@@ -302,7 +302,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     }
     if ((*opts->config->input_widths)[i] == 0 && (*opts->config->input_heights)[i] == 0) {
       ok = ok && select_input_res_auto(opts->input[i], &(*opts->config->input_widths)[i], &(*opts->config->input_heights)[i]);
-      goto done;
+      //goto done;
     }
   }
   //*********************************************
