@@ -1086,8 +1086,16 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     candidates = 1;
   }
 
-  // Use Temporal Motion Vector Prediction when enabled
-  if (state->encoder_control->cfg.tmvp_enable) {
+  // Use Temporal Motion Vector Prediction when enabled.
+  // TMVP required at least two sequential P/B-frames.
+  bool can_use_tmvp =
+    state->encoder_control->cfg.tmvp_enable &&
+    state->frame->poc > 1 &&
+    state->frame->ref->used_size &&
+    candidates < AMVP_MAX_NUM_CANDS &&
+    (h != NULL || c3 != NULL);
+
+  if (can_use_tmvp) {
     /*
     Predictor block locations
     __________
@@ -1098,58 +1106,49 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
               |H|
     */
 
-    // TMVP required at least two sequential P/B-frames
-    if (state->frame->poc > 1 && state->frame->ref->used_size && candidates < AMVP_MAX_NUM_CANDS) {
+    // Use "H" as the primary predictor and "C3" as secondary
+    const cu_info_t *selected_CU = (h != NULL) ? h : c3;
 
-      // Use "H" as the primary predictor and "C3" as secondary
-      const cu_info_t *selected_CU = (h != NULL) ? h : (c3 != NULL) ? c3 : NULL;
+    uint32_t colocated_ref = UINT_MAX;
 
-      if (selected_CU) {
-        uint32_t colocated_ref = UINT_MAX;
-        int32_t colocated_ref_poc = 0;
-        int td, tb;
+    // TODO: allow other than L0[0] for prediction
 
-        //ToDo: allow other than L0[0] for prediction
-
-        //Fetch ref idx of the selected CU in L0[0] ref list                    
-        for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
-          if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
-            colocated_ref = temporal_cand;
-            break;
-          }
-        }
-
-        if (colocated_ref != UINT_MAX) {
-
-          uint8_t used_reflist = reflist;
-
-          colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
-
-          if (!(selected_CU->inter.mv_dir & (1 << used_reflist))) {
-            used_reflist = !reflist;
-          }
-
-          // The reference id the colocated block is using
-          uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[used_reflist];
-
-          td = CLIP(-128, 127, colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref]);
-          tb = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]]);
-
-          if (td == tb) {
-            mv_cand[candidates][0] = selected_CU->inter.mv[used_reflist][0];
-            mv_cand[candidates][1] = selected_CU->inter.mv[used_reflist][1];
-          } else {
-            int scale = CALCULATE_SCALE(NULL, tb, td);
-            mv_cand[candidates][0] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[used_reflist][0] + 127 + ((scale * selected_CU->inter.mv[used_reflist][0]) < 0)) >> 8));
-            mv_cand[candidates][1] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[used_reflist][1] + 127 + ((scale * selected_CU->inter.mv[used_reflist][1]) < 0)) >> 8));
-          }
-           
-          candidates++;
-
-        }
+    // Fetch ref idx of the selected CU in L0[0] ref list
+    for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
+      if (state->frame->refmap[temporal_cand].list == 1 && state->frame->refmap[temporal_cand].idx == 0) {
+        colocated_ref = temporal_cand;
+        break;
       }
     }
-  }
+
+    if (colocated_ref != UINT_MAX) {
+
+      uint8_t used_reflist = reflist;
+
+      int32_t colocated_ref_poc = state->frame->ref->pocs[colocated_ref];
+
+      if (!(selected_CU->inter.mv_dir & (1 << used_reflist))) {
+        used_reflist = !reflist;
+      }
+
+      // The reference id the colocated block is using
+      uint32_t colocated_ref_mv_ref = selected_CU->inter.mv_ref[used_reflist];
+
+      int td = CLIP(-128, 127, colocated_ref_poc - state->frame->ref->images[colocated_ref]->ref_pocs[colocated_ref_mv_ref]);
+      int tb = CLIP(-128, 127, state->frame->poc - state->frame->ref->pocs[cur_cu->inter.mv_ref[reflist]]);
+
+      if (td == tb) {
+        mv_cand[candidates][0] = selected_CU->inter.mv[used_reflist][0];
+        mv_cand[candidates][1] = selected_CU->inter.mv[used_reflist][1];
+      } else {
+        int scale = CALCULATE_SCALE(NULL, tb, td);
+        mv_cand[candidates][0] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[used_reflist][0] + 127 + ((scale * selected_CU->inter.mv[used_reflist][0]) < 0)) >> 8));
+        mv_cand[candidates][1] = CLIP(-32768, 32767, ((scale * selected_CU->inter.mv[used_reflist][1] + 127 + ((scale * selected_CU->inter.mv[used_reflist][1]) < 0)) >> 8));
+      }
+
+      candidates++;
+    }
+  } // TMVP
 
   // Fill with (0,0)
   while (candidates < AMVP_MAX_NUM_CANDS) {
