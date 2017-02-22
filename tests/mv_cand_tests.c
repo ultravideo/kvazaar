@@ -31,22 +31,19 @@ TEST test_get_spatial_merge_cand(void)
     lcu.cu[i].type = CU_INTER;
   }
 
-  cu_info_t *mv_cand[5] = { NULL };
+  merge_candidates_t cand = { {0, 0}, {0, 0, 0}, 0, 0 };
+
   get_spatial_merge_candidates(64 + 32, 64, // x, y
                                32, 24,      // width, height
                                1920, 1080,  // picture size
-                               &mv_cand[0], // b0
-                               &mv_cand[1], // b1
-                               &mv_cand[2], // b2
-                               &mv_cand[3], // a0
-                               &mv_cand[4], // a1
-                               &lcu);
+                               &lcu,
+                               &cand);
 
-  ASSERT_EQ(mv_cand[0], &lcu.cu[289]); // b0
-  ASSERT_EQ(mv_cand[1], &lcu.cu[ 16]); // b1
-  ASSERT_EQ(mv_cand[2], &lcu.cu[  8]); // b2
-  ASSERT_EQ(mv_cand[3], &lcu.cu[127]); // a0
-  ASSERT_EQ(mv_cand[4], &lcu.cu[110]); // a1
+  ASSERT_EQ(cand.b[0], &lcu.cu[289]);
+  ASSERT_EQ(cand.b[1], &lcu.cu[ 16]);
+  ASSERT_EQ(cand.b[2], &lcu.cu[  8]);
+  ASSERT_EQ(cand.a[0], &lcu.cu[127]);
+  ASSERT_EQ(cand.a[1], &lcu.cu[110]);
 
   PASS();
 }
