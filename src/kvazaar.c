@@ -520,8 +520,8 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   kvz_picture *cur_src_out = NULL;
 
   //TODO: Use a while loop instead?
-  for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
-    
+  //for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
+  for( unsigned i = 0; cur_enc != NULL; i++) {  
     cur_pic_in = kvazaar_scaling(pics_in[cur_enc->control->cfg->input_layer], &cur_enc->downscaling);
 
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
@@ -534,25 +534,37 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
     cur_pic_in = NULL;
 
     //Aggregate new stuff
-    if(data_out) {
-      while((*data_out)->next != NULL) {
-        data_out = &(*data_out)->next;
+    if (data_out) {
+      if (*data_out == NULL) {
+        *data_out = cur_data_out;
+      } else {
+        while ((*data_out)->next != NULL) {
+          data_out = &(*data_out)->next;
+        }
+        (*data_out)->next = cur_data_out;
+        cur_data_out = NULL;
       }
-      (*data_out)->next = cur_data_out;
-      cur_data_out = NULL;
     }
-    if(len_out) len_out[i] += cur_len_out;
-    if(pic_out) {
-      (*pic_out)->base_image = kvz_image_copy_ref(cur_pic_out);
-      pic_out = &(*pic_out)->base_image;
-      kvz_image_free(cur_pic_out);
-      cur_pic_out = NULL;
+    if (len_out) len_out[i] += cur_len_out;
+    if (pic_out) {
+      if (*pic_out == NULL) {
+        *pic_out = cur_pic_out;
+      } else {
+        (*pic_out)->base_image = kvz_image_copy_ref(cur_pic_out);
+        pic_out = &(*pic_out)->base_image;
+        kvz_image_free(cur_pic_out);
+        cur_pic_out = NULL;
+      }
     }
-    if(src_out) {
-      (*src_out)->base_image = kvz_image_copy_ref(cur_src_out);
-      src_out = &(*src_out)->base_image;
-      kvz_image_free(cur_src_out);
-      cur_src_out = NULL;
+    if (src_out) {
+      if (*src_out == NULL) {
+        *src_out = cur_src_out;
+      } else {
+        (*src_out)->base_image = kvz_image_copy_ref(cur_src_out);
+        src_out = &(*src_out)->base_image;
+        kvz_image_free(cur_src_out);
+        cur_src_out = NULL;
+      }
     }
 
     //Update other values for the next layer
