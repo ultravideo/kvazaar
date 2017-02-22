@@ -1009,6 +1009,34 @@ static bool add_temporal_candidate(const encoder_state_t *state,
   return true;
 }
 
+static INLINE bool add_mvp_candidate(const encoder_state_t *state,
+                                     const cu_info_t *cur_cu,
+                                     const cu_info_t *cand,
+                                     int8_t reflist,
+                                     bool scaling,
+                                     int16_t mv_cand_out[2])
+{
+  if (!cand) return false;
+
+  const int cand_list = cand->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
+
+  if (scaling) {
+    mv_cand_out[0] = cand->inter.mv[cand_list][0];
+    mv_cand_out[1] = cand->inter.mv[cand_list][1];
+    apply_mv_scaling(state, cur_cu, cand, reflist, cand_list, mv_cand_out);
+    return true;
+  }
+
+  if (cand->inter.mv_dir & (1 << cand_list) &&
+      cand->inter.mv_ref[cand_list] == cur_cu->inter.mv_ref[reflist]) {
+    mv_cand_out[0] = cand->inter.mv[cand_list][0];
+    mv_cand_out[1] = cand->inter.mv[cand_list][1];
+    return true;
+  }
+
+  return false;
+}
+
 /**
  * \brief Pick two mv candidates from the spatial and temporal candidates.
  */
@@ -1030,121 +1058,45 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
 {
   uint8_t candidates = 0;
   uint8_t b_candidates = 0;
-  int8_t reflist2nd = !reflist;
 
-  // Left predictors
-  if (a0 &&
-      a0->inter.mv_dir & (1 << reflist) &&
-      a0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-
-    mv_cand[candidates][0] = a0->inter.mv[reflist][0];
-    mv_cand[candidates][1] = a0->inter.mv[reflist][1];
+  // Left predictors without scaling
+  if (add_mvp_candidate(state, cur_cu, a0, reflist, false, mv_cand[candidates])) {
+    candidates++;
+  } else if (add_mvp_candidate(state, cur_cu, a1, reflist, false, mv_cand[candidates])) {
     candidates++;
 
-  } else if (a0 &&
-      a0->inter.mv_dir & (1 << reflist2nd) &&
-      a0->inter.mv_ref[reflist2nd] == cur_cu->inter.mv_ref[reflist]) {
-
-    mv_cand[candidates][0] = a0->inter.mv[reflist2nd][0];
-    mv_cand[candidates][1] = a0->inter.mv[reflist2nd][1];
+  // Left predictors with scaling
+  } else if (add_mvp_candidate(state, cur_cu, a0, reflist, true, mv_cand[candidates])) {
     candidates++;
-
-  } else if (a1 &&
-      a1->inter.mv_dir & (1 << reflist) &&
-      a1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-
-    mv_cand[candidates][0] = a1->inter.mv[reflist][0];
-    mv_cand[candidates][1] = a1->inter.mv[reflist][1];
-    candidates++;
-
-  } else if (a1 &&
-      a1->inter.mv_dir & (1 << reflist2nd) &&
-      a1->inter.mv_ref[reflist2nd] == cur_cu->inter.mv_ref[reflist]) {
-
-    mv_cand[candidates][0] = a1->inter.mv[reflist2nd][0];
-    mv_cand[candidates][1] = a1->inter.mv[reflist2nd][1];
-    candidates++;
-
-  } else if (a0) {
-    int cand_list = a0->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
-    mv_cand[candidates][0] = a0->inter.mv[cand_list][0];
-    mv_cand[candidates][1] = a0->inter.mv[cand_list][1];
-    apply_mv_scaling(state, cur_cu, a0, reflist, cand_list, mv_cand[candidates]);
-    candidates++;
-
-  } else if (a1) {
-    int cand_list = a1->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
-    mv_cand[candidates][0] = a1->inter.mv[cand_list][0];
-    mv_cand[candidates][1] = a1->inter.mv[cand_list][1];
-    apply_mv_scaling(state, cur_cu, a1, reflist, cand_list, mv_cand[candidates]);
+  } else if (add_mvp_candidate(state, cur_cu, a1, reflist, true, mv_cand[candidates])) {
     candidates++;
   }
 
-  // Top predictors
-  if (b0 && (
-    ((b0->inter.mv_dir & 1) && b0->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
-    ((b0->inter.mv_dir & 2) && b0->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
-    if (b0->inter.mv_dir & (1 << reflist) && b0->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-      mv_cand[candidates][0] = b0->inter.mv[reflist][0];
-      mv_cand[candidates][1] = b0->inter.mv[reflist][1];
-    } else {
-      mv_cand[candidates][0] = b0->inter.mv[reflist2nd][0];
-      mv_cand[candidates][1] = b0->inter.mv[reflist2nd][1];
-    }
+  // Top predictors without scaling
+  if (add_mvp_candidate(state, cur_cu, b0, reflist, false, mv_cand[candidates])) {
     b_candidates++;
-  } else if (b1 && (
-    ((b1->inter.mv_dir & 1) && b1->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
-    ((b1->inter.mv_dir & 2) && b1->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
-    if (b1->inter.mv_dir & (1 << reflist) && b1->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-      mv_cand[candidates][0] = b1->inter.mv[reflist][0];
-      mv_cand[candidates][1] = b1->inter.mv[reflist][1];
-    } else {
-      mv_cand[candidates][0] = b1->inter.mv[reflist2nd][0];
-      mv_cand[candidates][1] = b1->inter.mv[reflist2nd][1];
-    }
+  } else if (add_mvp_candidate(state, cur_cu, b1, reflist, false, mv_cand[candidates])) {
     b_candidates++;
-  } else if (b2 && (
-    ((b2->inter.mv_dir & 1) && b2->inter.mv_ref[0] == cur_cu->inter.mv_ref[reflist]) ||
-    ((b2->inter.mv_dir & 2) && b2->inter.mv_ref[1] == cur_cu->inter.mv_ref[reflist]))) {
-    if (b2->inter.mv_dir & (1 << reflist) && b2->inter.mv_ref[reflist] == cur_cu->inter.mv_ref[reflist]) {
-      mv_cand[candidates][0] = b2->inter.mv[reflist][0];
-      mv_cand[candidates][1] = b2->inter.mv[reflist][1];
-    } else {
-      mv_cand[candidates][0] = b2->inter.mv[reflist2nd][0];
-      mv_cand[candidates][1] = b2->inter.mv[reflist2nd][1];
-    }
+  } else if (add_mvp_candidate(state, cur_cu, b2, reflist, false, mv_cand[candidates])) {
     b_candidates++;
   }
+
   candidates += b_candidates;
 
-  // When a1 or a0 is available, we dont check for secondary B candidates
+  // When a1 or a0 is available, we dont check for secondary B candidates.
   if (a1 || a0) {
     b_candidates = 1;
-  } else if(candidates != 2) {
+  } else if (candidates != 2) {
     b_candidates = 0;
   }
 
   if (!b_candidates) {
     // Top predictors with scaling
-    if (b0) {
-      int cand_list = b0->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
-      mv_cand[candidates][0] = b0->inter.mv[cand_list][0];
-      mv_cand[candidates][1] = b0->inter.mv[cand_list][1];
-      apply_mv_scaling(state, cur_cu, b0, reflist, cand_list, mv_cand[candidates]);
+    if (add_mvp_candidate(state, cur_cu, b0, reflist, true, mv_cand[candidates])) {
       candidates++;
-
-    } else if (b1) {
-      int cand_list = b1->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
-      mv_cand[candidates][0] = b1->inter.mv[cand_list][0];
-      mv_cand[candidates][1] = b1->inter.mv[cand_list][1];
-      apply_mv_scaling(state, cur_cu, b1, reflist, cand_list, mv_cand[candidates]);
+    } else if (add_mvp_candidate(state, cur_cu, b1, reflist, true, mv_cand[candidates])) {
       candidates++;
-
-    } else if (b2) {
-      int cand_list = b2->inter.mv_dir & (1 << reflist) ? reflist : reflist2nd;
-      mv_cand[candidates][0] = b2->inter.mv[cand_list][0];
-      mv_cand[candidates][1] = b2->inter.mv[cand_list][1];
-      apply_mv_scaling(state, cur_cu, b2, reflist, cand_list, mv_cand[candidates]);
+    } else if (add_mvp_candidate(state, cur_cu, b2, reflist, true, mv_cand[candidates])) {
       candidates++;
     }
   }
