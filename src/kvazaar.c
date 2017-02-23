@@ -125,7 +125,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     }
 
     for (unsigned i = 0; i < cur_enc->num_encoder_states; ++i) {
-      cur_enc->states[i].encoder_control = encoder->control;
+      cur_enc->states[i].encoder_control = cur_enc->control;
 
       if (!kvz_encoder_state_init(&cur_enc->states[i], NULL)) {
         goto kvazaar_open_failure;
@@ -506,9 +506,11 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   kvz_picture **pics_in = calloc(*enc->control->cfg->max_layers, sizeof(kvz_picture*));
   pics_in[0] = pic_in;
 
-  for( int i = 1; pic_in->base_image != pic_in; i++ ) {
-    pics_in[i] = pic_in->base_image;
-    pic_in = pic_in->base_image;
+  if (pic_in != NULL) {
+    for (int i = 1; pic_in->base_image != pic_in; i++) {
+      pics_in[i] = pic_in->base_image;
+      pic_in = pic_in->base_image;
+    }
   }
   
   //Use these to pass stuff to the actual encoder function and aggregate the results into the actual parameters

@@ -39,10 +39,6 @@
 #include "videoframe.h"
 #include "extras/crypto.h"
 
-// ***********************************************
-  // Modified for SHVC
-#include "scaler/scaler.h" //TODO: Possible without?
-// ***********************************************
 
 typedef enum {
   ENCODER_STATE_TYPE_INVALID = 'i',
