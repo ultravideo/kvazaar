@@ -193,7 +193,7 @@ static void* input_read_thread(void* in_args)
     // Set PTS to make sure we pass it on correctly.
     frame_in->pts = frames_read;
 
-    bool read_success = yuv_io_read(args->input, 
+    bool read_success = yuv_io_read(args->input,
                                     args->opts->config->width,
                                     args->opts->config->height,
                                     args->encoder->cfg.input_bitdepth,
@@ -269,6 +269,41 @@ done:
 }
 
 
+void output_recon_pictures(const kvz_api *const api,
+                           FILE *recout,
+                           kvz_picture *buffer[KVZ_MAX_GOP_LENGTH],
+                           int *buffer_size,
+                           uint64_t *next_pts,
+                           unsigned width,
+                           unsigned height)
+{
+  bool picture_written;
+  do {
+    picture_written = false;
+    for (int i = 0; i < *buffer_size; i++) {
+
+      kvz_picture *pic = buffer[i];
+      if (pic->pts == *next_pts) {
+        // Output the picture and remove it.
+        if (!yuv_io_write(recout, pic, width, height)) {
+          fprintf(stderr, "Failed to write reconstructed picture!\n");
+        }
+        api->picture_free(pic);
+        picture_written = true;
+        (*next_pts)++;
+
+        // Move rest of the pictures one position backward.
+        for (i++; i < *buffer_size; i++) {
+          buffer[i - 1] = buffer[i];
+          buffer[i] = NULL;
+        }
+        (*buffer_size)--;
+      }
+    }
+  } while (picture_written);
+}
+
+
 /**
  * \brief Program main function.
  * \param argc Argument count from commandline
@@ -290,6 +325,15 @@ int main(int argc, char *argv[])
   
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
+
+  // PTS of the reconstructed picture that should be output next.
+  // Only used with --debug.
+  uint64_t next_recon_pts = 0;
+  // Buffer for storing reconstructed pictures that are not to be output
+  // yet (i.e. in wrong order because GOP is used).
+  // Only used with --debug.
+  kvz_picture *recon_buffer[KVZ_MAX_GOP_LENGTH] = { NULL };
+  int recon_buffer_size = 0;
 
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -484,12 +528,20 @@ int main(int argc, char *argv[])
         if (recout) {
           // Since chunks_out was not NULL, img_rec should have been set.
           assert(img_rec);
-          if (!yuv_io_write(recout,
-                            img_rec,
-                            opts->config->width,
-                            opts->config->height)) {
-            fprintf(stderr, "Failed to write reconstructed picture!\n");
-          }
+
+          // Move img_rec to the recon buffer.
+          assert(recon_buffer_size < KVZ_MAX_GOP_LENGTH);
+          recon_buffer[recon_buffer_size++] = img_rec;
+          img_rec = NULL;
+
+          // Try to output some reconstructed pictures.
+          output_recon_pictures(api,
+                                recout,
+                                recon_buffer,
+                                &recon_buffer_size,
+                                &next_recon_pts,
+                                opts->config->width,
+                                opts->config->height);
         }
 
         frames_done += 1;
@@ -509,6 +561,9 @@ int main(int argc, char *argv[])
     KVZ_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     // Coding finished
+
+    // All reconstructed pictures should have been output.
+    assert(recon_buffer_size == 0);
 
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits",
