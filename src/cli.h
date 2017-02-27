@@ -62,14 +62,10 @@ void cmdline_opts_free(const kvz_api *api, cmdline_opts_t *opts);
 void print_usage(void);
 void print_version(void);
 void print_help(void);
-void print_frame_info(const kvz_frame_info *const info,
-                      const double frame_psnr[3],
-                      const uint32_t bytes);
 
 // ***********************************************
-        // Modified for SHVC
-//TODO: Merge with print_frame_info?
-void print_el_frame_info(const kvz_frame_info * const info,
+// Modified for SHVC
+void print_frame_info(const kvz_frame_info * const info,
                          const double frame_psnr[3],
                          const uint32_t bytes,
                          const int layer_id);

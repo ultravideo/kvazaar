@@ -23,9 +23,12 @@
 #include "bitstream.h"
 #include "strategies/strategies-nal.h"
 
-//****************************************
-//Modifyed to fit SHVC code. TODO: Merge with kvz_nal_write?
-void kvz_nal_ext_write(bitstream_t * const bitstream, const uint8_t nal_type,
+// ***********************************************
+// Modified for SHVC
+/**
+ * \brief Write a Network Abstraction Layer (NAL) packet to the output.
+ */
+void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
   const uint8_t temporal_id, const int long_start_code, const uint8_t layer_id)
 {
   uint8_t byte;
@@ -56,40 +59,6 @@ void kvz_nal_ext_write(bitstream_t * const bitstream, const uint8_t nal_type,
   kvz_bitstream_writebyte(bitstream, byte);
 }
 //****************************************
-
-
-/**
- * \brief Write a Network Abstraction Layer (NAL) packet to the output.
- */
-void kvz_nal_write(bitstream_t * const bitstream, const uint8_t nal_type,
-               const uint8_t temporal_id, const int long_start_code)
-{
-  uint8_t byte;
-
-  // Some useful constants
-  const uint8_t start_code_prefix_one_3bytes = 0x01;
-  const uint8_t zero = 0x00;
-
-  // zero_byte (0x00) shall be present in the byte stream NALU of VPS, SPS
-  // and PPS, or the first NALU of an access unit
-  if(long_start_code)
-    kvz_bitstream_writebyte(bitstream, zero);
-
-  // start_code_prefix_one_3bytes
-  kvz_bitstream_writebyte(bitstream, zero);
-  kvz_bitstream_writebyte(bitstream, zero);
-  kvz_bitstream_writebyte(bitstream, start_code_prefix_one_3bytes);
-
-  // Handle header bits with full bytes instead of using bitstream
-  // forbidden_zero_flag(1) + nal_unit_type(6) + 1bit of nuh_layer_id
-  byte = nal_type << 1;
-  kvz_bitstream_writebyte(bitstream, byte);
-
-  // 5bits of nuh_layer_id + nuh_temporal_id_plus1(3)
-  byte = (temporal_id + 1) & 7;
-  kvz_bitstream_writebyte(bitstream, byte);
-}
-
 
 
 /*!

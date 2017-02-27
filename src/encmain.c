@@ -279,7 +279,7 @@ done:
 // ***********************************************
 // Modified for SHVC
 //Helper function for deallocating chained kvz_pictures
-void free_chained_img(const kvz_api const *api, kvz_picture *img )
+static void free_chained_img(const kvz_api const *api, kvz_picture *img )
 {
   if( img == NULL ) return;
   while( img != img->base_image ) {
@@ -388,23 +388,7 @@ int main(int argc, char *argv[])
       }
     }
   }
-
-  //******************************************
-  //TODO: Replace with proper implementation. Move to encoder?
-  //opts->config->layer = 0;
-  //opts->config->max_layers = 2;
-  //opts->config->el_width = opts->config->in_width = opts->config->width;
-  //opts->config->el_height = opts->config->in_height = opts->config->height;
-  //opts->config->width /= 2;
-  //opts->config->height /= 2;
-  /*kvz_encoder *el_enc = api->encoder_open(opts->config);
-  if (!el_enc) {
-    fprintf(stderr, "Failed to open encoder.\n");
-    goto exit_failure;
-  }
-  opts->config->layer = 0;
-  */
-
+  
   enc = api->encoder_open(opts->config);
   if (!enc) {
     fprintf(stderr, "Failed to open encoder.\n");
@@ -578,7 +562,7 @@ int main(int argc, char *argv[])
 
         bitstream_length += tot_len_out;
 
-// ***********************************************
+        // ***********************************************
         // Modified for SHVC
 
         // Compute and print stats.
@@ -613,139 +597,14 @@ int main(int argc, char *argv[])
           psnr_sum[2] += frame_psnr[2];
 
 
-          print_el_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id], layer_id); 
+          print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id], layer_id); 
 
           //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;
           cur_rec = cur_rec->base_image;
           cur_src = cur_src->base_image;
         }
-        
-        //TODO: Remove
-        ////TODO: Figure out a better way? 
-        ////Loop over layers
-        //kvz_picture* last_l_src = img_src->base_image;
-        //kvz_picture* last_l_rec = img_rec->base_image;
-        //img_src->base_image = img_src; //Need to set correct base image for deallocation
-        //img_rec->base_image = img_rec;
-        //
-        //for (int layer_id = 1; layer_id < *opts->config->max_layers; layer_id++) {
-        //  //We use the subimage to pass bl and el images from the encoder at several at the time.
-        //  //img_src and img_rec will be set to be the bl images and they will have the respective el image pointer in the base_image field
-        //  kvz_picture* el_img_src = last_l_src;
-        //  kvz_picture* el_img_rec = last_l_rec;
-        //  last_l_src = last_l_src->base_image;
-        //  last_l_rec = last_l_rec->base_image;
-        //  el_img_src->base_image = el_img_src; //Need to set correct base image for deallocation
-        //  el_img_rec->base_image = el_img_rec;
-
-        //  //Calculate info
-        //  if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
-        //    // Do not compute PSNR for interlaced frames, because img_rec does not contain
-        //    // the deinterlaced frame yet.
-        //    compute_psnr(el_img_src, el_img_rec, frame_psnr);
-        //  }
-
-        //  if (recout_el) {
-        //    // Since chunks_out was not NULL, img_rec should have been set.
-        //    assert(el_img_rec);
-        //    if (!yuv_io_write(recout_el,
-        //      el_img_rec,
-        //      cfg->width,
-        //      cfg->height)) {
-        //      fprintf(stderr, "Failed to write reconstructed picture!\n");
-        //    }
-        //  }
-
-        //  //TODO: Print el info correctly. Do calculate psnr_sum for el
-        //  print_el_frame_info(&info_out[layer_id], frame_psnr, len_out, layer_id);
-
-        //  //Deallocate el_img_*
-        //  //TODO: Need to deallocate even if no data is output?
-        //  api->picture_free(el_img_rec);
-        //  api->picture_free(el_img_src);
-
-        //  cfg = cfg->next_cfg;
-        //}
       }
-
-      //TODO: Remove
-// ***********************************************
-      /******************************************
-      //DO EL coding here
-      //TODO: DO Proper implementation. Move to encoder?
-      //Use img_src as the EL picture to encode
-      api->chunk_free(chunks_out);
-      api->picture_free(cur_in_img);
-      api->picture_free(img_rec);
-
-      cur_in_img = img_src;
-      img_src = NULL;
-      img_rec = NULL;
-      chunks_out = NULL;
-
-      if (!api->encoder_encode(el_enc,
-        cur_in_img,
-        &chunks_out,
-        &len_out,
-        &img_rec,
-        &img_src,
-        &info_out)) {
-        fprintf(stderr, "Failed to encode image.\n");
-        api->picture_free(cur_in_img);
-        goto exit_failure;
-      }
-
-      //TODO: Make this a separate function to minimize copy-paste? Same for stat printing
-      if (chunks_out != NULL) {
-        uint64_t written = 0;
-        // Write data into the output file.
-        for (kvz_data_chunk *chunk = chunks_out;
-          chunk != NULL;
-          chunk = chunk->next) {
-          assert(written + chunk->len <= len_out);
-          if (fwrite(chunk->data, sizeof(uint8_t), chunk->len, output) != chunk->len) {
-            fprintf(stderr, "Failed to write data to file.\n");
-            api->picture_free(cur_in_img);
-            api->chunk_free(chunks_out);
-            goto exit_failure;
-          }
-          written += chunk->len;
-        }
-        fflush(output);
-
-        bitstream_length += len_out;
-
-        // Compute and print stats.
-
-        double frame_psnr[3] = { 0.0, 0.0, 0.0 };
-        if (encoder->cfg->calc_psnr && encoder->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
-          // Do not compute PSNR for interlaced frames, because img_rec does not contain
-          // the deinterlaced frame yet.
-          compute_psnr(img_src, img_rec, frame_psnr);
-        }
-
-        if (recout) {
-          // Since chunks_out was not NULL, img_rec should have been set.
-          assert(img_rec);
-          if (!yuv_io_write(recout,
-            img_rec,
-            opts->config->width,
-            opts->config->height)) {
-            fprintf(stderr, "Failed to write reconstructed picture!\n");
-          }
-        }
-
-        frames_done += 1;
-        psnr_sum[0] += frame_psnr[0];
-        psnr_sum[1] += frame_psnr[1];
-        psnr_sum[2] += frame_psnr[2];
-
-        print_frame_info(&info_out, frame_psnr, len_out);
-      }
-      */
-      
-      
 
       free_chained_img(api, cur_in_img); cur_in_img = NULL;
       api->chunk_free(chunks_out);

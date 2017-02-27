@@ -309,34 +309,6 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
 
 done:
 
-  //*********************************************
-  //For scalable extension. TODO: remove
-  //Add the necessary cfgs for els here and set parameters as needed here
-  //opts->config->in_width = opts->config->width;
-  //opts->config->in_height = opts->config->height;
-  //opts->config->width /= 2;
-  //opts->config->height /= 2;
-  //opts->config->max_layers = 2;
-
-  //int layers = opts->config->max_layers;
-  //if( layers > 1 ){  
-  //  kvz_config **el_configs = MALLOC(kvz_config*,layers);
-
-  //  for( int el_layer_id = 0; el_layer_id < layers-1; el_layer_id++) {
-  //    el_configs[el_layer_id] = api->config_alloc();
-  //    api->config_init(el_configs[el_layer_id]);
-  //    *el_configs[el_layer_id] = *(opts->config); //Copy default values. TODO: Don't copy pointer (as reference), make a deep copy.
-  //    el_configs[el_layer_id]->layer = el_layer_id+1;
-  //    el_configs[el_layer_id]->qp = 20;
-  //    el_configs[el_layer_id]->width = opts->config->in_width;
-  //    el_configs[el_layer_id]->height = opts->config->in_height;
-  //    //el_configs[el_layer_id]->ref_frames = el_configs[el_layer_id]->ref_frames == 0 ? 0 : el_configs[el_layer_id]->ref_frames-1; //"Reserve one frame for ILR. TODO: infer correct num from somewhere.
-  //  }
-
-  //  opts->config->el_cfg = el_configs;
-  //}
-  //*********************************************
-
   if (!ok) {
     cmdline_opts_free(api, opts);
     opts = NULL;
@@ -570,38 +542,9 @@ void print_help(void)
     "  -h, --height                : Use --input-res\n");
 }
 
-
-void print_frame_info(const kvz_frame_info *const info,
-                      const double frame_psnr[3],
-                      const uint32_t bytes)
-{
-  fprintf(stderr, "POC %4d QP %2d (%c-frame) %10d bits PSNR: %2.4f %2.4f %2.4f",
-          info->poc,
-          info->qp,
-          "BPI"[info->slice_type % 3],
-          bytes << 3,
-          frame_psnr[0], frame_psnr[1], frame_psnr[2]);
-
-  if (info->slice_type != KVZ_SLICE_I) {
-    // Print reference picture lists
-    fprintf(stderr, " [L0 ");
-    for (int j = info->ref_list_len[0] - 1; j >= 0; j--) {
-      fprintf(stderr, "%d ", info->ref_list[0][j]);
-    }
-    fprintf(stderr, "] [L1 ");
-    for (int j = 0; j < info->ref_list_len[1]; j++) {
-      fprintf(stderr, "%d ", info->ref_list[1][j]);
-    }
-    fprintf(stderr, "]");
-  }
-
-  fprintf(stderr, "\n");
-}
-
 // ***********************************************
-        // Modified for SHVC
-//TODO: Merge with print_frame_info?
-void print_el_frame_info(const kvz_frame_info * const info,
+// Modified for SHVC
+void print_frame_info(const kvz_frame_info * const info,
                          const double frame_psnr[3],
                          const uint32_t bytes,
                          const int layer_id)
