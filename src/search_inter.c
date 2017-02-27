@@ -1343,12 +1343,12 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   else {
     //Calc cost for 0-mv. TODO: Better cost calc check?
     //TODO: Enough to use get_mvd_cost? 
-    temp_cost += 1;
+    //temp_cost += 1;
     //temp_cost = INT_MAX - 1;
-    /*temp_cost += kvz_image_calc_sad(frame->source, ref_image, orig.x, orig.y,
+    temp_cost += kvz_image_calc_sad(frame->source, ref_image, orig.x, orig.y,
                                     state->tile->lcu_offset_x * LCU_WIDTH + orig.x,
                                     state->tile->lcu_offset_y * LCU_WIDTH + orig.y,
-                                    width, height, -1);*/
+                                    width, height, -1);
     if( state->encoder_control->cfg->mv_rdo ){
       temp_cost += kvz_calc_mvd_cost_cabac( state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost );
     }
@@ -1357,7 +1357,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     }
   }
   //TODO: Handle frac search
-  if (state->encoder_control->cfg->fme_level > 0) {
+  if (!is_ILR && state->encoder_control->cfg->fme_level > 0) {
     temp_cost = search_frac(state,
                             width, height,
                             frame->source,

@@ -765,9 +765,9 @@ int main(int argc, char *argv[])
       // ***********************************************
       // Modified for SHVC. TODO: Compute seperatly for each layer?
       fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
-              psnr_sum[0] / frames_done / *opts->config->max_layers,
-              psnr_sum[1] / frames_done / *opts->config->max_layers,
-              psnr_sum[2] / frames_done / *opts->config->max_layers);
+              psnr_sum[0] / frames_done,
+              psnr_sum[1] / frames_done,
+              psnr_sum[2] / frames_done);
       // ***********************************************
     }
     fprintf(stderr, "\n");

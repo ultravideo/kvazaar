@@ -1143,8 +1143,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
       if( ref_region_layer_offset_present_flag ) {
         WRITE_SE(stream, 0>>1, "ref_region_layer_left_offset");
         WRITE_SE(stream, 0>>1, "ref_region_layer_top_offset");
-        WRITE_SE(stream, state->encoder_control->layer.upscaling->right_offset>>1, "ref_region_layer_right_offset");
-        WRITE_SE(stream, state->encoder_control->layer.upscaling->bottom_offset>>1, "ref_region_layer_bottom_offset");
+        WRITE_SE(stream, state->encoder_control->layer.upscaling->src_padding_x>>1, "ref_region_layer_right_offset");
+        WRITE_SE(stream, state->encoder_control->layer.upscaling->src_padding_y>>1, "ref_region_layer_bottom_offset");
       }
 
       uint8_t resample_phase_set_presetn_flag = 0; //TODO: get from somewhere
