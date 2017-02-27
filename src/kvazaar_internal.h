@@ -66,6 +66,8 @@ struct kvz_encoder {
   unsigned frames_started;
   unsigned frames_done;
 
+  // ***********************************************
+  // Modified for SHVC
   //TODO: Add all the encoders as a list?
 
   //Point to the previous encoder (ILR) and to the next encoder (EL)

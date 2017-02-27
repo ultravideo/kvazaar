@@ -746,7 +746,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //  }
 //}
 //Use inter rps_set pred. Write ref sets for the case that n prev frames are referenced.
-void writeSTermRSet(encoder_state_t* const state, unsigned idx )
+static void writeSTermRSet(encoder_state_t* const state, unsigned idx )
 {
   
   const encoder_control_t* const encoder = state->encoder_control;

@@ -269,7 +269,7 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
 // ***********************************************
   // Modified for SHVC
 //TODO: Move somewhere more appropriate.
-void remove_ILR_pics( encoder_state_t* const state)
+static void remove_ILR_pics( encoder_state_t* const state)
 {
   //Loop over refs and remove IL refs from the list
   for( unsigned i = 0; i < state->frame->ref->used_size; i++) {
@@ -284,7 +284,7 @@ void remove_ILR_pics( encoder_state_t* const state)
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //TODO: remove memory db stuff
 //Create a new kvz picture based on pic_in with size given by width and height
-kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_t* param)
+static kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_t* param)
 {
   //Create the buffers that are passed to the scaling function
   //TODO: Consider the case when kvz_pixel is not uint8

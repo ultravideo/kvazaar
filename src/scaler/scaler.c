@@ -225,7 +225,7 @@ static const int chromaUpFilter[16][4] = {
 };
 
 //Used for clipping values
-int clip(int val, int min, int max)
+static int clip(int val, int min, int max)
 {
   if (val <= min)
     return min;
@@ -579,7 +579,7 @@ void deallocateYuvBuffer(yuv_buffer_t* yuv)
 
 //Helper function for choosing the correct filter
 //Returns the size of the filter and the filter param is set to the correct filter
-int getFilter(const int** const filter, int is_upsampling, int is_luma, int phase, int filter_ind)
+static int getFilter(const int** const filter, int is_upsampling, int is_luma, int phase, int filter_ind)
 {
   if (is_upsampling) {
     //Upsampling so use 8- or 4-tap filters
@@ -598,7 +598,7 @@ int getFilter(const int** const filter, int is_upsampling, int is_luma, int phas
 }
 
 //Resampling is done here per buffer
-void _resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+static void _resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
 {
   //TODO: Add cropping etc.
 
@@ -712,7 +712,7 @@ void _resample(const pic_buffer_t* const buffer, const scaling_parameter_t* cons
 }
 
 //Resampling is done here per buffer
-void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
+static void resample(const pic_buffer_t* const buffer, const scaling_parameter_t* const param, const int is_upscaling, const int is_luma)
 {
   //TODO: Add cropping etc.
 
