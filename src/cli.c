@@ -309,34 +309,6 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
 
 done:
 
-  //*********************************************
-  //For scalable extension. TODO: remove
-  //Add the necessary cfgs for els here and set parameters as needed here
-  //opts->config->in_width = opts->config->width;
-  //opts->config->in_height = opts->config->height;
-  //opts->config->width /= 2;
-  //opts->config->height /= 2;
-  //opts->config->max_layers = 2;
-
-  //int layers = opts->config->max_layers;
-  //if( layers > 1 ){  
-  //  kvz_config **el_configs = MALLOC(kvz_config*,layers);
-
-  //  for( int el_layer_id = 0; el_layer_id < layers-1; el_layer_id++) {
-  //    el_configs[el_layer_id] = api->config_alloc();
-  //    api->config_init(el_configs[el_layer_id]);
-  //    *el_configs[el_layer_id] = *(opts->config); //Copy default values. TODO: Don't copy pointer (as reference), make a deep copy.
-  //    el_configs[el_layer_id]->layer = el_layer_id+1;
-  //    el_configs[el_layer_id]->qp = 20;
-  //    el_configs[el_layer_id]->width = opts->config->in_width;
-  //    el_configs[el_layer_id]->height = opts->config->in_height;
-  //    //el_configs[el_layer_id]->ref_frames = el_configs[el_layer_id]->ref_frames == 0 ? 0 : el_configs[el_layer_id]->ref_frames-1; //"Reserve one frame for ILR. TODO: infer correct num from somewhere.
-  //  }
-
-  //  opts->config->el_cfg = el_configs;
-  //}
-  //*********************************************
-
   if (!ok) {
     cmdline_opts_free(api, opts);
     opts = NULL;

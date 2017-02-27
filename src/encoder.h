@@ -161,8 +161,6 @@ typedef struct encoder_control_t
 
   // ***********************************************
   // Modified for SHVC.
-  //*********************************************
-  //For scalable extension. TODO: Move somewhere else?
   //Hold current layer info
   struct
   {
@@ -173,8 +171,6 @@ typedef struct encoder_control_t
     uint8_t list_modification_present_flag; //TODO: Move somewhere else?
     scaling_parameter_t* upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
   } layer;
-
-  //*********************************************
 
   // TODO: Needed to set rep_formats in vps. Find a better way?
   const struct encoder_control_t* next_enc_ctrl;
