@@ -40,12 +40,12 @@
  */
 static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int height, int wpp_limit)
 {
-  if (state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_NONE) {
+  if (state->encoder_control->cfg.mv_constraint == KVZ_MV_CONSTRAIN_NONE) {
     return (wpp_limit == -1 || y + (height << 2) <= (wpp_limit << 2));
   };
 
   int margin = 0;
-  if (state->encoder_control->cfg->mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
+  if (state->encoder_control->cfg.mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
     // Enforce a distance of 8 from any tile boundary.
     margin = 4 * 4;
   }
@@ -68,14 +68,14 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
 static INLINE int get_wpp_limit(const encoder_state_t *state, const vector2d_t* orig)
 {
   const encoder_control_t *ctrl = state->encoder_control;
-  if (ctrl->owf && ctrl->wpp) {
+  if (ctrl->cfg.owf && ctrl->cfg.wpp) {
     // Limit motion vectors to the LCU-row below this row.
     // To avoid fractional pixel interpolation depending on things outside
     // this range, add a margin of 4 pixels.
     // - fme needs 4 pixels
     // - odd chroma interpolation needs 4 pixels
     int wpp_limit = 2 * LCU_WIDTH - 4 - orig->y % LCU_WIDTH;
-    if (ctrl->deblock_enable && !ctrl->sao_enable) {
+    if (ctrl->cfg.deblock_enable && !ctrl->cfg.sao_enable) {
       // As a special case, when deblocking is enabled but SAO is not, we have
       // to avoid the possibility of interpolation filters reaching the
       // non-deblocked pixels. The deblocking for the horizontal edge on the
@@ -191,22 +191,22 @@ static uint32_t get_mvd_coding_cost(encoder_state_t * const state, vector2d_t *m
   if (abs_mvd.x > 0) {
     bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.x > 1);
     if (abs_mvd.x > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2) << 15;
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.x - 2) << CTX_FRAC_BITS;
     }
-    bitcost += 1 << 15; // sign
+    bitcost += CTX_FRAC_ONE_BIT; // sign
   }
 
   bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[0], abs_mvd.y > 0);
   if (abs_mvd.y > 0) {
     bitcost += CTX_ENTROPY_BITS(&cabac->ctx.cu_mvd_model[1], abs_mvd.y > 1);
     if (abs_mvd.y > 1) {
-      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2) << 15;
+      bitcost += get_ep_ex_golomb_bitcost(abs_mvd.y - 2) << CTX_FRAC_BITS;
     }
-    bitcost += 1 << 15; // sign
+    bitcost += CTX_FRAC_ONE_BIT; // sign
   }
 
   // Round and shift back to integer bits.
-  return (bitcost + (1 << 14)) >> 15;
+  return (bitcost + CTX_FRAC_HALF_BIT) >> CTX_FRAC_BITS;
 }
 
 
@@ -253,7 +253,7 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
     temp_bitcost += cur_mv_cand ? cand2_cost : cand1_cost;
   }
   *bitcost = temp_bitcost;
-  return temp_bitcost*(int32_t)(state->frame->cur_lambda_cost_sqrt+0.5);
+  return temp_bitcost*(int32_t)(state->lambda_sqrt + 0.5);
 }
 
 
@@ -268,7 +268,7 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
   };
   double multiplier = 1;
   // If early termination is set to fast set multiplier to 0.9
-  if (state->encoder_control->cfg->me_early_termination == KVZ_ME_EARLY_TERMINATION_SENSITIVE){
+  if (state->encoder_control->cfg.me_early_termination == KVZ_ME_EARLY_TERMINATION_SENSITIVE){
     multiplier = 0.95;
   }
   const vector2d_t *offset;
@@ -324,7 +324,7 @@ unsigned kvz_tz_pattern_search(encoder_state_t * const state, const kvz_picture 
 
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
 
@@ -479,7 +479,7 @@ unsigned kvz_tz_raster_search(encoder_state_t * const state, const kvz_picture *
   vector2d_t mv_best = { 0, 0 };
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
   
@@ -548,7 +548,7 @@ static unsigned tz_search(encoder_state_t * const state,
   int wpp_limit = get_wpp_limit(state, orig);
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
 
@@ -585,7 +585,7 @@ static unsigned tz_search(encoder_state_t * const state,
                                 pic, ref, mv_cand, ref_idx, best_cost, &best_index, &best_bitcost, calc_mvd);
 
   // Check if we should stop search
-  if (state->encoder_control->cfg->me_early_termination){
+  if (state->encoder_control->cfg.me_early_termination){
     if (early_terminate(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
       pic, ref, mv_cand, ref_idx, &best_cost, bitcost_out, &best_bitcost, calc_mvd)) return best_cost;
   }
@@ -700,7 +700,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
   int wpp_limit = get_wpp_limit(state, orig);
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
 
@@ -738,7 +738,7 @@ static unsigned hexagon_search(encoder_state_t * const state,
                                 pic, ref, mv_cand, ref_idx, best_cost, &best_index, &best_bitcost, calc_mvd);
 
   // Check if we should stop search
-  if (state->encoder_control->cfg->me_early_termination){
+  if (state->encoder_control->cfg.me_early_termination){
     if (early_terminate(num_cand, merge_cand, mv_in_out, &mv, state, orig, width, height, wpp_limit,
       pic, ref, mv_cand, ref_idx, &best_cost, bitcost_out, &best_bitcost, calc_mvd)) return best_cost;
   }
@@ -855,7 +855,7 @@ static unsigned search_mv_full(encoder_state_t * const state,
   int wpp_limit = get_wpp_limit(state, orig);
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
 
@@ -1043,10 +1043,10 @@ static unsigned search_frac(encoder_state_t * const state,
   hpel_pos[6] = fracpel_blocks[HPEL_POS_DIA] + (LCU_WIDTH + 1);
   hpel_pos[7] = fracpel_blocks[HPEL_POS_DIA] + (LCU_WIDTH + 1) + 1;
 
-  int fme_level = state->encoder_control->fme_level;
+  int fme_level = state->encoder_control->cfg.fme_level;
 
   kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     calc_mvd = kvz_calc_mvd_cost_cabac;
   }
 
@@ -1229,20 +1229,16 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                                 double *inter_cost,
                                 uint32_t *inter_bitcost)
 {
-  const int x_cu = x >> 3;
-  const int y_cu = y >> 3;
   const videoframe_t * const frame = state->tile->frame;
   kvz_picture *ref_image = state->frame->ref->images[ref_idx];
+  const vector2d_t orig = { x, y };
   uint32_t temp_bitcost = 0;
   uint32_t temp_cost = 0;
-  vector2d_t orig;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
   int8_t ref_list = state->frame->refmap[ref_idx].list-1;
   int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
-  orig.x = x_cu * CU_MIN_SIZE_PIXELS;
-  orig.y = y_cu * CU_MIN_SIZE_PIXELS;
   // Get MV candidates
   cur_cu->inter.mv_ref[ref_list] = ref_idx;
   kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
@@ -1282,7 +1278,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   // Skip search for ILR
   if (!is_ILR) {
     int search_range = 32;
-    switch (state->encoder_control->cfg->ime_algorithm) {
+    switch (state->encoder_control->cfg.ime_algorithm) {
     case KVZ_IME_FULL64: search_range = 64; break;
     case KVZ_IME_FULL32: search_range = 32; break;
     case KVZ_IME_FULL16: search_range = 16; break;
@@ -1290,7 +1286,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     default: break;
     }
 
-    switch (state->encoder_control->cfg->ime_algorithm) {
+  switch (state->encoder_control->cfg.ime_algorithm) {
     case KVZ_IME_TZ:
       temp_cost += tz_search(state,
         width, height,
@@ -1349,7 +1345,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                                     state->tile->lcu_offset_x * LCU_WIDTH + orig.x,
                                     state->tile->lcu_offset_y * LCU_WIDTH + orig.y,
                                     width, height, -1);
-    if( state->encoder_control->cfg->mv_rdo ){
+    if( state->encoder_control->cfg.mv_rdo ){
       temp_cost += kvz_calc_mvd_cost_cabac( state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &temp_bitcost );
     }
     else {
@@ -1357,7 +1353,7 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     }
   }
   //TODO: Handle frac search
-  if (!is_ILR && state->encoder_control->cfg->fme_level > 0) {
+  if (!is_ILR && state->encoder_control->cfg.fme_level > 0 && temp_cost < *inter_cost) {
     temp_cost = search_frac(state,
                             width, height,
                             frame->source,
@@ -1468,15 +1464,19 @@ static void search_pu_inter(encoder_state_t * const state,
   // Search for merge mode candidate
   inter_merge_cand_t merge_cand[MRG_MAX_NUM_CANDS];
   // Get list of candidates
-  int16_t num_cand = kvz_inter_get_merge_cand(state,
-                                              x, y,
-                                              width, height,
-                                              merge_a1, merge_b1,
-                                              merge_cand,
-                                              lcu);
+  int16_t num_cand = 0;
+  if (!state->encoder_control->cfg.tmvp_enable) {
+    num_cand = kvz_inter_get_merge_cand(state,
+                                        x, y,
+                                        width, height,
+                                        merge_a1, merge_b1,
+                                        merge_cand,
+                                        lcu,
+                                        0);
+  }
 
   uint32_t(*get_mvd_cost)(encoder_state_t * const state, vector2d_t *, const cabac_data_t*) = get_mvd_coding_cost;
-  if (state->encoder_control->cfg->mv_rdo) {
+  if (state->encoder_control->cfg.mv_rdo) {
     get_mvd_cost = kvz_get_mvd_coding_cost_cabac;
   }
 
@@ -1486,12 +1486,23 @@ static void search_pu_inter(encoder_state_t * const state,
 
   uint32_t ref_idx;
   for (ref_idx = 0; ref_idx < state->frame->ref->used_size; ref_idx++) {
+    if (state->encoder_control->cfg.tmvp_enable) {
+      // Get list of candidates, TMVP required MV scaling for each reference
+      num_cand = kvz_inter_get_merge_cand(state,
+                                          x, y,
+                                          width, height,
+                                          merge_a1, merge_b1,
+                                          merge_cand,
+                                          lcu,
+                                          ref_idx);
+    }
     search_pu_inter_ref(state,
                         x, y,
                         width, height,
                         depth,
                         lcu, cur_cu,
-                        mv_cand, merge_cand, num_cand,
+                        mv_cand, merge_cand,
+                        num_cand,
                         ref_idx,
                         get_mvd_cost,
                         inter_cost,
@@ -1500,24 +1511,22 @@ static void search_pu_inter(encoder_state_t * const state,
 
   // Search bi-pred positions
   bool can_use_bipred = state->frame->slicetype == KVZ_SLICE_B
-    && state->encoder_control->cfg->bipred
+    && state->encoder_control->cfg.bipred
     && width + height >= 16; // 4x8 and 8x4 PBs are restricted to unipred
 
   if (can_use_bipred) {
     lcu_t *templcu = MALLOC(lcu_t, 1);
     unsigned cu_width = LCU_WIDTH >> depth;
-    #define NUM_PRIORITY_LIST 12;
     static const uint8_t priorityList0[] = { 0, 1, 0, 2, 1, 2, 0, 3, 1, 3, 2, 3 };
     static const uint8_t priorityList1[] = { 1, 0, 2, 0, 2, 1, 3, 0, 3, 1, 3, 2 };
-    uint8_t cutoff = num_cand;
-
+    const unsigned num_cand_pairs = MIN(num_cand * (num_cand - 1), 12);
 
     kvz_mvd_cost_func *calc_mvd = calc_mvd_cost;
-    if (state->encoder_control->cfg->mv_rdo) {
+    if (state->encoder_control->cfg.mv_rdo) {
       calc_mvd = kvz_calc_mvd_cost_cabac;
     }
 
-    for (int32_t idx = 0; idx<cutoff*(cutoff - 1); idx++) {
+    for (int32_t idx = 0; idx < num_cand_pairs; idx++) {
       uint8_t i = priorityList0[idx];
       uint8_t j = priorityList1[idx];
       if (i >= num_cand || j >= num_cand) break;

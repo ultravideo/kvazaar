@@ -321,7 +321,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_luma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += kvz_cu_rd_cost_luma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + tr_tree_bits * state->frame->cur_lambda_cost;
+    return sum + tr_tree_bits * state->lambda;
   }
 
   // Add transform_tree cbf_luma bit cost.
@@ -336,7 +336,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
 
   // SSD between reconstruction and original
   int ssd = 0;
-  if (!state->encoder_control->cfg->lossless) {
+  if (!state->encoder_control->cfg.lossless) {
     int index = y_px * LCU_WIDTH + x_px;
     ssd = kvz_pixels_calc_ssd(&lcu->ref.y[index], &lcu->rec.y[index],
                                         LCU_WIDTH,          LCU_WIDTH,
@@ -353,7 +353,7 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * LUMA_MULT + bits * state->frame->cur_lambda_cost;
+  return (double)ssd * LUMA_MULT + bits * state->lambda;
 }
 
 
@@ -398,12 +398,12 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
     sum += kvz_cu_rd_cost_chroma(state, x_px, y_px + offset, depth + 1, pred_cu, lcu);
     sum += kvz_cu_rd_cost_chroma(state, x_px + offset, y_px + offset, depth + 1, pred_cu, lcu);
 
-    return sum + tr_tree_bits * state->frame->cur_lambda_cost;
+    return sum + tr_tree_bits * state->lambda;
   }
 
   // Chroma SSD
   int ssd = 0;
-  if (!state->encoder_control->cfg->lossless) {
+  if (!state->encoder_control->cfg.lossless) {
     int index = lcu_px.y * LCU_WIDTH_C + lcu_px.x;
     int ssd_u = kvz_pixels_calc_ssd(&lcu->ref.u[index], &lcu->rec.u[index],
                                     LCU_WIDTH_C,         LCU_WIDTH_C,
@@ -428,7 +428,7 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   double bits = tr_tree_bits + coeff_bits;
-  return (double)ssd * CHROMA_MULT + bits * state->frame->cur_lambda_cost;
+  return (double)ssd * CHROMA_MULT + bits * state->lambda;
 }
 
 
@@ -516,7 +516,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
     bool can_use_inter =
         state->frame->slicetype != KVZ_SLICE_I
-        && WITHIN(depth, ctrl->pu_depth_inter.min, ctrl->pu_depth_inter.max);
+        && WITHIN(depth, ctrl->cfg.pu_depth_inter.min, ctrl->cfg.pu_depth_inter.max);
 
     if (can_use_inter) {
       double mode_cost;
@@ -541,8 +541,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         SIZE_nLx2N, SIZE_nRx2N,
       };
 
-      const int first_mode = ctrl->cfg->smp_enable ? 0 : 2;
-      const int last_mode  = (ctrl->cfg->amp_enable && cu_width >= 16) ? 5 : 1;
+      const int first_mode = ctrl->cfg.smp_enable ? 0 : 2;
+      const int last_mode  = (ctrl->cfg.amp_enable && cu_width >= 16) ? 5 : 1;
       for (int i = first_mode; i <= last_mode; ++i) {
         kvz_search_cu_smp(state,
                           x, y,
@@ -563,11 +563,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // Try to skip intra search in rd==0 mode.
     // This can be quite severe on bdrate. It might be better to do this
     // decision after reconstructing the inter frame.
-    bool skip_intra = state->encoder_control->rdo == 0
+    bool skip_intra = state->encoder_control->cfg.rdo == 0
                       && cur_cu->type != CU_NOTSET
                       && cost / (cu_width * cu_width) < INTRA_TRESHOLD;
     if (!skip_intra
-        && WITHIN(depth, ctrl->pu_depth_intra.min, ctrl->pu_depth_intra.max))
+        && WITHIN(depth, ctrl->cfg.pu_depth_intra.min, ctrl->cfg.pu_depth_intra.max))
     {
       int8_t intra_mode;
       double intra_cost;
@@ -599,7 +599,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
-        if (state->encoder_control->rdo == 3) {
+        if (state->encoder_control->cfg.rdo == 3) {
           intra_mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, &work_tree[depth]);
           lcu_set_intra_mode(&work_tree[depth], x, y, depth,
                              intra_mode, intra_mode_chroma,
@@ -682,11 +682,13 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       mode_bits = inter_bitcost;
     }
 
-    cost += mode_bits * state->frame->cur_lambda_cost;
+    cost += mode_bits * state->lambda;
   }
   
   // Recursively split all the way to max search depth.
-  if (depth < ctrl->pu_depth_intra.max || (depth < ctrl->pu_depth_inter.max && state->frame->slicetype != KVZ_SLICE_I)) {
+  if (depth < ctrl->cfg.pu_depth_intra.max ||
+      (depth < ctrl->cfg.pu_depth_inter.max && state->frame->slicetype != KVZ_SLICE_I))
+  {
     int half_cu = cu_width / 2;
     double split_cost = 0.0;
     int cbf = cbf_is_set_any(cur_cu->cbf, depth);
@@ -695,25 +697,27 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       // Add cost of cu_split_flag.
       uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
       const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;
-      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->frame->cur_lambda_cost;
+      cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
+      split_cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;
     }
 
     if (cur_cu->type == CU_INTRA && depth == MAX_DEPTH) {
       // Add cost of intra part_size.
       const cabac_ctx_t *ctx = &(state->cabac.ctx.part_size_model[0]);
-      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->frame->cur_lambda_cost;  // 2Nx2N
-      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;  // NxN
+      cost += CTX_ENTROPY_FBITS(ctx, 1) * state->lambda;  // 2Nx2N
+      split_cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;  // NxN
     }
 
     // If skip mode was selected for the block, skip further search.
     // Skip mode means there's no coefficients in the block, so splitting
     // might not give any better results but takes more time to do.
-    if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg->cu_split_termination == KVZ_CU_SPLIT_TERMINATION_OFF) {
-      split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
-      split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
-      split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
-      split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
+    // It is ok to interrupt the search as soon as it is known that
+    // the split costs at least as much as not splitting.
+    if (cur_cu->type == CU_NOTSET || cbf || state->encoder_control->cfg.cu_split_termination == KVZ_CU_SPLIT_TERMINATION_OFF) {
+      if (split_cost < cost) split_cost += search_cu(state, x,           y,           depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y,           depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x,           y + half_cu, depth + 1, work_tree);
+      if (split_cost < cost) split_cost += search_cu(state, x + half_cu, y + half_cu, depth + 1, work_tree);
     } else {
       split_cost = INT_MAX;
     }
@@ -733,7 +737,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
 
         cur_cu->intra = cu_d1->intra;
         cur_cu->type = CU_INTRA;
-        cur_cu->part_size = depth > MAX_DEPTH ? SIZE_NxN : SIZE_2Nx2N;
+        cur_cu->part_size = SIZE_2Nx2N;
 
         kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, cur_cu->tr_depth);
         lcu_set_intra_mode(&work_tree[depth], x, y, depth,
@@ -750,11 +754,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         // Add the cost of coding no-split.
         uint8_t split_model = get_ctx_cu_split_model(lcu, x, y, depth);
         const cabac_ctx_t *ctx = &(state->cabac.ctx.split_flag_model[split_model]);
-        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->frame->cur_lambda_cost;
+        cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
 
         // Add the cost of coding intra mode only once.
         double mode_bits = calc_mode_bits(state, &work_tree[depth], cur_cu, x, y);
-        cost += mode_bits * state->frame->cur_lambda_cost;
+        cost += mode_bits * state->lambda;
       }
     }
 
@@ -949,7 +953,10 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   }
 
   // Start search from depth 0.
-  search_cu(state, x, y, 0, work_tree);
+  double cost = search_cu(state, x, y, 0, work_tree);
+
+  // Save squared cost for rate control.
+  kvz_get_lcu_stats(state, x / LCU_WIDTH, y / LCU_WIDTH)->weight = cost * cost;
 
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.

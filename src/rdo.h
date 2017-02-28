@@ -54,7 +54,11 @@ kvz_mvd_cost_func kvz_calc_mvd_cost_cabac;
 
 uint32_t kvz_get_mvd_coding_cost_cabac(encoder_state_t * const state, vector2d_t *mvd, const cabac_data_t* cabac);
 
-// Fixed points fractional bits, 16b.16b
+// Number of fixed point fractional bits used in the fractional bit table.
+#define CTX_FRAC_BITS 15
+#define CTX_FRAC_ONE_BIT (1 << CTX_FRAC_BITS)
+#define CTX_FRAC_HALF_BIT (1 << (CTX_FRAC_BITS - 1))
+
 extern const uint32_t kvz_entropy_bits[128];
 #define CTX_ENTROPY_BITS(ctx, val) kvz_entropy_bits[(ctx)->uc_state ^ (val)]
 

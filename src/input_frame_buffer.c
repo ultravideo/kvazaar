@@ -54,7 +54,7 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
                                     kvz_picture *const img_in)
 {
   const encoder_control_t* const encoder = state->encoder_control;
-  const kvz_config* const cfg = encoder->cfg;
+  const kvz_config* const cfg = &encoder->cfg;
 
   const int gop_buf_size = 3 * cfg->gop_len;
 
@@ -67,7 +67,8 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
 
     img_in->dts = img_in->pts;
     state->frame->gop_offset = 0;
-    if (cfg->gop_lowdelay) {
+    if (cfg->gop_len > 0) {
+      // Using a low delay GOP structure.
       state->frame->gop_offset = (state->frame->num - 1) % cfg->gop_len;
       if (state->frame->gop_offset < 0) {
         // Set gop_offset of IDR as the highest quality picture.

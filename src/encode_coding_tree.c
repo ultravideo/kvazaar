@@ -117,7 +117,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int32_t i;
   uint32_t sig_coeffgroup_flag[8 * 8] = { 0 };
 
-  int8_t be_valid = encoder->sign_hiding;
+  int8_t be_valid = encoder->cfg.signhide_enable;
   int32_t scan_pos_sig;
   uint32_t go_rice_param = 0;
   uint32_t blk_pos, pos_y, pos_x, sig, ctx_sig;
@@ -174,7 +174,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
   int pos_last = scan[scan_pos_last];
 
   // transform skip flag
-  if(width == 4 && encoder->trskip_enable) {
+  if(width == 4 && encoder->cfg.trskip_enable) {
     cabac->cur_ctx = (type == 0) ? &(cabac->ctx.transform_skip_model_luma) : &(cabac->ctx.transform_skip_model_chroma);
     CABAC_BIN(cabac, tr_skip, "transform_skip_flag");
   }
@@ -256,7 +256,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
     if (num_non_zero > 0) {
       bool sign_hidden = last_nz_pos_in_cg - first_nz_pos_in_cg >= 4 /* SBH_THRESHOLD */
-                         && !encoder->cfg->lossless;
+                         && !encoder->cfg.lossless;
       uint32_t ctx_set  = (i > 0 && type == 0) ? 2 : 0;
       cabac_ctx_t *base_ctx_mod;
       int32_t num_c1_flag, first_c2_flag_idx, idx, first_coeff2;
@@ -301,13 +301,13 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
       if (be_valid && sign_hidden) {
     	coeff_signs = coeff_signs >> 1;
     	if(!state->cabac.only_count)
-    	  if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
+    	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
     	    coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero-1);
     	  }
         CABAC_BINS_EP(cabac, coeff_signs , (num_non_zero - 1), "coeff_sign_flag");
       } else {
         if(!state->cabac.only_count)
-    	  if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
+    	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
     	    coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero);
         CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "coeff_sign_flag");
       }
@@ -320,7 +320,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 
           if (abs_coeff[idx] >= base_level) {
         	if(!state->cabac.only_count) {
-        	  if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)
+        	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFFS)
                 kvz_cabac_write_coeff_remain_encry(state, cabac, abs_coeff[idx] - base_level, go_rice_param, base_level);
         	  else
         		kvz_cabac_write_coeff_remain(cabac, abs_coeff[idx] - base_level, go_rice_param);
@@ -459,7 +459,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
-  int tr_depth_intra = state->encoder_control->tr_depth_intra;
+  int tr_depth_intra = state->encoder_control->cfg.tr_depth_intra;
   int max_tr_depth = (cur_cu->type == CU_INTRA ? tr_depth_intra + intra_split_flag : TR_DEPTH_INTER);
 
   int8_t split = (cur_cu->tr_depth > depth);
@@ -517,6 +517,28 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
+    if (state->must_code_qp_delta) {
+      const int qp_delta      = state->qp - state->ref_qp;
+      const int qp_delta_abs  = ABS(qp_delta);
+      cabac_data_t* cabac     = &state->cabac;
+
+      // cu_qp_delta_abs prefix
+      cabac->cur_ctx = &cabac->ctx.cu_qp_delta_abs[0];
+      kvz_cabac_write_unary_max_symbol(cabac, cabac->ctx.cu_qp_delta_abs, MIN(qp_delta_abs, 5), 1, 5);
+
+      if (qp_delta_abs >= 5) {
+        // cu_qp_delta_abs suffix
+        kvz_cabac_write_ep_ex_golomb(state, cabac, qp_delta_abs - 5, 0);
+      }
+
+      if (qp_delta != 0) {
+        CABAC_BIN_EP(cabac, (qp_delta >= 0 ? 0 : 1), "qp_delta_sign_flag");
+      }
+
+      state->must_code_qp_delta = false;
+      state->ref_qp = state->qp;
+    }
+
     encode_transform_unit(state, x_pu, y_pu, depth);
   }
 }
@@ -645,7 +667,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
             }
             uint32_t mvd_hor_sign = (mvd_hor>0)?0:1;
             if(!state->cabac.only_count)
-              if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_MV_SIGNS)
+              if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
                 mvd_hor_sign = mvd_hor_sign^ff_get_key(&state->tile->dbs_g, 1);
             CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
           }
@@ -655,7 +677,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
             }
             uint32_t mvd_ver_sign = (mvd_ver>0)?0:1;
             if(!state->cabac.only_count)
-              if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_MV_SIGNS)
+              if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
                 mvd_ver_sign = mvd_ver_sign^ff_get_key(&state->tile->dbs_g, 1);
             CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
           }
@@ -873,7 +895,7 @@ static void encode_part_mode(encoder_state_t * const state,
       CABAC_BIN(cabac, 0, "part_mode horizontal");
     }
 
-    if (state->encoder_control->cfg->amp_enable && depth < MAX_DEPTH) {
+    if (state->encoder_control->cfg.amp_enable && depth < MAX_DEPTH) {
       cabac->cur_ctx = &(cabac->ctx.part_size_model[3]);
 
       if (cur_cu->part_size == SIZE_2NxN ||
@@ -894,14 +916,16 @@ static void encode_part_mode(encoder_state_t * const state,
 }
 
 void kvz_encode_coding_tree(encoder_state_t * const state,
-                        uint16_t x_ctb, uint16_t y_ctb, uint8_t depth)
+                            uint16_t x_ctb,
+                            uint16_t y_ctb,
+                            uint8_t depth)
 {
   cabac_data_t * const cabac = &state->cabac;
   const videoframe_t * const frame = state->tile->frame;
   const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb);
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
-  
+
   //Absolute ctb
   uint16_t abs_x_ctb = x_ctb + (state->tile->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
   uint16_t abs_y_ctb = y_ctb + (state->tile->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
@@ -949,7 +973,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
   }
 
-  if (state->encoder_control->cfg->lossless) {
+  if (state->encoder_control->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
   }

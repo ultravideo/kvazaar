@@ -188,6 +188,16 @@ enum kvz_chroma_format {
   KVZ_CSP_444 = 3,
 };
 
+/**
+ * \brief Chroma subsampling format used for encoding.
+ * \since 3.15.0
+ */
+enum kvz_slices {
+  KVZ_SLICES_NONE,
+  KVZ_SLICES_TILES = (1 << 0), /*!< \brief Put each tile in a slice. */
+  KVZ_SLICES_WPP   = (1 << 1), /*!< \brief Put each row in a slice. */
+};
+
 // Map from input format to chroma format.
 #define KVZ_FORMAT2CSP(format) ((enum kvz_chroma_format)"\0\1\2\3"[format])
 
@@ -320,6 +330,14 @@ typedef struct kvz_config
 
   int32_t implicit_rdpcm; /*!< \brief Enable implicit residual DPCM. */
 
+  struct {
+    int32_t width;
+    int32_t height;
+    uint8_t *dqps;
+  } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
+
+  unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
+
 //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   uint8_t layer;
@@ -364,6 +382,8 @@ typedef struct kvz_picture {
 
   enum kvz_interlacing interlacing; //!< \since 3.2.0 \brief Field order for interlaced pictures.
   enum kvz_chroma_format chroma_format;
+
+  int32_t ref_pocs[16];
 } kvz_picture;
 
 /**
@@ -567,9 +587,6 @@ typedef struct kvz_api {
    * The returned encoder should be closed by calling encoder_close.
    *
    * Only one encoder may be open at a time.
-   *
-   * The caller must not modify the config between passing it to this function
-   * and calling encoder_close.
    *
    * \param cfg   encoder configuration
    * \return      created encoder, or NULL if creation failed.

@@ -22,8 +22,6 @@ addons:
 
 matrix:
   fast_finish: true
-  allow_failures:
-  - os: osx  # Don't know what's wrong. Something changed in the environment.
   
   include:
     - compiler: clang
@@ -115,9 +113,25 @@ matrix:
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=1 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
     - env: TEST_FRAMES=10 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=4 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
     - env: TEST_FRAMES=20 VALGRIND_TEST="--gop=8 -p0 --threads=2 --wpp --owf=0 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3"
+    
+    # Tests for --mv-constraint
+    - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --pu-depth-inter=0-3 --mv-constraint=frametilemargin"
+    - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --subme=4 --mv-constraint=frametilemargin"
+    
+    # Tests for --slices
+    - env: TEST_DIM=512x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --tiles=2x2 --slices=tiles"
+    - env: VALGRIND_TEST="--threads=2 --owf=1 --preset=ultrafast --slices=wpp"
+    
+    # Test weird shapes.
+    - env: TEST_DIM=16x16 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
+    - env: TEST_DIM=256x16 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
+    - env: TEST_DIM=16x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
 
 install:
   - source .travis-install.sh
 
 script:
   - source .travis-script.sh
+  
+after_script:
+  - set +e # Disable errors to work around Travis not knowing how to fix their stuff.

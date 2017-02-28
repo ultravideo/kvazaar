@@ -196,23 +196,98 @@ static void encode_sao(encoder_state_t * const state,
 }
 
 
-static void encoder_state_worker_encode_lcu(void * opaque) {
+/**
+ * \brief Sets the QP for each CU in state->tile->frame->cu_array.
+ *
+ * The QPs are used in deblocking.
+ *
+ * The delta QP for an LCU is coded when the first CU with coded block flag
+ * set is encountered. Hence, for the purposes of deblocking, all CUs
+ * before the first one with cbf set use state->ref_qp and all CUs after
+ * that use state->qp.
+ *
+ * \param state           encoder state
+ * \param x               x-coordinate of the left edge of the root CU
+ * \param y               y-coordinate of the top edge of the root CU
+ * \param depth           depth in the CU quadtree
+ * \param coeffs_coded    Used for tracking whether a CU with a residual
+ *                        has been encountered. Should be set to false at
+ *                        the top level.
+ * \return Whether there were any CUs with residual or not.
+ */
+static bool set_cu_qps(encoder_state_t *state, int x, int y, int depth, bool coeffs_coded)
+{
+  if (state->qp == state->ref_qp) {
+    // If the QPs are equal there is no need to care about the residuals.
+    coeffs_coded = true;
+  }
+
+  cu_info_t *cu = kvz_cu_array_at(state->tile->frame->cu_array, x, y);
+  const int cu_width = LCU_WIDTH >> depth;
+  coeffs_coded = coeffs_coded || cbf_is_set_any(cu->cbf, cu->depth);
+
+  if (!coeffs_coded && cu->depth > depth) {
+    // Recursively process sub-CUs.
+    const int d = cu_width >> 1;
+    coeffs_coded = set_cu_qps(state, x,     y,     depth + 1, coeffs_coded);
+    coeffs_coded = set_cu_qps(state, x + d, y,     depth + 1, coeffs_coded);
+    coeffs_coded = set_cu_qps(state, x,     y + d, depth + 1, coeffs_coded);
+    coeffs_coded = set_cu_qps(state, x + d, y + d, depth + 1, coeffs_coded);
+
+  } else {
+    if (!coeffs_coded && cu->tr_depth > depth) {
+      // The CU is split into smaller transform units. Check whether coded
+      // block flag is set for any of the TUs.
+      const int tu_width = LCU_WIDTH >> cu->tr_depth;
+      for (int y_scu = y; y_scu < y + cu_width; y_scu += tu_width) {
+        for (int x_scu = x; x_scu < x + cu_width; x_scu += tu_width) {
+          cu_info_t *tu = kvz_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu);
+          if (cbf_is_set_any(tu->cbf, cu->depth)) {
+            coeffs_coded = true;
+          }
+        }
+      }
+    }
+
+    // Set the correct QP for all state->tile->frame->cu_array elements in
+    // the area covered by the CU.
+    const int8_t qp = coeffs_coded ? state->qp : state->ref_qp;
+
+    for (int y_scu = y; y_scu < y + cu_width; y_scu += SCU_WIDTH) {
+      for (int x_scu = x; x_scu < x + cu_width; x_scu += SCU_WIDTH) {
+        kvz_cu_array_at(state->tile->frame->cu_array, x_scu, y_scu)->qp = qp;
+      }
+    }
+  }
+
+  return coeffs_coded;
+}
+
+
+static void encoder_state_worker_encode_lcu(void * opaque)
+{
   const lcu_order_element_t * const lcu = opaque;
   encoder_state_t *state = lcu->encoder_state;
   const encoder_control_t * const encoder = state->encoder_control;
   videoframe_t* const frame = state->tile->frame;
-  
+
+  kvz_set_lcu_lambda_and_qp(state, lcu->position);
+
   //This part doesn't write to bitstream, it's only search, deblock and sao
   
   kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
     
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
-  if (encoder->deblock_enable) {
+  if (encoder->cfg.deblock_enable) {
+    if (encoder->cfg.target_bitrate > 0 || encoder->cfg.roi.dqps != NULL) {
+      set_cu_qps(state, lcu->position_px.x, lcu->position_px.y, 0, false);
+    }
+
     kvz_filter_deblock_lcu(state, lcu->position_px.x, lcu->position_px.y);
   }
 
-  if (encoder->sao_enable) {
+  if (encoder->cfg.sao_enable) {
     kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
   }
 
@@ -239,28 +314,64 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
   }
   
   //Now write data to bitstream (required to have a correct CABAC state)
-  
-  //First LCU, and we are in a slice. We need a slice header
-  if (state->type == ENCODER_STATE_TYPE_SLICE && lcu->index == 0) {
-    kvz_encoder_state_write_bitstream_slice_header(state);
-    kvz_bitstream_add_rbsp_trailing_bits(&state->stream); 
-  }
+  const uint64_t existing_bits = kvz_bitstream_tell(&state->stream);
   
   //Encode SAO
-  if (encoder->sao_enable) {
+  if (encoder->cfg.sao_enable) {
     encode_sao(state, lcu->position.x, lcu->position.y, &frame->sao_luma[lcu->position.y * frame->width_in_lcu + lcu->position.x], &frame->sao_chroma[lcu->position.y * frame->width_in_lcu + lcu->position.x]);
   }
   
+
+  // QP delta is not used when rate control is turned off.
+  state->must_code_qp_delta = (
+      state->encoder_control->cfg.target_bitrate > 0
+      || state->encoder_control->cfg.roi.dqps != NULL);
+
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
 
-  //Terminator
-  if (lcu->index < state->lcu_order_count - 1) {
-    //Since we don't handle slice segments, end of slice segment == end of slice
-    //Always 0 since otherwise it would be split
-    kvz_cabac_encode_bin_trm(&state->cabac, 0);  // end_of_slice_segment_flag
+  bool end_of_slice_segment_flag;
+  if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {
+    // Slice segments end after each WPP row.
+    end_of_slice_segment_flag = lcu->last_column;
+  } else if (state->encoder_control->cfg.slices & KVZ_SLICES_TILES) {
+    // Slices end after each tile.
+    end_of_slice_segment_flag = lcu->last_column && lcu->last_row;
+  } else {
+    // Slice ends after the last row of the last tile.
+    int last_tile_id = -1 + encoder->cfg.tiles_width_count * encoder->cfg.tiles_height_count;
+    bool is_last_tile = state->tile->id == last_tile_id;
+    end_of_slice_segment_flag = is_last_tile && lcu->last_column && lcu->last_row;
   }
-  
+  kvz_cabac_encode_bin_trm(&state->cabac, end_of_slice_segment_flag);
+
+  {
+    const bool end_of_tile = lcu->last_column && lcu->last_row;
+    const bool end_of_wpp_row = encoder->cfg.wpp && lcu->last_column;
+
+
+    if (end_of_tile || end_of_wpp_row) {
+      if (!end_of_slice_segment_flag) {
+        // end_of_sub_stream_one_bit
+        kvz_cabac_encode_bin_trm(&state->cabac, 1);
+      }
+
+      // Finish the substream by writing out remaining state.
+      kvz_cabac_finish(&state->cabac);
+
+      // Write a rbsp_trailing_bits or a byte_alignment. The first one is used
+      // for ending a slice_segment_layer_rbsp and the second one for ending
+      // a substream. They are identical and align the byte stream.
+      kvz_bitstream_put(state->cabac.stream, 1, 1);
+      kvz_bitstream_align_zero(state->cabac.stream);
+
+      kvz_cabac_start(&state->cabac);
+    }
+  }
+
+  const uint32_t bits = kvz_bitstream_tell(&state->stream) - existing_bits;
+  kvz_get_lcu_stats(state, lcu->position.x, lcu->position.y)->bits = bits;
+
   //Wavefronts need the context to be copied to the next row
   if (state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW && lcu->index == 1) {
     int j;
@@ -273,7 +384,7 @@ static void encoder_state_worker_encode_lcu(void * opaque) {
     }
   }
   
-  if (encoder->sao_enable && lcu->above) {
+  if (encoder->cfg.sao_enable && lcu->above) {
     // Add the post-deblocking but pre-SAO pixels of the LCU row above this
     // row to a buffer so this row can use them on it's own SAO
     // reconstruction.
@@ -296,11 +407,14 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
 
-  const kvz_config *cfg = state->encoder_control->cfg;
-  if ( state->encoder_control->cfg->crypto_features) {
-	  InitC(state->tile->dbs_g);
-	  state->tile->m_prev_pos = 0;
-   }
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  if (cfg->crypto_features) {
+    InitC(state->tile->dbs_g);
+    state->tile->m_prev_pos = 0;
+  }
+
+  state->ref_qp = state->frame->QP;
+
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
   bool wavefront = state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW;
@@ -322,7 +436,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 #endif //KVZ_DEBUG
     }
     
-    if (state->encoder_control->sao_enable) {
+    if (state->encoder_control->cfg.sao_enable) {
       PERFORMANCE_MEASURE_START(KVZ_PERF_SAOREC);
       kvz_sao_reconstruct_frame(state);
       PERFORMANCE_MEASURE_END(KVZ_PERF_SAOREC, state->encoder_control->threadqueue, "type=kvz_sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count - 1].position.y + state->tile->lcu_offset_y,
@@ -341,7 +455,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
     {
       // For LP-gop, depend on the state of the first reference.
       int ref_neg = cfg->gop[(state->frame->poc - 1) % cfg->gop_len].ref_neg[0];
-      if (ref_neg > state->encoder_control->owf) {
+      if (ref_neg > state->encoder_control->cfg.owf) {
         // If frame is not within OWF range, it's already done.
         ref_state = NULL;
       } else {
@@ -405,7 +519,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
       // In the case where SAO is not enabled, the wavefront row is
       // done when the last LCU in the row is done.
-      if (!state->encoder_control->sao_enable && i + 1 == state->lcu_order_count) {
+      if (!state->encoder_control->cfg.sao_enable && i + 1 == state->lcu_order_count) {
         assert(!state->tqj_recon_done);
         state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
       }
@@ -415,31 +529,23 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
 static void encoder_state_encode(encoder_state_t * const main_state);
 
-static void encoder_state_worker_encode_children(void * opaque) {
+static void encoder_state_worker_encode_children(void * opaque)
+{
   encoder_state_t *sub_state = opaque;
   encoder_state_encode(sub_state);
-  if (sub_state->is_leaf) {
-    if (sub_state->type != ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_BSLEAF);
-      kvz_encoder_state_write_bitstream_leaf(sub_state);
-      PERFORMANCE_MEASURE_END(KVZ_PERF_BSLEAF, sub_state->encoder_control->threadqueue, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->frame->num, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count - 1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count - 1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count - 1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count - 1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
-    } else {
-      threadqueue_job_t *job;
-#ifdef KVZ_DEBUG
-      char job_description[256];
-      sprintf(job_description, "type=encoder_state_write_bitstream_leaf,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", sub_state->frame->num, sub_state->tile->id, sub_state->slice->id, sub_state->lcu_order[0].position_px.x + sub_state->tile->lcu_offset_x * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.x + sub_state->lcu_order[sub_state->lcu_order_count-1].size.x + sub_state->tile->lcu_offset_x * LCU_WIDTH - 1, sub_state->lcu_order[0].position_px.y + sub_state->tile->lcu_offset_y * LCU_WIDTH, sub_state->lcu_order[sub_state->lcu_order_count-1].position_px.y + sub_state->lcu_order[sub_state->lcu_order_count-1].size.y + sub_state->tile->lcu_offset_y * LCU_WIDTH - 1);
-#else
-      char* job_description = NULL;
-#endif
-      job = kvz_threadqueue_submit(sub_state->encoder_control->threadqueue, kvz_encoder_state_worker_write_bitstream_leaf, sub_state, 1, job_description);
-      kvz_threadqueue_job_dep_add(job, sub_state->tile->wf_jobs[sub_state->wfrow->lcu_offset_y * sub_state->tile->frame->width_in_lcu + sub_state->lcu_order_count - 1]);
-      kvz_threadqueue_job_unwait_job(sub_state->encoder_control->threadqueue, job);
-      
-      assert(!sub_state->tqj_bitstream_written);
-      //Bitstream is written for the row, if we're at the last LCU
-      sub_state->tqj_bitstream_written = job;
-      return;
-    }
+
+  if (sub_state->is_leaf && sub_state->type == ENCODER_STATE_TYPE_WAVEFRONT_ROW) {
+    // Set the last wavefront job of this row as the job that completes
+    // the bitstream for this wavefront row state.
+
+    int wpp_row = sub_state->wfrow->lcu_offset_y;
+    int tile_width = sub_state->tile->frame->width_in_lcu;
+    int end_of_row = (wpp_row + 1) * tile_width - 1;
+    threadqueue_job_t *job = sub_state->tile->wf_jobs[end_of_row];
+
+    assert(!sub_state->tqj_bitstream_written);
+    sub_state->tqj_bitstream_written = job;
+    return;
   }
 }
 
@@ -594,7 +700,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       }
       
       // Add SAO reconstruction jobs and their dependancies when using WPP coding.
-      if (main_state->encoder_control->sao_enable && 
+      if (main_state->encoder_control->cfg.sao_enable && 
           main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW)
       {
         int y;
@@ -756,20 +862,20 @@ static void encoder_state_ref_sort(encoder_state_t *state) {
 static void encoder_state_remove_refs(encoder_state_t *state) {
   const encoder_control_t * const encoder = state->encoder_control;
   
-  int neg_refs = encoder->cfg->gop[state->frame->gop_offset].ref_neg_count;
-  int pos_refs = encoder->cfg->gop[state->frame->gop_offset].ref_pos_count;
+  int neg_refs = encoder->cfg.gop[state->frame->gop_offset].ref_neg_count;
+  int pos_refs = encoder->cfg.gop[state->frame->gop_offset].ref_pos_count;
 
   unsigned target_ref_num;
-  if (encoder->cfg->gop_len) {
+  if (encoder->cfg.gop_len) {
     target_ref_num = neg_refs + pos_refs;
   } else {
-    target_ref_num = encoder->cfg->ref_frames;
+    target_ref_num = encoder->cfg.ref_frames;
   }
   if (state->frame->slicetype == KVZ_SLICE_I) {
     target_ref_num = 0;
   }
 
-  if (encoder->cfg->gop_len && target_ref_num > 0) {
+  if (encoder->cfg.gop_len && target_ref_num > 0) {
     // With GOP in use, go through all the existing reference pictures and
     // remove any picture that is not referenced by the current picture.
 
@@ -779,7 +885,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
       int ref_poc = state->frame->ref->pocs[ref];
       
       for (int i = 0; i < neg_refs; i++) {
-        int ref_relative_poc = -encoder->cfg->gop[state->frame->gop_offset].ref_neg[i];
+        int ref_relative_poc = -encoder->cfg.gop[state->frame->gop_offset].ref_neg[i];
         if (ref_poc == state->frame->poc + ref_relative_poc) {
           is_referenced = true;
           break;
@@ -788,7 +894,7 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
 
       
       for (int i = 0; i < pos_refs; i++) {
-        int ref_relative_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[i];
+        int ref_relative_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[i];
         if (ref_poc == state->frame->poc + ref_relative_poc) {
           is_referenced = true;
           break;
@@ -827,7 +933,7 @@ static void encoder_set_source_picture(encoder_state_t * const state, kvz_pictur
   assert(!state->tile->frame->rec);
 
   state->tile->frame->source = frame;
-  if (state->encoder_control->cfg->lossless) {
+  if (state->encoder_control->cfg.lossless) {
     // In lossless mode, the reconstruction is equal to the source frame.
     state->tile->frame->rec = kvz_image_copy_ref(frame);
   } else {
@@ -857,10 +963,26 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   }
 }
 
+static void normalize_lcu_weights(encoder_state_t * const state)
+{
+  if (state->frame->num == 0) return;
+
+  const uint32_t num_lcus = state->encoder_control->in.width_in_lcu *
+                            state->encoder_control->in.height_in_lcu;
+  double sum = 0.0;
+  for (uint32_t i = 0; i < num_lcus; i++) {
+    sum += state->frame->lcu_stats[i].weight;
+  }
+
+  for (uint32_t i = 0; i < num_lcus; i++) {
+    state->frame->lcu_stats[i].weight /= sum;
+  }
+}
+
 static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_picture* frame) {
   assert(state->type == ENCODER_STATE_TYPE_MAIN);
 
-  const kvz_config * const cfg = state->encoder_control->cfg;
+  const kvz_config * const cfg = &state->encoder_control->cfg;
 
   encoder_set_source_picture(state, frame);
 
@@ -886,15 +1008,23 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
     state->frame->slicetype = KVZ_SLICE_I;
     state->frame->pictype = KVZ_NAL_IDR_W_RADL;
   } else {
-    state->frame->slicetype = cfg->intra_period==1 ? KVZ_SLICE_I : (state->encoder_control->cfg->gop_len?KVZ_SLICE_B:KVZ_SLICE_P);
+    if (cfg->intra_period == 1) {
+      state->frame->slicetype = KVZ_SLICE_I;
+    } else if (cfg->gop_len != 0) {
+      state->frame->slicetype = KVZ_SLICE_B;
+    } else {
+      state->frame->slicetype = KVZ_SLICE_P;
+    }
 
     // Use P-slice for lowdelay.
-    if (state->frame->slicetype == KVZ_SLICE_B && cfg->gop_lowdelay) {
+    if (state->frame->slicetype == KVZ_SLICE_B &&
+        cfg->gop_len > 0 &&
+        cfg->gop_lowdelay) {
       state->frame->slicetype = KVZ_SLICE_P;
     }
 
     state->frame->pictype = KVZ_NAL_TRAIL_R;
-    if (state->encoder_control->cfg->gop_len) {
+    if (state->encoder_control->cfg.gop_len) {
       if (cfg->intra_period > 1 && (state->frame->poc % cfg->intra_period) == 0) {
         state->frame->slicetype = KVZ_SLICE_I;
       }
@@ -904,24 +1034,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   encoder_state_remove_refs(state);
   encoder_state_ref_sort(state);
-  double lambda;
-  if (cfg->target_bitrate > 0) {
-    // Rate control enabled.
-    lambda = kvz_select_picture_lambda(state);
-    state->frame->QP = kvz_lambda_to_QP(lambda);
-  } else {
-    if (cfg->gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
-      kvz_gop_config const * const gop =
-        cfg->gop + state->frame->gop_offset;
-      state->frame->QP = cfg->qp + gop->qp_offset;
-      state->frame->QP_factor = gop->qp_factor;
-    } else {
-      state->frame->QP = cfg->qp;
-    }
-    lambda = kvz_select_picture_lambda_from_qp(state);
-  }
-  state->frame->cur_lambda_cost = lambda;
-  state->frame->cur_lambda_cost_sqrt = sqrt(lambda);
+
+  normalize_lcu_weights(state);
+  kvz_set_picture_lambda_and_qp(state);
 
   encoder_state_init_children(state);
 }
@@ -973,7 +1088,7 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
     assert(!state->tqj_bitstream_written);
     state->tqj_bitstream_written = job;
   }
-  state->frame_done = 0;
+  state->frame->done = 0;
   //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
@@ -991,7 +1106,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   const encoder_control_t * const encoder = state->encoder_control;
 
   // The previous frame must be done before the next one is started.
-  assert(state->frame_done);
+  assert(state->frame->done);
 
   if (state->frame->num == -1) {
     // We're at the first frame, so don't care about all this stuff.
@@ -999,7 +1114,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->frame->poc   = 0;
     assert(!state->tile->frame->source);
     assert(!state->tile->frame->rec);
-    state->prepared = 1;
+    state->frame->prepared = 1;
     return;
   }
 
@@ -1016,9 +1131,13 @@ void kvz_encoder_prepare(encoder_state_t *state)
     kvz_image_list_copy_contents(state->frame->ref, prev_state->frame->ref);
   }
 
-  if (!encoder->cfg->gop_len ||
+  if (!encoder->cfg.gop_len ||
       !prev_state->frame->poc ||
-      encoder->cfg->gop[prev_state->frame->gop_offset].is_ref) {
+      encoder->cfg.gop[prev_state->frame->gop_offset].is_ref) {
+
+    // Store current list of POCs for use in TMVP derivation
+    memcpy(prev_state->tile->frame->rec->ref_pocs, state->frame->ref->pocs, sizeof(int32_t)*state->frame->ref->used_size);
+
     // Add previous reconstructed picture as a reference
     kvz_image_list_add(state->frame->ref,
                    prev_state->tile->frame->rec,
@@ -1040,7 +1159,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
   state->frame->num = prev_state->frame->num + 1;
   state->frame->poc   = prev_state->frame->poc   + 1;
 
-  state->prepared = 1;
+  state->frame->prepared = 1;
 }
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
@@ -1057,4 +1176,12 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
   }
 
   return SCAN_DIAG;
+}
+
+lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y)
+{
+  const int index = lcu_x + state->tile->lcu_offset_x +
+                    (lcu_y + state->tile->lcu_offset_y) *
+                    state->encoder_control->in.width_in_lcu;
+  return &state->frame->lcu_stats[index];
 }

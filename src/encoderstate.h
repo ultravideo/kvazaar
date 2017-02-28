@@ -49,18 +49,48 @@ typedef enum {
 } encoder_state_type;
 
 
+typedef struct lcu_stats_t {
+  //! \brief Number of bits that were spent
+  uint32_t bits;
+
+  //! \brief Weight of the LCU for rate control
+  double weight;
+
+  //! \brief Lambda value which was used for this LCU
+  double lambda;
+
+  //! \brief Rate control alpha parameter
+  double rc_alpha;
+
+  //! \brief Rate control beta parameter
+  double rc_beta;
+} lcu_stats_t;
+
 
 typedef struct encoder_state_config_frame_t {
-  double cur_lambda_cost; //!< \brief Lambda for SSE
-  double cur_lambda_cost_sqrt; //!< \brief Lambda for SAD and SATD
-  
+  /**
+   * \brief Frame-level lambda.
+   *
+   * Use state->lambda or state->lambda_sqrt for cost computations.
+   *
+   * \see encoder_state_t::lambda
+   * \see encoder_state_t::lambda_sqrt
+   */
+  double lambda;
+
   int32_t num;       /*!< \brief Frame number */
   int32_t poc;       /*!< \brief Picture order count */
   int8_t gop_offset; /*!< \brief Offset in the gop structure */
-  
-  int8_t QP;   //!< \brief Quantization parameter
-  double QP_factor; //!< \brief Quantization factor
-  
+
+  /**
+   * \brief Frame-level quantization parameter
+   *
+   * \see encoder_state_t::qp
+   */
+  int8_t QP;
+  //! \brief quantization factor
+  double QP_factor;
+
   //Current picture available references
   image_list_t *ref;
   int8_t ref_list;
@@ -84,9 +114,37 @@ typedef struct encoder_state_config_frame_t {
   //! Number of bits targeted for the current GOP.
   double cur_gop_target_bits;
 
+  //! Number of bits targeted for the current picture.
+  double cur_pic_target_bits;
+
   // Parameters used in rate control
   double rc_alpha;
   double rc_beta;
+
+  /**
+   * \brief Indicates that this encoder state is ready for encoding the
+   * next frame i.e. kvz_encoder_prepare has been called.
+   */
+  bool prepared;
+
+  /**
+   * \brief Indicates that the previous frame has been encoded and the
+   * encoded data written and the encoding the next frame has not been
+   * started yet.
+   */
+  bool done;
+
+  /**
+   * \brief Information about the coded LCUs.
+   *
+   * Used for rate control.
+   */
+  lcu_stats_t *lcu_stats;
+
+  /**
+   * \brief Whether next NAL is the first NAL in the access unit.
+   */
+  bool first_nal;
 
 } encoder_state_config_frame_t;
 
@@ -185,21 +243,26 @@ typedef struct encoder_state_t {
   bitstream_t stream;
   cabac_data_t cabac;
 
-  /**
-   * \brief Indicates that this encoder state is ready for encoding the
-   * next frame i.e. kvz_encoder_prepare has been called.
-   */
-  int prepared;
-
-  /**
-   * \brief Indicates that the previous frame has been encoded and the
-   * encoded data written and the encoding the next frame has not been
-   * started yet.
-   */
-  int frame_done;
-
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
-  
+
+  //! \brief Lambda for SSE
+  double lambda;
+  //! \brief Lambda for SAD and SATD
+  double lambda_sqrt;
+  //! \brief Quantization parameter for the current LCU
+  int8_t qp;
+
+  /**
+   * \brief Whether a QP delta value must be coded for the current LCU.
+   */
+  bool must_code_qp_delta;
+
+  /**
+   * \brief Reference for computing QP delta for the next LCU that is coded
+   * next. Updated whenever a QP delta is coded.
+   */
+  int8_t ref_qp;
+
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
@@ -217,6 +280,21 @@ coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
 void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
                                int ref_list_len_out[2],
                                int ref_list_poc_out[2][16]);
+
+lcu_stats_t* kvz_get_lcu_stats(encoder_state_t *state, int lcu_x, int lcu_y);
+
+
+/**
+ * Whether the parameter sets should be written with the current frame.
+ */
+static INLINE bool encoder_state_must_write_vps(const encoder_state_t *state)
+{
+  const int32_t frame = state->frame->num;
+  const int32_t vps_period = state->encoder_control->cfg.vps_period;
+
+  return (vps_period >  0 && frame % vps_period == 0) ||
+         (vps_period >= 0 && frame == 0);
+}
 
 static const uint8_t g_group_idx[32] = {
   0, 1, 2, 3, 4, 4, 5, 5, 6, 6,

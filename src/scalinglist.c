@@ -23,6 +23,7 @@
 #include <string.h>
 
 #include "scalinglist.h"
+#include "rdo.h"
 #include "tables.h"
 
 
@@ -345,7 +346,7 @@ static void scalinglist_set_err_scale(uint8_t bitdepth, scaling_list_t * const s
   double *err_scale         = (double *) scaling_list->error_scale[size][list][qp];
 
   // Compensate for scaling of bitcount in Lagrange cost function
-  double scale = (double)(1<<15);
+  double scale = CTX_FRAC_ONE_BIT;
   // Compensate for scaling through forward transform
   scale = scale*pow(2.0,-2.0*transform_shift);
   for(i=0;i<max_num_coeff;i++) {

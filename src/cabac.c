@@ -141,11 +141,11 @@ void kvz_cabac_write(cabac_data_t * const data)
       uint32_t carry = lead_byte >> 8;
       uint32_t byte = data->buffered_byte + carry;
       data->buffered_byte = lead_byte & 0xff;
-      kvz_bitstream_put(data->stream, byte, 8);
+      kvz_bitstream_put_byte(data->stream, byte);
 
       byte = (0xff + carry) & 0xff;
       while (data->num_buffered_bytes > 1) {
-        kvz_bitstream_put(data->stream, byte, 8);
+        kvz_bitstream_put_byte(data->stream, byte);
         data->num_buffered_bytes--;
       }
     } else {
@@ -163,18 +163,18 @@ void kvz_cabac_finish(cabac_data_t * const data)
   assert(data->bits_left <= 32);
 
   if (data->low >> (32 - data->bits_left)) {
-    kvz_bitstream_put(data->stream,data->buffered_byte + 1, 8);
+    kvz_bitstream_put_byte(data->stream, data->buffered_byte + 1);
     while (data->num_buffered_bytes > 1) {
-      kvz_bitstream_put(data->stream, 0, 8);
+      kvz_bitstream_put_byte(data->stream, 0);
       data->num_buffered_bytes--;
     }
     data->low -= 1 << (32 - data->bits_left);
   } else {
     if (data->num_buffered_bytes > 0) {
-      kvz_bitstream_put(data->stream,data->buffered_byte, 8);
+      kvz_bitstream_put_byte(data->stream, data->buffered_byte);
     }
     while (data->num_buffered_bytes > 1) {
-      kvz_bitstream_put(data->stream, 0xff, 8);
+      kvz_bitstream_put_byte(data->stream, 0xff);
       data->num_buffered_bytes--;
     }
   }
@@ -208,17 +208,6 @@ void kvz_cabac_encode_bin_trm(cabac_data_t * const data, const uint8_t bin_value
   if (data->bits_left < 12) {
     kvz_cabac_write(data);
   }
-}
-
-/**
- * \brief
- */
-void kvz_cabac_flush(cabac_data_t * const data)
-{
-  kvz_cabac_finish(data);
-  kvz_bitstream_put(data->stream, 1, 1);
-  kvz_bitstream_align_zero(data->stream);
-  kvz_cabac_start(data);
 }
 
 /**
@@ -559,13 +548,14 @@ void kvz_cabac_write_ep_ex_golomb(struct encoder_state_t * const state, cabac_da
 
   bins      = (bins << count) | symbol;
   num_bins += count;
-  if(!state->cabac.only_count)
-    if (state->encoder_control->cfg->crypto_features & KVZ_CRYPTO_MVs) {
+  if (!state->cabac.only_count) {
+    if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MVs) {
       uint32_t key, mask;
       key                      = ff_get_key(&state->tile->dbs_g, num_bins>>1);
       mask                     = ( (1<<(num_bins >>1) ) -1 );
       state->tile->m_prev_pos  = ( bins + ( state->tile->m_prev_pos^key ) ) & mask;
       bins                     = ( (bins >> (num_bins >>1) ) << (num_bins >>1) ) | state->tile->m_prev_pos;
     }
+  }
   kvz_cabac_encode_bins_ep(data, bins, num_bins);
 }

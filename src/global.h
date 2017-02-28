@@ -151,13 +151,13 @@ typedef int16_t coeff_t;
 #define LCU_CHROMA_SIZE (LCU_WIDTH * LCU_WIDTH >> 2)
 
 #define MAX_REF_PIC_COUNT 16
-#define DEFAULT_REF_PIC_COUNT 3
 
 #define AMVP_MAX_NUM_CANDS 2
 #define AMVP_MAX_NUM_CANDS_MEM 3
 #define MRG_MAX_NUM_CANDS 5
 
 /* Some tools */
+#define ABS(a) ((a) >= 0 ? (a) : (-a))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define CLIP(low,high,value) MAX((low),MIN((high),(value)))
@@ -181,7 +181,7 @@ typedef int16_t coeff_t;
 // NOTE: When making a release, check to see if incrementing libversion in 
 // configure.ac is necessary.
 #ifndef KVZ_VERSION
-#define KVZ_VERSION 1.0.0
+#define KVZ_VERSION 1.1.0
 #endif
 #define VERSION_STRING QUOTE_EXPAND(KVZ_VERSION)
 
@@ -245,8 +245,6 @@ typedef int16_t coeff_t;
 #define SCALING_LIST_REM_NUM  6
 
 #define MAX_TR_DYNAMIC_RANGE 15
-
-#define EXP_GOLOMB_TABLE_SIZE (4096*8)
 
 //Constants
 typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;

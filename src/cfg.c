@@ -20,6 +20,7 @@
 
 #include "cfg.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,15 +28,7 @@
 
 kvz_config *kvz_config_alloc(void)
 {
-  kvz_config *cfg = (kvz_config *)malloc(sizeof(kvz_config));
-  if (!cfg) {
-    fprintf(stderr, "Failed to allocate a config object!\n");
-    return cfg;
-  }
-
-  FILL(*cfg, 0);
-
-  return cfg;
+  return calloc(1, sizeof(kvz_config));
 }
 
 int kvz_config_init(kvz_config *cfg)
@@ -76,7 +69,7 @@ int kvz_config_init(kvz_config *cfg)
   cfg->vui.chroma_loc  = 0; /* left center */
   cfg->aud_enable      = 0;
   cfg->cqmfile         = NULL;
-  cfg->ref_frames      = DEFAULT_REF_PIC_COUNT;
+  cfg->ref_frames      = 1;
   cfg->gop_len         = 4;
   cfg->gop_lowdelay    = true;
   cfg->bipred          = 0;
@@ -122,6 +115,12 @@ int kvz_config_init(kvz_config *cfg)
   cfg->gop_lp_definition.d = 3;
   cfg->gop_lp_definition.t = 1;
 
+  cfg->roi.width = 0;
+  cfg->roi.height = 0;
+  cfg->roi.dqps = NULL;
+
+  cfg->slices = KVZ_SLICES_NONE;
+
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   cfg->layer = 0;
@@ -145,26 +144,29 @@ int kvz_config_init(kvz_config *cfg)
 
 int kvz_config_destroy(kvz_config *cfg)
 {
-  //*********************************************
-  //For scalable extension. TODO: Move somewhere else?
-  //Deallocate el cfgs here
-  if(cfg->next_cfg != NULL){
-    kvz_config_destroy(cfg->next_cfg);
-    cfg->next_cfg = NULL;//FREE_POINTER(cfg->next_cfg);
-  } else {
-    FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared fields
-    FREE_POINTER(cfg->max_input_layers);
-    FREE_POINTER(*cfg->input_widths);
-    FREE_POINTER(*cfg->input_heights);
-    FREE_POINTER(cfg->input_widths);
-    FREE_POINTER(cfg->input_heights);
+  if (cfg) {
+    FREE_POINTER(cfg->cqmfile);
+    FREE_POINTER(cfg->tiles_width_split);
+    FREE_POINTER(cfg->tiles_height_split);
+    FREE_POINTER(cfg->slice_addresses_in_ts);
+    FREE_POINTER(cfg->roi.dqps);
+    //*********************************************
+    //For scalable extension. TODO: Move somewhere else?
+    //Deallocate el cfgs here
+    if(cfg->next_cfg != NULL){
+      kvz_config_destroy(cfg->next_cfg);
+      cfg->next_cfg = NULL;//FREE_POINTER(cfg->next_cfg);
+    } else {
+      FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared fields
+      FREE_POINTER(cfg->max_input_layers);
+      FREE_POINTER(*cfg->input_widths);
+      FREE_POINTER(*cfg->input_heights);
+      FREE_POINTER(cfg->input_widths);
+      FREE_POINTER(cfg->input_heights);
+
+    }
+    //*********************************************
   }
-  //*********************************************
-  FREE_POINTER(cfg->cqmfile);
-  FREE_POINTER(cfg->tiles_width_split);
-  FREE_POINTER(cfg->tiles_height_split);
-  FREE_POINTER(cfg->slice_addresses_in_ts);
-  
   free(cfg);
 
   return 1;
@@ -718,8 +720,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->vui.chroma_loc = atoi(value);
   else if OPT("aud")
     cfg->aud_enable = atobool(value);
-  else if OPT("cqmfile")
-    cfg->cqmfile = strdup(value);
+  else if OPT("cqmfile") {
+    char* cqmfile = strdup(value);
+    if (!cqmfile) {
+      fprintf(stderr, "Failed to allocate memory for CQM file name.\n");
+      return 0;
+    }
+    FREE_POINTER(cfg->cqmfile);
+    cfg->cqmfile = cqmfile;
+  }
   else if OPT("tiles-width-split") {
     int retval = parse_tiles_specification(value, &cfg->tiles_width_count, &cfg->tiles_width_split);
     
@@ -795,11 +804,27 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       // -1 means automatic selection
       cfg->owf = -1;
     }
-  } else if OPT("slice-addresses") {
-    fprintf(stderr, "--slice-addresses doesn't do anything, because slices are not implemented.\n");
-    return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
-  } else if OPT("threads")
+  } else if OPT("slices") {
+    if (!strcmp(value, "tiles")) {
+      cfg->slices = KVZ_SLICES_TILES;
+      return 1;
+    } else if (!strcmp(value, "wpp")) {
+      cfg->slices = KVZ_SLICES_WPP;
+      return 1;
+    } else if (!strcmp(value, "tiles+wpp")) {
+      cfg->slices = KVZ_SLICES_TILES | KVZ_SLICES_WPP;
+      return 1;
+    } else {
+      return parse_slice_specification(value, &cfg->slice_count, &cfg->slice_addresses_in_ts);
+    }
+
+  } else if OPT("threads") {
     cfg->threads = atoi(value);
+    if (cfg->threads == 0 && !strcmp(value, "auto")) {
+      // -1 means automatic selection
+      cfg->threads = -1;
+    }
+  }
   else if OPT("cpuid")
     cfg->cpuid = atoi(value);
   else if OPT("pu-depth-inter")
@@ -999,10 +1024,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->lossless = (bool)atobool(value);
   else if OPT("tmvp") {
     cfg->tmvp_enable = atobool(value);
-    if (cfg->gop_len && cfg->tmvp_enable) {
-      fprintf(stderr, "Cannot enable TMVP because GOP is used.\n");
-      cfg->tmvp_enable = false;
-    }
     if (cfg->tiles_width_count > 1 || cfg->tiles_height_count > 1) {
       fprintf(stderr, "Cannot enable TMVP because tiles are used.\n");
       cfg->tmvp_enable = false;
@@ -1039,6 +1060,60 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("implicit-rdpcm")
     cfg->implicit_rdpcm = (bool)atobool(value);
+  else if OPT("roi") {
+    // The ROI description is as follows:
+    // First number is width, second number is height,
+    // then follows width * height number of dqp values.
+    FILE* f = fopen(value, "rb");
+    if (!f) {
+      fprintf(stderr, "Could not open ROI file.\n");
+      return 0;
+    }
+
+    int width = 0;
+    int height = 0;
+    if (!fscanf(f, "%d", &width) || !fscanf(f, "%d", &height)) {
+      fprintf(stderr, "Failed to read ROI size.\n");
+      fclose(f);
+      return 0;
+    }
+
+    if (width <= 0 || height <= 0) {
+      fprintf(stderr, "Invalid ROI size: %dx%d.\n", width, height);
+      fclose(f);
+      return 0;
+    }
+
+    if (width > 10000 || height > 10000) {
+      fprintf(stderr, "ROI dimensions exceed arbitrary value of 10000.\n");
+      return 0;
+    }
+
+    const unsigned size = width * height;
+    uint8_t *dqp_array  = calloc((size_t)size, sizeof(cfg->roi.dqps[0]));
+    if (!dqp_array) {
+      fprintf(stderr, "Failed to allocate memory for ROI table.\n");
+      fclose(f);
+      return 0;
+    }
+
+    FREE_POINTER(cfg->roi.dqps);
+    cfg->roi.dqps   = dqp_array;
+    cfg->roi.width  = width;
+    cfg->roi.height = height;
+
+    for (int i = 0; i < size; ++i) {
+      int number; // Need a pointer to int for fscanf
+      if (fscanf(f, "%d", &number) != 1) {
+        fprintf(stderr, "Reading ROI file failed.\n");
+        fclose(f);
+        return 0;
+      }
+      dqp_array[i] = (uint8_t)number;
+    }
+
+    fclose(f);
+  }
   //*********************************************
   //For scalable extension. TODO: Move somewhere else? Add error checking
   else if OPT("layer") {
@@ -1197,6 +1272,21 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
+  if (cfg->width > 0 && cfg->height > 0) {
+    // We must be able to store the total number of luma and chroma pixels
+    // in an int32_t. For 4:4:4 chroma mode, the number of pixels is
+    // 3 * width * height. Width and height are rounded up to a multiple of
+    // LCU size.
+    const uint32_t max_lcus = INT_MAX / (3 * LCU_WIDTH * LCU_WIDTH);
+    const uint64_t num_lcus = CEILDIV((uint64_t)cfg->width,  LCU_WIDTH) *
+                              CEILDIV((uint64_t)cfg->height, LCU_WIDTH);
+    if (num_lcus > max_lcus) {
+      fprintf(stderr, "Input error: resolution %dx%d too large (max %u CTUs)\n",
+              cfg->width, cfg->height, max_lcus);
+      error = 1;
+    }
+  }
+
   if (cfg->framerate < 0.0) {
     fprintf(stderr, "Input error: --input-fps must be positive\n");
     error = 1;
@@ -1340,6 +1430,11 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
+  if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->wpp) {
+    fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
+    error = 1;
+  }
+
   //*********************************************
   //For scalable extension. TODO: Relax constraints as more parameters become compatiple
   //Validity check for scalable extension
@@ -1362,8 +1457,6 @@ int kvz_config_validate(const kvz_config *const cfg)
         error = 1;
       }
     } 
-
-
   }
   //*********************************************
 

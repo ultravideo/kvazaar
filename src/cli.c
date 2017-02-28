@@ -84,7 +84,7 @@ static const struct option long_options[] = {
   { "wpp",                      no_argument, NULL, 0 },
   { "no-wpp",                   no_argument, NULL, 0 },
   { "owf",                required_argument, NULL, 0 },
-  { "slice-addresses",    required_argument, NULL, 0 },
+  { "slices",             required_argument, NULL, 0 },
   { "threads",            required_argument, NULL, 0 },
   { "cpuid",              required_argument, NULL, 0 },
   { "pu-depth-inter",     required_argument, NULL, 0 },
@@ -118,6 +118,7 @@ static const struct option long_options[] = {
   { "input-format",       required_argument, NULL, 0 },
   { "implicit-rdpcm",           no_argument, NULL, 0 },
   { "no-implicit-rdpcm",        no_argument, NULL, 0 },
+  { "roi",                required_argument, NULL, 0 },
   //*********************************************
   //For scalable extension.
   { "layer",                    no_argument, NULL, 0 }, //New layer
@@ -433,6 +434,13 @@ void print_help(void)
     "                                   - none: no constraint\n"
     "                                   - frametile: constrain within the tile\n"
     "                                   - frametilemargin: constrain even more\n"
+    "      --roi <string>         : Use a delta QP map for region of interest\n"
+    "                                   Read an array of delta QP values from\n"
+    "                                   a file, where the first two values are the\n"
+    "                                   width and height, followed by width*height\n"
+    "                                   delta QP values in raster order.\n"
+    "                                   The delta QP map can be any size or aspect\n"
+    "                                   ratio, and will be mapped to LCU's.\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") ************/
     "Compression tools:\n"
@@ -506,13 +514,10 @@ void print_help(void)
     "                               positions of tiles rows separation coordinates.\n"
     "                               Can also be u followed by and a single int n,\n"
     "                               in which case it produces rows of uniform height.\n"
-    /*
-    "      --slice-addresses <string>|u<int> :\n"
-    "                               Specifies a comma separated list of LCU\n"
-    "                               positions in tile scan order of tile separations.\n"
-    "                               Can also be u followed by and a single int n,\n"
-    "                               in which case it produces uniform slice length.\n"
-    */
+    "      --slices <string>      : Control how slices are used\n"
+    "                                   - tiles: put tiles in independent slices\n"
+    "                                   - wpp: put rows in dependent slices\n"
+    "                                   - tiles+wpp: do both\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") ************/
     "Video Usability Information:\n"

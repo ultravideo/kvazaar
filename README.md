@@ -4,15 +4,26 @@ An open-source HEVC encoder licensed under LGPLv2.1
 
 Join channel #kvazaar_hevc in Freenode IRC network to contact us.
 
-Kvazaar is not yet finished and does not implement all the features of
-HEVC. Compression performance will increase as we add more coding tools.
+Kvazaar is still under development. Speed and RD-quality will continue to improve.
 
 http://ultravideo.cs.tut.fi/#encoder for more information.
 
-[![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
-[![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
+- Linux/Mac [![Build Status](https://travis-ci.org/ultravideo/kvazaar.svg?branch=master)](https://travis-ci.org/ultravideo/kvazaar)
+- Windows [![Build status](https://ci.appveyor.com/api/projects/status/88sg1h25lp0k71pu?svg=true)](https://ci.appveyor.com/project/Ultravideo/kvazaar)
 
 ## Using Kvazaar
+
+### Example:
+
+    kvazaar --input BQMall_832x480_60.yuv --output out.hevc
+
+The mandatory parameters are input and output. If the resolution of the input file is not in the filename, or when pipe is used, the input resolution must also be given: ```--input-res=1920x1080```.
+
+The default input format is 8-bit yuv420p for 8-bit and yuv420p10le for 10-bit. Input format and bitdepth can be selected with ```--input-format``` and ```--input-bitdepth```.
+
+Speed and compression quality can be selected with ```--preset```, or by setting the options manually.
+
+### Parameters
 
 [comment]: # (BEGIN KVAZAAR HELP MESSAGE)
 ```
@@ -82,6 +93,13 @@ Video structure:
                                    - none: no constraint
                                    - frametile: constrain within the tile
                                    - frametilemargin: constrain even more
+      --roi <string>         : Use a delta QP map for region of interest
+                                   Read an array of delta QP values from
+                                   a file, where the first two values are the
+                                   width and height, followed by width*height
+                                   delta QP values in raster order.
+                                   The delta QP map can be any size or aspect
+                                   ratio, and will be mapped to LCU's.
 
 Compression tools:
       --deblock [<beta:tc>]  : Deblocking
@@ -153,6 +171,10 @@ Parallel processing:
                                positions of tiles rows separation coordinates.
                                Can also be u followed by and a single int n,
                                in which case it produces rows of uniform height.
+      --slices <string>      : Control how slices are used
+                                   - tiles: put tiles in independent slices
+                                   - wpp: put rows in dependent slices
+                                   - tiles+wpp: do both
 
 Video Usability Information:
       --sar <width:height>   : Specify Sample Aspect Ratio
@@ -180,12 +202,6 @@ Deprecated parameters: (might be removed at some point)
   -h, --height                : Use --input-res
 ```
 [comment]: # (END KVAZAAR HELP MESSAGE)
-
-### For example:
-
-    kvazaar -i BQMall_832x480_60.yuv --input-res 832x480 -o out.hevc -n 600 -q 32
-
-The only accepted input format so far is 8-bit YUV 4:2:0.
 
 
 ### LP-GOP syntax
@@ -233,7 +249,6 @@ me-early-termination | sens. | sens. | sens. | sens. | on    | on    | on    | o
 
 
 ## Kvazaar library
-
 See [kvazaar.h](src/kvazaar.h) for the library API and its
 documentation.
 
@@ -242,13 +257,14 @@ must be defined. On other platforms it's not strictly required.
 
 The needed linker and compiler flags can be obtained with pkg-config.
 
-## Compiling Kvazaar
 
+## Compiling Kvazaar
 If you have trouble regarding compiling the source code, please make an
 [issue](https://github.com/ultravideo/kvazaar/issues) about in Github.
 Others might encounter the same problem and there is probably much to
 improve in the build process. We want to make this as simple as
 possible.
+
 
 ### Required libraries
 - For Visual Studio, the pthreads-w32 library is required. Platforms
@@ -259,10 +275,11 @@ possible.
   - The executable needs pthreadVC2.dll to be present. Either install it
     somewhere or ship it with the executable.
 
-### Autotools
 
+### Autotools
 Depending on the platform, some additional tools are required for compiling Kvazaar with autotools.
-For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`.
+For Ubuntu, the required packages are `automake autoconf libtool m4 build-essential yasm`. Yasm is
+optional, but some of the optimization will not be compiled in if it's missing.
 
 Run the following commands to compile and install Kvazaar.
 
@@ -273,30 +290,28 @@ Run the following commands to compile and install Kvazaar.
 
 See `./configure --help` for more options.
 
+
 ### OS X
-- The program should compile and work on OS X but you might need a newer
-  version of GCC than what comes with the platform.
+- Install Homebrew
+- run ```brew install automake libtool yasm```
+- Refer to Autotools instructions
+
 
 ### Visual Studio
-- VS2010 and older do not have support for some of the C99 features that
-  we use. Please use VS2013 or newer or GCC (MinGW) to compile on
-  Windows.
+- At least VisualStudio 2013 is required.
 - Project files can be found under build/.
 - Requires external [vsyasm.exe](http://yasm.tortall.net/Download.html)
   in %PATH%
-  - Run `rundll32 sysdm.cpl,EditEnvironmentVariables` and add PATH to
-    user variables
-- Building the Kvazaar library is not yet supported.
+
 
 ### Docker
-
 This project includes a [Dockerfile](./Dockerfile), which enables building for Docker. Kvazaar is also available in the Docker Hub [`ultravideo/kvazaar`](https://hub.docker.com/r/ultravideo/kvazaar/)
 Build using Docker: `docker build -t kvazaar .`
 Example usage: `docker run -i -a STDIN -a STDOUT kvazaar -i - --input-res=320x240 -o - < testfile_320x240.yuv > out.265`
 For other examples, see [Dockerfile](./Dockerfile)
 
-### Visualization (Windows only)
 
+### Visualization (Windows only)
 Branch `visualizer` has a visual studio project, which can be compiled to enable visualization feature in Kvazaar.
 
 Additional Requirements: [`SDL2`](https://www.libsdl.org/download-2.0.php), [`SDL2-ttf`](https://www.libsdl.org/projects/SDL_ttf/).
@@ -309,46 +324,38 @@ Note: The solution should be compiled on the x64 platform in visual studio.
 
 Optional font file `arial.ttf` is to be placed in the working directory, if block info tool is used.
 
-## Contributing to Kvazaar
 
-See http://github.com/ultravideo/kvazaar/wiki/List-of-suggested-topics
-for a list of topics you might want to examine if you would like to do
-something bigger than a bug fix but don't know what yet.
+## Contributing to Kvazaar
+We are happy to look at pull requests in Github. There is still lots of work to be done.
 
 
 ### Code documentation
-
 You can generate Doxygen documentation pages by running the command
 "doxygen docs.doxy". Here is a rough sketch of the module structure:
 ![Kvazaar module hierarchy](https://github.com/ultravideo/kvazaar/blob/master/doc/kvazaar_module_hierarchy.png)
 
-### For version control we try to follow these conventions:
 
+### For version control we try to follow these conventions:
 - Master branch always produces a working bitstream (can be decoded with
   HM).
 - Commits for new features and major changes/fixes put to a sensibly
   named feature branch first and later merged to the master branch.
 - Always merge the feature branch to the master branch, not the other
-  way around, with fast-forwarding disabled if necessary. We have found
-  that this differentiates between working and unfinished versions
-  nicely.
-- Every commit should at least compile. Producing a working bitstream is
-  nice as well, but not always possible. Features may be temporarily
-  disabled to produce a working bitstream, but remember to re-enable
-  them before merging to master.
+  way around, with fast-forwarding disabled if necessary.
+- Every commit should at least compile.
 
 
 ### Testing
-
-- We do not have a proper testing framework yet. We test mainly by
-  decoding the bitstream with HM and checking that the result matches
-  the encoders own reconstruction.
-- You should at least test that HM decodes a bitstream file made with
-  your changes without throwing checksum errors. If your changes
-  shouldn't alter the bitstream, you should check that they don't.
-- We would like to have a suite of automatic tests that also check for
-  BD-rate increase and speed decrease in addition to checking that the
-  bitstream is valid. As of yet there is no such suite.
+- Main automatic way of testing is with Travis CI. Commits, branches
+  and pull requests are tested automatically.
+  - Uninitialized variables and such are checked with Valgrind.
+  - Bitstream validity is checked with HM.
+  - Compilation is checked on GCC and Clang on Linux, and Clang on OSX.
+- Windows msys2 build is checked automatically on Appveyor.
+- If your changes change the bitstream, decode with HM to check that
+  it doesn't throw checksum errors or asserts.
+- If your changes shouldn't alter the bitstream, check that they don't.
+- Automatic compression quality testing is in the works.
 
 
 ### Unit tests
@@ -363,9 +370,10 @@ You can generate Doxygen documentation pages by running the command
         git submodule init
         git submodule update
 
+- On Linux, run ```make test```.
+
 
 ### Code style
-
 We try to follow the following conventions:
 - C99 without features not supported by Visual Studio 2013 (VLAs).
  - // comments allowed and encouraged.
@@ -378,16 +386,5 @@ We try to follow the following conventions:
 - Functions only used inside the module shouldn't be defined in the
   module header. They can be defined in the beginning of the .c file if
   necessary.
-
-
-### Resources for HEVC bitstream features
-
-- A good first resource for HEVC bitstream is JCTVC-N1002 High
-  Efficiency Video Coding (HEVC) Test Model 12 (HM12) Encoder
-  Description
-- Many good articles regarding specific parts of HEVC can be found on
-  IEEE Transactions on Circuits and Systems for Video Technology,
-  Combined issue on High Efficiency Video Coding (HEVC) Standards and
-  Research
-- The specification tends to follow the reference implementation, not
-  the other way around, so check HM if the specification is unclear.
+- Symbols defined in headers prefixed with kvz_ or KVZ_.
+- Includes in alphabetic order.

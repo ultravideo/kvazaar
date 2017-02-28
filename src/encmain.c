@@ -201,10 +201,10 @@ static void* input_read_thread(void* in_args)
     // Set PTS to make sure we pass it on correctly.
     frame_in->pts = frames_read;
 
-    bool read_success = yuv_io_read(args->input, 
+    bool read_success = yuv_io_read(args->input,
                                     (*args->opts->config->input_widths)[args->input_layer],
                                     (*args->opts->config->input_heights)[args->input_layer],
-                                    args->encoder->cfg->input_bitdepth,
+                                    args->encoder->cfg.input_bitdepth,
                                     args->encoder->bitdepth,
                                     frame_in);
     if (!read_success) {
@@ -222,7 +222,7 @@ static void* input_read_thread(void* in_args)
           bool read_success = yuv_io_read(args->input,
                                          (*args->opts->config->input_widths)[args->input_layer],
                                          (*args->opts->config->input_heights)[args->input_layer],
-                                          args->encoder->cfg->input_bitdepth,
+                                          args->encoder->cfg.input_bitdepth,
                                           args->encoder->bitdepth,
                                           frame_in);
           if (!read_success) {
@@ -244,9 +244,9 @@ static void* input_read_thread(void* in_args)
 
     frames_read++;
 
-    if (args->encoder->cfg->source_scan_type != 0) {
+    if (args->encoder->cfg.source_scan_type != 0) {
       // Set source scan type for frame, so that it will be turned into fields.
-      frame_in->interlacing = args->encoder->cfg->source_scan_type;
+      frame_in->interlacing = args->encoder->cfg.source_scan_type;
     }
 
     // Wait until main thread is ready to receive the next frame.
@@ -293,6 +293,41 @@ static void free_chained_img(const kvz_api const *api, kvz_picture *img )
 }
 // ***********************************************
 
+void output_recon_pictures(const kvz_api *const api,
+                           FILE *recout,
+                           kvz_picture *buffer[KVZ_MAX_GOP_LENGTH],
+                           int *buffer_size,
+                           uint64_t *next_pts,
+                           unsigned width,
+                           unsigned height)
+{
+  bool picture_written;
+  do {
+    picture_written = false;
+    for (int i = 0; i < *buffer_size; i++) {
+
+      kvz_picture *pic = buffer[i];
+      if (pic->pts == *next_pts) {
+        // Output the picture and remove it.
+        if (!yuv_io_write(recout, pic, width, height)) {
+          fprintf(stderr, "Failed to write reconstructed picture!\n");
+        }
+        api->picture_free(pic);
+        picture_written = true;
+        (*next_pts)++;
+
+        // Move rest of the pictures one position backward.
+        for (i++; i < *buffer_size; i++) {
+          buffer[i - 1] = buffer[i];
+          buffer[i] = NULL;
+        }
+        (*buffer_size)--;
+      }
+    }
+  } while (picture_written);
+}
+
+
 /**
  * \brief Program main function.
  * \param argc Argument count from commandline
@@ -317,6 +352,16 @@ int main(int argc, char *argv[])
 
   // ***********************************************
   // Modified for SHVC
+  
+  // PTS of the reconstructed picture that should be output next.
+  // Only used with --debug.
+  uint64_t *next_recon_pts = NULL;
+  // Buffer for storing reconstructed pictures that are not to be output
+  // yet (i.e. in wrong order because GOP is used).
+  // Only used with --debug.
+  kvz_picture *(*recon_buffer)[KVZ_MAX_GOP_LENGTH] = NULL; //Feels so wrong but should mean recon_buffer is a pointer to kvz_picture* [KVZ_MAX_GOP_LENGTH] -arrays
+  int *recon_buffer_size = NULL;
+
   //Need to declare these here because goto may jump over the initialization
   kvz_frame_info* info_out = NULL;
   uint32_t *len_out = NULL;
@@ -395,7 +440,7 @@ int main(int argc, char *argv[])
     goto exit_failure;
   }
 
-  encoder_control_t *encoder = enc->control;
+  const encoder_control_t *encoder = enc->control;
 
   for ( int i = 0; i < opts->num_inputs; i++) {
     fprintf(stderr, "Input layer %d:\n", i);
@@ -434,6 +479,11 @@ int main(int argc, char *argv[])
   main_thread_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
 
   in_args = calloc(opts->num_inputs,sizeof(input_handler_args));
+
+  //Allocate stuff for the debug output buffers etc.
+  next_recon_pts = calloc(opts->num_debugs,sizeof(uint64_t));
+  recon_buffer = calloc(opts->num_debugs,sizeof(kvz_picture*[KVZ_MAX_GOP_LENGTH])); //Feels so wrong but should mean recon_buffer is a pointer to kvz_picture* [KVZ_MAX_GOP_LENGTH] -arrays
+  recon_buffer_size = calloc(opts->num_debugs,sizeof(int));
 
   //Now, do the real stuff
   {
@@ -583,12 +633,24 @@ int main(int argc, char *argv[])
           if (layer_id < opts->num_debugs && recout[layer_id]) {
             // Since chunks_out was not NULL, img_rec should have been set.
             assert(cur_rec);
-            if (!yuv_io_write(recout[layer_id],
-              cur_rec,
-              cfg->width,
-              cfg->height)) {
-              fprintf(stderr, "Failed to write reconstructed picture!\n");
-            }
+            
+            // Move img_rec to the recon buffer.
+            assert(recon_buffer_size[layer_id] < KVZ_MAX_GOP_LENGTH);
+            recon_buffer[layer_id][recon_buffer_size[layer_id]++] = cur_rec;
+            //cur_rec = NULL;
+            //Cur rec might be freed in output_recon_pictures so we need to move to the next picture here
+            kvz_picture *tmp = cur_rec;
+            cur_rec = cur_rec->base_image;
+            tmp->base_image = tmp;
+
+            // Try to output some reconstructed pictures.
+            output_recon_pictures(api,
+                                  recout[layer_id],
+                                  recon_buffer[layer_id],
+                                  &recon_buffer_size[layer_id],
+                                  &next_recon_pts[layer_id],
+                                  cfg->width,
+                                  cfg->height);
           }
 
           frames_done += 1;
@@ -596,25 +658,27 @@ int main(int argc, char *argv[])
           psnr_sum[1] += frame_psnr[1];
           psnr_sum[2] += frame_psnr[2];
 
-
           print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id], layer_id); 
 
           //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;
-          cur_rec = cur_rec->base_image;
           cur_src = cur_src->base_image;
         }
       }
 
       free_chained_img(api, cur_in_img); cur_in_img = NULL;
       api->chunk_free(chunks_out);
-      free_chained_img(api, img_rec); img_rec = NULL;
+      //free_chained_img(api, img_rec); //Should be freed by output_recon_pictures
+      img_rec = NULL;  
       free_chained_img(api, img_src); img_src = NULL;
     }
     
     KVZ_GET_TIME(&encoding_end_real_time);
     encoding_end_cpu_time = clock();
     // Coding finished
+
+    // All reconstructed pictures should have been output.
+    assert(recon_buffer_size == 0);
 
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits",
@@ -678,6 +742,9 @@ done:
   free(input_threads);
   free(input_mutex);
   free(main_thread_mutex);
+  free(next_recon_pts);
+  free(recon_buffer);
+  free(recon_buffer_size);
   
   if (opts) cmdline_opts_free(api, opts);
   // ***********************************************

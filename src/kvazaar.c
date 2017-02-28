@@ -64,7 +64,8 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
-    kvz_encoder_control_free(encoder->control);
+    // Discard const from the pointer.
+    kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
   }
   else {
@@ -89,8 +90,6 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     goto kvazaar_open_failure;
   }
 
-  kvz_init_exp_golomb();
-
   // ***********************************************
   // Modified for SHVC. TODO: Account for more complex ref structures?
   kvz_encoder *cur_enc = NULL;
@@ -103,19 +102,17 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     }
     if( j == 0 ) encoder = cur_enc;
 
-    // FIXME: const qualifier disgarded. I don't want to change kvazaar_open
-    // but I really need to change cfg.
-    cur_enc->control = kvz_encoder_control_init((kvz_config*)cfg);
-    if (!cur_enc->control) {
-      goto kvazaar_open_failure;
-    }
+  encoder->control = kvz_encoder_control_init(cfg);
+  if (!encoder->control) {
+    goto kvazaar_open_failure;
+  }
     if( prev_enc != NULL ) prev_enc->control->next_enc_ctrl = cur_enc->control;
 
-    cur_enc->num_encoder_states = cur_enc->control->owf + 1;
-    cur_enc->cur_state_num = 0;
-    cur_enc->out_state_num = 0;
-    cur_enc->frames_started = 0;
-    cur_enc->frames_done = 0;
+  encoder->num_encoder_states = encoder->control->cfg.owf + 1;
+  encoder->cur_state_num = 0;
+  encoder->out_state_num = 0;
+  encoder->frames_started = 0;
+  encoder->frames_done = 0;
 
     kvz_init_input_frame_buffer(&cur_enc->input_buffer);
 
@@ -383,7 +380,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   encoder_state_t *state = &enc->states[enc->cur_state_num];
 
-  if (!state->prepared) {
+  if (!state->frame->prepared) {
     // ***********************************************
     // Modified for SHVC. TODO: Move all this to kvz_encoder_prepare?
     if (state->encoder_control->layer.layer_id > 0 && enc->prev_enc != NULL) {
@@ -417,7 +414,7 @@ static int kvazaar_encode(kvz_encoder *enc,
 
   if (pic_in != NULL) {
     // FIXME: The frame number printed here is wrong when GOP is enabled.
-    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg->seek);
+    CHECKPOINT_MARK("read source frame: %d", state->frame->num + enc->control->cfg.seek);
   }
 
   kvz_picture* frame = kvz_encoder_feed_frame(&enc->input_buffer, state, pic_in);
@@ -433,13 +430,13 @@ static int kvazaar_encode(kvz_encoder *enc,
     return 1;
   }
 
-  if (!state->frame_done) {
+  if (!state->frame->done) {
     // We started encoding a frame; move to the next encoder state.
     enc->cur_state_num = (enc->cur_state_num + 1) % (enc->num_encoder_states);
   }
 
   encoder_state_t *output_state = &enc->states[enc->out_state_num];
-  if (!output_state->frame_done &&
+  if (!output_state->frame->done &&
       (pic_in == NULL || enc->cur_state_num == enc->out_state_num)) {
 
     kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
@@ -454,8 +451,8 @@ static int kvazaar_encode(kvz_encoder *enc,
     if (src_out) *src_out = kvz_image_copy_ref(output_state->tile->frame->source);
     if (info_out) set_frame_info(info_out, output_state);
 
-    output_state->frame_done = 1;
-    output_state->prepared = 0;
+    output_state->frame->done = 1;
+    output_state->frame->prepared = 0;
     enc->frames_done += 1;
 
     enc->out_state_num = (enc->out_state_num + 1) % (enc->num_encoder_states);
@@ -472,13 +469,13 @@ static int kvazaar_encode(kvz_encoder *enc,
 int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   if (data_out) *data_out = NULL;
-  if (len_out) memset(len_out, 0, sizeof(uint32_t)*(*enc->control->cfg->max_layers));
+  if (len_out) memset(len_out, 0, sizeof(uint32_t)*(*enc->control->cfg.max_layers));
   if (pic_out) *pic_out = NULL;
   if (src_out) *src_out = NULL;
 
   //Pic_in should contain the input images chained using base_image.
   //Move them to a list for easier access
-  kvz_picture **pics_in = calloc(*enc->control->cfg->max_layers, sizeof(kvz_picture*));
+  kvz_picture **pics_in = calloc(*enc->control->cfg.max_layers, sizeof(kvz_picture*));
   pics_in[0] = pic_in;
 
   if (pic_in != NULL) {
@@ -499,7 +496,7 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   //TODO: Use a while loop instead?
   //for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
-    cur_pic_in = kvazaar_scaling(pics_in[cur_enc->control->cfg->input_layer], &cur_enc->downscaling);
+    cur_pic_in = kvazaar_scaling(pics_in[cur_enc->control->cfg.input_layer], &cur_enc->downscaling);
 
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
       kvz_image_free(cur_pic_in);
@@ -563,10 +560,10 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
                                           kvz_picture **src_out,
                                           kvz_frame_info *info_out)
 {
-  if (enc->control->cfg->source_scan_type == KVZ_INTERLACING_NONE) {
+  if (enc->control->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     //If several layers are used, call the apropriate function
-    if(*enc->control->cfg->max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+    if(*enc->control->cfg.max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
 

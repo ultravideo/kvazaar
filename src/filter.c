@@ -75,67 +75,80 @@ const int8_t kvz_g_chroma_filter[8][4] =
 // FUNCTIONS
 
 /**
- * \brief
+ * \brief Perform in strong luma filtering in place.
+ * \param line  line of 8 pixels, with center at index 4
+ * \param tc  tc treshold
+ * \return  Reach of the filter starting from center.
  */
-static INLINE void kvz_filter_deblock_luma(const encoder_control_t * const encoder,
-                                           kvz_pixel *src,
-                                           int32_t offset,
-                                           int32_t tc,
-                                           int8_t sw,
-                                           int8_t part_P_nofilter,
-                                           int8_t part_Q_nofilter,
-                                           int32_t thr_cut,
-                                           int8_t filter_second_P,
-                                           int8_t filter_second_Q)
+static INLINE int kvz_filter_deblock_luma_strong(
+    kvz_pixel *line,
+    int32_t tc)
 {
-  int32_t delta;
+  const kvz_pixel m0 = line[0];
+  const kvz_pixel m1 = line[1];
+  const kvz_pixel m2 = line[2];
+  const kvz_pixel m3 = line[3];
+  const kvz_pixel m4 = line[4];
+  const kvz_pixel m5 = line[5];
+  const kvz_pixel m6 = line[6];
+  const kvz_pixel m7 = line[7];
 
-  int16_t m0 = src[-offset * 4];
-  int16_t m1 = src[-offset * 3];
-  int16_t m2 = src[-offset * 2];
-  int16_t m3 = src[-offset];
-  int16_t m4 = src[0];
-  int16_t m5 = src[offset];
-  int16_t m6 = src[offset * 2];
-  int16_t m7 = src[offset * 3];
+  line[1] = CLIP(m1 - 2*tc, m1 + 2*tc, (2*m0 + 3*m1 +   m2 +   m3 +   m4 + 4) >> 3);
+  line[2] = CLIP(m2 - 2*tc, m2 + 2*tc, (  m1 +   m2 +   m3 +   m4        + 2) >> 2);
+  line[3] = CLIP(m3 - 2*tc, m3 + 2*tc, (  m1 + 2*m2 + 2*m3 + 2*m4 +   m5 + 4) >> 3);
+  line[4] = CLIP(m4 - 2*tc, m4 + 2*tc, (  m2 + 2*m3 + 2*m4 + 2*m5 +   m6 + 4) >> 3);
+  line[5] = CLIP(m5 - 2*tc, m5 + 2*tc, (  m3 +   m4 +   m5 +   m6        + 2) >> 2);
+  line[6] = CLIP(m6 - 2*tc, m6 + 2*tc, (  m3 +   m4 +   m5 + 3*m6 + 2*m7 + 4) >> 3);
 
-  if (sw) {
-    src[-offset * 3] = CLIP(m1 - 2*tc, m1 + 2*tc, (2*m0 + 3*m1 +   m2 +   m3 +   m4 + 4) >> 3);
-    src[-offset * 2] = CLIP(m2 - 2*tc, m2 + 2*tc, (  m1 +   m2 +   m3 +   m4        + 2) >> 2);
-    src[-offset]     = CLIP(m3 - 2*tc, m3 + 2*tc, (  m1 + 2*m2 + 2*m3 + 2*m4 +   m5 + 4) >> 3);
-    src[0]           = CLIP(m4 - 2*tc, m4 + 2*tc, (  m2 + 2*m3 + 2*m4 + 2*m5 +   m6 + 4) >> 3);
-    src[offset]      = CLIP(m5 - 2*tc, m5 + 2*tc, (  m3 +   m4 +   m5 +   m6        + 2) >> 2);
-    src[offset * 2]  = CLIP(m6 - 2*tc, m6 + 2*tc, (  m3 +   m4 +   m5 + 3*m6 + 2*m7 + 4) >> 3);
+  return 3;
+}
+
+/**
+ * \brief Perform in weak luma filtering in place.
+ * \param encoder  Encoder
+ * \param line  Line of 8 pixels, with center at index 4
+ * \param tc  The tc treshold
+ * \param p_2nd  Whether to filter the 2nd line of P
+ * \param q_2nd  Whether to filter the 2nd line of Q
+ */
+static INLINE int kvz_filter_deblock_luma_weak(
+    const encoder_control_t * const encoder,
+    kvz_pixel *line,
+    int32_t tc,
+    bool p_2nd,
+    bool q_2nd)
+{
+  const kvz_pixel m1 = line[1];
+  const kvz_pixel m2 = line[2];
+  const kvz_pixel m3 = line[3];
+  const kvz_pixel m4 = line[4];
+  const kvz_pixel m5 = line[5];
+  const kvz_pixel m6 = line[6];
+
+  int32_t delta = (9 * (m4 - m3) - 3 * (m5 - m2) + 8) >> 4;
+
+  if (abs(delta) >= tc * 10) {
+    return 0;
   } else {
-    // Weak filter
-    delta = (9*(m4 - m3) - 3*(m5 - m2) + 8) >> 4;
+    int32_t tc2 = tc >> 1;
+    delta = CLIP(-tc, tc, delta);
+    line[3] = CLIP(0, (1 << encoder->bitdepth) - 1, (m3 + delta));
+    line[4] = CLIP(0, (1 << encoder->bitdepth) - 1, (m4 - delta));
 
-    if (abs(delta) < thr_cut) {
-      int32_t tc2  = tc >> 1;
-      delta        = CLIP(-tc, tc, delta);
-      src[-offset] = CLIP(0, (1 << encoder->bitdepth) - 1, (m3 + delta));
-      src[0]       = CLIP(0, (1 << encoder->bitdepth) - 1, (m4 - delta));
-
-      if(filter_second_P) {
-        int32_t delta1   = CLIP(-tc2, tc2, (((m1 + m3 + 1) >> 1) - m2 + delta) >> 1);
-        src[-offset * 2] = CLIP(0, (1 << encoder->bitdepth) - 1, m2 + delta1);
-      }
-      if(filter_second_Q) {
-        int32_t delta2 = CLIP(-tc2, tc2, (((m6 + m4 + 1) >> 1) - m5 - delta) >> 1);
-        src[offset]    = CLIP(0, (1 << encoder->bitdepth) - 1, m5 + delta2);
-      }
+    if (p_2nd) {
+      int32_t delta1 = CLIP(-tc2, tc2, (((m1 + m3 + 1) >> 1) - m2 + delta) >> 1);
+      line[2] = CLIP(0, (1 << encoder->bitdepth) - 1, m2 + delta1);
     }
-  }
-
-  if(part_P_nofilter) {
-    src[-offset]     = (kvz_pixel)m3;
-    src[-offset * 2] = (kvz_pixel)m2;
-    src[-offset * 3] = (kvz_pixel)m1;
-  }
-  if(part_Q_nofilter) {
-    src[0]          = (kvz_pixel)m4;
-    src[offset]     = (kvz_pixel)m5;
-    src[offset * 2] = (kvz_pixel)m6;
+    if (q_2nd) {
+      int32_t delta2 = CLIP(-tc2, tc2, (((m6 + m4 + 1) >> 1) - m5 - delta) >> 1);
+      line[5] = CLIP(0, (1 << encoder->bitdepth) - 1, m5 + delta2);
+    }
+    
+    if (p_2nd || q_2nd) {
+      return 2;
+    } else {
+      return 1;
+    }
   }
 }
 
@@ -247,6 +260,59 @@ static bool is_on_8x8_grid(int x, int y, edge_dir dir)
   }
 }
 
+static int8_t get_qp_y_pred(const encoder_state_t* state, int x, int y, edge_dir dir)
+{
+  if (state->encoder_control->cfg.target_bitrate <= 0
+      && state->encoder_control->cfg.roi.dqps == NULL)
+  {
+    return state->qp;
+  }
+
+  int32_t qp_p;
+  if (dir == EDGE_HOR && y > 0) {
+    qp_p = kvz_cu_array_at_const(state->tile->frame->cu_array, x, y - 1)->qp;
+  } else if (dir == EDGE_VER && x > 0) {
+    qp_p = kvz_cu_array_at_const(state->tile->frame->cu_array, x - 1, y)->qp;
+  } else {
+    qp_p = state->frame->QP;
+  }
+
+  const int32_t qp_q =
+    kvz_cu_array_at_const(state->tile->frame->cu_array, x, y)->qp;
+
+  return (qp_p + qp_q + 1) >> 1;
+}
+
+/**
+ * \brief Gather pixels needed for deblocking
+ */
+static INLINE void gather_deblock_pixels(
+    const kvz_pixel *src,
+    int step, 
+    int stride,
+    int reach,
+    kvz_pixel *dst)
+{
+  for (int i = -reach; i < +reach; ++i) {
+    dst[i + 4] = src[i * step + stride];
+  }
+}
+
+/**
+* \brief Scatter pixels
+*/
+static INLINE void scatter_deblock_pixels(
+    const kvz_pixel *src,
+    int step, 
+    int stride,
+    int reach,
+    kvz_pixel *dst)
+{
+  for (int i = -reach; i < +reach; ++i) {
+    dst[i * step + stride] = src[i + 4];
+  }
+}
+
 /**
  * \brief Apply the deblocking filter to luma pixels on a single edge.
  *
@@ -284,33 +350,33 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
   {
     int32_t stride = frame->rec->stride;
-    int32_t beta_offset_div2 = encoder->beta_offset_div2;
-    int32_t tc_offset_div2   = encoder->tc_offset_div2;
+    int32_t beta_offset_div2 = encoder->cfg.deblock_beta;
+    int32_t tc_offset_div2   = encoder->cfg.deblock_tc;
     // TODO: support 10+bits
     kvz_pixel *orig_src = &frame->rec->y[x + y*stride];
     kvz_pixel *src = orig_src;
 
+    const int32_t qp = get_qp_y_pred(state, x, y, dir);
+
     int8_t strength = 0;
-    int32_t qp              = state->frame->QP;
     int32_t bitdepth_scale  = 1 << (encoder->bitdepth - 8);
     int32_t b_index         = CLIP(0, 51, qp + (beta_offset_div2 << 1));
     int32_t beta            = kvz_g_beta_table_8x8[b_index] * bitdepth_scale;
     int32_t side_threshold  = (beta + (beta >>1 )) >> 3;
     int32_t tc_index;
     int32_t tc;
-    int32_t thr_cut;
 
     uint32_t num_4px_parts  = length / 4;
 
-    const int32_t offset = (dir == EDGE_HOR) ? stride :      1;
-    const int32_t step   = (dir == EDGE_HOR) ?      1 : stride;
+    // Transpose the image by swapping x and y strides when doing horizontal
+    // edges.
+    const int32_t x_stride = (dir == EDGE_VER) ? 1 : stride;
+    const int32_t y_stride = (dir == EDGE_VER) ? stride : 1;
 
     // TODO: add CU based QP calculation
 
     // For each 4-pixel part in the edge
     for (uint32_t block_idx = 0; block_idx < num_4px_parts; ++block_idx) {
-      int32_t dp0, dq0, dp3, dq3, d0, d3, dp, dq, d;
-
       {
         // CUs on both sides of the edge
         cu_info_t *cu_p;
@@ -408,36 +474,51 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
 
         tc_index        = CLIP(0, 51 + 2, (int32_t)(qp + 2*(strength - 1) + (tc_offset_div2 << 1)));
         tc              = kvz_g_tc_table_8x8[tc_index] * bitdepth_scale;
-        thr_cut         = tc * 10;
       }
-      if(!strength) continue;
-      // Check conditions for filtering
-      // TODO: Get rid of these inline defines.
-      #define calc_DP(s,o) abs( (int16_t)s[-o*3] - (int16_t)2*s[-o*2] + (int16_t)s[-o] )
-      #define calc_DQ(s,o) abs( (int16_t)s[0]    - (int16_t)2*s[o]    + (int16_t)s[o*2] )
 
-      dp0 = calc_DP((src+step*(block_idx*4+0)), offset);
-      dq0 = calc_DQ((src+step*(block_idx*4+0)), offset);
-      dp3 = calc_DP((src+step*(block_idx*4+3)), offset);
-      dq3 = calc_DQ((src+step*(block_idx*4+3)), offset);
-      d0 = dp0 + dq0;
-      d3 = dp3 + dq3;
-      dp = dp0 + dp3;
-      dq = dq0 + dq3;
-      d  =  d0 + d3;
+      if (strength == 0) continue;
 
-      if (d < beta) {
-        int8_t filter_P = (dp < side_threshold) ? 1 : 0;
-        int8_t filter_Q = (dq < side_threshold) ? 1 : 0;
+      //                   +-- edge_src
+      //                   v
+      // line0 p3 p2 p1 p0 q0 q1 q2 q3
+      kvz_pixel *edge_src = &src[block_idx * 4 * y_stride];
 
+      // Gather the lines of pixels required for the filter on/off decision.
+      kvz_pixel b[4][8];
+      gather_deblock_pixels(edge_src, x_stride, 0 * y_stride, 4, &b[0][0]);
+      gather_deblock_pixels(edge_src, x_stride, 3 * y_stride, 4, &b[3][0]);
+
+      int_fast32_t dp0 = abs(b[0][1] - 2 * b[0][2] + b[0][3]);
+      int_fast32_t dq0 = abs(b[0][4] - 2 * b[0][5] + b[0][6]);
+      int_fast32_t dp3 = abs(b[3][1] - 2 * b[3][2] + b[3][3]);
+      int_fast32_t dq3 = abs(b[3][4] - 2 * b[3][5] + b[3][6]);
+      int_fast32_t dp = dp0 + dp3;
+      int_fast32_t dq = dq0 + dq3;
+
+      if (dp + dq < beta) {
         // Strong filtering flag checking
-        #define useStrongFiltering(o,d,s) ( ((abs(s[-o*4]-s[-o]) + abs(s[o*3]-s[0])) < (beta>>3)) && (d<(beta>>2)) && ( abs(s[-o]-s[0]) < ((tc*5+1)>>1)) )
-        int8_t sw = useStrongFiltering(offset, 2*d0, (src+step*(block_idx*4+0))) &&
-                    useStrongFiltering(offset, 2*d3, (src+step*(block_idx*4+3)));
+        int8_t sw = 2 * (dp0 + dq0) < beta >> 2 &&
+                    2 * (dp3 + dq3) < beta >> 2 &&
+                    abs(b[0][3] - b[0][4]) < (5 * tc + 1) >> 1 &&
+                    abs(b[3][3] - b[3][4]) < (5 * tc + 1) >> 1 &&
+                    abs(b[0][0] - b[0][3]) + abs(b[0][4] - b[0][7]) < beta >> 3 &&
+                    abs(b[3][0] - b[3][3]) + abs(b[3][4] - b[3][7]) < beta >> 3;
 
-        // Filter four rows/columns
-        for (int i = 0; i < 4; i++) {
-          kvz_filter_deblock_luma(encoder, src + step * (4*block_idx + i), offset, tc, sw, 0, 0, thr_cut, filter_P, filter_Q);
+        // Read lines 1 and 2. Weak filtering doesn't use the outermost pixels
+        // but let's give them anyway to simplify control flow.
+        gather_deblock_pixels(edge_src, x_stride, 1 * y_stride, 4, &b[1][0]);
+        gather_deblock_pixels(edge_src, x_stride, 2 * y_stride, 4, &b[2][0]);
+
+        for (int i = 0; i < 4; ++i) {
+          int filter_reach;
+          if (sw) {
+            filter_reach = kvz_filter_deblock_luma_strong(&b[i][0], tc);
+          } else {
+            bool p_2nd = dp < side_threshold;
+            bool q_2nd = dq < side_threshold;
+            filter_reach = kvz_filter_deblock_luma_weak(encoder, &b[i][0], tc, p_2nd, q_2nd);
+          }
+          scatter_deblock_pixels(&b[i][0], x_stride, i * y_stride, filter_reach, edge_src);
         }
       }
     }
@@ -482,7 +563,7 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
   // For each subpart
   {
     int32_t stride = frame->rec->stride >> 1;
-    int32_t tc_offset_div2 = encoder->tc_offset_div2;
+    int32_t tc_offset_div2 = encoder->cfg.deblock_tc;
     // TODO: support 10+bits
     kvz_pixel *src[] = {
       &frame->rec->u[x + y*stride],
@@ -490,7 +571,8 @@ static void filter_deblock_edge_chroma(encoder_state_t * const state,
     };
     int8_t strength = 2;
 
-    int32_t QP             = kvz_g_chroma_scale[state->frame->QP];
+    const int32_t luma_qp  = get_qp_y_pred(state, x << 1, y << 1, dir);
+    int32_t QP             = kvz_g_chroma_scale[luma_qp];
     int32_t bitdepth_scale = 1 << (encoder->bitdepth-8);
     int32_t TC_index       = CLIP(0, 51+2, (int32_t)(QP + 2*(strength-1) + (tc_offset_div2 << 1)));
     int32_t Tc             = kvz_g_tc_table_8x8[TC_index]*bitdepth_scale;
@@ -686,7 +768,7 @@ static void filter_deblock_lcu_rightmost(encoder_state_t * const state,
  */
 void kvz_filter_deblock_lcu(encoder_state_t * const state, int x_px, int y_px)
 {
-  assert(!state->encoder_control->cfg->lossless);
+  assert(!state->encoder_control->cfg.lossless);
 
   filter_deblock_lcu_inside(state, x_px, y_px, EDGE_VER);
   if (x_px > 0) {

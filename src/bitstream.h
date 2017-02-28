@@ -60,10 +60,6 @@ typedef struct
   uint32_t value;
 } bit_table_t;
 
-extern bit_table_t kvz_g_exp_table[EXP_GOLOMB_TABLE_SIZE];
-
-void kvz_init_exp_golomb();
-
 void kvz_bitstream_init(bitstream_t * stream);
 kvz_data_chunk * kvz_bitstream_alloc_chunk();
 kvz_data_chunk * kvz_bitstream_take_chunks(bitstream_t *stream);
@@ -77,10 +73,10 @@ void kvz_bitstream_move(bitstream_t *dst, bitstream_t *src);
 void kvz_bitstream_clear(bitstream_t *stream);
 
 void kvz_bitstream_put(bitstream_t *stream, uint32_t data, uint8_t bits);
-/* Use macros to force inlining */
-#define bitstream_put_ue(stream, data) { kvz_bitstream_put(stream,kvz_g_exp_table[data].value,kvz_g_exp_table[data].len); }
-#define bitstream_put_se(stream, data) { uint32_t index=(uint32_t)(((data)<=0)?(-(data))<<1:((data)<<1)-1);    \
-                                         kvz_bitstream_put(stream,kvz_g_exp_table[index].value,kvz_g_exp_table[index].len); }
+void kvz_bitstream_put_byte(bitstream_t *const stream, const uint32_t data);
+
+void kvz_bitstream_put_ue(bitstream_t *stream, uint32_t data);
+void kvz_bitstream_put_se(bitstream_t *stream, int32_t data);
 
 void kvz_bitstream_add_rbsp_trailing_bits(bitstream_t *stream);
 void kvz_bitstream_align(bitstream_t *stream);
@@ -90,12 +86,12 @@ void kvz_bitstream_align_zero(bitstream_t *stream);
 #ifdef KVZ_DEBUG_PRINT_CABAC
 /* Counter to keep up with bits written */
 #define WRITE_U(stream, data, bits, name) { printf("%-40s u(%d) : %d\n", name,bits,data); kvz_bitstream_put(stream,data,bits);}
-#define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); bitstream_put_ue(stream,data);}
-#define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); bitstream_put_se(stream,(data));}
+#define WRITE_UE(stream, data, name) { printf("%-40s ue(v): %d\n", name,data); kvz_bitstream_put_ue(stream,data);}
+#define WRITE_SE(stream, data, name) { printf("%-40s se(v): %d\n", name,data); kvz_bitstream_put_se(stream,(data));}
 #else
 #define WRITE_U(stream, data, bits, name) { kvz_bitstream_put(stream,data,bits); }
-#define WRITE_UE(stream, data, name) { bitstream_put_ue(stream,data); }
-#define WRITE_SE(stream, data, name) { bitstream_put_se(stream,data); }
+#define WRITE_UE(stream, data, name) { kvz_bitstream_put_ue(stream,data); }
+#define WRITE_SE(stream, data, name) { kvz_bitstream_put_se(stream,data); }
 #endif
 
 

@@ -584,7 +584,7 @@ void kvz_intra_recon_lcu_luma(
   kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
 
   kvz_pixel pred[32 * 32];
-  const kvz_config *cfg = state->encoder_control->cfg;
+  const kvz_config *cfg = &state->encoder_control->cfg;
   bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
   kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred, filter_boundary);
   
