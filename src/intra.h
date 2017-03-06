@@ -62,6 +62,26 @@ int8_t kvz_intra_get_dir_luma_predictor(
   const cu_info_t *const left_pu,
   const cu_info_t *const above_pu);
 
+#if KVZ_SEL_ENCRYPTION
+/**
+* \brief Function for deriving intra luma predictions with encryption
+* \param x          x-coordinate of the PU in pixels
+* \param y          y-coordinate of the PU in pixels
+* \param preds      output buffer for 3 predictions
+* \param cur_pu     PU to check
+* \param left_pu    PU to the left of cur_pu
+* \param above_pu   PU above cur_pu
+* \returns          1 if predictions are found, otherwise 0
+*/
+int8_t kvz_intra_get_dir_luma_predictor_encry(
+const uint32_t x,
+const uint32_t y,
+int8_t *preds,
+const cu_info_t *const cur_pu,
+const cu_info_t *const left_pu,
+const cu_info_t *const above_pu);
+#endif
+
 /**
 * \brief Generage angular predictions.
 * \param width    Width in pixels, range 4..32.

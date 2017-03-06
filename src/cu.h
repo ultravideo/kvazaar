@@ -138,6 +138,9 @@ typedef struct
       int8_t mode;
       int8_t mode_chroma;
       int8_t tr_skip;    //!< \brief transform skip flag
+#if KVZ_SEL_ENCRYPTION
+      int8_t mode_encry;
+#endif
     } intra;
     struct {
       int16_t mv[2][2];  // \brief Motion vectors for L0 and L1
