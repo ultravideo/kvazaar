@@ -114,6 +114,52 @@ int8_t kvz_intra_get_dir_luma_predictor(
   return 1;
 }
 
+#if KVZ_SEL_ENCRYPTION
+int8_t kvz_intra_get_dir_luma_predictor_encry(
+  const uint32_t x,
+  const uint32_t y,
+  int8_t *preds,
+  const cu_info_t *const cur_pu,
+  const cu_info_t *const left_pu,
+  const cu_info_t *const above_pu)
+{
+  // The default mode if block is not coded yet is INTRA_DC.
+  int8_t left_intra_dir  = 1;
+  if (left_pu && left_pu->type == CU_INTRA) {
+    left_intra_dir = left_pu->intra.mode_encry ;
+  }
+
+  int8_t above_intra_dir = 1;
+  if (above_pu && above_pu->type == CU_INTRA && y % LCU_WIDTH != 0) {
+    above_intra_dir = above_pu->intra.mode_encry;
+  }
+
+  // If the predictions are the same, add new predictions
+  if (left_intra_dir == above_intra_dir) {
+    if (left_intra_dir > 1) { // angular modes
+      preds[0] = left_intra_dir;
+      preds[1] = ((left_intra_dir + 29) % 32) + 2;
+      preds[2] = ((left_intra_dir - 1 ) % 32) + 2;
+    } else { //non-angular
+      preds[0] = 0;//PLANAR_IDX;
+      preds[1] = 1;//DC_IDX;
+      preds[2] = 26;//VER_IDX;
+    }
+  } else { // If we have two distinct predictions
+    preds[0] = left_intra_dir;
+    preds[1] = above_intra_dir;
+
+    // add planar mode if it's not yet present
+    if (left_intra_dir && above_intra_dir ) {
+      preds[2] = 0; // PLANAR_IDX;
+    } else {  // Add DC mode if it's not present, otherwise 26.
+      preds[2] =  (left_intra_dir+above_intra_dir)<2? 26 : 1;
+    }
+  }
+
+  return 1;
+}
+#endif
 
 static void intra_filter_reference(
   int_fast8_t log2_width,
