@@ -707,31 +707,35 @@ static uint8_t inline intra_mode_encryption(encoder_state_t * const state,
 
   const uint8_t nb_elems[3] = {17, 8, 8};
 
-  if(intra_pred_mode == 26 || intra_pred_mode == 10) /* for correct chroma Inra prediction mode */
+  if (intra_pred_mode == 26 || intra_pred_mode == 10) {
+    // correct chroma intra prediction mode
     return intra_pred_mode;
-  else {
+
+  } else {
     uint8_t keybits, scan_dir, elem_idx=0;
 
     keybits = ff_get_key(&state->tile->dbs_g, 5);
 
     scan_dir = SCAN_DIAG;
-    if (intra_pred_mode > 5  && intra_pred_mode < 15 )
+    if (intra_pred_mode > 5  && intra_pred_mode < 15) {
       scan_dir = SCAN_VER;
-    if (intra_pred_mode > 21 && intra_pred_mode < 31 )
-      scan_dir = SCAN_HOR;
-
-      for (int i = 0; i < nb_elems[scan_dir]; i++) {
-        if (intra_pred_mode == sets[scan_dir][i]) {
-          elem_idx = i;
-          break;
-        }
-      }
-
-      keybits = keybits % nb_elems[scan_dir];
-      keybits = (elem_idx + keybits) % nb_elems[scan_dir];
-
-      return sets[scan_dir][keybits];
     }
+    if (intra_pred_mode > 21 && intra_pred_mode < 31) {
+      scan_dir = SCAN_HOR;
+    }
+
+    for (int i = 0; i < nb_elems[scan_dir]; i++) {
+      if (intra_pred_mode == sets[scan_dir][i]) {
+        elem_idx = i;
+        break;
+      }
+    }
+
+    keybits = keybits % nb_elems[scan_dir];
+    keybits = (elem_idx + keybits) % nb_elems[scan_dir];
+
+    return sets[scan_dir][keybits];
+  }
 }
 
 static void encode_intra_coding_unit_encry(encoder_state_t * const state,
