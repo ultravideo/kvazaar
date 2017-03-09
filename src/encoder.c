@@ -113,398 +113,477 @@ static unsigned cfg_num_threads(void)
   return cpus + fake_cpus / 2;
 }
 
-
+// ***********************************************
+  // Modified for SHVC.
 /**
  * \brief Allocate and initialize an encoder control structure.
+ *
+ * Initialize an encoder control structure for each layer in the cfg and
+ * connect them through the next_enc_ctrl field. 
  *
  * \param cfg   encoder configuration
  * \return      initialized encoder control or NULL on failure
  */
-encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
+encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 {
   encoder_control_t *encoder = NULL;
+  encoder_control_t *prev_enc = NULL;
+  encoder_control_t *first_enc = NULL;
 
   if (!cfg) {
     fprintf(stderr, "Config object must not be null!\n");
     goto init_failed;
   }
 
-  // Make sure that the parameters make sense.
-  if (!kvz_config_validate(cfg)) {
-    goto init_failed;
-  }
+  for (; cfg != NULL; cfg = cfg->next_cfg ) {
 
-  encoder = calloc(1, sizeof(encoder_control_t));
-  if (!encoder) {
-    fprintf(stderr, "Failed to allocate encoder control.\n");
-    goto init_failed;
-  }
-
-  // Take a copy of the config.
-  memcpy(&encoder->cfg, cfg, sizeof(encoder->cfg));
-  // Set fields that are not copied to NULL.
-  encoder->cfg.cqmfile = NULL;
-  encoder->cfg.tiles_width_split = NULL;
-  encoder->cfg.tiles_height_split = NULL;
-  encoder->cfg.slice_addresses_in_ts = NULL;
-
-  if (encoder->cfg.threads == -1) {
-    encoder->cfg.threads = cfg_num_threads();
-  }
-
-  if (encoder->cfg.gop_len > 0) {
-    if (encoder->cfg.gop_lowdelay) {
-      kvz_config_process_lp_gop(&encoder->cfg);
+    // Make sure that the parameters make sense.
+    if (!kvz_config_validate(cfg)) {
+      goto init_failed;
     }
-  }
 
-  // Need to set owf before initializing threadqueue.
-  if (encoder->cfg.owf < 0) {
-    encoder->cfg.owf = select_owf_auto(&encoder->cfg);
-    fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
-  }
-  if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
-    // If using interlaced coding with OWF, the OWF has to be an even number
-    // to ensure that the pair of fields will be output for the same picture.
-    if (encoder->cfg.owf % 2 == 1) {
-      encoder->cfg.owf += 1;
+    encoder = calloc(1, sizeof(encoder_control_t));
+    
+    if (!encoder) {
+      fprintf(stderr, "Failed to allocate encoder control.\n");
+      goto init_failed;
     }
-  }
 
-  encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
-  if (!encoder->threadqueue ||
+    if(prev_enc != NULL) {
+      prev_enc->next_enc_ctrl = encoder;
+    }
+    else if(first_enc == NULL) {
+      first_enc = encoder;
+    }
+
+    // Take a copy of the config.
+    memcpy(&encoder->cfg, cfg, sizeof(encoder->cfg));
+    // Set fields that are not copied to NULL.
+    encoder->cfg.cqmfile = NULL;
+    encoder->cfg.tiles_width_split = NULL;
+    encoder->cfg.tiles_height_split = NULL;
+    encoder->cfg.slice_addresses_in_ts = NULL;
+
+
+    encoder->cfg.max_layers = NULL;
+    encoder->cfg.max_input_layers = NULL;
+    encoder->cfg.input_widths = NULL;
+    encoder->cfg.input_heights = NULL;
+    encoder->cfg.next_cfg = NULL;
+
+
+    if (encoder->cfg.threads == -1) {
+      encoder->cfg.threads = cfg_num_threads();
+    }
+
+    if (encoder->cfg.gop_len > 0) {
+      if (encoder->cfg.gop_lowdelay) {
+        kvz_config_process_lp_gop(&encoder->cfg);
+      }
+    }
+
+    // Need to set owf before initializing threadqueue.
+    if (encoder->cfg.owf < 0) {
+      encoder->cfg.owf = select_owf_auto(&encoder->cfg);
+      fprintf(stderr, "--owf=auto value set to %d.\n", encoder->cfg.owf);
+    }
+    if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
+      // If using interlaced coding with OWF, the OWF has to be an even number
+      // to ensure that the pair of fields will be output for the same picture.
+      if (encoder->cfg.owf % 2 == 1) {
+        encoder->cfg.owf += 1;
+      }
+    }
+
+    encoder->threadqueue = MALLOC(threadqueue_queue_t, 1);
+    if (!encoder->threadqueue ||
       !kvz_threadqueue_init(encoder->threadqueue,
-                        encoder->cfg.threads,
-                        encoder->cfg.owf > 0)) {
-    fprintf(stderr, "Could not initialize threadqueue.\n");
-    goto init_failed;
-  }
-
-  encoder->bitdepth = KVZ_BIT_DEPTH;
-
-  encoder->chroma_format = KVZ_FORMAT2CSP(encoder->cfg.input_format);
-
-  // Interlacing
-  encoder->in.source_scan_type = (int8_t)encoder->cfg.source_scan_type;
-  encoder->vui.field_seq_flag = encoder->cfg.source_scan_type != 0;
-  encoder->vui.frame_field_info_present_flag = encoder->cfg.source_scan_type != 0;
-
-  // Initialize the scaling list
-  kvz_scalinglist_init(&encoder->scaling_list);
-
-  // CQM
-  if (cfg->cqmfile) {
-    FILE* cqmfile = fopen(cfg->cqmfile, "rb");
-    if (cqmfile) {
-      kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
-      fclose(cqmfile);
-    } else {
-      fprintf(stderr, "Could not open CQM file.\n");
-      goto init_failed;
-    }
-  }
-  kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
-
-  kvz_encoder_control_input_init(encoder, encoder->cfg.width, encoder->cfg.height);
-
-  if (encoder->cfg.framerate_num != 0) {
-    double framerate = encoder->cfg.framerate_num / (double)encoder->cfg.framerate_denom;
-    encoder->target_avg_bppic = encoder->cfg.target_bitrate / framerate;
-  } else {
-    encoder->target_avg_bppic = encoder->cfg.target_bitrate / encoder->cfg.framerate;
-  }
-  encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
-
-  if (!encoder_control_init_gop_layer_weights(encoder)) {
-    goto init_failed;
-  }
-
-  // Copy delta QP array for ROI coding.
-  if (cfg->roi.dqps) {
-    const size_t roi_size = encoder->cfg.roi.width * encoder->cfg.roi.height;
-    encoder->cfg.roi.dqps = calloc(roi_size, sizeof(cfg->roi.dqps[0]));
-    memcpy(encoder->cfg.roi.dqps,
-           cfg->roi.dqps,
-           roi_size * sizeof(*cfg->roi.dqps));
-  }
-
-  //Tiles
-  encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
-                          encoder->cfg.tiles_height_count > 1;
-
-  {
-    const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
-
-    //Temporary pointers to allow encoder fields to be const
-    int32_t *tiles_col_width, *tiles_row_height, *tiles_ctb_addr_rs_to_ts, *tiles_ctb_addr_ts_to_rs, *tiles_tile_id, *tiles_col_bd, *tiles_row_bd;
-
-    if (encoder->cfg.tiles_width_count > encoder->in.width_in_lcu) {
-      fprintf(stderr, "Too many tiles (width)!\n");
-      goto init_failed;
-
-    } else if (encoder->cfg.tiles_height_count > encoder->in.height_in_lcu) {
-      fprintf(stderr, "Too many tiles (height)!\n");
+      encoder->cfg.threads,
+      encoder->cfg.owf > 0)) {
+      fprintf(stderr, "Could not initialize threadqueue.\n");
       goto init_failed;
     }
 
-    //Will be (perhaps) changed later
-    encoder->tiles_uniform_spacing_flag = 1;
+    encoder->bitdepth = KVZ_BIT_DEPTH;
 
-    encoder->tiles_col_width = tiles_col_width =
-      MALLOC(int32_t, encoder->cfg.tiles_width_count);
-    encoder->tiles_row_height = tiles_row_height =
-      MALLOC(int32_t, encoder->cfg.tiles_height_count);
+    encoder->chroma_format = KVZ_FORMAT2CSP(encoder->cfg.input_format);
 
-    encoder->tiles_col_bd = tiles_col_bd =
-      MALLOC(int32_t, encoder->cfg.tiles_width_count + 1);
-    encoder->tiles_row_bd = tiles_row_bd =
-      MALLOC(int32_t, encoder->cfg.tiles_height_count + 1);
+    // Interlacing
+    encoder->in.source_scan_type = (int8_t)encoder->cfg.source_scan_type;
+    encoder->vui.field_seq_flag = encoder->cfg.source_scan_type != 0;
+    encoder->vui.frame_field_info_present_flag = encoder->cfg.source_scan_type != 0;
 
-    encoder->tiles_ctb_addr_rs_to_ts = tiles_ctb_addr_rs_to_ts =
-      MALLOC(int32_t, num_ctbs);
-    encoder->tiles_ctb_addr_ts_to_rs = tiles_ctb_addr_ts_to_rs =
-      MALLOC(int32_t, num_ctbs);
-    encoder->tiles_tile_id = tiles_tile_id =
-      MALLOC(int32_t, num_ctbs);
+    // Initialize the scaling list
+    kvz_scalinglist_init(&encoder->scaling_list);
 
-    if (!tiles_col_width ||
+    // CQM
+    if (cfg->cqmfile) {
+      FILE* cqmfile = fopen(cfg->cqmfile, "rb");
+      if (cqmfile) {
+        kvz_scalinglist_parse(&encoder->scaling_list, cqmfile);
+        fclose(cqmfile);
+      }
+      else {
+        fprintf(stderr, "Could not open CQM file.\n");
+        goto init_failed;
+      }
+    }
+    kvz_scalinglist_process(&encoder->scaling_list, encoder->bitdepth);
+
+    kvz_encoder_control_input_init(encoder, encoder->cfg.width, encoder->cfg.height);
+
+    if (encoder->cfg.framerate_num != 0) {
+      double framerate = encoder->cfg.framerate_num / (double)encoder->cfg.framerate_denom;
+      encoder->target_avg_bppic = encoder->cfg.target_bitrate / framerate;
+    }
+    else {
+      encoder->target_avg_bppic = encoder->cfg.target_bitrate / encoder->cfg.framerate;
+    }
+    encoder->target_avg_bpp = encoder->target_avg_bppic / encoder->in.pixels_per_pic;
+
+    if (!encoder_control_init_gop_layer_weights(encoder)) {
+      goto init_failed;
+    }
+
+    // Copy delta QP array for ROI coding.
+    if (cfg->roi.dqps) {
+      const size_t roi_size = encoder->cfg.roi.width * encoder->cfg.roi.height;
+      encoder->cfg.roi.dqps = calloc(roi_size, sizeof(cfg->roi.dqps[0]));
+      memcpy(encoder->cfg.roi.dqps,
+        cfg->roi.dqps,
+        roi_size * sizeof(*cfg->roi.dqps));
+    }
+
+    //Tiles
+    encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
+      encoder->cfg.tiles_height_count > 1;
+
+    {
+      const int num_ctbs = encoder->in.width_in_lcu * encoder->in.height_in_lcu;
+
+      //Temporary pointers to allow encoder fields to be const
+      int32_t *tiles_col_width, *tiles_row_height, *tiles_ctb_addr_rs_to_ts, *tiles_ctb_addr_ts_to_rs, *tiles_tile_id, *tiles_col_bd, *tiles_row_bd;
+
+      if (encoder->cfg.tiles_width_count > encoder->in.width_in_lcu) {
+        fprintf(stderr, "Too many tiles (width)!\n");
+        goto init_failed;
+
+      }
+      else if (encoder->cfg.tiles_height_count > encoder->in.height_in_lcu) {
+        fprintf(stderr, "Too many tiles (height)!\n");
+        goto init_failed;
+      }
+
+      //Will be (perhaps) changed later
+      encoder->tiles_uniform_spacing_flag = 1;
+
+      encoder->tiles_col_width = tiles_col_width =
+        MALLOC(int32_t, encoder->cfg.tiles_width_count);
+      encoder->tiles_row_height = tiles_row_height =
+        MALLOC(int32_t, encoder->cfg.tiles_height_count);
+
+      encoder->tiles_col_bd = tiles_col_bd =
+        MALLOC(int32_t, encoder->cfg.tiles_width_count + 1);
+      encoder->tiles_row_bd = tiles_row_bd =
+        MALLOC(int32_t, encoder->cfg.tiles_height_count + 1);
+
+      encoder->tiles_ctb_addr_rs_to_ts = tiles_ctb_addr_rs_to_ts =
+        MALLOC(int32_t, num_ctbs);
+      encoder->tiles_ctb_addr_ts_to_rs = tiles_ctb_addr_ts_to_rs =
+        MALLOC(int32_t, num_ctbs);
+      encoder->tiles_tile_id = tiles_tile_id =
+        MALLOC(int32_t, num_ctbs);
+
+      if (!tiles_col_width ||
         !tiles_row_height ||
         !tiles_row_bd ||
         !tiles_col_bd ||
         !tiles_ctb_addr_rs_to_ts ||
         !tiles_ctb_addr_ts_to_rs ||
         !tiles_tile_id) {
-      goto init_failed;
-    }
+        goto init_failed;
+      }
 
-    //(6-3) and (6-4) in ITU-T Rec. H.265 (04/2013)
-    if (!cfg->tiles_width_split) {
+      //(6-3) and (6-4) in ITU-T Rec. H.265 (04/2013)
+      if (!cfg->tiles_width_split) {
+        for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
+          tiles_col_width[i] =
+            (i + 1) * encoder->in.width_in_lcu / encoder->cfg.tiles_width_count -
+            i    * encoder->in.width_in_lcu / encoder->cfg.tiles_width_count;
+        }
+      }
+      else {
+        int32_t last_pos_in_px = 0;
+        tiles_col_width[encoder->cfg.tiles_width_count - 1] = encoder->in.width_in_lcu;
+        for (int i = 0; i < encoder->cfg.tiles_width_count - 1; ++i) {
+          int32_t column_width_in_lcu = (cfg->tiles_width_split[i] - last_pos_in_px) / LCU_WIDTH;
+          last_pos_in_px = cfg->tiles_width_split[i];
+          tiles_col_width[i] = column_width_in_lcu;
+          tiles_col_width[encoder->cfg.tiles_width_count - 1] -= column_width_in_lcu;
+        }
+        encoder->tiles_uniform_spacing_flag = 0;
+      }
+
+      if (!cfg->tiles_height_split) {
+        for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
+          tiles_row_height[i] = ((i + 1) * encoder->in.height_in_lcu) / encoder->cfg.tiles_height_count -
+            i * encoder->in.height_in_lcu / encoder->cfg.tiles_height_count;
+        }
+      }
+      else {
+        int32_t last_pos_in_px = 0;
+        tiles_row_height[encoder->cfg.tiles_height_count - 1] = encoder->in.height_in_lcu;
+        for (int i = 0; i < encoder->cfg.tiles_height_count - 1; ++i) {
+          int32_t row_height_in_lcu = (cfg->tiles_height_split[i] - last_pos_in_px) / LCU_WIDTH;
+          last_pos_in_px = cfg->tiles_height_split[i];
+          tiles_row_height[i] = row_height_in_lcu;
+          tiles_row_height[encoder->cfg.tiles_height_count - 1] -= row_height_in_lcu;
+        }
+        encoder->tiles_uniform_spacing_flag = 0;
+      }
+
+      //(6-5) in ITU-T Rec. H.265 (04/2013)
+      tiles_col_bd[0] = 0;
       for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
-        tiles_col_width[i] =
-          (i+1) * encoder->in.width_in_lcu / encoder->cfg.tiles_width_count -
-           i    * encoder->in.width_in_lcu / encoder->cfg.tiles_width_count;
+        tiles_col_bd[i + 1] = tiles_col_bd[i] + tiles_col_width[i];
       }
-    } else {
-      int32_t last_pos_in_px = 0;
-      tiles_col_width[encoder->cfg.tiles_width_count - 1] = encoder->in.width_in_lcu;
-      for (int i = 0; i < encoder->cfg.tiles_width_count - 1; ++i) {
-        int32_t column_width_in_lcu = (cfg->tiles_width_split[i] - last_pos_in_px) / LCU_WIDTH;
-        last_pos_in_px = cfg->tiles_width_split[i];
-        tiles_col_width[i] = column_width_in_lcu;
-        tiles_col_width[encoder->cfg.tiles_width_count - 1] -= column_width_in_lcu;
-      }
-      encoder->tiles_uniform_spacing_flag = 0;
-    }
 
-    if (!cfg->tiles_height_split) {
+      //(6-6) in ITU-T Rec. H.265 (04/2013)
+      tiles_row_bd[0] = 0;
       for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
-        tiles_row_height[i] = ((i+1) * encoder->in.height_in_lcu) / encoder->cfg.tiles_height_count -
-                                   i * encoder->in.height_in_lcu / encoder->cfg.tiles_height_count;
-      }
-    } else {
-      int32_t last_pos_in_px = 0;
-      tiles_row_height[encoder->cfg.tiles_height_count - 1] = encoder->in.height_in_lcu;
-      for (int i = 0; i < encoder->cfg.tiles_height_count - 1; ++i) {
-        int32_t row_height_in_lcu = (cfg->tiles_height_split[i] - last_pos_in_px) / LCU_WIDTH;
-        last_pos_in_px = cfg->tiles_height_split[i];
-        tiles_row_height[i] = row_height_in_lcu;
-        tiles_row_height[encoder->cfg.tiles_height_count - 1] -= row_height_in_lcu;
-      }
-      encoder->tiles_uniform_spacing_flag = 0;
-    }
-
-    //(6-5) in ITU-T Rec. H.265 (04/2013)
-    tiles_col_bd[0] = 0;
-    for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
-      tiles_col_bd[i+1] = tiles_col_bd[i] + tiles_col_width[i];
-    }
-
-    //(6-6) in ITU-T Rec. H.265 (04/2013)
-    tiles_row_bd[0] = 0;
-    for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
-      tiles_row_bd[i+1] = tiles_row_bd[i] + tiles_row_height[i];
-    }
-
-    //(6-7) in ITU-T Rec. H.265 (04/2013)
-    //j == ctbAddrRs
-    for (int j = 0; j < num_ctbs; ++j) {
-      int tileX = 0, tileY = 0;
-      int tbX = j % encoder->in.width_in_lcu;
-      int tbY = j / encoder->in.width_in_lcu;
-
-      for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
-        if (tbX >= tiles_col_bd[i]) tileX = i;
+        tiles_row_bd[i + 1] = tiles_row_bd[i] + tiles_row_height[i];
       }
 
-      for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
-        if (tbY >= tiles_row_bd[i]) tileY = i;
+      //(6-7) in ITU-T Rec. H.265 (04/2013)
+      //j == ctbAddrRs
+      for (int j = 0; j < num_ctbs; ++j) {
+        int tileX = 0, tileY = 0;
+        int tbX = j % encoder->in.width_in_lcu;
+        int tbY = j / encoder->in.width_in_lcu;
+
+        for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
+          if (tbX >= tiles_col_bd[i]) tileX = i;
+        }
+
+        for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
+          if (tbY >= tiles_row_bd[i]) tileY = i;
+        }
+
+        tiles_ctb_addr_rs_to_ts[j] = 0;
+        for (int i = 0; i < tileX; ++i) {
+          tiles_ctb_addr_rs_to_ts[j] += tiles_row_height[tileY] * tiles_col_width[i];
+        }
+        for (int i = 0; i < tileY; ++i) {
+          tiles_ctb_addr_rs_to_ts[j] += encoder->in.width_in_lcu * tiles_row_height[i];
+        }
+        tiles_ctb_addr_rs_to_ts[j] += (tbY - tiles_row_bd[tileY]) * tiles_col_width[tileX] +
+          tbX - tiles_col_bd[tileX];
       }
 
-      tiles_ctb_addr_rs_to_ts[j] = 0;
-      for (int i = 0; i < tileX; ++i) {
-        tiles_ctb_addr_rs_to_ts[j] += tiles_row_height[tileY] * tiles_col_width[i];
+      //(6-8) in ITU-T Rec. H.265 (04/2013)
+      //Make reverse map from tile scan to raster scan
+      for (int j = 0; j < num_ctbs; ++j) {
+        tiles_ctb_addr_ts_to_rs[tiles_ctb_addr_rs_to_ts[j]] = j;
       }
-      for (int i = 0; i < tileY; ++i) {
-        tiles_ctb_addr_rs_to_ts[j] += encoder->in.width_in_lcu * tiles_row_height[i];
+
+      //(6-9) in ITU-T Rec. H.265 (04/2013)
+      int tileIdx = 0;
+      for (int j = 0; j < encoder->cfg.tiles_height_count; ++j) {
+        for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
+          for (int y = tiles_row_bd[j]; y < tiles_row_bd[j + 1]; ++y) {
+            for (int x = tiles_col_bd[i]; x < tiles_col_bd[i + 1]; ++x) {
+              tiles_tile_id[tiles_ctb_addr_rs_to_ts[y * encoder->in.width_in_lcu + x]] = tileIdx;
+            }
+          }
+          ++tileIdx;
+        }
       }
-      tiles_ctb_addr_rs_to_ts[j] += (tbY - tiles_row_bd[tileY]) * tiles_col_width[tileX] +
-                                     tbX - tiles_col_bd[tileX];
-    }
 
-    //(6-8) in ITU-T Rec. H.265 (04/2013)
-    //Make reverse map from tile scan to raster scan
-    for (int j = 0; j < num_ctbs; ++j) {
-      tiles_ctb_addr_ts_to_rs[tiles_ctb_addr_rs_to_ts[j]] = j;
-    }
+      if (encoder->cfg.slices & KVZ_SLICES_WPP) {
+        // Each WPP row will be put into a dependent slice.
+        encoder->pps.dependent_slice_segments_enabled_flag = 1;
+      }
 
-    //(6-9) in ITU-T Rec. H.265 (04/2013)
-    int tileIdx = 0;
-    for (int j = 0; j < encoder->cfg.tiles_height_count; ++j) {
-      for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
-        for (int y = tiles_row_bd[j]; y < tiles_row_bd[j+1]; ++y) {
-          for (int x = tiles_col_bd[i]; x < tiles_col_bd[i+1]; ++x) {
-            tiles_tile_id[tiles_ctb_addr_rs_to_ts[y * encoder->in.width_in_lcu + x]] = tileIdx;
+      //Slices
+      if (encoder->cfg.slices & KVZ_SLICES_TILES) {
+        // Configure a single independent slice per tile.
+
+        int *slice_addresses_in_ts;
+        encoder->slice_count = encoder->cfg.tiles_width_count * encoder->cfg.tiles_height_count;
+        encoder->slice_addresses_in_ts = slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
+
+        int slice_id = 0;
+        for (int tile_row = 0; tile_row < encoder->cfg.tiles_height_count; ++tile_row) {
+          for (int tile_col = 0; tile_col < encoder->cfg.tiles_width_count; ++tile_col) {
+            int x = tiles_col_bd[tile_col];
+            int y = tiles_row_bd[tile_row];
+            int rs = y * encoder->in.width_in_lcu + x;
+            int ts = tiles_ctb_addr_rs_to_ts[rs];
+            slice_addresses_in_ts[slice_id] = ts;
+            slice_id += 1;
           }
         }
-        ++tileIdx;
+
       }
-    }
+      else {
+        int *slice_addresses_in_ts;
+        encoder->slice_count = encoder->cfg.slice_count;
+        if (encoder->slice_count == 0) {
+          encoder->slice_count = 1;
 
-    if (encoder->cfg.slices & KVZ_SLICES_WPP) {
-      // Each WPP row will be put into a dependent slice.
-      encoder->pps.dependent_slice_segments_enabled_flag = 1;
-    }
+          encoder->slice_addresses_in_ts = slice_addresses_in_ts =
+            MALLOC(int, encoder->slice_count);
+          if (!slice_addresses_in_ts) goto init_failed;
 
-    //Slices
-    if (encoder->cfg.slices & KVZ_SLICES_TILES) {
-      // Configure a single independent slice per tile.
-
-      int *slice_addresses_in_ts;
-      encoder->slice_count = encoder->cfg.tiles_width_count * encoder->cfg.tiles_height_count;
-      encoder->slice_addresses_in_ts = slice_addresses_in_ts = MALLOC(int, encoder->slice_count);
-
-      int slice_id = 0;
-      for (int tile_row = 0; tile_row < encoder->cfg.tiles_height_count; ++tile_row) {
-        for (int tile_col = 0; tile_col < encoder->cfg.tiles_width_count; ++tile_col) {
-          int x = tiles_col_bd[tile_col];
-          int y = tiles_row_bd[tile_row];
-          int rs = y * encoder->in.width_in_lcu + x;
-          int ts = tiles_ctb_addr_rs_to_ts[rs];
-          slice_addresses_in_ts[slice_id] = ts;
-          slice_id += 1;
-        }
-      }
-
-    } else {
-      int *slice_addresses_in_ts;
-      encoder->slice_count = encoder->cfg.slice_count;
-      if (encoder->slice_count == 0) {
-        encoder->slice_count = 1;
-
-        encoder->slice_addresses_in_ts = slice_addresses_in_ts =
-          MALLOC(int, encoder->slice_count);
-        if (!slice_addresses_in_ts) goto init_failed;
-
-        slice_addresses_in_ts[0] = 0;
-
-      } else {
-        encoder->slice_addresses_in_ts = slice_addresses_in_ts =
-          MALLOC(int, encoder->slice_count);
-        if (!slice_addresses_in_ts) goto init_failed;
-
-        if (!cfg->slice_addresses_in_ts) {
           slice_addresses_in_ts[0] = 0;
-          for (int i = 1; i < encoder->slice_count; ++i) {
-            slice_addresses_in_ts[i] = encoder->in.width_in_lcu * encoder->in.height_in_lcu * i / encoder->slice_count;
+
+        }
+        else {
+          encoder->slice_addresses_in_ts = slice_addresses_in_ts =
+            MALLOC(int, encoder->slice_count);
+          if (!slice_addresses_in_ts) goto init_failed;
+
+          if (!cfg->slice_addresses_in_ts) {
+            slice_addresses_in_ts[0] = 0;
+            for (int i = 1; i < encoder->slice_count; ++i) {
+              slice_addresses_in_ts[i] = encoder->in.width_in_lcu * encoder->in.height_in_lcu * i / encoder->slice_count;
+            }
           }
-        } else {
-          for (int i = 0; i < encoder->slice_count; ++i) {
-            slice_addresses_in_ts[i] = cfg->slice_addresses_in_ts[i];
+          else {
+            for (int i = 0; i < encoder->slice_count; ++i) {
+              slice_addresses_in_ts[i] = cfg->slice_addresses_in_ts[i];
+            }
           }
         }
       }
-    }
 
 #ifdef _DEBUG_PRINT_THREADING_INFO
-    printf("Tiles columns width:");
-    for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
-      printf(" %d", encoder->tiles_col_width[i]);
-    }
-    printf("\n");
-    printf("Tiles row height:");
-    for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
-      printf(" %d", encoder->tiles_row_height[i]);
-    }
-    printf("\n");
-    //Print tile index map
-    for (int y = 0; y < encoder->in.height_in_lcu; ++y) {
-      for (int x = 0; x < encoder->in.width_in_lcu; ++x) {
-        const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
-        const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
-        const char slice_start = kvz_lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
-        const char slice_end = kvz_lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
-
-        printf("%c%03d%c", slice_start, encoder->tiles_tile_id[lcu_id_ts], slice_end);
+      printf("Tiles columns width:");
+      for (int i = 0; i < encoder->cfg.tiles_width_count; ++i) {
+        printf(" %d", encoder->tiles_col_width[i]);
       }
       printf("\n");
-    }
-    printf("\n");
-    if (encoder->cfg.wpp) {
-      printf("Wavefront Parallel Processing: enabled\n");
-    } else {
-      printf("Wavefront Parallel Processing: disabled\n");
-    }
-    printf("\n");
+      printf("Tiles row height:");
+      for (int i = 0; i < encoder->cfg.tiles_height_count; ++i) {
+        printf(" %d", encoder->tiles_row_height[i]);
+      }
+      printf("\n");
+      //Print tile index map
+      for (int y = 0; y < encoder->in.height_in_lcu; ++y) {
+        for (int x = 0; x < encoder->in.width_in_lcu; ++x) {
+          const int lcu_id_rs = y * encoder->in.width_in_lcu + x;
+          const int lcu_id_ts = encoder->tiles_ctb_addr_rs_to_ts[lcu_id_rs];
+          const char slice_start = kvz_lcu_at_slice_start(encoder, lcu_id_ts) ? '|' : ' ';
+          const char slice_end = kvz_lcu_at_slice_end(encoder, lcu_id_ts)  ? '|' : ' ';
+
+          printf("%c%03d%c", slice_start, encoder->tiles_tile_id[lcu_id_ts], slice_end);
+        }
+        printf("\n");
+      }
+      printf("\n");
+      if (encoder->cfg.wpp) {
+        printf("Wavefront Parallel Processing: enabled\n");
+            }
+      else {
+        printf("Wavefront Parallel Processing: disabled\n");
+      }
+      printf("\n");
 #endif //KVZ_DEBUG
-  }
+          }
 
-  assert(WITHIN(encoder->cfg.pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
-  assert(WITHIN(encoder->cfg.pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
-  assert(WITHIN(encoder->cfg.pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
-  assert(WITHIN(encoder->cfg.pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
+    assert(WITHIN(encoder->cfg.pu_depth_inter.min, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
+    assert(WITHIN(encoder->cfg.pu_depth_inter.max, PU_DEPTH_INTER_MIN, PU_DEPTH_INTER_MAX));
+    assert(WITHIN(encoder->cfg.pu_depth_intra.min, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
+    assert(WITHIN(encoder->cfg.pu_depth_intra.max, PU_DEPTH_INTRA_MIN, PU_DEPTH_INTRA_MAX));
 
-  // Disable in-loop filters, sign hiding and transform skip when using
-  // lossless coding.
-  if (encoder->cfg.lossless) {
-    encoder->cfg.deblock_enable  = false;
-    encoder->cfg.sao_enable      = false;
-    encoder->cfg.signhide_enable = false;
-    encoder->cfg.trskip_enable   = false;
-  }
-
-  // If fractional framerate is set, use that instead of the floating point framerate.
-  if (encoder->cfg.framerate_num != 0) {
-    encoder->vui.timing_info_present_flag = 1;
-    encoder->vui.num_units_in_tick = encoder->cfg.framerate_denom;
-    encoder->vui.time_scale = encoder->cfg.framerate_num;
-    if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
-      // when field_seq_flag=1, the time_scale and num_units_in_tick refer to
-      // field rate rather than frame rate.
-      encoder->vui.time_scale *= 2;
+    // Disable in-loop filters, sign hiding and transform skip when using
+    // lossless coding.
+    if (encoder->cfg.lossless) {
+      encoder->cfg.deblock_enable = false;
+      encoder->cfg.sao_enable = false;
+      encoder->cfg.signhide_enable = false;
+      encoder->cfg.trskip_enable = false;
     }
+
+    // If fractional framerate is set, use that instead of the floating point framerate.
+    if (encoder->cfg.framerate_num != 0) {
+      encoder->vui.timing_info_present_flag = 1;
+      encoder->vui.num_units_in_tick = encoder->cfg.framerate_denom;
+      encoder->vui.time_scale = encoder->cfg.framerate_num;
+      if (encoder->cfg.source_scan_type != KVZ_INTERLACING_NONE) {
+        // when field_seq_flag=1, the time_scale and num_units_in_tick refer to
+        // field rate rather than frame rate.
+        encoder->vui.time_scale *= 2;
+      }
+    }
+
+    if (encoder->cfg.vps_period >= 0) {
+      encoder->cfg.vps_period = encoder->cfg.vps_period * encoder->cfg.intra_period;
+    }
+    else {
+      encoder->cfg.vps_period = -1;
+    }
+
+    //*********************************************
+    //For scalable extension. TODO: Check that stuff from the cfg is copied properly since it is only copied now
+    encoder->layer.layer_id = cfg->layer;
+    encoder->layer.input_layer = cfg->input_layer;
+    encoder->layer.max_layers = *cfg->max_layers;
+
+    encoder->layer.num_layer_sets = encoder->layer.num_output_layer_sets = encoder->layer.max_layers;
+    encoder->layer.list_modification_present_flag = (encoder->layer.layer_id > 0) && (cfg->ref_frames > 1) && (cfg->intra_period != 1) ? 1 : 0;
+    encoder->layer.sps_ext_or_max_sub_layers_minus1 = 7;
+    encoder->layer.multi_layer_ext_sps_flag = encoder->layer.layer_id != 0 && 
+                                              encoder->layer.sps_ext_or_max_sub_layers_minus1 == 7;
+    
+    //encoder->layer.upscaling = NULL; //This is set later when the parameters have been set
+
+    encoder->layer.input_width = (*cfg->input_widths)[encoder->layer.input_layer];
+    encoder->layer.input_height = (*cfg->input_heights)[encoder->layer.input_layer];
+
+    //Set scaling parameters
+    //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
+    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
+    encoder->layer.downscaling = newScalingParameters(encoder->layer.input_width,
+                                                      encoder->layer.input_height,
+                                                      encoder->in.real_width,
+                                                      encoder->in.real_height,
+                                                      csp);
+    if( prev_enc != NULL ){
+      encoder->layer.upscaling = newScalingParameters(prev_enc->layer.upscaling.trgt_width,
+                                                      prev_enc->layer.upscaling.trgt_height,
+                                                      encoder->in.real_width,
+                                                      encoder->in.real_height,
+                                                      csp);
+    }
+    else {
+      encoder->layer.upscaling = newScalingParameters(encoder->in.real_width,
+                                                      encoder->in.real_height,
+                                                      encoder->in.real_width,
+                                                      encoder->in.real_height,
+                                                      csp);
+    }
+    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
+    //Scaling parameters need to be calculated for the true sizes.
+    encoder->layer.upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - encoder->layer.upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    encoder->layer.upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - encoder->layer.upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+
+
+    //*********************************************
+
+    prev_enc = encoder;
   }
 
-  if (encoder->cfg.vps_period >= 0) {
-    encoder->cfg.vps_period = encoder->cfg.vps_period * encoder->cfg.intra_period;
-  } else {
-    encoder->cfg.vps_period = -1;
-  }
-
-  //*********************************************
-  //For scalable extension. TODO: Check that stuff from the cfg is copied properly since it is only copied now
-  encoder->layer.layer_id = cfg->layer;
-  encoder->layer.max_layers = *cfg->max_layers;
-  encoder->layer.num_layer_sets = encoder->layer.num_output_layer_sets = encoder->layer.max_layers;
-  encoder->layer.list_modification_present_flag = (encoder->layer.layer_id>0)&&(cfg->ref_frames>1)&&(cfg->intra_period!=1)?1:0;
-  encoder->layer.upscaling = NULL; //This is set later when the parameters have been set
-  //*********************************************
-
-  return encoder;
+  return first_enc;
 
 init_failed:
-  kvz_encoder_control_free(encoder);
+  if(encoder != NULL) kvz_encoder_control_free(encoder);
+  if(prev_enc != NULL) prev_enc->next_enc_ctrl = NULL;
+  for(encoder_control_t *enc = first_enc; enc != NULL; enc = (encoder_control_t*)enc->next_enc_ctrl)
+    kvz_encoder_control_free(enc);
   return NULL;
 }
+// ***********************************************
 
 /**
  * \brief Free an encoder control structure.

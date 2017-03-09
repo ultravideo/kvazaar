@@ -94,25 +94,38 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
   // Modified for SHVC. TODO: Account for more complex ref structures?
   kvz_encoder *cur_enc = NULL;
   kvz_encoder *prev_enc = NULL;
+  const encoder_control_t *ctrl = kvz_encoder_control_init(cfg); //Initializes the control structures for different layers/encoders
+  if (ctrl == NULL) {
+    goto kvazaar_open_failure;
+  }
+
   //TODO: Just use a while loop?
-  for (unsigned j = 0; cfg != NULL ; j++) {
+  for (; ctrl != NULL ; ctrl = ctrl->next_enc_ctrl) {
+    
     cur_enc = calloc(1, sizeof(kvz_encoder));
     if (!cur_enc) {
       goto kvazaar_open_failure;
     }
-    if( j == 0 ) encoder = cur_enc;
+    if( encoder == NULL ) encoder = cur_enc;
 
-  encoder->control = kvz_encoder_control_init(cfg);
-  if (!encoder->control) {
-    goto kvazaar_open_failure;
-  }
-    if( prev_enc != NULL ) prev_enc->control->next_enc_ctrl = cur_enc->control;
+    //Connect the sub encoders
+    cur_enc->next_enc = NULL;
+    cur_enc->prev_enc = prev_enc;
+    if (prev_enc != NULL) prev_enc->next_enc = cur_enc;
 
-  encoder->num_encoder_states = encoder->control->cfg.owf + 1;
-  encoder->cur_state_num = 0;
-  encoder->out_state_num = 0;
-  encoder->frames_started = 0;
-  encoder->frames_done = 0;
+    //encoder->control = kvz_encoder_control_init(cfg);
+    //if (!encoder->control) {
+    //  goto kvazaar_open_failure;
+    //}
+    //if (prev_enc != NULL) prev_enc->control->next_enc_ctrl = cur_enc->control;
+
+    cur_enc->control = ctrl;
+
+    cur_enc->num_encoder_states = encoder->control->cfg.owf + 1;
+    cur_enc->cur_state_num = 0;
+    cur_enc->out_state_num = 0;
+    cur_enc->frames_started = 0;
+    cur_enc->frames_done = 0;
 
     kvz_init_input_frame_buffer(&cur_enc->input_buffer);
 
@@ -142,40 +155,36 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
 
     cur_enc->states[cur_enc->cur_state_num].frame->num = -1;
 
-    //Set scaling parameters
-    //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
-    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    cur_enc->downscaling = newScalingParameters((*cfg->input_widths)[cfg->input_layer],
-                                                (*cfg->input_heights)[cfg->input_layer],
-                                                cur_enc->control->in.real_width,
-                                                cur_enc->control->in.real_height,
-                                                csp);
-    if( prev_enc ){
-      cur_enc->upscaling = newScalingParameters(prev_enc->upscaling.trgt_width,
-                                                prev_enc->upscaling.trgt_height,
-                                                cur_enc->control->in.real_width,
-                                                cur_enc->control->in.real_height,
-                                                csp);
-    }
-    else {
-      cur_enc->upscaling = newScalingParameters(cur_enc->control->in.real_width,
-                                                cur_enc->control->in.real_height,
-                                                cur_enc->control->in.real_width,
-                                                cur_enc->control->in.real_height,
-                                                csp);
-    }
-    //Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
-    //Scaling parameters need to be calculated for the true sizes.
-    cur_enc->upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    cur_enc->upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    ////Set scaling parameters
+    ////Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
+    //enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
+    //cur_enc->downscaling = newScalingParameters((*cfg->input_widths)[cfg->input_layer],
+    //                                            (*cfg->input_heights)[cfg->input_layer],
+    //                                            cur_enc->control->in.real_width,
+    //                                            cur_enc->control->in.real_height,
+    //                                            csp);
+    //if( prev_enc ){
+    //  cur_enc->upscaling = newScalingParameters(prev_enc->upscaling.trgt_width,
+    //                                            prev_enc->upscaling.trgt_height,
+    //                                            cur_enc->control->in.real_width,
+    //                                            cur_enc->control->in.real_height,
+    //                                            csp);
+    //}
+    //else {
+    //  cur_enc->upscaling = newScalingParameters(cur_enc->control->in.real_width,
+    //                                            cur_enc->control->in.real_height,
+    //                                            cur_enc->control->in.real_width,
+    //                                            cur_enc->control->in.real_height,
+    //                                            csp);
+    //}
+    ////Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
+    ////Scaling parameters need to be calculated for the true sizes.
+    //cur_enc->upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
+    //cur_enc->upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
 
     //Set the reference to the upscaling parameters in control
-    cur_enc->control->layer.upscaling = &cur_enc->upscaling;
+    //cur_enc->control->layer.upscaling = &cur_enc->upscaling;
 
-    //Connect the sub encoders
-    cur_enc->next_enc = NULL;
-    cur_enc->prev_enc = prev_enc;
-    if( prev_enc ) prev_enc->next_enc = cur_enc;
     
     //Prepare for the next loop
     prev_enc = cur_enc;
@@ -281,7 +290,7 @@ static void remove_ILR_pics( encoder_state_t* const state)
 //TODO: Reuse buffers? Or not, who cares. Use a scaler struct to hold all relevant info for different layers?
 //TODO: remove memory db stuff
 //Create a new kvz picture based on pic_in with size given by width and height
-static kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, scaling_parameter_t* param)
+static kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, const scaling_parameter_t *const param)
 {
   //Create the buffers that are passed to the scaling function
   //TODO: Consider the case when kvz_pixel is not uint8
@@ -404,7 +413,7 @@ static int kvazaar_encode(kvz_encoder *enc,
       //TODO: Don't skip on first frame? Skip if inter frame. 
       if (bl_state->tile->frame->rec != NULL) {
         kvz_image_list_add(state->frame->ref,
-                           kvazaar_scaling(bl_state->tile->frame->rec, &enc->upscaling),
+                           kvazaar_scaling(bl_state->tile->frame->rec, &enc->control->layer.upscaling),
                            kvz_cu_array_alloc(state->tile->frame->width_in_lcu * LCU_WIDTH, state->tile->frame->height_in_lcu * LCU_WIDTH),
                            bl_state->frame->poc);
       }
@@ -466,16 +475,16 @@ static int kvazaar_encode(kvz_encoder *enc,
 //TODO: Allow scaling "step-wise" instead of allways from the original, for a potentially reduced complexity?
 //TODO: Account for pic_in containing several input images for different layers
 //Use this function to aggregate the results etc. but otherwise just call kvazaar_encode with the correct encoder
-int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
+static int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chunk** data_out, uint32_t* len_out, kvz_picture** pic_out, kvz_picture** src_out, kvz_frame_info* info_out)
 {
   if (data_out) *data_out = NULL;
-  if (len_out) memset(len_out, 0, sizeof(uint32_t)*(*enc->control->cfg.max_layers));
+  if (len_out) memset(len_out, 0, sizeof(uint32_t)*enc->control->layer.max_layers);
   if (pic_out) *pic_out = NULL;
   if (src_out) *src_out = NULL;
 
   //Pic_in should contain the input images chained using base_image.
   //Move them to a list for easier access
-  kvz_picture **pics_in = calloc(*enc->control->cfg.max_layers, sizeof(kvz_picture*));
+  kvz_picture **pics_in = calloc(enc->control->layer.max_layers, sizeof(kvz_picture*));
   pics_in[0] = pic_in;
 
   if (pic_in != NULL) {
@@ -494,9 +503,9 @@ int kvazaar_scalable_encode(kvz_encoder* enc, kvz_picture* pic_in, kvz_data_chun
   kvz_picture *cur_src_out = NULL;
 
   //TODO: Use a while loop instead?
-  //for( unsigned i = 0; i < *enc->control->cfg->max_layers; i++) {
+  //for( unsigned i = 0; i < enc->control->layer.max_layers; i++) {
   for( unsigned i = 0; cur_enc != NULL; i++) {  
-    cur_pic_in = kvazaar_scaling(pics_in[cur_enc->control->cfg.input_layer], &cur_enc->downscaling);
+    cur_pic_in = kvazaar_scaling(pics_in[cur_enc->control->layer.input_layer], &cur_enc->control->layer.downscaling);
 
     if(!kvazaar_encode(cur_enc, cur_pic_in, &cur_data_out, &cur_len_out, &cur_pic_out, &cur_src_out, &(info_out[i]))) {
       kvz_image_free(cur_pic_in);
@@ -563,7 +572,7 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   if (enc->control->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     //If several layers are used, call the apropriate function
-    if(*enc->control->cfg.max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+    if(enc->control->layer.max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
 

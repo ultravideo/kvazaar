@@ -76,8 +76,8 @@ struct kvz_encoder {
   kvz_encoder *next_enc;
 
   //Current encoders scaling parameters relative to the prev and next encoders
-  scaling_parameter_t downscaling;
-  scaling_parameter_t upscaling;
+  //scaling_parameter_t downscaling;
+  //scaling_parameter_t upscaling;
 
   // ***********************************************
   

@@ -359,7 +359,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
 
   //dpb_size(){
   //TODO: Implement properly.
-  uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg->ref_frames + state->encoder_control->cfg->gop_len;
+  uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg.ref_frames + state->encoder_control->cfg.gop_len;
   uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = { 0, 0, max_dec_pic_buffering_minus1,
                                                          max_dec_pic_buffering_minus1 }; //needs to be in line (<=) sps values
   //for (int i = 1; i < state->encoder_control->layer.num_output_layer_sets; i++) {
@@ -425,8 +425,8 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   for (int i = 0; i < 1; i++) {
     //*********************************************
     //For scalable extension. TODO: Why was it previously 1?
-    WRITE_UE(stream, state->encoder_control->cfg->ref_frames
-              + state->encoder_control->cfg->gop_len, "vps_max_dec_pic_buffering_minus1[i]");
+    WRITE_UE(stream, state->encoder_control->cfg.ref_frames
+              + state->encoder_control->cfg.gop_len, "vps_max_dec_pic_buffering_minus1[i]");
     //*********************************************
     WRITE_UE(stream, 0, "vps_num_reorder_pics");
     WRITE_UE(stream, 0, "vps_max_latency_increase");
@@ -683,7 +683,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //  }
 //
 //  int j;
-//  int ref_negative = state->encoder_control->cfg->ref_frames - neg_ref_minus;
+//  int ref_negative = state->encoder_control->cfg.ref_frames - neg_ref_minus;
 //  ref_negative = ref_negative < 0 ? 0 : ref_negative;
 //  int ref_positive = 0;
 //  
@@ -698,10 +698,10 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //  for (j = 0; j < ref_negative; j++) {
 //    int8_t delta_poc = 0;
 //
-//    if (encoder->cfg->gop_len) {
+//    if (encoder->cfg.gop_len) {
 //      int8_t found = 0;
 //      do {
-//        delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+//        delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
 //        for (int i = 0; i < state->frame->ref->used_size; i++) {
 //          if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
 //            found = 1;
@@ -716,7 +716,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //      } while (!found);
 //    }
 //
-//    WRITE_UE(stream, encoder->cfg->gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
+//    WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
 //    last_poc = delta_poc;
 //    WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
 //  }
@@ -725,10 +725,10 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //  for (j = 0; j < ref_positive; j++) {
 //    int8_t delta_poc = 0;
 //
-//    if (encoder->cfg->gop_len) {
+//    if (encoder->cfg.gop_len) {
 //      int8_t found = 0;
 //      do {
-//        delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+//        delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
 //        for (int i = 0; i < state->frame->ref->used_size; i++) {
 //          if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
 //            found = 1;
@@ -743,7 +743,7 @@ static void encoder_state_write_bitstream_SPS_extension(bitstream_t *stream,
 //      } while (!found);
 //    }
 //
-//    WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+//    WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
 //    last_poc = delta_poc;
 //    WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
 //  }
@@ -761,11 +761,11 @@ static void writeSTermRSet(encoder_state_t* const state, unsigned idx )
   }
 
   int j;
-  int ref_negative = idx + 1;//state->encoder_control->cfg->ref_frames;
+  int ref_negative = idx + 1;//state->encoder_control->cfg.ref_frames;
   int ref_positive = 0;
   
   //TODO: Make a better implementation. Use neg_ref_minus?
-  if(state->encoder_control->layer.layer_id > 0 && encoder->cfg->ref_frames <= ref_negative+ref_positive) --ref_negative; //One frame needs to be for the ILR ref
+  if(state->encoder_control->layer.layer_id > 0 && encoder->cfg.ref_frames <= ref_negative+ref_positive) --ref_negative; //One frame needs to be for the ILR ref
 
   if( idx != 0) {
     //IF slice header WRITE "delta_idx_minus1" ?
@@ -785,10 +785,10 @@ static void writeSTermRSet(encoder_state_t* const state, unsigned idx )
     for (j = 0; j < ref_negative; j++) {
       int8_t delta_poc = 0;
 
-      if (encoder->cfg->gop_len) {
+      if (encoder->cfg.gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
           for (int i = 0; i < state->frame->ref->used_size; i++) {
             if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
               found = 1;
@@ -803,7 +803,7 @@ static void writeSTermRSet(encoder_state_t* const state, unsigned idx )
         } while (!found);
       }
 
-      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
+      WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
       last_poc = delta_poc;
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s0_flag");
     }
@@ -812,10 +812,10 @@ static void writeSTermRSet(encoder_state_t* const state, unsigned idx )
     for (j = 0; j < ref_positive; j++) {
       int8_t delta_poc = 0;
 
-      if (encoder->cfg->gop_len) {
+      if (encoder->cfg.gop_len) {
         int8_t found = 0;
         do {
-          delta_poc = encoder->cfg->gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
           for (int i = 0; i < state->frame->ref->used_size; i++) {
             if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
               found = 1;
@@ -830,18 +830,18 @@ static void writeSTermRSet(encoder_state_t* const state, unsigned idx )
         } while (!found);
       }
 
-      WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+      WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
       last_poc = delta_poc;
       WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
   }
 }
 //*******************************************
-  
+
 static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
-  encoder_state_t * const state)
+                                                            encoder_state_t* const state)
 {
-  const encoder_control_t * encoder = state->encoder_control;
+  const encoder_control_t* encoder = state->encoder_control;
 
 #ifdef KVZ_DEBUG
   printf("=========== Sequence Parameter Set ID: 0 ===========\n");
@@ -855,14 +855,13 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   //TODO: set sps_max_sub_layers in cfg?
   if (state->encoder_control->layer.layer_id == 0) {
     WRITE_U(stream, 1, 3, "sps_max_sub_layers_minus1");
-  }
-  else {
-    WRITE_U(stream, 7, 3, "sps_ext_or_max_sub_layers_minus1")
+  } else {
+    WRITE_U(stream, encoder->layer.sps_ext_or_max_sub_layers_minus1, 3, "sps_ext_or_max_sub_layers_minus1")
   }
   //TODO: Add sps_ext_of_max_sub_layers_minus1 to cfg?
-  uint8_t multi_layer_ext_sps_flag = (state->encoder_control->layer.layer_id != 0); // && sps_ext_or_max_sub_layers_minus1 == 7);
+  
 
-  if (!multi_layer_ext_sps_flag) {
+  if (!encoder->layer.multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "sps_temporal_id_nesting_flag");
     encoder_state_write_bitstream_PTL(stream, state);
   }
@@ -874,18 +873,16 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   // vps is the same for all layers
   WRITE_UE(stream, state->encoder_control->layer.layer_id, "sps_seq_parameter_set_id");
   // ***********************************************
- 
 
-  if (multi_layer_ext_sps_flag) {
+
+  if (encoder->layer.multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "update_rep_format_flag");
-  }
-  else {
+  } else {
     WRITE_UE(stream, encoder->chroma_format, "chroma_format_idc");
-  
+
     if (encoder->chroma_format == KVZ_CSP_444) {
       WRITE_U(stream, 0, 1, "separate_colour_plane_flag");
     }
-
 
 
     WRITE_UE(stream, encoder->in.width, "pic_width_in_luma_samples");
@@ -904,8 +901,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
       WRITE_UE(stream, 0, "conf_win_top_offset");
       WRITE_UE(stream, (encoder->in.height - encoder->in.real_height) >> 1,
         "conf_win_bottom_offset");
-    }
-    else {
+    } else {
       WRITE_U(stream, 0, 1, "conformance_window_flag");
     }
 
@@ -916,24 +912,25 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     WRITE_UE(stream, encoder->bitdepth - 8, "bit_depth_chroma_minus8");
 
   }
-  
-  
+
+
   WRITE_UE(stream, 1, "log2_max_pic_order_cnt_lsb_minus4");
-  if (!multi_layer_ext_sps_flag) {
+  if (!encoder->layer.multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
-  //for each layer
-  if (encoder->cfg.gop_lowdelay) {
-    WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, 0, "sps_num_reorder_pics");
-  } else {
-    WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
-    WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+    //for each layer
+    if (encoder->cfg.gop_lowdelay) {
+      WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
+      WRITE_UE(stream, 0, "sps_num_reorder_pics");
+    } else {
+      WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
+      WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
+    }
   }
 
   WRITE_UE(stream, MIN_SIZE-3, "log2_min_coding_block_size_minus3");
   WRITE_UE(stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
-  WRITE_UE(stream, 0, "log2_min_transform_block_size_minus2");   // 4x4
+  WRITE_UE(stream, 0, "log2_min_transform_block_size_minus2"); // 4x4
   WRITE_UE(stream, 3, "log2_diff_max_min_transform_block_size"); // 4x4...32x32
   WRITE_UE(stream, TR_DEPTH_INTER, "max_transform_hierarchy_depth_inter");
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
@@ -944,56 +941,55 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
     //TODO: Infer scaling list from previous layer?
     uint8_t sps_infer_scaling_list_flag = 0;
 
-    if (multi_layer_ext_sps_flag) {
+    if (encoder->layer.multi_layer_ext_sps_flag) {
       WRITE_U(stream, sps_infer_scaling_list_flag, 1, "sps_infer_scaling_list_flag");
     }
     if (sps_infer_scaling_list_flag) {
       WRITE_U(stream, state->encoder_control->layer.layer_id - 1, 6, "sps_scaling_list_ref_layer_id");
-    }
-    else {
+    } else {
       WRITE_U(stream, 1, 1, "sps_scaling_list_data_present_flag");
       encoder_state_write_bitstream_scaling_list(stream, state);
     }
   }
 
+
   WRITE_U(stream, (encoder->cfg.amp_enable ? 1 : 0), 1, "amp_enabled_flag");
 
   WRITE_U(stream, encoder->cfg.sao_enable ? 1 : 0, 1,
-          "sample_adaptive_offset_enabled_flag");
+    "sample_adaptive_offset_enabled_flag");
   WRITE_U(stream, ENABLE_PCM, 1, "pcm_enabled_flag");
-  #if ENABLE_PCM == 1
+#if ENABLE_PCM == 1
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_luma_minus1");
     WRITE_U(stream, 7, 4, "pcm_sample_bit_depth_chroma_minus1");
     WRITE_UE(stream, 0, "log2_min_pcm_coding_block_size_minus3");
     WRITE_UE(stream, 2, "log2_diff_max_min_pcm_coding_block_size");
     WRITE_U(stream, 1, 1, "pcm_loop_filter_disable_flag");
-  #endif
+#endif
 
   if (state->encoder_control->layer.max_layers > 1) {
     //Need to make sure the first frames don't reference non-existant pocs
-    uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: a beter implementation?
+    uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg.ref_frames; //TODO: a beter implementation?
     if (state->encoder_control->layer.layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve one "reference" for ILR 
     WRITE_UE(stream, num_short_term_ref_pic_sets, "num_short_term_ref_pic_sets");
-         //IF num short term ref pic sets
+    //IF num short term ref pic sets
     for (int i = 0; i < num_short_term_ref_pic_sets; i++) {
       writeSTermRSet(state, i);
     }
-  }
-  else {
+  } else {
     WRITE_UE(stream, 0, "num_short_term_ref_pic_sets");
   }
-  
+
   //ENDIF
 
 
-//*******************************************  
+  //*******************************************  
   WRITE_U(stream, 0, 1, "long_term_ref_pics_present_flag");
 
   //IF long_term_ref_pics_present
   //ENDIF
 
   WRITE_U(stream, state->encoder_control->cfg.tmvp_enable, 1,
-          "sps_temporal_mvp_enable_flag");
+    "sps_temporal_mvp_enable_flag");
   WRITE_U(stream, 0, 1, "sps_strong_intra_smoothing_enable_flag");
   WRITE_U(stream, 1, 1, "vui_parameters_present_flag");
 
@@ -1003,7 +999,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
 
   kvz_bitstream_add_rbsp_trailing_bits(stream);
 }
-
+  
 static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
                                                             encoder_state_t * const state)
 {
@@ -1147,8 +1143,8 @@ static void encoder_state_write_bitstream_pic_parameter_set(bitstream_t* stream,
       if( ref_region_layer_offset_present_flag ) {
         WRITE_SE(stream, 0>>1, "ref_region_layer_left_offset");
         WRITE_SE(stream, 0>>1, "ref_region_layer_top_offset");
-        WRITE_SE(stream, state->encoder_control->layer.upscaling->src_padding_x>>1, "ref_region_layer_right_offset");
-        WRITE_SE(stream, state->encoder_control->layer.upscaling->src_padding_y>>1, "ref_region_layer_bottom_offset");
+        WRITE_SE(stream, state->encoder_control->layer.upscaling.src_padding_x>>1, "ref_region_layer_right_offset");
+        WRITE_SE(stream, state->encoder_control->layer.upscaling.src_padding_y>>1, "ref_region_layer_bottom_offset");
       }
 
       uint8_t resample_phase_set_presetn_flag = 0; //TODO: get from somewhere
@@ -1392,24 +1388,24 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
     //WRITE_U(stream, state->frame->poc & 0x1f, 5, "pic_order_cnt_lsb");
 //***********************************************
     
-    uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg->ref_frames; //TODO: get this number from somewhere else
+    uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg.ref_frames; //TODO: get this number from somewhere else
     if( state->encoder_control->layer.layer_id > 0 ) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets-1 : 1; //Reserve a "reference" for IRL
     uint8_t ref_sets = state->encoder_control->layer.max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
     WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
     if (ref_sets == 0) {
       WRITE_UE(stream, ref_negative, "num_negative_pics");
       WRITE_UE(stream, ref_positive, "num_positive_pics");
-    for (j = 0; j < ref_negative; j++) {      
-      int8_t delta_poc = 0;
-      
-      if (encoder->cfg.gop_len) {
-        int8_t found = 0;
-        do {
-          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
-          for (int i = 0; i < state->frame->ref->used_size; i++) {
-            if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
-              found = 1;
-              break;
+      for (j = 0; j < ref_negative; j++) {
+        int8_t delta_poc = 0;
+
+        if (encoder->cfg.gop_len) {
+          int8_t found = 0;
+          do {
+            delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_neg[j + poc_shift];
+            for (int i = 0; i < state->frame->ref->used_size; i++) {
+              if (state->frame->ref->pocs[i] == state->frame->poc - delta_poc) {
+                found = 1;
+                break;
               }
             }
             if (!found) poc_shift++;
@@ -1417,10 +1413,11 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
               fprintf(stderr, "Failure, reference not found!");
               exit(EXIT_FAILURE);
             }
-          } while (!found);
+          }
+          while (!found);
         }
 
-        WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
+        WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s0_minus1");
         last_poc = delta_poc;
         WRITE_U(stream, 1, 1, "used_by_curr_pic_s0_flag");
       }
@@ -1429,41 +1426,38 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       for (j = 0; j < ref_positive; j++) {
         int8_t delta_poc = 0;
 
-      WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
-      last_poc = delta_poc;
-      WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
-    }
-    last_poc = 0;
-    poc_shift = 0;
-    for (j = 0; j < ref_positive; j++) {      
-      int8_t delta_poc = 0;
-      
-      if (encoder->cfg.gop_len) {
-        int8_t found = 0;
-        do {
-          delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
-          for (int i = 0; i < state->frame->ref->used_size; i++) {
-            if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
-              found = 1;
-              break;
+        WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
+        last_poc = delta_poc;
+        WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
+      }
+      last_poc = 0;
+      poc_shift = 0;
+      for (j = 0; j < ref_positive; j++) {
+        int8_t delta_poc = 0;
+
+        if (encoder->cfg.gop_len) {
+          int8_t found = 0;
+          do {
+            delta_poc = encoder->cfg.gop[state->frame->gop_offset].ref_pos[j + poc_shift];
+            for (int i = 0; i < state->frame->ref->used_size; i++) {
+              if (state->frame->ref->pocs[i] == state->frame->poc + delta_poc) {
+                found = 1;
+                break;
+              }
             }
-          }
             if (!found) poc_shift++;
             if (j + poc_shift == ref_positive) {
               fprintf(stderr, "Failure, reference not found!");
               exit(EXIT_FAILURE);
             }
-          } while (!found);
+          }
+          while (!found);
         }
 
-        WRITE_UE(stream, encoder->cfg->gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
+        WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
         last_poc = delta_poc;
         WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
       }
-      
-      WRITE_UE(stream, encoder->cfg.gop_len ? delta_poc - last_poc - 1 : 0, "delta_poc_s1_minus1");
-      last_poc = delta_poc;
-      WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
     }
     else if( num_short_term_ref_pic_sets > 1 ){
       uint32_t poc = state->frame->poc;
@@ -1696,7 +1690,7 @@ static void encoder_state_write_slice_header(
 {
   uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
 
-  kvz_nal_write(stream, nal_type, 0, state->frame->first_nal);
+  kvz_nal_write(stream, nal_type, 0, state->frame->first_nal, state->encoder_control->layer.layer_id);
   state->frame->first_nal = false;
 
   kvz_encoder_state_write_bitstream_slice_header(stream, state, independent);
@@ -1747,8 +1741,9 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
   // ***********************************************
   // Modified for SHVC. TODO: only in base layer?
   // Send Kvazaar version information only in the first frame.
-  if (state->frame->num == 0 && encoder->cfg->add_encoder_info && state->encoder_control->layer.layer_id == 0) {
-    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au, 0); //TODO: Need to specify layer?
+  if (state->frame->num == 0 && encoder->cfg.add_encoder_info && state->encoder_control->layer.layer_id == 0) {
+    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal, 0); //TODO: Need to specify layer?
+    state->frame->first_nal = false;
     encoder_state_write_bitstream_prefix_sei_version(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
@@ -1764,17 +1759,15 @@ static void encoder_state_write_bitstream_main(encoder_state_t * const state)
     //encoder_state_write_active_parameter_sets_sei_message(state);
     //kvz_bitstream_rbsp_trailing_bits(stream);
 
-    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, first_nal_in_au, 0); //TODO: Need to specify layer?
+    kvz_nal_write(stream, KVZ_NAL_PREFIX_SEI_NUT, 0, state->frame->first_nal, 0); //TODO: Need to specify layer?
+    state->frame->first_nal = false;
     encoder_state_write_picture_timing_sei_message(state);
 
     // spec:sei_rbsp() rbsp_trailing_bits
     kvz_bitstream_add_rbsp_trailing_bits(stream);
   }
 
-  {
-    uint8_t nal_type = (state->frame->is_idr_frame ? KVZ_NAL_IDR_W_RADL : KVZ_NAL_TRAIL_R);
-    kvz_nal_write(stream, nal_type, 0, first_nal_in_au, state->encoder_control->layer.layer_id);
-  }
+  
  // ***********************************************
   {
     PERFORMANCE_MEASURE_START(KVZ_PERF_FRAME);

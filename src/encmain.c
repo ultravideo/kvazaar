@@ -454,14 +454,13 @@ int main(int argc, char *argv[])
     }
   }
   for( const encoder_control_t* ctrl = encoder; ctrl != NULL ; ctrl = ctrl->next_enc_ctrl) {
-    const kvz_config* cfg = ctrl->cfg;
-    fprintf(stderr, "Layer %d:\n", cfg->layer);
-    fprintf(stderr, "  Input layer: %d\n", cfg->input_layer);
+    fprintf(stderr, "Layer %d:\n", ctrl->layer.layer_id);
+    fprintf(stderr, "  Input layer: %d\n", ctrl->layer.input_layer);
     fprintf(stderr, "    Video size: %dx%d (input=%dx%d)\n",
       ctrl->in.width, ctrl->in.height,
       ctrl->in.real_width, ctrl->in.real_height);
-    if( cfg->layer < opts->num_debugs ){
-      fprintf(stderr, "  Debug output: %s\n", opts->debug[cfg->layer]);
+    if( ctrl->layer.layer_id < opts->num_debugs ){
+      fprintf(stderr, "  Debug output: %s\n", opts->debug[ctrl->layer.layer_id]);
     }
   }
 //******************************************

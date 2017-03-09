@@ -39,6 +39,8 @@
 /* Encoder control options, the main struct */
 typedef struct encoder_control_t
 {
+  // ***********************************************
+  // Modified for SHVC.
   /**
    * \brief Configuration.
    *
@@ -48,8 +50,14 @@ typedef struct encoder_control_t
    *    - tiles_width_split
    *    - tiles_height_split
    *    - slice_addresses_in_ts
+   *    - max_layers
+   *    - max_input_layers
+   *    - input_widths
+   *    - input_heights
+   *    - next_cfg
    * Use appropriate fields in encoder_control_t instead.
    */
+  // ***********************************************
   kvz_config cfg;
 
   /* Input */
@@ -133,11 +141,23 @@ typedef struct encoder_control_t
   struct
   {
     uint8_t layer_id; //id of the current layer
+    uint8_t input_layer; //Index into the input image list used for this layer
     uint8_t max_layers; //Total number of layers
+
     uint16_t num_layer_sets; //TODO: Find out what they do. Needs to be > 1 if more than 2 layers (as many?)
     uint16_t num_output_layer_sets;
     uint8_t list_modification_present_flag; //TODO: Move somewhere else?
-    scaling_parameter_t* upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
+    uint8_t multi_layer_ext_sps_flag;
+    uint8_t sps_ext_or_max_sub_layers_minus1;
+
+    scaling_parameter_t upscaling; //Reference to the upscaling parameters defined in the encoder. TODO: Find a better way?
+    scaling_parameter_t downscaling; 
+
+    //Copied from cfg. TODO: Move somewhere else?
+    //Width and height of the input image. TODO: move to .in etc?
+    int32_t input_width;
+    int32_t input_height;
+
   } layer;
 
   // TODO: Needed to set rep_formats in vps. Find a better way?
