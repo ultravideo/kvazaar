@@ -279,7 +279,7 @@ done:
 // ***********************************************
 // Modified for SHVC
 //Helper function for deallocating chained kvz_pictures
-static void free_chained_img(const kvz_api const *api, kvz_picture *img )
+static void free_chained_img(const kvz_api *const api, kvz_picture *img )
 {
   if( img == NULL ) return;
   while( img != img->base_image ) {

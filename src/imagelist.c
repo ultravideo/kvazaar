@@ -137,34 +137,33 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
  * \param picture_list list to use
  * \return 1 on success
  */
-int kvz_image_list_add_back(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc)
-{
-  int i = 0;
-  if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {
-    fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
-    assert(0); //Stop for debugging
-    return 0;
-  }
-  
-  if (KVZ_ATOMIC_INC(&(cua->refcount)) == 1) {
-    fprintf(stderr, "Tried to add an unreferenced cu_array. This is a bug!\n");
-    assert(0); //Stop for debugging
-    return 0;
-  }
-
-  if (list->size == list->used_size) {
-    if (!kvz_image_list_resize(list, list->size*2)) return 0;
-  }
-
-  int end = list->used_size;
-
-  list->images[end] = im;
-  list->cu_arrays[end] = cua;
-  list->pocs[end] = poc;
-  
-  list->used_size++;
-  return 1;
-}
+//int kvz_image_list_add_back(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc)
+//{
+//  if (KVZ_ATOMIC_INC(&(im->refcount)) == 1) {
+//    fprintf(stderr, "Tried to add an unreferenced picture. This is a bug!\n");
+//    assert(0); //Stop for debugging
+//    return 0;
+//  }
+//  
+//  if (KVZ_ATOMIC_INC(&(cua->refcount)) == 1) {
+//    fprintf(stderr, "Tried to add an unreferenced cu_array. This is a bug!\n");
+//    assert(0); //Stop for debugging
+//    return 0;
+//  }
+//
+//  if (list->size == list->used_size) {
+//    if (!kvz_image_list_resize(list, list->size*2)) return 0;
+//  }
+//
+//  int end = list->used_size;
+//
+//  list->images[end] = im;
+//  list->cu_arrays[end] = cua;
+//  list->pocs[end] = poc;
+//  
+//  list->used_size++;
+//  return 1;
+//}
 
 // ***********************************************
 
