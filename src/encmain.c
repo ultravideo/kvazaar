@@ -677,8 +677,9 @@ int main(int argc, char *argv[])
     // Coding finished
 
     // All reconstructed pictures should have been output.
-    assert(recon_buffer_size == 0);
-
+    for (int i = 0; i < opts->num_debugs; i++) {
+      assert(recon_buffer_size[i] == 0);
+    }
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames, %10llu bits",
             frames_done,
