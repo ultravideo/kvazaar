@@ -918,7 +918,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   if (!encoder->layer.multi_layer_ext_sps_flag) {
     WRITE_U(stream, 0, 1, "sps_sub_layer_ordering_info_present_flag");
 
-    //for each layer
+    //for each layer. TODO: Do this for each temporal layer when added
     if (encoder->cfg.gop_lowdelay) {
       WRITE_UE(stream, encoder->cfg.ref_frames, "sps_max_dec_pic_buffering");
       WRITE_UE(stream, 0, "sps_num_reorder_pics");
@@ -926,6 +926,8 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
       WRITE_UE(stream, encoder->cfg.ref_frames + encoder->cfg.gop_len, "sps_max_dec_pic_buffering");
       WRITE_UE(stream, encoder->cfg.gop_len, "sps_num_reorder_pics");
     }
+    WRITE_UE(stream, 0, "sps_max_latency_increase");
+    //end for
   }
 
   WRITE_UE(stream, MIN_SIZE-3, "log2_min_coding_block_size_minus3");
@@ -1344,29 +1346,6 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
   //TODO: Make a better implementation
   //if( ref_negative > 0 && state->frame->ref->pocs[state->frame->ref->used_size-1] == state->frame->poc) --ref_negative;
   // ***********************************************
-  
-#ifdef KVZ_DEBUG
-  printf("=========== Slice ===========\n");
-#endif
-  WRITE_U(stream, (state->slice->start_in_rs == 0), 1, "first_slice_segment_in_pic_flag");
-
-  if (state->frame->pictype >= KVZ_NAL_BLA_W_LP
-      && state->frame->pictype <= KVZ_NAL_RSV_IRAP_VCL23) {
-    WRITE_U(stream, 1, 1, "no_output_of_prior_pics_flag");
-  }
-
-  // ***********************************************
-  // Modified for SHVC
-  // parameter set ids are global (layer id does not matter)
-  // so set the correct pps id (use layer id as the pset id)
-  WRITE_UE(stream, state->encoder_control->layer.layer_id, "slice_pic_parameter_set_id");
-  // ***********************************************
-  
-  if (state->slice->start_in_rs > 0) {
-    //For now, we don't support dependent slice segments
-    //WRITE_U(stream, 0, 1, "dependent_slice_segment_flag");
-    WRITE_UE(stream, state->slice->start_in_rs, "slice_segment_address");
-  }
 
   WRITE_UE(stream, state->frame->slicetype, "slice_type");
 
@@ -1577,7 +1556,12 @@ void kvz_encoder_state_write_bitstream_slice_header(
     WRITE_U(stream, 0, 1, "no_output_of_prior_pics_flag");
   }
 
-  WRITE_UE(stream, 0, "slice_pic_parameter_set_id");
+  // ***********************************************
+  // Modified for SHVC
+  // parameter set ids are global (layer id does not matter)
+  // so set the correct pps id (use layer id as the pset id)
+  WRITE_UE(stream, state->encoder_control->layer.layer_id, "slice_pic_parameter_set_id");
+  // ***********************************************
 
   if (!first_slice_segment_in_pic) {
     if (encoder->pps.dependent_slice_segments_enabled_flag) {
