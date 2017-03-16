@@ -128,8 +128,7 @@ matrix:
     - env: TEST_DIM=16x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
     
     # Test scalability extension.
-    allow_failures:
-      - env: VALGRIND_TEST="--layer-res=960x540 --preset=ultrafast -q30 -r1 --threads=0 --gop=0 -p0 --layer --preset=ultrafast -q28  -r1 --threads=0 --gop=0 -p0
+    - env: VALGRIND_TEST="--layer-res=960x540 --preset=ultrafast -q30 -r1 --threads=0 --gop=0 -p0 --layer --preset=ultrafast -q28  -r1 --threads=0 --gop=0 -p0
 
 install:
   - source .travis-install.sh
