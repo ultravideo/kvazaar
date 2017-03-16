@@ -607,7 +607,36 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   else if OPT("height")
     cfg->height = atoi(value);
   //*********************************************
-  //For scalable extension. TODO: Handle multiple input layers
+  //For scalable extension. TODO: Handle multiple input layers. Move somewhere else? Add error checking
+  else if OPT("layer") {
+    //TODO: Handle cfg switching stuff here.
+    //Allocate a new cfg for the new layer
+    cfg->next_cfg = kvz_config_alloc();
+    kvz_config_init(cfg->next_cfg);
+    
+    //Do additional initialization
+    cfg->next_cfg->layer = cfg->layer + 1;
+
+    free(cfg->next_cfg->max_layers);
+    cfg->next_cfg->max_layers = cfg->max_layers;
+    *cfg->max_layers += 1;
+
+    free(cfg->next_cfg->max_input_layers);
+    cfg->next_cfg->max_input_layers = cfg->max_input_layers;
+
+    free(cfg->next_cfg->input_widths);
+    free(cfg->next_cfg->input_heights);
+    cfg->next_cfg->input_widths = cfg->input_widths;
+    cfg->next_cfg->input_heights = cfg->input_heights;
+
+    //Set a value for the input layer if not set yet.
+    //Associate the latest input in the (old) layer with the (old) input layer or default to 0
+    if( cfg->input_layer == -1 ) {
+      cfg->input_layer = MAX(*cfg->max_input_layers-1,0);
+    }
+  }
+  else if OPT("layer-res")
+    return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
   else if OPT("input-layer")
     cfg->input_layer = atoi(value);
   else if OPT("input"){
@@ -636,8 +665,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
     return (success);
   }
-  else if OPT("layer-res")
-    return (sscanf(value, "%dx%d", &cfg->width, &cfg->height) == 2);
   //*********************************************
   else if OPT("input-fps") {
     int32_t fps_num, fps_denom;
@@ -1114,36 +1141,6 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     fclose(f);
   }
-  //*********************************************
-  //For scalable extension. TODO: Move somewhere else? Add error checking
-  else if OPT("layer") {
-    //TODO: Handle cfg switching stuff here.
-    //Allocate a new cfg for the new layer
-    cfg->next_cfg = kvz_config_alloc();
-    kvz_config_init(cfg->next_cfg);
-    
-    //Do additional initialization
-    cfg->next_cfg->layer = cfg->layer + 1;
-
-    free(cfg->next_cfg->max_layers);
-    cfg->next_cfg->max_layers = cfg->max_layers;
-    *cfg->max_layers += 1;
-
-    free(cfg->next_cfg->max_input_layers);
-    cfg->next_cfg->max_input_layers = cfg->max_input_layers;
-
-    free(cfg->next_cfg->input_widths);
-    free(cfg->next_cfg->input_heights);
-    cfg->next_cfg->input_widths = cfg->input_widths;
-    cfg->next_cfg->input_heights = cfg->input_heights;
-
-    //Set a value for the input layer if not set yet.
-    //Associate the latest input in the (old) layer with the (old) input layer or default to 0
-    if( cfg->input_layer == -1 ) {
-      cfg->input_layer = MAX(*cfg->max_input_layers-1,0);
-    }
-  }
-  //*********************************************
   else
     return 0;
 #undef OPT

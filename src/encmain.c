@@ -723,7 +723,7 @@ done:
   if (enc) api->encoder_close(enc);
   
   // close files
-  if (opts != NULL) {
+  if (opts != NULL && input != NULL) {
     for (size_t i = 0; i < opts->num_inputs; i++) {
       if (input[i])  fclose(input[i]);
     }
