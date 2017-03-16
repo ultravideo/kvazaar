@@ -295,3 +295,46 @@ Specify color matrix setting [undef]
 .TP
 \fB\-\-chromaloc <integer> 
 Specify chroma sample location (0 to 5) [0]
+
+.SS "Scalability extension (experimental):"
+.TP
+\FB\-\-layer
+Add a new layer (EL). Parameters for this layer
+should be given after this tag. The base layer
+(BL) is created implicitly and parameters for
+it should be given before the first --layer tag.
+.TP
+\FB\-\-layer\-res <res>
+Specify the size for the current layer. If no
+size is given, the size is assumed to be the
+same as the input size. When the layer size and
+input size differ, the input is scaled to match
+the layer size.
+.TP
+\FB\-\-input\-layer <integer>
+Explicitly specify which input layer the current
+layer should use. If not given tries to infer
+it. If no input is given in the current layer,
+use the latest input layer. Declaring a new
+input will associate the it with the current
+layer if not set before.
+.TP
+\fB\-i\fR, \fB\-\-input   
+Declare a new input layer and specify the
+filename that should be read. See Required
+section for more info.
+.TP
+\FB\-\-input\-res <res>
+Specify the size for the latest input.
+See Required section for more info.
+.TP
+\FB\-\-debug <string>
+Specify the filename for reconstruction
+output. Each layer will have a debug file
+assosiated with it in order. See Options section
+for more info.
+.TP
+note: The scalability functionality is still WIP, so compatibility with other
+      parameters is limited. At least GOP and Parallel tools are not supported
+      with Scalability features. Also, only two layer (BL+EL) configuration
+      have been tested, with 2x spatial and PSNR scalability.

@@ -196,6 +196,36 @@ Video Usability Information:
                                    - undef, bt709, fcc, bt470bg, smpte170m,
                                      smpte240m, GBR, YCgCo, bt2020nc, bt2020c
       --chromaloc <integer>  : Specify chroma sample location (0 to 5) [0]
+      
+Scalability extension (experimental):
+      --layer                : Add a new layer (EL). Parameters for this layer
+                               should be given after this tag. The base layer
+                               (BL) is created implicitly and parameters for
+                               it should be given before the first --layer tag.
+      --layer-res <res>      : Specify the size for the current layer. If no
+                               size is given, the size is assumed to be the
+                               same as the input size. When the layer size and
+                               input size differ, the input is scaled to match
+                               the layer size.
+      --input-layer <integer>: Explicitly specify which input layer the current
+                               layer should use. If not given tries to infer
+                               it. If no input is given in the current layer,
+                               use the latest input layer. Declaring a new
+                               input will associate the it with the current
+                               layer if not set before.
+  -i, --input <string>       : Declare a new input layer and specify the
+                               filename that should be read. See Required
+                               section for more info.
+      --input-res <res>      : Specify the size for the latest input.
+                               See Required section for more info.
+      --debug <string>       : Specify the filename for reconstruction
+                               output. Each layer will have a debug file
+                               assosiated with it in order. See Options section
+                               for more info.
+  note: The scalability functionality is still WIP, so compatibility with other
+        parameters is limited. At least GOP and Parallel tools are not supported
+        with Scalability features. Also, only two layer (BL+EL) configuration
+        have been tested, with 2x spatial and PSNR scalability.
 
 Deprecated parameters: (might be removed at some point)
   -w, --width                 : Use --input-res
