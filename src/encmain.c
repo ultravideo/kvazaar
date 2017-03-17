@@ -38,6 +38,8 @@
 #include <string.h>
 #include <time.h> // IWYU pragma: keep for CLOCKS_PER_SEC
 
+#include <errno.h>
+
 #include "checkpoint.h"
 #include "cli.h"
 #include "encoder.h"
@@ -752,8 +754,8 @@ done:
   for( int8_t i = 0; i < opts->num_inputs && input_mutex != NULL && main_thread_mutex != NULL; i++) {
     //Unlock main_thread mutex. Necessary?
     if(&main_thread_mutex[i] != NULL) PTHREAD_UNLOCK(&main_thread_mutex[i]);
-    if((input_mutex[i] != NULL && pthread_mutex_destroy(&input_mutex[i]) == EBUSY) ||
-       (main_thread_mutex[i] != NULL && pthread_mutex_destroy(&main_thread_mutex[i]) == EBUSY )) {
+    if((&input_mutex[i] != NULL && pthread_mutex_destroy(&input_mutex[i]) == EBUSY) ||
+       (&main_thread_mutex[i] != NULL && pthread_mutex_destroy(&main_thread_mutex[i]) == EBUSY )) {
       //Relevant check?
       fprintf(stderr, "Locked mutex destroyed.\n");
     }
