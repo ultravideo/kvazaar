@@ -1021,7 +1021,7 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
 
   //both dimensions need to be either up- or downscaled
   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
-    is_downscaled_height && !is_downscaled_width && !is_equal_width) {
+      (is_downscaled_height && !is_downscaled_width && !is_equal_width)) {
     return NULL;
   }
   if (is_equal_height && is_equal_width) {
@@ -1146,7 +1146,7 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
 
   //both dimensions need to be either up- or downscaled
   if ((is_downscaled_width && !is_downscaled_height && !is_equal_height) ||
-    is_downscaled_height && !is_downscaled_width && !is_equal_width) {
+      (is_downscaled_height && !is_downscaled_width && !is_equal_width)) {
     return NULL;
   }
   if (is_equal_height && is_equal_width) {

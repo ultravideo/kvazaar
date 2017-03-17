@@ -272,6 +272,9 @@ done:
   // Do some cleaning up.
   args->api->picture_free(frame_in);
 
+  //Unlock input_mutex before exit
+  PTHREAD_UNLOCK(args->input_mutex);
+
   pthread_exit(NULL);
   return 0;
 }
@@ -474,8 +477,8 @@ int main(int argc, char *argv[])
 
   input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
 
-  input_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
-  main_thread_mutex = malloc(sizeof(pthread_mutex_t)*opts->num_inputs);
+  input_mutex = calloc(opts->num_inputs, sizeof(pthread_mutex_t));
+  main_thread_mutex = calloc(opts->num_inputs, sizeof(pthread_mutex_t));
 
   in_args = calloc(opts->num_inputs,sizeof(input_handler_args));
 
@@ -496,8 +499,12 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < opts->num_inputs; i++) {
       // Lock both mutexes at startup
-      input_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
-      main_thread_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
+      if( pthread_mutex_init(&input_mutex[i],NULL) || pthread_mutex_init(&main_thread_mutex[i],NULL) ) {
+        fprintf(stderr,"Failed to initialize mutex.\n");
+        goto exit_failure;
+      }
+      //pthread_mutex_init(&input_mutex[i],NULL);//input_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
+      //pthread_mutex_init(&main_thread_mutex[i],NULL);//main_thread_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
       PTHREAD_LOCK(&main_thread_mutex[i]);
       PTHREAD_LOCK(&input_mutex[i]);
 
@@ -740,6 +747,17 @@ done:
   free(len_out);
   free(in_args);
   free(input_threads);
+
+  //Destroy mutexes
+  for( int8_t i = 0; i < opts->num_inputs && input_mutex != NULL && main_thread_mutex != NULL; i++) {
+    //Unlock main_thread mutex. Necessary?
+    if(&main_thread_mutex[i] != NULL) PTHREAD_UNLOCK(&main_thread_mutex[i]);
+    if((input_mutex[i] != NULL && pthread_mutex_destroy(&input_mutex[i]) == EBUSY) ||
+       (main_thread_mutex[i] != NULL && pthread_mutex_destroy(&main_thread_mutex[i]) == EBUSY )) {
+      //Relevant check?
+      fprintf(stderr, "Locked mutex destroyed.\n");
+    }
+  }
   free(input_mutex);
   free(main_thread_mutex);
   free(next_recon_pts);
