@@ -42,7 +42,7 @@
 // ***********************************************
   // Modified for SHVC
 #include "scaler/scaler.h"
-#include <crtdbg.h>
+//#include <crtdbg.h>
 
 // ***********************************************
 
