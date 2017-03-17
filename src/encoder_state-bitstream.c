@@ -202,7 +202,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   uint8_t vps_nuh_layer_id_present_flag = 0;
   WRITE_U(stream, vps_nuh_layer_id_present_flag, 1, "vps_nuh_layer_id_present_flag");
 
-  uint16_t dimension_id[2][1] = { 0, 1 }; //Values from SHM
+  uint16_t dimension_id[2][1] = {{0}, {1}}; //Values from SHM
   
   //TODO: implement settings?
   for (int i = 1; i < state->encoder_control->layer.max_layers; i++) {
@@ -271,7 +271,7 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   
   //TODO: Move to a better place
   //ptl_idx for layer sets
-  uint16_t ptl_idx[2][2] = { 0, 0, 1, 2 };
+  uint16_t ptl_idx[2][2] = {{0, 0}, {1, 2}};
 
   //TODO: Add proper conditions
   uint8_t num_layers_in_id_list = 2;
@@ -360,8 +360,8 @@ static void encoder_state_write_bitsream_vps_extension(bitstream_t* stream,
   //dpb_size(){
   //TODO: Implement properly.
   uint16_t max_dec_pic_buffering_minus1 = state->encoder_control->cfg.ref_frames + state->encoder_control->cfg.gop_len;
-  uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = { 0, 0, max_dec_pic_buffering_minus1,
-                                                         max_dec_pic_buffering_minus1 }; //needs to be in line (<=) sps values
+  uint16_t max_vps_dec_pic_buffering_minus1[2][2][1] = {{{0},{0}},
+                                                        {{max_dec_pic_buffering_minus1}, {max_dec_pic_buffering_minus1}}}; //needs to be in line (<=) sps values
   //for (int i = 1; i < state->encoder_control->layer.num_output_layer_sets; i++) {
   //  state->encoder_control->layer.num_output_layer_sets == 2
   WRITE_U(stream, 0, 1, "sub_layer_flag_info_present_flag[i]");

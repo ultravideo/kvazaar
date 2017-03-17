@@ -399,7 +399,7 @@ int main(int argc, char *argv[])
   // ***********************************************
   // Modified for SHVC
   input = calloc(opts->num_inputs, sizeof(FILE*));
-  for (size_t i = 0; i < opts->num_inputs; i++) {
+  for (int8_t i = 0; i < opts->num_inputs; i++) {
     input[i] = open_input_file(opts->input[i]);
     if (input[i] == NULL) {
       fprintf(stderr, "Could not open input file, shutting down!\n");
@@ -424,7 +424,7 @@ int main(int argc, char *argv[])
 #endif
 
   recout = calloc(opts->num_debugs, sizeof(FILE*));
-  for (size_t i = 0; i < opts->num_debugs; i++) {
+  for (int8_t i = 0; i < opts->num_debugs; i++) {
     if (opts->debug[i] != NULL) {
       recout[i] = open_output_file(opts->debug[i]);
       if (recout[i] == NULL) {
@@ -724,10 +724,10 @@ done:
   
   // close files
   if (opts != NULL && input != NULL) {
-    for (size_t i = 0; i < opts->num_inputs; i++) {
+    for (int8_t i = 0; i < opts->num_inputs; i++) {
       if (input[i])  fclose(input[i]);
     }
-    for (size_t i = 0; i < opts->num_debugs; i++) {
+    for (int8_t i = 0; i < opts->num_debugs; i++) {
       if (recout[i]) fclose(recout[i]);
     }
   }

@@ -543,7 +543,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 
     //Set scaling parameters
     //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
-    enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
+    chroma_format_t csp = (chroma_format_t)KVZ_FORMAT2CSP(cfg->input_format);
     encoder->layer.downscaling = newScalingParameters(encoder->layer.input_width,
                                                       encoder->layer.input_height,
                                                       encoder->in.real_width,
