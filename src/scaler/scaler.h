@@ -85,16 +85,16 @@ typedef struct
 /**
 * \brief Returns the appropriate chroma format for the given parameters
 */
-chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height);
+chroma_format_t kvz_getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height);
 
 /**
 * \brief Function for getting initial scaling parameters given src and trgt size parameters.
 */
-scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
 /**
 * \brief Experimental. Function for getting initial scaling parameters given src and trgt size parameters.
 */
-scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
+scaling_parameter_t kvz_newScalingParameters_(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma);
 /*=============================================================================================*/
 
 
@@ -130,68 +130,31 @@ typedef struct
 /**
  * \brief Create a Picture buffer. The caller is responsible for deallocation
  */
-pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row);
-yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row);
+pic_buffer_t* kva_newPictureBuffer(int width, int height, int has_tmp_row);
+yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row);
 
-/**
-* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
-*/
-pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row);
-pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row);
-
-/**
-* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the final buffer. Stride should be the width of the input (padded image). The caller is responsible for deallocation
-*/
-pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width, int height, int stride, int has_tmp_row);
 
 /**
 * \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation
 */
-yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
-yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
+//yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
+//yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row);
 
 /**
 * \brief Create/Initialize a yuv buffer. Width/height should be the width/height of the final buffer. Stride should be the width of the input (padded image). The caller is responsible for deallocation
 */
-yuv_buffer_t* newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row);
+yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row);
 
-/**
-* \brief Clone the given pic buffer
-*/
-pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic);
 
 /**
 * \brief Clone the given yuv buffer
 */
-yuv_buffer_t* cloneYuvBuffer(const yuv_buffer_t* const yuv);
+yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv);
 
 /**
 * \brief Create/Initialize a Picture buffer. The caller is responsible for deallocation
 */
-void deallocateYuvBuffer(yuv_buffer_t* yuv);
-
-/**
- * \brief Deallocate a picture buffer.
- */
-void deallocatePictureBuffer(pic_buffer_t* buffer);
-
-/**
- * \brief Copies data from one buffer to the other.
- * \param src is the source buffer
- * \param dst is the destination buffer
- * \param fill signals if the inds in dst not overlapped by src should be filled
-*    with values adjacent to the said index.
- */
-void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t* const dst, int fill);
-
-/**
-* \brief Copies data from one buffer to the other.
-* \param src is the source buffer
-* \param dst is the destination buffer
-* \param fill signals if the inds in dst not overlapped by src should be filled
-*    with values adjacent to the said index.
-*/
-void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, int fill);
+void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv);
 
 /*=======================================================*/
 
@@ -202,14 +165,14 @@ void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst,
 * \brief Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
 */
-yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
 /**
 * \brief Experimental. Function for scaling an image given in a yuv buffer (can handle down- and upscaling).
 *        Returns result in yuv buffer. If dst is null or incorrect size, allocate new buffer and return it (dst is deallocated). If dst is a usable buffer, returns the given dst
 * \pre yuv and dst must have tmp rows that are either NULL or valid and guaranteed to be atleast MAX(width,height) of the respective pic buffer.
 * \post the larger of yuv and dst will have valid tmp rows in it's pic buffers. 
 */
-yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
+yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param, yuv_buffer_t* dst);
 
 /*=============================================================*/
 #endif

@@ -157,7 +157,7 @@ int yuv_io_write(FILE* file,
 
   //assumes 420
   int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
   yuv_buffer_t* scaled = scale(in, &param, is_420);
 
@@ -191,7 +191,7 @@ void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
   *out = yuvScaling(in, &param, *out);
 }
@@ -206,9 +206,9 @@ void _kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
 
   //assumes 420
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
-  scaling_parameter_t param = newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
+  scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
-  *out = _yuvScaling(in, &param, *out);
+  *out = kvz_yuvScaling_(in, &param, *out);
 }
 
 
@@ -349,7 +349,7 @@ int isSame(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2 )
 
   int is_420 = IN_Y_W != in_cb_width ? 1 : 0;
   yuv_buffer_t* pic = newYuvBuffer_uint8(y_data, cb_data, cr_data, IN_Y_W, IN_Y_H, is_420);
-  scaling_parameter_t param = newScalingParameters(IN_Y_W, IN_Y_H, OUT_Y_W, OUT_Y_H, IN_Y_W != in_cb_width ? CHROMA_420 : CHROMA_444);
+  scaling_parameter_t param = kvz_newScalingParameters(IN_Y_W, IN_Y_H, OUT_Y_W, OUT_Y_H, IN_Y_W != in_cb_width ? CHROMA_420 : CHROMA_444);
 
   yuv_buffer_t* scaled = yuvDownscaling(pic, &param, is_420);
   printout(scaled);

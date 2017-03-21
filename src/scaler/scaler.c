@@ -235,7 +235,7 @@ static int clip(int val, int min, int max)
   return val;
 }
 
-pic_buffer_t* newPictureBuffer(int width, int height, int has_tmp_row)
+pic_buffer_t* kva_newPictureBuffer(int width, int height, int has_tmp_row)
 {
   //TODO: Add error checking
   pic_buffer_t* buffer = (pic_buffer_t*)malloc(sizeof(pic_buffer_t));
@@ -263,7 +263,7 @@ yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int h
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
   yuv->format =format;
-  yuv->y = newPictureBuffer(width, height, has_tmp_row);
+  yuv->y = kva_newPictureBuffer(width, height, has_tmp_row);
 
   int w_factor = 0;
   int h_factor = 0;
@@ -297,17 +297,20 @@ yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int h
   width = width >> w_factor;
   height = height >> h_factor;
 
-  yuv->u = newPictureBuffer( width, height, has_tmp_row);
-  yuv->v = newPictureBuffer( width, height, has_tmp_row);
+  yuv->u = kva_newPictureBuffer( width, height, has_tmp_row);
+  yuv->v = kva_newPictureBuffer( width, height, has_tmp_row);
 
   return yuv;
 }
 
 // ======================= newPictureBuffer_ ==================================
 //TODO: DO something about the lack of overloading?
-pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row)
+/**
+* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
+*/
+static pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row)
 {
-  pic_buffer_t* buffer = newPictureBuffer(width, height, has_tmp_row);
+  pic_buffer_t* buffer = kva_newPictureBuffer(width, height, has_tmp_row);
 
   //If data is null skip initializing
   if (data == NULL) return buffer;
@@ -320,9 +323,12 @@ pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int h
   return buffer;
 }
 
-pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row)
+/**
+* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
+*/
+static pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row)
 {
-  pic_buffer_t* buffer = newPictureBuffer(width, height, has_tmp_row);
+  pic_buffer_t* buffer = kva_newPictureBuffer(width, height, has_tmp_row);
 
   //If data is null skip initializing
   if (data == NULL) return buffer;
@@ -335,9 +341,12 @@ pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int h
   return buffer;
 }
 
-pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width, int height, int stride, int has_tmp_row)
+/**
+* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the final buffer. Stride should be the width of the input (padded image). The caller is responsible for deallocation
+*/
+static pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width, int height, int stride, int has_tmp_row)
 {
-  pic_buffer_t* buffer = newPictureBuffer(width, height, has_tmp_row);
+  pic_buffer_t* buffer = kva_newPictureBuffer(width, height, has_tmp_row);
 
   //If data is null skip initializing
   if (data == NULL) return buffer;
@@ -353,7 +362,9 @@ pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width
 }
 
 // ==============================================================================
-
+/**
+ * \brief Deallocate a picture buffer.
+ */
 void deallocatePictureBuffer(pic_buffer_t* buffer)
 {
   if (buffer != NULL) {
@@ -363,7 +374,14 @@ void deallocatePictureBuffer(pic_buffer_t* buffer)
   free(buffer);
 }
 
-void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t* const dst, int fill)
+/**
+ * \brief Copies data from one buffer to the other.
+ * \param src is the source buffer
+ * \param dst is the destination buffer
+ * \param fill signals if the inds in dst not overlapped by src should be filled
+*    with values adjacent to the said index.
+ */
+static void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t* const dst, int fill)
 {
   //TODO: add checks. Check if fill is necessary
   //max_dim_* is chosen so that no over indexing happenes (src/dst)
@@ -395,7 +413,15 @@ void copyPictureBuffer(const pic_buffer_t* const src, const pic_buffer_t* const 
   }
 }
 
-void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, int fill)
+
+/**
+* \brief Copies data from one buffer to the other.
+* \param src is the source buffer
+* \param dst is the destination buffer
+* \param fill signals if the inds in dst not overlapped by src should be filled
+*    with values adjacent to the said index.
+*/
+static void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst, int fill)
 {
   copyPictureBuffer(src->y, dst->y, fill);
   copyPictureBuffer(src->u, dst->u, fill);
@@ -403,7 +429,7 @@ void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* const dst,
 }
 
 // ======================= newYuvBuffer_ ==================================
-yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
+static yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
   yuv->format = format;
@@ -449,7 +475,7 @@ yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* cons
   return yuv;
 }
 
-yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
+static yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
 
@@ -491,7 +517,7 @@ yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* con
   return yuv;
 }
 
-yuv_buffer_t* newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row)
+yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
 
@@ -535,8 +561,10 @@ yuv_buffer_t* newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8
 
 // ==============================================================================
 
-
-pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
+/**
+* \brief Clone the given pic buffer
+*/
+static pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
 {
   pic_buffer_t* ret = malloc(sizeof(pic_buffer_t));
   int size = pic->width * pic->height;
@@ -554,7 +582,7 @@ pic_buffer_t* clonePictureBuffer(const pic_buffer_t* const pic)
   return ret;
 }
 
-yuv_buffer_t* cloneYuvBuffer(const yuv_buffer_t* const yuv)
+yuv_buffer_t* kvz_cloneYuvBuffer(const yuv_buffer_t* const yuv)
 {
   yuv_buffer_t* ret = malloc(sizeof(yuv_buffer_t));
 
@@ -565,7 +593,7 @@ yuv_buffer_t* cloneYuvBuffer(const yuv_buffer_t* const yuv)
   return ret;
 }
 
-void deallocateYuvBuffer(yuv_buffer_t* yuv)
+void kvz_deallocateYuvBuffer(yuv_buffer_t* yuv)
 {
   if (yuv == NULL) return;
 
@@ -872,7 +900,7 @@ static void calculateParameters(scaling_parameter_t* const param, const int w_fa
   param->delta_y = 4 * phase_y; //- (top_offset << 4)
 }
 
-scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
+scaling_parameter_t kvz_newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
 {
   scaling_parameter_t param = {
     .src_width = src_width,
@@ -905,7 +933,7 @@ scaling_parameter_t newScalingParameters(int src_width, int src_height, int trgt
   return param;
 }
 
-scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
+scaling_parameter_t kvz_newScalingParameters_(int src_width, int src_height, int trgt_width, int trgt_height, chroma_format_t chroma)
 {
   scaling_parameter_t param = {
     .src_width = src_width,
@@ -937,7 +965,7 @@ scaling_parameter_t _newScalingParameters(int src_width, int src_height, int trg
 }
 
 
-chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height)
+chroma_format_t kvz_getChromaFormat(int luma_width, int luma_height, int chroma_width, int chroma_height)
 {
   if (chroma_width == 0 && chroma_height == 0) {
     return CHROMA_400;
@@ -955,7 +983,7 @@ chroma_format_t getChromaFormat(int luma_width, int luma_height, int chroma_widt
 }
 
 
-yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
+yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
                          yuv_buffer_t* dst)
 {
   /*========== Basic Initialization ==============*/
@@ -1006,9 +1034,9 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
     || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
     || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
 
-    deallocateYuvBuffer(dst); //Free old buffer if it exists
+    kvz_deallocateYuvBuffer(dst); //Free old buffer if it exists
 
-    dst = newYuvBuffer(param.trgt_width, param.trgt_height, param.chroma, 0);
+    dst = kvz_newYuvBuffer(param.trgt_width, param.trgt_height, param.chroma, 0);
   }
 
   //Calculate if we are upscaling or downscaling
@@ -1045,7 +1073,7 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
   int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
-  pic_buffer_t* buffer = newPictureBuffer(buffer_width, buffer_height, 1);
+  pic_buffer_t* buffer = kva_newPictureBuffer(buffer_width, buffer_height, 1);
 
 
   /*==========Start Resampling=============*/
@@ -1080,7 +1108,7 @@ yuv_buffer_t* yuvScaling(const yuv_buffer_t* const yuv, const scaling_parameter_
 
 //Use yuv and dst as the buffer instead of allocating a new buffer. Also use unrounded sizes
 //yuv is not quaranteet to contain the original data.
-yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
+yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t* const base_param,
                           yuv_buffer_t* dst)
 {
   /*========== Basic Initialization ==============*/
@@ -1131,9 +1159,9 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
     || dst->u->width != SHIFT(param.trgt_width, w_factor) || dst->u->height != SHIFT(param.trgt_height, h_factor)
     || dst->v->width != SHIFT(param.trgt_width, w_factor) || dst->v->height != SHIFT(param.trgt_height, h_factor)) {
 
-    deallocateYuvBuffer(dst); //Free old buffer if it exists
+    kvz_deallocateYuvBuffer(dst); //Free old buffer if it exists
 
-    dst = newYuvBuffer(param.trgt_width, param.trgt_height, param.chroma, 0);
+    dst = kvz_newYuvBuffer(param.trgt_width, param.trgt_height, param.chroma, 0);
   }
 
   //Calculate if we are upscaling or downscaling
@@ -1170,7 +1198,7 @@ yuv_buffer_t* _yuvScaling(yuv_buffer_t* const yuv, const scaling_parameter_t* co
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
   int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
-  pic_buffer_t* buffer = newPictureBuffer(buffer_width, buffer_height, 1);*/
+  pic_buffer_t* buffer = kva_newPictureBuffer(buffer_width, buffer_height, 1);*/
   //TODO: Clean up this part and implement properly
   //param.rnd_trgt_height = param.trgt_height;
   //param.rnd_trgt_width = param.trgt_width;

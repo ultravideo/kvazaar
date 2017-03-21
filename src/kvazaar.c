@@ -158,20 +158,20 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     ////Set scaling parameters
     ////Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
     //enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    //cur_enc->downscaling = newScalingParameters((*cfg->input_widths)[cfg->input_layer],
+    //cur_enc->downscaling = kvz_newScalingParameters((*cfg->input_widths)[cfg->input_layer],
     //                                            (*cfg->input_heights)[cfg->input_layer],
     //                                            cur_enc->control->in.real_width,
     //                                            cur_enc->control->in.real_height,
     //                                            csp);
     //if( prev_enc ){
-    //  cur_enc->upscaling = newScalingParameters(prev_enc->upscaling.trgt_width,
+    //  cur_enc->upscaling = kvz_newScalingParameters(prev_enc->upscaling.trgt_width,
     //                                            prev_enc->upscaling.trgt_height,
     //                                            cur_enc->control->in.real_width,
     //                                            cur_enc->control->in.real_height,
     //                                            csp);
     //}
     //else {
-    //  cur_enc->upscaling = newScalingParameters(cur_enc->control->in.real_width,
+    //  cur_enc->upscaling = kvz_newScalingParameters(cur_enc->control->in.real_width,
     //                                            cur_enc->control->in.real_height,
     //                                            cur_enc->control->in.real_width,
     //                                            cur_enc->control->in.real_height,
@@ -300,15 +300,15 @@ static kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, const scali
     return NULL;
   }
 
-  yuv_buffer_t* src_pic = newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->src_padding_x, param->src_height+param->src_padding_y, pic_in->stride, param->chroma, 0);
+  yuv_buffer_t* src_pic = kvz_newYuvBuffer_padded_uint8(pic_in->y, pic_in->u, pic_in->v, param->src_width+param->src_padding_x, param->src_height+param->src_padding_y, pic_in->stride, param->chroma, 0);
   //yuv_buffer_t* src_pic = newYuvBuffer_uint8(pic_in->y, pic_in->u, pic_in->v, pic_in->width, pic_in->height, param->chroma, 0);
   
-  yuv_buffer_t* trgt_pic = yuvScaling(src_pic, param, NULL );
+  yuv_buffer_t* trgt_pic = kvz_yuvScaling(src_pic, param, NULL );
   
   //_ASSERTE( _CrtCheckMemory() );
 
   if( trgt_pic == NULL ) {
-    deallocateYuvBuffer(src_pic);
+    kvz_deallocateYuvBuffer(src_pic);
     return NULL;
   }
   
@@ -319,8 +319,8 @@ static kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, const scali
   //Create a new kvz picture from the buffer
   kvz_picture* pic_out = kvz_image_alloc(pic_in->chroma_format,param->trgt_width+padding_x, param->trgt_height+padding_y);
   if( pic_out == NULL) {
-    deallocateYuvBuffer(src_pic);
-    deallocateYuvBuffer(trgt_pic);
+    kvz_deallocateYuvBuffer(src_pic);
+    kvz_deallocateYuvBuffer(trgt_pic);
     return NULL;
   }
   pic_out->dts = pic_in->dts;
@@ -365,9 +365,9 @@ static kvz_picture* kvazaar_scaling(const kvz_picture* const pic_in, const scali
   //_ASSERTE( _CrtCheckMemory() );
 
   //Do deallocation
-  deallocateYuvBuffer(src_pic);
+  kvz_deallocateYuvBuffer(src_pic);
   //_ASSERTE( _CrtCheckMemory() );
-  deallocateYuvBuffer(trgt_pic);
+  kvz_deallocateYuvBuffer(trgt_pic);
   //_ASSERTE( _CrtCheckMemory() );
   return pic_out;
 }
