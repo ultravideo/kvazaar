@@ -130,7 +130,7 @@ typedef struct
 /**
  * \brief Create a Picture buffer. The caller is responsible for deallocation
  */
-pic_buffer_t* kva_newPictureBuffer(int width, int height, int has_tmp_row);
+pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row);
 yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row);
 
 

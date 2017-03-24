@@ -49,6 +49,9 @@
 #include "threads.h"
 #include "yuv_io.h"
 
+#include <crtdbg.h>
+
+
 /**
  * \brief Open a file for reading.
  *
@@ -342,7 +345,7 @@ void output_recon_pictures(const kvz_api *const api,
 int main(int argc, char *argv[])
 {
   int retval = EXIT_SUCCESS;
-
+  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF|_CRTDBG_LEAK_CHECK_DF);
   cmdline_opts_t *opts = NULL; //!< Command line options
   kvz_encoder* enc = NULL;
   FILE **input  = NULL; //!< input files (YUV)
@@ -670,7 +673,7 @@ int main(int argc, char *argv[])
 
           //Update stuff. The images of different layers should be chained together using base_image;
           cfg = cfg->next_cfg;
-          cur_src = cur_src->base_image;
+          if(cur_src) cur_src = cur_src->base_image;
         }
       }
 
@@ -751,13 +754,15 @@ done:
   free(input_threads);
 
   //Destroy mutexes
-  for( int8_t i = 0; i < opts->num_inputs && input_mutex != NULL && main_thread_mutex != NULL; i++) {
-    //Unlock main_thread mutex. Necessary?
-    if(&main_thread_mutex[i] != NULL) PTHREAD_UNLOCK(&main_thread_mutex[i]);
-    if((&input_mutex[i] != NULL && pthread_mutex_destroy(&input_mutex[i]) == EBUSY) ||
-       (&main_thread_mutex[i] != NULL && pthread_mutex_destroy(&main_thread_mutex[i]) == EBUSY )) {
-      //Relevant check?
-      fprintf(stderr, "Locked mutex destroyed.\n");
+  if (opts != NULL) {
+    for (int8_t i = 0; i < opts->num_inputs && input_mutex != NULL && main_thread_mutex != NULL; i++) {
+      //Unlock main_thread mutex. Necessary?
+      if (&main_thread_mutex[i] != NULL) PTHREAD_UNLOCK(&main_thread_mutex[i]);
+      if ((&input_mutex[i] != NULL && pthread_mutex_destroy(&input_mutex[i]) == EBUSY) ||
+        (&main_thread_mutex[i] != NULL && pthread_mutex_destroy(&main_thread_mutex[i]) == EBUSY)) {
+        //Relevant check?
+        fprintf(stderr, "Locked mutex destroyed.\n");
+      }
     }
   }
   free(input_mutex);
@@ -770,6 +775,6 @@ done:
   // ***********************************************
 
   CHECKPOINTS_FINALIZE();
-
+  _CrtDumpMemoryLeaks();
   return retval;
 }

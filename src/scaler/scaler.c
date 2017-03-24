@@ -235,7 +235,7 @@ static int clip(int val, int min, int max)
   return val;
 }
 
-pic_buffer_t* kva_newPictureBuffer(int width, int height, int has_tmp_row)
+pic_buffer_t* kvz_newPictureBuffer(int width, int height, int has_tmp_row)
 {
   //TODO: Add error checking
   pic_buffer_t* buffer = (pic_buffer_t*)malloc(sizeof(pic_buffer_t));
@@ -259,11 +259,11 @@ pic_buffer_t* kva_newPictureBuffer(int width, int height, int has_tmp_row)
   return buffer;
 }
 
-yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row)
+yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, int has_tmp_row)
 {
   yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
   yuv->format =format;
-  yuv->y = kva_newPictureBuffer(width, height, has_tmp_row);
+  yuv->y = kvz_newPictureBuffer(width, height, has_tmp_row);
 
   int w_factor = 0;
   int h_factor = 0;
@@ -297,8 +297,8 @@ yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int h
   width = width >> w_factor;
   height = height >> h_factor;
 
-  yuv->u = kva_newPictureBuffer( width, height, has_tmp_row);
-  yuv->v = kva_newPictureBuffer( width, height, has_tmp_row);
+  yuv->u = kvz_newPictureBuffer( width, height, has_tmp_row);
+  yuv->v = kvz_newPictureBuffer( width, height, has_tmp_row);
 
   return yuv;
 }
@@ -310,7 +310,7 @@ yuv_buffer_t* newYuvBuffer(int width, int height , chroma_format_t format, int h
 */
 static pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row)
 {
-  pic_buffer_t* buffer = kva_newPictureBuffer(width, height, has_tmp_row);
+  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
 
   //If data is null skip initializing
   if (data == NULL) return buffer;
@@ -328,7 +328,7 @@ static pic_buffer_t* newPictureBuffer_double(const double* const data, int width
 */
 static pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row)
 {
-  pic_buffer_t* buffer = kva_newPictureBuffer(width, height, has_tmp_row);
+  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
 
   //If data is null skip initializing
   if (data == NULL) return buffer;
@@ -346,7 +346,7 @@ static pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width
 */
 static pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, int width, int height, int stride, int has_tmp_row)
 {
-  pic_buffer_t* buffer = kva_newPictureBuffer(width, height, has_tmp_row);
+  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
 
   //If data is null skip initializing
   if (data == NULL) return buffer;
@@ -1073,7 +1073,7 @@ yuv_buffer_t* kvz_yuvScaling(const yuv_buffer_t* const yuv, const scaling_parame
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
   int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
-  pic_buffer_t* buffer = kva_newPictureBuffer(buffer_width, buffer_height, 1);
+  pic_buffer_t* buffer = kvz_newPictureBuffer(buffer_width, buffer_height, 1);
 
 
   /*==========Start Resampling=============*/
@@ -1198,7 +1198,7 @@ yuv_buffer_t* kvz_yuvScaling_(yuv_buffer_t* const yuv, const scaling_parameter_t
   int min_height_rnd32 = ((min_height + 31) >> 5) << 5;
   int buffer_width = ((max_width * min_width_rnd16 + (min_width << 4) - 1) / (min_width << 4)) << 4;
   int buffer_height = ((max_height * min_height_rnd32 + (min_height << 4) - 1) / (min_height << 4)) << 4;;
-  pic_buffer_t* buffer = kva_newPictureBuffer(buffer_width, buffer_height, 1);*/
+  pic_buffer_t* buffer = kvz_newPictureBuffer(buffer_width, buffer_height, 1);*/
   //TODO: Clean up this part and implement properly
   //param.rnd_trgt_height = param.trgt_height;
   //param.rnd_trgt_width = param.trgt_width;

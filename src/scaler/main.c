@@ -263,7 +263,7 @@ pic_buffer_t* diffComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
 
 yuv_buffer_t* yuvDiff(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2)
 {
-  yuv_buffer_t* res = newYuvBuffer(yuv1->y->width, yuv1->y->height, yuv1->format, 0);
+  yuv_buffer_t* res = kvz_newYuvBuffer(yuv1->y->width, yuv1->y->height, yuv1->format, 0);
 
   res->y = diffComponent(yuv1->y, yuv2->y);
   res->u = diffComponent(yuv1->u, yuv2->u);
@@ -425,8 +425,8 @@ void test3()
     printf("File name: %s", in_file_name);
   }
 
-  yuv_buffer_t* data = newYuvBuffer(in_width, in_height, CHROMA_420, 0);
-  yuv_buffer_t* out = newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* out = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
 
   if (yuv_io_read(file, in_width, in_height, data)) {
 
@@ -467,10 +467,10 @@ void test4()
     printf("File name: %s", in_file_name);
   }
 
-  yuv_buffer_t* data1 = newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* data1 = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
   yuv_buffer_t* data2 = NULL;
-  yuv_buffer_t* out1 = newYuvBuffer(out_width, out_height, CHROMA_420, 0);
-  yuv_buffer_t* out2 = newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* out1 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* out2 = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
 
   if (yuv_io_read(file, in_width, in_height, data1)) {
 
@@ -532,7 +532,7 @@ void test5()
     printf("File name: %s", in_file_name);
   }
 
-  yuv_buffer_t* data = newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
   yuv_buffer_t* data1 = NULL;
   yuv_buffer_t* data2 = NULL;
 
@@ -545,8 +545,8 @@ void test5()
         data1 = cloneYuvBuffer(data);
         data2 = cloneYuvBuffer(data);
 
-        yuv_buffer_t* out1 = newYuvBuffer(w, h, CHROMA_420, 0);
-        yuv_buffer_t* out2 = newYuvBuffer(w, h, CHROMA_420, 0);
+        yuv_buffer_t* out1 = kvz_newYuvBuffer(w, h, CHROMA_420, 0);
+        yuv_buffer_t* out2 = kvz_newYuvBuffer(w, h, CHROMA_420, 0);
 
         kvzScaling(data1, &out1);
         _kvzScaling(data2, &out2);
@@ -603,8 +603,8 @@ void vscaling()
     printf("File name: %s", in_file_name);
   }
 
-  yuv_buffer_t* data = newYuvBuffer(in_width, in_height, CHROMA_420, 0);
-  yuv_buffer_t* out = newYuvBuffer(out_width, out_height, CHROMA_420, 0);
+  yuv_buffer_t* data = kvz_newYuvBuffer(in_width, in_height, CHROMA_420, 0);
+  yuv_buffer_t* out = kvz_newYuvBuffer(out_width, out_height, CHROMA_420, 0);
   int i = 0;
   
   while (yuv_io_read(file, in_width, in_height, data) && frames > i) {
