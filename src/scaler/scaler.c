@@ -308,38 +308,38 @@ yuv_buffer_t* kvz_newYuvBuffer(int width, int height , chroma_format_t format, i
 /**
 * \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
 */
-static pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row)
-{
-  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
-
-  //If data is null skip initializing
-  if (data == NULL) return buffer;
-
-  //Initialize buffer
-  for (int i = width * height - 1; i >= 0; i--) {
-    buffer->data[i] = (int)data[i];
-  }
-
-  return buffer;
-}
-
-/**
-* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
-*/
-static pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row)
-{
-  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
-
-  //If data is null skip initializing
-  if (data == NULL) return buffer;
-
-  //Initialize buffer
-  for (int i = width * height - 1; i >= 0; i--) {
-    buffer->data[i] = (int)data[i];
-  }
-
-  return buffer;
-}
+//static pic_buffer_t* newPictureBuffer_double(const double* const data, int width, int height, int has_tmp_row)
+//{
+//  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
+//
+//  //If data is null skip initializing
+//  if (data == NULL) return buffer;
+//
+//  //Initialize buffer
+//  for (int i = width * height - 1; i >= 0; i--) {
+//    buffer->data[i] = (int)data[i];
+//  }
+//
+//  return buffer;
+//}
+//
+///**
+//* \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the data. The caller is responsible for deallocation.
+//*/
+//static pic_buffer_t* newPictureBuffer_uint8(const uint8_t* const data, int width, int height, int has_tmp_row)
+//{
+//  pic_buffer_t* buffer = kvz_newPictureBuffer(width, height, has_tmp_row);
+//
+//  //If data is null skip initializing
+//  if (data == NULL) return buffer;
+//
+//  //Initialize buffer
+//  for (int i = width * height - 1; i >= 0; i--) {
+//    buffer->data[i] = (int)data[i];
+//  }
+//
+//  return buffer;
+//}
 
 /**
 * \brief Create/Initialize a Picture buffer. Width/height should be the width/height of the final buffer. Stride should be the width of the input (padded image). The caller is responsible for deallocation
@@ -429,93 +429,93 @@ static void copyYuvBuffer(const yuv_buffer_t* const src, const yuv_buffer_t* con
 }
 
 // ======================= newYuvBuffer_ ==================================
-static yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
-{
-  yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
-  yuv->format = format;
-
-  //Allocate y pic_buffer
-  yuv->y = newPictureBuffer_double(y_data, width, height, has_tmp_row);
-
-  //Allocate u and v buffers
-  int w_factor = 0;
-  int h_factor = 0;
-
-  switch (format) {
-    case CHROMA_400:
-      {
-        //No chroma
-        width = height = 0;
-        break;
-      }
-    case CHROMA_420:
-      {
-        w_factor = 1;
-        h_factor = 1;
-        break;
-      }
-    case CHROMA_422:
-      {
-        w_factor = 1;
-        break;
-      }
-    case CHROMA_444:
-      {
-        break;
-      }
-    default:
-      assert(0);//Unsupported format
-  }
-
-  width = width >> w_factor;
-  height = height >> h_factor;
-  yuv->u = newPictureBuffer_double(u_data, width, height, has_tmp_row);
-  yuv->v = newPictureBuffer_double(v_data, width, height, has_tmp_row);
-
-  return yuv;
-}
-
-static yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
-{
-  yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
-
-  //Allocate y pic_buffer
-  yuv->y = newPictureBuffer_uint8(y_data, width, height, has_tmp_row);
-  yuv->format = format;
-
-  //Allocate u and v buffers
-  int w_factor = 0;
-  int h_factor = 0;
-
-  switch (format) {
-    case CHROMA_400: {
-      //No chroma
-      width = height = 0;
-      break;
-    }
-    case CHROMA_420: {
-      w_factor = 1;
-      h_factor = 1;
-      break;
-    }
-    case CHROMA_422: {
-      w_factor = 1;
-      break;
-    }
-    case CHROMA_444: {
-      break;
-    }
-    default:
-      assert(0);//Unsupported format
-  }
-
-  width = width >> w_factor;
-  height = height >> h_factor;
-  yuv->u = newPictureBuffer_uint8(u_data, width, height, has_tmp_row);
-  yuv->v = newPictureBuffer_uint8(v_data, width, height, has_tmp_row);
-
-  return yuv;
-}
+//static yuv_buffer_t* newYuvBuffer_double(const double* const y_data, const double* const u_data, const double* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
+//{
+//  yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+//  yuv->format = format;
+//
+//  //Allocate y pic_buffer
+//  yuv->y = newPictureBuffer_double(y_data, width, height, has_tmp_row);
+//
+//  //Allocate u and v buffers
+//  int w_factor = 0;
+//  int h_factor = 0;
+//
+//  switch (format) {
+//    case CHROMA_400:
+//      {
+//        //No chroma
+//        width = height = 0;
+//        break;
+//      }
+//    case CHROMA_420:
+//      {
+//        w_factor = 1;
+//        h_factor = 1;
+//        break;
+//      }
+//    case CHROMA_422:
+//      {
+//        w_factor = 1;
+//        break;
+//      }
+//    case CHROMA_444:
+//      {
+//        break;
+//      }
+//    default:
+//      assert(0);//Unsupported format
+//  }
+//
+//  width = width >> w_factor;
+//  height = height >> h_factor;
+//  yuv->u = newPictureBuffer_double(u_data, width, height, has_tmp_row);
+//  yuv->v = newPictureBuffer_double(v_data, width, height, has_tmp_row);
+//
+//  return yuv;
+//}
+//
+//static yuv_buffer_t* newYuvBuffer_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, chroma_format_t format, int has_tmp_row)
+//{
+//  yuv_buffer_t* yuv = (yuv_buffer_t*)malloc(sizeof(yuv_buffer_t));
+//
+//  //Allocate y pic_buffer
+//  yuv->y = newPictureBuffer_uint8(y_data, width, height, has_tmp_row);
+//  yuv->format = format;
+//
+//  //Allocate u and v buffers
+//  int w_factor = 0;
+//  int h_factor = 0;
+//
+//  switch (format) {
+//    case CHROMA_400: {
+//      //No chroma
+//      width = height = 0;
+//      break;
+//    }
+//    case CHROMA_420: {
+//      w_factor = 1;
+//      h_factor = 1;
+//      break;
+//    }
+//    case CHROMA_422: {
+//      w_factor = 1;
+//      break;
+//    }
+//    case CHROMA_444: {
+//      break;
+//    }
+//    default:
+//      assert(0);//Unsupported format
+//  }
+//
+//  width = width >> w_factor;
+//  height = height >> h_factor;
+//  yuv->u = newPictureBuffer_uint8(u_data, width, height, has_tmp_row);
+//  yuv->v = newPictureBuffer_uint8(v_data, width, height, has_tmp_row);
+//
+//  return yuv;
+//}
 
 yuv_buffer_t* kvz_newYuvBuffer_padded_uint8(const uint8_t* const y_data, const uint8_t* const u_data, const uint8_t* const v_data, int width, int height, int stride, chroma_format_t format, int has_tmp_row)
 {
