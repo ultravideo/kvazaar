@@ -49,7 +49,6 @@
 #include "threads.h"
 #include "yuv_io.h"
 
-#include <crtdbg.h>
 
 
 /**
@@ -345,7 +344,7 @@ void output_recon_pictures(const kvz_api *const api,
 int main(int argc, char *argv[])
 {
   int retval = EXIT_SUCCESS;
-  _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF|_CRTDBG_LEAK_CHECK_DF);
+
   cmdline_opts_t *opts = NULL; //!< Command line options
   kvz_encoder* enc = NULL;
   FILE **input  = NULL; //!< input files (YUV)
@@ -775,6 +774,6 @@ done:
   // ***********************************************
 
   CHECKPOINTS_FINALIZE();
-  _CrtDumpMemoryLeaks();
+
   return retval;
 }
