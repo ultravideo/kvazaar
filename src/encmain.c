@@ -631,8 +631,9 @@ int main(int argc, char *argv[])
         kvz_config *cfg = opts->config;
         kvz_picture *cur_src = img_src;
         kvz_picture *cur_rec = img_rec;
+        int layer_id = 0;
 
-        for (int layer_id = 0; cfg != NULL; layer_id++) { 
+        for (layer_id = 0; cfg != NULL; layer_id++) { 
           if (cfg->calc_psnr && cfg->source_scan_type == KVZ_INTERLACING_NONE) {
             // Do not compute PSNR for interlaced frames, because img_rec does not contain
             // the deinterlaced frame yet.
@@ -674,11 +675,12 @@ int main(int argc, char *argv[])
           cfg = cfg->next_cfg;
           if(cur_src) cur_src = cur_src->base_image;
         }
+        img_rec = opts->num_debugs < layer_id ? cur_rec : NULL; //Set remaining images to img_rec so they are freed later
       }
 
       free_chained_img(api, cur_in_img); cur_in_img = NULL;
       api->chunk_free(chunks_out);
-      //free_chained_img(api, img_rec); //Should be freed by output_recon_pictures
+      free_chained_img(api, img_rec); //img_rec should contain image not output. Others should be freed by output_recon_pictures.
       img_rec = NULL;  
       free_chained_img(api, img_src); img_src = NULL;
     }
