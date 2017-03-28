@@ -1366,9 +1366,9 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
 
     //WRITE_U(stream, state->frame->poc & 0x1f, 5, "pic_order_cnt_lsb");
 //***********************************************
-    
+
     uint8_t num_short_term_ref_pic_sets = state->encoder_control->cfg.ref_frames; //TODO: get this number from somewhere else
-    if( state->encoder_control->layer.layer_id > 0 ) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets-1 : 1; //Reserve a "reference" for IRL
+    if (state->encoder_control->layer.layer_id > 0) num_short_term_ref_pic_sets = num_short_term_ref_pic_sets > 1 ? num_short_term_ref_pic_sets - 1 : 1; //Reserve a "reference" for IRL
     uint8_t ref_sets = state->encoder_control->layer.max_layers > 1 ? 1 : 0; //TODO: Remove if pointless
     WRITE_U(stream, ref_sets, 1, "short_term_ref_pic_set_sps_flag");
     if (ref_sets == 0) {
@@ -1405,15 +1405,6 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
       for (j = 0; j < ref_positive; j++) {
         int8_t delta_poc = 0;
 
-        WRITE_UE(stream, encoder->cfg.gop_len?delta_poc - last_poc - 1:0, "delta_poc_s0_minus1");
-        last_poc = delta_poc;
-        WRITE_U(stream,1,1, "used_by_curr_pic_s0_flag");
-      }
-      last_poc = 0;
-      poc_shift = 0;
-      for (j = 0; j < ref_positive; j++) {
-        int8_t delta_poc = 0;
-
         if (encoder->cfg.gop_len) {
           int8_t found = 0;
           do {
@@ -1437,20 +1428,19 @@ static void kvz_encoder_state_write_bitstream_slice_header_independent(
         last_poc = delta_poc;
         WRITE_U(stream, 1, 1, "used_by_curr_pic_s1_flag");
       }
-    }
-    else if( num_short_term_ref_pic_sets > 1 ){
+    } else if (num_short_term_ref_pic_sets > 1) {
       uint32_t poc = state->frame->poc;
       //int stRpsIdx = num_short_term_ref_pic_sets <= poc ? 0 : num_short_term_ref_pic_sets - poc; //stRpsIdx==0 should be the one with max ref, so for the first frames use num_short_term_ref_pic_sets - Poc
       int stRpsIdx = (num_short_term_ref_pic_sets <= poc ? num_short_term_ref_pic_sets : poc) - 1; // num of (available) refs increases with idx/poc
       WRITE_U(stream, stRpsIdx, kvz_math_ceil_log2(num_short_term_ref_pic_sets), "short_term_ref_pic_set_idx"); //TODO: Get correct idx from somewhere
     }
-    
+
     if (state->encoder_control->cfg.tmvp_enable) {
       WRITE_U(stream, ref_negative?1:0, 1, "slice_temporal_mvp_enabled_flag");
     }
   }
 
-    //end if
+  //end if
   //end if
 
   // ***********************************************
