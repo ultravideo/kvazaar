@@ -453,11 +453,11 @@ static void encoder_state_write_bitstream_vid_parameter_set(bitstream_t* stream,
   //WRITE_U(stream, 0, 1, "vps_extension_flag");
   //*********************************************
   //For scalable extension. TODO: Move somewhere else? Set based on extension used
-  WRITE_U(stream, (state->encoder_control->layer.max_layers - 1) > 0 ? 1 : 0 , 1, "vps_extension_flag");
+  WRITE_U(stream, state->encoder_control->layer.max_layers > 1 ? 1 : 0 , 1, "vps_extension_flag");
 
   //Align with ones
   //TODO: a better way?
-  if (state->encoder_control->layer.max_layers > 0){
+  if (state->encoder_control->layer.max_layers > 1){
     //while (stream->cur_bit != 0) {
     if (stream->cur_bit != 0){
       //kvz_bitstream_align(stream);
