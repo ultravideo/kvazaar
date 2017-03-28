@@ -193,7 +193,7 @@ void kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
   //int is_420 = in->y->width != in->u->width ? 1 : 0;
   scaling_parameter_t param = kvz_newScalingParameters(in_y_width, in_y_height, out_y_width, out_y_height, CHROMA_420);
 
-  *out = yuvScaling(in, &param, *out);
+  *out = kvz_yuvScaling(in, &param, *out);
 }
 
 void _kvzScaling(yuv_buffer_t* in, yuv_buffer_t** out)
@@ -249,7 +249,7 @@ pic_buffer_t* diffComponent(pic_buffer_t* pic1, pic_buffer_t* pic2)
   int width = pic1->width;
   int height = pic1->height;
   int row = 0;
-  pic_buffer_t* res = newPictureBuffer(width, height, 0);
+  pic_buffer_t* res = kvz_newPictureBuffer(width, height, 0);
 
   for( int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
@@ -312,7 +312,7 @@ int isSame(yuv_buffer_t* yuv1, yuv_buffer_t* yuv2 )
   
   int res = isZero(result);
 
-  deallocateYuvBuffer(result);
+  kvz_deallocateYuvBuffer(result);
 
   return res;
 }
@@ -442,8 +442,8 @@ void test3()
     if (ferror(file)) perror("File error");
   }
 
-  deallocateYuvBuffer(data);
-  deallocateYuvBuffer(out);
+  kvz_deallocateYuvBuffer(data);
+  kvz_deallocateYuvBuffer(out);
   fclose(file);
 }
 
@@ -474,7 +474,7 @@ void test4()
 
   if (yuv_io_read(file, in_width, in_height, data1)) {
 
-    data2 = cloneYuvBuffer(data1);
+    data2 = kvz_cloneYuvBuffer(data1);
 
     kvzScaling(data1, &out1);
     _kvzScaling(data2, &out2);
@@ -488,7 +488,7 @@ void test4()
 
     printf("PSNR:\n Y: %f\n U: %f\n V: %f\n", psnr[0], psnr[1], psnr[2]);
 
-    deallocateYuvBuffer(result);
+    kvz_deallocateYuvBuffer(result);
 
     //FILE* out_file = fopen(out_file_name, "wb");
     //yuv_io_write(out_file, out1, out1->y->width, out1->y->height);
@@ -500,10 +500,10 @@ void test4()
     if (ferror(file)) perror("File error");
   }
 
-  deallocateYuvBuffer(data1);
-  deallocateYuvBuffer(out1);
-  deallocateYuvBuffer(data2);
-  deallocateYuvBuffer(out2);
+  kvz_deallocateYuvBuffer(data1);
+  kvz_deallocateYuvBuffer(out1);
+  kvz_deallocateYuvBuffer(data2);
+  kvz_deallocateYuvBuffer(out2);
   fclose(file);
 }
 
@@ -542,8 +542,8 @@ void test5()
     //Iterate over different widths and heights
     for (int w = out_width_beg; w < max_width; w += w_step) {
       for (int h = out_height_beg; h < max_height; h += h_step) {
-        data1 = cloneYuvBuffer(data);
-        data2 = cloneYuvBuffer(data);
+        data1 = kvz_cloneYuvBuffer(data);
+        data2 = kvz_cloneYuvBuffer(data);
 
         yuv_buffer_t* out1 = kvz_newYuvBuffer(w, h, CHROMA_420, 0);
         yuv_buffer_t* out2 = kvz_newYuvBuffer(w, h, CHROMA_420, 0);
@@ -558,10 +558,10 @@ void test5()
           printf("Not same at %ix%i size.\n", w, h);
           all_same = 0;
         }
-        deallocateYuvBuffer(data1);
-        deallocateYuvBuffer(data2);
-        deallocateYuvBuffer(out1);
-        deallocateYuvBuffer(out2);
+        kvz_deallocateYuvBuffer(data1);
+        kvz_deallocateYuvBuffer(data2);
+        kvz_deallocateYuvBuffer(out1);
+        kvz_deallocateYuvBuffer(out2);
       }
     }
   }
@@ -573,7 +573,7 @@ void test5()
 
   if(all_same) printf("All were same.\n");
 
-  deallocateYuvBuffer(data);
+  kvz_deallocateYuvBuffer(data);
   
   fclose(file);
 }
@@ -583,8 +583,8 @@ void vscaling()
 {
   int32_t in_width = 1920;
   int32_t in_height = 1080;
-  int32_t out_width = 960;
-  int32_t out_height = 540;
+  int32_t out_width = 264;
+  int32_t out_height = 130;
   int framerate = 24;
   int frames = 300;
 
@@ -617,8 +617,8 @@ void vscaling()
       printf("Frame number %i\n",++i);
   }
 
-  deallocateYuvBuffer(data);
-  deallocateYuvBuffer(out);
+  kvz_deallocateYuvBuffer(data);
+  kvz_deallocateYuvBuffer(out);
   fclose(file);
   fclose(out_file);
 }

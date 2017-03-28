@@ -365,7 +365,7 @@ static pic_buffer_t* newPictureBuffer_padded_uint8(const uint8_t* const data, in
 /**
  * \brief Deallocate a picture buffer.
  */
-void deallocatePictureBuffer(pic_buffer_t* buffer)
+static void deallocatePictureBuffer(pic_buffer_t* buffer)
 {
   if (buffer != NULL) {
     free(buffer->data);
