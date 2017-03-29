@@ -630,7 +630,7 @@ int main(int argc, char *argv[])
         double frame_psnr[3] = { 0.0, 0.0, 0.0 };
         kvz_config *cfg = opts->config;
         kvz_picture *cur_src = img_src;
-        kvz_picture *cur_rec = img_rec;
+        kvz_picture *cur_rec = img_rec; img_rec = NULL; //Set img_rec later to the first rec that is not output
         int layer_id = 0;
 
         for (layer_id = 0; cfg != NULL; layer_id++) { 
@@ -641,9 +641,19 @@ int main(int argc, char *argv[])
           }
 
           //Write recout only for as many layers as rec outs were given
-          if (layer_id < opts->num_debugs && recout[layer_id]) {
+          if (layer_id < opts->num_debugs) {
             // Since chunks_out was not NULL, img_rec should have been set.
             assert(cur_rec);
+
+            //Check that recon file has been set
+            if(!recout[layer_id]) {
+              printf("Error: Recout file not set for layer %d.\n",layer_id);
+              free_chained_img(api, cur_in_img);
+              api->chunk_free(chunks_out);
+              free_chained_img(api, cur_rec);
+              free_chained_img(api, img_src);
+              goto exit_failure;
+            }
             
             // Move img_rec to the recon buffer.
             assert(recon_buffer_size[layer_id] < KVZ_MAX_GOP_LENGTH);
@@ -663,6 +673,13 @@ int main(int argc, char *argv[])
                                   cfg->width,
                                   cfg->height);
           }
+          else {
+            if( img_rec == NULL) {
+              //Should be the first time in the loop the else branch has been taken and cur_rec is the first rec not output
+              img_rec = cur_rec;
+            }
+            cur_rec = cur_rec->base_image;
+          }
 
           frames_done += 1;
           psnr_sum[0] += frame_psnr[0];
@@ -675,7 +692,6 @@ int main(int argc, char *argv[])
           cfg = cfg->next_cfg;
           if(cur_src) cur_src = cur_src->base_image;
         }
-        img_rec = opts->num_debugs < layer_id ? cur_rec : NULL; //Set remaining images to img_rec so they are freed later
       }
 
       free_chained_img(api, cur_in_img); cur_in_img = NULL;
