@@ -624,6 +624,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     free(cfg->next_cfg->max_input_layers);
     cfg->next_cfg->max_input_layers = cfg->max_input_layers;
 
+    free(*cfg->next_cfg->input_widths);
+    free(*cfg->next_cfg->input_heights);
     free(cfg->next_cfg->input_widths);
     free(cfg->next_cfg->input_heights);
     cfg->next_cfg->input_widths = cfg->input_widths;

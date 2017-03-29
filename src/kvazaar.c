@@ -393,12 +393,7 @@ static int kvazaar_encode(kvz_encoder *enc,
     // ***********************************************
     // Modified for SHVC. TODO: Move all this to kvz_encoder_prepare?
     if (state->encoder_control->layer.layer_id > 0 && enc->prev_enc != NULL) {
-      //TODO: Find a better way. Handle cu_arrays properly
-      //deallocate dummy cu_array
-      cu_array_t* cua = state->frame->ref->cu_arrays[0]; //ILR pic should be first
-      int used_size = state->frame->ref->used_size;
       remove_ILR_pics(state); //Remove old ILR pics from the ref list so they don't interfere. TODO: Move somewhere else?
-      if (used_size > 0) kvz_cu_array_free(cua);
     }
 
     kvz_encoder_prepare(state);
@@ -412,10 +407,15 @@ static int kvazaar_encode(kvz_encoder *enc,
       //TODO: Add upscaling, Handle memory leak of kvz_cu_array_?
       //TODO: Don't skip on first frame? Skip if inter frame. 
       if (bl_state->tile->frame->rec != NULL) {
+        kvz_picture* scaled_pic = kvazaar_scaling(bl_state->tile->frame->rec, &enc->control->layer.upscaling);
+        cu_array_t* scaled_cu = kvz_cu_array_alloc(state->tile->frame->width_in_lcu * LCU_WIDTH, state->tile->frame->height_in_lcu * LCU_WIDTH);
         kvz_image_list_add(state->frame->ref,
-                           kvazaar_scaling(bl_state->tile->frame->rec, &enc->control->layer.upscaling),
-                           kvz_cu_array_alloc(state->tile->frame->width_in_lcu * LCU_WIDTH, state->tile->frame->height_in_lcu * LCU_WIDTH),
+                           scaled_pic,
+                           scaled_cu,
                            bl_state->frame->poc);
+        //TODO: Add error handling?
+        kvz_image_free(scaled_pic);
+        kvz_cu_array_free(scaled_cu);
       }
     }
     // ***********************************************
