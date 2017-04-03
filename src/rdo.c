@@ -557,13 +557,11 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
 
   // Explicitly tell the only possible numbers of elements to be zeroed.
   // Hope the compiler is able to utilize this information.
-  // TODO: Make sure this works if someone changes type of sig_coeffgoup_flag.
-  // Also check that eg. GCC7 does not warn about not multiplying by element size.
   switch (cg_num) {
-    case  1: memset(sig_coeffgroup_flag, 0,  1 * sizeof(uint32_t)); break;
-    case  4: memset(sig_coeffgroup_flag, 0,  4 * sizeof(uint32_t)); break;
-    case 16: memset(sig_coeffgroup_flag, 0, 16 * sizeof(uint32_t)); break;
-    case 64: memset(sig_coeffgroup_flag, 0, 64 * sizeof(uint32_t)); break;
+    case  1: memset(sig_coeffgroup_flag, 0,  1 * sizeof(sig_coeffgroup_flag[0])); break;
+    case  4: memset(sig_coeffgroup_flag, 0,  4 * sizeof(sig_coeffgroup_flag[0])); break;
+    case 16: memset(sig_coeffgroup_flag, 0, 16 * sizeof(sig_coeffgroup_flag[0])); break;
+    case 64: memset(sig_coeffgroup_flag, 0, 64 * sizeof(sig_coeffgroup_flag[0])); break;
     default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }
 
