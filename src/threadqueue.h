@@ -46,7 +46,10 @@ typedef struct threadqueue_job_t {
   struct threadqueue_job_t **rdepends; //array of pointer to jobs that depend on this one. They have to exist when the thread finishes, because they cannot be run before.
   unsigned int rdepends_count; //number of rdepends
   unsigned int rdepends_size; //allocated size of rdepends
-  
+
+  // Reference count
+  int refcount;
+
   //Job function and state to use
   void (*fptr)(void *arg);
   void *arg;
@@ -106,6 +109,10 @@ int kvz_threadqueue_init(threadqueue_queue_t * threadqueue, int thread_count, in
 
 //Add a job to the queue, and returs a threadqueue_job handle. If wait == 1, one has to run kvz_threadqueue_job_unwait_job in order to have it run
 threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * threadqueue, void (*fptr)(void *arg), void *arg, int wait, const char* debug_description);
+
+void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr);
+
+threadqueue_job_t *kvz_threadqueue_copy_ref(threadqueue_job_t *job);
 
 int kvz_threadqueue_job_unwait_job(threadqueue_queue_t * threadqueue, threadqueue_job_t *job);
 

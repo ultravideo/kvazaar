@@ -324,52 +324,59 @@ int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_cou
 }
 
 /**
- * \brief Free a single job from the threadqueue index i, destroying it.
+ * \brief Get a new pointer to a job.
+ *
+ * Increment reference count and return the job.
  */
-static void threadqueue_free_job(threadqueue_queue_t * const threadqueue, int i)
+threadqueue_job_t *kvz_threadqueue_copy_ref(threadqueue_job_t *job)
 {
-#ifdef KVZ_DEBUG
-#if KVZ_DEBUG & KVZ_PERF_JOB
-  int j;
-  KVZ_GET_TIME(&threadqueue->queue[i]->debug_clock_dequeue);
-  fprintf(threadqueue->debug_log, "%p\t%d\t%lf\t+%lf\t+%lf\t+%lf\t%s\n", threadqueue->queue[i], threadqueue->queue[i]->debug_worker_id, KVZ_CLOCK_T_AS_DOUBLE(threadqueue->queue[i]->debug_clock_enqueue), KVZ_CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_enqueue, threadqueue->queue[i]->debug_clock_start), KVZ_CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_start, threadqueue->queue[i]->debug_clock_stop), KVZ_CLOCK_T_DIFF(threadqueue->queue[i]->debug_clock_stop, threadqueue->queue[i]->debug_clock_dequeue), threadqueue->queue[i]->debug_description);
+  // The caller should have had another reference.
+  assert(job->refcount > 0);
+  KVZ_ATOMIC_INC(&job->refcount);
+  return job;
+}
 
-  for (j = 0; j < threadqueue->queue[i]->rdepends_count; ++j) {
-    fprintf(threadqueue->debug_log, "%p->%p\n", threadqueue->queue[i], threadqueue->queue[i]->rdepends[j]);
+
+/**
+ * \brief Free a job.
+ *
+ * Decrement reference count of the job. If no references exist any more,
+ * deallocate associated memory and destroy mutexes.
+ *
+ * Sets the job pointer to NULL.
+ */
+void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr)
+{
+  threadqueue_job_t *job = *job_ptr;
+  if (job == NULL) return;
+  *job_ptr = NULL;
+
+  int new_refcount = KVZ_ATOMIC_DEC(&job->refcount);
+  if (new_refcount > 0) {
+    // There are still references so we don't free the data yet.
+    return;
   }
 
-  FREE_POINTER(threadqueue->queue[i]->debug_description);
-#endif
-#endif
-  FREE_POINTER(threadqueue->queue[i]->rdepends);
-  
-  pthread_mutex_destroy(&threadqueue->queue[i]->lock);
+  assert(new_refcount >= 0);
 
-  FREE_POINTER(threadqueue->queue[i]);
+#ifdef KVZ_DEBUG
+  FREE_POINTER(job->debug_description);
+#endif
+
+  FREE_POINTER(job->rdepends);
+  pthread_mutex_destroy(&job->lock);
+  FREE_POINTER(job);
 }
 
 static void threadqueue_free_jobs(threadqueue_queue_t * const threadqueue) {
-  int i;
-  for (i=0; i < threadqueue->queue_count; ++i) {
-    threadqueue_free_job(threadqueue, i);
+  for (int i = 0; i < threadqueue->queue_count; ++i) {
+    kvz_threadqueue_free_job(&threadqueue->queue[i]);
   }
   threadqueue->queue_count = 0;
   threadqueue->queue_start = 0;
-#ifdef KVZ_DEBUG
-#if KVZ_DEBUG & KVZ_PERF_JOB
-  {
-    KVZ_CLOCK_T time;
-    KVZ_GET_TIME(&time);
-   
-    fprintf(threadqueue->debug_log, "\t\t-\t-\t%lf\t-\tFLUSH\n", KVZ_CLOCK_T_AS_DOUBLE(time));
-  }
-#endif
-#endif
 }
 
 int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
-  int i;
-  
   //Flush the queue
   if (!kvz_threadqueue_flush(threadqueue)) {
     fprintf(stderr, "Unable to flush threadqueue!\n");
@@ -406,7 +413,7 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
   PTHREAD_UNLOCK(&threadqueue->lock);
   
   //Join threads
-  for(i = 0; i < threadqueue->threads_count; i++) {
+  for(int i = 0; i < threadqueue->threads_count; i++) {
     if(pthread_join(threadqueue->threads[i], NULL) != 0) {
       fprintf(stderr, "pthread_join failed!\n");
       return 0;
@@ -493,10 +500,10 @@ int kvz_threadqueue_waitfor(threadqueue_queue_t * const threadqueue, threadqueue
   } while (!job_done);
 
   // Free jobs submitted before this job.
-  int i;
-  for (i = 0; i < threadqueue->queue_count; ++i) {
+  int i = 0;
+  for (; i < threadqueue->queue_count; ++i) {
     if (threadqueue->queue[i] == job) break;
-    threadqueue_free_job(threadqueue, i);
+    kvz_threadqueue_free_job(&threadqueue->queue[i]);
   }
   // Move remaining jobs to the beginning of the array.
   if (i > 0) {
@@ -525,6 +532,7 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
   assert(wait == 0 || wait == 1);
   
   job = MALLOC(threadqueue_job_t, 1);
+  job->refcount = 1;
   
 #ifdef KVZ_DEBUG
   if (debug_description) {
@@ -580,6 +588,7 @@ threadqueue_job_t * kvz_threadqueue_submit(threadqueue_queue_t * const threadque
     threadqueue->queue_size += THREADQUEUE_LIST_REALLOC_SIZE;
   }
   threadqueue->queue[threadqueue->queue_count++] = job;
+  job->refcount++;
   
   if (job->ndepends == 0) {
     ++threadqueue->queue_waiting_execution;
