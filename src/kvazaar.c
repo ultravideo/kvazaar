@@ -572,7 +572,10 @@ static int kvazaar_field_encoding_adapter(kvz_encoder *enc,
   if (enc->control->cfg.source_scan_type == KVZ_INTERLACING_NONE) {
     // For progressive, simply call the normal encoding function.
     //If several layers are used, call the apropriate function
-    if(enc->control->layer.max_layers > 1) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
+    //If base layer and input layer differ in size, use scalable
+    uint8_t bl_scaling = enc->control->layer.downscaling.src_width != enc->control->layer.downscaling.trgt_width ||
+                         enc->control->layer.downscaling.src_height != enc->control->layer.downscaling.trgt_height;
+    if(enc->control->layer.max_layers > 1 || bl_scaling) return kvazaar_scalable_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
     return kvazaar_encode(enc, pic_in, data_out, len_out, pic_out, src_out, info_out);
   }
 
