@@ -33,6 +33,7 @@
 
 #include <math.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -124,9 +125,9 @@ static void compute_psnr(const kvz_picture *const src,
 }
 
 typedef struct {
-  // Mutexes for synchronization.
-  pthread_mutex_t* input_mutex;
-  pthread_mutex_t* main_thread_mutex;
+  // Semaphores for synchronization.
+  sem_t* available_input_slots;
+  sem_t* filled_input_slots;
 
   // Parameters passed from main thread to input thread.
   FILE* input;
@@ -140,9 +141,6 @@ typedef struct {
   kvz_picture *img_in;
   int retval;
 } input_handler_args;
-
-#define PTHREAD_LOCK(l) if (pthread_mutex_lock((l)) != 0) { fprintf(stderr, "pthread_mutex_lock(%s) failed!\n", #l); assert(0); return 0; }
-#define PTHREAD_UNLOCK(l) if (pthread_mutex_unlock((l)) != 0) { fprintf(stderr, "pthread_mutex_unlock(%s) failed!\n", #l); assert(0); return 0; }
 
 #define RETVAL_RUNNING 0
 #define RETVAL_FAILURE 1
@@ -242,30 +240,30 @@ static void* input_read_thread(void* in_args)
     }
 
     // Wait until main thread is ready to receive the next frame.
-    PTHREAD_LOCK(args->input_mutex);
+    sem_wait(args->available_input_slots);
     args->img_in = frame_in;
     args->retval = retval;
     // Unlock main_thread_mutex to notify main thread that the new img_in
     // and retval have been placed to args.
-    PTHREAD_UNLOCK(args->main_thread_mutex);
+    sem_post(args->filled_input_slots);
 
     frame_in = NULL;
   }
 
 done:
   // Wait until main thread is ready to receive the next frame.
-  PTHREAD_LOCK(args->input_mutex);
+  sem_wait(args->available_input_slots);
   args->img_in = NULL;
   args->retval = retval;
   // Unlock main_thread_mutex to notify main thread that the new img_in
   // and retval have been placed to args.
-  PTHREAD_UNLOCK(args->main_thread_mutex);
+  sem_post(args->filled_input_slots);
 
   // Do some cleaning up.
   args->api->picture_free(frame_in);
 
   pthread_exit(NULL);
-  return 0;
+  return NULL;
 }
 
 
@@ -322,7 +320,7 @@ int main(int argc, char *argv[])
   clock_t start_time = clock();
   clock_t encoding_start_cpu_time;
   KVZ_CLOCK_T encoding_start_real_time;
-  
+
   clock_t encoding_end_cpu_time;
   KVZ_CLOCK_T encoding_end_real_time;
 
@@ -335,11 +333,24 @@ int main(int argc, char *argv[])
   kvz_picture *recon_buffer[KVZ_MAX_GOP_LENGTH] = { NULL };
   int recon_buffer_size = 0;
 
+  // Semaphores for synchronizing the input reader thread and the main
+  // thread.
+  //
+  // available_input_slots tells whether the main thread is currently using
+  // input_handler_args.img_in. (0 = in use, 1 = not in use)
+  //
+  // filled_input_slots tells whether there is a new input picture (or NULL
+  // if the input has ended) in input_handler_args.img_in placed by the
+  // input reader thread. (0 = no new image, 1 = one new image)
+  //
+  sem_t *available_input_slots = NULL;
+  sem_t *filled_input_slots = NULL;
+
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
   setmode( _fileno( stderr ), _O_TEXT );
 #endif
-      
+
   CHECKPOINTS_INIT();
 
   const kvz_api * const api = kvz_api_get(8);
@@ -423,17 +434,15 @@ int main(int argc, char *argv[])
 
     pthread_t input_thread;
 
-    pthread_mutex_t input_mutex = PTHREAD_MUTEX_INITIALIZER;
-    pthread_mutex_t main_thread_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-    // Lock both mutexes at startup
-    PTHREAD_LOCK(&main_thread_mutex);
-    PTHREAD_LOCK(&input_mutex);
+    available_input_slots = calloc(1, sizeof(sem_t));
+    filled_input_slots    = calloc(1, sizeof(sem_t));
+    sem_init(available_input_slots, 0, 0);
+    sem_init(filled_input_slots,    0, 0);
 
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
-      .input_mutex = NULL,
-      .main_thread_mutex = NULL,
+      .available_input_slots = available_input_slots,
+      .filled_input_slots    = filled_input_slots,
 
       .input = input,
       .api = api,
@@ -445,8 +454,8 @@ int main(int argc, char *argv[])
       .img_in = NULL,
       .retval = RETVAL_RUNNING,
     };
-    in_args.input_mutex = &input_mutex;
-    in_args.main_thread_mutex = &main_thread_mutex;
+    in_args.available_input_slots = available_input_slots;
+    in_args.filled_input_slots    = filled_input_slots;
 
     if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
       fprintf(stderr, "pthread_create failed!\n");
@@ -458,11 +467,12 @@ int main(int argc, char *argv[])
 
       // Skip mutex locking if the input thread does not exist.
       if (in_args.retval == RETVAL_RUNNING) {
-        // Unlock input_mutex so that the input thread can write the new
-        // img_in and retval to in_args.
-        PTHREAD_UNLOCK(&input_mutex);
-        // Wait until the input thread has updated in_args.
-        PTHREAD_LOCK(&main_thread_mutex);
+        // Increase available_input_slots so that the input thread can
+        // write the new img_in and retval to in_args.
+        sem_post(available_input_slots);
+        // Wait until the input thread has updated in_args and then
+        // decrease filled_input_slots.
+        sem_wait(filled_input_slots);
 
         cur_in_img = in_args.img_in;
         in_args.img_in = NULL;
@@ -595,6 +605,12 @@ exit_failure:
   retval = EXIT_FAILURE;
 
 done:
+  // destroy semaphores
+  if (available_input_slots) sem_destroy(available_input_slots);
+  if (filled_input_slots)    sem_destroy(filled_input_slots);
+  FREE_POINTER(available_input_slots);
+  FREE_POINTER(filled_input_slots);
+
   // deallocate structures
   if (enc) api->encoder_close(enc);
   if (opts) cmdline_opts_free(api, opts);
