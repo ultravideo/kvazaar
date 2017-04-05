@@ -863,5 +863,5 @@ void kvz_search_cu_intra(encoder_state_t * const state,
   uint8_t best_mode_i = select_best_mode_index(modes, costs, number_of_modes);
 
   *mode_out = modes[best_mode_i];
-  *cost_out = best_rough_cost;
+  *cost_out = skip_rough_search ? costs[best_mode_i]:best_rough_cost;
 }
