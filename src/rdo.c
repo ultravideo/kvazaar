@@ -558,10 +558,10 @@ void kvz_rdoq(encoder_state_t * const state, coeff_t *coef, coeff_t *dest_coeff,
   // Explicitly tell the only possible numbers of elements to be zeroed.
   // Hope the compiler is able to utilize this information.
   switch (cg_num) {
-    case  1: memset(sig_coeffgroup_flag, 0,  1 * sizeof(sig_coeffgroup_flag[0])); break;
-    case  4: memset(sig_coeffgroup_flag, 0,  4 * sizeof(sig_coeffgroup_flag[0])); break;
-    case 16: memset(sig_coeffgroup_flag, 0, 16 * sizeof(sig_coeffgroup_flag[0])); break;
-    case 64: memset(sig_coeffgroup_flag, 0, 64 * sizeof(sig_coeffgroup_flag[0])); break;
+    case  1: FILL_ARRAY(sig_coeffgroup_flag, 0,  1); break;
+    case  4: FILL_ARRAY(sig_coeffgroup_flag, 0,  4); break;
+    case 16: FILL_ARRAY(sig_coeffgroup_flag, 0, 16); break;
+    case 64: FILL_ARRAY(sig_coeffgroup_flag, 0, 64); break;
     default: assert(0 && "There should be 1, 4, 16 or 64 coefficient groups");
   }
 
