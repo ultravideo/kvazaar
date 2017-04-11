@@ -2,6 +2,7 @@ language: c
 
 env:
   global:
+  - KVZ_CONFIGURE_ARGS=--enable-werror 
   - TEST_DIM=264x130
   - TEST_FRAMES=10
 

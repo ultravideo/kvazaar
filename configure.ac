@@ -32,7 +32,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 
-AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 dist-xz foreign subdir-objects])
+AM_INIT_AUTOMAKE([-Wall dist-bzip2 dist-xz foreign subdir-objects])
 AM_SILENT_RULES([yes])
 
 AC_PROG_CC
@@ -88,9 +88,9 @@ CFLAGS="$PTHREAD_CFLAGS $CFLAGS"
 LIBS="$PTHREAD_LIBS $LIBS"
 CC="$PTHREAD_CC"
 
-# --disable-werror
-AC_ARG_ENABLE([werror], [AS_HELP_STRING([--disable-werror], [don't treat warnings as errors [no]])],
-              [], [CFLAGS="-Werror $CFLAGS"]
+# --enable-werror
+AC_ARG_ENABLE([werror], [AS_HELP_STRING([--enable-werror], [treat warnings as errors [no]])],
+              [CFLAGS="-Werror $CFLAGS"], []
 )
 
 
