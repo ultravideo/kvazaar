@@ -30,10 +30,6 @@
 
 #include <pthread.h>
 
-#define E3 1000
-#define E9 1000000000
-#define FILETIME_TO_EPOCH 0x19DB1DED53E8000LL
-
 #if defined(__GNUC__) && !defined(__MINGW32__) 
 #include <unistd.h> // IWYU pragma: export
 #include <time.h> // IWYU pragma: export
@@ -135,8 +131,5 @@ static INLINE void kvz_sem_destroy(kvz_sem_t *sem)
 }
 
 #endif
-
-#undef E9
-#undef E3
 
 #endif //THREADS_H_
