@@ -33,7 +33,6 @@
 
 #include <math.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -126,8 +125,8 @@ static void compute_psnr(const kvz_picture *const src,
 
 typedef struct {
   // Semaphores for synchronization.
-  sem_t* available_input_slots;
-  sem_t* filled_input_slots;
+  kvz_sem_t* available_input_slots;
+  kvz_sem_t* filled_input_slots;
 
   // Parameters passed from main thread to input thread.
   FILE* input;
@@ -240,24 +239,24 @@ static void* input_read_thread(void* in_args)
     }
 
     // Wait until main thread is ready to receive the next frame.
-    sem_wait(args->available_input_slots);
+    kvz_sem_wait(args->available_input_slots);
     args->img_in = frame_in;
     args->retval = retval;
     // Unlock main_thread_mutex to notify main thread that the new img_in
     // and retval have been placed to args.
-    sem_post(args->filled_input_slots);
+    kvz_sem_post(args->filled_input_slots);
 
     frame_in = NULL;
   }
 
 done:
   // Wait until main thread is ready to receive the next frame.
-  sem_wait(args->available_input_slots);
+  kvz_sem_wait(args->available_input_slots);
   args->img_in = NULL;
   args->retval = retval;
   // Unlock main_thread_mutex to notify main thread that the new img_in
   // and retval have been placed to args.
-  sem_post(args->filled_input_slots);
+  kvz_sem_post(args->filled_input_slots);
 
   // Do some cleaning up.
   args->api->picture_free(frame_in);
@@ -343,8 +342,8 @@ int main(int argc, char *argv[])
   // if the input has ended) in input_handler_args.img_in placed by the
   // input reader thread. (0 = no new image, 1 = one new image)
   //
-  sem_t *available_input_slots = NULL;
-  sem_t *filled_input_slots = NULL;
+  kvz_sem_t *available_input_slots = NULL;
+  kvz_sem_t *filled_input_slots = NULL;
 
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -434,10 +433,10 @@ int main(int argc, char *argv[])
 
     pthread_t input_thread;
 
-    available_input_slots = calloc(1, sizeof(sem_t));
-    filled_input_slots    = calloc(1, sizeof(sem_t));
-    sem_init(available_input_slots, 0, 0);
-    sem_init(filled_input_slots,    0, 0);
+    available_input_slots = calloc(1, sizeof(kvz_sem_t));
+    filled_input_slots    = calloc(1, sizeof(kvz_sem_t));
+    kvz_sem_init(available_input_slots, 0);
+    kvz_sem_init(filled_input_slots,    0);
 
     // Give arguments via struct to the input thread
     input_handler_args in_args = {
@@ -469,10 +468,10 @@ int main(int argc, char *argv[])
       if (in_args.retval == RETVAL_RUNNING) {
         // Increase available_input_slots so that the input thread can
         // write the new img_in and retval to in_args.
-        sem_post(available_input_slots);
+        kvz_sem_post(available_input_slots);
         // Wait until the input thread has updated in_args and then
         // decrease filled_input_slots.
-        sem_wait(filled_input_slots);
+        kvz_sem_wait(filled_input_slots);
 
         cur_in_img = in_args.img_in;
         in_args.img_in = NULL;
@@ -606,8 +605,8 @@ exit_failure:
 
 done:
   // destroy semaphores
-  if (available_input_slots) sem_destroy(available_input_slots);
-  if (filled_input_slots)    sem_destroy(filled_input_slots);
+  if (available_input_slots) kvz_sem_destroy(available_input_slots);
+  if (filled_input_slots)    kvz_sem_destroy(filled_input_slots);
   FREE_POINTER(available_input_slots);
   FREE_POINTER(filled_input_slots);
 
