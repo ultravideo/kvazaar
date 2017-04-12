@@ -30,10 +30,6 @@
 
 #include <pthread.h>
 
-#define E3 1000
-#define E9 1000000000
-#define FILETIME_TO_EPOCH 0x19DB1DED53E8000LL
-
 #if defined(__GNUC__) && !defined(__MINGW32__) 
 #include <unistd.h> // IWYU pragma: export
 #include <time.h> // IWYU pragma: export
@@ -76,7 +72,64 @@
 
 #endif //__GNUC__
 
-#undef E9
-#undef E3
+#ifdef __APPLE__
+// POSIX semaphores are deprecated on Mac so we use Grand Central Dispatch
+// semaphores instead.
+#include <dispatch/dispatch.h>
+typedef dispatch_semaphore_t kvz_sem_t;
+
+static INLINE void kvz_sem_init(kvz_sem_t *sem, int value)
+{
+    assert(value >= 0);
+    *sem = dispatch_semaphore_create(value);
+}
+
+static INLINE void kvz_sem_wait(kvz_sem_t *sem)
+{
+    dispatch_semaphore_wait(*sem, DISPATCH_TIME_FOREVER);
+}
+
+static INLINE void kvz_sem_post(kvz_sem_t *sem)
+{
+    dispatch_semaphore_signal(*sem);
+}
+
+
+static INLINE void kvz_sem_destroy(kvz_sem_t *sem)
+{
+    // Do nothing for GCD semaphores.
+}
+
+#else
+// Use POSIX semaphores.
+#include <semaphore.h>
+
+typedef sem_t kvz_sem_t;
+
+static INLINE void kvz_sem_init(kvz_sem_t *sem, int value)
+{
+    assert(value >= 0);
+    // Pthreads-w32 does not support process-shared semaphores, so pshared
+    // must always be zero.
+    int pshared = 0;
+    sem_init(sem, pshared, value);
+}
+
+static INLINE void kvz_sem_wait(kvz_sem_t *sem)
+{
+    sem_wait(sem);
+}
+
+static INLINE void kvz_sem_post(kvz_sem_t *sem)
+{
+    sem_post(sem);
+}
+
+static INLINE void kvz_sem_destroy(kvz_sem_t *sem)
+{
+    sem_destroy(sem);
+}
+
+#endif
 
 #endif //THREADS_H_
