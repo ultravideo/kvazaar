@@ -133,10 +133,17 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   if (state->tile == NULL) return;
 
   if (state->tile->hor_buf_before_sao) kvz_yuv_t_free(state->tile->hor_buf_before_sao);
-  
+
   kvz_yuv_t_free(state->tile->hor_buf_search);
   kvz_yuv_t_free(state->tile->ver_buf_search);
-  
+
+  if (state->encoder_control->cfg.wpp) {
+    int num_jobs = state->tile->frame->width_in_lcu * state->tile->frame->height_in_lcu;
+    for (int i = 0; i < num_jobs; ++i) {
+      kvz_threadqueue_free_job(&state->tile->wf_jobs[i]);
+    }
+  }
+
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
   if (state->encoder_control->cfg.crypto_features && state->tile->dbs_g) {
@@ -145,8 +152,10 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
   FREE_POINTER(state->tile->wf_jobs);
 }
 
-static int encoder_state_config_slice_init(encoder_state_t * const state, 
-                                          const int start_address_in_ts, const int end_address_in_ts) {
+static int encoder_state_config_slice_init(encoder_state_t * const state,
+                                           const int start_address_in_ts,
+                                           const int end_address_in_ts)
+{
   state->slice->id = -1;
   for (int i = 0; i < state->encoder_control->slice_count; ++i) {
     if (state->encoder_control->slice_addresses_in_ts[i] == start_address_in_ts) {
@@ -706,4 +715,7 @@ void kvz_encoder_state_finalize(encoder_state_t * const state) {
   }
 
   kvz_bitstream_finalize(&state->stream);
+
+  kvz_threadqueue_free_job(&state->tqj_recon_done);
+  kvz_threadqueue_free_job(&state->tqj_bitstream_written);
 }

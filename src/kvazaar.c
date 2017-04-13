@@ -451,7 +451,7 @@ static int kvazaar_encode(kvz_encoder *enc,
     kvz_threadqueue_waitfor(enc->control->threadqueue, output_state->tqj_bitstream_written);
     // The job pointer must be set to NULL here since it won't be usable after
     // the next frame is done.
-    output_state->tqj_bitstream_written = NULL;
+    kvz_threadqueue_free_job(&output_state->tqj_bitstream_written);
 
     // Get stream length before taking chunks since that clears the stream.
     if (len_out) *len_out = kvz_bitstream_tell(&output_state->stream) / 8;

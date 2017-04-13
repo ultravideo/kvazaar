@@ -35,6 +35,7 @@
 #include "sao.h"
 #include "search.h"
 #include "tables.h"
+#include "threadqueue.h"
 
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
@@ -479,6 +480,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 #else
       char* job_description = NULL;
 #endif
+      kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
       state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
       
       // If job object was returned, add dependancies and allow it to run.
@@ -515,13 +517,14 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
         }
 
         kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
-      }
 
-      // In the case where SAO is not enabled, the wavefront row is
-      // done when the last LCU in the row is done.
-      if (!state->encoder_control->cfg.sao_enable && i + 1 == state->lcu_order_count) {
-        assert(!state->tqj_recon_done);
-        state->tqj_recon_done = state->tile->wf_jobs[lcu->id];
+        // In the case where SAO is not enabled, the wavefront row is
+        // done when the last LCU in the row is done.
+        if (!state->encoder_control->cfg.sao_enable && i + 1 == state->lcu_order_count) {
+          assert(!state->tqj_recon_done);
+          state->tqj_recon_done =
+            kvz_threadqueue_copy_ref(state->tile->wf_jobs[lcu->id]);
+        }
       }
     }
   }
@@ -541,11 +544,11 @@ static void encoder_state_worker_encode_children(void * opaque)
     int wpp_row = sub_state->wfrow->lcu_offset_y;
     int tile_width = sub_state->tile->frame->width_in_lcu;
     int end_of_row = (wpp_row + 1) * tile_width - 1;
-    threadqueue_job_t *job = sub_state->tile->wf_jobs[end_of_row];
-
     assert(!sub_state->tqj_bitstream_written);
-    sub_state->tqj_bitstream_written = job;
-    return;
+    if (sub_state->tile->wf_jobs[end_of_row]) {
+      sub_state->tqj_bitstream_written =
+        kvz_threadqueue_copy_ref(sub_state->tile->wf_jobs[end_of_row]);
+    }
   }
 }
 
@@ -674,6 +677,7 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 #else
           char* job_description = NULL;
 #endif
+          kvz_threadqueue_free_job(&main_state->children[i].tqj_recon_done);
           main_state->children[i].tqj_recon_done = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_encode_children, &(main_state->children[i]), 1, job_description);
           if (main_state->children[i].previous_encoder_state != &main_state->children[i] && main_state->children[i].previous_encoder_state->tqj_recon_done && !main_state->children[i].frame->is_idr_frame) {
 #if 0
@@ -703,11 +707,10 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
       if (main_state->encoder_control->cfg.sao_enable && 
           main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW)
       {
-        int y;
         videoframe_t * const frame = main_state->tile->frame;
         threadqueue_job_t *previous_job = NULL;
         
-        for (y = 0; y < frame->height_in_lcu; ++y) {
+        for (int y = 0; y < frame->height_in_lcu; ++y) {
           // Queue a single job performing SAO reconstruction for the whole wavefront row.
 
           worker_sao_reconstruct_lcu_data *data = MALLOC(worker_sao_reconstruct_lcu_data, 1);
@@ -743,13 +746,14 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           
           // The wavefront row is finished, when the SAO-reconstruction is
           // finished.
+          kvz_threadqueue_free_job(&main_state->children[y].tqj_recon_done);
           main_state->children[y].tqj_recon_done = job;
           
           if (y == frame->height_in_lcu - 1) {
             // This tile is finished, when the reconstruction of the last
             // WPP-row is finished.
             assert(!main_state->tqj_recon_done);
-            main_state->tqj_recon_done = job;
+            main_state->tqj_recon_done = kvz_threadqueue_copy_ref(job);
           }
         }
       }
@@ -955,8 +959,8 @@ static void encoder_state_init_children(encoder_state_t * const state) {
   }
 
   //Clear the jobs
-  state->tqj_bitstream_written = NULL;
-  state->tqj_recon_done = NULL;
+  kvz_threadqueue_free_job(&state->tqj_bitstream_written);
+  kvz_threadqueue_free_job(&state->tqj_recon_done);
 
   for (int i = 0; state->children[i].encoder_control; ++i) {
     encoder_state_init_children(&state->children[i]);

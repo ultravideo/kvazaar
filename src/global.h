@@ -219,7 +219,11 @@ typedef int16_t coeff_t;
 // Fill a structure or a static array with val bytes.
 #define FILL(var, val) memset(&(var), (val), sizeof(var))
 // Fill a number of elements in an array with val bytes.
-#define FILL_ARRAY(ar, val, size) memset((ar), (val), (size) * sizeof(*(ar)))
+#define FILL_ARRAY(ar, val, size) \
+{\
+  void *temp_ptr = (void*)(ar);\
+  memset((temp_ptr), (val), (size) * sizeof(*(ar)));\
+}
 
 #define FREE_POINTER(pointer) { free((void*)pointer); pointer = NULL; }
 #define MOVE_POINTER(dst_pointer,src_pointer) { dst_pointer = src_pointer; src_pointer = NULL; }
