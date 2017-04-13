@@ -273,9 +273,6 @@ done:
   // Do some cleaning up.
   args->api->picture_free(frame_in);
 
-  //Unlock input_mutex before exit
-  PTHREAD_UNLOCK(args->input_mutex);
-
   pthread_exit(NULL);
   return NULL;
 }
@@ -370,8 +367,7 @@ int main(int argc, char *argv[])
   kvz_frame_info* info_out = NULL;
   uint32_t *len_out = NULL;
   pthread_t *input_threads = NULL;
-  pthread_mutex_t *input_mutex = NULL;
-  pthread_mutex_t *main_thread_mutex = NULL;
+ 
   input_handler_args *in_args = NULL;
   //*************************************************
 
@@ -385,8 +381,8 @@ int main(int argc, char *argv[])
   // if the input has ended) in input_handler_args.img_in placed by the
   // input reader thread. (0 = no new image, 1 = one new image)
   //
-  kvz_sem_t *available_input_slots = NULL;
-  kvz_sem_t *filled_input_slots = NULL;
+  kvz_sem_t **available_input_slots = NULL;
+  kvz_sem_t **filled_input_slots = NULL;
 
 #ifdef _WIN32
   // Stderr needs to be text mode to convert \n to \r\n in Windows.
@@ -491,8 +487,9 @@ int main(int argc, char *argv[])
 
   input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
 
-  input_mutex = calloc(opts->num_inputs, sizeof(pthread_mutex_t));
-  main_thread_mutex = calloc(opts->num_inputs, sizeof(pthread_mutex_t));
+  //Allocate semaphores
+  available_input_slots = calloc(opts->num_inputs, sizeof(kvz_sem_t*));
+  filled_input_slots = calloc(opts->num_inputs, sizeof(kvz_sem_t*));
 
   in_args = calloc(opts->num_inputs,sizeof(input_handler_args));
 
@@ -501,6 +498,7 @@ int main(int argc, char *argv[])
   recon_buffer = calloc(opts->num_debugs,sizeof(kvz_picture*[KVZ_MAX_GOP_LENGTH])); //Feels so wrong but should mean recon_buffer is a pointer to kvz_picture* [KVZ_MAX_GOP_LENGTH] -arrays
   recon_buffer_size = calloc(opts->num_debugs,sizeof(int));
 
+  
   //Now, do the real stuff
   {
 
@@ -512,23 +510,17 @@ int main(int argc, char *argv[])
     double psnr_sum[3] = { 0.0, 0.0, 0.0 };
 
     for (int i = 0; i < opts->num_inputs; i++) {
-      // Lock both mutexes at startup
-      if( pthread_mutex_init(&input_mutex[i],NULL) || pthread_mutex_init(&main_thread_mutex[i],NULL) ) {
-        fprintf(stderr,"Failed to initialize mutex.\n");
-        goto exit_failure;
-      }
-      //pthread_mutex_init(&input_mutex[i],NULL);//input_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
-      //pthread_mutex_init(&main_thread_mutex[i],NULL);//main_thread_mutex[i] = PTHREAD_MUTEX_INITIALIZER;
-      PTHREAD_LOCK(&main_thread_mutex[i]);
-      PTHREAD_LOCK(&input_mutex[i]);
 
       uint8_t padding_x = get_padding((*opts->config->input_widths)[i]);
       uint8_t padding_y = get_padding((*opts->config->input_heights)[i]);
 
-    available_input_slots = calloc(1, sizeof(kvz_sem_t));
-    filled_input_slots    = calloc(1, sizeof(kvz_sem_t));
-    kvz_sem_init(available_input_slots, 0);
-    kvz_sem_init(filled_input_slots,    0);
+      available_input_slots[i] = calloc(1, sizeof(kvz_sem_t));
+      filled_input_slots[i]    = calloc(1, sizeof(kvz_sem_t));
+      kvz_sem_init(available_input_slots[i], 0);
+      kvz_sem_init(filled_input_slots[i],    0);
+
+      in_args[i].available_input_slots = available_input_slots[i];
+      in_args[i].filled_input_slots = filled_input_slots[i];
 
       in_args[i].input = input[i];
       in_args[i].api = api;
@@ -536,33 +528,16 @@ int main(int argc, char *argv[])
       in_args[i].encoder = encoder;
       in_args[i].padding_x = padding_x;
       in_args[i].padding_y = padding_y;
-
-    // Give arguments via struct to the input thread
-    input_handler_args in_args = {
-      .available_input_slots = available_input_slots,
-      .filled_input_slots    = filled_input_slots,
+      
       in_args[i].img_in = NULL;
       in_args[i].retval = RETVAL_RUNNING;
       
-      in_args[i].input_mutex = &input_mutex[i];
-      in_args[i].main_thread_mutex = &main_thread_mutex[i];
-
+      
       if (pthread_create(&input_threads[i], NULL, input_read_thread, (void*)&in_args[i]) != 0) {
         fprintf(stderr, "pthread_create failed!\n");
         assert(0);
         return 0;
       }
-
-      .img_in = NULL,
-      .retval = RETVAL_RUNNING,
-    };
-    in_args.available_input_slots = available_input_slots;
-    in_args.filled_input_slots    = filled_input_slots;
-
-    if (pthread_create(&input_thread, NULL, input_read_thread, (void*)&in_args) != 0) {
-      fprintf(stderr, "pthread_create failed!\n");
-      assert(0);
-      return 0;
     }
     // ***********************************************
     kvz_picture *cur_in_img = NULL;
@@ -573,9 +548,7 @@ int main(int argc, char *argv[])
       //TODO: Move relevant de/allocation to done tag.
       kvz_picture *cur_img = NULL;
       for (int i = 0; i < opts->num_inputs; i++) {
-        // Skip mutex locking if the input thread does not exist.
         if (in_args[i].retval == RETVAL_RUNNING) {
-          
           // Increase available_input_slots so that the input thread can
           // write the new img_in and retval to in_args.
           kvz_sem_post(available_input_slots[i]);
@@ -591,7 +564,6 @@ int main(int argc, char *argv[])
             cur_img = cur_img->base_image;
           }
           in_args[i].img_in = NULL;
-
         } else if(in_args[i].retval == RETVAL_EOF) {
           cur_in_img = NULL;
           break;
@@ -603,7 +575,6 @@ int main(int argc, char *argv[])
       kvz_data_chunk* chunks_out = NULL;
       kvz_picture *img_rec = NULL;
       kvz_picture *img_src = NULL;
-      //uint32_t len_out = 0;
       
       if (!api->encoder_encode(enc,
                                cur_in_img,
@@ -775,11 +746,6 @@ exit_failure:
 done:
   // ***********************************************
   // Modified for SHVC
-  // destroy semaphores
-  if (available_input_slots) kvz_sem_destroy(available_input_slots);
-  if (filled_input_slots)    kvz_sem_destroy(filled_input_slots);
-  FREE_POINTER(available_input_slots);
-  FREE_POINTER(filled_input_slots);
 
   // deallocate structures
   if (enc) api->encoder_close(enc);
@@ -793,33 +759,30 @@ done:
       if (recout[i]) fclose(recout[i]);
     }
   }
-  free(input);
+  FREE_POINTER(input);
   if (output) fclose(output);  
-  free(recout);
+  FREE_POINTER(recout);
 
   //Free some stuff
-  free(info_out);
-  free(len_out);
-  free(in_args);
-  free(input_threads);
+  FREE_POINTER(info_out);
+  FREE_POINTER(len_out);
+  FREE_POINTER(in_args);
+  FREE_POINTER(input_threads);
 
-  //Destroy mutexes
+  // destroy semaphores
   if (opts != NULL) {
-    for (int8_t i = 0; i < opts->num_inputs && input_mutex != NULL && main_thread_mutex != NULL; i++) {
-      //Unlock main_thread mutex. Necessary?
-      if (&main_thread_mutex[i] != NULL) PTHREAD_UNLOCK(&main_thread_mutex[i]);
-      if ((&input_mutex[i] != NULL && pthread_mutex_destroy(&input_mutex[i]) == EBUSY) ||
-        (&main_thread_mutex[i] != NULL && pthread_mutex_destroy(&main_thread_mutex[i]) == EBUSY)) {
-        //Relevant check?
-        fprintf(stderr, "Locked mutex destroyed.\n");
-      }
+    for (int i = 0; i < opts->num_inputs && available_input_slots != NULL && filled_input_slots != NULL; i++) {
+      if (available_input_slots[i]) kvz_sem_destroy(available_input_slots[i]);
+      if (filled_input_slots[i])    kvz_sem_destroy(filled_input_slots[i]);
+      FREE_POINTER(available_input_slots);
+      FREE_POINTER(filled_input_slots);
     }
   }
-  free(input_mutex);
-  free(main_thread_mutex);
-  free(next_recon_pts);
-  free(recon_buffer);
-  free(recon_buffer_size);
+  FREE_POINTER(available_input_slots);
+  FREE_POINTER(filled_input_slots);
+  FREE_POINTER(next_recon_pts);
+  FREE_POINTER(recon_buffer);
+  FREE_POINTER(recon_buffer_size);
   
   if (opts) cmdline_opts_free(api, opts);
   // ***********************************************
