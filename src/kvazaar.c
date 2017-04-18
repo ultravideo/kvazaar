@@ -113,12 +113,7 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     cur_enc->prev_enc = prev_enc;
     if (prev_enc != NULL) prev_enc->next_enc = cur_enc;
 
-    //encoder->control = kvz_encoder_control_init(cfg);
-    //if (!encoder->control) {
-    //  goto kvazaar_open_failure;
-    //}
-    //if (prev_enc != NULL) prev_enc->control->next_enc_ctrl = cur_enc->control;
-
+    
     cur_enc->control = ctrl;
 
     cur_enc->num_encoder_states = encoder->control->cfg.owf + 1;
@@ -154,37 +149,6 @@ static kvz_encoder * kvazaar_open(const kvz_config *cfg)
     }
 
     cur_enc->states[cur_enc->cur_state_num].frame->num = -1;
-
-    ////Set scaling parameters
-    ////Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
-    //enum kvz_chroma_format csp = KVZ_FORMAT2CSP(cfg->input_format);
-    //cur_enc->downscaling = kvz_newScalingParameters((*cfg->input_widths)[cfg->input_layer],
-    //                                            (*cfg->input_heights)[cfg->input_layer],
-    //                                            cur_enc->control->in.real_width,
-    //                                            cur_enc->control->in.real_height,
-    //                                            csp);
-    //if( prev_enc ){
-    //  cur_enc->upscaling = kvz_newScalingParameters(prev_enc->upscaling.trgt_width,
-    //                                            prev_enc->upscaling.trgt_height,
-    //                                            cur_enc->control->in.real_width,
-    //                                            cur_enc->control->in.real_height,
-    //                                            csp);
-    //}
-    //else {
-    //  cur_enc->upscaling = kvz_newScalingParameters(cur_enc->control->in.real_width,
-    //                                            cur_enc->control->in.real_height,
-    //                                            cur_enc->control->in.real_width,
-    //                                            cur_enc->control->in.real_height,
-    //                                            csp);
-    //}
-    ////Need to set the source (target?) to the padded size (because reasons) to conform with SHM. TODO: Trgt needs to be padded as well?
-    ////Scaling parameters need to be calculated for the true sizes.
-    //cur_enc->upscaling.src_padding_x = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_width % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-    //cur_enc->upscaling.src_padding_y = (CU_MIN_SIZE_PIXELS - cur_enc->upscaling.src_height % CU_MIN_SIZE_PIXELS) % CU_MIN_SIZE_PIXELS;
-
-    //Set the reference to the upscaling parameters in control
-    //cur_enc->control->layer.upscaling = &cur_enc->upscaling;
-
     
     //Prepare for the next loop
     prev_enc = cur_enc;
