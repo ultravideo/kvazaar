@@ -770,16 +770,17 @@ done:
   FREE_POINTER(input_threads);
 
   // destroy semaphores
-  if (opts != NULL) {
-    for (int i = 0; i < opts->num_inputs && available_input_slots != NULL && filled_input_slots != NULL; i++) {
+  if (opts != NULL && available_input_slots != NULL && filled_input_slots != NULL) {
+    for (int i = 0; i < opts->num_inputs; i++) {
       if (available_input_slots[i]) kvz_sem_destroy(available_input_slots[i]);
       if (filled_input_slots[i])    kvz_sem_destroy(filled_input_slots[i]);
-      FREE_POINTER(available_input_slots);
-      FREE_POINTER(filled_input_slots);
+      FREE_POINTER(available_input_slots[i]);
+      FREE_POINTER(filled_input_slots[i]);
     }
   }
   FREE_POINTER(available_input_slots);
   FREE_POINTER(filled_input_slots);
+
   FREE_POINTER(next_recon_pts);
   FREE_POINTER(recon_buffer);
   FREE_POINTER(recon_buffer_size);
