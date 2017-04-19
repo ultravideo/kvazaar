@@ -118,6 +118,8 @@ typedef struct encoder_control_t
   //! Picture weights when GOP is used.
   double gop_layer_weights[MAX_GOP_LAYERS];
 
+  bool lcu_dqp_enabled;
+
   //! pic_parameter_set
   struct {
     uint8_t dependent_slice_segments_enabled_flag;

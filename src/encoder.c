@@ -228,6 +228,8 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
            roi_size * sizeof(*cfg->roi.dqps));
   }
 
+  encoder->lcu_dqp_enabled = cfg->target_bitrate > 0 || cfg->roi.dqps;
+
   //Tiles
   encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
                           encoder->cfg.tiles_height_count > 1;
