@@ -9,4 +9,10 @@ if [ -n "$VALGRIND_TEST" ]; then
   ./ffmpeg-2.6.3-32bit-static/ffmpeg -f lavfi -i "mandelbrot=size=${TEST_DIM}:end_pts=10" -vframes $TEST_FRAMES -pix_fmt yuv420p mandelbrot_${TEST_DIM}.yuv
   wget http://ultravideo.cs.tut.fi/ubuntu-12.04-hmdec-16.10.tgz
   tar -xzvf ubuntu-12.04-hmdec-16.10.tgz
+elif [ -n "$VALGRIND_EXPECTED_STATUS" ] && [ -n "$VALGRIND_EXPECTED_TEST" ]; then
+  wget http://ultravideo.cs.tut.fi/ffmpeg-release-32bit-static.tar.xz
+  7z x ffmpeg-release-32bit-static.tar.xz
+  7z x ffmpeg-release-32bit-static.tar
+  chmod +x ./ffmpeg-2.6.3-32bit-static/ffmpeg
+  ./ffmpeg-2.6.3-32bit-static/ffmpeg -f lavfi -i "mandelbrot=size=${TEST_DIM}:end_pts=10" -vframes $TEST_FRAMES -pix_fmt yuv420p mandelbrot_${TEST_DIM}.yuv
 fi
