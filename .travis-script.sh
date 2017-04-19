@@ -18,7 +18,7 @@ elif [ -n "$EXPECTED_STATUS" ]; then
   [ "$EXIT_STATUS" = "$EXPECTED_STATUS" ]
 elif [ -n "$VALGRIND_EXPECTED_STATUS" ] && [ -n "$VALGRIND_EXPECTED_TEST" ]; then
   set +e
-  libtool execute valgrind --leak-check=full --error-exitcode=1 -- \
+  libtool execute valgrind --leak-check=full --error-exitcode=2 -- \
     src/kvazaar -i mandelbrot_${TEST_DIM}.yuv --input-res=${TEST_DIM} \
     -o test.265 $VALGRIND_EXPECTED_TEST
   VALGRIND_EXIT_STATUS=$?
@@ -26,7 +26,7 @@ elif [ -n "$VALGRIND_EXPECTED_STATUS" ] && [ -n "$VALGRIND_EXPECTED_TEST" ]; the
     -o test.265 $VALGRIND_EXPECTED_TEST
   EXIT_STATUS=$?
   set -e
-  [ "$VALGRIND_EXIT_STATUS" = "0" ] && [ "$EXIT_STATUS" = "$VALGRIND_EXPECTED_STATUS" ]
+  [ "$VALGRIND_EXIT_STATUS" != "2" ] && [ "$EXIT_STATUS" = "$VALGRIND_EXPECTED_STATUS" ]
 else
   make check
 fi
