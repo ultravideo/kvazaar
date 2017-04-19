@@ -119,6 +119,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->roi.height = 0;
   cfg->roi.dqps = NULL;
 
+  cfg->erp_aqp = false;
+
   cfg->slices = KVZ_SLICES_NONE;
 
   return 1;
@@ -1045,6 +1047,8 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     fclose(f);
   }
+  else if OPT("erp-aqp")
+    cfg->erp_aqp = (bool)atobool(value);
   else
     return 0;
 #undef OPT
