@@ -26,7 +26,7 @@ elif [ -n "$VALGRIND_EXPECTED_STATUS" ] && [ -n "$VALGRIND_EXPECTED_TEST" ]; the
     -o test.265 $VALGRIND_EXPECTED_TEST
   EXIT_STATUS=$?
   set -e
-  [ "$VALGRIND_EXIT_STATUS" = 0 ] && [ "$EXIT_STATUS" = "$VALGRIND_EXPECTED_STATUS" ]
+  [ "$VALGRIND_EXIT_STATUS" = "0" ] && [ "$EXIT_STATUS" = "$VALGRIND_EXPECTED_STATUS" ]
 else
   make check
 fi
