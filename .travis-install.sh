@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ev
 
-if [ -n "$VALGRIND_TEST" ]; then
+if [ -n "$VALGRIND_TEST" ] || [ -n "$TEMPORAL_TEST" ]; then
   wget http://ultravideo.cs.tut.fi/ffmpeg-release-32bit-static.tar.xz
   7z x ffmpeg-release-32bit-static.tar.xz
   7z x ffmpeg-release-32bit-static.tar
