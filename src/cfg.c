@@ -893,13 +893,47 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop_len = gop.g;
       cfg->gop_lp_definition.d = gop.d;
       cfg->gop_lp_definition.t = gop.t;
+
+    } else if (!strncmp(value, "lpt-", 4)){ //Handle temporal version of lp-gop
+      struct {
+        unsigned g;  // length
+        unsigned d;  // depth
+        unsigned t;  // temporal
+      } gop = { 0, 0, 0 };
+
+      // Parse --gop=lp-d#t#
+      if (sscanf(value, "lpt-d%ut%u", &gop.d, &gop.t) != 2) {
+        fprintf(stderr, "Error in GOP syntax. Example: lpt-d4t2\n");
+        return 0;
+      }
+
+      if (gop.d < 1 || gop.d > 8) {
+        fprintf(stderr, "gop.d must be between 1 and 8.\n");
+        return 0;
+      }
+      const uint8_t max_temp_layer = 5;
+      if (gop.t < 1 || gop.t > max_temp_layer) {
+        fprintf(stderr, "gop.t must be between 1 and %u.\n", max_temp_layer);
+        return 0;
+      }
+
+      cfg->max_temporal_layer = gop.t;
+      gop.g = (gop.t - 1) == 0 ? 1 : 2 << (gop.t - 1);
+      gop.t = gop.g;
+
+      cfg->gop_lowdelay = true;
+      cfg->gop_len = gop.g;
+      cfg->gop_lp_definition.d = gop.d;
+      cfg->gop_lp_definition.t = gop.t;
+
     } else if (atoi(value) == 8) {
       cfg->gop_lowdelay = 0;
       // GOP
       cfg->gop_len = 8;
       cfg->gop[0].poc_offset = 8; cfg->gop[0].qp_offset = 1; cfg->gop[0].layer = 1; cfg->gop[0].qp_factor = 0.442;  cfg->gop[0].is_ref = 1;
       cfg->gop[0].ref_pos_count = 0;
-      cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16;
+      //cfg->gop[0].ref_neg_count = 3; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[1] = 12; cfg->gop[0].ref_neg[2] = 16; //Not compatible with temporal scalability
+      cfg->gop[0].ref_neg_count = 2; cfg->gop[0].ref_neg[0] = 8; cfg->gop[0].ref_neg[2] = 16;
 
       cfg->gop[1].poc_offset = 4; cfg->gop[1].qp_offset = 2; cfg->gop[1].layer = 2; cfg->gop[1].qp_factor = 0.3536; cfg->gop[1].is_ref = 1;
       cfg->gop[1].ref_neg_count = 2; cfg->gop[1].ref_neg[0] = 4; cfg->gop[1].ref_neg[1] = 8;
@@ -928,12 +962,24 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
       cfg->gop[7].poc_offset = 7; cfg->gop[7].qp_offset = 4; cfg->gop[7].layer = 4; cfg->gop[7].qp_factor = 0.68;   cfg->gop[7].is_ref = 0;
       cfg->gop[7].ref_neg_count = 3; cfg->gop[7].ref_neg[0] = 1; cfg->gop[7].ref_neg[1] = 3; cfg->gop[7].ref_neg[2] = 7;
       cfg->gop[7].ref_pos_count = 1; cfg->gop[7].ref_pos[0] = 1;
+
+      cfg->max_temporal_layer = 4;
+      
+      //tIds for 7 max_layers. Can be used for smaller max_layers ( tId = tIds[i]-7+max_temporal_layers-1, i!=0 )
+      static const uint8_t tIds[] = {0, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6,
+                                     1, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6};
+
+      for (int i = 0; i < cfg->gop_len; i++) {
+        uint8_t t_offset = cfg->gop[i].poc_offset%cfg->gop_len == 0 ? 0 : cfg->max_temporal_layer - 7;
+        cfg->gop[i].tId = tIds[cfg->gop[i].poc_offset%cfg->gop_len] + t_offset;
+      }
+
     } else if (atoi(value) == 0) {
       //Disable gop
       cfg->gop_len = 0;
       cfg->gop_lowdelay = 0;
-      cfg->gop_lp_definition.d = 0;
-      cfg->gop_lp_definition.t = 0;
+      cfg->gop_lp_definition.d = 1;
+      cfg->gop_lp_definition.t = 1;
     } else if (atoi(value)) {
       fprintf(stderr, "Input error: unsupported gop length, must be 0 or 8\n");
       return 0;
@@ -1239,6 +1285,18 @@ void kvz_config_process_lp_gop(kvz_config *cfg)
   // Key-frame is always a reference.
   cfg->gop[gop.g - 1].is_ref = 1;
   cfg->gop[gop.g - 1].qp_factor = 0.578;  // from HM
+
+  //Set tIds
+  //tIds for 7 max_layers. Can be used for smaller max_layers ( tId = tIds[i]-7+max_temporal_layers, i!=0 ) 
+  if (cfg->max_temporal_layer > 1) {
+    static const uint8_t tIds[] = {0, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6,
+                                   1, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6, 2, 6, 5, 6, 4, 6, 5, 6, 3, 6, 5, 6, 4, 6, 5, 6};
+
+    for (int i = 0; i < cfg->gop_len; i++) {
+      uint8_t t_offset = cfg->gop[i].poc_offset%cfg->gop_len == 0 ? 0 : cfg->max_temporal_layer - 7;
+      cfg->gop[i].tId = tIds[cfg->gop[i].poc_offset%cfg->gop_len] + t_offset;
+    }
+  }
 }
 
 /**
