@@ -1021,7 +1021,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
 
     const unsigned size = width * height;
-    uint8_t *dqp_array  = calloc((size_t)size, sizeof(cfg->roi.dqps[0]));
+    int8_t *dqp_array  = calloc((size_t)size, sizeof(cfg->roi.dqps[0]));
     if (!dqp_array) {
       fprintf(stderr, "Failed to allocate memory for ROI table.\n");
       fclose(f);
@@ -1040,7 +1040,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
         fclose(f);
         return 0;
       }
-      dqp_array[i] = (uint8_t)number;
+      dqp_array[i] = CLIP(-51, 51, number);
     }
 
     fclose(f);
