@@ -30,7 +30,7 @@ elif [ -n "$VALGRIND_EXPECTED_STATUS" ] && [ -n "$VALGRIND_EXPECTED_TEST" ]; the
 elif [ -n "$TEMPORAL_TEST" ]; then
   libtool execute src/kvazaar -i mandelbrot_${TEST_DIM}.yuv --input-res=${TEST_DIM} \
     -o test.265 --gop 8 --preset ultrafast
-    ./hmdec-16.10 -b test.265 -tid $TEMPORAL_TEST
+    ./hmdec-16.10 -b test.265 -t $TEMPORAL_TEST
 else
   make check
 fi
