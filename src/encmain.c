@@ -83,11 +83,11 @@ static unsigned get_padding(unsigned width_or_height){
   }
 }
 
-#if KVZ_BIT_DEPTH == 8
-#define PSNRMAX (255.0 * 255.0)
-#else
-  #define PSNRMAX ((double)PIXEL_MAX * (double)PIXEL_MAX)
-#endif
+/**
+ * \brief Value that is printed instead of PSNR when SSE is zero.
+ */
+static const double MAX_PSNR = 999.99;
+static const double MAX_SQUARED_ERROR = (double)PIXEL_MAX * (double)PIXEL_MAX;
 
 /**
  * \brief Calculates image PSNR value
@@ -105,21 +105,24 @@ static void compute_psnr(const kvz_picture *const src,
 
   int32_t pixels = src->width * src->height;
   int colors = rec->chroma_format == KVZ_CSP_400 ? 1 : 3;
+  double sse[3] = { 0.0 };
 
   for (int32_t c = 0; c < colors; ++c) {
     int32_t num_pixels = pixels;
     if (c != COLOR_Y) {
       num_pixels >>= 2;
     }
-    psnr[c] = 0;
     for (int32_t i = 0; i < num_pixels; ++i) {
       const int32_t error = src->data[c][i] - rec->data[c][i];
-      psnr[c] += error * error;
+      sse[c] += error * error;
     }
 
     // Avoid division by zero
-    if (psnr[c] == 0) psnr[c] = 99.0;
-    psnr[c] = 10 * log10((num_pixels * PSNRMAX) / ((double)psnr[c]));;
+    if (sse[c] == 0.0) {
+      psnr[c] = MAX_PSNR;
+    } else {
+      psnr[c] = 10.0 * log10(num_pixels * MAX_SQUARED_ERROR / sse[c]);
+    }
   }
 }
 
