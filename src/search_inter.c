@@ -1746,6 +1746,7 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     cur_pu->type      = CU_INTER;
     cur_pu->part_size = part_mode;
     cur_pu->depth     = depth;
+    cur_pu->qp        = state->qp;
 
     double cost      = MAX_INT;
     uint32_t bitcost = MAX_INT;

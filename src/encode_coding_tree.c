@@ -435,7 +435,9 @@ static void encode_transform_coeff(encoder_state_t * const state,
   const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
   // Round coordinates down to a multiple of 8 to get the location of the
   // containing CU.
-  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x & ~7, y & ~7);
+  const int x_cu = 8 * (x / 8);
+  const int y_cu = 8 * (y / 8);
+  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x_cu, y_cu);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
@@ -508,9 +510,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
 
   if (cb_flag_y | cb_flag_u | cb_flag_v) {
     if (state->must_code_qp_delta) {
-      const int qp_delta      = state->qp - state->ref_qp;
-      const int qp_delta_abs  = ABS(qp_delta);
-      cabac_data_t* cabac     = &state->cabac;
+      const int qp_pred      = kvz_get_cu_ref_qp(state, x_cu, y_cu, state->last_qp);
+      const int qp_delta     = cur_cu->qp - qp_pred;
+      const int qp_delta_abs = ABS(qp_delta);
+      cabac_data_t* cabac    = &state->cabac;
 
       // cu_qp_delta_abs prefix
       cabac->cur_ctx = &cabac->ctx.cu_qp_delta_abs[0];
@@ -526,7 +529,6 @@ static void encode_transform_coeff(encoder_state_t * const state,
       }
 
       state->must_code_qp_delta = false;
-      state->ref_qp = state->qp;
     }
 
     encode_transform_unit(state, x, y, depth);
@@ -957,6 +959,9 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   const videoframe_t * const frame = state->tile->frame;
   const cu_info_t *cur_cu   = kvz_cu_array_at_const(frame->cu_array, x, y);
 
+  const int cu_width = LCU_WIDTH >> depth;
+  const int half_cu  = cu_width >> 1;
+
   const cu_info_t *left_cu  = NULL;
   if (x > 0) {
     left_cu = kvz_cu_array_at_const(frame->cu_array, x - 1, y);
@@ -973,12 +978,16 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   uint16_t abs_x = x + state->tile->offset_x;
   uint16_t abs_y = y + state->tile->offset_y;
 
-  // Check for slice border FIXME
-  bool border_x = ctrl->in.width  < abs_x + (LCU_WIDTH >> depth);
-  bool border_y = ctrl->in.height < abs_y + (LCU_WIDTH >> depth);
-  bool border_split_x = ctrl->in.width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1));
-  bool border_split_y = ctrl->in.height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1));
+  // Check for slice border
+  bool border_x = ctrl->in.width  < abs_x + cu_width;
+  bool border_y = ctrl->in.height < abs_y + cu_width;
+  bool border_split_x = ctrl->in.width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
+  bool border_split_y = ctrl->in.height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + half_cu;
   bool border = border_x || border_y; /*!< are we in any border CU */
+
+  if (depth <= ctrl->max_qp_delta_depth) {
+    state->must_code_qp_delta = true;
+  }
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
@@ -999,25 +1008,22 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
-      int offset = LCU_WIDTH >> (depth + 1);
-
       kvz_encode_coding_tree(state, x, y, depth + 1);
 
-      // TODO: fix when other half of the block would not be completely over the border
       if (!border_x || border_split_x) {
-        kvz_encode_coding_tree(state, x + offset, y, depth + 1);
+        kvz_encode_coding_tree(state, x + half_cu, y, depth + 1);
       }
       if (!border_y || border_split_y) {
-        kvz_encode_coding_tree(state, x, y + offset, depth + 1);
+        kvz_encode_coding_tree(state, x, y + half_cu, depth + 1);
       }
       if (!border || (border_split_x && border_split_y)) {
-        kvz_encode_coding_tree(state, x + offset, y + offset, depth + 1);
+        kvz_encode_coding_tree(state, x + half_cu, y + half_cu, depth + 1);
       }
       return;
     }
   }
 
-  if (state->encoder_control->cfg.lossless) {
+  if (ctrl->cfg.lossless) {
     cabac->cur_ctx = &cabac->ctx.cu_transquant_bypass;
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
   }
@@ -1053,7 +1059,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
           }
         }
       }
-      return;
+      goto end;
     }
   }
 
@@ -1068,7 +1074,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
   if (cur_cu->type == CU_INTER) {
     const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
-    const int cu_width = LCU_WIDTH >> depth;
 
     for (int i = 0; i < num_pu; ++i) {
       const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
@@ -1138,6 +1143,12 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     // CU type not set. Should not happen.
     assert(0);
     exit(1);
+  }
+
+end:
+
+  if (is_last_cu_in_qg(state, x, y, depth)) {
+    state->last_qp = cur_cu->qp;
   }
 }
 
