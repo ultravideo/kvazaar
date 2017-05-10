@@ -369,6 +369,9 @@ int main(int argc, char *argv[])
   pthread_t *input_threads = NULL;
  
   input_handler_args *in_args = NULL;
+
+  uint64_t *substream_lengths = NULL; //Store total layer bitstream lengths
+  double (*layer_psnr_sum)[3] = NULL; //Per layer psnr sums
   //*************************************************
 
   // Semaphores for synchronizing the input reader thread and the main
@@ -498,7 +501,9 @@ int main(int argc, char *argv[])
   recon_buffer = calloc(opts->num_debugs,sizeof(kvz_picture*[KVZ_MAX_GOP_LENGTH])); //Feels so wrong but should mean recon_buffer is a pointer to kvz_picture* [KVZ_MAX_GOP_LENGTH] -arrays
   recon_buffer_size = calloc(opts->num_debugs,sizeof(int));
 
-  
+  substream_lengths = calloc(*opts->config->max_layers,sizeof(uint64_t));
+  layer_psnr_sum = calloc(*opts->config->max_layers,sizeof(double[3]));
+
   //Now, do the real stuff
   {
 
@@ -599,6 +604,7 @@ int main(int argc, char *argv[])
       uint32_t tot_len_out = 0;
       for (int i = 0; i < *opts->config->max_layers; ++i) {
         tot_len_out += len_out[i];
+        substream_lengths[i] += len_out[i];
       }
 
       if (chunks_out != NULL) {
@@ -684,6 +690,11 @@ int main(int argc, char *argv[])
           psnr_sum[1] += frame_psnr[1];
           psnr_sum[2] += frame_psnr[2];
 
+          //Set per layer psnr_sum
+          layer_psnr_sum[layer_id][0] += frame_psnr[0];
+          layer_psnr_sum[layer_id][1] += frame_psnr[1];
+          layer_psnr_sum[layer_id][2] += frame_psnr[2];
+
           print_frame_info(&(info_out[layer_id]), frame_psnr, len_out[layer_id], layer_id); 
 
           //Update stuff. The images of different layers should be chained together using base_image;
@@ -708,12 +719,13 @@ int main(int argc, char *argv[])
       assert(recon_buffer_size[i] == 0);
     }
     // Print statistics of the coding
-    fprintf(stderr, " Processed %d frames, %10llu bits",
+    fprintf(stderr, " Processed %d frames over %d layer(s), %10llu bits",
             frames_done,
+            *opts->config->max_layers,
             (long long unsigned int)bitstream_length * 8);
     if (frames_done > 0) {
       // ***********************************************
-      // Modified for SHVC. TODO: Compute seperatly for each layer?
+      // Modified for SHVC.
       fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
               psnr_sum[0] / frames_done,
               psnr_sum[1] / frames_done,
@@ -721,6 +733,22 @@ int main(int argc, char *argv[])
       // ***********************************************
     }
     fprintf(stderr, "\n");
+    //Print layer stats if more than two layers
+    if (*opts->config->max_layers > 1) {
+      for (int i = 0; i < *opts->config->max_layers; ++i) {
+        fprintf(stderr, "  Layer %d: %10llu bits,",
+          i,
+          (long long unsigned int)substream_lengths[i] * 8);
+        if (frames_done > 0) {
+          fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
+            layer_psnr_sum[i][0] / frames_done * (*opts->config->max_layers),
+            layer_psnr_sum[i][1] / frames_done * (*opts->config->max_layers),
+            layer_psnr_sum[i][2] / frames_done * (*opts->config->max_layers));
+        }
+        fprintf(stderr, "\n");
+      }
+    }
+
     fprintf(stderr, " Total CPU time: %.3f s.\n", ((float)(clock() - start_time)) / CLOCKS_PER_SEC);
 
     {
@@ -784,6 +812,9 @@ done:
   FREE_POINTER(next_recon_pts);
   FREE_POINTER(recon_buffer);
   FREE_POINTER(recon_buffer_size);
+
+  FREE_POINTER(layer_psnr_sum);
+  FREE_POINTER(substream_lengths);
   
   if (opts) cmdline_opts_free(api, opts);
   // ***********************************************
