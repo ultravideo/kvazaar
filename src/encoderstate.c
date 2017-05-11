@@ -274,8 +274,10 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   kvz_set_lcu_lambda_and_qp(state, lcu->position);
 
+  lcu_coeff_t coeff;
+  state->coeff = &coeff;
+
   //This part doesn't write to bitstream, it's only search, deblock and sao
-  
   kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
     
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
@@ -328,6 +330,9 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   //Encode coding tree
   kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
+
+  // Coeffs are not needed anymore.
+  state->coeff = NULL;
 
   bool end_of_slice_segment_flag;
   if (state->encoder_control->cfg.slices & KVZ_SLICES_WPP) {

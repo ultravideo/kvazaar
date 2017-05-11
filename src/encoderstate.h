@@ -263,6 +263,11 @@ typedef struct encoder_state_t {
    */
   int8_t ref_qp;
 
+  /**
+   * \brief Coeffs for the LCU.
+   */
+  lcu_coeff_t *coeff;
+
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written

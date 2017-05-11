@@ -54,8 +54,6 @@ videoframe_t * kvz_videoframe_alloc(int32_t width,
     frame->cu_array = kvz_cu_array_alloc(cu_array_width, cu_array_height);
   }
 
-  frame->coeff_y = NULL; frame->coeff_u = NULL; frame->coeff_v = NULL;
-
   frame->sao_luma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
   if (chroma_format != KVZ_CSP_400) {
     frame->sao_chroma = MALLOC(sao_info_t, frame->width_in_lcu * frame->height_in_lcu);
@@ -77,10 +75,6 @@ int kvz_videoframe_free(videoframe_t * const frame)
   frame->rec = NULL;
 
   kvz_cu_array_free(frame->cu_array);
-
-  FREE_POINTER(frame->coeff_y);
-  FREE_POINTER(frame->coeff_u);
-  FREE_POINTER(frame->coeff_v);
 
   FREE_POINTER(frame->sao_luma);
   FREE_POINTER(frame->sao_chroma);
