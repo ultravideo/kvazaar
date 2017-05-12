@@ -78,33 +78,6 @@ const uint8_t kvz_part_mode_sizes[][4][2] = {
 };
 
 
-#define BLIT_COEFF_CASE(n) case n:\
-  for (y = 0; y < n; ++y) {\
-    memcpy(&dst[y*dst_stride], &orig[y*orig_stride], n * sizeof(coeff_t));\
-  }\
-  break;
-
-void kvz_coefficients_blit(const coeff_t * const orig, coeff_t * const dst,
-                         const unsigned width, const unsigned height,
-                         const unsigned orig_stride, const unsigned dst_stride)
-{
-  unsigned y;
-  
-  int nxn_width = (width == height) ? width : 0;
-  switch (nxn_width) {
-    BLIT_COEFF_CASE(4)
-    BLIT_COEFF_CASE(8)
-    BLIT_COEFF_CASE(16)
-    BLIT_COEFF_CASE(32)
-    BLIT_COEFF_CASE(64)
-  default:
-    for (y = 0; y < height; ++y) {
-      memcpy(&dst[y*dst_stride], &orig[y*orig_stride], width * sizeof(coeff_t));
-    }
-    break;
-  }
-}
-
 cu_info_t* kvz_cu_array_at(cu_array_t *cua, unsigned x_px, unsigned y_px)
 {
   return (cu_info_t*) kvz_cu_array_at_const(cua, x_px, y_px);

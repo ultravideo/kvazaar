@@ -489,10 +489,6 @@ static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
 } while(0)
 
 
-void kvz_coefficients_blit(const coeff_t *orig, coeff_t *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride);
-
 #define NUM_CBF_DEPTHS 5
 static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };
 
