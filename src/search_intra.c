@@ -844,7 +844,7 @@ void kvz_search_cu_intra(encoder_state_t * const state,
     if (rdo_level == 3) {
       number_of_modes_to_search = 35;
     } else if (rdo_level == 2) {
-      number_of_modes_to_search = (cu_width <= 8) ? 8 : 3;
+      number_of_modes_to_search = (cu_width == 4) ? 3 : 2;
     } else {
       // Check only the predicted modes.
       number_of_modes_to_search = 0;
