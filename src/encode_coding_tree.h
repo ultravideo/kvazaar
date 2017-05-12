@@ -35,7 +35,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
                             uint8_t depth);
 
 void kvz_encode_coeff_nxn(encoder_state_t *state,
-                          coeff_t *coeff,
+                          const coeff_t *coeff,
                           uint8_t width,
                           uint8_t type,
                           int8_t scan_mode,

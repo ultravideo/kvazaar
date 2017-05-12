@@ -103,7 +103,7 @@ static void encode_last_significant_xy(encoder_state_t * const state,
 }
 
 void kvz_encode_coeff_nxn(encoder_state_t * const state,
-                          coeff_t *coeff,
+                          const coeff_t *coeff,
                           uint8_t width,
                           uint8_t type,
                           int8_t scan_mode,
@@ -356,10 +356,6 @@ static void encode_transform_unit(encoder_state_t * const state,
   const int y_cu = y_pu / 2;
   const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
 
-  coeff_t coeff_y[LCU_WIDTH*LCU_WIDTH+1];
-  coeff_t coeff_u[LCU_WIDTH*LCU_WIDTH>>2];
-  coeff_t coeff_v[LCU_WIDTH*LCU_WIDTH>>2];
-
   int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
   int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
@@ -367,18 +363,10 @@ static void encode_transform_unit(encoder_state_t * const state,
   if (cbf_y) {
     int x_local = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH) % LCU_WIDTH;
     int y_local = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH) % LCU_WIDTH;
-    const coeff_t *orig_pos = &state->coeff->y[x_local + y_local * LCU_WIDTH];
-    for (int y = 0; y < width; y++) {
-      for (int x = 0; x < width; x++) {
-        coeff_y[x + y * width] = orig_pos[x];
-      }
-      orig_pos += LCU_WIDTH;
-    }
-  }
+    const coeff_t *coeff_y = &state->coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
 
-  // CoeffNxN
-  // Residual Coding
-  if (cbf_y) {
+    // CoeffNxN
+    // Residual Coding
     kvz_encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_pu->intra.tr_skip);
   }
 
@@ -402,17 +390,8 @@ static void encode_transform_unit(encoder_state_t * const state,
       x_local = x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) % LCU_WIDTH_C;
       y_local = y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) % LCU_WIDTH_C;
     }
-    const coeff_t *orig_pos_u = &state->coeff->u[x_local + y_local * LCU_WIDTH_C];
-    const coeff_t *orig_pos_v = &state->coeff->v[x_local + y_local * LCU_WIDTH_C];
-
-    for (int y = 0; y < width_c; y++) {
-      for (int x = 0; x < width_c; x++) {
-        coeff_u[x + y * width_c] = orig_pos_u[x];
-        coeff_v[x + y * width_c] = orig_pos_v[x];
-      }
-      orig_pos_u += LCU_WIDTH_C;
-      orig_pos_v += LCU_WIDTH_C;
-    }
+    const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
+    const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
     scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
 

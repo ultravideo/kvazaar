@@ -290,6 +290,72 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 #define LCU_GET_CU_AT_PX(lcu, x_px, y_px) \
   (&(lcu)->cu[LCU_CU_OFFSET + ((x_px) >> 2) + ((y_px) >> 2) * LCU_T_CU_WIDTH])
 
+
+/**
+ * \brief  Copy a part of a coeff_t array to another.
+ *
+ * \param width  Size of the block to be copied in pixels.
+ * \param src    Pointer to the source array.
+ * \param dest   Pointer to the destination array.
+ */
+static INLINE void copy_coeffs(const coeff_t *__restrict src,
+                               coeff_t *__restrict dest,
+                               size_t width)
+{
+  memcpy(dest, src, width * width * sizeof(coeff_t));
+}
+
+
+/**
+ * \brief  Convert (x, y) coordinates to z-order index.
+ *
+ * Only works for widths and coordinates divisible by four. Width must be
+ * a power of two in range [4..64].
+ *
+ * \param width   size of the containing block
+ * \param x       x-coordinate
+ * \param y       y-coordinate
+ * \return        index in z-order
+ */
+static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
+{
+  assert(width % 4 == 0 && width >= 4 && width <= 64);
+  assert(x % 4 == 0 && x < width);
+  assert(y % 4 == 0 && y < width);
+
+  unsigned result = 0;
+
+  switch (width) {
+    case 64:
+      result += x / 32 * (32*32);
+      result += y / 32 * (64*32);
+      x %= 32;
+      y %= 32;
+      // fallthrough
+    case 32:
+      result += x / 16 * (16*16);
+      result += y / 16 * (32*16);
+      x %= 16;
+      y %= 16;
+      // fallthrough
+    case 16:
+      result += x / 8 * ( 8*8);
+      result += y / 8 * (16*8);
+      x %= 8;
+      y %= 8;
+      // fallthrough
+    case 8:
+      result += x / 4 * (4*4);
+      result += y / 4 * (8*4);
+      // fallthrough
+    case 4:
+      break;
+  }
+
+  return result;
+}
+
+
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \
   CHECKPOINT_CU(prefix_str " cu[0]", (lcu).cu[0]); \
   CHECKPOINT_CU(prefix_str " cu[1]", (lcu).cu[1]); \
