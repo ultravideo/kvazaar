@@ -191,7 +191,7 @@ int32_t kvz_get_coeff_cost(const encoder_state_t * const state, coeff_t *coeff, 
  * \returns cost of given absolute transform level
  * From HM 12.0
  */
-int32_t kvz_get_ic_rate(encoder_state_t * const state,
+INLINE int32_t kvz_get_ic_rate(encoder_state_t * const state,
                     uint32_t abs_level,
                     uint16_t ctx_num_one,
                     uint16_t ctx_num_abs,
@@ -255,7 +255,7 @@ int32_t kvz_get_ic_rate(encoder_state_t * const state,
  * This method calculates the best quantized transform level for a given scan position.
  * From HM 12.0
  */
-uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
+INLINE uint32_t kvz_get_coded_level ( encoder_state_t * const state, double *coded_cost, double *coded_cost0, double *coded_cost_sig,
                            int32_t level_double, uint32_t max_abs_level,
                            uint16_t ctx_num_sig, uint16_t ctx_num_one, uint16_t ctx_num_abs,
                            uint16_t abs_go_rice,
