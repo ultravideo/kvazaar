@@ -664,10 +664,12 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         }
       }
 
-      kvz_quantize_lcu_luma_residual(state, x, y, depth, NULL, &work_tree[depth]);
-      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-        kvz_quantize_lcu_chroma_residual(state, x, y, depth, NULL, &work_tree[depth]);
-      }
+      const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+      kvz_quantize_lcu_residual(state,
+                                true, has_chroma,
+                                x, y, depth,
+                                NULL,
+                                &work_tree[depth]);
 
       int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
@@ -933,23 +935,15 @@ static void copy_lcu_to_cu_data(const encoder_state_t * const state, int x_px, i
     const int pic_width = pic->width;
     const int x_max = MIN(x_px + LCU_WIDTH, pic_width) - x_px;
     const int y_max = MIN(y_px + LCU_WIDTH, pic->height) - y_px;
-    const int luma_index = x_px + y_px * pic_width;
-    const int chroma_index = (x_px / 2) + (y_px / 2) * (pic_width / 2);
 
     kvz_pixels_blit(lcu->rec.y, &pic->rec->y[x_px + y_px * pic->rec->stride],
                         x_max, y_max, LCU_WIDTH, pic->rec->stride);
-    kvz_coefficients_blit(lcu->coeff.y, &pic->coeff_y[luma_index],
-                        x_max, y_max, LCU_WIDTH, pic_width);
 
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
       kvz_pixels_blit(lcu->rec.u, &pic->rec->u[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
                       x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
       kvz_pixels_blit(lcu->rec.v, &pic->rec->v[(x_px / 2) + (y_px / 2) * (pic->rec->stride / 2)],
                       x_max / 2, y_max / 2, LCU_WIDTH / 2, pic->rec->stride / 2);
-      kvz_coefficients_blit(lcu->coeff.u, &pic->coeff_u[chroma_index],
-                            x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
-      kvz_coefficients_blit(lcu->coeff.v, &pic->coeff_v[chroma_index],
-                            x_max / 2, y_max / 2, LCU_WIDTH / 2, pic_width / 2);
     }
   }
 }
@@ -983,4 +977,9 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   // The best decisions through out the LCU got propagated back to depth 0,
   // so copy those back to the frame.
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
+
+  // Copy coeffs to encoder state.
+  memcpy(state->coeff->y, work_tree[0].coeff.y, LCU_WIDTH   * LCU_WIDTH   * sizeof(coeff_t));
+  memcpy(state->coeff->u, work_tree[0].coeff.u, LCU_WIDTH_C * LCU_WIDTH_C * sizeof(coeff_t));
+  memcpy(state->coeff->v, work_tree[0].coeff.v, LCU_WIDTH_C * LCU_WIDTH_C * sizeof(coeff_t));
 }

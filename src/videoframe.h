@@ -39,10 +39,6 @@ typedef struct videoframe
   kvz_picture *source;         //!< \brief Source image.
   kvz_picture *rec;            //!< \brief Reconstructed image.
 
-  coeff_t* coeff_y;   //!< \brief coefficient pointer Y
-  coeff_t* coeff_u;   //!< \brief coefficient pointer U
-  coeff_t* coeff_v;   //!< \brief coefficient pointer V
-
   int32_t width;          //!< \brief Luma pixel array width.
   int32_t height;         //!< \brief Luma pixel array height.
   int32_t height_in_lcu;  //!< \brief Picture width in number of LCU's.
