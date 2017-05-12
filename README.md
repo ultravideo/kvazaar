@@ -100,6 +100,8 @@ Video structure:
                                    delta QP values in raster order.
                                    The delta QP map can be any size or aspect
                                    ratio, and will be mapped to LCU's.
+      --(no-)erp-aqp         : Use adaptive QP for 360 video with
+                               equirectangular projection
 
 Compression tools:
       --deblock [<beta:tc>]  : Deblocking

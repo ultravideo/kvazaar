@@ -335,10 +335,15 @@ typedef struct kvz_config
   struct {
     int32_t width;
     int32_t height;
-    uint8_t *dqps;
+    int8_t *dqps;
   } roi; /*!< \since 3.14.0 \brief Map of delta QPs for region of interest coding. */
 
   unsigned slices; /*!< \since 3.15.0 \brief How to map slices to frame. */
+
+  /**
+   * \brief Use adaptive QP for 360 video with equirectangular projection.
+   */
+  int32_t erp_aqp;
 } kvz_config;
 
 /**
