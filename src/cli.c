@@ -119,6 +119,8 @@ static const struct option long_options[] = {
   { "implicit-rdpcm",           no_argument, NULL, 0 },
   { "no-implicit-rdpcm",        no_argument, NULL, 0 },
   { "roi",                required_argument, NULL, 0 },
+  { "erp-aqp",                  no_argument, NULL, 0 },
+  { "no-erp-aqp",               no_argument, NULL, 0 },
   //*********************************************
   //For scalable extension.
   { "layer",                    no_argument, NULL, 0 }, //New layer
@@ -441,6 +443,8 @@ void print_help(void)
     "                                   delta QP values in raster order.\n"
     "                                   The delta QP map can be any size or aspect\n"
     "                                   ratio, and will be mapped to LCU's.\n"
+    "      --(no-)erp-aqp         : Use adaptive QP for 360 video with\n"
+    "                               equirectangular projection\n"
     "\n"
     /* Word wrap to this width to stay under 80 characters (including ") ************/
     "Compression tools:\n"

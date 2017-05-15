@@ -83,12 +83,6 @@ static int encoder_state_config_tile_init(encoder_state_t * const state,
     return 0;
   }
   
-  // Init coeff data table
-  //FIXME: move them
-  state->tile->frame->coeff_y = MALLOC(coeff_t, width * height);
-  state->tile->frame->coeff_u = MALLOC(coeff_t, (width * height) >> 2);
-  state->tile->frame->coeff_v = MALLOC(coeff_t, (width * height) >> 2);
-  
   state->tile->lcu_offset_x = lcu_offset_x;
   state->tile->lcu_offset_y = lcu_offset_y;
   

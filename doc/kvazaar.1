@@ -1,4 +1,4 @@
-.TH KVAZAAR "1" "February 2017" "kvazaar v1.1.0" "User Commands"
+.TH KVAZAAR "1" "April 2017" "kvazaar v1.1.0" "User Commands"
 .SH NAME
 kvazaar \- open source HEVC encoder
 .SH SYNOPSIS
@@ -131,6 +131,10 @@ Use a delta QP map for region of interest
     delta QP values in raster order.
     The delta QP map can be any size or aspect
     ratio, and will be mapped to LCU's.
+.TP
+\fB\-\-(no\-)erp\-aqp        
+Use adaptive QP for 360 video with
+equirectangular projection
 
 .SS "Compression tools:"
 .TP

@@ -291,7 +291,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     };
     int roi_index = roi.x + roi.y * ctrl->cfg.roi.width;
     int dqp = ctrl->cfg.roi.dqps[roi_index];
-    state->qp = state->frame->QP + dqp;
+    state->qp = CLIP(0, 51, state->frame->QP + dqp);
     state->lambda = qp_to_lamba(state, state->qp);
     state->lambda_sqrt = sqrt(state->frame->lambda);
 
