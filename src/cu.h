@@ -224,6 +224,53 @@ typedef struct {
   kvz_pixel v[LCU_REF_PX_WIDTH / 2 + 1];
 } lcu_ref_px_t;
 
+/**
+ * \brief Coefficients of an LCU
+ *
+ * Coefficients inside a single TU are stored in row-major order. TUs
+ * themselves are stored in a zig-zag order, so that the coefficients of
+ * a TU are contiguous in memory.
+ *
+ * Example storage order for a 32x32 pixel TU tree
+ *
+ \verbatim
+
+   +------+------+------+------+---------------------------+
+   |   0  |  16  |  64  |  80  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   |  15  |  31  |  79  |  95  |                           |
+   +------+------+------+------+                           |
+   |  32  |  48  |  96  | 112  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   |  47  |  63  | 111  | 127  |                           |
+   +------+------+------+------+         256 - 511         |
+   | 128  | 144  | 192  | 208  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   | 143  | 159  | 207  | 223  |                           |
+   +------+------+------+------+                           |
+   | 160  | 176  | 224  | 240  |                           |
+   |   -  |   -  |   -  |   -  |                           |
+   | 175  | 191  | 239  | 255  |                           |
+   +------+------+------+------+-------------+------+------+
+   | 512  | 528  |             |             | 832  | 848  |
+   |   -  |   -  |             |             |   -  |   -  |
+   | 527  | 543  |             |             | 847  | 863  |
+   +------+------+  576 - 639  |  768 - 831  +------+------+
+   | 544  | 560  |             |             | 864  | 880  |
+   |   -  |   -  |             |             |   -  |   -  |
+   | 559  | 575  |             |             | 879  | 895  |
+   +------+------+-------------+-------------+------+------+
+   |             |             |             |             |
+   |             |             |             |             |
+   |             |             |             |             |
+   |  640 - 703  |  704 - 767  |  896 - 959  |  960 - 1023 |
+   |             |             |             |             |
+   |             |             |             |             |
+   |             |             |             |             |
+   +-------------+-------------+-------------+-------------+
+
+ \endverbatim
+ */
 typedef struct {
   coeff_t y[LCU_LUMA_SIZE];
   coeff_t u[LCU_CHROMA_SIZE];
@@ -289,6 +336,72 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
  */
 #define LCU_GET_CU_AT_PX(lcu, x_px, y_px) \
   (&(lcu)->cu[LCU_CU_OFFSET + ((x_px) >> 2) + ((y_px) >> 2) * LCU_T_CU_WIDTH])
+
+
+/**
+ * \brief  Copy a part of a coeff_t array to another.
+ *
+ * \param width  Size of the block to be copied in pixels.
+ * \param src    Pointer to the source array.
+ * \param dest   Pointer to the destination array.
+ */
+static INLINE void copy_coeffs(const coeff_t *__restrict src,
+                               coeff_t *__restrict dest,
+                               size_t width)
+{
+  memcpy(dest, src, width * width * sizeof(coeff_t));
+}
+
+
+/**
+ * \brief  Convert (x, y) coordinates to z-order index.
+ *
+ * Only works for widths and coordinates divisible by four. Width must be
+ * a power of two in range [4..64].
+ *
+ * \param width   size of the containing block
+ * \param x       x-coordinate
+ * \param y       y-coordinate
+ * \return        index in z-order
+ */
+static INLINE unsigned xy_to_zorder(unsigned width, unsigned x, unsigned y)
+{
+  assert(width % 4 == 0 && width >= 4 && width <= 64);
+  assert(x % 4 == 0 && x < width);
+  assert(y % 4 == 0 && y < width);
+
+  unsigned result = 0;
+
+  switch (width) {
+    case 64:
+      result += x / 32 * (32*32);
+      result += y / 32 * (64*32);
+      x %= 32;
+      y %= 32;
+      // fallthrough
+    case 32:
+      result += x / 16 * (16*16);
+      result += y / 16 * (32*16);
+      x %= 16;
+      y %= 16;
+      // fallthrough
+    case 16:
+      result += x / 8 * ( 8*8);
+      result += y / 8 * (16*8);
+      x %= 8;
+      y %= 8;
+      // fallthrough
+    case 8:
+      result += x / 4 * (4*4);
+      result += y / 4 * (8*4);
+      // fallthrough
+    case 4:
+      break;
+  }
+
+  return result;
+}
+
 
 #define CHECKPOINT_LCU(prefix_str, lcu) do { \
   CHECKPOINT_CU(prefix_str " cu[0]", (lcu).cu[0]); \
@@ -375,10 +488,6 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
   CHECKPOINT_CU(prefix_str " cu[81]", (lcu).cu[81]); \
 } while(0)
 
-
-void kvz_coefficients_blit(const coeff_t *orig, coeff_t *dst,
-                         unsigned width, unsigned height,
-                         unsigned orig_stride, unsigned dst_stride);
 
 #define NUM_CBF_DEPTHS 5
 static const uint16_t cbf_masks[NUM_CBF_DEPTHS] = { 0x1f, 0x0f, 0x07, 0x03, 0x1 };

@@ -62,7 +62,7 @@ const uint8_t kvz_g_chroma_scale[58]=
  *
  * \param width       Transform width.
  * \param in_stride   Stride for ref_in and pred_in
- * \param out_stride  Stride for rec_out and coeff_out.
+ * \param out_stride  Stride for rec_out.
  * \param ref_in      Reference pixels.
  * \param pred_in     Predicted pixels.
  * \param rec_out     Returns the reconstructed pixels.
@@ -82,14 +82,15 @@ static bool bypass_transquant(const int width,
 
   for (int y = 0; y < width; ++y) {
     for (int x = 0; x < width; ++x) {
-      int32_t in_idx  = x + y * in_stride;
-      int32_t out_idx = x + y * out_stride;
+      int32_t in_idx    = x + y * in_stride;
+      int32_t out_idx   = x + y * out_stride;
+      int32_t coeff_idx = x + y * width;
 
       // The residual must be computed before writing to rec_out because
       // pred_in and rec_out may point to the same array.
-      coeff_t coeff      = (coeff_t)(ref_in[in_idx] - pred_in[in_idx]);
-      coeff_out[out_idx] = coeff;
-      rec_out[out_idx]   = ref_in[in_idx];
+      coeff_t coeff        = (coeff_t)(ref_in[in_idx] - pred_in[in_idx]);
+      coeff_out[coeff_idx] = coeff;
+      rec_out[out_idx]     = ref_in[in_idx];
 
       nonzero_coeffs |= (coeff != 0);
     }
@@ -102,22 +103,20 @@ static bool bypass_transquant(const int width,
  * Apply DPCM to residual.
  *
  * \param width   width of the block
- * \param stride  stride of coeff array
  * \param dir     RDPCM direction
  * \param coeff   coefficients (residual) to filter
  */
 static void rdpcm(const int width,
-                  const int stride,
                   const rdpcm_dir dir,
                   coeff_t *coeff)
 {
-  const int offset = (dir == RDPCM_HOR) ? 1 : stride;
+  const int offset = (dir == RDPCM_HOR) ? 1 : width;
   const int min_x  = (dir == RDPCM_HOR) ? 1 : 0;
   const int min_y  = (dir == RDPCM_HOR) ? 0 : 1;
 
   for (int y = width - 1; y >= min_y; y--) {
     for (int x = width - 1; x >= min_x; x--) {
-      const int index = x + y * stride;
+      const int index = x + y * width;
       coeff[index] -= coeff[index - offset];
     }
   }
@@ -209,7 +208,7 @@ void kvz_itransform2d(const encoder_control_t * const encoder, int16_t *block, i
  * \param color  Color.
  * \param scan_order  Coefficient scan order.
  * \param trskip_out  Whether transform skip is used.
- * \param stride  Stride for ref_in, pred_in rec_out and coeff_out.
+ * \param stride  Stride for ref_in, pred_in and rec_out.
  * \param ref_in  Reference pixels.
  * \param pred_in  Predicted pixels.
  * \param rec_out  Reconstructed pixels.
@@ -261,7 +260,7 @@ int kvz_quantize_residual_trskip(
     // we can skip this.
     kvz_pixels_blit(best->rec, rec_out, width, width, 4, out_stride);
   }
-  kvz_coefficients_blit(best->coeff, coeff_out, width, width, 4, out_stride);
+  copy_coeffs(best->coeff, coeff_out, width);
 
   return best->has_coeffs;
 }
@@ -308,6 +307,7 @@ static void quantize_tr_residual(encoder_state_t * const state,
   const coeff_scan_order_t scan_idx =
     kvz_get_scan_order(cur_pu->type, mode, depth);
   const int offset = lcu_px.x + lcu_px.y * lcu_width;
+  const int z_index = xy_to_zorder(lcu_width, lcu_px.x, lcu_px.y);
 
   // Pointers to current location in arrays with prediction. The
   // reconstruction will be written to this array.
@@ -321,17 +321,17 @@ static void quantize_tr_residual(encoder_state_t * const state,
     case COLOR_Y:
       pred  = &lcu->rec.y[offset];
       ref   = &lcu->ref.y[offset];
-      coeff = &lcu->coeff.y[offset];
+      coeff = &lcu->coeff.y[z_index];
       break;
     case COLOR_U:
       pred = &lcu->rec.u[offset];
       ref  = &lcu->ref.u[offset];
-      coeff = &lcu->coeff.u[offset];
+      coeff = &lcu->coeff.u[z_index];
       break;
     case COLOR_V:
       pred = &lcu->rec.v[offset];
       ref  = &lcu->ref.v[offset];
-      coeff = &lcu->coeff.v[offset];
+      coeff = &lcu->coeff.v[z_index];
       break;
   }
 
@@ -352,9 +352,9 @@ static void quantize_tr_residual(encoder_state_t * const state,
     if (cfg->implicit_rdpcm && cur_pu->type == CU_INTRA) {
       // implicit rdpcm for horizontal and vertical intra modes
       if (mode == 10) {
-        rdpcm(tr_width, lcu_width, RDPCM_HOR, coeff);
+        rdpcm(tr_width, RDPCM_HOR, coeff);
       } else if (mode == 26) {
-        rdpcm(tr_width, lcu_width, RDPCM_VER, coeff);
+        rdpcm(tr_width, RDPCM_VER, coeff);
       }
     }
 

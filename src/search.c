@@ -105,13 +105,13 @@ static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX
 
     // Copy coefficients up. They do not have to be copied down because they
     // are not used for the search.
-    kvz_coefficients_blit(&from_coeff->y[luma_index], &to_coeff->y[luma_index],
-                          width_px, width_px, LCU_WIDTH, LCU_WIDTH);
+    const int luma_z = xy_to_zorder(LCU_WIDTH, x, y);
+    copy_coeffs(&from_coeff->y[luma_z], &to_coeff->y[luma_z], width_px);
+
     if (from->chroma_format != KVZ_CSP_400) {
-      kvz_coefficients_blit(&from_coeff->u[chroma_index], &to_coeff->u[chroma_index],
-                            width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-      kvz_coefficients_blit(&from_coeff->v[chroma_index], &to_coeff->v[chroma_index],
-                            width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+      const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x >> 1, y >> 1);
+      copy_coeffs(&from_coeff->u[chroma_z], &to_coeff->u[chroma_z], width_px >> 1);
+      copy_coeffs(&from_coeff->v[chroma_z], &to_coeff->v[chroma_z], width_px >> 1);
     }
   }
 }
@@ -344,12 +344,11 @@ double kvz_cu_rd_cost_luma(const encoder_state_t *const state,
   }
 
   {
-    coeff_t coeff_temp[32 * 32];
     int8_t luma_scan_mode = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode, depth);
+    const coeff_t *coeffs = &lcu->coeff.y[xy_to_zorder(LCU_WIDTH, x_px, y_px)];
 
     // Code coeffs using cabac to get a better estimate of real coding costs.
-    kvz_coefficients_blit(&lcu->coeff.y[(y_px*LCU_WIDTH) + x_px], coeff_temp, width, width, LCU_WIDTH, width);
-    coeff_bits += kvz_get_coeff_cost(state, coeff_temp, width, 0, luma_scan_mode);
+    coeff_bits += kvz_get_coeff_cost(state, coeffs, width, 0, luma_scan_mode);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -415,16 +414,13 @@ double kvz_cu_rd_cost_chroma(const encoder_state_t *const state,
   }
 
   {
-    coeff_t coeff_temp[16 * 16];
     int8_t scan_order = kvz_get_scan_order(pred_cu->type, pred_cu->intra.mode_chroma, depth);
-    
-    kvz_coefficients_blit(&lcu->coeff.u[(lcu_px.y*(LCU_WIDTH_C)) + lcu_px.x],
-                      coeff_temp, width, width, LCU_WIDTH_C, width);
-    coeff_bits += kvz_get_coeff_cost(state, coeff_temp, width, 2, scan_order);
 
-    kvz_coefficients_blit(&lcu->coeff.v[(lcu_px.y*(LCU_WIDTH_C)) + lcu_px.x],
-                      coeff_temp, width, width, LCU_WIDTH_C, width);
-    coeff_bits += kvz_get_coeff_cost(state, coeff_temp, width, 2, scan_order);
+    // Code coeffs using cabac to get a better estimate of real coding costs.
+    const int index = xy_to_zorder(LCU_WIDTH_C, lcu_px.x, lcu_px.y);
+
+    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.u[index], width, 2, scan_order);
+    coeff_bits += kvz_get_coeff_cost(state, &lcu->coeff.v[index], width, 2, scan_order);
   }
 
   double bits = tr_tree_bits + coeff_bits;
@@ -979,7 +975,7 @@ void kvz_search_lcu(encoder_state_t * const state, const int x, const int y, con
   copy_lcu_to_cu_data(state, x, y, &work_tree[0]);
 
   // Copy coeffs to encoder state.
-  memcpy(state->coeff->y, work_tree[0].coeff.y, LCU_WIDTH   * LCU_WIDTH   * sizeof(coeff_t));
-  memcpy(state->coeff->u, work_tree[0].coeff.u, LCU_WIDTH_C * LCU_WIDTH_C * sizeof(coeff_t));
-  memcpy(state->coeff->v, work_tree[0].coeff.v, LCU_WIDTH_C * LCU_WIDTH_C * sizeof(coeff_t));
+  copy_coeffs(work_tree[0].coeff.y, state->coeff->y, LCU_WIDTH);
+  copy_coeffs(work_tree[0].coeff.u, state->coeff->u, LCU_WIDTH_C);
+  copy_coeffs(work_tree[0].coeff.v, state->coeff->v, LCU_WIDTH_C);
 }
