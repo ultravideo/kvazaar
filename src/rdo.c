@@ -146,7 +146,11 @@ struct sh_rates_t {
  * \param type data type (0 == luma)
  * \returns bits needed to code input coefficients
  */
-int32_t kvz_get_coeff_cost(const encoder_state_t * const state, coeff_t *coeff, int32_t width, int32_t type, int8_t scan_mode)
+int32_t kvz_get_coeff_cost(const encoder_state_t * const state,
+                           const coeff_t *coeff,
+                           int32_t width,
+                           int32_t type,
+                           int8_t scan_mode)
 {
   int32_t cost = 0;
   int i;

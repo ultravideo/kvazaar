@@ -169,7 +169,7 @@ void kvz_quant_generic(const encoder_state_t * const state, coeff_t *coef, coeff
 * \param color  Color.
 * \param scan_order  Coefficient scan order.
 * \param use_trskip  Whether transform skip is used.
-* \param stride  Stride for ref_in, pred_in rec_out and coeff_out.
+* \param stride  Stride for ref_in, pred_in and rec_out.
 * \param ref_in  Reference pixels.
 * \param pred_in  Predicted pixels.
 * \param rec_out  Reconstructed pixels.
@@ -186,7 +186,6 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
 {
   // Temporary arrays to pass data to and from kvz_quant and transform functions.
   int16_t residual[TR_MAX_WIDTH * TR_MAX_WIDTH];
-  coeff_t quant_coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
   coeff_t coeff[TR_MAX_WIDTH * TR_MAX_WIDTH];
 
   int has_coeffs = 0;
@@ -212,16 +211,16 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
     kvz_transform2d(state->encoder_control, residual, coeff, width, (color == COLOR_Y ? 0 : 65535));
   }
 
-  // Quantize coeffs. (coeff -> quant_coeff)
+  // Quantize coeffs. (coeff -> coeff_out)
   if (state->encoder_control->cfg.rdoq_enable &&
       (width > 4 || !state->encoder_control->cfg.rdoq_skip))
   {
     int8_t tr_depth = cur_cu->tr_depth - cur_cu->depth;
     tr_depth += (cur_cu->part_size == SIZE_NxN ? 1 : 0);
-    kvz_rdoq(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
+    kvz_rdoq(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type, tr_depth);
   } else {
-    kvz_quant(state, coeff, quant_coeff, width, width, (color == COLOR_Y ? 0 : 2),
+    kvz_quant(state, coeff, coeff_out, width, width, (color == COLOR_Y ? 0 : 2),
       scan_order, cur_cu->type);
   }
 
@@ -229,23 +228,20 @@ int kvz_quantize_residual_generic(encoder_state_t *const state,
   {
     int i;
     for (i = 0; i < width * width; ++i) {
-      if (quant_coeff[i] != 0) {
+      if (coeff_out[i] != 0) {
         has_coeffs = 1;
         break;
       }
     }
   }
 
-  // Copy coefficients to coeff_out.
-  kvz_coefficients_blit(quant_coeff, coeff_out, width, width, width, out_stride);
-
   // Do the inverse quantization and transformation and the reconstruction to
   // rec_out.
   if (has_coeffs) {
     int y, x;
 
-    // Get quantized residual. (quant_coeff -> coeff -> residual)
-    kvz_dequant(state, quant_coeff, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)), cur_cu->type);
+    // Get quantized residual. (coeff_out -> coeff -> residual)
+    kvz_dequant(state, coeff_out, coeff, width, width, (color == COLOR_Y ? 0 : (color == COLOR_U ? 2 : 3)), cur_cu->type);
     if (use_trskip) {
       kvz_itransformskip(state->encoder_control, residual, coeff, width);
     }
