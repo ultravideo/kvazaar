@@ -266,13 +266,17 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
       { 0, 0 },
       { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 },
   };
-  double multiplier = 1;
-  // If early termination is set to fast set multiplier to 0.9
-  if (state->encoder_control->cfg.me_early_termination == KVZ_ME_EARLY_TERMINATION_SENSITIVE){
-    multiplier = 0.95;
-  }
+
   const vector2d_t *offset;
-  for (int k = 0; k < 2; ++k){
+  for (int k = 0; k < 2; ++k) {
+
+    double threshold;
+    if (state->encoder_control->cfg.me_early_termination == KVZ_ME_EARLY_TERMINATION_SENSITIVE) {
+      threshold = *best_cost * 0.95;
+    } else {
+      threshold = *best_cost;
+    }
+
     unsigned best_index = 0;
     for (int i = 1; i < 5; ++i) {
       offset = &small_hexbs[i];
@@ -287,7 +291,7 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
       unsigned bitcost;
       cost += calc_mvd(state, mv->x + offset->x, mv->y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
-      if (cost < multiplier * *best_cost ) {
+      if (cost < *best_cost ) {
         *best_cost = cost;
         best_index = i;
         *best_bitcost = bitcost;
@@ -297,8 +301,8 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
     mv->x += small_hexbs[best_index].x;
     mv->y += small_hexbs[best_index].y;
 
-    // if best match is at center we stop the search
-    if (best_index == 0){
+    // If best match is not better than threshold, we stop the search.
+    if (*best_cost >= threshold) {
       // Return final movement vector in quarter-pixel precision.
       mv_in_out->x = mv->x << 2;
       mv_in_out->y = mv->y << 2;
