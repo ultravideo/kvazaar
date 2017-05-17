@@ -673,7 +673,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
 }
 
 #if KVZ_SEL_ENCRYPTION
-static uint8_t inline intra_mode_encryption(encoder_state_t * const state,
+static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
                                            uint8_t intra_pred_mode)
 {
   const uint8_t sets[3][17] =
