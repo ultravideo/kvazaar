@@ -170,7 +170,7 @@ static double pic_allocate_bits(encoder_state_t * const state)
 static int8_t lambda_to_qp(const double lambda)
 {
   const int8_t qp = 4.2005 * log(lambda) + 13.7223 + 0.5;
-  return CLIP(0, 51, qp);
+  return CLIP_TO_QP(qp);
 }
 
 static double qp_to_lamba(encoder_state_t * const state, int qp)
@@ -240,10 +240,10 @@ void kvz_set_picture_lambda_and_qp(encoder_state_t * const state)
     kvz_gop_config const * const gop = &ctrl->cfg.gop[state->frame->gop_offset];
     const int gop_len = ctrl->cfg.gop_len;
 
-    state->frame->QP = ctrl->cfg.qp;
-
     if (gop_len > 0 && state->frame->slicetype != KVZ_SLICE_I) {
-      state->frame->QP += gop->qp_offset;
+      state->frame->QP = CLIP_TO_QP(ctrl->cfg.qp + gop->qp_offset);
+    } else {
+      state->frame->QP = ctrl->cfg.qp;
     }
 
     state->frame->lambda = qp_to_lamba(state, state->frame->QP);
@@ -291,7 +291,7 @@ void kvz_set_lcu_lambda_and_qp(encoder_state_t * const state,
     };
     int roi_index = roi.x + roi.y * ctrl->cfg.roi.width;
     int dqp = ctrl->cfg.roi.dqps[roi_index];
-    state->qp = CLIP(0, 51, state->frame->QP + dqp);
+    state->qp = CLIP_TO_QP(state->frame->QP + dqp);
     state->lambda = qp_to_lamba(state, state->qp);
     state->lambda_sqrt = sqrt(state->frame->lambda);
 
