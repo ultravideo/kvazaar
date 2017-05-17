@@ -451,8 +451,15 @@ static unsigned image_interpolated_sad(const kvz_picture *pic, const kvz_picture
 *
 * \returns  
 */
-unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int pic_x, int pic_y, int ref_x, int ref_y,
-                        int block_width, int block_height, int max_px_below_lcu) {
+unsigned kvz_image_calc_sad(const kvz_picture *pic,
+                            const kvz_picture *ref,
+                            int pic_x,
+                            int pic_y,
+                            int ref_x,
+                            int ref_y,
+                            int block_width,
+                            int block_height,
+                            int max_px_below_lcu) {
   assert(pic_x >= 0 && pic_x <= pic->width - block_width);
   assert(pic_y >= 0 && pic_y <= pic->height - block_height);
   
@@ -478,6 +485,55 @@ unsigned kvz_image_calc_sad(const kvz_picture *pic, const kvz_picture *ref, int 
     return image_interpolated_sad(pic, ref, pic_x, pic_y, ref_x, ref_y, block_width, block_height) >> (KVZ_BIT_DEPTH - 8);
   }
 }
+
+
+/**
+* \brief Calculate interpolated SATD between two blocks.
+*
+* \param pic        Image for the block we are trying to find.
+* \param ref        Image where we are trying to find the block.
+*/
+unsigned kvz_image_calc_satd(const kvz_picture *pic,
+                             const kvz_picture *ref,
+                             int pic_x,
+                             int pic_y,
+                             int ref_x,
+                             int ref_y,
+                             int block_width,
+                             int block_height)
+{
+  assert(pic_x >= 0 && pic_x <= pic->width - block_width);
+  assert(pic_y >= 0 && pic_y <= pic->height - block_height);
+
+  if (ref_x >= 0 && ref_x <= ref->width  - block_width &&
+      ref_y >= 0 && ref_y <= ref->height - block_height)
+  {
+    // Reference block is completely inside the frame, so just calculate the
+    // SAD directly. This is the most common case, which is why it's first.
+    const kvz_pixel *pic_data = &pic->y[pic_y * pic->stride + pic_x];
+    const kvz_pixel *ref_data = &ref->y[ref_y * ref->stride + ref_x];
+    return kvz_satd_any_size(block_width,
+                             block_height,
+                             pic_data,
+                             pic->stride,
+                             ref_data,
+                             ref->stride) >> (KVZ_BIT_DEPTH - 8);
+  } else {
+    // Call a routine that knows how to interpolate pixels outside the frame.
+    // TODO: write interpolated SATD
+    unsigned sad = image_interpolated_sad(pic,
+                                          ref,
+                                          pic_x,
+                                          pic_y,
+                                          ref_x,
+                                          ref_y,
+                                          block_width,
+                                          block_height) >> (KVZ_BIT_DEPTH - 8);
+    return 2.4 * sad;
+  }
+}
+
+
 
 
 /**

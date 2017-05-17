@@ -1245,8 +1245,6 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   const videoframe_t * const frame = state->tile->frame;
   kvz_picture *ref_image = state->frame->ref->images[ref_idx];
   const vector2d_t orig = { x, y };
-  uint32_t temp_bitcost = 0;
-  uint32_t temp_cost = 0;
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
@@ -1287,19 +1285,21 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     default: break;
   }
 
+  uint32_t temp_cost = 0;
+  uint32_t temp_bitcost = 0;
   switch (state->encoder_control->cfg.ime_algorithm) {
     case KVZ_IME_TZ:
-      temp_cost += tz_search(state,
-                             width, height,
-                             frame->source,
-                             ref_image,
-                             &orig,
-                             &mv,
-                             mv_cand,
-                             merge_cand,
-                             num_cand,
-                             ref_idx,
-                             &temp_bitcost);
+      temp_cost = tz_search(state,
+                            width, height,
+                            frame->source,
+                            ref_image,
+                            &orig,
+                            &mv,
+                            mv_cand,
+                            merge_cand,
+                            num_cand,
+                            ref_idx,
+                            &temp_bitcost);
       break;
 
 
@@ -1308,32 +1308,32 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     case KVZ_IME_FULL16:
     case KVZ_IME_FULL8:
     case KVZ_IME_FULL:
-      temp_cost += search_mv_full(state,
-                                  width, height,
-                                  frame->source,
-                                  ref_image,
-                                  &orig,
-                                  &mv,
-                                  mv_cand,
-                                  merge_cand,
-                                  num_cand,
-                                  ref_idx,
-                                  search_range,
-                                  &temp_bitcost);
+      temp_cost = search_mv_full(state,
+                                 width, height,
+                                 frame->source,
+                                 ref_image,
+                                 &orig,
+                                 &mv,
+                                 mv_cand,
+                                 merge_cand,
+                                 num_cand,
+                                 ref_idx,
+                                 search_range,
+                                 &temp_bitcost);
       break;
 
     default:
-      temp_cost += hexagon_search(state,
-                                  width, height,
-                                  frame->source,
-                                  ref_image,
-                                  &orig,
-                                  &mv,
-                                  mv_cand,
-                                  merge_cand,
-                                  num_cand,
-                                  ref_idx,
-                                  &temp_bitcost);
+      temp_cost = hexagon_search(state,
+                                 width, height,
+                                 frame->source,
+                                 ref_image,
+                                 &orig,
+                                 &mv,
+                                 mv_cand,
+                                 merge_cand,
+                                 num_cand,
+                                 ref_idx,
+                                 &temp_bitcost);
       break;
   }
 
@@ -1349,8 +1349,20 @@ static void search_pu_inter_ref(encoder_state_t * const state,
                             num_cand,
                             ref_idx,
                             &temp_bitcost);
+  } else if (temp_cost < INT_MAX) {
+    // Recalculate inter cost with SATD.
+    temp_cost = kvz_image_calc_satd(
+        frame->source,
+        ref_image,
+        orig.x,
+        orig.y,
+        state->tile->offset_x + orig.x + (mv.x >> 2),
+        state->tile->offset_y + orig.y + (mv.y >> 2),
+        width,
+        height);
+    temp_cost += temp_bitcost * (int)(state->lambda_sqrt + 0.5);
   }
-  
+
   merged = 0;
   // Check every candidate to find a match
   for(merge_idx = 0; merge_idx < num_cand; merge_idx++) {
