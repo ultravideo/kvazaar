@@ -140,8 +140,8 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
 
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
-  if (state->encoder_control->cfg.crypto_features && state->tile->dbs_g) {
-    DeleteCryptoC(state->tile->dbs_g);
+  if (state->encoder_control->cfg.crypto_features) {
+    kvz_crypto_delete(&state->tile->crypto_hdl);
   }
   FREE_POINTER(state->tile->wf_jobs);
 }
@@ -329,7 +329,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       return 0;
     }
 
-    child_state->tile->dbs_g = NULL;  // Not used. The used state is in the sub-tile.
+    child_state->tile->crypto_hdl = NULL;  // Not used. The used state is in the sub-tile.
     child_state->slice = MALLOC(encoder_state_config_slice_t, 1);
     if (!child_state->slice || !encoder_state_config_slice_init(child_state, 0, encoder->in.width_in_lcu * encoder->in.height_in_lcu - 1)) {
       fprintf(stderr, "Could not initialize encoder_state->slice!\n");
@@ -465,7 +465,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         new_child->frame = child_state->frame;
         new_child->tile  = MALLOC(encoder_state_config_tile_t, 1);
         if (child_state->encoder_control->cfg.crypto_features) {
-          new_child->tile->dbs_g = CreateC();
+          new_child->tile->crypto_hdl = kvz_crypto_create();
         }
         new_child->slice = child_state->slice;
         new_child->wfrow = child_state->wfrow;

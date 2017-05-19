@@ -302,13 +302,13 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
     	coeff_signs = coeff_signs >> 1;
     	if(!state->cabac.only_count)
     	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS) {
-    	    coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero-1);
+    	    coeff_signs = coeff_signs ^ kvz_crypto_get_key(state->tile->crypto_hdl, num_non_zero-1);
     	  }
         CABAC_BINS_EP(cabac, coeff_signs , (num_non_zero - 1), "coeff_sign_flag");
       } else {
         if(!state->cabac.only_count)
     	  if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_TRANSF_COEFF_SIGNS)
-    	    coeff_signs = coeff_signs ^ ff_get_key(&state->tile->dbs_g, num_non_zero);
+    	    coeff_signs = coeff_signs ^ kvz_crypto_get_key(state->tile->crypto_hdl, num_non_zero);
         CABAC_BINS_EP(cabac, coeff_signs, num_non_zero, "coeff_sign_flag");
       }
 
@@ -646,7 +646,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
             uint32_t mvd_hor_sign = (mvd_hor>0)?0:1;
             if(!state->cabac.only_count)
               if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
-                mvd_hor_sign = mvd_hor_sign^ff_get_key(&state->tile->dbs_g, 1);
+                mvd_hor_sign = mvd_hor_sign^kvz_crypto_get_key(state->tile->crypto_hdl, 1);
             CABAC_BIN_EP(cabac, mvd_hor_sign, "mvd_sign_flag_hor");
           }
           if (ver_abs_gr0) {
@@ -656,7 +656,7 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
             uint32_t mvd_ver_sign = (mvd_ver>0)?0:1;
             if(!state->cabac.only_count)
               if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_MV_SIGNS)
-                mvd_ver_sign = mvd_ver_sign^ff_get_key(&state->tile->dbs_g, 1);
+                mvd_ver_sign = mvd_ver_sign^kvz_crypto_get_key(state->tile->crypto_hdl, 1);
             CABAC_BIN_EP(cabac, mvd_ver_sign, "mvd_sign_flag_ver");
           }
         }
@@ -692,7 +692,7 @@ static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
   } else {
     uint8_t keybits, scan_dir, elem_idx=0;
 
-    keybits = ff_get_key(&state->tile->dbs_g, 5);
+    keybits = kvz_crypto_get_key(state->tile->crypto_hdl, 5);
 
     scan_dir = SCAN_DIAG;
     if (intra_pred_mode > 5  && intra_pred_mode < 15) {

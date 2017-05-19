@@ -413,7 +413,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
 
   const kvz_config *cfg = &state->encoder_control->cfg;
   if (cfg->crypto_features) {
-    InitC(state->tile->dbs_g);
+    kvz_crypto_init(state->tile->crypto_hdl);
     state->tile->m_prev_pos = 0;
   }
 

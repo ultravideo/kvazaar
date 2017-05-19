@@ -178,7 +178,7 @@ typedef struct encoder_state_config_tile_t {
   threadqueue_job_t **wf_jobs;
 
   // Instance of encryption generator by tile
-  Crypto_Handle dbs_g;
+  crypto_handle_t *crypto_hdl;
   uint32_t m_prev_pos;
 
 } encoder_state_config_tile_t;
