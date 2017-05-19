@@ -1504,8 +1504,8 @@ int kvz_config_validate(const kvz_config *const cfg)
       fprintf(stderr, "Input error: GoP is not currently supported with layers\n");
       error = 1;
     }
-    if( cfg->threads > 0 ) {
-      fprintf(stderr, "Input error: threads are not currently supported with layers\n");
+    if( cfg->owf > 1 || cfg->owf < 0) {
+      fprintf(stderr, "Input error: owf other than {0,1} is not currently supported with layers\n");
       error = 1;
     }
     if( cfg->ref_frames > 1 ) {
