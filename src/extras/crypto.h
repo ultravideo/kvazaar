@@ -21,7 +21,6 @@ extern "C" {
 typedef struct crypto_handle_t crypto_handle_t;
 
 STUBBED crypto_handle_t* kvz_crypto_create();
-STUBBED void kvz_crypto_init(crypto_handle_t* hdl);
 STUBBED void kvz_crypto_decrypt(crypto_handle_t* hdl,
                                 const uint8_t *in_stream,
                                 int size_bits,
@@ -50,9 +49,6 @@ static INLINE crypto_handle_t* kvz_crypto_create()
 {
   return NULL;
 }
-
-static INLINE void kvz_crypto_init(crypto_handle_t* hdl)
-{}
 
 static INLINE void kvz_crypto_decrypt(crypto_handle_t* hdl,
                                 const uint8_t *in_stream,

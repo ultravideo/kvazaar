@@ -25,24 +25,23 @@ struct crypto_handle_t {
   int counter_index_pos;
 };
 
+
+static const int init_val[32] = {
+  201,  75, 219, 152,   6, 245, 237, 107,
+  179, 194,  81,  29,  66,  98, 198,   0,
+   16, 213,  27,  56, 255, 127, 242, 112,
+   97, 126, 197, 204,  25,  59,  38,  30,
+};
+
+
 crypto_handle_t* kvz_crypto_create()
 {
-  return (crypto_handle_t*)calloc(1, sizeof(crypto_handle_t));
-}
-
-void kvz_crypto_init(crypto_handle_t* hdl)
-{
-  int init_val[32] = {
-    201,  75, 219, 152,   6, 245, 237, 107,
-    179, 194,  81,  29,  66,  98, 198,   0,
-     16, 213,  27,  56, 255, 127, 242, 112,
-     97, 126, 197, 204,  25,  59,  38,  30,
-  };
+  crypto_handle_t* hdl = (crypto_handle_t*)calloc(1, sizeof(crypto_handle_t));
 
   for (int i = 0; i < 16; i++) {
-      hdl->iv [i]     = init_val[i];
-      hdl->counter[i] = init_val[i + 5];
-      hdl->key[i]     = init_val[i + 16];
+    hdl->iv [i]     = init_val[i];
+    hdl->counter[i] = init_val[i + 5];
+    hdl->key[i]     = init_val[i + 16];
   }
 
   hdl->cipher = new cipher_t(hdl->key, CryptoPP::AES::DEFAULT_KEYLENGTH, hdl->iv);
@@ -50,10 +49,16 @@ void kvz_crypto_init(crypto_handle_t* hdl)
   hdl->couter_avail      = 0;
   hdl->counter_index     = 0;
   hdl->counter_index_pos = 0;
+
+  return hdl;
 }
 
 void kvz_crypto_delete(crypto_handle_t **hdl)
 {
+  if (*hdl) {
+    delete (*hdl)->cipher;
+    (*hdl)->cipher = NULL;
+  }
   FREE_POINTER(*hdl);
 }
 
