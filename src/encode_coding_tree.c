@@ -718,7 +718,7 @@ static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
 static void encode_intra_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
                                      const cu_info_t * const cur_cu,
-                                     int x_ctb, int y_ctb, int depth)
+                                     int x, int y, int depth)
 {
   const videoframe_t * const frame = state->tile->frame;
   uint8_t intra_pred_mode_actual[4];
@@ -755,8 +755,8 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
   const int cu_width = LCU_WIDTH >> depth;
 
   for (int j = 0; j < num_pred_units; ++j) {
-    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x_ctb << 3, j);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y_ctb << 3, j);
+    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, j);
+    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, j);
     const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
 
     const cu_info_t *left_pu = NULL;
@@ -898,7 +898,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
   }
 
-  encode_transform_coeff(state, x_ctb * 8, y_ctb * 8, depth, 0, 0, 0);
+  encode_transform_coeff(state, x, y, depth, 0, 0, 0);
 }
 
 static void encode_part_mode(encoder_state_t * const state,
@@ -985,37 +985,48 @@ static void encode_part_mode(encoder_state_t * const state,
 }
 
 void kvz_encode_coding_tree(encoder_state_t * const state,
-                            uint16_t x_ctb,
-                            uint16_t y_ctb,
+                            uint16_t x,
+                            uint16_t y,
                             uint8_t depth)
 {
   cabac_data_t * const cabac = &state->cabac;
+  const encoder_control_t * const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
-  const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb);
+  const cu_info_t *cur_cu   = kvz_cu_array_at_const(frame->cu_array, x, y);
+
+  const cu_info_t *left_cu  = NULL;
+  if (x > 0) {
+    left_cu = kvz_cu_array_at_const(frame->cu_array, x - 1, y);
+  }
+  const cu_info_t *above_cu = NULL;
+  if (y > 0) {
+    above_cu = kvz_cu_array_at_const(frame->cu_array, x, y - 1);
+  }
+
   uint8_t split_flag = GET_SPLITDATA(cur_cu, depth);
   uint8_t split_model = 0;
 
-  //Absolute ctb
-  uint16_t abs_x_ctb = x_ctb + (state->tile->lcu_offset_x * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
-  uint16_t abs_y_ctb = y_ctb + (state->tile->lcu_offset_y * LCU_WIDTH) / (LCU_WIDTH >> MAX_DEPTH);
+  // Absolute coordinates
+  uint16_t abs_x = x + state->tile->lcu_offset_x * LCU_WIDTH;
+  uint16_t abs_y = y + state->tile->lcu_offset_y * LCU_WIDTH;
 
   // Check for slice border FIXME
-  uint8_t border_x = ((state->encoder_control->in.width) < (abs_x_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_y = ((state->encoder_control->in.height) < (abs_y_ctb * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> depth))) ? 1 : 0;
-  uint8_t border_split_x = ((state->encoder_control->in.width)  < ((abs_x_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border_split_y = ((state->encoder_control->in.height) < ((abs_y_ctb + 1) * (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1)))) ? 0 : 1;
-  uint8_t border = border_x | border_y; /*!< are we in any border CU */
+  bool border_x = ctrl->in.width  < abs_x + (LCU_WIDTH >> depth);
+  bool border_y = ctrl->in.height < abs_y + (LCU_WIDTH >> depth);
+  bool border_split_x = ctrl->in.width  >= abs_x + (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1));
+  bool border_split_y = ctrl->in.height >= abs_y + (LCU_WIDTH >> MAX_DEPTH) + (LCU_WIDTH >> (depth + 1));
+  bool border = border_x || border_y; /*!< are we in any border CU */
 
   // When not in MAX_DEPTH, insert split flag and split the blocks if needed
   if (depth != MAX_DEPTH) {
     // Implisit split flag when on border
     if (!border) {
       // Get left and top block split_flags and if they are present and true, increase model number
-      if (x_ctb > 0 && GET_SPLITDATA(kvz_videoframe_get_cu_const(frame, x_ctb - 1, y_ctb), depth) == 1) {
+      if (left_cu && GET_SPLITDATA(left_cu, depth) == 1) {
         split_model++;
       }
 
-      if (y_ctb > 0 && GET_SPLITDATA(kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb - 1), depth) == 1) {
+      if (above_cu && GET_SPLITDATA(above_cu, depth) == 1) {
         split_model++;
       }
 
@@ -1025,18 +1036,19 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
 
     if (split_flag || border) {
       // Split blocks and remember to change x and y block positions
-      uint8_t change = 1<<(MAX_DEPTH-1-depth);
-      kvz_encode_coding_tree(state, x_ctb, y_ctb, depth + 1); // x,y
+      int offset = LCU_WIDTH >> (depth + 1);
+
+      kvz_encode_coding_tree(state, x, y, depth + 1);
 
       // TODO: fix when other half of the block would not be completely over the border
       if (!border_x || border_split_x) {
-        kvz_encode_coding_tree(state, x_ctb + change, y_ctb, depth + 1);
+        kvz_encode_coding_tree(state, x + offset, y, depth + 1);
       }
       if (!border_y || border_split_y) {
-        kvz_encode_coding_tree(state, x_ctb, y_ctb + change, depth + 1);
+        kvz_encode_coding_tree(state, x, y + offset, depth + 1);
       }
       if (!border || (border_split_x && border_split_y)) {
-        kvz_encode_coding_tree(state, x_ctb + change, y_ctb + change, depth + 1);
+        kvz_encode_coding_tree(state, x + offset, y + offset, depth + 1);
       }
       return;
     }
@@ -1047,27 +1059,25 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     CABAC_BIN(cabac, 1, "cu_transquant_bypass_flag");
   }
 
-    // Encode skip flag
+  // Encode skip flag
   if (state->frame->slicetype != KVZ_SLICE_I) {
-    int8_t ctx_skip = 0; // uiCtxSkip = aboveskipped + leftskipped;
-    int ui;
-    int16_t num_cand = MRG_MAX_NUM_CANDS;
-    // Get left and top skipped flags and if they are present and true, increase context number
-    if (x_ctb > 0 && (kvz_videoframe_get_cu_const(frame, x_ctb - 1, y_ctb))->skipped) {
+    // uiCtxSkip = aboveskipped + leftskipped;
+    int8_t ctx_skip = 0;
+
+    if (left_cu && left_cu->skipped) {
       ctx_skip++;
     }
-
-    if (y_ctb > 0 && (kvz_videoframe_get_cu_const(frame, x_ctb, y_ctb - 1))->skipped) {
+    if (above_cu && above_cu->skipped) {
       ctx_skip++;
     }
 
     cabac->cur_ctx = &(cabac->ctx.cu_skip_flag_model[ctx_skip]);
     CABAC_BIN(cabac, cur_cu->skipped, "SkipFlag");
 
-    // IF SKIP
     if (cur_cu->skipped) {
+      int16_t num_cand = MRG_MAX_NUM_CANDS;
       if (num_cand > 1) {
-        for (ui = 0; ui < num_cand - 1; ui++) {
+        for (int ui = 0; ui < num_cand - 1; ui++) {
           int32_t symbol = (ui != cur_cu->merge_idx);
           if (ui == 0) {
             cabac->cur_ctx = &(cabac->ctx.cu_merge_idx_ext_model);
@@ -1084,8 +1094,6 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     }
   }
 
-  // ENDIF SKIP
-
   // Prediction mode
   if (state->frame->slicetype != KVZ_SLICE_I) {
     cabac->cur_ctx = &(cabac->ctx.cu_pred_mode_model);
@@ -1100,8 +1108,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
     const int cu_width = LCU_WIDTH >> depth;
 
     for (int i = 0; i < num_pu; ++i) {
-      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x_ctb << 3, i);
-      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y_ctb << 3, i);
+      const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
+      const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
       const int pu_w = PU_GET_W(cur_cu->part_size, cu_width, i);
       const int pu_h = PU_GET_H(cur_cu->part_size, cu_width, i);
       const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y);
@@ -1120,57 +1128,52 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(state, x_ctb * 8, y_ctb * 8, depth, 0, 0, 0);
+        encode_transform_coeff(state, x, y, depth, 0, 0, 0);
       }
     }
   } else if (cur_cu->type == CU_INTRA) {
-    encode_intra_coding_unit(state, cabac, cur_cu, x_ctb, y_ctb, depth);
+    encode_intra_coding_unit(state, cabac, cur_cu, x, y, depth);
   }
 
-    #if ENABLE_PCM == 1
+#if ENABLE_PCM
   // Code IPCM block
-  if (cur_cu->type == CU_PCM) {
+  else if (cur_cu->type == CU_PCM) {
     kvz_cabac_encode_bin_trm(cabac, 1); // IPCMFlag == 1
-      kvz_cabac_finish(cabac);
-      kvz_bitstream_add_rbsp_trailing_bits(cabac.stream);
+    kvz_cabac_finish(cabac);
+    kvz_bitstream_add_rbsp_trailing_bits(cabac.stream);
+
     // PCM sample
-      {
-      unsigned y, x;
+    pixel *base_y = &cur_pic->y_data[x     + y * encoder->in.width];
+    pixel *base_u = &cur_pic->u_data[x / 2 + y / 2 * encoder->in.width / 2];
+    pixel *base_v = &cur_pic->v_data[x / 2 + y / 2 * encoder->in.width / 2];
 
-      pixel *base_y = &cur_pic->y_data[x_ctb * (LCU_WIDTH >> (MAX_DEPTH))    + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH))) * encoder->in.width];
-      pixel *base_u = &cur_pic->u_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
-      pixel *base_v = &cur_pic->v_data[(x_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1)) + (y_ctb * (LCU_WIDTH >> (MAX_DEPTH + 1))) * encoder->in.width / 2)];
+    // Luma
+    for (unsigned y_px = 0; y_px < LCU_WIDTH >> depth; y_px++) {
+      for (unsigned  x_px = 0; x_px < LCU_WIDTH >> depth; x_px++) {
+        kvz_bitstream_put(cabac.stream, base_y[x_px + y_px * encoder->in.width], 8);
+      }
+    }
 
-      // Luma
-      for (y = 0; y < LCU_WIDTH >> depth; y++) {
-        for (x = 0; x < LCU_WIDTH >> depth; x++) {
-          kvz_bitstream_put(cabac.stream, base_y[x + y * encoder->in.width], 8);
-          }
+    // Chroma
+    if (encoder->in.video_format != FORMAT_400) {
+      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
+        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
+          kvz_bitstream_put(cabac.stream, base_u[x_px + y_px * (encoder->in.width >> 1)], 8);
         }
-
-      // Chroma
-      if (encoder->in.video_format != FORMAT_400) {
-        for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-          for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
-            kvz_bitstream_put(cabac.stream, base_u[x + y * (encoder->in.width >> 1)], 8);
-          }
-        }
-        for (y = 0; y < LCU_WIDTH >> (depth + 1); y++) {
-          for (x = 0; x < LCU_WIDTH >> (depth + 1); x++) {
-            kvz_bitstream_put(cabac.stream, base_v[x + y * (encoder->in.width >> 1)], 8);
-          }
+      }
+      for (unsigned y_px = 0; y_px < LCU_WIDTH >> (depth + 1); y_px++) {
+        for (unsigned x_px = 0; x_px < LCU_WIDTH >> (depth + 1); x_px++) {
+          kvz_bitstream_put(cabac.stream, base_v[x_px + y_px * (encoder->in.width >> 1)], 8);
         }
       }
     }
-    // end PCM sample
-      kvz_cabac_start(cabac);
-  } // end Code IPCM block
-#endif /* END ENABLE_PCM */
-  else { /* Should not happend */
+    kvz_cabac_start(cabac);
+  }
+#endif
+
+  else {
+    // CU type not set. Should not happen.
     assert(0);
     exit(1);
   }
-
-   /* end prediction unit */
-  /* end coding_unit */
 }
