@@ -342,7 +342,7 @@ void kvz_encode_coeff_nxn(encoder_state_t * const state,
 }
 
 static void encode_transform_unit(encoder_state_t * const state,
-                                  int x_pu, int y_pu, int depth)
+                                  int x, int y, int depth)
 {
   assert(depth >= 1 && depth <= MAX_PU_DEPTH);
 
@@ -350,19 +350,15 @@ static void encode_transform_unit(encoder_state_t * const state,
   const uint8_t width = LCU_WIDTH >> depth;
   const uint8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
-  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x_pu << 2, y_pu << 2);
-
-  const int x_cu = x_pu / 2;
-  const int y_cu = y_pu / 2;
-  const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
+  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
 
   int8_t scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode, depth);
 
   int cbf_y = cbf_is_set(cur_pu->cbf, depth, COLOR_Y);
 
   if (cbf_y) {
-    int x_local = x_pu * (LCU_WIDTH >> MAX_PU_DEPTH) % LCU_WIDTH;
-    int y_local = y_pu * (LCU_WIDTH >> MAX_PU_DEPTH) % LCU_WIDTH;
+    int x_local = x % LCU_WIDTH;
+    int y_local = y % LCU_WIDTH;
     const coeff_t *coeff_y = &state->coeff->y[xy_to_zorder(LCU_WIDTH, x_local, y_local)];
 
     // CoeffNxN
@@ -370,36 +366,37 @@ static void encode_transform_unit(encoder_state_t * const state,
     kvz_encode_coeff_nxn(state, coeff_y, width, 0, scan_idx, cur_pu->intra.tr_skip);
   }
 
-  if (depth == MAX_DEPTH + 1 && !(x_pu % 2 && y_pu % 2)) {
+  if (depth == MAX_DEPTH + 1) {
     // For size 4x4 luma transform the corresponding chroma transforms are
-    // also of size 4x4 covering 8x8 luma pixels. The residual is coded
-    // in the last transform unit so for the other ones, don't do anything.
-    return;
+    // also of size 4x4 covering 8x8 luma pixels. The residual is coded in
+    // the last transform unit.
+    if (x % 8 == 0 || y % 8 == 0) {
+      // Not the last luma transform block so there is nothing more to do.
+      return;
+    } else {
+      // Time to to code the chroma transform blocks. Move to the top-left
+      // corner of the block.
+      x -= 4;
+      y -= 4;
+      cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
+    }
   }
 
-  bool chroma_cbf_set = cbf_is_set(cur_cu->cbf, depth, COLOR_U) ||
-                        cbf_is_set(cur_cu->cbf, depth, COLOR_V);
+  bool chroma_cbf_set = cbf_is_set(cur_pu->cbf, depth, COLOR_U) ||
+                        cbf_is_set(cur_pu->cbf, depth, COLOR_V);
   if (chroma_cbf_set) {
-    int x_local, y_local;
+    int x_local = (x >> 1) % LCU_WIDTH_C;
+    int y_local = (y >> 1) % LCU_WIDTH_C;
+    scan_idx = kvz_get_scan_order(cur_pu->type, cur_pu->intra.mode_chroma, depth);
 
-    if (depth <= MAX_DEPTH) {
-      x_local = x_pu * (LCU_WIDTH >> (MAX_PU_DEPTH + 1)) % LCU_WIDTH_C;
-      y_local = y_pu * (LCU_WIDTH >> (MAX_PU_DEPTH + 1)) % LCU_WIDTH_C;
-    } else {
-      // for 4x4 select top left pixel of the CU.
-      x_local = x_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) % LCU_WIDTH_C;
-      y_local = y_cu * (LCU_WIDTH >> (MAX_DEPTH + 1)) % LCU_WIDTH_C;
-    }
     const coeff_t *coeff_u = &state->coeff->u[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
     const coeff_t *coeff_v = &state->coeff->v[xy_to_zorder(LCU_WIDTH_C, x_local, y_local)];
 
-    scan_idx = kvz_get_scan_order(cur_cu->type, cur_cu->intra.mode_chroma, depth);
-
-    if (cbf_is_set(cur_cu->cbf, depth, COLOR_U)) {
+    if (cbf_is_set(cur_pu->cbf, depth, COLOR_U)) {
       kvz_encode_coeff_nxn(state, coeff_u, width_c, 2, scan_idx, 0);
     }
 
-    if (cbf_is_set(cur_cu->cbf, depth, COLOR_V)) {
+    if (cbf_is_set(cur_pu->cbf, depth, COLOR_V)) {
       kvz_encode_coeff_nxn(state, coeff_v, width_c, 2, scan_idx, 0);
     }
   }
@@ -415,8 +412,8 @@ static void encode_transform_unit(encoder_state_t * const state,
  * \param parent_coeff_v  What was signlaed at previous level for cbf_cr.
  */
 static void encode_transform_coeff(encoder_state_t * const state,
-                                   int32_t x_pu,
-                                   int32_t y_pu,
+                                   int32_t x,
+                                   int32_t y,
                                    int8_t depth,
                                    int8_t tr_depth,
                                    uint8_t parent_coeff_u,
@@ -425,11 +422,10 @@ static void encode_transform_coeff(encoder_state_t * const state,
   cabac_data_t * const cabac = &state->cabac;
   const videoframe_t * const frame = state->tile->frame;
 
-  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x_pu << 2, y_pu << 2);
-
-  const int32_t x_cu = x_pu / 2;
-  const int32_t y_cu = y_pu / 2;
-  const cu_info_t *cur_cu = kvz_videoframe_get_cu_const(frame, x_cu, y_cu);
+  const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
+  // Round coordinates down to a multiple of 8 to get the location of the
+  // containing CU.
+  const cu_info_t *cur_cu = kvz_cu_array_at_const(frame->cu_array, x & ~7, y & ~7);
 
   // NxN signifies implicit transform split at the first transform level.
   // There is a similar implicit split for inter, but it is only used when
@@ -476,11 +472,13 @@ static void encode_transform_coeff(encoder_state_t * const state,
   }
 
   if (split) {
-    uint8_t pu_offset = 1 << (MAX_PU_DEPTH - (depth + 1));
-    encode_transform_coeff(state, x_pu, y_pu, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x_pu + pu_offset, y_pu,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x_pu, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
-    encode_transform_coeff(state, x_pu + pu_offset, y_pu + pu_offset,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    uint8_t offset = LCU_WIDTH >> (depth + 1);
+    int x2 = x + offset;
+    int y2 = y + offset;
+    encode_transform_coeff(state, x,  y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x2, y,  depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x,  y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
+    encode_transform_coeff(state, x2, y2, depth + 1, tr_depth + 1, cb_flag_u, cb_flag_v);
     return;
   }
 
@@ -489,7 +487,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
   // - transform depth > 0
   // - we have chroma coefficients at this level
   // When it is not present, it is inferred to be 1.
-  if(cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) {
+  if (cur_cu->type == CU_INTRA || tr_depth > 0 || cb_flag_u || cb_flag_v) {
       cabac->cur_ctx = &(cabac->ctx.qt_cbf_model_luma[!tr_depth]);
       CABAC_BIN(cabac, cb_flag_y, "cbf_luma");
   }
@@ -517,7 +515,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
       state->ref_qp = state->qp;
     }
 
-    encode_transform_unit(state, x_pu, y_pu, depth);
+    encode_transform_unit(state, x, y, depth);
   }
 }
 
@@ -867,7 +865,7 @@ static void encode_intra_coding_unit_encry(encoder_state_t * const state,
     }
   }
 
-  encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+  encode_transform_coeff(state, x_ctb * 8, y_ctb * 8, depth, 0, 0, 0);
 }
 #endif
 
@@ -1013,7 +1011,7 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     }
   }
 
-  encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+  encode_transform_coeff(state, x_ctb * 8, y_ctb * 8, depth, 0, 0, 0);
 }
 
 static void encode_part_mode(encoder_state_t * const state,
@@ -1235,7 +1233,7 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
       // Code (possible) coeffs to bitstream
 
       if (cbf) {
-        encode_transform_coeff(state, x_ctb * 2, y_ctb * 2, depth, 0, 0, 0);
+        encode_transform_coeff(state, x_ctb * 8, y_ctb * 8, depth, 0, 0, 0);
       }
     }
   } else if (cur_cu->type == CU_INTRA) {
