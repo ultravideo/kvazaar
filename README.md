@@ -225,8 +225,8 @@ Scalability extension (experimental):
                                assosiated with it in order. See Options section
                                for more info.
   note: The scalability functionality is still WIP, so compatibility with other
-        parameters is limited. At least GOP and Parallel tools are not supported
-        with Scalability features. Also, only two layer (BL+EL) configuration
+        parameters is limited. At least GOP is not supported with Scalability
+        features. Also, only two layer (BL+EL) configuration
         have been tested, with 2x spatial and PSNR scalability.
 
 Deprecated parameters: (might be removed at some point)
