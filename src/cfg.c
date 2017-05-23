@@ -616,7 +616,7 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   //*********************************************
   //For scalable extension. TODO: Move somewhere else? Add error handling, Add printing. Use a list instead?
   //Alloc the shared structure if it does not exist yet
-  if(cfg->shared != NULL) {
+  if(cfg->shared == NULL) {
     cfg->shared = calloc(1,sizeof(struct shared_t));
     shared_init(cfg);
   }
