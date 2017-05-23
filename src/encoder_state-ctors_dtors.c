@@ -29,7 +29,6 @@
 #include "encoder.h"
 #include "encoder_state-geometry.h"
 #include "encoderstate.h"
-#include "extras/crypto.h"
 #include "image.h"
 #include "imagelist.h"
 #include "kvazaar.h"
@@ -308,6 +307,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->parent = parent_state;
   child_state->children = MALLOC(encoder_state_t, 1);
   child_state->children[0].encoder_control = NULL;
+  child_state->crypto_hdl = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
   
