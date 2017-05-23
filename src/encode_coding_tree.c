@@ -670,9 +670,9 @@ static void encode_inter_prediction_unit(encoder_state_t * const state,
   } // if !merge
 }
 
-#if KVZ_SEL_ENCRYPTION
+
 static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
-                                           uint8_t intra_pred_mode)
+                                            uint8_t intra_pred_mode)
 {
   const uint8_t sets[3][17] =
   {
@@ -714,160 +714,6 @@ static INLINE uint8_t intra_mode_encryption(encoder_state_t * const state,
   }
 }
 
-static void encode_intra_coding_unit_encry(encoder_state_t * const state,
-                                     cabac_data_t * const cabac,
-                                     const cu_info_t * const cur_cu,
-                                     int x_ctb, int y_ctb, int depth)
-{
-  const videoframe_t * const frame = state->tile->frame;
-  uint8_t intra_pred_mode[4];
-  uint8_t intra_pred_mode_encry[4] = {-1, -1, -1, -1};
-  uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
-  int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
-  int8_t mpm_preds[4] = {-1, -1, -1, -1};
-  uint32_t flag[4];
-
-  #if ENABLE_PCM == 1
-  // Code must start after variable initialization
-  kvz_cabac_encode_bin_trm(cabac, 0); // IPCMFlag == 0
-  #endif
-
-  // PREDINFO CODING
-  // If intra prediction mode is found from the predictors,
-  // it can be signaled with two EP's. Otherwise we can send
-  // 5 EP bins with the full predmode
-  const int num_pred_units = kvz_part_mode_num_parts[cur_cu->part_size];
-  const int cu_width = LCU_WIDTH >> depth;
-
-  for (int j = 0; j < num_pred_units; ++j) {
-    const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x_ctb << 3, j);
-    const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y_ctb << 3, j);
-    cu_info_t *cur_pu = kvz_cu_array_at(frame->cu_array, pu_x, pu_y);
-
-    const cu_info_t *left_pu = NULL;
-    const cu_info_t *above_pu = NULL;
-
-    if (pu_x > 0) {
-      assert(pu_x >> 2 > 0);
-      left_pu = kvz_cu_array_at_const(frame->cu_array, pu_x - 1, pu_y);
-    }
-    // Don't take the above PU across the LCU boundary.
-    if (pu_y % LCU_WIDTH > 0 && pu_y > 0) {
-      assert(pu_y >> 2 > 0);
-      above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
-    }
-
-    kvz_intra_get_dir_luma_predictor_encry(pu_x, pu_y,
-                                           intra_preds[j],
-                                           (const cu_info_t *)cur_pu,
-                                           left_pu, above_pu);
-
-    intra_pred_mode[j] = cur_pu->intra.mode;
-
-    intra_pred_mode_encry[j] = intra_mode_encryption(state, intra_pred_mode[j]);
-
-    for (int i = 0; i < 3; i++) {
-      if (intra_preds[j][i] == intra_pred_mode_encry[j]) {
-        mpm_preds[j] = (int8_t)i;
-        break;
-      }
-    }
-    flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
-    //Set the modified intra_pred_mode of the current pu here to make it available
-    // from its neighbours for mpm decision
-    cur_pu->intra.mode_encry=intra_pred_mode_encry[j];
-    if (cur_pu->part_size!=SIZE_NxN){
-      cu_info_t *cu = cur_pu;
-      //FIXME: there might be a more efficient way to propagate mode_encry for
-      //future use from left and above PUs
-      for (int y = pu_y; y < pu_y + cu_width; y += 4 ) {
-        for (int x = pu_x; x < pu_x + cu_width; x += 4) {
-          cu = (cu_info_t *)kvz_cu_array_at(frame->cu_array, x, y);
-          cu->intra.mode_encry = intra_pred_mode_encry[j];
-        }
-      }
-    }
-  }
-
-  cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
-  for (int j = 0; j < num_pred_units; ++j) {
-    CABAC_BIN(cabac, flag[j], "prev_intra_luma_pred_flag");
-  }
-
-  for (int j = 0; j < num_pred_units; ++j) {
-    // Signal index of the prediction mode in the prediction list.
-    if (flag[j]) {
-      CABAC_BIN_EP(cabac, (mpm_preds[j] == 0 ? 0 : 1), "mpm_idx");
-      if (mpm_preds[j] != 0) {
-        CABAC_BIN_EP(cabac, (mpm_preds[j] == 1 ? 0 : 1), "mpm_idx");
-      }
-    } else {
-      // Signal the modified prediction mode.
-      int32_t tmp_pred = intra_pred_mode_encry[j];
-
-      // Sort prediction list from lowest to highest.
-      if (intra_preds[j][0] > intra_preds[j][1]) SWAP(intra_preds[j][0], intra_preds[j][1], int8_t);
-      if (intra_preds[j][0] > intra_preds[j][2]) SWAP(intra_preds[j][0], intra_preds[j][2], int8_t);
-      if (intra_preds[j][1] > intra_preds[j][2]) SWAP(intra_preds[j][1], intra_preds[j][2], int8_t);
-
-      // Reduce the index of the signaled prediction mode according to the
-      // prediction list, as it has been already signaled that it's not one
-      // of the prediction modes.
-      for (int i = 2; i >= 0; i--) {
-        tmp_pred = (tmp_pred > intra_preds[j][i] ? tmp_pred - 1 : tmp_pred);
-      }
-
-      CABAC_BINS_EP(cabac, tmp_pred, 5, "rem_intra_luma_pred_mode");
-    }
-  }
-
-  // Code chroma prediction mode.
-  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-    unsigned pred_mode = 5;
-    unsigned chroma_pred_modes[4] = {0, 26, 10, 1};
-
-    if (intra_pred_mode_chroma == intra_pred_mode[0]) {
-      pred_mode = 4;
-    } else if (intra_pred_mode_chroma == 34) {
-      // Angular 34 mode is possible only if intra pred mode is one of the
-      // possible chroma pred modes, in which case it is signaled with that
-      // duplicate mode.
-      for (int i = 0; i < 4; ++i) {
-        if (intra_pred_mode[0] == chroma_pred_modes[i]) pred_mode = i;
-      }
-    } else {
-      for (int i = 0; i < 4; ++i) {
-        if (intra_pred_mode_chroma == chroma_pred_modes[i]) pred_mode = i;
-      }
-    }
-
-    // pred_mode == 5 mean intra_pred_mode_chroma is something that can't
-    // be coded.
-    assert(pred_mode != 5);
-
-    /**
-     * Table 9-35 - Binarization for intra_chroma_pred_mode
-     *   intra_chroma_pred_mode  bin_string
-     *                        4           0
-     *                        0         100
-     *                        1         101
-     *                        2         110
-     *                        3         111
-     * Table 9-37 - Assignment of ctxInc to syntax elements with context coded bins
-     *   intra_chroma_pred_mode[][] = 0, bypass, bypass
-     */
-    cabac->cur_ctx = &(cabac->ctx.chroma_pred_model[0]);
-    if (pred_mode == 4) {
-      CABAC_BIN(cabac, 0, "intra_chroma_pred_mode");
-    } else {
-      CABAC_BIN(cabac, 1, "intra_chroma_pred_mode");
-      CABAC_BINS_EP(cabac, pred_mode, 2, "intra_chroma_pred_mode");
-    }
-  }
-
-  encode_transform_coeff(state, x_ctb * 8, y_ctb * 8, depth, 0, 0, 0);
-}
-#endif
 
 static void encode_intra_coding_unit(encoder_state_t * const state,
                                      cabac_data_t * const cabac,
@@ -875,19 +721,26 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
                                      int x_ctb, int y_ctb, int depth)
 {
   const videoframe_t * const frame = state->tile->frame;
-  uint8_t intra_pred_mode[4];
+  uint8_t intra_pred_mode_actual[4];
+  uint8_t *intra_pred_mode = intra_pred_mode_actual;
+
+#if KVZ_SEL_ENCRYPTION
+  const bool do_crypto =
+    !state->cabac.only_count &&
+    state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_INTRA_MODE;
+#else
+  const bool do_crypto = false;
+#endif
+
+  uint8_t intra_pred_mode_encry[4] = {-1, -1, -1, -1};
+  if (do_crypto) {
+    intra_pred_mode = intra_pred_mode_encry;
+  }
 
   uint8_t intra_pred_mode_chroma = cur_cu->intra.mode_chroma;
   int8_t intra_preds[4][3] = {{-1, -1, -1},{-1, -1, -1},{-1, -1, -1},{-1, -1, -1}};
   int8_t mpm_preds[4] = {-1, -1, -1, -1};
   uint32_t flag[4];
-#if KVZ_SEL_ENCRYPTION
-  if(!state->cabac.only_count)
-      if (state->encoder_control->cfg.crypto_features & KVZ_CRYPTO_INTRA_MODE) {
-        encode_intra_coding_unit_encry(state, cabac, (cu_info_t *)cur_cu, x_ctb, y_ctb, depth);
-        return;
-      }
-#endif
 
   #if ENABLE_PCM == 1
   // Code must start after variable initialization
@@ -919,12 +772,26 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       above_pu = kvz_cu_array_at_const(frame->cu_array, pu_x, pu_y - 1);
     }
 
-    kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
-                                     intra_preds[j],
-                                     cur_pu,
-                                     left_pu, above_pu);
+    if (do_crypto) {
+#if KVZ_SEL_ENCRYPTION
+      // Need to wrap in preprocessor directives because this function is
+      // only defined when KVZ_SEL_ENCRYPTION is defined.
+      kvz_intra_get_dir_luma_predictor_encry(pu_x, pu_y,
+                                             intra_preds[j],
+                                             cur_pu,
+                                             left_pu, above_pu);
+#endif
+    } else {
+      kvz_intra_get_dir_luma_predictor(pu_x, pu_y,
+                                       intra_preds[j],
+                                       cur_pu,
+                                       left_pu, above_pu);
+    }
 
-    intra_pred_mode[j] = cur_pu->intra.mode;
+    intra_pred_mode_actual[j] = cur_pu->intra.mode;
+    if (do_crypto) {
+      intra_pred_mode_encry[j] = intra_mode_encryption(state, cur_pu->intra.mode);
+    }
 
     for (int i = 0; i < 3; i++) {
       if (intra_preds[j][i] == intra_pred_mode[j]) {
@@ -933,6 +800,26 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
       }
     }
     flag[j] = (mpm_preds[j] == -1) ? 0 : 1;
+
+#if KVZ_SEL_ENCRYPTION
+    // Need to wrap in preprocessor directives because
+    // cu_info_t.intra.mode_encry is only defined when KVZ_SEL_ENCRYPTION
+    // is defined.
+    if (do_crypto) {
+      // Set the modified intra_pred_mode of the current pu here to make it
+      // available from its neighbours for mpm decision.
+
+      // FIXME: there might be a more efficient way to propagate mode_encry
+      // for future use from left and above PUs
+      const int pu_width = PU_GET_W(cur_cu->part_size, cu_width, j);
+      for (int y = pu_y; y < pu_y + pu_width; y += 4 ) {
+        for (int x = pu_x; x < pu_x + pu_width; x += 4) {
+          cu_info_t *cu = kvz_cu_array_at(frame->cu_array, x, y);
+          cu->intra.mode_encry = intra_pred_mode_encry[j];
+        }
+      }
+    }
+#endif
   }
 
   cabac->cur_ctx = &(cabac->ctx.intra_mode_model);
@@ -972,14 +859,14 @@ static void encode_intra_coding_unit(encoder_state_t * const state,
     unsigned pred_mode = 5;
     unsigned chroma_pred_modes[4] = {0, 26, 10, 1};
 
-    if (intra_pred_mode_chroma == intra_pred_mode[0]) {
+    if (intra_pred_mode_chroma == intra_pred_mode_actual[0]) {
       pred_mode = 4;
     } else if (intra_pred_mode_chroma == 34) {
       // Angular 34 mode is possible only if intra pred mode is one of the
       // possible chroma pred modes, in which case it is signaled with that
       // duplicate mode.
       for (int i = 0; i < 4; ++i) {
-        if (intra_pred_mode[0] == chroma_pred_modes[i]) pred_mode = i;
+        if (intra_pred_mode_actual[0] == chroma_pred_modes[i]) pred_mode = i;
       }
     } else {
       for (int i = 0; i < 4; ++i) {
