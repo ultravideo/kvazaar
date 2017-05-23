@@ -370,6 +370,8 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       kvz_bitstream_align_zero(state->cabac.stream);
 
       kvz_cabac_start(&state->cabac);
+
+      kvz_crypto_delete(&state->crypto_hdl);
     }
   }
 
@@ -407,17 +409,19 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   }
 }
 
-static void encoder_state_encode_leaf(encoder_state_t * const state) {
+static void encoder_state_encode_leaf(encoder_state_t * const state)
+{
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
 
   const kvz_config *cfg = &state->encoder_control->cfg;
-  if (cfg->crypto_features) {
-    InitC(state->tile->dbs_g);
-    state->tile->m_prev_pos = 0;
-  }
 
   state->ref_qp = state->frame->QP;
+
+  if (cfg->crypto_features) {
+    state->crypto_hdl = kvz_crypto_create();
+    state->crypto_prev_pos = 0;
+  }
 
   // Select whether to encode the frame/tile in current thread or to define
   // wavefront jobs for other threads to handle.
@@ -439,7 +443,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state) {
       }
 #endif //KVZ_DEBUG
     }
-    
+
     if (state->encoder_control->cfg.sao_enable) {
       PERFORMANCE_MEASURE_START(KVZ_PERF_SAOREC);
       kvz_sao_reconstruct_frame(state);
