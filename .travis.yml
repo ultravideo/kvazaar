@@ -129,7 +129,7 @@ matrix:
     - env: TEST_DIM=16x256 VALGRIND_TEST="--threads=2 --owf=1 --preset=veryslow"
     
     # Test scalability extension.
-    - env: TEST_DIM=512x264 VALGRIND_TEST="--layer-res=256x132 --preset=ultrafast -q30 -r1 --owf=0 --gop=0 -p0 --layer --preset=ultrafast -q28  -r1 --owf=0 --gop=0 -p0"
+    - env: TEST_DIM=512x264 VALGRIND_TEST="--layer-res=256x132 --preset=ultrafast -q30 -r1 --gop=0 -p0 --layer --preset=ultrafast -q28 -r1 --gop=0 -p0"
     
     # Test main functions sequence breaks
     - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--false"
