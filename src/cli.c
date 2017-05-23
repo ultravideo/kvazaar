@@ -295,7 +295,7 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
     while( cfg != NULL ) {
       //Default input_layer to highest input layer
       if( cfg->input_layer == -1 ) {
-        cfg->input_layer = *cfg->max_input_layers - 1;
+        cfg->input_layer = cfg->shared->max_input_layers - 1;
       }
       if (cfg->input_layer == i && cfg->width == 0 && cfg->height == 0) {
         ok = ok && select_input_res_auto(opts->input[i], &cfg->width, &cfg->height);
@@ -303,8 +303,8 @@ cmdline_opts_t* cmdline_opts_parse(const kvz_api *const api, int argc, char *arg
       }
       cfg = cfg->next_cfg;
     }
-    if ((*opts->config->input_widths)[i] == 0 && (*opts->config->input_heights)[i] == 0) {
-      ok = ok && select_input_res_auto(opts->input[i], &(*opts->config->input_widths)[i], &(*opts->config->input_heights)[i]);
+    if (opts->config->shared->input_widths[i] == 0 && opts->config->shared->input_heights[i] == 0) {
+      ok = ok && select_input_res_auto(opts->input[i], &opts->config->shared->input_widths[i], &opts->config->shared->input_heights[i]);
       //goto done;
     }
   }

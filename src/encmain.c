@@ -193,8 +193,8 @@ static void* input_read_thread(void* in_args)
   // Modified for SHVC
     enum kvz_chroma_format csp = KVZ_FORMAT2CSP(args->opts->config->input_format);
     frame_in = args->api->picture_alloc_csp(csp,
-                                            (*args->opts->config->input_widths)[args->input_layer]  + args->padding_x,
-                                            (*args->opts->config->input_heights)[args->input_layer] + args->padding_y);
+                                            args->opts->config->shared->input_widths[args->input_layer]  + args->padding_x,
+                                            args->opts->config->shared->input_heights[args->input_layer] + args->padding_y);
 
     if (!frame_in) {
       fprintf(stderr, "Failed to allocate image.\n");
@@ -206,8 +206,8 @@ static void* input_read_thread(void* in_args)
     frame_in->pts = frames_read;
 
     bool read_success = yuv_io_read(args->input,
-                                    (*args->opts->config->input_widths)[args->input_layer],
-                                    (*args->opts->config->input_heights)[args->input_layer],
+                                    args->opts->config->shared->input_widths[args->input_layer],
+                                    args->opts->config->shared->input_heights[args->input_layer],
                                     args->encoder->cfg.input_bitdepth,
                                     args->encoder->bitdepth,
                                     frame_in);
@@ -224,8 +224,8 @@ static void* input_read_thread(void* in_args)
             goto done;
           }
           bool read_success = yuv_io_read(args->input,
-                                         (*args->opts->config->input_widths)[args->input_layer],
-                                         (*args->opts->config->input_heights)[args->input_layer],
+                                          args->opts->config->shared->input_widths[args->input_layer],
+                                          args->opts->config->shared->input_heights[args->input_layer],
                                           args->encoder->cfg.input_bitdepth,
                                           args->encoder->bitdepth,
                                           frame_in);
@@ -465,9 +465,9 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Input layer %d:\n", i);
     fprintf(stderr, "  Input: %s, output: %s\n", opts->input[i], opts->output);
     fprintf(stderr, "    Video input size: %dx%d\n",
-      *(opts->config->input_widths[i]), *(opts->config->input_heights[i]));
+      opts->config->shared->input_widths[i], opts->config->shared->input_heights[i]);
 
-    if (opts->seek > 0 && !yuv_io_seek(input[i], opts->seek, (*opts->config->input_widths)[i], (*opts->config->input_heights)[i])) {
+    if (opts->seek > 0 && !yuv_io_seek(input[i], opts->seek, opts->config->shared->input_widths[i], opts->config->shared->input_heights[i])) {
       fprintf(stderr, "Failed to seek %d frames.\n", opts->seek);
       goto exit_failure;
     }
@@ -488,8 +488,8 @@ int main(int argc, char *argv[])
   // ***********************************************
   // Modified for SHVC
   //Allocate space for some stuff
-  info_out = malloc(sizeof(kvz_frame_info)*(*opts->config->max_layers));
-  len_out = calloc(*opts->config->max_layers, sizeof(uint32_t)); // Each layer has their own len_out
+  info_out = malloc(sizeof(kvz_frame_info) * opts->config->shared->max_layers);
+  len_out = calloc( opts->config->shared->max_layers, sizeof(uint32_t)); // Each layer has their own len_out
 
   input_threads = malloc(sizeof(pthread_t)*opts->num_inputs);
 
@@ -504,8 +504,8 @@ int main(int argc, char *argv[])
   recon_buffer = calloc(opts->num_debugs,sizeof(kvz_picture*[KVZ_MAX_GOP_LENGTH])); //Feels so wrong but should mean recon_buffer is a pointer to kvz_picture* [KVZ_MAX_GOP_LENGTH] -arrays
   recon_buffer_size = calloc(opts->num_debugs,sizeof(int));
 
-  substream_lengths = calloc(*opts->config->max_layers,sizeof(uint64_t));
-  layer_psnr_sum = calloc(*opts->config->max_layers,sizeof(double[3]));
+  substream_lengths = calloc( opts->config->shared->max_layers,sizeof(uint64_t));
+  layer_psnr_sum = calloc( opts->config->shared->max_layers,sizeof(double[3]));
 
   //Now, do the real stuff
   {
@@ -519,8 +519,8 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < opts->num_inputs; i++) {
 
-      uint8_t padding_x = get_padding((*opts->config->input_widths)[i]);
-      uint8_t padding_y = get_padding((*opts->config->input_heights)[i]);
+      uint8_t padding_x = get_padding( opts->config->shared->input_widths[i] );
+      uint8_t padding_y = get_padding( opts->config->shared->input_heights[i] );
 
       available_input_slots[i] = calloc(1, sizeof(kvz_sem_t));
       filled_input_slots[i]    = calloc(1, sizeof(kvz_sem_t));
@@ -605,7 +605,7 @@ int main(int argc, char *argv[])
       // ***********************************************
       // Modified for SHVC
       uint32_t tot_len_out = 0;
-      for (int i = 0; i < *opts->config->max_layers; ++i) {
+      for (int i = 0; i < opts->config->shared->max_layers; ++i) {
         tot_len_out += len_out[i];
         substream_lengths[i] += len_out[i];
       }
@@ -724,7 +724,7 @@ int main(int argc, char *argv[])
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames over %d layer(s), %10llu bits",
             frames_done,
-            *opts->config->max_layers,
+            opts->config->shared->max_layers,
             (long long unsigned int)bitstream_length * 8);
     if (frames_done > 0) {
       // ***********************************************
@@ -737,16 +737,16 @@ int main(int argc, char *argv[])
     }
     fprintf(stderr, "\n");
     //Print layer stats if more than two layers
-    if (*opts->config->max_layers > 1) {
-      for (int i = 0; i < *opts->config->max_layers; ++i) {
+    if ( opts->config->shared->max_layers > 1) {
+      for (int i = 0; i < opts->config->shared->max_layers; ++i) {
         fprintf(stderr, "  Layer %d: %10llu bits,",
           i,
           (long long unsigned int)substream_lengths[i] * 8);
         if (frames_done > 0) {
           fprintf(stderr, " AVG PSNR: %2.4f %2.4f %2.4f",
-            layer_psnr_sum[i][0] / frames_done * (*opts->config->max_layers),
-            layer_psnr_sum[i][1] / frames_done * (*opts->config->max_layers),
-            layer_psnr_sum[i][2] / frames_done * (*opts->config->max_layers));
+            layer_psnr_sum[i][0] / frames_done * opts->config->shared->max_layers,
+            layer_psnr_sum[i][1] / frames_done * opts->config->shared->max_layers,
+            layer_psnr_sum[i][2] / frames_done * opts->config->shared->max_layers );
         }
         fprintf(stderr, "\n");
       }

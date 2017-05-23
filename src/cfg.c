@@ -126,22 +126,39 @@ int kvz_config_init(kvz_config *cfg)
   //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   cfg->layer = 0;
+  cfg->input_layer = -1;
+
+  cfg->shared = NULL;
+  /*
   cfg->max_layers = malloc(sizeof(uint8_t));
   *cfg->max_layers = 1;
   cfg->max_input_layers = malloc(sizeof(uint8_t));
   *cfg->max_input_layers = 0;
-  cfg->input_layer = -1;
 
   cfg->input_widths = calloc(1,sizeof(int32_t**));
   cfg->input_heights = calloc(1,sizeof(int32_t**));
   *cfg->input_widths = calloc(1,sizeof(int32_t*));
   *cfg->input_heights = calloc(1,sizeof(int32_t*));
-
+  */
   cfg->next_cfg = NULL;
 
   //*********************************************
 
   return 1;
+}
+
+//Init shared structure
+static void shared_init(kvz_config *cfg)
+{
+  cfg->shared->intra_period = cfg->intra_period;
+  cfg->shared->wpp = cfg->wpp;
+  cfg->shared->owf = cfg->owf;
+  cfg->shared->threads = cfg->threads;
+
+  cfg->shared->max_layers = 1;
+  cfg->shared->max_input_layers = 0;
+  cfg->shared->input_widths = calloc(1,sizeof(int32_t));
+  cfg->shared->input_heights = calloc(1,sizeof(int32_t));
 }
 
 int kvz_config_destroy(kvz_config *cfg)
@@ -158,14 +175,15 @@ int kvz_config_destroy(kvz_config *cfg)
     if(cfg->next_cfg != NULL){
       kvz_config_destroy(cfg->next_cfg);
       cfg->next_cfg = NULL;//FREE_POINTER(cfg->next_cfg);
+      cfg->shared = NULL;
     } else {
-      FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared fields
-      FREE_POINTER(cfg->max_input_layers);
-      FREE_POINTER(*cfg->input_widths);
-      FREE_POINTER(*cfg->input_heights);
-      FREE_POINTER(cfg->input_widths);
-      FREE_POINTER(cfg->input_heights);
-
+      //FREE_POINTER(cfg->max_layers); // Last cfg, so free the shared fields
+      //FREE_POINTER(cfg->max_input_layers);
+      //FREE_POINTER(*cfg->input_widths);
+      //FREE_POINTER(*cfg->input_heights);
+      FREE_POINTER(cfg->shared->input_widths);
+      FREE_POINTER(cfg->shared->input_heights);
+      FREE_POINTER(cfg->shared)
     }
     //*********************************************
   }
@@ -597,10 +615,16 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
   //*********************************************
   //For scalable extension. TODO: Move somewhere else? Add error handling, Add printing. Use a list instead?
+  //Alloc the shared structure if it does not exist yet
+  if(cfg->shared != NULL) {
+    cfg->shared = calloc(1,sizeof(struct shared_t));
+    shared_init(cfg);
+  }
   //Activate the correct el_cfg based on the max_layers param
-  while( cfg->layer != (*cfg->max_layers - 1) ) {
+  while( cfg->layer != (cfg->shared->max_layers - 1) ) {
     cfg = cfg->next_cfg;
   }
+  
   //*********************************************
 
 #define OPT(STR) (!strcmp(name, STR))
@@ -615,28 +639,29 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     //Allocate a new cfg for the new layer
     cfg->next_cfg = kvz_config_alloc();
     kvz_config_init(cfg->next_cfg);
+    cfg->next_cfg->shared = cfg->shared;
     
     //Do additional initialization
     cfg->next_cfg->layer = cfg->layer + 1;
 
-    free(cfg->next_cfg->max_layers);
-    cfg->next_cfg->max_layers = cfg->max_layers;
-    *cfg->max_layers += 1;
+    //free(cfg->next_cfg->max_layers);
+    //cfg->next_cfg->max_layers = cfg->max_layers;
+    cfg->shared->max_layers += 1;
 
-    free(cfg->next_cfg->max_input_layers);
-    cfg->next_cfg->max_input_layers = cfg->max_input_layers;
+    //free(cfg->next_cfg->max_input_layers);
+    //cfg->next_cfg->max_input_layers = cfg->max_input_layers;
 
-    free(*cfg->next_cfg->input_widths);
-    free(*cfg->next_cfg->input_heights);
-    free(cfg->next_cfg->input_widths);
-    free(cfg->next_cfg->input_heights);
-    cfg->next_cfg->input_widths = cfg->input_widths;
-    cfg->next_cfg->input_heights = cfg->input_heights;
+    //free(*cfg->next_cfg->input_widths);
+    //free(*cfg->next_cfg->input_heights);
+    //free(cfg->next_cfg->input_widths);
+    //free(cfg->next_cfg->input_heights);
+    //cfg->next_cfg->input_widths = cfg->input_widths;
+    //cfg->next_cfg->input_heights = cfg->input_heights;
 
     //Set a value for the input layer if not set yet.
     //Associate the latest input in the (old) layer with the (old) input layer or default to 0
     if( cfg->input_layer == -1 ) {
-      cfg->input_layer = MAX(*cfg->max_input_layers-1,0);
+      cfg->input_layer = MAX(cfg->shared->max_input_layers-1,0);
     }
   }
   else if OPT("layer-res")
@@ -645,14 +670,14 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->input_layer = atoi(value);
   else if OPT("input"){
     //Allocate a new spot for the new input layer
-    (*cfg->max_input_layers)++;
-    *cfg->input_widths = realloc(*cfg->input_widths, (*cfg->max_input_layers) * sizeof(int32_t*));
-    *cfg->input_heights = realloc(*cfg->input_heights, (*cfg->max_input_layers) * sizeof(int32_t*));
+    cfg->shared->max_input_layers++;
+    cfg->shared->input_widths = realloc(cfg->shared->input_widths, cfg->shared->max_input_layers * sizeof(int32_t*));
+    cfg->shared->input_heights = realloc(cfg->shared->input_heights, cfg->shared->max_input_layers * sizeof(int32_t*));
 
     //If cur layers input layer has not been set, set the newest layer as the input layer set
     //Associates the first input in the layer with the input layer
     if( cfg->input_layer == -1 ) {
-      cfg->input_layer = *cfg->max_input_layers - 1;
+      cfg->input_layer = cfg->shared->max_input_layers - 1;
     }
   }
   else if OPT("input-res"){
@@ -663,9 +688,9 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     int32_t width, height;
     bool success = sscanf(value, "%dx%d", &width, &height) == 2;
     if( success ) {
-      int i = (*cfg->max_input_layers) == 0 ? 0 : *cfg->max_input_layers - 1;
-      (*cfg->input_widths)[i] = width;
-      (*cfg->input_heights)[i] = height;
+      int i = cfg->shared->max_input_layers == 0 ? 0 : cfg->shared->max_input_layers - 1;
+      cfg->shared->input_widths[i] = width;
+      cfg->shared->input_heights[i] = height;
     }
     return (success);
   }
@@ -683,8 +708,13 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
   }
   else if OPT("qp")
     cfg->qp = atoi(value);
-  else if OPT("period")
+  else if OPT("period"){
+    //*********************************************
+    //For scalable extension.
     cfg->intra_period = atoi(value);
+    cfg->shared->intra_period = cfg->intra_period;
+    //*********************************************
+  }
   else if OPT("vps-period")
     cfg->vps_period = atoi(value);
   else if OPT("ref")
@@ -770,6 +800,11 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     if (cfg->wpp) {
       cfg->wpp = false;
+      //*********************************************
+      //For scalable extension.
+      cfg->shared->wpp = false;
+      //*********************************************
+      
       fprintf(stderr, "Disabling WPP because tiles were enabled.\n");
     }
 
@@ -785,6 +820,10 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     if (cfg->wpp) {
       cfg->wpp = false;
+      //*********************************************
+      //For scalable extension.
+      cfg->shared->wpp = false;
+      //*********************************************
       fprintf(stderr, "Disabling WPP because tiles were enabled.\n");
     }
 
@@ -822,19 +861,32 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
 
     if (cfg->wpp) {
       cfg->wpp = false;
+      //*********************************************
+      //For scalable extension.
+      cfg->shared->wpp = false;
+      //*********************************************
       fprintf(stderr, "Disabling WPP because tiles were enabled.\n");
     }
 
     return 1;
   }
-  else if OPT("wpp")
+  else if OPT("wpp"){
     cfg->wpp = atobool(value);
+    //*********************************************
+    //For scalable extension.
+    cfg->shared->wpp = cfg->wpp;
+    //*********************************************
+  }
   else if OPT("owf") {
+    //*********************************************
+    //For scalable extension.
     cfg->owf = atoi(value);
     if (cfg->owf == 0 && !strcmp(value, "auto")) {
       // -1 means automatic selection
       cfg->owf = -1;
     }
+    cfg->shared->owf = cfg->owf;
+    //*********************************************
   } else if OPT("slices") {
     if (!strcmp(value, "tiles")) {
       cfg->slices = KVZ_SLICES_TILES;
@@ -850,11 +902,15 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     }
 
   } else if OPT("threads") {
+    //*********************************************
+      //For scalable extension.
     cfg->threads = atoi(value);
     if (cfg->threads == 0 && !strcmp(value, "auto")) {
       // -1 means automatic selection
       cfg->threads = -1;
     }
+    cfg->shared->threads = cfg->threads;
+      //*********************************************
   }
   else if OPT("cpuid")
     cfg->cpuid = atoi(value);
@@ -1361,8 +1417,10 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->gop_len && cfg->intra_period && !cfg->gop_lowdelay &&
-      cfg->intra_period % cfg->gop_len != 0)
+  //*********************************************
+  //For scalable extension.
+  if (cfg->gop_len && (cfg->intra_period || cfg->shared->intra_period) && !cfg->gop_lowdelay &&
+     ( cfg->intra_period % cfg->gop_len != 0 || cfg->shared->intra_period % cfg->gop_len != 0 ))
   {
     fprintf(stderr,
             "Input error: intra period (%d) not a multiple of B-gop length (%d)\n",
@@ -1370,6 +1428,7 @@ int kvz_config_validate(const kvz_config *const cfg)
             cfg->gop_len);
     error = 1;
   }
+  //*********************************************
 
   if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
     fprintf(stderr, "Input error: --ref out of range [1..%d]\n", MAX_REF_PIC_COUNT - 1);
@@ -1406,10 +1465,14 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
-  if (cfg->owf < -1) {
+  //*********************************************
+  //For scalable extension.
+  if (cfg->shared->owf < -1) {
     fprintf(stderr, "Input error: --owf must be nonnegative or -1\n");
     error = 1;
   }
+  //*********************************************
+  
 
   if (cfg->target_bitrate < 0) {
       fprintf(stderr, "Input error: --bitrate must be nonnegative\n");
@@ -1490,21 +1553,21 @@ int kvz_config_validate(const kvz_config *const cfg)
     fprintf(stderr, "Input error: --implicit-rdpcm is not suppoted without --lossless\n");
     error = 1;
   }
-
-  if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->wpp) {
+//*********************************************
+  //For scalable extension.
+  if ((cfg->slices & KVZ_SLICES_WPP) && !cfg->shared->wpp) {
     fprintf(stderr, "Input error: --slices=wpp does not work without --wpp.\n");
     error = 1;
   }
 
-  //*********************************************
-  //For scalable extension. TODO: Relax constraints as more parameters become compatiple
+   //TODO: Relax constraints as more parameters become compatiple
   //Validity check for scalable extension
-  if( *cfg->max_layers > 1 ) {
+  if( cfg->shared != NULL && cfg->shared->max_layers > 1 ) {
     if( cfg->gop_len > 0) {
       fprintf(stderr, "Input error: GoP is not currently supported with layers\n");
       error = 1;
     }
-    if( cfg->owf > 1 || cfg->owf < 0) {
+    if( cfg->shared->owf > 1 || cfg->shared->owf < 0) {
       fprintf(stderr, "Input error: owf other than {0,1} is not currently supported with layers\n");
       error = 1;
     }

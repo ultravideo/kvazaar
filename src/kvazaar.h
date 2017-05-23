@@ -350,16 +350,28 @@ typedef struct kvz_config
 //*********************************************
   //For scalable extension. TODO: Move somewhere else?
   uint8_t layer;
-  uint8_t *max_layers; //This needs to be shared between cfgs
-  uint8_t *max_input_layers; //Keep trach of how many input layers there are (size of input_*s listst)
   int8_t input_layer; //Which input layer this layer uses
-
-  //Size of the input pictures. TODO: A better way?
-  int32_t **input_widths;  
-  int32_t **input_heights; 
+  
   //TODO: Add all the cfgs as a list?
   //Points to the next cfg of a higher layer (null if highest layer)
   struct kvz_config *next_cfg; //TODO: Find a better way? Pass the cfg for the els here
+
+  //Define a shared struct here to contain parameters shared by layers when parsing the cfg
+  //helps avoid the need to change code elsewhere that uses cfg values
+  struct shared_t
+  {
+    int32_t intra_period; 
+    int wpp;
+    int owf;
+    int32_t threads;
+
+    uint8_t max_layers; //This needs to be shared between cfgs
+    uint8_t max_input_layers; //Keep trach of how many input layers there are (size of input_*s listst)
+    //Size of the input pictures. TODO: A better way?
+    int32_t *input_widths;  
+    int32_t *input_heights; 
+    
+  } *shared;
 
   //*********************************************
 

@@ -124,8 +124,7 @@ static unsigned cfg_num_threads(void)
   return cpus + fake_cpus / 2;
 }
 
-// ***********************************************
-  // Modified for SHVC.
+
 /**
  * \brief Return weight for 360 degree ERP video
  *
@@ -201,7 +200,8 @@ static void init_erp_aqp_roi(encoder_control_t* encoder,
   }
 }
 
-
+// ***********************************************
+  // Modified for SHVC.
 /**
  * \brief Allocate and initialize an encoder control structure.
  *
@@ -251,13 +251,22 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     encoder->cfg.tiles_height_split = NULL;
     encoder->cfg.slice_addresses_in_ts = NULL;
 
-
-    encoder->cfg.max_layers = NULL;
+    // ***********************************************
+  // Modified for SHVC.
+    //Move shared data from cfg to the actual values in the encoder later
+    encoder->cfg.shared = NULL;
+    /*encoder->cfg.max_layers = NULL;
     encoder->cfg.max_input_layers = NULL;
     encoder->cfg.input_widths = NULL;
     encoder->cfg.input_heights = NULL;
-    encoder->cfg.next_cfg = NULL;
+    encoder->cfg.next_cfg = NULL;*/
 
+    //Move shared variables
+    encoder->cfg.wpp = cfg->shared->wpp;
+    encoder->cfg.threads = cfg->shared->threads;
+    encoder->cfg.owf = cfg->shared->owf;
+    if(encoder->cfg.owf == -1) encoder->cfg.intra_period = cfg->shared->intra_period;
+    // ***********************************************
 
     if (encoder->cfg.threads == -1) {
       encoder->cfg.threads = cfg_num_threads();
@@ -622,20 +631,20 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 
     //*********************************************
     //For scalable extension. TODO: Check that stuff from the cfg is copied properly since it is only copied now
-    encoder->layer.layer_id = cfg->layer;
-    encoder->layer.input_layer = cfg->input_layer;
-    encoder->layer.max_layers = *cfg->max_layers;
+    encoder->layer.layer_id = encoder->cfg.layer;
+    encoder->layer.input_layer = encoder->cfg.input_layer;
+    encoder->layer.max_layers = cfg->shared->max_layers;
 
     encoder->layer.num_layer_sets = encoder->layer.num_output_layer_sets = encoder->layer.max_layers;
-    encoder->layer.list_modification_present_flag = (encoder->layer.layer_id > 0) && (cfg->ref_frames > 1) && (cfg->intra_period != 1) ? 1 : 0;
+    encoder->layer.list_modification_present_flag = (encoder->layer.layer_id > 0) && (encoder->cfg.ref_frames > 1) && (encoder->cfg.intra_period != 1) ? 1 : 0;
     encoder->layer.sps_ext_or_max_sub_layers_minus1 = 7;
     encoder->layer.multi_layer_ext_sps_flag = encoder->layer.layer_id != 0 && 
                                               encoder->layer.sps_ext_or_max_sub_layers_minus1 == 7;
     
     //encoder->layer.upscaling = NULL; //This is set later when the parameters have been set
 
-    encoder->layer.input_width = (*cfg->input_widths)[encoder->layer.input_layer];
-    encoder->layer.input_height = (*cfg->input_heights)[encoder->layer.input_layer];
+    encoder->layer.input_width = cfg->shared->input_widths[encoder->layer.input_layer];
+    encoder->layer.input_height = cfg->shared->input_heights[encoder->layer.input_layer];
 
     //Set scaling parameters
     //Prepare scaling parameters so that up/downscaling gives the correct parameters for up/downscaling from prev_layer/orig to current layer
