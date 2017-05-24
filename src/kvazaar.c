@@ -77,6 +77,12 @@ static void kvazaar_close(kvz_encoder *encoder)
     }
     FREE_POINTER(encoder->states);
 
+    //Threadqueue is shared so free it only in the last encoder and set to NULL for others
+    if(next==NULL) {
+      encoder_control_t *ctrl = (encoder_control_t*)encoder->control;
+      ctrl->threadqueue = NULL;
+    }
+
     // Discard const from the pointer.
     kvz_encoder_control_free((void*) encoder->control);
     encoder->control = NULL;
@@ -353,6 +359,11 @@ static int yuv_io_extract_field(const kvz_picture *frame_in, unsigned source_sca
 //  
 //  return pic_out;
 //}
+
+static kvz_picture* deferred_kvazaar_scaling(encoder_state_t *ref, const scaling_parameter_t *const param)
+{
+  
+}
 // ***********************************************
 
 

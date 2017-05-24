@@ -320,12 +320,22 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
     }
   }
 
-  encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
-  if (!encoder->threadqueue) {
-    fprintf(stderr, "Could not initialize threadqueue.\n");
-    goto init_failed;
-  }
 
+    // ***********************************************
+    // Modified for SHVC.
+    // Share the thread queue if prev encoder has been set
+    
+    if ( prev_enc == NULL || prev_enc->threadqueue == NULL ) {
+      encoder->threadqueue = kvz_threadqueue_init(encoder->cfg.threads);
+      if (!encoder->threadqueue) {
+        fprintf(stderr, "Could not initialize threadqueue.\n");
+        goto init_failed;
+      }
+    } else {
+      encoder->threadqueue = prev_enc->threadqueue;
+    }
+    
+    // ***********************************************
     encoder->bitdepth = KVZ_BIT_DEPTH;
 
     encoder->chroma_format = KVZ_FORMAT2CSP(encoder->cfg.input_format);
