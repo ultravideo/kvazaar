@@ -1567,11 +1567,12 @@ int kvz_config_validate(const kvz_config *const cfg)
       fprintf(stderr, "Input error: GoP is not currently supported with layers\n");
       error = 1;
     }
-    //TODO: remove
-    /*if( cfg->shared->owf > 1 || cfg->shared->owf < 0) {
-      fprintf(stderr, "Input error: owf other than {0,1} is not currently supported with layers\n");
+    
+    if( (cfg->shared->owf > 1 || cfg->shared->owf < 0 || cfg->shared->threads > 0) && cfg->shared->wpp) {
+      fprintf(stderr, "Input error: wpp not currently supported with layers when owf and threads are used\n");
       error = 1;
-    }*/
+    }
+
     if( cfg->ref_frames > 1 ) {
       fprintf(stderr, "Input error: Only one (IL) reference currently supported\n");
       error = 1;
