@@ -637,89 +637,70 @@ static void intra_recon_tb_leaf(
   kvz_pixels_blit(pred, block , width, width, width, lcu_width);
 }
 
-void kvz_intra_recon_lcu_luma(
+/**
+ * \brief Reconstruct an intra CU
+ *
+ * \param state         encoder state
+ * \param x             x-coordinate of the CU in luma pixels
+ * \param y             y-coordinate of the CU in luma pixels
+ * \param depth         depth in the CU tree
+ * \param mode_luma     intra mode for luma, or -1 to skip luma recon
+ * \param mode_chroma   intra mode for chroma, or -1 to skip chroma recon
+ * \param cur_cu        pointer to the CU, or NULL to fetch CU from LCU
+ * \param lcu           containing LCU
+ */
+void kvz_intra_recon_cu(
   encoder_state_t *const state,
   int x,
   int y,
   int depth,
-  int8_t intra_mode,
+  int8_t mode_luma,
+  int8_t mode_chroma,
   cu_info_t *cur_cu,
   lcu_t *lcu)
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
+  const int8_t width = LCU_WIDTH >> depth;
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
   }
-  const int8_t width = LCU_WIDTH >> depth;
 
   if (depth == 0 || cur_cu->tr_depth > depth) {
-    int offset = width / 2;
+    const int offset = width / 2;
+    const int32_t x2 = x + offset;
+    const int32_t y2 = y + offset;
 
-    kvz_intra_recon_lcu_luma(state, x,          y,          depth+1, intra_mode, NULL, lcu);
-    kvz_intra_recon_lcu_luma(state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
-    kvz_intra_recon_lcu_luma(state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
-    kvz_intra_recon_lcu_luma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y,  depth + 1, mode_luma, mode_chroma, NULL, lcu);
+    kvz_intra_recon_cu(state, x2, y,  depth + 1, mode_luma, mode_chroma, NULL, lcu);
+    kvz_intra_recon_cu(state, x,  y2, depth + 1, mode_luma, mode_chroma, NULL, lcu);
+    kvz_intra_recon_cu(state, x2, y2, depth + 1, mode_luma, mode_chroma, NULL, lcu);
 
-    if (depth < MAX_DEPTH) {
-      uint16_t child_cbfs[3] = {
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
-      };
+    // Propagate coded block flags from child CUs to parent CU.
+    uint16_t child_cbfs[3] = {
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
+      LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
+    };
+
+    if (mode_luma != -1 && depth < MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
-
-  } else {
-    intra_recon_tb_leaf(state, x, y, depth, intra_mode, lcu, COLOR_Y);
-
-    kvz_quantize_lcu_residual(state,
-                              true, false, // process luma only
-                              x, y, depth,
-                              cur_cu, lcu);
-  }
-}
-
-
-void kvz_intra_recon_lcu_chroma(
-  encoder_state_t *const state,
-  int x,
-  int y,
-  int depth,
-  int8_t intra_mode,
-  cu_info_t *cur_cu,
-  lcu_t *lcu)
-{
-  const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
-  const int8_t width = LCU_WIDTH >> depth;
-
-  if (cur_cu == NULL) {
-    cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
-  }
-
-  if (depth == 0 || cur_cu->tr_depth > depth) {
-    int offset = width / 2;
-
-    kvz_intra_recon_lcu_chroma(state, x,          y,          depth+1, intra_mode, NULL, lcu);
-    kvz_intra_recon_lcu_chroma(state, x + offset, y,          depth+1, intra_mode, NULL, lcu);
-    kvz_intra_recon_lcu_chroma(state, x,          y + offset, depth+1, intra_mode, NULL, lcu);
-    kvz_intra_recon_lcu_chroma(state, x + offset, y + offset, depth+1, intra_mode, NULL, lcu);
-
-    if (depth <= MAX_DEPTH) {
-      uint16_t child_cbfs[3] = {
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y         )->cbf,
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x,          lcu_px.y + offset)->cbf,
-        LCU_GET_CU_AT_PX(lcu, lcu_px.x + offset, lcu_px.y + offset)->cbf,
-      };
+    if (mode_chroma != -1 && depth <= MAX_DEPTH) {
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
     }
-  } else if (x % 8 == 0 && y % 8 == 0) {
-    intra_recon_tb_leaf(state, x, y, depth, intra_mode, lcu, COLOR_U);
-    intra_recon_tb_leaf(state, x, y, depth, intra_mode, lcu, COLOR_V);
+  } else {
+    const bool has_luma = mode_luma != -1;
+    const bool has_chroma = mode_chroma != -1 && x % 8 == 0 && y % 8 == 0;
+    // Process a leaf TU.
+    if (has_luma) {
+      intra_recon_tb_leaf(state, x, y, depth, mode_luma, lcu, COLOR_Y);
+    }
+    if (has_chroma) {
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_U);
+      intra_recon_tb_leaf(state, x, y, depth, mode_chroma, lcu, COLOR_V);
+    }
 
-    kvz_quantize_lcu_residual(state,
-                              false, true, // process chroma only
-                              x, y, depth,
-                              cur_cu, lcu);
+    kvz_quantize_lcu_residual(state, has_luma, has_chroma, x, y, depth, cur_cu, lcu);
   }
 }

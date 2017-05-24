@@ -117,27 +117,13 @@ void kvz_intra_predict(
   kvz_pixel *dst,
   bool filter_boundary);
 
-/**
- * \brief Do a full intra prediction cycle on a CU in lcu for luma.
- */
-void kvz_intra_recon_lcu_luma(
+void kvz_intra_recon_cu(
   encoder_state_t *const state,
   int x,
   int y,
   int depth,
-  int8_t intra_mode,
-  cu_info_t *cur_cu,
-  lcu_t *lcu);
-
-/**
-* \brief Do a full intra prediction cycle on a CU in lcu for chroma.
-*/
-void kvz_intra_recon_lcu_chroma(
-  encoder_state_t *const state,
-  int x,
-  int y,
-  int depth,
-  int8_t intra_mode,
+  int8_t mode_luma,
+  int8_t mode_chroma,
   cu_info_t *cur_cu,
   lcu_t *lcu);
 

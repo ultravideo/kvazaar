@@ -220,15 +220,20 @@ static double search_intra_trdepth(encoder_state_t * const state,
     nosplit_cost = 0.0;
 
     cbf_clear(&pred_cu->cbf, depth, COLOR_Y);
-
-    kvz_intra_recon_lcu_luma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
-    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
-
     if (reconstruct_chroma) {
       cbf_clear(&pred_cu->cbf, depth, COLOR_U);
       cbf_clear(&pred_cu->cbf, depth, COLOR_V);
+    }
 
-      kvz_intra_recon_lcu_chroma(state, x_px, y_px, depth, intra_mode, pred_cu, lcu);
+    const int8_t chroma_mode = reconstruct_chroma ? intra_mode : -1;
+    kvz_intra_recon_cu(state,
+                       x_px, y_px,
+                       depth,
+                       intra_mode, chroma_mode,
+                       pred_cu, lcu);
+
+    nosplit_cost += kvz_cu_rd_cost_luma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
+    if (reconstruct_chroma) {
       nosplit_cost += kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, pred_cu, lcu);
     }
 
@@ -697,7 +702,11 @@ int8_t kvz_search_intra_chroma_rdo(encoder_state_t * const state,
     for (int8_t chroma_mode_i = 0; chroma_mode_i < num_modes; ++chroma_mode_i) {
       chroma.mode = modes[chroma_mode_i];
 
-      kvz_intra_recon_lcu_chroma(state, x_px, y_px, depth, chroma.mode, NULL, lcu);
+      kvz_intra_recon_cu(state,
+                         x_px, y_px,
+                         depth,
+                         -1, chroma.mode, // skip luma
+                         NULL, lcu);
       chroma.cost = kvz_cu_rd_cost_chroma(state, lcu_px.x, lcu_px.y, depth, tr_cu, lcu);
 
       double mode_bits = kvz_chroma_mode_bits(state, chroma.mode, intra_mode);

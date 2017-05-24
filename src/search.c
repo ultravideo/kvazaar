@@ -600,7 +600,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                          intra_mode,
                          intra_mode,
                          cur_cu->part_size);
-      kvz_intra_recon_lcu_luma(state, x, y, depth, intra_mode, NULL, &work_tree[depth]);
+      kvz_intra_recon_cu(state,
+                         x, y,
+                         depth,
+                         intra_mode, -1, // skip chroma
+                         NULL, &work_tree[depth]);
 
       if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
         int8_t intra_mode_chroma = intra_mode;
@@ -616,7 +620,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                              cur_cu->part_size);
         }
 
-        kvz_intra_recon_lcu_chroma(state, x, y, depth, intra_mode_chroma, NULL, &work_tree[depth]);
+        kvz_intra_recon_cu(state,
+                           x, y,
+                           depth,
+                           -1, intra_mode_chroma, // skip luma
+                           NULL, &work_tree[depth]);
       }
     } else if (cur_cu->type == CU_INTER) {
       // Reset transform depth because intra messes with them.
@@ -761,11 +769,17 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         lcu_set_intra_mode(&work_tree[depth], x, y, depth,
                            cur_cu->intra.mode, cur_cu->intra.mode_chroma,
                            cur_cu->part_size);
-        kvz_intra_recon_lcu_luma(state, x, y, depth, cur_cu->intra.mode, NULL, &work_tree[depth]);
-        cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
 
-        if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-          kvz_intra_recon_lcu_chroma(state, x, y, depth, cur_cu->intra.mode_chroma, NULL, &work_tree[depth]);
+        const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
+        const int8_t mode_chroma = has_chroma ? cur_cu->intra.mode_chroma : -1;
+        kvz_intra_recon_cu(state,
+                           x, y,
+                           depth,
+                           cur_cu->intra.mode, mode_chroma,
+                           NULL, &work_tree[depth]);
+
+        cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+        if (has_chroma) {
           cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
         }
 
