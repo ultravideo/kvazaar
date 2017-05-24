@@ -587,6 +587,56 @@ void kvz_intra_build_reference(
   }
 }
 
+static void intra_recon_tb_leaf(
+  encoder_state_t *const state,
+  int x,
+  int y,
+  int depth,
+  int8_t intra_mode,
+  lcu_t *lcu,
+  color_t color)
+{
+  const kvz_config *cfg = &state->encoder_control->cfg;
+  const int shift = color == COLOR_Y ? 0 : 1;
+
+  int log2width = LOG2_LCU_WIDTH - depth;
+  if (color != COLOR_Y && depth < MAX_PU_DEPTH) {
+    // Chroma width is half of luma width, when not at maximum depth.
+    log2width -= 1;
+  }
+  const int width = 1 << log2width;
+  const int lcu_width = LCU_WIDTH >> shift;
+
+  const vector2d_t luma_px = { x, y };
+  const vector2d_t pic_px = {
+    state->tile->frame->width,
+    state->tile->frame->height,
+  };
+  const vector2d_t lcu_px = { SUB_SCU(x) >> shift, SUB_SCU(y) >> shift};
+
+  kvz_intra_references refs;
+  kvz_intra_build_reference(log2width, color, &luma_px, &pic_px, lcu, &refs);
+
+  kvz_pixel pred[32 * 32];
+  const bool filter_boundary = color == COLOR_Y && !(cfg->lossless && cfg->implicit_rdpcm);
+  kvz_intra_predict(&refs, log2width, intra_mode, color, pred, filter_boundary);
+
+  const int index = lcu_px.x + lcu_px.y * lcu_width;
+  kvz_pixel *block = NULL;
+  switch (color) {
+    case COLOR_Y:
+      block = &lcu->rec.y[index];
+      break;
+    case COLOR_U:
+      block = &lcu->rec.u[index];
+      break;
+    case COLOR_V:
+      block = &lcu->rec.v[index];
+      break;
+  }
+  kvz_pixels_blit(pred, block , width, width, width, lcu_width);
+}
+
 void kvz_intra_recon_lcu_luma(
   encoder_state_t *const state,
   int x,
@@ -619,28 +669,14 @@ void kvz_intra_recon_lcu_luma(
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_Y);
     }
 
-    return;
+  } else {
+    intra_recon_tb_leaf(state, x, y, depth, intra_mode, lcu, COLOR_Y);
+
+    kvz_quantize_lcu_residual(state,
+                              true, false, // process luma only
+                              x, y, depth,
+                              cur_cu, lcu);
   }
-
-  // Perform intra prediction and put the result in correct place lcu.
-  vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-  vector2d_t luma_px = { x, y };
-  kvz_intra_references refs;
-  const int_fast8_t log2_width = kvz_g_convert_to_bit[width] + 2;
-  kvz_intra_build_reference(log2_width, COLOR_Y, &luma_px, &pic_px, lcu, &refs);
-
-  kvz_pixel pred[32 * 32];
-  const kvz_config *cfg = &state->encoder_control->cfg;
-  bool filter_boundary = !(cfg->lossless && cfg->implicit_rdpcm);
-  kvz_intra_predict(&refs, log2_width, intra_mode, COLOR_Y, pred, filter_boundary);
-  
-  kvz_pixel *block_in_lcu = &lcu->rec.y[lcu_px.x + lcu_px.y * LCU_WIDTH];
-  kvz_pixels_blit(pred, block_in_lcu, width, width, width, LCU_WIDTH);
-
-  kvz_quantize_lcu_residual(state,
-                            true, false, // process luma only
-                            x, y, depth,
-                            cur_cu, lcu);
 }
 
 
@@ -655,7 +691,6 @@ void kvz_intra_recon_lcu_chroma(
 {
   const vector2d_t lcu_px = { SUB_SCU(x), SUB_SCU(y) };
   const int8_t width = LCU_WIDTH >> depth;
-  const int8_t width_c = (depth == MAX_PU_DEPTH ? width : width / 2);
 
   if (cur_cu == NULL) {
     cur_cu = LCU_GET_CU_AT_PX(lcu, lcu_px.x, lcu_px.y);
@@ -678,37 +713,9 @@ void kvz_intra_recon_lcu_chroma(
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_U);
       cbf_set_conditionally(&cur_cu->cbf, child_cbfs, depth, COLOR_V);
     }
-    return;
-  }
-
-  if (!(x & 4 || y & 4)) {
-    const int_fast8_t log2_width_c = kvz_g_convert_to_bit[width_c] + 2;
-    const vector2d_t luma_px = { x, y };
-    const vector2d_t pic_px = { state->tile->frame->width, state->tile->frame->height };
-
-    // Intra predict U-plane and put the result in lcu buffer.
-    {
-      kvz_intra_references refs;
-      kvz_intra_build_reference(log2_width_c, COLOR_U, &luma_px, &pic_px, lcu, &refs);
-
-      kvz_pixel pred[32 * 32];
-      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_U, pred, false);
-
-      kvz_pixel *pu_in_lcu = &lcu->rec.u[lcu_px.x / 2 + (lcu_px.y * LCU_WIDTH) / 4];
-      kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);
-    }
-
-    // Intra predict V-plane and put the result in lcu buffer.
-    {
-      kvz_intra_references refs;
-      kvz_intra_build_reference(log2_width_c, COLOR_V, &luma_px, &pic_px, lcu, &refs);
-      
-      kvz_pixel pred[32 * 32];
-      kvz_intra_predict(&refs, log2_width_c, intra_mode, COLOR_V, pred, false);
-
-      kvz_pixel *pu_in_lcu = &lcu->rec.v[lcu_px.x / 2 + (lcu_px.y * LCU_WIDTH) / 4];
-      kvz_pixels_blit(pred, pu_in_lcu, width_c, width_c, width_c, LCU_WIDTH_C);
-    }
+  } else if (x % 8 == 0 && y % 8 == 0) {
+    intra_recon_tb_leaf(state, x, y, depth, intra_mode, lcu, COLOR_U);
+    intra_recon_tb_leaf(state, x, y, depth, intra_mode, lcu, COLOR_V);
 
     kvz_quantize_lcu_residual(state,
                               false, true, // process chroma only
