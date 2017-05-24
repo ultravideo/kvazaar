@@ -56,7 +56,4 @@ int kvz_videoframe_free(videoframe_t * const frame);
 
 void kvz_videoframe_set_poc(videoframe_t * frame, int32_t poc);
 
-const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame, unsigned int x_in_scu, unsigned int y_in_scu);
-cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame, const unsigned int x_in_scu, const unsigned int y_in_scu);
-
 #endif

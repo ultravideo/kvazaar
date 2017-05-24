@@ -329,7 +329,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   state->must_code_qp_delta = encoder->lcu_dqp_enabled;
 
   //Encode coding tree
-  kvz_encode_coding_tree(state, lcu->position.x << MAX_DEPTH, lcu->position.y << MAX_DEPTH, 0);
+  kvz_encode_coding_tree(state, lcu->position.x * LCU_WIDTH, lcu->position.y * LCU_WIDTH, 0);
 
   // Coeffs are not needed anymore.
   state->coeff = NULL;
