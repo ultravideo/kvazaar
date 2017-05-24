@@ -87,17 +87,3 @@ int kvz_videoframe_free(videoframe_t * const frame)
 void kvz_videoframe_set_poc(videoframe_t * const frame, const int32_t poc) {
   frame->poc = poc;
 }
-
-const cu_info_t* kvz_videoframe_get_cu_const(const videoframe_t * const frame,
-                                             unsigned int x_in_scu,
-                                             unsigned int y_in_scu)
-{
-  return kvz_cu_array_at_const(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
-}
-
-cu_info_t* kvz_videoframe_get_cu(videoframe_t * const frame,
-                                 const unsigned int x_in_scu,
-                                 const unsigned int y_in_scu)
-{
-  return kvz_cu_array_at(frame->cu_array, x_in_scu << 3, y_in_scu << 3);
-}

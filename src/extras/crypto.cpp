@@ -1,132 +1,138 @@
 #include <extras/crypto.h>
 
 #ifndef KVZ_SEL_ENCRYPTION
-extern int kvz_make_vs_ignore_crypto_not_having_symbols;
 int kvz_make_vs_ignore_crypto_not_having_symbols = 0;
 #else
+
 #include <cryptopp/aes.h>
 #include <cryptopp/modes.h>
 #include <cryptopp/osrng.h>
-typedef struct AESDecoder {
+
 #if AESEncryptionStreamMode
-        CryptoPP::CFB_Mode<CryptoPP::AES>::Encryption *CFBdec;
+  typedef CryptoPP::CFB_Mode<CryptoPP::AES>::Encryption cipher_t;
 #else
-    CryptoPP::CFB_Mode<CryptoPP::AES>::Decryption *CFBdec;
+  typedef CryptoPP::CFB_Mode<CryptoPP::AES>::Decryption cipher_t;
 #endif
 
-    byte key[CryptoPP::AES::DEFAULT_KEYLENGTH], iv[CryptoPP::AES::BLOCKSIZE], out_stream_counter[CryptoPP::AES::BLOCKSIZE], counter[CryptoPP::AES::BLOCKSIZE];
-    int couter_avail, counter_index, counter_index_pos;
-} AESDecoder;
+struct crypto_handle_t {
+  cipher_t *cipher;
+  byte key[CryptoPP::AES::DEFAULT_KEYLENGTH];
+  byte iv[CryptoPP::AES::BLOCKSIZE];
+  byte out_stream_counter[CryptoPP::AES::BLOCKSIZE];
+  byte counter[CryptoPP::AES::BLOCKSIZE];
+  int couter_avail;
+  int counter_index;
+  int counter_index_pos;
+};
 
 
-AESDecoder* Create() {
-	AESDecoder * AESdecoder = (AESDecoder *)malloc(sizeof(AESDecoder));
-	return AESdecoder;
+static const int init_val[32] = {
+  201,  75, 219, 152,   6, 245, 237, 107,
+  179, 194,  81,  29,  66,  98, 198,   0,
+   16, 213,  27,  56, 255, 127, 242, 112,
+   97, 126, 197, 204,  25,  59,  38,  30,
+};
+
+
+crypto_handle_t* kvz_crypto_create()
+{
+  crypto_handle_t* hdl = (crypto_handle_t*)calloc(1, sizeof(crypto_handle_t));
+
+  for (int i = 0; i < 16; i++) {
+    hdl->iv [i]     = init_val[i];
+    hdl->counter[i] = init_val[i + 5];
+    hdl->key[i]     = init_val[i + 16];
+  }
+
+  hdl->cipher = new cipher_t(hdl->key, CryptoPP::AES::DEFAULT_KEYLENGTH, hdl->iv);
+
+  hdl->couter_avail      = 0;
+  hdl->counter_index     = 0;
+  hdl->counter_index_pos = 0;
+
+  return hdl;
 }
-void  Init(AESDecoder* AESdecoder) {
-    int init_val[32] = {201, 75, 219, 152, 6, 245, 237, 107, 179, 194, 81, 29, 66, 98, 198, 0, 16, 213, 27, 56, 255, 127, 242, 112, 97, 126, 197, 204, 25, 59, 38, 30};
-    for(int i=0;i<16; i++) {
-        AESdecoder->iv [i]     = init_val[i];
-        AESdecoder->counter[i] = init_val[5+i];
-        AESdecoder->key[i]     = init_val[i+16];
+
+void kvz_crypto_delete(crypto_handle_t **hdl)
+{
+  if (*hdl) {
+    delete (*hdl)->cipher;
+    (*hdl)->cipher = NULL;
+  }
+  FREE_POINTER(*hdl);
+}
+
+void kvz_crypto_decrypt(crypto_handle_t* hdl,
+                        const uint8_t *in_stream,
+                        int size_bits,
+                        uint8_t *out_stream)
+{
+  int num_bytes = ceil((double)size_bits/8);
+  hdl->cipher->ProcessData(out_stream, in_stream, num_bytes);
+  if (size_bits & 7) {
+    hdl->cipher->SetKeyWithIV(hdl->key, CryptoPP::AES::DEFAULT_KEYLENGTH, hdl->iv);
+  }
+}
+#if AESEncryptionStreamMode
+static void increment_counter(unsigned char *counter)
+{
+  counter[0]++;
+}
+
+static void decrypt_counter(crypto_handle_t *hdl)
+{
+  hdl->cipher->ProcessData(hdl->out_stream_counter, hdl->counter, 16);
+  hdl->couter_avail      = 128;
+  hdl->counter_index     = 15;
+  hdl->counter_index_pos = 8;
+  increment_counter(hdl->counter);
+}
+
+unsigned kvz_crypto_get_key(crypto_handle_t *hdl, int nb_bits)
+{
+  unsigned key = 0;
+  if (nb_bits > 32) {
+      fprintf(stderr, "The generator cannot generate %d bits (max 32 bits)\n", nb_bits);
+      return 0;
+  }
+  if (nb_bits == 0) return 0;
+
+  if (!hdl->couter_avail) {
+    decrypt_counter(hdl);
+  }
+
+  if(hdl->couter_avail >= nb_bits) {
+      hdl->couter_avail -= nb_bits;
+  } else {
+      hdl->couter_avail = 0;
+  }
+
+  int nb = 0;
+  while (nb_bits) {
+    if (nb_bits >= hdl->counter_index_pos) {
+      nb = hdl->counter_index_pos;
+    } else {
+      nb = nb_bits;
     }
-#if AESEncryptionStreamMode
-    AESdecoder->CFBdec = new CryptoPP::CFB_Mode<CryptoPP::AES >::Encryption(AESdecoder->key, CryptoPP::AES::DEFAULT_KEYLENGTH, AESdecoder->iv);
-#else
-    AESdecoder->CFBdec = new CryptoPP::CFB_Mode<CryptoPP::AES >::Decryption(AESdecoder->key, CryptoPP::AES::DEFAULT_KEYLENGTH, AESdecoder->iv);
-#endif
-    AESdecoder->couter_avail      = 0;
-    AESdecoder->counter_index     = 0;
-    AESdecoder->counter_index_pos = 0;
-}
 
-void DeleteCrypto(AESDecoder * AESdecoder) {
-    if(AESdecoder)
-        free(AESdecoder);
-}
+    key <<= nb;
+    key += hdl->out_stream_counter[hdl->counter_index] & ((1 << nb) - 1);
+    hdl->out_stream_counter[hdl->counter_index] >>= nb;
+    nb_bits -= nb;
 
-void Decrypt(AESDecoder *AESdecoder, const unsigned char *in_stream, int size_bits, unsigned char  *out_stream) {
-    int nb_bytes = ceil((double)size_bits/8);
-    AESdecoder->CFBdec->ProcessData(out_stream, in_stream, nb_bytes);
-    if(size_bits&7)
-        AESdecoder->CFBdec->SetKeyWithIV(AESdecoder->key, CryptoPP::AES::DEFAULT_KEYLENGTH, AESdecoder->iv);
-    
-}
-void Incr_counter (unsigned char *counter) {
-    counter[0]++;
-}
-
-#if AESEncryptionStreamMode
-void Decrypt_counter(AESDecoder * AESdecoder) {
-    AESdecoder->CFBdec->ProcessData(AESdecoder->out_stream_counter, AESdecoder->counter, 16);
-    AESdecoder->couter_avail      = 128;
-    AESdecoder->counter_index     = 15;
-    AESdecoder->counter_index_pos = 8;
-    Incr_counter(AESdecoder->counter);
-}
-#endif
-
-#if AESEncryptionStreamMode
-unsigned int get_key (AESDecoder * AESdecoder, int nb_bits) {
-    unsigned int key_ = 0;
-    if(nb_bits > 32) {
-        printf("The Generator can not generate more than 32 bit %d \n", nb_bits);
-        return 0;
+    if (hdl->counter_index && nb == hdl->counter_index_pos) {
+      hdl->counter_index--;
+      hdl->counter_index_pos = 8;
+    } else {
+      hdl->counter_index_pos -= nb;
+      if (nb_bits) {
+        decrypt_counter(hdl);
+        hdl->couter_avail -=  nb_bits;
+      }
     }
-    if( !nb_bits )
-        return 0;
-    if(!AESdecoder->couter_avail)
-        Decrypt_counter(AESdecoder);
-
-    if(AESdecoder->couter_avail >= nb_bits)
-        AESdecoder->couter_avail -= nb_bits;
-    else
-        AESdecoder->couter_avail = 0;
-    int nb = 0;
-    while( nb_bits ) {
-        if( nb_bits >= AESdecoder->counter_index_pos )
-            nb = AESdecoder->counter_index_pos;
-        else
-            nb = nb_bits;
-        key_ <<= nb;
-        key_ += (AESdecoder->out_stream_counter[AESdecoder->counter_index] & ((1<<nb)-1));
-        AESdecoder->out_stream_counter[AESdecoder->counter_index] >>= nb;
-        nb_bits -= nb;
-
-        if(AESdecoder->counter_index && nb == AESdecoder->counter_index_pos ) {
-            AESdecoder->counter_index--;
-            AESdecoder->counter_index_pos = 8;
-        } else {
-            AESdecoder->counter_index_pos -= nb;
-            if(nb_bits) {
-                Decrypt_counter(AESdecoder);
-                AESdecoder->couter_avail -=  nb_bits;
-            }
-        }
-    }
-    return key_;
+  }
+  return key;
 }
-#endif
-Crypto_Handle CreateC() {
-	AESDecoder* AESdecoder = Create();
-	    return AESdecoder;
-}
-
-void InitC(Crypto_Handle hdl) {
-    Init((AESDecoder*)hdl);
-}
-
-#if AESEncryptionStreamMode
-unsigned int ff_get_key (Crypto_Handle *hdl, int nb_bits) {
-    return get_key ((AESDecoder*)*hdl, nb_bits);
-}
-#endif
-void DecryptC(Crypto_Handle hdl, const unsigned char *in_stream, int size_bits, unsigned char  *out_stream) {
-    Decrypt((AESDecoder*)hdl, in_stream, size_bits, out_stream);
-}
-
-void DeleteCryptoC(Crypto_Handle hdl) {
-	  DeleteCrypto((AESDecoder *)hdl);
-}
+#endif // AESEncryptionStreamMode
 
 #endif // KVZ_SEL_ENCRYPTION

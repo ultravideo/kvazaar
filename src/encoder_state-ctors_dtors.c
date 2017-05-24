@@ -29,7 +29,6 @@
 #include "encoder.h"
 #include "encoder_state-geometry.h"
 #include "encoderstate.h"
-#include "extras/crypto.h"
 #include "image.h"
 #include "imagelist.h"
 #include "kvazaar.h"
@@ -140,9 +139,6 @@ static void encoder_state_config_tile_finalize(encoder_state_t * const state) {
 
   kvz_videoframe_free(state->tile->frame);
   state->tile->frame = NULL;
-  if (state->encoder_control->cfg.crypto_features && state->tile->dbs_g) {
-    DeleteCryptoC(state->tile->dbs_g);
-  }
   FREE_POINTER(state->tile->wf_jobs);
 }
 
@@ -311,6 +307,7 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->parent = parent_state;
   child_state->children = MALLOC(encoder_state_t, 1);
   child_state->children[0].encoder_control = NULL;
+  child_state->crypto_hdl = NULL;
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
   
@@ -329,7 +326,6 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
       return 0;
     }
 
-    child_state->tile->dbs_g = NULL;  // Not used. The used state is in the sub-tile.
     child_state->slice = MALLOC(encoder_state_config_slice_t, 1);
     if (!child_state->slice || !encoder_state_config_slice_init(child_state, 0, encoder->in.width_in_lcu * encoder->in.height_in_lcu - 1)) {
       fprintf(stderr, "Could not initialize encoder_state->slice!\n");
@@ -464,9 +460,6 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
         new_child->type  = ENCODER_STATE_TYPE_TILE;
         new_child->frame = child_state->frame;
         new_child->tile  = MALLOC(encoder_state_config_tile_t, 1);
-        if (child_state->encoder_control->cfg.crypto_features) {
-          new_child->tile->dbs_g = CreateC();
-        }
         new_child->slice = child_state->slice;
         new_child->wfrow = child_state->wfrow;
         

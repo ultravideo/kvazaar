@@ -177,10 +177,6 @@ typedef struct encoder_state_config_tile_t {
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
 
-  // Instance of encryption generator by tile
-  Crypto_Handle dbs_g;
-  uint32_t m_prev_pos;
-
 } encoder_state_config_tile_t;
 
 typedef struct encoder_state_config_slice_t {
@@ -242,6 +238,10 @@ typedef struct encoder_state_t {
   
   bitstream_t stream;
   cabac_data_t cabac;
+
+  // Crypto stuff
+  crypto_handle_t *crypto_hdl;
+  uint32_t crypto_prev_pos;
 
   uint32_t stats_bitstream_length; //Bitstream length written in bytes
 

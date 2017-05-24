@@ -1474,6 +1474,11 @@ int kvz_config_validate(const kvz_config *const cfg)
   //*********************************************
   
 
+  if (cfg->qp != CLIP_TO_QP(cfg->qp)) {
+      fprintf(stderr, "Input error: --qp parameter out of range [0..51]\n");
+      error = 1;
+  }
+
   if (cfg->target_bitrate < 0) {
       fprintf(stderr, "Input error: --bitrate must be nonnegative\n");
       error = 1;
