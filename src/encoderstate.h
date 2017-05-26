@@ -271,6 +271,11 @@ typedef struct encoder_state_t {
   //Jobs to wait for
   threadqueue_job_t * tqj_recon_done; //Reconstruction is done
   threadqueue_job_t * tqj_bitstream_written; //Bitstream is written
+
+  // ***********************************************
+    // Modified for SHVC. TODO: Account for a more complex reference structure?
+  const struct encoder_state_t *ILR_state;
+  // ***********************************************
 } encoder_state_t;
 
 void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame);
@@ -279,6 +284,11 @@ void kvz_encoder_prepare(encoder_state_t *state);
 
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state);
+
+// ***********************************************
+    // Modified for SHVC.
+int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state);
+// ***********************************************
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth);
 

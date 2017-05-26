@@ -165,6 +165,17 @@ int kvz_image_list_add(image_list_t *list, kvz_picture *im, cu_array_t *cua, int
 //  return 1;
 //}
 
+void kvz_image_list_rem_ILR( image_list_t *list, int32_t prev_poc)
+{
+  //Loop over refs and remove IL refs from the list
+  for( unsigned i = 0; i < list->used_size; i++) {
+    //TODO: Figure out a better way? Eg. extra info.
+    //If a ref poc matches the prev frames poc, the ref should have been an ILR in the prev frame.
+    if( list->pocs[i] == prev_poc ) {
+      kvz_image_list_rem( list, i);
+    }
+  }
+}
 // ***********************************************
 
 /**

@@ -52,7 +52,9 @@ int kvz_image_list_rem(image_list_t *list, unsigned n);
 // ***********************************************
   // Modified for SHVC
 
-int kvz_image_list_add_back(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
+//int kvz_image_list_add_back(image_list_t *list, kvz_picture *im, cu_array_t* cua, int32_t poc);
+
+void kvz_image_list_rem_ILR( image_list_t *list, int32_t prev_poc);
 
 // ***********************************************
 

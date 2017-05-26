@@ -30,6 +30,11 @@
 
 #include "kvazaar.h"
 
+// ***********************************************
+  // Modified for SHVC
+#include "scaler/scaler.h"
+// ***********************************************
+
 
 typedef struct {
   kvz_pixel y[LCU_LUMA_SIZE];
@@ -82,5 +87,9 @@ void kvz_pixels_blit(const kvz_pixel* orig, kvz_pixel *dst,
                          unsigned width, unsigned height,
                          unsigned orig_stride, unsigned dst_stride);
 
+// ***********************************************
+// Modified for SHVC
+kvz_picture* kvz_image_scaling(const kvz_picture* const pic_in, const scaling_parameter_t *const param);
+// ***********************************************
 
 #endif

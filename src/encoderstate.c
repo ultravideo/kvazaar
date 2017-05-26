@@ -49,6 +49,21 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
   return 1;
 }
 
+// ***********************************************
+    // Modified for SHVC.
+int kvz_encoder_state_match_ILR_states_of_children(encoder_state_t *const state)
+{
+  if (state->ILR_state == NULL) return 1; //State has no ILR_state so children can't have one either 
+
+  int i;
+  for(i = 0; state->children[i].encoder_control; ++i) {
+    state->children[i].ILR_state = &state->ILR_state->children[i];
+    kvz_encoder_state_match_ILR_states_of_children(&state->children[i]);
+  }
+  return 1;
+}
+// ***********************************************
+
 static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const lcu_order_element_t * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
   videoframe_t* const frame = state->tile->frame;
   
@@ -1102,6 +1117,8 @@ void kvz_encode_one_frame(encoder_state_t * const state, kvz_picture* frame)
   //kvz_threadqueue_flush(main_state->encoder_control->threadqueue);
 }
 
+// ***********************************************
+    // Modified for SHVC.
 
 /**
  * Prepare the encoder state for encoding the next frame.
@@ -1127,7 +1144,7 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->frame->prepared = 1;
     return;
   }
-
+  
   // NOTE: prev_state is equal to state when OWF is zero
   encoder_state_t *prev_state = state->previous_encoder_state;
 
@@ -1139,6 +1156,11 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
 
     kvz_image_list_copy_contents(state->frame->ref, prev_state->frame->ref);
+  }
+
+  // For SHVC.
+  if (encoder->layer.layer_id > 0 && prev_state->ILR_state != NULL) {
+      kvz_image_list_rem_ILR(state->frame->ref, prev_state->frame->poc); //Remove old ILR pics from the ref list so they don't interfere.
   }
 
   if (!encoder->cfg.gop_len ||
@@ -1159,6 +1181,22 @@ void kvz_encoder_prepare(encoder_state_t *state)
     state->tile->frame->cu_array = kvz_cu_array_alloc(width, height);
   }
 
+  // For SHVC.
+  //TODO: Allow first EL frame to be a P-slice
+  if (state->encoder_control->layer.layer_id > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
+    //Also add base layer to the reference list.
+    //TODO: Don't skip on first frame? Skip if inter frame.
+    kvz_picture* scaled_pic = kvz_image_scaling(state->ILR_state->tile->frame->rec, &encoder->layer.upscaling);
+    cu_array_t* scaled_cu = kvz_cu_array_alloc(state->tile->frame->width_in_lcu * LCU_WIDTH, state->tile->frame->height_in_lcu * LCU_WIDTH);
+    kvz_image_list_add(state->frame->ref,
+      scaled_pic,
+      scaled_cu,
+      state->ILR_state->frame->poc);
+    //TODO: Add error handling?
+    kvz_image_free(scaled_pic);
+    kvz_cu_array_free(scaled_cu);
+  }
+
   // Remove source and reconstructed picture.
   kvz_image_free(state->tile->frame->source);
   state->tile->frame->source = NULL;
@@ -1171,6 +1209,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   state->frame->prepared = 1;
 }
+
+// ***********************************************
 
 coeff_scan_order_t kvz_get_scan_order(int8_t cu_type, int intra_mode, int depth)
 {

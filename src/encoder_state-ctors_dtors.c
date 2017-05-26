@@ -314,6 +314,11 @@ int kvz_encoder_state_init(encoder_state_t * const child_state, encoder_state_t 
   child_state->tqj_bitstream_written = NULL;
   child_state->tqj_recon_done = NULL;
   
+  // ***********************************************
+    // Modified for SHVC.
+  child_state->ILR_state = NULL; //Set later
+  // ***********************************************
+
   if (!parent_state) {
     const encoder_control_t * const encoder = child_state->encoder_control;
     child_state->type = ENCODER_STATE_TYPE_MAIN;
