@@ -1021,8 +1021,8 @@ void kvz_encode_coding_tree(encoder_state_t * const state,
   uint8_t split_model = 0;
 
   // Absolute coordinates
-  uint16_t abs_x = x + state->tile->lcu_offset_x * LCU_WIDTH;
-  uint16_t abs_y = y + state->tile->lcu_offset_y * LCU_WIDTH;
+  uint16_t abs_x = x + state->tile->offset_x;
+  uint16_t abs_y = y + state->tile->offset_y;
 
   // Check for slice border FIXME
   bool border_x = ctrl->in.width  < abs_x + (LCU_WIDTH >> depth);

@@ -153,11 +153,15 @@ typedef struct encoder_state_config_tile_t {
   videoframe_t *frame;
   
   int32_t id;
-  
+
   //Tile: offset in LCU for current encoder_state in global coordinates
   int32_t lcu_offset_x;
   int32_t lcu_offset_y;
-  
+
+  //Tile: offset in pixels
+  int32_t offset_x;
+  int32_t offset_y;
+
   //Position of the first element in tile scan in global coordinates
   int32_t lcu_offset_in_ts;
   

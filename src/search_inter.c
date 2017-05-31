@@ -171,8 +171,8 @@ static unsigned select_starting_point(int16_t num_cand, inter_merge_cand_t *merg
 
     uint32_t bitcost = 0;
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-      (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x,
-      (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y,
+      state->tile->offset_x + orig->x + mv->x,
+      state->tile->offset_y + orig->y + mv->y,
       width, height, -1);
     cost += calc_mvd(state, mv->x, mv->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -299,8 +299,8 @@ static bool early_terminate(int16_t num_cand, inter_merge_cand_t *merge_cand, ve
       }
 
       unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-        (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + offset->x,
-        (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + offset->y,
+        state->tile->offset_x + orig->x + mv->x + offset->x,
+        state->tile->offset_y + orig->y + mv->y + offset->y,
         width, height, -1);
       unsigned bitcost;
       cost += calc_mvd(state, mv->x + offset->x, mv->y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
@@ -457,8 +457,8 @@ unsigned kvz_tz_pattern_search(encoder_state_t * const state, const kvz_picture 
 
     {
       cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                            (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + current->x,
-                            (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + current->y,
+                            state->tile->offset_x + orig->x + mv->x + current->x,
+                            state->tile->offset_y + orig->y + mv->y + current->y,
                             width, height, -1);
       cost += calc_mvd(state, mv->x + current->x, mv->y + current->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     }
@@ -516,8 +516,8 @@ unsigned kvz_tz_raster_search(encoder_state_t * const state, const kvz_picture *
 
       {
         cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-          (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv->x + k,
-          (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv->y + i,
+          state->tile->offset_x + orig->x + mv->x + k,
+          state->tile->offset_y + orig->y + mv->y + i,
           width, height, -1);
         cost += calc_mvd(state, mv->x + k, mv->y + i, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
       }
@@ -572,8 +572,8 @@ static unsigned tz_search(encoder_state_t * const state,
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
   if (intmv_within_tile(state, orig, 0, 0, width, height)) {
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
+                                   state->tile->offset_x + orig->x,
+                                   state->tile->offset_y + orig->y,
                                    width, height, -1);
     best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &best_bitcost);
     best_index = num_cand + 1;
@@ -584,8 +584,8 @@ static unsigned tz_search(encoder_state_t * const state,
       intmv_within_tile(state, orig, mv.x, mv.y, width, height))
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                      (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                      (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                      state->tile->offset_x + orig->x + mv.x,
+                                      state->tile->offset_y + orig->y + mv.y,
                                       width, height, -1);
     unsigned bitcost;
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
@@ -723,8 +723,8 @@ static unsigned hexagon_search(encoder_state_t * const state,
   // Check the 0-vector, so we can ignore all 0-vectors in the merge cand list.
   if (intmv_within_tile(state, orig, 0, 0, width, height)) {
     best_cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y,
+                                   state->tile->offset_x + orig->x,
+                                   state->tile->offset_y + orig->y,
                                    width, height, -1);
     best_cost += calc_mvd(state, 0, 0, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
     best_bitcost = bitcost;
@@ -736,8 +736,8 @@ static unsigned hexagon_search(encoder_state_t * const state,
       intmv_within_tile(state, orig, mv.x, mv.y, width, height)) 
   {
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y,
+                                   state->tile->offset_x + orig->x + mv.x,
+                                   state->tile->offset_y + orig->y + mv.y,
                                    width, height, -1);
     cost += calc_mvd(state, mv.x, mv.y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -768,8 +768,8 @@ static unsigned hexagon_search(encoder_state_t * const state,
     }
 
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + pattern->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + pattern->y,
+                                   state->tile->offset_x + orig->x + mv.x + pattern->x,
+                                   state->tile->offset_y + orig->y + mv.y + pattern->y,
                                    width, height, -1);
     cost += calc_mvd(state, mv.x + pattern->x, mv.y + pattern->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -805,8 +805,8 @@ static unsigned hexagon_search(encoder_state_t * const state,
       }
 
       unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                     (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                                     (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
+                                     state->tile->offset_x + orig->x + mv.x + offset->x,
+                                     state->tile->offset_y + orig->y + mv.y + offset->y,
                                      width, height, -1);
       cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -831,8 +831,8 @@ static unsigned hexagon_search(encoder_state_t * const state,
     }
 
     unsigned cost = kvz_image_calc_sad(pic, ref, orig->x, orig->y,
-                                   (state->tile->lcu_offset_x * LCU_WIDTH) + orig->x + mv.x + offset->x,
-                                   (state->tile->lcu_offset_y * LCU_WIDTH) + orig->y + mv.y + offset->y,
+                                   state->tile->offset_x + orig->x + mv.x + offset->x,
+                                   state->tile->offset_y + orig->y + mv.y + offset->y,
                                    width, height, -1);
     cost += calc_mvd(state, mv.x + offset->x, mv.y + offset->y, 2, mv_cand, merge_cand, num_cand, ref_idx, &bitcost);
 
@@ -1064,8 +1064,8 @@ static unsigned search_frac(encoder_state_t * const state,
   }
 
   kvz_get_extended_block(orig->x, orig->y, mv.x-1, mv.y-1,
-                state->tile->lcu_offset_x * LCU_WIDTH,
-                state->tile->lcu_offset_y * LCU_WIDTH,
+                state->tile->offset_x,
+                state->tile->offset_y,
                 ref->y, ref->width, ref->height, FILTER_SIZE, width+1, height+1, &src);
 
   kvz_filter_frac_blocks_luma(state->encoder_control, src.orig_topleft, src.stride, width,
@@ -1263,12 +1263,8 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     // Take starting point for MV search from previous frame.
     // When temporal motion vector candidates are added, there is probably
     // no point to this anymore, but for now it helps.
-    const vector2d_t tile_top_left_corner = {
-        (state->tile->lcu_offset_x << LOG2_LCU_WIDTH),
-        (state->tile->lcu_offset_y << LOG2_LCU_WIDTH)
-    };
-    const int mid_x = tile_top_left_corner.x + x + (width >> 1);
-    const int mid_y = tile_top_left_corner.y + y + (height >> 1);
+    const int mid_x = state->tile->offset_x + x + (width >> 1);
+    const int mid_y = state->tile->offset_y + y + (height >> 1);
     const cu_array_t* ref_array = state->frame->ref->cu_arrays[ref_idx];
     const cu_info_t* ref_cu = kvz_cu_array_at_const(ref_array, mid_x, mid_y);
     if (ref_cu->type == CU_INTER) {
