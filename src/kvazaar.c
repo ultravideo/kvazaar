@@ -44,6 +44,15 @@ static void kvazaar_close(kvz_encoder *encoder)
 {
   if (encoder) {
     if (encoder->states) {
+      // Flush input frame buffer.
+      kvz_picture *pic = NULL;
+      while ((pic = kvz_encoder_feed_frame(&encoder->input_buffer,
+                                           &encoder->states[0],
+                                           NULL)) != NULL) {
+        kvz_image_free(pic);
+        pic = NULL;
+      }
+
       for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
         kvz_encoder_state_finalize(&encoder->states[i]);
       }
