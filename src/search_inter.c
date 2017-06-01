@@ -1579,14 +1579,16 @@ static void search_pu_inter(encoder_state_t * const state,
           cost += calc_mvd(state, merge_cand[i].mv[0][0], merge_cand[i].mv[0][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[0]);
           cost += calc_mvd(state, merge_cand[i].mv[1][0], merge_cand[i].mv[1][1], 0, mv_cand, merge_cand, 0, ref_idx, &bitcost[1]);
 
+          const uint8_t mv_ref_coded[2] = {
+            state->frame->refmap[merge_cand[i].ref[0]].idx,
+            state->frame->refmap[merge_cand[j].ref[1]].idx
+          };
+          const int extra_bits = mv_ref_coded[0] + mv_ref_coded[1] + 2 /* mv dir cost */;
+          cost += state->lambda_sqrt * extra_bits + 0.5;
+
+
           if (cost < *inter_cost) {
-
             cur_cu->inter.mv_dir = 3;
-            uint8_t mv_ref_coded[2] = {
-              state->frame->refmap[merge_cand[i].ref[0]].idx,
-              state->frame->refmap[merge_cand[j].ref[1]].idx
-            };
-
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
             cur_cu->inter.mv_ref[1] = merge_cand[j].ref[1];
 
@@ -1595,15 +1597,15 @@ static void search_pu_inter(encoder_state_t * const state,
             cur_cu->inter.mv[1][0] = merge_cand[j].mv[1][0];
             cur_cu->inter.mv[1][1] = merge_cand[j].mv[1][1];
             cur_cu->merged = 0;
-                        
+
             // Check every candidate to find a match
             for(int merge_idx = 0; merge_idx < num_cand; merge_idx++) {
               if (
                   merge_cand[merge_idx].mv[0][0] == cur_cu->inter.mv[0][0] &&
-                  merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&     
+                  merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&
                   merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
-                  merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&    
-                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] && 
+                  merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&
+                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
                   merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1]) {
                 cur_cu->merged = 1;
                 cur_cu->merge_idx = merge_idx;
@@ -1629,13 +1631,14 @@ static void search_pu_inter(encoder_state_t * const state,
 
                 // Select candidate 1 if it has lower cost
                 if (cand2_cost < cand1_cost) {
-                  cu_mv_cand = 1;                  
+                  cu_mv_cand = 1;
                 }
               }
               CU_SET_MV_CAND(cur_cu, reflist, cu_mv_cand);
             }
+
             *inter_cost = cost;
-            *inter_bitcost = bitcost[0] + bitcost[1] + cur_cu->inter.mv_dir - 1 + mv_ref_coded[0] + mv_ref_coded[1];
+            *inter_bitcost = bitcost[0] + bitcost[1] + extra_bits;
           }
         }
       }
