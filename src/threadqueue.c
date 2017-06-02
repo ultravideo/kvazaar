@@ -231,7 +231,7 @@ static void* threadqueue_worker(void* threadqueue_worker_spec_opaque)
     }
   }
 
-  // We got out of the loop because threadqueue->stop == 1. The queue is locked.
+  // We got out of the loop because threadqueue->stop is true. The queue is locked.
   assert(threadqueue->stop);
   --threadqueue->threads_running;
   
@@ -270,7 +270,7 @@ int kvz_threadqueue_init(threadqueue_queue_t * const threadqueue, int thread_cou
     return 0;
   }
   
-  threadqueue->stop = 0;
+  threadqueue->stop = false;
   threadqueue->fifo = !!fifo;
   threadqueue->threads_running = 0;
   threadqueue->threads_count = thread_count;
@@ -367,58 +367,47 @@ void kvz_threadqueue_free_job(threadqueue_job_t **job_ptr)
   FREE_POINTER(job);
 }
 
-static void threadqueue_free_jobs(threadqueue_queue_t * const threadqueue) {
+int kvz_threadqueue_stop(threadqueue_queue_t * const threadqueue)
+{
+  PTHREAD_LOCK(&threadqueue->lock);
+
+  if (threadqueue->stop) {
+    // The threadqueue should have stopped already.
+    assert(threadqueue->threads_running == 0);
+    PTHREAD_UNLOCK(&threadqueue->lock);
+    return 1;
+  }
+
+  // Tell all threads to stop.
+  threadqueue->stop = true;
+  PTHREAD_COND_BROADCAST(&threadqueue->cond);
+  PTHREAD_UNLOCK(&threadqueue->lock);
+
+  // Wait for them to stop.
+  for (int i = 0; i < threadqueue->threads_count; i++) {
+    if (pthread_join(threadqueue->threads[i], NULL) != 0) {
+      fprintf(stderr, "pthread_join failed!\n");
+      return 0;
+    }
+  }
+
+  return 1;
+}
+
+
+int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue)
+{
+  if (!kvz_threadqueue_stop(threadqueue)) return 0;
+
+  // Free all jobs
+  PTHREAD_LOCK(&threadqueue->lock);
   for (int i = 0; i < threadqueue->queue_count; ++i) {
     kvz_threadqueue_free_job(&threadqueue->queue[i]);
   }
   threadqueue->queue_count = 0;
   threadqueue->queue_start = 0;
-}
-
-int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
-  //Flush the queue
-  if (!kvz_threadqueue_flush(threadqueue)) {
-    fprintf(stderr, "Unable to flush threadqueue!\n");
-    return 0;
-  }
-  
-  //Lock threadqueue
-  PTHREAD_LOCK(&threadqueue->lock);
-  
-  //Free job memory
-  threadqueue_free_jobs(threadqueue);
-  
-  if (threadqueue->stop) {
-    fprintf(stderr, "threadqueue already stopping\n");
-    
-    if (pthread_mutex_unlock(&threadqueue->lock) != 0) {
-      fprintf(stderr, "pthread_mutex_unlock failed!\n");
-      assert(0);
-      return 0;
-    }
-    assert(0); //We should get here...
-    return 0;
-  }
-  
-  threadqueue->stop = 1;
-  
-  if (pthread_cond_broadcast(&(threadqueue->cond)) != 0) {
-    fprintf(stderr, "pthread_cond_broadcast failed!\n");
-    PTHREAD_UNLOCK(&threadqueue->lock);
-    assert(0);
-    return 0;
-  }
-  //Unlock it now, since all jobs have to stpo
   PTHREAD_UNLOCK(&threadqueue->lock);
-  
-  //Join threads
-  for(int i = 0; i < threadqueue->threads_count; i++) {
-    if(pthread_join(threadqueue->threads[i], NULL) != 0) {
-      fprintf(stderr, "pthread_join failed!\n");
-      return 0;
-    }
-  }
-  
+
 #ifdef KVZ_DEBUG
   FREE_POINTER(threadqueue->debug_clock_thread_start);
   FREE_POINTER(threadqueue->debug_clock_thread_end);
@@ -451,30 +440,6 @@ int kvz_threadqueue_finalize(threadqueue_queue_t * const threadqueue) {
     return 0;
   }
   
-  return 1;
-}
-
-int kvz_threadqueue_flush(threadqueue_queue_t * const threadqueue) {
-  int notdone = 1;
-  
-  //Lock the queue
-  PTHREAD_LOCK(&threadqueue->lock);
-  
-  do {
-    notdone = threadqueue->queue_waiting_execution + threadqueue->queue_waiting_dependency + threadqueue->queue_running;
-
-    if (notdone > 0) {
-      PTHREAD_COND_BROADCAST(&(threadqueue->cond));
-      PTHREAD_COND_WAIT(&threadqueue->cb_cond, &threadqueue->lock);
-    }
-  } while (notdone > 0);
-  
-  threadqueue_free_jobs(threadqueue);
-
-  assert(threadqueue->queue_waiting_dependency == 0 && threadqueue->queue_waiting_execution == 0 && threadqueue->queue_running == 0);
-
-  PTHREAD_UNLOCK(&threadqueue->lock);
-
   return 1;
 }
 
