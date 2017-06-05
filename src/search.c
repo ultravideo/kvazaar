@@ -58,109 +58,63 @@
 # define CHROMA_MULT 1.5
 #endif
 
-
-/**
- * Copy all non-reference CU data from depth+1 to depth.
- */
-static void work_tree_copy_up(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static INLINE void copy_cu_info(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
 {
-  assert(depth >= 0 && depth < MAX_PU_DEPTH);
-
-  // Copy non-reference CUs.
-  {
-    const int x_orig = SUB_SCU(x_px);
-    const int y_orig = SUB_SCU(y_px);
-    const int width_cu = LCU_WIDTH >> depth;
-    for (int y = y_orig; y < y_orig + width_cu; y += SCU_WIDTH) {
-      for (int x = x_orig; x < x_orig + width_cu; x += SCU_WIDTH) {
-        const cu_info_t *from_cu = LCU_GET_CU_AT_PX(&work_tree[depth + 1], x, y);
-        cu_info_t *to_cu = LCU_GET_CU_AT_PX(&work_tree[depth], x, y);
-        memcpy(to_cu, from_cu, sizeof(*to_cu));
-      }
-    }
-  }
-
-  // Copy reconstructed pixels.
-  {
-    const int x = SUB_SCU(x_px);
-    const int y = SUB_SCU(y_px);
-    const int width_px = LCU_WIDTH >> depth;
-    const int luma_index = x + y * LCU_WIDTH;
-    const int chroma_index = (x / 2) + (y / 2) * (LCU_WIDTH / 2);
-
-    const lcu_yuv_t *from = &work_tree[depth + 1].rec;
-    lcu_yuv_t *to = &work_tree[depth].rec;
-
-    const lcu_coeff_t *from_coeff = &work_tree[depth + 1].coeff;
-    lcu_coeff_t *to_coeff = &work_tree[depth].coeff;
-
-    kvz_pixels_blit(&from->y[luma_index], &to->y[luma_index],
-                    width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    if (from->chroma_format != KVZ_CSP_400) {
-      kvz_pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
-                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-      kvz_pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
-                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    }
-
-    // Copy coefficients up. They do not have to be copied down because they
-    // are not used for the search.
-    const int luma_z = xy_to_zorder(LCU_WIDTH, x, y);
-    copy_coeffs(&from_coeff->y[luma_z], &to_coeff->y[luma_z], width_px);
-
-    if (from->chroma_format != KVZ_CSP_400) {
-      const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x >> 1, y >> 1);
-      copy_coeffs(&from_coeff->u[chroma_z], &to_coeff->u[chroma_z], width_px >> 1);
-      copy_coeffs(&from_coeff->v[chroma_z], &to_coeff->v[chroma_z], width_px >> 1);
+  for   (int y = y_local; y < y_local + width; y += SCU_WIDTH) {
+    for (int x = x_local; x < x_local + width; x += SCU_WIDTH) {
+      *LCU_GET_CU_AT_PX(to, x, y) = *LCU_GET_CU_AT_PX(from, x, y);
     }
   }
 }
 
+static INLINE void copy_cu_pixels(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
+{
+  const int luma_index = x_local + y_local * LCU_WIDTH;
+  const int chroma_index = (x_local / 2) + (y_local / 2) * (LCU_WIDTH / 2);
+
+  kvz_pixels_blit(&from->rec.y[luma_index], &to->rec.y[luma_index],
+                  width, width, LCU_WIDTH, LCU_WIDTH);
+  if (from->rec.chroma_format != KVZ_CSP_400) {
+    kvz_pixels_blit(&from->rec.u[chroma_index], &to->rec.u[chroma_index],
+                    width / 2, width / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+    kvz_pixels_blit(&from->rec.v[chroma_index], &to->rec.v[chroma_index],
+                    width / 2, width / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
+  }
+}
+
+static INLINE void copy_cu_coeffs(int x_local, int y_local, int width, lcu_t *from, lcu_t *to)
+{
+  const int luma_z = xy_to_zorder(LCU_WIDTH, x_local, y_local);
+  copy_coeffs(&from->coeff.y[luma_z], &to->coeff.y[luma_z], width);
+
+  if (from->rec.chroma_format != KVZ_CSP_400) {
+    const int chroma_z = xy_to_zorder(LCU_WIDTH_C, x_local >> 1, y_local >> 1);
+    copy_coeffs(&from->coeff.u[chroma_z], &to->coeff.u[chroma_z], width >> 1);
+    copy_coeffs(&from->coeff.v[chroma_z], &to->coeff.v[chroma_z], width >> 1);
+  }
+}
 
 /**
- * Copy all non-reference CU data from depth to depth+1..MAX_PU_DEPTH.
+ * Copy all non-reference CU data from next level to current level.
  */
-static void work_tree_copy_down(int x_px, int y_px, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+static void work_tree_copy_up(int x_local, int y_local, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
 {
-  assert(depth >= 0 && depth < MAX_PU_DEPTH);
+  const int width = LCU_WIDTH >> depth;
+  copy_cu_info  (x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
+  copy_cu_pixels(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
+  copy_cu_coeffs(x_local, y_local, width, &work_tree[depth + 1], &work_tree[depth]);
+}
 
-  // TODO: clean up to remove the copy pasta
-  const int width_px = LCU_WIDTH >> depth;
 
-  int d;
-
-  for (d = depth + 1; d < MAX_PU_DEPTH + 1; ++d) {
-    const int x_orig = SUB_SCU(x_px);
-    const int y_orig = SUB_SCU(y_px);
-
-    for (int y = y_orig; y < y_orig + width_px; y += SCU_WIDTH) {
-      for (int x = x_orig; x < x_orig + width_px; x += SCU_WIDTH) {
-        const cu_info_t *from_cu = LCU_GET_CU_AT_PX(&work_tree[depth], x, y);
-        cu_info_t *to_cu = LCU_GET_CU_AT_PX(&work_tree[d], x, y);
-        memcpy(to_cu, from_cu, sizeof(*to_cu));
-      }
-    }
-  }
-
-  // Copy reconstructed pixels.
-  for (d = depth + 1; d < MAX_PU_DEPTH + 1; ++d) {
-    const int x = SUB_SCU(x_px);
-    const int y = SUB_SCU(y_px);
-
-    const int luma_index = x + y * LCU_WIDTH;
-    const int chroma_index = (x / 2) + (y / 2) * (LCU_WIDTH / 2);
-
-    lcu_yuv_t *from = &work_tree[depth].rec;
-    lcu_yuv_t *to = &work_tree[d].rec;
-
-    kvz_pixels_blit(&from->y[luma_index], &to->y[luma_index],
-                    width_px, width_px, LCU_WIDTH, LCU_WIDTH);
-    if (from->chroma_format != KVZ_CSP_400) {
-      kvz_pixels_blit(&from->u[chroma_index], &to->u[chroma_index],
-                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-      kvz_pixels_blit(&from->v[chroma_index], &to->v[chroma_index],
-                      width_px / 2, width_px / 2, LCU_WIDTH / 2, LCU_WIDTH / 2);
-    }
+/**
+ * Copy all non-reference CU data from current level to all lower levels.
+ */
+static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t work_tree[MAX_PU_DEPTH + 1])
+{
+  const int width = LCU_WIDTH >> depth;
+  for (int i = depth + 1; i <= MAX_PU_DEPTH; i++) {
+    copy_cu_info  (x_local, y_local, width, &work_tree[depth], &work_tree[i]);
+    copy_cu_pixels(x_local, y_local, width, &work_tree[depth], &work_tree[i]);
   }
 }
 
@@ -557,7 +511,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           cost = mode_cost;
           inter_bitcost = mode_bitcost;
           // TODO: only copy inter prediction info, not pixels
-          work_tree_copy_up(x, y, depth, work_tree);
+          work_tree_copy_up(x_local, y_local, depth, work_tree);
         }
       }
     }
@@ -797,19 +751,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (split_cost < cost) {
       // Copy split modes to this depth.
       cost = split_cost;
-      work_tree_copy_up(x, y, depth, work_tree);
+      work_tree_copy_up(x_local, y_local, depth, work_tree);
 #if KVZ_DEBUG
       debug_split = 1;
 #endif
     } else if (depth > 0) {
       // Copy this CU's mode all the way down for use in adjacent CUs mode
       // search.
-      work_tree_copy_down(x, y, depth, work_tree);
+      work_tree_copy_down(x_local, y_local, depth, work_tree);
     }
   } else if (depth >= 0 && depth < MAX_PU_DEPTH) {
     // Need to copy modes down since the lower level of the work tree is used
     // when searching SMP and AMP blocks.
-    work_tree_copy_down(x, y, depth, work_tree);
+    work_tree_copy_down(x_local, y_local, depth, work_tree);
   }
 
   PERFORMANCE_MEASURE_END(KVZ_PERF_SEARCHCU, state->encoder_control->threadqueue, "type=search_cu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d,depth=%d,split=%d,cur_cu_is_intra=%d", state->frame->num, state->tile->id, state->slice->id,
