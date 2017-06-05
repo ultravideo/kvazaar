@@ -78,8 +78,8 @@ typedef struct {
   int threads_count;
   int threads_running;
 
-  int stop; //=>1: threads should stop asap
-  
+  bool stop; // if true, threads should stop asap
+
   int fifo;
   
   threadqueue_job_t **queue;
@@ -119,8 +119,12 @@ int kvz_threadqueue_job_unwait_job(threadqueue_queue_t * threadqueue, threadqueu
 //Add a dependency between two jobs.
 int kvz_threadqueue_job_dep_add(threadqueue_job_t *job, threadqueue_job_t *depends_on);
 
-//Blocking call until the queue is empty. Previously set threadqueue_job handles should not be used anymore
-int kvz_threadqueue_flush(threadqueue_queue_t * threadqueue);
+/**
+ * \brief Stop all threads after they finish the current jobs.
+ *
+ * Blocks until all threads have stopped.
+ */
+int kvz_threadqueue_stop(threadqueue_queue_t * const threadqueue);
 
 //Blocking call until job is executed. Job handles submitted before job should not be used any more as they are removed from the queue.
 int kvz_threadqueue_waitfor(threadqueue_queue_t * threadqueue, threadqueue_job_t * job);
