@@ -118,110 +118,73 @@ static void work_tree_copy_down(int x_local, int y_local, int depth, lcu_t work_
   }
 }
 
-
 void kvz_lcu_set_trdepth(lcu_t *lcu, int x_px, int y_px, int depth, int tr_depth)
 {
+  const int x_local = SUB_SCU(x_px);
+  const int y_local = SUB_SCU(y_px);
   const int width = LCU_WIDTH >> depth;
-  const vector2d_t lcu_cu = { SUB_SCU(x_px), SUB_SCU(y_px) };
-
-  // Depth 4 doesn't go inside the loop. Set the top-left CU.
-  LCU_GET_CU_AT_PX(lcu, lcu_cu.x, lcu_cu.y)->tr_depth = tr_depth;
 
   for (unsigned y = 0; y < width; y += SCU_WIDTH) {
     for (unsigned x = 0; x < width; x += SCU_WIDTH) {
-      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, lcu_cu.x + x, lcu_cu.y + y);
-      cu->tr_depth = tr_depth;
+      LCU_GET_CU_AT_PX(lcu, x_local + x, y_local + y)->tr_depth = tr_depth;
     }
   }
 }
 
-
-static void lcu_set_intra_mode(lcu_t *lcu, int x_px, int y_px, int depth, int pred_mode, int chroma_mode, int part_mode)
-{
-  const int width = LCU_WIDTH >> depth;
-  const int x_cu  = SUB_SCU(x_px);
-  const int y_cu  = SUB_SCU(y_px);
-
-  if (part_mode == SIZE_NxN) {
-    assert(depth == MAX_DEPTH + 1);
-    assert(width == SCU_WIDTH);
-  }
-
-  if (depth > MAX_DEPTH) {
-    depth = MAX_DEPTH;
-    assert(part_mode == SIZE_NxN);
-  }
-
-  // Set mode in every CU covered by part_mode in this depth.
-  for (int y = y_cu; y < y_cu + width; y += SCU_WIDTH) {
-    for (int x = x_cu; x < x_cu + width; x += SCU_WIDTH) {
-      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x, y);
-      cu->depth = depth;
-      cu->type = CU_INTRA;
-      cu->intra.mode = pred_mode;
-      cu->intra.mode_chroma = chroma_mode;
-      cu->part_size = part_mode;
-    }
-  }
-}
-
-
-static void lcu_set_inter_pu(lcu_t *lcu, int x_px, int y_px, int width, int height, cu_info_t *cur_pu)
+static void lcu_fill_cu_info(lcu_t *lcu, int x_local, int y_local, int width, int height, cu_info_t *cu)
 {
   // Set mode in every CU covered by part_mode in this depth.
-  for (int y = y_px; y < y_px + height; y += SCU_WIDTH) {
-    for (int x = x_px; x < x_px + width; x += SCU_WIDTH) {
-      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x, y);
-      //Check if this could be moved inside the if
-      if (cu != cur_pu) {
-        cu->depth     = cur_pu->depth;
-        cu->part_size = cur_pu->part_size;
-        cu->type      = CU_INTER;
-        cu->tr_depth  = cur_pu->tr_depth;
-        cu->merged    = cur_pu->merged;
-        cu->skipped   = cur_pu->skipped;
-        memcpy(&cu->inter, &cur_pu->inter, sizeof(cur_pu->inter));
+  for (int y = y_local; y < y_local + height; y += SCU_WIDTH) {
+    for (int x = x_local; x < x_local + width; x += SCU_WIDTH) {
+      cu_info_t *to = LCU_GET_CU_AT_PX(lcu, x, y);
+      to->type      = cu->type;
+      to->depth     = cu->depth;
+      to->part_size = cu->part_size;
+
+      if (cu->type == CU_INTRA) {
+        to->intra.mode        = cu->intra.mode;
+        to->intra.mode_chroma = cu->intra.mode_chroma;
+      } else {
+        to->skipped   = cu->skipped;
+        to->merged    = cu->merged;
+        to->merge_idx = cu->merge_idx;
+        to->inter     = cu->inter;
       }
     }
   }
 }
 
-
-static void lcu_set_inter(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *cur_cu)
+static void lcu_set_inter(lcu_t *lcu, int x_local, int y_local, int cu_width)
 {
-  const int width = LCU_WIDTH >> depth;
-  const int x_local = SUB_SCU(x_px);
-  const int y_local = SUB_SCU(y_px);
-  const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
+  const part_mode_t part_mode = LCU_GET_CU_AT_PX(lcu, x_local, y_local)->part_size;
+  const int num_pu = kvz_part_mode_num_parts[part_mode];
 
   for (int i = 0; i < num_pu; ++i) {
-    const int x_pu      = PU_GET_X(cur_cu->part_size, width, x_local, i);
-    const int y_pu      = PU_GET_Y(cur_cu->part_size, width, y_local, i);
-    const int width_pu  = PU_GET_W(cur_cu->part_size, width, i);
-    const int height_pu = PU_GET_H(cur_cu->part_size, width, i);
-    cu_info_t *cur_pu   = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
-    lcu_set_inter_pu(lcu, x_pu, y_pu, width_pu, height_pu, cur_pu);
+    const int x_pu      = PU_GET_X(part_mode, cu_width, x_local, i);
+    const int y_pu      = PU_GET_Y(part_mode, cu_width, y_local, i);
+    const int width_pu  = PU_GET_W(part_mode, cu_width, i);
+    const int height_pu = PU_GET_H(part_mode, cu_width, i);
+
+    cu_info_t *pu  = LCU_GET_CU_AT_PX(lcu, x_pu, y_pu);
+    pu->type = CU_INTER;
+    lcu_fill_cu_info(lcu, x_pu, y_pu, width_pu, height_pu, pu);
   }
 }
 
-
-static void lcu_set_coeff(lcu_t *lcu, int x_px, int y_px, int depth, cu_info_t *cur_cu)
+static void lcu_set_coeff(lcu_t *lcu, int x_local, int y_local, int width, cu_info_t *cur_cu)
 {
-  const uint32_t width = LCU_WIDTH >> depth;
-  const uint32_t x_local = SUB_SCU(x_px);
-  const uint32_t y_local = SUB_SCU(y_px);
-  const uint32_t tr_split = cur_cu->tr_depth-cur_cu->depth;
+  const uint32_t tr_split = cur_cu->tr_depth - cur_cu->depth;
   const uint32_t mask = ~((width >> tr_split)-1);
 
   // Set coeff flags in every CU covered by part_mode in this depth.
   for (uint32_t y = y_local; y < y_local + width; y += SCU_WIDTH) {
     for (uint32_t x = x_local; x < x_local + width; x += SCU_WIDTH) {
-      cu_info_t *cu = LCU_GET_CU_AT_PX(lcu, x, y);
       // Use TU top-left CU to propagate coeff flags
       cu_info_t *cu_from = LCU_GET_CU_AT_PX(lcu, x & mask, y & mask);
-      if (cu != cu_from) {
+      cu_info_t *cu_to   = LCU_GET_CU_AT_PX(lcu, x, y);
+      if (cu_from != cu_to) {
         // Chroma coeff data is not used, luma is needed for deblocking
-        cbf_copy(&cu->cbf, cu_from->cbf, COLOR_Y);
+        cbf_copy(&cu_to->cbf, cu_from->cbf, COLOR_Y);
       }
     }
   }
@@ -452,7 +415,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     return 0;
   }
 
-  cur_cu = LCU_GET_CU_AT_PX(&work_tree[depth], x_local, y_local);
+  cur_cu = LCU_GET_CU_AT_PX(lcu, x_local, y_local);
   // Assign correct depth
   cur_cu->depth = depth > MAX_DEPTH ? MAX_DEPTH : depth;
   cur_cu->tr_depth = depth > 0 ? depth : 1;
@@ -480,7 +443,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
       kvz_search_cu_inter(state,
                           x, y,
                           depth,
-                          &work_tree[depth],
+                          lcu,
                           &mode_cost, &mode_bitcost);
       if (mode_cost < cost) {
         cost = mode_cost;
@@ -535,7 +498,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     if (can_use_intra && !skip_intra) {
       int8_t intra_mode;
       double intra_cost;
-      kvz_search_cu_intra(state, x, y, depth, &work_tree[depth],
+      kvz_search_cu_intra(state, x, y, depth, lcu,
                           &intra_mode, &intra_cost);
       if (intra_cost < cost) {
         cost = intra_cost;
@@ -549,46 +512,37 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
     // mode search of adjacent CUs.
     if (cur_cu->type == CU_INTRA) {
       assert(cur_cu->part_size == SIZE_2Nx2N || cur_cu->part_size == SIZE_NxN);
-      int8_t intra_mode = cur_cu->intra.mode;
-      lcu_set_intra_mode(&work_tree[depth], x, y, depth,
-                         intra_mode,
-                         intra_mode,
-                         cur_cu->part_size);
+      cur_cu->intra.mode_chroma = cur_cu->intra.mode;
+      lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
       kvz_intra_recon_cu(state,
                          x, y,
                          depth,
-                         intra_mode, -1, // skip chroma
-                         NULL, &work_tree[depth]);
+                         cur_cu->intra.mode, -1, // skip chroma
+                         NULL, lcu);
 
       if (x % 8 == 0 && y % 8 == 0 && state->encoder_control->chroma_format != KVZ_CSP_400) {
-        int8_t intra_mode_chroma = intra_mode;
-
         // There is almost no benefit to doing the chroma mode search for
         // rd2. Possibly because the luma mode search already takes chroma
         // into account, so there is less of a chanse of luma mode being
         // really bad for chroma.
         if (state->encoder_control->cfg.rdo == 3) {
-          intra_mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, &work_tree[depth]);
-          lcu_set_intra_mode(&work_tree[depth], x, y, depth,
-                             intra_mode, intra_mode_chroma,
-                             cur_cu->part_size);
+          cur_cu->intra.mode_chroma = kvz_search_cu_intra_chroma(state, x, y, depth, lcu);
+          lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
         }
 
         kvz_intra_recon_cu(state,
                            x, y,
                            depth,
-                           -1, intra_mode_chroma, // skip luma
-                           NULL, &work_tree[depth]);
+                           -1, cur_cu->intra.mode_chroma, // skip luma
+                           NULL, lcu);
       }
     } else if (cur_cu->type == CU_INTER) {
       // Reset transform depth because intra messes with them.
       // This will no longer be necessary if the transform depths are not shared.
       int tr_depth = depth > 0 ? depth : 1;
-      kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, tr_depth);
+      kvz_lcu_set_trdepth(lcu, x, y, depth, tr_depth);
 
-      const int cu_width = LCU_WIDTH >> depth;
       const int num_pu = kvz_part_mode_num_parts[cur_cu->part_size];
-
       for (int i = 0; i < num_pu; ++i) {
         const int pu_x = PU_GET_X(cur_cu->part_size, cu_width, x, i);
         const int pu_y = PU_GET_Y(cur_cu->part_size, cu_width, y, i);
@@ -607,7 +561,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                                      pu_x, pu_y,
                                      pu_w, pu_h,
                                      cur_pu->inter.mv,
-                                     &work_tree[depth]);
+                                     lcu);
         } else {
           const int mv_idx = cur_pu->inter.mv_dir - 1;
           const kvz_picture *const ref =
@@ -617,7 +571,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                               pu_x, pu_y,
                               pu_w, pu_h,
                               cur_pu->inter.mv[mv_idx],
-                              &work_tree[depth],
+                              lcu,
                               0);
         }
       }
@@ -627,7 +581,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                                 true, has_chroma,
                                 x, y, depth,
                                 NULL,
-                                &work_tree[depth]);
+                                lcu);
 
       int cbf = cbf_is_set_any(cur_cu->cbf, depth);
 
@@ -639,19 +593,19 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
           inter_bitcost -= 1;
         }
       }
-      lcu_set_inter(&work_tree[depth], x, y, depth, cur_cu);
-      lcu_set_coeff(&work_tree[depth], x, y, depth, cur_cu);
+      lcu_set_inter(lcu, x_local, y_local, cu_width);
+      lcu_set_coeff(lcu, x_local, y_local, cu_width, cur_cu);
     }
   }
   if (cur_cu->type == CU_INTRA || cur_cu->type == CU_INTER) {
-    cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+    cost = kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
     if (state->encoder_control->chroma_format != KVZ_CSP_400) {
-      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+      cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
     }
 
     double mode_bits;
     if (cur_cu->type == CU_INTRA) {
-      mode_bits = calc_mode_bits(state, &work_tree[depth], cur_cu, x, y);
+      mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
     } else {
       mode_bits = inter_bitcost;
     }
@@ -719,10 +673,8 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cur_cu->type = CU_INTRA;
         cur_cu->part_size = SIZE_2Nx2N;
 
-        kvz_lcu_set_trdepth(&work_tree[depth], x, y, depth, cur_cu->tr_depth);
-        lcu_set_intra_mode(&work_tree[depth], x, y, depth,
-                           cur_cu->intra.mode, cur_cu->intra.mode_chroma,
-                           cur_cu->part_size);
+        kvz_lcu_set_trdepth(lcu, x, y, depth, cur_cu->tr_depth);
+        lcu_fill_cu_info(lcu, x_local, y_local, cu_width, cu_width, cur_cu);
 
         const bool has_chroma = state->encoder_control->chroma_format != KVZ_CSP_400;
         const int8_t mode_chroma = has_chroma ? cur_cu->intra.mode_chroma : -1;
@@ -730,11 +682,11 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
                            x, y,
                            depth,
                            cur_cu->intra.mode, mode_chroma,
-                           NULL, &work_tree[depth]);
+                           NULL, lcu);
 
-        cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+        cost += kvz_cu_rd_cost_luma(state, x_local, y_local, depth, cur_cu, lcu);
         if (has_chroma) {
-          cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, &work_tree[depth]);
+          cost += kvz_cu_rd_cost_chroma(state, x_local, y_local, depth, cur_cu, lcu);
         }
 
         // Add the cost of coding no-split.
@@ -743,7 +695,7 @@ static double search_cu(encoder_state_t * const state, int x, int y, int depth, 
         cost += CTX_ENTROPY_FBITS(ctx, 0) * state->lambda;
 
         // Add the cost of coding intra mode only once.
-        double mode_bits = calc_mode_bits(state, &work_tree[depth], cur_cu, x, y);
+        double mode_bits = calc_mode_bits(state, lcu, cur_cu, x, y);
         cost += mode_bits * state->lambda;
       }
     }
