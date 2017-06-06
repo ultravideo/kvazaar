@@ -1573,6 +1573,11 @@ int kvz_config_validate(const kvz_config *const cfg)
     error = 1;
   }
 
+  if( cfg->ILR_frames > cfg->layer) {
+    fprintf(stderr, "Input error: There are not enough layers with a smaller lid to have %d ILR for layer %d \n",cfg->ILR_frames,cfg->layer);
+    error = 1;
+  }
+
    //TODO: Relax constraints as more parameters become compatiple
   //Validity check for scalable extension
   if( cfg->shared != NULL && cfg->shared->max_layers > 1 ) {
@@ -1588,11 +1593,6 @@ int kvz_config_validate(const kvz_config *const cfg)
 
     if( cfg->ref_frames > 0 && cfg->layer > 0) {
       fprintf(stderr, "Input error: Inter frame references currently not supported for layers with lid > 0\n");
-      error = 1;
-    }
-
-    if( cfg->ILR_frames > cfg->layer) {
-      fprintf(stderr, "Input error: There are not enough layers with a smaller lid to have %d ILR \n",cfg->ILR_frames);
       error = 1;
     }
 

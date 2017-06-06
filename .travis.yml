@@ -133,8 +133,8 @@ matrix:
     
     # Test encoder control initing failures when using layers
     - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--ilr=1"
-    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--no-wpp --layer --ilr=2"
-    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--no-wpp --layer --gop=0 --ilr=2 --layer --ilr=3"
+    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--no-wpp --gop=0 --layer --ilr=2"
+    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--no-wpp --gop=0 --layer --gop=0 --ilr=2 --layer --ilr=3"
     
     # Test main functions sequence breaks
     - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--false"
