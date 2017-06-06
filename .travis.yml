@@ -131,6 +131,11 @@ matrix:
     # Test scalability extension.
     - env: TEST_DIM=512x264 VALGRIND_TEST="--layer-res=256x132 --preset=ultrafast -q30 -r1 --gop=0 -p0 --layer --preset=ultrafast -q28 -r1 --gop=0 -p0 --no-wpp"
     
+    # Test encoder control initing failures when using layers
+    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--ilr=1"
+    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--no-wpp --layer --ilr=2"
+    - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--no-wpp --layer --gop=0 --ilr=2 --layer --ilr=3"
+    
     # Test main functions sequence breaks
     - env: VALGRIND_EXPECTED_STATUS=1 VALGRIND_EXPECTED_TEST="--false"
     - env: VALGRIND_EXPECTED_STATUS=0 VALGRIND_EXPECTED_TEST="--version"

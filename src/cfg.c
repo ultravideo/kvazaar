@@ -128,6 +128,8 @@ int kvz_config_init(kvz_config *cfg)
   cfg->layer = 0;
   cfg->input_layer = -1;
 
+  cfg->ILR_frames = 0;
+
   cfg->shared = NULL;
   /*
   cfg->max_layers = malloc(sizeof(uint8_t));
@@ -719,6 +721,12 @@ int kvz_config_parse(kvz_config *cfg, const char *name, const char *value)
     cfg->vps_period = atoi(value);
   else if OPT("ref")
     cfg->ref_frames = atoi(value);
+  else if OPT("ilr"){
+  //*********************************************
+    //For scalable extension.
+    cfg->ILR_frames = atoi(value);
+    //*********************************************
+  }
   else if OPT("deblock") {
     int beta, tc;
     if (2 == sscanf(value, "%d:%d", &beta, &tc)) {
@@ -1428,13 +1436,13 @@ int kvz_config_validate(const kvz_config *const cfg)
             cfg->gop_len);
     error = 1;
   }
-  //*********************************************
+  
 
-  if (cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) {
+  if ((cfg->ref_frames  < 1 || cfg->ref_frames >= MAX_REF_PIC_COUNT) && cfg->layer == 0) {
     fprintf(stderr, "Input error: --ref out of range [1..%d]\n", MAX_REF_PIC_COUNT - 1);
     error = 1;
   }
-
+//*********************************************
   if (cfg->deblock_beta  < -6 || cfg->deblock_beta  > 6) {
     fprintf(stderr, "Input error: deblock beta parameter out of range [-6..6]\n");
     error = 1;
@@ -1578,10 +1586,21 @@ int kvz_config_validate(const kvz_config *const cfg)
       error = 1;
     }
 
-    if( cfg->ref_frames > 1 ) {
-      fprintf(stderr, "Input error: Only one (IL) reference currently supported\n");
+    if( cfg->ref_frames > 0 && cfg->layer > 0) {
+      fprintf(stderr, "Input error: Inter frame references currently not supported for layers with lid > 0\n");
       error = 1;
     }
+
+    if( cfg->ILR_frames > cfg->layer) {
+      fprintf(stderr, "Input error: There are not enough layers with a smaller lid to have %d ILR \n",cfg->ILR_frames);
+      error = 1;
+    }
+
+    if( cfg->ILR_frames + cfg->ref_frames == 0) {
+      fprintf(stderr, "Input error: There needs to atleast one type of reference frame\n");
+      error = 1;
+    }
+
     if( cfg->next_cfg != NULL ) {
       if( cfg->width > cfg->next_cfg->width || cfg->height > cfg->next_cfg->height ) {
         fprintf(stderr, "Input error: a layer with a lower layer_id needs to be smaller or equal to layers with a greater layer_id\n");
@@ -1589,6 +1608,7 @@ int kvz_config_validate(const kvz_config *const cfg)
       }
     } 
   }
+
   //*********************************************
 
   return !error;

@@ -351,6 +351,8 @@ typedef struct kvz_config
   //For scalable extension. TODO: Move somewhere else?
   uint8_t layer;
   int8_t input_layer; //Which input layer this layer uses
+
+  int32_t ILR_frames; //number of interlayer references. TODO: allow specifying the layers to use as ref
   
   //TODO: Add all the cfgs as a list?
   //Points to the next cfg of a higher layer (null if highest layer)

@@ -229,6 +229,7 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
       goto init_failed;
     }
 
+    prev_enc = encoder;
     encoder = calloc(1, sizeof(encoder_control_t));
     
     if (!encoder) {
@@ -676,16 +677,18 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 
     //*********************************************
 
-    prev_enc = encoder;
   }
 
   return first_enc;
 
 init_failed:
-  if(encoder != NULL) kvz_encoder_control_free(encoder);
+  if(encoder != NULL && encoder != first_enc) kvz_encoder_control_free(encoder);
   if(prev_enc != NULL) prev_enc->next_enc_ctrl = NULL;
-  for(encoder_control_t *enc = first_enc; enc != NULL; enc = (encoder_control_t*)enc->next_enc_ctrl)
+  for(encoder_control_t *enc = first_enc; enc != NULL;){
+    encoder_control_t *next_enc = (encoder_control_t*)enc->next_enc_ctrl; 
     kvz_encoder_control_free(enc);
+    enc = next_enc;
+  }
   return NULL;
 }
 // ***********************************************
