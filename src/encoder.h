@@ -120,6 +120,8 @@ typedef struct encoder_control_t
 
   bool lcu_dqp_enabled;
 
+  int tr_depth_inter;
+
   //! pic_parameter_set
   struct {
     uint8_t dependent_slice_segments_enabled_flag;

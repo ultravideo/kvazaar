@@ -420,6 +420,7 @@ static void encode_transform_coeff(encoder_state_t * const state,
                                    uint8_t parent_coeff_v)
 {
   cabac_data_t * const cabac = &state->cabac;
+  const encoder_control_t *const ctrl = state->encoder_control;
   const videoframe_t * const frame = state->tile->frame;
 
   const cu_info_t *cur_pu = kvz_cu_array_at_const(frame->cu_array, x, y);
@@ -433,8 +434,12 @@ static void encode_transform_coeff(encoder_state_t * const state,
   int intra_split_flag = (cur_cu->type == CU_INTRA && cur_cu->part_size == SIZE_NxN);
 
   // The implicit split by intra NxN is not counted towards max_tr_depth.
-  int tr_depth_intra = state->encoder_control->cfg.tr_depth_intra;
-  int max_tr_depth = (cur_cu->type == CU_INTRA ? tr_depth_intra + intra_split_flag : TR_DEPTH_INTER);
+  int max_tr_depth;
+  if (cur_cu->type == CU_INTRA) {
+    max_tr_depth = ctrl->cfg.tr_depth_intra + intra_split_flag;
+  } else {
+    max_tr_depth = ctrl->tr_depth_inter;
+  }
 
   int8_t split = (cur_cu->tr_depth > depth);
 

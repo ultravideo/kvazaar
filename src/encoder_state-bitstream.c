@@ -389,7 +389,7 @@ static void encoder_state_write_bitstream_seq_parameter_set(bitstream_t* stream,
   WRITE_UE(stream, MAX_DEPTH, "log2_diff_max_min_coding_block_size");
   WRITE_UE(stream, 0, "log2_min_transform_block_size_minus2");   // 4x4
   WRITE_UE(stream, 3, "log2_diff_max_min_transform_block_size"); // 4x4...32x32
-  WRITE_UE(stream, TR_DEPTH_INTER, "max_transform_hierarchy_depth_inter");
+  WRITE_UE(stream, encoder->tr_depth_inter, "max_transform_hierarchy_depth_inter");
   WRITE_UE(stream, encoder->cfg.tr_depth_intra, "max_transform_hierarchy_depth_intra");
 
   // scaling list
