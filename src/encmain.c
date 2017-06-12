@@ -723,7 +723,7 @@ int main(int argc, char *argv[])
     }
     // Print statistics of the coding
     fprintf(stderr, " Processed %d frames over %d layer(s), %10llu bits",
-            frames_done,
+            frames_done / opts->config->shared->max_layers,
             opts->config->shared->max_layers,
             (long long unsigned int)bitstream_length * 8);
     if (frames_done > 0) {
