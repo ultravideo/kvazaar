@@ -900,9 +900,15 @@ static void encoder_state_remove_refs(encoder_state_t *state) {
   } else {
     target_ref_num = encoder->cfg.ref_frames;
   }
+  //*********************************************
+  //For scalable extension.
+  //Add space for irl to the list
+  target_ref_num += encoder->cfg.ILR_frames;
+  //*********************************************
   if (state->frame->slicetype == KVZ_SLICE_I) {
     target_ref_num = 0;
   }
+
 
   if (encoder->cfg.gop_len && target_ref_num > 0) {
     // With GOP in use, go through all the existing reference pictures and
@@ -1187,7 +1193,8 @@ void kvz_encoder_prepare(encoder_state_t *state)
 
   // For SHVC.
   //TODO: Allow first EL frame to be a P-slice
-  if (state->encoder_control->layer.layer_id > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
+  //TODO: Account for adding several ILR frames
+  if (state->encoder_control->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
     //Also add base layer to the reference list.
     //TODO: Don't skip on first frame? Skip if inter frame.
     kvz_picture* scaled_pic = kvz_image_scaling(state->ILR_state->tile->frame->rec, &encoder->layer.upscaling);

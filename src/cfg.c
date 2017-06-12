@@ -1597,7 +1597,7 @@ int kvz_config_validate(const kvz_config *const cfg)
     }
 
     if( cfg->ILR_frames + cfg->ref_frames == 0) {
-      fprintf(stderr, "Input error: There needs to atleast one type of reference frame\n");
+      fprintf(stderr, "Input error: There needs to be at least one type of reference frame\n");
       error = 1;
     }
 
