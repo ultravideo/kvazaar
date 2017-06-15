@@ -56,7 +56,21 @@ static void kvazaar_close(kvz_encoder *encoder)
     encoder->next_enc = NULL;
     encoder->prev_enc = NULL; //Prev encoder should be closed in a previous call
 
+    // The threadqueue must be stopped before freeing states.
+    if (encoder->control) {
+      kvz_threadqueue_stop(encoder->control->threadqueue);
+    }
+
     if (encoder->states) {
+      // Flush input frame buffer.
+      kvz_picture *pic = NULL;
+      while ((pic = kvz_encoder_feed_frame(&encoder->input_buffer,
+                                           &encoder->states[0],
+                                           NULL)) != NULL) {
+        kvz_image_free(pic);
+        pic = NULL;
+      }
+
       for (unsigned i = 0; i < encoder->num_encoder_states; ++i) {
         kvz_encoder_state_finalize(&encoder->states[i]);
       }

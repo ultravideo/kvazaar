@@ -360,6 +360,12 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg)
 
   encoder->lcu_dqp_enabled = cfg->target_bitrate > 0 || encoder->cfg.roi.dqps;
 
+  // When tr_depth_inter is equal to 0, inter transform split flag defaults
+  // to 1 for SMP and AMP partition units. We want to avoid the extra
+  // transform split so we set tr_depth_inter to 1 when SMP or AMP
+  // partition modes are enabled.
+  encoder->tr_depth_inter = (encoder->cfg.smp_enable || encoder->cfg.amp_enable) ? 1 : 0;
+
   //Tiles
   encoder->tiles_enable = encoder->cfg.tiles_width_count > 1 ||
                           encoder->cfg.tiles_height_count > 1;
