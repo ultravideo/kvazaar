@@ -56,6 +56,10 @@ AM_CONDITIONAL([HAVE_SSE2], [test x"$flag_sse2" = x"true"])
 KVZ_CFLAGS="-Wall -Wtype-limits -Wvla -I$srcdir/src -I$srcdir/src/extras -ftree-vectorize -fvisibility=hidden"
 CFLAGS="$KVZ_CFLAGS $CFLAGS"
 
+AC_SEARCH_LIBS([log], [m c], [], [exit 1])
+AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
+AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
+
 AC_ARG_WITH([cryptopp],
     AS_HELP_STRING([--with-cryptopp],
         [Build with cryptopp Enables selective encryption.]))
@@ -76,11 +80,6 @@ LIBS="$LIBS $cryptopp_LIBS"
 
 
 CPPFLAGS="-DKVZ_DLL_EXPORTS $CPPFLAGS"
-
-AC_SEARCH_LIBS([log], [m c], [], [exit 1])
-AC_SEARCH_LIBS([pow], [m c], [], [exit 1])
-AC_SEARCH_LIBS([sqrt], [m c], [], [exit 1])
-
 
 
 # This does workarounds for pthreads on various compilers.
