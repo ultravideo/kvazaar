@@ -196,6 +196,18 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
                        const cu_array_t* src, int src_x, int src_y,
                        int width, int height);
 
+// ***********************************************
+    // Modified for SHVC.
+/**
+ * \brief Return a cu array that has been upsampled from base_cua.
+ *
+ * mv_scale should contain the width and height scaling factor used for scaling the motion vectors and
+ * cu_pos_scale the factors for mapping the base_cua positions to the target cua.
+ *
+ */
+cu_array_t *kvz_cu_array_upsampling( cu_array_t *base_cua, int32_t mv_scale[2], int32_t cu_pos_scale[2]);
+// ***********************************************
+    
 
 /**
  * \brief Return the 7 lowest-order bits of the pixel coordinate.

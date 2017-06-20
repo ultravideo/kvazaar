@@ -252,9 +252,17 @@ typedef enum { COLOR_Y = 0, COLOR_U, COLOR_V } color_t;
 
 
 //*********************************************
-  //For scalable extension. TODO: Allow more layers?
+  //For scalable extension. TODO: Allow more layers? 
 //Specified in SHM
-#define MAX_LAYERS 8
+#define MAX_LAYERS 8 //Not used
+
+#define MV_SCALE_FAC_1X 4096
+#define POS_SCALE_FAC_1X 65536
+//TODO: Account for offsets
+#define GET_SCALE_POS(src,dst) ((((src) << 16) + ((dst) >> 1)) / (dst) )
+#define GET_SCALE_MV(src,dst) ((src) == (dst) ? MV_SCALE_FAC_1X : CLIP(-4096, 4096, (((dst) << 8) + ((src) >> 1)) / (src)))
+#define SCALE_POS_COORD(posc,scale) (((posc) * (scale) + (1<<15)) >> 16)
+#define SCALE_MV_COORD(mvc,scale) ((scale) == MV_SCALE_FAC_1X ? (mvc) : CLIP(-32768, 327667,((scale) * (mvc) + 127 + ((scale) * (mvc) < 0) ) >> 8))
 //*********************************************
 
 // Hardware data (abstraction of defines). Extend for other compilers

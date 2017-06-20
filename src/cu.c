@@ -197,3 +197,90 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
     }
   }
 }
+
+// ***********************************************
+// Modified for SHVC.
+// Adapted from shm
+cu_array_t *kvz_cu_array_upsampling( cu_array_t *base_cua, int32_t mv_scale[2], int32_t cu_pos_scale[2])
+{
+  //Define a few basic things
+  //TODO: Just use MAX_DEPTH or MAX_PU_DEPTH?    v----log2_min_luma_transform_block_size
+  uint8_t max_depth = MAX_DEPTH + MAX(0,MIN_SIZE-2); //If chroma format is 422 and log2_min_luma_transform_block_size > 2 need to add 1 
+  uint16_t num_partitions = 1 << (max_depth << 1); //Number of cu in a CTU/LCU
+  uint8_t w_min_pu = LCU_WIDTH / (1 << max_depth); //SCU_WIDTH
+  uint8_t h_min_pu = LCU_WIDTH / (1 << max_depth);
+  uint8_t block_w = 16;
+  uint8_t block_h = 16;
+  int8_t part_w = MAX( 1,  (int8_t)(block_w/w_min_pu)); //width of LCU in parts
+  //int8_t part_h = MAX( 1,  (int8_t)(block_h/h_min_pu)); //height --||--
+  int8_t part_num = MAX( 1, (int8_t)( (block_w/w_min_pu) * (block_h/h_min_pu))); //Number of scu in a 16x16 block, e.g. how many scu to skip to get to the next 16x16 block
+  uint16_t num_blocks = num_partitions / part_num; //Number of 16x16 blocks in lcu
+
+  //Allocate the new cua. Use cu_pos_scale to calculate the new size
+  cu_array_t *cua = kvz_cu_array_alloc( SCALE_POS_COORD(base_cua->width,cu_pos_scale[0]), SCALE_POS_COORD(base_cua->height,cu_pos_scale[1]));
+
+//#define LCUIND2X(ind,stride) (((ind) * LCU_WIDTH) % (stride))
+//#define LCUIND2Y(ind,lcu_stride) (((ind) * LCU_WIDTH) / (lcu_stride))
+
+#define IND2X(ind,step,stride) (((ind) * (step)) % (stride))
+#define IND2Y(ind,step,stride) (((ind) * (step)) / (stride))
+
+  //Loop over LCUs/CTUs
+  uint32_t frame_lcu_stride = cua->width / LCU_WIDTH;
+  uint32_t num_lcu_in_frame = (cua->width * cua->height) / LCU_LUMA_SIZE;
+  for ( uint32_t lcu_ind = 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
+    uint32_t lcu_x = IND2X(lcu_ind,LCU_WIDTH,cua->width);//(lcu_ind * LCU_WIDTH) % cua->width;
+    uint32_t lcu_y = IND2Y(lcu_ind,LCU_WIDTH,frame_lcu_stride);//(lcu_ind * LCU_WIDTH) / frame_lcu_stride; 
+
+    //Loop over 16x16 blocks of the LCU. TODO: Best way to loop over cu memory access wise?
+    for ( uint32_t part_ind = 0; part_ind < num_blocks; part_ind++) {
+      uint32_t block_x = lcu_x + IND2X(part_ind,block_w,LCU_WIDTH);
+      uint32_t block_y = lcu_y + IND2Y(part_ind,block_h,part_w);
+      cu_info_t *cu = kvz_cu_array_at(cua, block_x, block_y);
+
+      //Get co-located cu. Use center of 16x16 block to find co-located cu. TODO: Account for offsets?     
+      uint32_t col_x = block_x;
+      uint32_t col_y = block_y;
+
+      if ( cu_pos_scale[0] != POS_SCALE_FAC_1X || cu_pos_scale[1] != POS_SCALE_FAC_1X) {
+        //Need to round here for some reason acording to shm.
+        col_x = ((SCALE_POS_COORD(block_x + (block_w >> 1), cu_pos_scale[0]) + 4 ) >> 4 ) << 4;
+        col_y = ((SCALE_POS_COORD(block_y + (block_h >> 1), cu_pos_scale[1]) + 4 ) >> 4 ) << 4;
+      }
+      //TODO: Check if col_x/col_y are out of bounds?
+      const cu_info_t *col = kvz_cu_array_at_const(base_cua,col_x,col_y);
+      
+      //Copy stuff from col to cu
+      memcpy(cu,col,sizeof(cu_info_t));
+
+      //Scale mv
+      if( !col->skipped && col->type == CU_INTER ) {
+        cu->inter.mv[0][0] = SCALE_MV_COORD(col->inter.mv[0][0],mv_scale[0]);
+        cu->inter.mv[0][1] = SCALE_MV_COORD(col->inter.mv[0][1],mv_scale[1]);
+        cu->inter.mv[1][0] = SCALE_MV_COORD(col->inter.mv[1][0],mv_scale[0]);
+        cu->inter.mv[1][1] = SCALE_MV_COORD(col->inter.mv[1][1],mv_scale[1]);
+      }
+      else {
+        //TODO: Need to do something for intra? Should not access inter data structures.
+
+      }
+      
+      //Set Partision size to 2Nx2N for all cu in the 16x16 block
+      cu->part_size = SIZE_2Nx2N;
+
+      //Copy results to other cu in the 16x16 block.
+      for ( uint32_t i = 1; i < part_num; i++) {
+        uint32_t sub_x = block_x + IND2X(i,1,block_w);
+        uint32_t sub_y = block_y + IND2Y(i,1,block_w);
+        cu_info_t *sub_cu = kvz_cu_array_at(cua, sub_x, sub_y);
+        memcpy(sub_cu,cu,sizeof(cu_info_t));
+      }
+    }
+  }
+
+#undef IND2X
+#undef IND2Y
+
+  return cua;
+}
+// ***********************************************
