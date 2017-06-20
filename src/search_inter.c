@@ -40,9 +40,50 @@
  */
 static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector2d_t* orig, int x, int y, int width, int height, int wpp_limit)
 {
+  const encoder_control_t *ctrl = state->encoder_control;
+
+  if (ctrl->cfg.owf && ctrl->cfg.wpp) {
+    // Check that the block does not reference pixels that are not final.
+
+    // Fractional motion estimation and odd chroma interpolation need
+    // 4 pixels below the bottom edge of the block.
+    int margin = 4;
+    if (ctrl->cfg.sao_enable) {
+      // Make sure we don't refer to pixels for which SAO reconstruction
+      // has not been done.
+      margin += SAO_DELAY_PX;
+    } else if (ctrl->cfg.deblock_enable) {
+      // Make sure we don't refer to pixels that have not been deblocked.
+      margin += DEBLOCK_DELAY_PX;
+    }
+
+    // Coordinates of the top-left corner of the containing LCU.
+    const vector2d_t orig_lcu = {
+      .x = orig->x / LCU_WIDTH,
+      .y = orig->y / LCU_WIDTH,
+    };
+    // Difference between the coordinates of the LCU containing the
+    // bottom-left corner of the referenced block and the LCU containing
+    // this block.
+    const vector2d_t mv_lcu = {
+      .x = (((orig->x + width  + margin) << 2) + x) / (LCU_WIDTH << 2) - orig_lcu.x,
+      .y = (((orig->y + height + margin) << 2) + y) / (LCU_WIDTH << 2) - orig_lcu.y,
+    };
+
+    // TODO: Remove hard coded constants.
+    if (mv_lcu.y > 1) {
+      return false;
+    }
+
+    // TODO: Remove hard coded constants.
+    if (mv_lcu.x + mv_lcu.y > 2) {
+      return false;
+    }
+  }
+
   if (state->encoder_control->cfg.mv_constraint == KVZ_MV_CONSTRAIN_NONE) {
-    return (wpp_limit == -1 || y + (height << 2) <= (wpp_limit << 2));
-  };
+    return true;
+  }
 
   int margin = 0;
   if (state->encoder_control->cfg.mv_constraint == KVZ_MV_CONSTRAIN_FRAME_AND_TILE_MARGIN) {
@@ -1710,6 +1751,13 @@ void kvz_search_cu_smp(encoder_state_t * const state,
     uint32_t bitcost = MAX_INT;
 
     search_pu_inter(state, x, y, depth, part_mode, i, lcu, &cost, &bitcost);
+
+    if (cost >= MAX_INT) {
+      // Could not find any motion vector.
+      *inter_cost    = MAX_INT;
+      *inter_bitcost = MAX_INT;
+      return;
+    }
 
     *inter_cost    += cost;
     *inter_bitcost += bitcost;

@@ -795,9 +795,10 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 #endif
       kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
       state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
-      
+      threadqueue_job_t **job = &state->tile->wf_jobs[lcu->id];
+
       // If job object was returned, add dependancies and allow it to run.
-      if (state->tile->wf_jobs[lcu->id]) {
+      if (job[0]) {
         // Add inter frame dependancies when ecoding more than one frame at
         // once. The added dependancy is for the first LCU of each wavefront
         // row to depend on the reconstruction status of the row below in the
@@ -806,26 +807,33 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
             state->previous_encoder_state->tqj_recon_done &&
             state->frame->slicetype != KVZ_SLICE_I)
         {
-          if (!lcu->left) {
-            const lcu_order_element_t * const ref_lcu = &ref_state->lcu_order[i];
-            if (lcu->below) {
-              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], ref_lcu->below->encoder_state->tqj_recon_done);
+          // We need to wait until the CTUs whose pixels we refer to are
+          // done before we can start this CTU.
+          if (lcu->below) {
+            if (lcu->below->right) {
+              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->below->right->id]);
             } else {
-              kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], ref_lcu->encoder_state->tqj_recon_done);
+              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->below->id]);
+            }
+          } else {
+            if (lcu->right) {
+              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->right->id]);
+            } else {
+              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->id]);
             }
           }
         }
 
         // Add local WPP dependancy to the LCU on the left.
         if (lcu->left) {
-          kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - 1]);
+          kvz_threadqueue_job_dep_add(job[0], job[-1]);
         }
         // Add local WPP dependancy to the LCU on the top right.
         if (lcu->above) {
           if (lcu->above->right) {
-            kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu + 1]);
+            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu + 1]);
           } else {
-            kvz_threadqueue_job_dep_add(state->tile->wf_jobs[lcu->id], state->tile->wf_jobs[lcu->id - state->tile->frame->width_in_lcu]);
+            kvz_threadqueue_job_dep_add(job[0], job[-state->tile->frame->width_in_lcu]);
           }
         }
 
