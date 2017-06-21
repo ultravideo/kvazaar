@@ -994,50 +994,46 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
 
   encoder_set_source_picture(state, frame);
 
+  // Check whether the frame is a keyframe or not.
   if (state->frame->num == 0) {
     state->frame->is_idr_frame = true;
-  }  else if (cfg->gop_len) {
-    // Closed GOP / CRA is not yet supported.
-    state->frame->is_idr_frame = false;
-  
-    // Calculate POC according to the global frame counter and GOP structure
-    int32_t poc = state->frame->num - 1;
-    int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
-    state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
-    kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
   } else {
     bool is_i_idr = (cfg->intra_period == 1 && state->frame->num % 2 == 0);
     bool is_p_idr = (cfg->intra_period > 1 && (state->frame->num % cfg->intra_period) == 0);
     state->frame->is_idr_frame = is_i_idr || is_p_idr;
   }
- 
+
+  // Set pictype.
   if (state->frame->is_idr_frame) {
-    encoder_state_reset_poc(state);
-    state->frame->slicetype = KVZ_SLICE_I;
     state->frame->pictype = KVZ_NAL_IDR_W_RADL;
   } else {
-    if (cfg->intra_period == 1) {
-      state->frame->slicetype = KVZ_SLICE_I;
-    } else if (cfg->gop_len != 0) {
-      state->frame->slicetype = KVZ_SLICE_B;
-    } else {
-      state->frame->slicetype = KVZ_SLICE_P;
-    }
-
-    // Use P-slice for lowdelay.
-    if (state->frame->slicetype == KVZ_SLICE_B &&
-        cfg->gop_len > 0 &&
-        cfg->gop_lowdelay) {
-      state->frame->slicetype = KVZ_SLICE_P;
-    }
-
     state->frame->pictype = KVZ_NAL_TRAIL_R;
-    if (state->encoder_control->cfg.gop_len) {
-      if (cfg->intra_period > 1 && (state->frame->poc % cfg->intra_period) == 0) {
-        state->frame->slicetype = KVZ_SLICE_I;
-      }
-    }
+  }
 
+  // Set slicetype.
+  if (state->frame->is_idr_frame || cfg->intra_period == 1) {
+    state->frame->slicetype = KVZ_SLICE_I;
+  } else if (cfg->gop_len > 0 && !cfg->gop_lowdelay) {
+    state->frame->slicetype = KVZ_SLICE_B;
+  } else {
+    state->frame->slicetype = KVZ_SLICE_P;
+  }
+
+  // Set POC.
+  if (state->frame->is_idr_frame) {
+    encoder_state_reset_poc(state);
+  } else if (cfg->intra_period != 1 && cfg->gop_len > 0) {
+    // Calculate POC according to the global frame counter and GOP
+    // structure.
+    int32_t poc;
+    if (cfg->intra_period > 0) {
+      poc = state->frame->num % cfg->intra_period - 1;
+    } else {
+      poc = state->frame->num - 1;
+    }
+    int32_t poc_offset = cfg->gop[state->frame->gop_offset].poc_offset;
+    state->frame->poc = poc - poc % cfg->gop_len + poc_offset;
+    kvz_videoframe_set_poc(state->tile->frame, state->frame->poc);
   }
 
   encoder_state_remove_refs(state);
