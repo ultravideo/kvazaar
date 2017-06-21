@@ -1384,7 +1384,9 @@ void kvz_get_extended_block_avx2(int xpos, int ypos, int mv_x, int mv_y, int off
   int sample_out_of_bounds = out_of_bounds_y || out_of_bounds_x;
 
   if (sample_out_of_bounds){
-    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (height + filter_size));
+    // Alloc 5 pixels more than we actually use because AVX2 filter
+    // functions read up to 5 pixels past the last pixel.
+    out->buffer = MALLOC(kvz_pixel, (width + filter_size) * (height + filter_size) + 5);
     if (!out->buffer){
       fprintf(stderr, "Memory allocation failed!\n");
       assert(0);
