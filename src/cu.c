@@ -200,17 +200,6 @@ void kvz_cu_array_copy_from_lcu(cu_array_t* dst, int dst_x, int dst_y, const lcu
 
 // ***********************************************
 // Modified for SHVC.
-static const cu_info_t* kvz_cu_array_at_scu_pos_const(const cu_array_t *cua, unsigned x_scu, unsigned y_scu)
-{
-  //Need to scale the scu pos to pixel pos. Each scu is 4 pixels wide/tall
-  return kvz_cu_array_at_const(cua, x_scu << 2, y_scu << 2);
-}
-
-static cu_info_t* kvz_cu_array_at_scu_pos(cu_array_t *cua, unsigned x_scu, unsigned y_scu)
-{
-  return (cu_info_t*) kvz_cu_array_at_scu_pos_const(cua, x_scu, y_scu);
-}
-
 
 // Adapted from shm
 cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale)
@@ -229,30 +218,32 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
   uint16_t num_blocks = num_partitions / part_num; //Number of 16x16 blocks in lcu
 
   //Allocate the new cua. Use cu_pos_scale to calculate the new size
-  cu_array_t *cua = kvz_cu_array_alloc( nw_in_lcu * LCU_WIDTH, nh_in_lcu * LCU_WIDTH);
+  uint32_t n_width = nw_in_lcu * LCU_WIDTH;
+  uint32_t n_height = nh_in_lcu * LCU_WIDTH;
+  cu_array_t *cua = kvz_cu_array_alloc( n_width, n_height);
 
 //#define LCUIND2X(ind,stride) (((ind) * LCU_WIDTH) % (stride))
 //#define LCUIND2Y(ind,lcu_stride) (((ind) * LCU_WIDTH) / (lcu_stride))
 
 #define IND2X(ind,step,stride) (((ind) * (step)) % (stride))
-#define IND2Y(ind,step,stride) (((ind) * (step)) / (stride))
+#define IND2Y(ind,step,stride) (((ind) / (stride)) * (step))
 
   //Loop over LCUs/CTUs
   //uint32_t frame_lcu_stride = nw_in_lcu;
   uint32_t num_lcu_in_frame = nw_in_lcu * nh_in_lcu;
   for ( uint32_t lcu_ind = 0; lcu_ind < num_lcu_in_frame; lcu_ind++ ) {
-    uint32_t lcu_x = IND2X(lcu_ind,LCU_WIDTH,cua->width);//(lcu_ind * LCU_WIDTH) % cua->width;
+    uint32_t lcu_x = IND2X(lcu_ind,LCU_WIDTH,n_width);//(lcu_ind * LCU_WIDTH) % cua->width;
     uint32_t lcu_y = IND2Y(lcu_ind,LCU_WIDTH,nw_in_lcu);//(lcu_ind * LCU_WIDTH) / frame_lcu_stride; 
 
     //Loop over 16x16 blocks of the LCU. TODO: Best way to loop over cu memory access wise?
     for ( uint32_t part_ind = 0; part_ind < num_blocks; part_ind++) {
       uint32_t block_x = lcu_x + IND2X(part_ind,block_w,LCU_WIDTH);
       uint32_t block_y = lcu_y + IND2Y(part_ind,block_h,part_w);
-      cu_info_t *cu = kvz_cu_array_at_scu_pos(cua, block_x, block_y);
+      cu_info_t *cu = kvz_cu_array_at(cua, block_x, block_y);
 
       //Get co-located cu. Use center of 16x16 block to find co-located cu. TODO: Account for offsets?     
-      uint32_t col_px_x = block_x * w_min_pu; //Go from scu pos to pixel pos
-      uint32_t col_px_y = block_y * h_min_pu;
+      uint32_t col_px_x = block_x; //Go from scu pos to pixel pos
+      uint32_t col_px_y = block_y;
 
       if ( cu_pos_scale[0] != POS_SCALE_FAC_1X || cu_pos_scale[1] != POS_SCALE_FAC_1X) {
         //Need to round here for some reason acording to shm.
@@ -262,7 +253,7 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
       
       const cu_info_t *col = NULL;
       //Check that col is inside the frame. TODO: Use actual pic size?
-      if (col_px_x >= 0 && col_px_y >= 0 && col_px_x <= base_cua->width && col_px_y <= base_cua->height ) {
+      if (col_px_x >= 0 && col_px_y >= 0 && col_px_x < base_cua->width && col_px_y < base_cua->height ) {
         col = kvz_cu_array_at_const(base_cua, col_px_x, col_px_y);
       }
       
@@ -294,9 +285,9 @@ cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int
 
       //Copy results to other cu in the 16x16 block.
       for ( uint32_t i = 1; i < part_num; i++) {
-        uint32_t sub_x = block_x + IND2X(i,1,block_w);
-        uint32_t sub_y = block_y + IND2Y(i,1,block_w);
-        cu_info_t *sub_cu = kvz_cu_array_at_scu_pos(cua, sub_x, sub_y);
+        uint32_t sub_x = block_x + IND2X(i,w_min_pu,block_w);
+        uint32_t sub_y = block_y + IND2Y(i,h_min_pu,part_w);
+        cu_info_t *sub_cu = kvz_cu_array_at(cua, sub_x, sub_y);
         memcpy(sub_cu,cu,sizeof(cu_info_t));
       }
     }
