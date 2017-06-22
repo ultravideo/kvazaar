@@ -67,7 +67,11 @@ kvz_picture* kvz_encoder_feed_frame(input_frame_buffer_t *buf,
     state->frame->gop_offset = 0;
     if (cfg->gop_len > 0) {
       // Using a low delay GOP structure.
-      state->frame->gop_offset = (buf->num_out + cfg->gop_len - 1) % cfg->gop_len;
+      uint64_t frame_num = buf->num_out;
+      if (cfg->intra_period) {
+        frame_num %= cfg->intra_period;
+      }
+      state->frame->gop_offset = (frame_num + cfg->gop_len - 1) % cfg->gop_len;
     }
     buf->num_in++;
     buf->num_out++;
