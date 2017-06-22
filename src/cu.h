@@ -201,11 +201,12 @@ void kvz_cu_array_copy(cu_array_t* dst,       int dst_x, int dst_y,
 /**
  * \brief Return a cu array that has been upsampled from base_cua.
  *
+ * n?_in_lcu should be the new width and height in lcu 
  * mv_scale should contain the width and height scaling factor used for scaling the motion vectors and
  * cu_pos_scale the factors for mapping the base_cua positions to the target cua.
  *
  */
-cu_array_t *kvz_cu_array_upsampling( cu_array_t *base_cua, int32_t mv_scale[2], int32_t cu_pos_scale[2]);
+cu_array_t *kvz_cu_array_upsampling(cu_array_t *base_cua, int32_t nw_in_lcu, int32_t nh_in_lcu, int32_t * mv_scale, int32_t * cu_pos_scale);
 // ***********************************************
     
 

@@ -1197,19 +1197,23 @@ void kvz_encoder_prepare(encoder_state_t *state)
   if (state->encoder_control->cfg.ILR_frames > 0 && state->ILR_state != NULL && state->ILR_state->tile->frame->rec != NULL) {
     //Also add base layer to the reference list.
     //TODO: Don't skip on first frame? Skip if inter frame.
-    kvz_picture* scaled_pic = kvz_image_scaling(state->ILR_state->tile->frame->rec, &encoder->layer.upscaling);
+    const encoder_state_t *ILR_state = state->ILR_state;
+    kvz_picture* scaled_pic = kvz_image_scaling(ILR_state->tile->frame->rec, &encoder->layer.upscaling);
 
     //TODO: Account for offsets etc. Need to use something else than original sizes?
     int32_t mv_scale[2] = {GET_SCALE_MV(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
                            GET_SCALE_MV(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
     int32_t pos_scale[2]= {GET_SCALE_POS(encoder->layer.upscaling.src_width,encoder->layer.upscaling.trgt_width),
                            GET_SCALE_POS(encoder->layer.upscaling.src_height,encoder->layer.upscaling.trgt_height)};
-    cu_array_t* scaled_cu = kvz_cu_array_upsampling(state->tile->frame->cu_array, mv_scale, pos_scale);
+    cu_array_t* scaled_cu = kvz_cu_array_upsampling(ILR_state->tile->frame->cu_array,
+                                                    state->tile->frame->width_in_lcu,
+                                                    state->tile->frame->height_in_lcu,
+                                                    mv_scale, pos_scale);
 
     kvz_image_list_add(state->frame->ref,
       scaled_pic,
       scaled_cu,
-      state->ILR_state->frame->poc);
+      ILR_state->frame->poc);
     //TODO: Add error handling?
     kvz_image_free(scaled_pic);
     kvz_cu_array_free(scaled_cu);
