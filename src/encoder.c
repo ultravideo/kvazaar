@@ -574,6 +574,9 @@ encoder_control_t* kvz_encoder_control_init(const kvz_config *const cfg)
     encoder->cfg.trskip_enable   = false;
   }
 
+  encoder->max_inter_ref_lcu.right = 1;
+  encoder->max_inter_ref_lcu.down  = 1;
+
   // If fractional framerate is set, use that instead of the floating point framerate.
   if (encoder->cfg.framerate_num != 0) {
     encoder->vui.timing_info_present_flag = 1;

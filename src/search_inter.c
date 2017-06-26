@@ -70,13 +70,13 @@ static INLINE bool fracmv_within_tile(const encoder_state_t *state, const vector
       .y = (((orig->y + height + margin) << 2) + y) / (LCU_WIDTH << 2) - orig_lcu.y,
     };
 
-    // TODO: Remove hard coded constants.
-    if (mv_lcu.y > 1) {
+    if (mv_lcu.y > ctrl->max_inter_ref_lcu.down) {
       return false;
     }
 
-    // TODO: Remove hard coded constants.
-    if (mv_lcu.x + mv_lcu.y > 2) {
+    if (mv_lcu.x + mv_lcu.y >
+        ctrl->max_inter_ref_lcu.down + ctrl->max_inter_ref_lcu.right)
+    {
       return false;
     }
   }

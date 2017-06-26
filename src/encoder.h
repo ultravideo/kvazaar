@@ -127,6 +127,12 @@ typedef struct encoder_control_t
     uint8_t dependent_slice_segments_enabled_flag;
   } pps;
 
+  //! Maximum motion vector distance as number of LCUs.
+  struct {
+    int right;
+    int down;
+  } max_inter_ref_lcu;
+
 } encoder_control_t;
 
 encoder_control_t* kvz_encoder_control_init(const kvz_config *cfg);

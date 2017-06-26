@@ -729,7 +729,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
   assert(state->is_leaf);
   assert(state->lcu_order_count > 0);
 
-  const kvz_config *cfg = &state->encoder_control->cfg;
+  const encoder_control_t *ctrl = state->encoder_control;
+  const kvz_config *cfg = &ctrl->cfg;
 
   state->ref_qp = state->frame->QP;
 
@@ -754,7 +755,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 #ifdef KVZ_DEBUG
       {
         const lcu_order_element_t * const lcu = &state->lcu_order[i];
-        PERFORMANCE_MEASURE_END(KVZ_PERF_LCU, state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
+        PERFORMANCE_MEASURE_END(KVZ_PERF_LCU, ctrl->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
       }
 #endif //KVZ_DEBUG
     }
@@ -769,7 +770,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
     {
       // For LP-gop, depend on the state of the first reference.
       int ref_neg = cfg->gop[(state->frame->poc - 1) % cfg->gop_len].ref_neg[0];
-      if (ref_neg > state->encoder_control->cfg.owf) {
+      if (ref_neg > cfg->owf) {
         // If frame is not within OWF range, it's already done.
         ref_state = NULL;
       } else {
@@ -794,7 +795,7 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
       char* job_description = NULL;
 #endif
       kvz_threadqueue_free_job(&state->tile->wf_jobs[lcu->id]);
-      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(state->encoder_control->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
+      state->tile->wf_jobs[lcu->id] = kvz_threadqueue_submit(ctrl->threadqueue, encoder_state_worker_encode_lcu, (void*)lcu, 1, job_description);
       threadqueue_job_t **job = &state->tile->wf_jobs[lcu->id];
 
       // If job object was returned, add dependancies and allow it to run.
@@ -809,19 +810,14 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         {
           // We need to wait until the CTUs whose pixels we refer to are
           // done before we can start this CTU.
-          if (lcu->below) {
-            if (lcu->below->right) {
-              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->below->right->id]);
-            } else {
-              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->below->id]);
-            }
-          } else {
-            if (lcu->right) {
-              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->right->id]);
-            } else {
-              kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[lcu->id]);
-            }
+          const lcu_order_element_t *dep_lcu = lcu;
+          for (int i = 0; dep_lcu->below && i < ctrl->max_inter_ref_lcu.down; i++) {
+            dep_lcu = dep_lcu->below;
           }
+          for (int i = 0; dep_lcu->right && i < ctrl->max_inter_ref_lcu.right; i++) {
+            dep_lcu = dep_lcu->right;
+          }
+          kvz_threadqueue_job_dep_add(job[0], ref_state->tile->wf_jobs[dep_lcu->id]);
         }
 
         // Add local WPP dependancy to the LCU on the left.
