@@ -787,81 +787,51 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 }
 
 
-static void encoder_ref_insertion_sort(int reflist[16], int length) {
+static void encoder_ref_insertion_sort(const encoder_state_t *const state, uint8_t reflist[16], uint8_t length) {
 
   for (uint8_t i = 1; i < length; ++i) {
-    const int16_t cur_poc = reflist[i];
-    int16_t j = i;
-    while (j > 0 && cur_poc < reflist[j - 1]) {
+    const int32_t cur_poc = state->frame->ref->pocs[reflist[i]];
+    uint8_t cur_idx = reflist[i];
+    int8_t j = i;
+    while (j > 0 && cur_poc < state->frame->ref->pocs[reflist[j - 1]]) {
       reflist[j] = reflist[j - 1];
       --j;
     }
-    reflist[j] = cur_poc;
+    reflist[j] = cur_idx;
   }
 }
 
 /**
- * \brief Return reference picture lists.
+ * \brief Generate reference picture lists.
  *
  * \param state             main encoder state
- * \param ref_list_len_out  Returns the lengths of the reference lists.
- * \param ref_list_poc_out  Returns two lists of POCs of the reference pictures.
  */
-void kvz_encoder_get_ref_lists(const encoder_state_t *const state,
-                               int ref_list_len_out[2],
-                               int ref_list_poc_out[2][16])
+void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
 {
-  FILL_ARRAY(ref_list_len_out, 0, 2);
+  // TODO check possibility to add L0 references to L1 list also
+  
+  FILL_ARRAY(state->frame->ref_LX_size, 0, 2);
 
   // List all pocs of lists
   int j = 0;
   for (j = 0; j < state->frame->ref->used_size; j++) {
     if (state->frame->ref->pocs[j] < state->frame->poc) {
-      ref_list_poc_out[0][ref_list_len_out[0]] = state->frame->ref->pocs[j];
-      ref_list_len_out[0]++;
+      state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = state->frame->ref->pocs[j];
+      state->frame->ref_LX_size[0] += 1;
     } else {
-      ref_list_poc_out[1][ref_list_len_out[1]] = state->frame->ref->pocs[j];
-      ref_list_len_out[1]++;
+      state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = state->frame->ref->pocs[j];
+      state->frame->ref_LX_size[1] += 1;
     }
   }
 
   // Fill the rest of ref_list_poc_out array with -1s.
   for (; j < 16; j++) {
-    ref_list_poc_out[0][j] = -1;
-    ref_list_poc_out[1][j] = -1;
+    state->frame->ref_LX[0][j] = (uint8_t) -1;
+    state->frame->ref_LX[1][j] = (uint8_t) -1;
   }
 
-  encoder_ref_insertion_sort(ref_list_poc_out[0], ref_list_len_out[0]);
-  encoder_ref_insertion_sort(ref_list_poc_out[1], ref_list_len_out[1]);
-}
-
-static void encoder_state_ref_sort(encoder_state_t *state) {
-  int ref_list_len[2];
-  int ref_list_poc[2][16];
-
-  kvz_encoder_get_ref_lists(state, ref_list_len, ref_list_poc);
-
-  for (int j = 0; j < state->frame->ref->used_size; j++) {
-    if (state->frame->ref->pocs[j] < state->frame->poc) {
-      for (int ref_idx = 0; ref_idx < ref_list_len[0]; ref_idx++) {
-        if (ref_list_poc[0][ref_idx] == state->frame->ref->pocs[j]) {
-          state->frame->refmap[j].idx = ref_list_len[0] - ref_idx - 1;
-          break;
-        }
-      }
-      state->frame->refmap[j].list = 1;
-
-    } else {
-      for (int ref_idx = 0; ref_idx < ref_list_len[1]; ref_idx++) {
-        if (ref_list_poc[1][ref_idx] == state->frame->ref->pocs[j]) {
-          state->frame->refmap[j].idx = ref_idx;
-          break;
-        }
-      }
-      state->frame->refmap[j].list = 2;
-    }
-    state->frame->refmap[j].poc = state->frame->ref->pocs[j];
-  }
+  encoder_ref_insertion_sort(state, state->frame->ref_LX[0], state->frame->ref_LX_size[0]);
+  encoder_ref_insertion_sort(state, state->frame->ref_LX[1], state->frame->ref_LX_size[1]);
 }
 
 /**
@@ -1037,7 +1007,7 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   }
 
   encoder_state_remove_refs(state);
-  encoder_state_ref_sort(state);
+  kvz_encoder_create_ref_lists(state);
 
   normalize_lcu_weights(state);
   kvz_set_picture_lambda_and_qp(state);

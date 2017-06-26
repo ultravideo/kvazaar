@@ -141,7 +141,12 @@ static void set_frame_info(kvz_frame_info *const info, const encoder_state_t *co
   info->qp = state->frame->QP;
   info->nal_unit_type = state->frame->pictype;
   info->slice_type = state->frame->slicetype;
-  kvz_encoder_get_ref_lists(state, info->ref_list_len, info->ref_list);
+
+  memcpy(info->ref_list[0], state->frame->ref_LX[0], 16);
+  memcpy(info->ref_list[1], state->frame->ref_LX[1], 16);
+  info->ref_list_len[0] = state->frame->ref_LX_size[0];
+  info->ref_list_len[1] = state->frame->ref_LX_size[1];
+  //kvz_encoder_create_ref_lists(state);
 }
 
 

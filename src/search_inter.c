@@ -229,7 +229,9 @@ static int calc_mvd_cost(encoder_state_t * const state, int x, int y, int mv_shi
     if (merge_cand[merge_idx].dir == 3) continue;
     if (merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == x &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == y &&
-        merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
+        state->frame->ref_LX[merge_cand[merge_idx].dir - 1][
+          merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1]
+        ] == ref_idx) {
       temp_bitcost += merge_idx;
       merged = 1;
       break;
@@ -1241,10 +1243,37 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   int32_t merged = 0;
   uint8_t cu_mv_cand = 0;
   int8_t merge_idx = 0;
-  int8_t ref_list = state->frame->refmap[ref_idx].list-1;
+
+  // which list, L0 or L1, ref_idx is in and in what index
+  int8_t ref_list = -1;
+  // the index of the ref_idx in L0 or L1 list
+  int8_t LX_idx;
+  // max value of LX_idx plus one
+  const int8_t LX_IDX_MAX_PLUS_1 = max(state->frame->ref_LX_size[0],
+                                       state->frame->ref_LX_size[1]);
+
+  for (LX_idx = 0; LX_idx < LX_IDX_MAX_PLUS_1; LX_idx++)
+  {
+    // check if ref_idx is in L0
+    if (LX_idx < state->frame->ref_LX_size[0] &&
+        state->frame->ref_LX[0][LX_idx] == ref_idx) {
+      ref_list = 0;
+      break;
+    }
+
+    // check if ref_idx is in L1
+    if (LX_idx < state->frame->ref_LX_size[1] &&
+        state->frame->ref_LX[1][LX_idx] == ref_idx) {
+      ref_list = 1;
+      break;
+    }
+  }
+  // ref_idx has to be found in either L0 or L1
+  assert(LX_idx < LX_IDX_MAX_PLUS_1);
+
   int8_t temp_ref_idx = cur_cu->inter.mv_ref[ref_list];
   // Get MV candidates
-  cur_cu->inter.mv_ref[ref_list] = ref_idx;
+  cur_cu->inter.mv_ref[ref_list] = LX_idx;
   kvz_inter_get_mv_cand(state, x, y, width, height, mv_cand, cur_cu, lcu, ref_list);
   cur_cu->inter.mv_ref[ref_list] = temp_ref_idx;
 
@@ -1352,7 +1381,8 @@ static void search_pu_inter_ref(encoder_state_t * const state,
     if (merge_cand[merge_idx].dir != 3 &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][0] == mv.x &&
         merge_cand[merge_idx].mv[merge_cand[merge_idx].dir - 1][1] == mv.y &&
-        (uint32_t)merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1] == ref_idx) {
+        (uint32_t)state->frame->ref_LX[merge_cand[merge_idx].dir - 1][
+        merge_cand[merge_idx].ref[merge_cand[merge_idx].dir - 1]] == ref_idx) {
       merged = 1;
       break;
     }
@@ -1380,11 +1410,11 @@ static void search_pu_inter_ref(encoder_state_t * const state,
   if (temp_cost < *inter_cost) {
     // Map reference index to L0/L1 pictures
     cur_cu->inter.mv_dir = ref_list+1;
-    uint8_t mv_ref_coded = state->frame->refmap[ref_idx].idx;
+    uint8_t mv_ref_coded = LX_idx;
 
     cur_cu->merged        = merged;
     cur_cu->merge_idx     = merge_idx;
-    cur_cu->inter.mv_ref[ref_list] = ref_idx;
+    cur_cu->inter.mv_ref[ref_list] = LX_idx;
     cur_cu->inter.mv[ref_list][0] = (int16_t)mv.x;
     cur_cu->inter.mv[ref_list][1] = (int16_t)mv.y;
     CU_SET_MV_CAND(cur_cu, ref_list, cu_mv_cand);
@@ -1512,17 +1542,18 @@ static void search_pu_inter(encoder_state_t * const state,
 
       // Find one L0 and L1 candidate according to the priority list
       if ((merge_cand[i].dir & 0x1) && (merge_cand[j].dir & 0x2)) {
-        if (merge_cand[i].ref[0] != merge_cand[j].ref[1] ||
-          merge_cand[i].mv[0][0] != merge_cand[j].mv[1][0] ||
-          merge_cand[i].mv[0][1] != merge_cand[j].mv[1][1]) {
+        if (state->frame->ref_LX[0][merge_cand[i].ref[0]] !=
+            state->frame->ref_LX[1][merge_cand[j].ref[1]] ||
+
+            merge_cand[i].mv[0][0] != merge_cand[j].mv[1][0] ||
+            merge_cand[i].mv[0][1] != merge_cand[j].mv[1][1])
+        {
           uint32_t bitcost[2];
           uint32_t cost = 0;
           int8_t cu_mv_cand = 0;
           int16_t mv[2][2];
           kvz_pixel tmp_block[64 * 64];
           kvz_pixel tmp_pic[64 * 64];
-          // Force L0 and L1 references
-          if (state->frame->refmap[merge_cand[i].ref[0]].list == 2 || state->frame->refmap[merge_cand[j].ref[1]].list == 1) continue;
 
           mv[0][0] = merge_cand[i].mv[0][0];
           mv[0][1] = merge_cand[i].mv[0][1];
@@ -1540,8 +1571,12 @@ static void search_pu_inter(encoder_state_t * const state,
           }
 
           kvz_inter_recon_lcu_bipred(state,
-                                     state->frame->ref->images[merge_cand[i].ref[0]],
-                                     state->frame->ref->images[merge_cand[j].ref[1]],
+                                     state->frame->ref->images[
+                                       state->frame->ref_LX[0][merge_cand[i].ref[0]]
+                                     ],
+                                     state->frame->ref->images[
+                                       state->frame->ref_LX[1][merge_cand[j].ref[1]]
+                                     ],
                                      x, y,
                                      width,
                                      height,
@@ -1566,8 +1601,8 @@ static void search_pu_inter(encoder_state_t * const state,
 
             cur_cu->inter.mv_dir = 3;
             uint8_t mv_ref_coded[2] = {
-              state->frame->refmap[merge_cand[i].ref[0]].idx,
-              state->frame->refmap[merge_cand[j].ref[1]].idx
+              state->frame->ref_LX[0][merge_cand[i].ref[0]],
+              state->frame->ref_LX[1][merge_cand[j].ref[1]]
             };
 
             cur_cu->inter.mv_ref[0] = merge_cand[i].ref[0];
@@ -1586,8 +1621,9 @@ static void search_pu_inter(encoder_state_t * const state,
                   merge_cand[merge_idx].mv[0][1] == cur_cu->inter.mv[0][1] &&     
                   merge_cand[merge_idx].mv[1][0] == cur_cu->inter.mv[1][0] &&
                   merge_cand[merge_idx].mv[1][1] == cur_cu->inter.mv[1][1] &&    
-                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] && 
-                  merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1]) {
+                  merge_cand[merge_idx].ref[0] == cur_cu->inter.mv_ref[0] &&
+                  merge_cand[merge_idx].ref[1] == cur_cu->inter.mv_ref[1])
+              {
                 cur_cu->merged = 1;
                 cur_cu->merge_idx = merge_idx;
                 break;

@@ -652,11 +652,13 @@ static bool is_b0_cand_coded(int x, int y, int width, int height)
 /**
  * \brief Get merge candidates for current block
  *
- * \param encoder   encoder control struct to use
+ * \param state     encoder control state to use
  * \param x         block x position in SCU
  * \param y         block y position in SCU
  * \param width     current block width
  * \param height    current block height
+ * \param ref_list  which reference list, L0 is 1 and L1 is 2
+ * \param ref_idx   index in the reference list
  * \param cand_out  will be filled with C3 and H candidates
  */
 static void get_temporal_merge_candidates(const encoder_state_t * const state,
@@ -682,17 +684,15 @@ static void get_temporal_merge_candidates(const encoder_state_t * const state,
 
   // Find temporal reference
   if (state->frame->ref->used_size) {
-    uint32_t colocated_ref = UINT_MAX;
+    uint32_t colocated_ref;
 
     // Select L0/L1 ref_idx reference
-    for (int temporal_cand = 0; temporal_cand < state->frame->ref->used_size; temporal_cand++) {
-      if (state->frame->refmap[temporal_cand].list == ref_list && state->frame->refmap[temporal_cand].idx == ref_idx) {
-        colocated_ref = temporal_cand;
-        break;
-      }
+    if (state->frame->ref_LX_size[ref_list-1] > ref_idx) {
+      colocated_ref = state->frame->ref_LX[ref_list - 1][ref_idx];
+    } else {
+      // not found
+      return;
     }
-    
-    if (colocated_ref == UINT_MAX) return;
 
     cu_array_t *ref_cu_array = state->frame->ref->cu_arrays[colocated_ref];
     int cu_per_width = ref_cu_array->width / SCU_WIDTH;
@@ -938,9 +938,13 @@ static INLINE void apply_mv_scaling(const encoder_state_t *state,
                                     int16_t mv_cand[2])
 {
   apply_mv_scaling_pocs(state->frame->poc,
-                        state->frame->ref->pocs[current_cu->inter.mv_ref[current_reflist]],
+                        state->frame->ref->pocs[
+                          state->frame->ref_LX[current_reflist][
+                            current_cu->inter.mv_ref[current_reflist]]],
                         state->frame->poc,
-                        state->frame->ref->pocs[neighbor_cu->inter.mv_ref[neighbor_reflist]],
+                        state->frame->ref->pocs[
+                          state->frame->ref_LX[current_reflist][
+                            neighbor_cu->inter.mv_ref[neighbor_reflist]]],
                         mv_cand);
 }
 
@@ -966,23 +970,21 @@ static bool add_temporal_candidate(const encoder_state_t *state,
 {
   if (!colocated) return false;
 
-  int colocated_ref = -1;
-  for (int i = 0; i < state->frame->ref->used_size; i++) {
-    if (state->frame->refmap[i].list == 1 &&
-        state->frame->refmap[i].idx == 0) {
-      colocated_ref = i;
-      break;
-    }
+  int colocated_ref;
+  if (state->frame->ref_LX_size[0] > 0) {
+    // get the first reference from L0 if it exists
+    colocated_ref = state->frame->ref_LX[0][0];
+  } else {
+    // otherwise no candidate added
+    return false;
   }
-
-  if (colocated_ref < 0) return false;
 
   int cand_list = colocated->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
 
   // The reference id the colocated block is using
-  uint32_t colocated_ref_mv_ref = colocated->inter.mv_ref[cand_list];
+  uint32_t colocated_ref_mv_ref = state->frame->ref_LX[cand_list][colocated->inter.mv_ref[cand_list]];
 
-  if (ref_out) *ref_out = colocated_ref;
+  if (ref_out) *ref_out = 0; //colocated_ref;
 
   mv_out[0] = colocated->inter.mv[cand_list][0];
   mv_out[1] = colocated->inter.mv[cand_list][1];
@@ -1105,7 +1107,7 @@ static void get_mv_cand_from_candidates(const encoder_state_t * const state,
     (h != NULL || c3 != NULL);
 
   if (can_use_tmvp && add_temporal_candidate(state,
-                                             cur_cu->inter.mv_ref[reflist],
+                                             state->frame->ref_LX[reflist][cur_cu->inter.mv_ref[reflist]],
                                              (h != NULL) ? h : c3,
                                              reflist,
                                              mv_cand[candidates],
@@ -1220,7 +1222,7 @@ static bool add_merge_candidate(const cu_info_t *cand,
   merge_cand_out->mv[0][1] = cand->inter.mv[0][1];
   merge_cand_out->mv[1][0] = cand->inter.mv[1][0];
   merge_cand_out->mv[1][1] = cand->inter.mv[1][1];
-  merge_cand_out->ref[0]   = cand->inter.mv_ref[0];
+  merge_cand_out->ref[0]   = cand->inter.mv_ref[0]; // L0/L1 references
   merge_cand_out->ref[1]   = cand->inter.mv_ref[1];
   merge_cand_out->dir      = cand->inter.mv_dir;
   return true;
@@ -1325,9 +1327,11 @@ uint8_t kvz_inter_get_merge_cand(const encoder_state_t * const state,
         mv_cand[candidates].ref[0]    = mv_cand[i].ref[0];
         mv_cand[candidates].ref[1]    = mv_cand[j].ref[1];
 
-        if (mv_cand[i].ref[0] == mv_cand[j].ref[1] &&
-          mv_cand[i].mv[0][0] == mv_cand[j].mv[1][0] && 
-          mv_cand[i].mv[0][1] == mv_cand[j].mv[1][1]) {
+        if (state->frame->ref_LX[0][mv_cand[i].ref[0]] ==
+            state->frame->ref_LX[1][mv_cand[j].ref[1]]
+            &&
+            mv_cand[i].mv[0][0] == mv_cand[j].mv[1][0] && 
+            mv_cand[i].mv[0][1] == mv_cand[j].mv[1][1]) {
           // Not a candidate
         } else {
           candidates++;

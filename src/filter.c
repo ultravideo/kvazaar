@@ -401,10 +401,13 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
           // Non-zero residual/coeffs and transform boundary
           // Neither CU is intra so tr_depth <= MAX_DEPTH.
           strength = 1;       
-        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 && ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= 4) || (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= 4))) {
+        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
+                 ((abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][0] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][0]) >= 4) ||
+                  (abs(cu_q->inter.mv[cu_q->inter.mv_dir - 1][1] - cu_p->inter.mv[cu_p->inter.mv_dir - 1][1]) >= 4))) {
           // Absolute motion vector diff between blocks >= 1 (Integer pixel)
           strength = 1;
-        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 && cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
+        } else if (cu_p->inter.mv_dir != 3 && cu_q->inter.mv_dir != 3 &&
+                   cu_q->inter.mv_ref[cu_q->inter.mv_dir - 1] != cu_p->inter.mv_ref[cu_p->inter.mv_dir - 1]) {
           strength = 1;
         }
         
@@ -429,10 +432,10 @@ static void filter_deblock_edge_luma(encoder_state_t * const state,
             cu_p->inter.mv[1][0] = 0;
             cu_p->inter.mv[1][1] = 0;
           }
-          const int refP0 = (cu_p->inter.mv_dir & 1) ? cu_p->inter.mv_ref[0] : -1;
-          const int refP1 = (cu_p->inter.mv_dir & 2) ? cu_p->inter.mv_ref[1] : -1;
-          const int refQ0 = (cu_q->inter.mv_dir & 1) ? cu_q->inter.mv_ref[0] : -1;
-          const int refQ1 = (cu_q->inter.mv_dir & 2) ? cu_q->inter.mv_ref[1] : -1;
+          const int refP0 = (cu_p->inter.mv_dir & 1) ? state->frame->ref_LX[0][cu_p->inter.mv_ref[0]] : -1;
+          const int refP1 = (cu_p->inter.mv_dir & 2) ? state->frame->ref_LX[1][cu_p->inter.mv_ref[1]] : -1;
+          const int refQ0 = (cu_q->inter.mv_dir & 1) ? state->frame->ref_LX[0][cu_q->inter.mv_ref[0]] : -1;
+          const int refQ1 = (cu_q->inter.mv_dir & 2) ? state->frame->ref_LX[1][cu_q->inter.mv_ref[1]] : -1;
           const int16_t* mvQ0 = cu_q->inter.mv[0];
           const int16_t* mvQ1 = cu_q->inter.mv[1];
 
