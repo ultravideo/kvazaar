@@ -816,10 +816,10 @@ void kvz_encoder_create_ref_lists(const encoder_state_t *const state)
   int j = 0;
   for (j = 0; j < state->frame->ref->used_size; j++) {
     if (state->frame->ref->pocs[j] < state->frame->poc) {
-      state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = state->frame->ref->pocs[j];
+      state->frame->ref_LX[0][state->frame->ref_LX_size[0]] = j;
       state->frame->ref_LX_size[0] += 1;
     } else {
-      state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = state->frame->ref->pocs[j];
+      state->frame->ref_LX[1][state->frame->ref_LX_size[1]] = j;
       state->frame->ref_LX_size[1] += 1;
     }
   }
