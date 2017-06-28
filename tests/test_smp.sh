@@ -3,7 +3,7 @@
 # Test SMP and AMP blocks.
 
 set -eu
-. util.sh
+. "${0%/*}/util.sh"
 
 valgrind_test 264x130 4 --threads=2 --owf=1 --wpp --smp
 valgrind_test 264x130 4 --threads=2 --owf=1 --wpp --amp

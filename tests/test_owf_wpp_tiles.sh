@@ -5,7 +5,7 @@
 # tried.
 
 set -eu
-. util.sh
+. "${0%/*}/util.sh"
 
 common_args='-p4 --rd=0 --no-rdoq --no-deblock --no-sao --no-signhide --subme=0 --pu-depth-inter=1-3 --pu-depth-intra=2-3'
 valgrind_test 264x130 10 $common_args -r1 --owf=1 --threads=0 --no-wpp

@@ -3,7 +3,7 @@
 # Test RDOQ, SAO, deblock and signhide and subme.
 
 set -eu
-. util.sh
+. "${0%/*}/util.sh"
 
 common_args='264x130 10 -p0 -r1 --threads=2 --wpp --owf=1 --rd=0'
 
