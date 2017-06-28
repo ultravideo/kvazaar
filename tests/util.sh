@@ -1,15 +1,15 @@
-#!/bin/bash
+#!/bin/sh
 
 # Helper functions for test scripts.
 
-set -euo pipefail
+set -eu${BASH+o pipefail}
 
 # Temporary files for encoder input and output.
-yuvfile="$(mktemp --tmpdir tmp.XXXXXXXXXX.yuv)"
-hevcfile="$(mktemp --tmpdir tmp.XXXXXXXXXX.hevc)"
+yuvfile="$(mktemp)"
+hevcfile="$(mktemp)"
 
 cleanup() {
-    rm -rf ${yuvfile} ${hevcfile}
+    rm -rf "${yuvfile}" "${hevcfile}"
 }
 trap cleanup EXIT
 
@@ -22,7 +22,7 @@ prepare() {
     cleanup
     print_and_run \
         ffmpeg -f lavfi -i "mandelbrot=size=${1}" \
-            -vframes "${2}" -pix_fmt yuv420p \
+            -vframes "${2}" -pix_fmt yuv420p -f yuv4mpegpipe \
             "${yuvfile}"
 }
 
@@ -61,5 +61,5 @@ encode_test() {
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     actual_status="$?"
     set -e
-    [[ ${actual_status} = ${expected_status} ]]
+    [ ${actual_status} -eq ${expected_status} ]
 }
