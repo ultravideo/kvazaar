@@ -1,8 +1,8 @@
-#!/bin/bash
+#!/bin/sh
 
 # Helper functions for test scripts.
 
-set -euo pipefail
+set -eu${BASH+o pipefail}
 
 # Temporary files for encoder input and output.
 yuvfile="$(mktemp --tmpdir tmp.XXXXXXXXXX.yuv)"
@@ -61,5 +61,5 @@ encode_test() {
             ../src/kvazaar -i "${yuvfile}" "--input-res=${dimensions}" -o "${hevcfile}" "$@"
     actual_status="$?"
     set -e
-    [[ ${actual_status} = ${expected_status} ]]
+    [ ${actual_status} -eq ${expected_status} ]
 }

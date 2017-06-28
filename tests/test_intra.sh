@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/bin/sh
 
 # Test all-intra coding.
 
 set -eu
 
-source util.bash
+. util.sh
 
 common_args='264x130 10 -p1 --threads=2 --owf=1 --no-rdoq --no-deblock --no-sao --no-signhide'
 valgrind_test $common_args --rd=1
