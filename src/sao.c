@@ -261,181 +261,115 @@ static void calc_sao_bands(const encoder_state_t * const state, const kvz_pixel 
 }
 
 
-/**
- * \brief Calculate dimensions of the buffer used by sao reconstruction.
-
- * \param pic  Picture.
- * \param sao  Sao parameters.
- * \param rec  Top-left corner of the LCU
- */
-static void sao_calc_band_block_dims(const videoframe_t *frame, color_t color_i,
-                                     vector2d_t *rec, vector2d_t *block)
+static int sao_calc_eo_cat(kvz_pixel a, kvz_pixel b, kvz_pixel c)
 {
-  const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  int width = frame->width >> is_chroma;
-  int height = frame->height >> is_chroma;
-  int block_width = LCU_WIDTH >> is_chroma;
+  // Mapping relationships between a, b and c to eo_idx.
+  static const int sao_eo_idx_to_eo_category[] = { 1, 2, 0, 3, 4 };
 
+  int eo_idx = 2 + SIGN3((int)c - (int)a) + SIGN3((int)c - (int)b);
 
-  // Handle right and bottom, taking care of non-LCU sized CUs.
-  if (rec->y + block_width >= height) {
-    if (rec->y + block_width >= height) {
-      block->y = height - rec->y;
-    }
-  }
-  if (rec->x + block_width >= width) {
-    if (rec->x + block_width > width) {
-      block->x = width - rec->x;
-    }
-  }
-
-  rec->x = 0; rec->y = 0;
+  return sao_eo_idx_to_eo_category[eo_idx];
 }
+
 
 /**
- * \brief Calculate dimensions of the buffer used by sao reconstruction.
+ * \brief Reconstruct SAO.
  *
- * This function calculates 4 vectors that can be used to make the temporary
- * buffers required by sao_reconstruct_color.
- *
- * Vector block is the area affected by sao. Vectors tr and br are top-left
- * margin and bottom-right margin, which contain pixels that are not modified
- * by the reconstruction of this LCU but are needed by the reconstruction.
- * Vector rec is the offset from the CU to the required pixel area.
- *
- * The margins are always either 0 or 1, depending on the direction of the
- * edge offset class.
- *
- * This also takes into account borders of the picture and non-LCU sized
- * CU's at the bottom and right of the picture.
- *
- * \ CU + rec
- *  +------+
- *  |\ tl  |
- *  | +--+ |
- *  | |\ block
- *  | | \| |
- *  | +--+ |
- *  |     \ br
- *  +------+
- *
- * \param pic  Picture.
- * \param sao  Sao parameters.
- * \param rec  Top-left corner of the LCU, modified to be top-left corner of
+ * \param encoder         encoder state
+ * \param buffer          Buffer containing the deblocked input pixels. The
+ *                        area to filter starts at index 0.
+ * \param stride          stride of buffer
+ * \param x               x-coordinate of the top-left corner in pixels
+ * \param y               y-coordinate of the top-left corner in pixels
+ * \param width           width of the area to filter
+ * \param height          height of the area to filter
+ * \param sao             SAO information
+ * \param color           color plane index
+ * \param border_left     true, if the left border of the area exists
+ * \param border_right    true, if the right border of the area exists
+ * \param border_above    true, if the top border of the area exists
+ * \param border_below    true, if the bottom border of the area exists
  */
-static void sao_calc_edge_block_dims(const videoframe_t * const frame, color_t color_i,
-                                     const sao_info_t *sao, vector2d_t *rec,
-                                     vector2d_t *tl, vector2d_t *br,
-                                     vector2d_t *block)
+void kvz_sao_reconstruct(const encoder_state_t *state,
+                         const kvz_pixel *buffer,
+                         int stride,
+                         int frame_x,
+                         int frame_y,
+                         int width,
+                         int height,
+                         const sao_info_t *sao,
+                         color_t color)
 {
-  vector2d_t a_ofs = g_sao_edge_offsets[sao->eo_class][0];
-  vector2d_t b_ofs = g_sao_edge_offsets[sao->eo_class][1];
-  const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  int width = frame->width >> is_chroma;
-  int height = frame->height >> is_chroma;
-  int block_width = LCU_WIDTH >> is_chroma;
+  const encoder_control_t *const ctrl = state->encoder_control;
+  videoframe_t *const frame = state->tile->frame;
+  const int shift = color == COLOR_Y ? 0 : 1;
 
-  // Handle top and left.
-  if (rec->y == 0) {
-    tl->y = 0;
-    if (a_ofs.y == -1 || b_ofs.y == -1) {
-      block->y -= 1;
-      tl->y += 1;
-    }
-  }
-  if (rec->x == 0) {
-    tl->x = 0;
-    if (a_ofs.x == -1 || b_ofs.x == -1) {
-      block->x -= 1;
-      tl->x += 1;
-    }
-  }
+  const int frame_width = frame->width >> shift;
+  const int frame_height = frame->height >> shift;
+  kvz_pixel *output = &frame->rec->data[color][frame_x + frame_y * frame_width];
 
-  // Handle right and bottom, taking care of non-LCU sized CUs.
-  if (rec->y + block_width >= height) {
-    br->y = 0;
-    block->y -= block_width + rec->y - height;
-    if (a_ofs.y == 1 || b_ofs.y == 1) {
-      block->y -= 1;
-      br->y += 1;
-    }
-  }
-  if (rec->x + block_width >= width) {
-    br->x = 0;
-    block->x -= block_width + rec->x - width;
-    if (a_ofs.x == 1 || b_ofs.x == 1) {
-      block->x -= 1;
-      br->x += 1;
-    }
-  }
+  switch (sao->type) {
 
-  rec->y = (rec->y == 0 ? 0 : -1);
-  rec->x = (rec->x == 0 ? 0 : -1);
+    case SAO_TYPE_NONE:
+      break;
+
+    case SAO_TYPE_BAND: {
+      int offsets[1 << KVZ_BIT_DEPTH];
+      kvz_calc_sao_offset_array(ctrl, sao, offsets, color);
+      for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+          output[x + y * frame_width] = offsets[buffer[x + y * stride]];
+        }
+      }
+      break;
+    }
+
+    case SAO_TYPE_EDGE: {
+      const int offset_v = color == COLOR_V ? 5 : 0;
+      const vector2d_t *offset = g_sao_edge_offsets[sao->eo_class];
+
+      int x_orig = 0;
+      int y_orig = 0;
+
+      if (frame_x + offset[0].x < 0 || frame_x + offset[1].x < 0) {
+        // Nothing to do for the leftmost column.
+        x_orig += 1;
+      }
+      if (frame_x + width + offset[0].x > frame_width ||
+          frame_x + width + offset[1].x > frame_width)
+      {
+        // Nothing to do for the rightmost column.
+        width -= 1;
+      }
+      if (frame_y + offset[0].y < 0 || frame_y + offset[1].y < 0) {
+        // Nothing to do for the topmost row.
+        y_orig += 1;
+      }
+      if (frame_y + height + offset[0].y > frame_height ||
+          frame_y + height + offset[1].y > frame_height)
+      {
+        // Nothing to do for the bottommost row.
+        height -= 1;
+      }
+
+      for (int y = y_orig; y < height; y++) {
+        for (int x = x_orig; x < width; x++) {
+          const kvz_pixel *data = &buffer[x + y * stride];
+
+          kvz_pixel a = data[offset[0].x + offset[0].y * stride];
+          kvz_pixel c = data[0];
+          kvz_pixel b = data[offset[1].x + offset[1].y * stride];
+
+          const int eo_cat = sao_calc_eo_cat(a, b, c);
+
+          output[x + y * frame_width] =
+            CLIP(0, (1 << KVZ_BIT_DEPTH) - 1, c + sao->offsets[eo_cat + offset_v]);
+        }
+      }
+      break;
+    }
+  }
 }
-
-void kvz_sao_reconstruct(const encoder_control_t * const encoder, videoframe_t * frame, const kvz_pixel *old_rec,
-                     unsigned x_ctb, unsigned y_ctb,
-                     const sao_info_t *sao, color_t color_i)
-{
-  const int is_chroma = (color_i != COLOR_Y ? 1 : 0);
-  const int pic_stride = frame->width >> is_chroma;
-  const int lcu_stride = LCU_WIDTH >> is_chroma;
-  const int buf_stride = lcu_stride + 2;
-
-  kvz_pixel *recdata = frame->rec->data[color_i];
-  kvz_pixel buf_rec[(LCU_WIDTH + 2) * (LCU_WIDTH + 2)];
-  kvz_pixel new_rec[LCU_WIDTH * LCU_WIDTH];
-  // Calling CU_TO_PIXEL with depth 1 is the same as using block size of 32.
-  kvz_pixel *lcu_rec = &recdata[CU_TO_PIXEL(x_ctb, y_ctb, is_chroma, frame->rec->stride>>is_chroma)];
-  const kvz_pixel *old_lcu_rec = &old_rec[CU_TO_PIXEL(x_ctb, y_ctb, is_chroma, pic_stride)];
-
-  vector2d_t ofs;
-  vector2d_t tl = { 1, 1 };
-  vector2d_t br = { 1, 1 };
-  vector2d_t block;
-
-  if (sao->type == SAO_TYPE_NONE) {
-    return;
-  }
-
-  ofs.x = x_ctb * lcu_stride;
-  ofs.y = y_ctb * lcu_stride;
-  block.x = lcu_stride;
-  block.y = lcu_stride;
-  if (sao->type == SAO_TYPE_BAND) {
-    tl.x = 0; tl.y = 0;
-    br.x = 0; br.y = 0;
-    sao_calc_band_block_dims(frame, color_i, &ofs, &block);
-  }
-  else {
-    sao_calc_edge_block_dims(frame, color_i, sao, &ofs, &tl, &br, &block);
-  }
-  
-  assert(ofs.x + tl.x + block.x + br.x <= frame->width);
-  assert(ofs.y + tl.y + block.y + br.y <= frame->height);
-  
-  CHECKPOINT("ofs.x=%d ofs.y=%d tl.x=%d tl.y=%d block.x=%d block.y=%d br.x=%d br.y=%d", 
-             ofs.x, ofs.y, tl.x, tl.y, block.x, block.y, br.x, br.y);
-  
-  // Data to tmp buffer.
-  kvz_pixels_blit(&old_lcu_rec[ofs.y * pic_stride + ofs.x],
-                      buf_rec,
-                      tl.x + block.x + br.x,
-                      tl.y + block.y + br.y,
-                      pic_stride, buf_stride);
-
-  kvz_sao_reconstruct_color(encoder, &buf_rec[tl.y * buf_stride + tl.x],
-                        &new_rec[(ofs.y + tl.y) * lcu_stride + ofs.x + tl.x],
-                        sao,
-                        buf_stride, lcu_stride,
-                        block.x, block.y, color_i);
-
-  // Copy reconstructed block from tmp buffer to rec image.
-  kvz_pixels_blit(&new_rec[(tl.y + ofs.y) * lcu_stride + (tl.x + ofs.x)],
-                      &lcu_rec[(tl.y + ofs.y) * (frame->rec->stride >> is_chroma) + (tl.x + ofs.x)],
-                      block.x, block.y, lcu_stride, frame->rec->stride >> is_chroma);
-}
-
 
 
 static void sao_search_edge_sao(const encoder_state_t * const state, 
@@ -818,9 +752,18 @@ void kvz_sao_reconstruct_frame(encoder_state_t * const state)
     for (lcu.x = 0; lcu.x < frame->width_in_lcu; lcu.x++) {
       unsigned stride = frame->width_in_lcu;
       sao_info_t *sao_luma = &frame->sao_luma[lcu.y * stride + lcu.x];
-      
+
       // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
-      kvz_sao_reconstruct(state->encoder_control, frame, new_y_data, lcu.x, lcu.y, sao_luma, COLOR_Y);
+      vector2d_t pos = { lcu.x * LCU_WIDTH, lcu.y * LCU_WIDTH };
+      kvz_sao_reconstruct(state,
+                          &new_y_data[pos.x + pos.y * frame->width],
+                          frame->width,
+                          pos.x,
+                          pos.y,
+                          MIN(LCU_WIDTH, frame->width - pos.x),
+                          MIN(LCU_WIDTH, frame->height - pos.y),
+                          sao_luma,
+                          COLOR_Y);
     }
   }
   free(new_y_data);
@@ -837,8 +780,25 @@ void kvz_sao_reconstruct_frame(encoder_state_t * const state)
         unsigned stride = frame->width_in_lcu;
         sao_info_t *sao_chroma = &frame->sao_chroma[lcu.y * stride + lcu.x];
 
-        kvz_sao_reconstruct(state->encoder_control, frame, new_u_data, lcu.x, lcu.y, sao_chroma, COLOR_U);
-        kvz_sao_reconstruct(state->encoder_control, frame, new_v_data, lcu.x, lcu.y, sao_chroma, COLOR_V);
+        vector2d_t pos = { lcu.x * LCU_WIDTH_C, lcu.y * LCU_WIDTH_C };
+        kvz_sao_reconstruct(state,
+                            &new_u_data[pos.x + pos.y * frame->width/2],
+                            frame->width / 2,
+                            pos.x,
+                            pos.y,
+                            MIN(LCU_WIDTH_C, frame->width/2 - pos.x),
+                            MIN(LCU_WIDTH_C, frame->height/2 - pos.y),
+                            sao_chroma,
+                            COLOR_U);
+        kvz_sao_reconstruct(state,
+                            &new_v_data[pos.x + pos.y * frame->width/2],
+                            frame->width / 2,
+                            pos.x,
+                            pos.y,
+                            MIN(LCU_WIDTH_C, frame->width/2 - pos.x),
+                            MIN(LCU_WIDTH_C, frame->height/2 - pos.y),
+                            sao_chroma,
+                            COLOR_V);
       }
     }
 

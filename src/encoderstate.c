@@ -606,10 +606,36 @@ static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
   // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
     sao_info_t *sao_luma = &frame->sao_luma[data->y * stride + x];
     sao_info_t *sao_chroma = &frame->sao_chroma[data->y * stride + x];
-    kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_y_data, x, data->y, sao_luma, COLOR_Y);
+
+    kvz_sao_reconstruct(data->encoder_state,
+                        &new_y_data[x * LCU_WIDTH + frame->width * (data->y * LCU_WIDTH)],
+                        frame->width,
+                        x * LCU_WIDTH,
+                        data->y * LCU_WIDTH,
+                        MIN(LCU_WIDTH, frame->width - x * LCU_WIDTH),
+                        MIN(LCU_WIDTH, frame->height - data->y * LCU_WIDTH),
+                        sao_luma,
+                        COLOR_Y);
+
     if (frame->rec->chroma_format != KVZ_CSP_400) {
-      kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_u_data, x, data->y, sao_chroma, COLOR_U);
-      kvz_sao_reconstruct(data->encoder_state->encoder_control, frame, new_v_data, x, data->y, sao_chroma, COLOR_V);
+      kvz_sao_reconstruct(data->encoder_state,
+                          &new_u_data[x * LCU_WIDTH_C + frame->width/2 * (data->y * LCU_WIDTH_C)],
+                          frame->width/2,
+                          x * LCU_WIDTH_C,
+                          data->y * LCU_WIDTH_C,
+                          MIN(LCU_WIDTH_C, frame->width/2 - x * LCU_WIDTH_C),
+                          MIN(LCU_WIDTH_C, frame->height/2 - data->y * LCU_WIDTH_C),
+                          sao_chroma,
+                          COLOR_U);
+      kvz_sao_reconstruct(data->encoder_state,
+                          &new_v_data[x * LCU_WIDTH_C + frame->width/2 * (data->y * LCU_WIDTH_C)],
+                          frame->width/2,
+                          x * LCU_WIDTH_C,
+                          data->y * LCU_WIDTH_C,
+                          MIN(LCU_WIDTH_C, frame->width/2 - x * LCU_WIDTH_C),
+                          MIN(LCU_WIDTH_C, frame->height/2 - data->y * LCU_WIDTH_C),
+                          sao_chroma,
+                          COLOR_V);
     }
   }
   

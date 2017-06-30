@@ -72,9 +72,16 @@ static const vector2d_t g_sao_edge_offsets[SAO_NUM_EO][2] = {
   (sao).offsets[0], (sao).offsets[1], (sao).offsets[2], (sao).offsets[3], (sao).offsets[4])
 
 
-void kvz_sao_reconstruct(const encoder_control_t * encoder, videoframe_t *frame, const kvz_pixel *old_rec,
-                     unsigned x_ctb, unsigned y_ctb,
-                     const sao_info_t *sao, color_t color_i);
+void kvz_sao_reconstruct(const encoder_state_t *state,
+                         const kvz_pixel *buffer,
+                         int stride,
+                         int frame_x,
+                         int frame_y,
+                         int width,
+                         int height,
+                         const sao_info_t *sao,
+                         color_t color);
+
 void kvz_sao_reconstruct_frame(encoder_state_t *state);
 void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y);
 void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i);
