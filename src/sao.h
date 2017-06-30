@@ -82,7 +82,6 @@ void kvz_sao_reconstruct(const encoder_state_t *state,
                          const sao_info_t *sao,
                          color_t color);
 
-void kvz_sao_reconstruct_frame(encoder_state_t *state);
 void kvz_sao_search_lcu(const encoder_state_t* const state, int lcu_x, int lcu_y);
 void kvz_calc_sao_offset_array(const encoder_control_t * const encoder, const sao_info_t *sao, int *offset, color_t color_i);
 

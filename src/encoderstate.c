@@ -37,6 +37,9 @@
 #include "tables.h"
 #include "threadqueue.h"
 
+#define SAO_BUF_WIDTH (LCU_WIDTH + SAO_DELAY_PX + 2)
+#define SAO_BUF_WIDTH_C (SAO_BUF_WIDTH / 2)
+
 
 int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const state) {
   int i;
@@ -49,7 +52,127 @@ int kvz_encoder_state_match_children_of_previous_frame(encoder_state_t * const s
   return 1;
 }
 
-static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const lcu_order_element_t * const lcu, yuv_t * const hor_buf, yuv_t * const ver_buf) {
+/**
+ * \brief Save edge pixels before SAO to buffers.
+ *
+ * Copies pixels at the edges of the area that will be filtered with SAO to
+ * the given buffers. If deblocking is enabled, the pixels must have been
+ * deblocked before this.
+ *
+ * The saved pixels will be needed later when doing SAO for the neighboring
+ * areas.
+ */
+static void encoder_state_recdata_before_sao_to_bufs(
+    encoder_state_t * const state,
+    const lcu_order_element_t * const lcu,
+    yuv_t * const hor_buf,
+    yuv_t * const ver_buf)
+{
+  videoframe_t* const frame = state->tile->frame;
+
+  if (hor_buf && lcu->below) {
+    // Copy the bottommost row that will be filtered with SAO to the
+    // horizontal buffer.
+    vector2d_t pos = {
+      .x = lcu->position_px.x,
+      .y = lcu->position_px.y + LCU_WIDTH - SAO_DELAY_PX - 1,
+    };
+    // Copy all pixels that have been deblocked.
+    int length = lcu->size.x - DEBLOCK_DELAY_PX;
+
+    if (!lcu->right) {
+      // If there is no LCU to the right, the last pixels will be
+      // filtered too.
+      length += DEBLOCK_DELAY_PX;
+    }
+
+    if (lcu->left) {
+      // The rightmost pixels of the CTU to the left will also be filtered.
+      pos.x -= DEBLOCK_DELAY_PX;
+      length += DEBLOCK_DELAY_PX;
+    }
+
+    const unsigned from_index = pos.x + pos.y * frame->rec->stride;
+    // NOTE: The horizontal buffer is indexed by
+    //    x_px + y_lcu * frame->width
+    // where x_px is in pixels and y_lcu in number of LCUs.
+    const unsigned to_index = pos.x + lcu->position.y * frame->width;
+
+    kvz_pixels_blit(&frame->rec->y[from_index],
+                    &hor_buf->y[to_index],
+                    length, 1,
+                    frame->rec->stride,
+                    frame->width);
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      const unsigned from_index_c = (pos.x / 2) + (pos.y / 2) * frame->rec->stride / 2;
+      const unsigned to_index_c = (pos.x / 2) + lcu->position.y * frame->width / 2;
+
+      kvz_pixels_blit(&frame->rec->u[from_index_c],
+                      &hor_buf->u[to_index_c],
+                      length / 2, 1,
+                      frame->rec->stride / 2,
+                      frame->width / 2);
+      kvz_pixels_blit(&frame->rec->v[from_index_c],
+                      &hor_buf->v[to_index_c],
+                      length / 2, 1,
+                      frame->rec->stride / 2,
+                      frame->width / 2);
+    }
+  }
+
+  if (ver_buf && lcu->right) {
+    // Copy the rightmost column that will be filtered with SAO to the
+    // vertical buffer.
+    vector2d_t pos = {
+      .x = lcu->position_px.x + LCU_WIDTH - SAO_DELAY_PX - 1,
+      .y = lcu->position_px.y,
+    };
+    int length = lcu->size.y - DEBLOCK_DELAY_PX;
+
+    if (!lcu->below) {
+      // If there is no LCU below, the last pixels will be filtered too.
+      length += DEBLOCK_DELAY_PX;
+    }
+
+    if (lcu->above) {
+      // The bottommost pixels of the CTU above will also be filtered.
+      pos.y -= DEBLOCK_DELAY_PX;
+      length += DEBLOCK_DELAY_PX;
+    }
+
+    const unsigned from_index = pos.x + pos.y * frame->rec->stride;
+    // NOTE: The vertical buffer is indexed by
+    //    x_lcu * frame->height + y_px
+    // where x_lcu is in number of LCUs and y_px in pixels.
+    const unsigned to_index = lcu->position.x * frame->height + pos.y;
+
+    kvz_pixels_blit(&frame->rec->y[from_index],
+                    &ver_buf->y[to_index],
+                    1, length,
+                    frame->rec->stride, 1);
+
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      const unsigned from_index_c = (pos.x / 2) + (pos.y / 2) * frame->rec->stride / 2;
+      const unsigned to_index_c = lcu->position.x * frame->height / 2 + pos.y / 2;
+
+      kvz_pixels_blit(&frame->rec->u[from_index_c],
+                      &ver_buf->u[to_index_c],
+                      1, length / 2,
+                      frame->rec->stride / 2, 1);
+      kvz_pixels_blit(&frame->rec->v[from_index_c],
+                      &ver_buf->v[to_index_c],
+                      1, length / 2,
+                      frame->rec->stride / 2, 1);
+    }
+  }
+}
+
+static void encoder_state_recdata_to_bufs(encoder_state_t * const state,
+                                          const lcu_order_element_t * const lcu,
+                                          yuv_t * const hor_buf,
+                                          yuv_t * const ver_buf)
+{
   videoframe_t* const frame = state->tile->frame;
   
   if (hor_buf) {
@@ -108,6 +231,209 @@ static void encoder_state_recdata_to_bufs(encoder_state_t * const state, const l
   
 }
 
+/**
+ * \brief Do SAO reconstuction for all available pixels.
+ *
+ * Does SAO reconstruction for all pixels that are available after the
+ * given LCU has been deblocked. This means the following pixels:
+ *  - bottom-right block of SAO_DELAY_PX times SAO_DELAY_PX in the lcu to
+ *    the left and up
+ *  - the rightmost SAO_DELAY_PX pixels of the LCU to the left (excluding
+ *    the bottommost pixel)
+ *  - the bottommost SAO_DELAY_PX pixels of the LCU above (excluding the
+ *    rightmost pixels)
+ *  - all pixels inside the LCU, excluding the rightmost SAO_DELAY_PX and
+ *    bottommost SAO_DELAY_PX
+ */
+static void encoder_sao_reconstruct(const encoder_state_t *const state,
+                                    const lcu_order_element_t *const lcu)
+{
+  videoframe_t *const frame = state->tile->frame;
+
+  // Temporary buffers for SAO input pixels.
+  kvz_pixel sao_buf_y_array[SAO_BUF_WIDTH * SAO_BUF_WIDTH];
+  kvz_pixel sao_buf_u_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C];
+  kvz_pixel sao_buf_v_array[SAO_BUF_WIDTH_C * SAO_BUF_WIDTH_C];
+
+  // Pointers to the top-left pixel of the LCU in the buffers.
+  kvz_pixel *const sao_buf_y = &sao_buf_y_array[(SAO_DELAY_PX + 1) * (SAO_BUF_WIDTH + 1)];
+  kvz_pixel *const sao_buf_u = &sao_buf_u_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
+  kvz_pixel *const sao_buf_v = &sao_buf_v_array[(SAO_DELAY_PX/2 + 1) * (SAO_BUF_WIDTH_C + 1)];
+
+  const int x_offsets[3] = {
+    // If there is an lcu to the left, we need to filter its rightmost
+    // pixels.
+    lcu->left ? -SAO_DELAY_PX : 0,
+    0,
+    // If there is an lcu to the right, the rightmost pixels of this LCU
+    // are filtered when filtering that LCU. Otherwise we filter them now.
+    lcu->size.x - (lcu->right ? SAO_DELAY_PX : 0),
+  };
+
+  const int y_offsets[3] = {
+    // If there is an lcu above, we need to filter its bottommost pixels.
+    lcu->above ? -SAO_DELAY_PX : 0,
+    0,
+    // If there is an lcu below, the bottommost pixels of this LCU are
+    // filtered when filtering that LCU. Otherwise we filter them now.
+    lcu->size.y - (lcu->below ? SAO_DELAY_PX : 0),
+  };
+
+  // Number of pixels around the block that need to be copied to the
+  // buffers.
+  const int border_left  = lcu->left  ? 1 : 0;
+  const int border_right = lcu->right ? 1 : 0;
+  const int border_above = lcu->above ? 1 : 0;
+  const int border_below = lcu->below ? 1 : 0;
+
+  // Index of the pixel at the intersection of the top and left borders.
+  const int border_index = (x_offsets[0] - border_left) +
+                           (y_offsets[0] - border_above) * SAO_BUF_WIDTH;
+  const int border_index_c = (x_offsets[0]/2 - border_left) +
+                             (y_offsets[0]/2 - border_above) * SAO_BUF_WIDTH_C;
+  // Width and height of the whole area to filter.
+  const int width  = x_offsets[2] - x_offsets[0];
+  const int height = y_offsets[2] - y_offsets[0];
+
+  // Copy bordering pixels from above and left to buffers.
+  if (lcu->above) {
+    const int from_index = (lcu->position_px.x + x_offsets[0] - border_left) +
+                           (lcu->position.y - 1) * frame->width;
+    kvz_pixels_blit(&state->tile->hor_buf_before_sao->y[from_index],
+                    &sao_buf_y[border_index],
+                    width + border_left + border_right,
+                    1,
+                    frame->width,
+                    SAO_BUF_WIDTH);
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 - border_left +
+                               (lcu->position.y - 1) * frame->width/2;
+      kvz_pixels_blit(&state->tile->hor_buf_before_sao->u[from_index_c],
+                      &sao_buf_u[border_index_c],
+                      width/2 + border_left + border_right,
+                      1,
+                      frame->width/2,
+                      SAO_BUF_WIDTH_C);
+      kvz_pixels_blit(&state->tile->hor_buf_before_sao->v[from_index_c],
+                      &sao_buf_v[border_index_c],
+                      width/2 + border_left + border_right,
+                      1,
+                      frame->width/2,
+                      SAO_BUF_WIDTH_C);
+    }
+  }
+  if (lcu->left) {
+    const int from_index = (lcu->position.x - 1) * frame->height +
+                           (lcu->position_px.y + y_offsets[0] - border_above);
+    kvz_pixels_blit(&state->tile->ver_buf_before_sao->y[from_index],
+                    &sao_buf_y[border_index],
+                    1,
+                    height + border_above + border_below,
+                    1,
+                    SAO_BUF_WIDTH);
+    if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+      const int from_index_c = (lcu->position.x - 1) * frame->height/2 +
+                               (lcu->position_px.y + y_offsets[0])/2 - border_above;
+      kvz_pixels_blit(&state->tile->ver_buf_before_sao->u[from_index_c],
+                      &sao_buf_u[border_index_c],
+                      1,
+                      height/2 + border_above + border_below,
+                      1,
+                      SAO_BUF_WIDTH_C);
+      kvz_pixels_blit(&state->tile->ver_buf_before_sao->v[from_index_c],
+                      &sao_buf_v[border_index_c],
+                      1,
+                      height/2 + border_above + border_below,
+                      1,
+                      SAO_BUF_WIDTH_C);
+    }
+  }
+  // Copy pixels that will be filtered and bordering pixels from right and
+  // below.
+  const int from_index = (lcu->position_px.x + x_offsets[0]) +
+                         (lcu->position_px.y + y_offsets[0]) * frame->width;
+  const int to_index = x_offsets[0] + y_offsets[0] * SAO_BUF_WIDTH;
+  kvz_pixels_blit(&frame->rec->y[from_index],
+                  &sao_buf_y[to_index],
+                  width + border_right,
+                  height + border_below,
+                  frame->width,
+                  SAO_BUF_WIDTH);
+  if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+    const int from_index_c = (lcu->position_px.x + x_offsets[0])/2 +
+                             (lcu->position_px.y + y_offsets[0])/2 * frame->width/2;
+    const int to_index_c = x_offsets[0]/2 + y_offsets[0]/2 * SAO_BUF_WIDTH_C;
+    kvz_pixels_blit(&frame->rec->u[from_index_c],
+                    &sao_buf_u[to_index_c],
+                    width/2 + border_right,
+                    height/2 + border_below,
+                    frame->width/2,
+                    SAO_BUF_WIDTH_C);
+    kvz_pixels_blit(&frame->rec->v[from_index_c],
+                    &sao_buf_v[to_index_c],
+                    width/2 + border_right,
+                    height/2 + border_below,
+                    frame->width/2,
+                    SAO_BUF_WIDTH_C);
+  }
+
+  // We filter the pixels in four parts:
+  //  1. Pixels that belong to the LCU above and to the left
+  //  2. Pixels that belong to the LCU above
+  //  3. Pixels that belong to the LCU to the left
+  //  4. Pixels that belong to the current LCU
+  for (int y_offset_index = 0; y_offset_index < 2; y_offset_index++) {
+    for (int x_offset_index = 0; x_offset_index < 2; x_offset_index++) {
+      const int x = x_offsets[x_offset_index];
+      const int y = y_offsets[y_offset_index];
+      const int width = x_offsets[x_offset_index + 1] - x;
+      const int height = y_offsets[y_offset_index + 1] - y;
+
+      if (width == 0 || height == 0) continue;
+
+      const int lcu_x = (lcu->position_px.x + x) >> LOG2_LCU_WIDTH;
+      const int lcu_y = (lcu->position_px.y + y) >> LOG2_LCU_WIDTH;
+      const int lcu_index = lcu_x + lcu_y * frame->width_in_lcu;
+      const sao_info_t *sao_luma   = &frame->sao_luma[lcu_index];
+      const sao_info_t *sao_chroma = &frame->sao_chroma[lcu_index];
+
+      kvz_sao_reconstruct(state,
+                          &sao_buf_y[x + y * SAO_BUF_WIDTH],
+                          SAO_BUF_WIDTH,
+                          lcu->position_px.x + x,
+                          lcu->position_px.y + y,
+                          width,
+                          height,
+                          sao_luma,
+                          COLOR_Y);
+
+      if (state->encoder_control->chroma_format != KVZ_CSP_400) {
+        // Coordinates in chroma pixels.
+        int x_c = x >> 1;
+        int y_c = y >> 1;
+
+        kvz_sao_reconstruct(state,
+                            &sao_buf_u[x_c + y_c * SAO_BUF_WIDTH_C],
+                            SAO_BUF_WIDTH_C,
+                            lcu->position_px.x / 2 + x_c,
+                            lcu->position_px.y / 2 + y_c,
+                            width / 2,
+                            height / 2,
+                            sao_chroma,
+                            COLOR_U);
+        kvz_sao_reconstruct(state,
+                            &sao_buf_v[x_c + y_c * SAO_BUF_WIDTH_C],
+                            SAO_BUF_WIDTH_C,
+                            lcu->position_px.x / 2 + x_c,
+                            lcu->position_px.y / 2 + y_c,
+                            width / 2,
+                            height / 2,
+                            sao_chroma,
+                            COLOR_V);
+      }
+    }
+  }
+}
 
 static void encode_sao_color(encoder_state_t * const state, sao_info_t *sao,
                              color_t color_i)
@@ -279,7 +605,7 @@ static void encoder_state_worker_encode_lcu(void * opaque)
 
   //This part doesn't write to bitstream, it's only search, deblock and sao
   kvz_search_lcu(state, lcu->position_px.x, lcu->position_px.y, state->tile->hor_buf_search, state->tile->ver_buf_search);
-    
+
   encoder_state_recdata_to_bufs(state, lcu, state->tile->hor_buf_search, state->tile->ver_buf_search);
 
   if (encoder->cfg.deblock_enable) {
@@ -291,7 +617,14 @@ static void encoder_state_worker_encode_lcu(void * opaque)
   }
 
   if (encoder->cfg.sao_enable) {
+    // Save the post-deblocking but pre-SAO pixels of the LCU to a buffer
+    // so that they can be used in SAO reconstruction later.
+    encoder_state_recdata_before_sao_to_bufs(state,
+                                             lcu,
+                                             state->tile->hor_buf_before_sao,
+                                             state->tile->ver_buf_before_sao);
     kvz_sao_search_lcu(state, lcu->position.x, lcu->position.y);
+    encoder_sao_reconstruct(state, lcu);
   }
 
   // Copy LCU cu_array to main states cu_array, because that is the only one
@@ -389,24 +722,6 @@ static void encoder_state_worker_encode_lcu(void * opaque)
       }
     }
   }
-  
-  if (encoder->cfg.sao_enable && lcu->above) {
-    // Add the post-deblocking but pre-SAO pixels of the LCU row above this
-    // row to a buffer so this row can use them on it's own SAO
-    // reconstruction.
-
-    // The pixels need to be taken to from the LCU to the top-left, because
-    // not all of the pixels could be deblocked before prediction of this
-    // LCU was reconstructed.
-    if (lcu->above->left) {
-      encoder_state_recdata_to_bufs(state, lcu->above->left, state->tile->hor_buf_before_sao, NULL);
-    }
-    // If this is the last LCU in the row, we can save the pixels from the top
-    // also, as they have been fully deblocked.
-    if (!lcu->right) {
-      encoder_state_recdata_to_bufs(state, lcu->above, state->tile->hor_buf_before_sao, NULL);
-    }
-  }
 }
 
 static void encoder_state_encode_leaf(encoder_state_t * const state)
@@ -442,15 +757,6 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
         PERFORMANCE_MEASURE_END(KVZ_PERF_LCU, state->encoder_control->threadqueue, "type=encode_lcu,frame=%d,tile=%d,slice=%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH, lcu->position_px.x + state->tile->lcu_offset_x * LCU_WIDTH + lcu->size.x - 1, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH, lcu->position_px.y + state->tile->lcu_offset_y * LCU_WIDTH + lcu->size.y - 1);
       }
 #endif //KVZ_DEBUG
-    }
-
-    if (state->encoder_control->cfg.sao_enable) {
-      PERFORMANCE_MEASURE_START(KVZ_PERF_SAOREC);
-      kvz_sao_reconstruct_frame(state);
-      PERFORMANCE_MEASURE_END(KVZ_PERF_SAOREC, state->encoder_control->threadqueue, "type=kvz_sao_reconstruct_frame,frame=%d,tile=%d,slice=%d,row=%d-%d,px_x=%d-%d,px_y=%d-%d", state->frame->num, state->tile->id, state->slice->id, state->lcu_order[0].position.y + state->tile->lcu_offset_y, state->lcu_order[state->lcu_order_count - 1].position.y + state->tile->lcu_offset_y,
-        state->tile->lcu_offset_x * LCU_WIDTH, state->tile->frame->width + state->tile->lcu_offset_x * LCU_WIDTH - 1,
-        state->tile->lcu_offset_y * LCU_WIDTH, state->tile->frame->height + state->tile->lcu_offset_y * LCU_WIDTH - 1
-      );
     }
   } else {
     // Add each LCU in the wavefront row as it's own job to the queue.
@@ -525,9 +831,8 @@ static void encoder_state_encode_leaf(encoder_state_t * const state)
 
         kvz_threadqueue_job_unwait_job(state->encoder_control->threadqueue, state->tile->wf_jobs[lcu->id]);
 
-        // In the case where SAO is not enabled, the wavefront row is
-        // done when the last LCU in the row is done.
-        if (!state->encoder_control->cfg.sao_enable && i + 1 == state->lcu_order_count) {
+        // The wavefront row is done when the last LCU in the row is done.
+        if (i + 1 == state->lcu_order_count) {
           assert(!state->tqj_recon_done);
           state->tqj_recon_done =
             kvz_threadqueue_copy_ref(state->tile->wf_jobs[lcu->id]);
@@ -558,94 +863,6 @@ static void encoder_state_worker_encode_children(void * opaque)
     }
   }
 }
-
-typedef struct {
-  int y;
-  const encoder_state_t * encoder_state;
-} worker_sao_reconstruct_lcu_data;
-
-static void encoder_state_worker_sao_reconstruct_lcu(void *opaque) {
-  worker_sao_reconstruct_lcu_data *data = opaque;
-  videoframe_t * const frame = data->encoder_state->tile->frame;
-  unsigned stride = frame->width_in_lcu;
-  int x;
-  
-  //TODO: copy only needed data
-  kvz_pixel *new_y_data = MALLOC(kvz_pixel, frame->width * frame->height);
-  kvz_pixel *new_u_data = NULL;
-  kvz_pixel *new_v_data = NULL;
-  if (frame->rec->chroma_format != KVZ_CSP_400) {
-    new_u_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
-    new_v_data = MALLOC(kvz_pixel, (frame->width * frame->height) >> 2);
-  }
-  
-  const int offset = frame->width * (data->y*LCU_WIDTH);
-  const int offset_c = frame->width/2 * (data->y*LCU_WIDTH_C);
-  int num_pixels = frame->width * (LCU_WIDTH + 2);
-  
-  if (num_pixels + offset > frame->width * frame->height) {
-    num_pixels = frame->width * frame->height - offset;
-  }
-  
-  memcpy(&new_y_data[offset], &frame->rec->y[offset], sizeof(kvz_pixel) * num_pixels);
-  if (frame->rec->chroma_format != KVZ_CSP_400) {
-    memcpy(&new_u_data[offset_c], &frame->rec->u[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
-    memcpy(&new_v_data[offset_c], &frame->rec->v[offset_c], sizeof(kvz_pixel) * num_pixels >> 2);
-  }
-  
-  if (data->y>0) {
-    //copy first row from buffer
-    memcpy(&new_y_data[frame->width * (data->y*LCU_WIDTH-1)], &data->encoder_state->tile->hor_buf_before_sao->y[frame->width * (data->y-1)], frame->width * sizeof(kvz_pixel));
-    if (frame->rec->chroma_format != KVZ_CSP_400) {
-      memcpy(&new_u_data[frame->width / 2 * (data->y*LCU_WIDTH_C - 1)], &data->encoder_state->tile->hor_buf_before_sao->u[frame->width / 2 * (data->y - 1)], frame->width / 2 * sizeof(kvz_pixel));
-      memcpy(&new_v_data[frame->width / 2 * (data->y*LCU_WIDTH_C - 1)], &data->encoder_state->tile->hor_buf_before_sao->v[frame->width / 2 * (data->y - 1)], frame->width / 2 * sizeof(kvz_pixel));
-    }
-  }
-
-  for (x = 0; x < frame->width_in_lcu; x++) {
-  // sao_do_rdo(encoder, lcu.x, lcu.y, sao_luma, sao_chroma);
-    sao_info_t *sao_luma = &frame->sao_luma[data->y * stride + x];
-    sao_info_t *sao_chroma = &frame->sao_chroma[data->y * stride + x];
-
-    kvz_sao_reconstruct(data->encoder_state,
-                        &new_y_data[x * LCU_WIDTH + frame->width * (data->y * LCU_WIDTH)],
-                        frame->width,
-                        x * LCU_WIDTH,
-                        data->y * LCU_WIDTH,
-                        MIN(LCU_WIDTH, frame->width - x * LCU_WIDTH),
-                        MIN(LCU_WIDTH, frame->height - data->y * LCU_WIDTH),
-                        sao_luma,
-                        COLOR_Y);
-
-    if (frame->rec->chroma_format != KVZ_CSP_400) {
-      kvz_sao_reconstruct(data->encoder_state,
-                          &new_u_data[x * LCU_WIDTH_C + frame->width/2 * (data->y * LCU_WIDTH_C)],
-                          frame->width/2,
-                          x * LCU_WIDTH_C,
-                          data->y * LCU_WIDTH_C,
-                          MIN(LCU_WIDTH_C, frame->width/2 - x * LCU_WIDTH_C),
-                          MIN(LCU_WIDTH_C, frame->height/2 - data->y * LCU_WIDTH_C),
-                          sao_chroma,
-                          COLOR_U);
-      kvz_sao_reconstruct(data->encoder_state,
-                          &new_v_data[x * LCU_WIDTH_C + frame->width/2 * (data->y * LCU_WIDTH_C)],
-                          frame->width/2,
-                          x * LCU_WIDTH_C,
-                          data->y * LCU_WIDTH_C,
-                          MIN(LCU_WIDTH_C, frame->width/2 - x * LCU_WIDTH_C),
-                          MIN(LCU_WIDTH_C, frame->height/2 - data->y * LCU_WIDTH_C),
-                          sao_chroma,
-                          COLOR_V);
-    }
-  }
-  
-  free(new_y_data);
-  free(new_u_data);
-  free(new_v_data);
-
-  free(opaque);
-}
-
 
 static int encoder_state_tree_is_a_chain(const encoder_state_t * const state) {
   if (!state->children[0].encoder_control) return 1;
@@ -733,64 +950,6 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
           //Wavefront rows have parallelism at LCU level, so we should not launch multiple threads here!
           //FIXME: add an assert: we can only have wavefront children
           encoder_state_worker_encode_children(&(main_state->children[i]));
-        }
-      }
-      
-      // Add SAO reconstruction jobs and their dependancies when using WPP coding.
-      if (main_state->encoder_control->cfg.sao_enable && 
-          main_state->children[0].type == ENCODER_STATE_TYPE_WAVEFRONT_ROW)
-      {
-        videoframe_t * const frame = main_state->tile->frame;
-        threadqueue_job_t *previous_job = NULL;
-        
-        for (int y = 0; y < frame->height_in_lcu; ++y) {
-          // Queue a single job performing SAO reconstruction for the whole wavefront row.
-
-          worker_sao_reconstruct_lcu_data *data = MALLOC(worker_sao_reconstruct_lcu_data, 1);
-          threadqueue_job_t *job;
-#ifdef KVZ_DEBUG
-          char job_description[256];
-          sprintf(job_description, "type=sao,frame=%d,tile=%d,px_x=%d-%d,px_y=%d-%d", main_state->frame->num, main_state->tile->id, main_state->tile->lcu_offset_x * LCU_WIDTH, main_state->tile->lcu_offset_x * LCU_WIDTH + main_state->tile->frame->width - 1, (main_state->tile->lcu_offset_y + y) * LCU_WIDTH, MIN(main_state->tile->lcu_offset_y * LCU_WIDTH + main_state->tile->frame->height, (main_state->tile->lcu_offset_y + y + 1) * LCU_WIDTH)-1);
-#else
-          char* job_description = NULL;
-#endif
-          data->y = y;
-          data->encoder_state = main_state;
-          
-          job = kvz_threadqueue_submit(main_state->encoder_control->threadqueue, encoder_state_worker_sao_reconstruct_lcu, data, 1, job_description);
-
-          // If job object was returned, add dependancies and allow it to run.
-          if (job) {
-            // This dependancy is needed, because the pre-SAO pixels from the LCU row
-            // below this one are read straigh from the frame.
-            if (previous_job) {
-              kvz_threadqueue_job_dep_add(job, previous_job);
-            }
-            previous_job = job;
-            
-            // This depepndancy ensures that the bottom edge of this LCU row
-            // has been fully deblocked.
-            if (y < frame->height_in_lcu - 1) {
-              // Not last row: depend on the last LCU of the row below.
-              kvz_threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 1) * frame->width_in_lcu + frame->width_in_lcu - 1]);
-            } else {
-              // Last row: depend on the last LCU of the row
-              kvz_threadqueue_job_dep_add(job, main_state->tile->wf_jobs[(y + 0) * frame->width_in_lcu + frame->width_in_lcu - 1]);
-            }
-            kvz_threadqueue_job_unwait_job(main_state->encoder_control->threadqueue, job);
-            
-            // The wavefront row is finished, when the SAO-reconstruction is
-            // finished.
-            kvz_threadqueue_free_job(&main_state->children[y].tqj_recon_done);
-            main_state->children[y].tqj_recon_done = job;
-            
-            if (y == frame->height_in_lcu - 1) {
-              // This tile is finished, when the reconstruction of the last
-              // WPP-row is finished.
-              assert(!main_state->tqj_recon_done);
-              main_state->tqj_recon_done = kvz_threadqueue_copy_ref(job);
-            }
-          }
         }
       }
     } else {
