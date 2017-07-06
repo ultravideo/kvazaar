@@ -1005,6 +1005,7 @@ static INLINE bool add_mvp_candidate(const encoder_state_t *state,
 {
   if (!cand) return false;
 
+  assert(cand->inter.mv_dir != 0);
   const int cand_list = cand->inter.mv_dir & (1 << reflist) ? reflist : !reflist;
 
   if (scaling) {

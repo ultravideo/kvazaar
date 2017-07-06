@@ -191,12 +191,14 @@ yuv_t * kvz_yuv_t_alloc(int luma_size, int chroma_size)
   return yuv;
 }
 
-void kvz_yuv_t_free(yuv_t * yuv)
+void kvz_yuv_t_free(yuv_t *yuv)
 {
-  free(yuv->y);
-  free(yuv->u);
-  free(yuv->v);
-  free(yuv);
+  if (yuv) {
+    FREE_POINTER(yuv->y);
+    FREE_POINTER(yuv->u);
+    FREE_POINTER(yuv->v);
+  }
+  FREE_POINTER(yuv);
 }
 
 hi_prec_buf_t * kvz_hi_prec_buf_t_alloc(int luma_size)

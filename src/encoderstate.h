@@ -169,11 +169,17 @@ typedef struct encoder_state_config_tile_t {
   // LCU-column. They are packed such that each LCU-column index maps to the
   // x-coordinate.
   yuv_t *ver_buf_search;
-  
-  // This is a buffer for the deblocked bottom pixels of every LCU-row in the
-  // tile. They are packed such that each LCU-row index maps to the y-coordinate.
+
+  // This is a buffer for the deblocked bottom pixels of every LCU in the
+  // tile. They are packed such that each LCU-row index maps to the
+  // y-coordinate.
   yuv_t *hor_buf_before_sao;
-  
+
+  // This is a buffer for the deblocked right pixels of every LCU in the
+  // tile. They are packed such that each LCU-column index maps to the
+  // x-coordinate.
+  yuv_t *ver_buf_before_sao;
+
   //Jobs for each individual LCU of a wavefront row.
   threadqueue_job_t **wf_jobs;
 
