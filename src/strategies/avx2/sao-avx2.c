@@ -36,11 +36,6 @@
 // is difficult to understand.
 
 
-static INLINE __m256i load_6_offsets(const int* offsets){
-
-  return _mm256_inserti128_si256(_mm256_castsi128_si256(_mm_loadu_si128((__m128i*) offsets)), _mm_loadl_epi64((__m128i*)&(offsets[4])), 1);
-}
-
 static INLINE __m128i load_6_pixels(const kvz_pixel* data){
 
   return _mm_insert_epi16(_mm_cvtsi32_si128(*(int32_t*)&(data[0])), *(int16_t*)&(data[4]), 2);
@@ -96,7 +91,7 @@ int kvz_sao_edge_ddistortion_avx2(const kvz_pixel *orig_data, const kvz_pixel *r
 
       __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
 
-      __m256i v_offset = _mm256_loadu_si256((__m256i*) offsets);
+      __m256i v_offset = load_5_offsets(offsets);
       v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
    
       __m256i v_diff = _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i*)&(orig_data[y * block_width + x])));
@@ -117,7 +112,7 @@ int kvz_sao_edge_ddistortion_avx2(const kvz_pixel *orig_data, const kvz_pixel *r
 
     __m256i v_cat = _mm256_cvtepu8_epi32(sao_calc_eo_cat_avx2(&v_a, &v_b, &v_c));
 
-    __m256i v_offset = load_6_offsets(offsets);
+    __m256i v_offset = load_5_offsets(offsets);
     v_offset = _mm256_permutevar8x32_epi32(v_offset, v_cat);
    
     const kvz_pixel* orig_ptr = &(orig_data[y * block_width + x]);
