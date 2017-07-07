@@ -943,7 +943,7 @@ static INLINE void apply_mv_scaling(const encoder_state_t *state,
                             current_cu->inter.mv_ref[current_reflist]]],
                         state->frame->poc,
                         state->frame->ref->pocs[
-                          state->frame->ref_LX[current_reflist][
+                          state->frame->ref_LX[neighbor_reflist][
                             neighbor_cu->inter.mv_ref[neighbor_reflist]]],
                         mv_cand);
 }

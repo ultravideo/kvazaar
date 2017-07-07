@@ -790,8 +790,8 @@ static void encoder_state_encode(encoder_state_t * const main_state) {
 static void encoder_ref_insertion_sort(const encoder_state_t *const state, uint8_t reflist[16], uint8_t length) {
 
   for (uint8_t i = 1; i < length; ++i) {
-    const int32_t cur_poc = state->frame->ref->pocs[reflist[i]];
-    uint8_t cur_idx = reflist[i];
+    const uint8_t cur_idx = reflist[i];
+    const int32_t cur_poc = state->frame->ref->pocs[cur_idx];
     int8_t j = i;
     while (j > 0 && cur_poc < state->frame->ref->pocs[reflist[j - 1]]) {
       reflist[j] = reflist[j - 1];
