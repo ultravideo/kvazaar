@@ -1228,7 +1228,9 @@ static void encoder_state_init_new_frame(encoder_state_t * const state, kvz_pict
   encoder_state_remove_refs(state);
   encoder_state_ref_sort(state);
 
-  normalize_lcu_weights(state);
+  if (cfg->target_bitrate > 0 && state->frame->num > cfg->owf) {
+    normalize_lcu_weights(state);
+  }
   kvz_set_picture_lambda_and_qp(state);
 
   encoder_state_init_children(state);
